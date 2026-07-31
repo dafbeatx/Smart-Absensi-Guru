@@ -37,7 +37,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     const matchesSearch =
       t.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.nip && t.nip.includes(searchQuery)) ||
-      t.phone_number.includes(searchQuery);
+      String(t.phone_number || '').includes(searchQuery);
 
     const matchesRole = filterRole === 'ALL' || t.role === filterRole;
     return matchesSearch && matchesRole;
