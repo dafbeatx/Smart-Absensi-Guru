@@ -65,7 +65,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
     try {
       const provider = ProviderFactory.getProvider();
-      await provider.createUser(newTeacher, 'authenticated_token');
+      const token = useAuthStore.getState().token || '';
+      await provider.createUser(newTeacher, token);
     } catch (err) {
       console.warn('Backend GAS create user notify:', err);
     }
@@ -157,7 +158,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
     try {
       const provider = ProviderFactory.getProvider();
-      await provider.deleteUser(selectedTeacher.id, 'authenticated_token');
+      const token = useAuthStore.getState().token || '';
+      await provider.deleteUser(selectedTeacher.id, token);
     } catch (e) {
       console.warn('Backend GAS delete notify:', e);
     }

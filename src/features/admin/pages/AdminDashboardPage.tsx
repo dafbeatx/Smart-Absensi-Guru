@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
@@ -8,6 +8,7 @@ import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { AuditLogTable } from '../components/AuditLogTable';
 import { ReportService } from '../../../services/report.service';
 import { useToastStore } from '../../../store/useToastStore';
+import { ProviderFactory } from '../../../providers/provider-factory';
 import type { UserProfile } from '../../../types/database.types';
 
 export interface AdminDashboardPageProps {
@@ -83,6 +84,23 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     setTeachers(updated);
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
   };
+
+  useEffect(() => {
+    const fetchUsersFromBackend = async () => {
+      try {
+        const provider = ProviderFactory.getProvider();
+        const token = useAuthStore.getState().token || '';
+        const fetched = await provider.getAllUsers(token);
+        if (fetched && fetched.length > 0) {
+          setTeachers(fetched);
+          localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
+        }
+      } catch (err) {
+        console.warn('Backend fetch users fallback:', err);
+      }
+    };
+    fetchUsersFromBackend();
+  }, []);
 
   const handleExportExcel = async () => {
     await ReportService.generateAndDownloadMonthlyReport(
