@@ -89,7 +89,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       const matchesSearch =
         !query ||
         teacher.full_name.toLowerCase().includes(query) ||
-        teacher.nip.includes(query) ||
+        (teacher.nip ? teacher.nip.includes(query) : false) ||
         (teacher.position && teacher.position.toLowerCase().includes(query));
 
       if (!matchesSearch) return false;
@@ -281,7 +281,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500">
-                        NIP: {teacher.nip} • {teacher.position || 'Tenaga Pendidik'}
+                        NIP: {teacher.nip || '-'} • {teacher.position || 'Tenaga Pendidik'}
                       </p>
                     </div>
                   </div>
