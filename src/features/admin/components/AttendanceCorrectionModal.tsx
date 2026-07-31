@@ -11,6 +11,7 @@ export interface AttendanceCorrectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   teachers: UserProfile[];
+  selectedTeacherId?: string;
   onSuccess?: () => void;
 }
 
@@ -18,13 +19,23 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
   isOpen,
   onClose,
   teachers,
+  selectedTeacherId,
   onSuccess,
 }) => {
   const { user } = useAuthStore();
   const { showToast } = useToastStore();
 
-  const [selectedUserId, setSelectedUserId] = useState(teachers[0]?.id || '');
+  const [selectedUserId, setSelectedUserId] = useState(selectedTeacherId || teachers[0]?.id || '');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Sync selectedUserId when selectedTeacherId prop changes or modal opens
+  React.useEffect(() => {
+    if (selectedTeacherId) {
+      setSelectedUserId(selectedTeacherId);
+    } else if (teachers.length > 0) {
+      setSelectedUserId(teachers[0].id);
+    }
+  }, [selectedTeacherId, teachers]);
   const [newStatus, setNewStatus] = useState<AttendanceStatus>('HADIR');
   const [checkInTime, setCheckInTime] = useState('07:00');
   const [reason, setReason] = useState('');

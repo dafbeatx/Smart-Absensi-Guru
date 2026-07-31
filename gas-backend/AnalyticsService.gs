@@ -166,9 +166,14 @@ var AnalyticsService = {
       return String(a.date) === todayStr;
     });
 
+    var todaySummary = AnalyticsService._calculateTodaySummary(teachers, todayAttendance);
+
     var pendingLeaves = context.leaves.filter(function(l) {
       return l.approval_status === APPROVAL_STATUS.SUBMITTED;
     }).length;
+
+    var presentCount = todaySummary.hadir + todaySummary.terlambat;
+    var attendanceRate = teachers.length > 0 ? Math.round((presentCount / teachers.length) * 100) : 100;
 
     return {
       system: {
@@ -181,6 +186,8 @@ var AnalyticsService = {
       },
       teacherCount: teachers.length,
       todayAttendance: todayAttendance.length,
+      todaySummary: todaySummary,
+      attendanceRate: attendanceRate,
       pendingLeave: pendingLeaves,
       auditToday: todayAuditLogs
     };

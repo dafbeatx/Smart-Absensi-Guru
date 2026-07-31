@@ -49,8 +49,8 @@ export class ApprovalEngine {
         ? 'REJECTED'
         : 'SUBMITTED';
 
-    // Role check: Only Kepsek or Operator can decide approvals
-    if (actorRole !== 'KEPSEK' && actorRole !== 'OPERATOR') {
+    // Role check: Kepsek, Admin, or Operator can decide approvals
+    if (actorRole !== 'KEPSEK' && actorRole !== 'OPERATOR' && actorRole !== 'ADMIN') {
       return {
         success: false,
         previousState: currentState,
@@ -58,7 +58,7 @@ export class ApprovalEngine {
         error: {
           code: 'AUTH_004',
           message: 'Anda tidak memiliki hak akses untuk menyetujui pengajuan.',
-          solution: 'Persetujuan hanya dapat dilakukan oleh Kepala Sekolah atau Operator.',
+          solution: 'Persetujuan hanya dapat dilakukan oleh Kepala Sekolah, Admin, atau Operator.',
         },
       };
     }

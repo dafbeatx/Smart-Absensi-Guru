@@ -7,6 +7,8 @@ import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionMod
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
 import { AuditLogTable } from '../components/AuditLogTable';
+import { DailyAttendanceTracker } from '../components/DailyAttendanceTracker';
+import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
 import { ReportService } from '../../../services/report.service';
 import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -20,8 +22,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const { user, logout } = useAuthStore();
   const { showToast } = useToastStore();
 
-  const [activeTab, setActiveTab] = useState<'MY_ATTENDANCE' | 'TEACHERS' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('TEACHERS');
+  const [activeTab, setActiveTab] = useState<'ATTENDANCE_TRACKING' | 'TEACHERS' | 'MY_ATTENDANCE' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('ATTENDANCE_TRACKING');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
+  const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
 
   // Status absensi pribadi Admin hari ini (mock/state)
@@ -177,6 +180,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           {/* Navigation Bar */}
           <div className="flex flex-wrap gap-2 pt-2">
             {[
+              { id: 'ATTENDANCE_TRACKING', label: '📍 Live Tracking Absensi' },
               { id: 'TEACHERS', label: '👥 Kelola Master Pengguna' },
               { id: 'MY_ATTENDANCE', label: '📷 Absensi Pribadi Saya' },
               { id: 'SETTINGS', label: '⚙️ Jam Kerja & Geofence' },
@@ -202,6 +206,27 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       {/* Main Content Area */}
       <main className="max-w-5xl mx-auto px-5 -mt-8 space-y-5">
         <QueueMonitor />
+
+        {/* Live Attendance Tracking Tab */}
+        {activeTab === 'ATTENDANCE_TRACKING' && (
+          <div className="space-y-6">
+            <DailyAttendanceTracker
+              teachers={teachers}
+              onOpenCorrectionModal={(teacher) => {
+                setSelectedCorrectionTeacher(teacher);
+                setIsCorrectionModalOpen(true);
+              }}
+            />
+            
+            {/* Pending Approvals Widget for Admin */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-3">
+              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                <span>📝 Persetujuan Pengajuan Izin / Sakit Guru</span>
+              </h3>
+              <PendingApprovalWidget />
+            </div>
+          </div>
+        )}
 
         {/* Card Absensi Pribadi Admin */}
         {activeTab === 'MY_ATTENDANCE' && (
@@ -281,8 +306,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       {/* Manual Attendance Correction Modal */}
       <AttendanceCorrectionModal
         isOpen={isCorrectionModalOpen}
-        onClose={() => setIsCorrectionModalOpen(false)}
+        onClose={() => {
+          setIsCorrectionModalOpen(false);
+          setSelectedCorrectionTeacher(undefined);
+        }}
         teachers={teachers}
+        selectedTeacherId={selectedCorrectionTeacher?.id}
       />
 
       {/* Official QR Code Poster Generator Modal */}
