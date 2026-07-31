@@ -32,41 +32,57 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     checkOut: '',
   });
 
-  const [teachers, setTeachers] = useState<UserProfile[]>([
-    {
-      id: 'usr_1001',
-      nip: '198507122010011008',
-      full_name: 'Ahmad Hidayat, S.Pd.',
-      phone_number: '081234567890',
-      role: 'GURU',
-      position: 'Guru Matematika Utama',
-      avatar_url: null,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'usr_1002',
-      nip: '199002142018021002',
-      full_name: 'Budi Santoso, M.Pd.',
-      phone_number: '081398765432',
-      role: 'GURU',
-      position: 'Guru Fisika',
-      avatar_url: null,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'usr_1003',
-      nip: '197504122003121001',
-      full_name: 'Drs. H. M. Yusuf, M.Pd.',
-      phone_number: '081298765432',
-      role: 'KEPSEK',
-      position: 'Kepala Sekolah Utama',
-      avatar_url: null,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-  ]);
+  const [teachers, setTeachers] = useState<UserProfile[]>(() => {
+    const saved = localStorage.getItem('smart_absensi_teachers');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error('Failed to parse saved teachers:', e);
+      }
+    }
+    return [
+      {
+        id: 'usr_1001',
+        nip: '198507122010011008',
+        full_name: 'Ahmad Hidayat, S.Pd.',
+        phone_number: '081234567890',
+        role: 'GURU',
+        position: 'Guru Matematika Utama',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'usr_1002',
+        nip: '199002142018021002',
+        full_name: 'Budi Santoso, M.Pd.',
+        phone_number: '081398765432',
+        role: 'GURU',
+        position: 'Guru Fisika',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'usr_1003',
+        nip: '197504122003121001',
+        full_name: 'Drs. H. M. Yusuf, M.Pd.',
+        phone_number: '081298765432',
+        role: 'KEPSEK',
+        position: 'Kepala Sekolah Utama',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+    ];
+  });
+
+  const handleTeachersChange = (updated: UserProfile[]) => {
+    setTeachers(updated);
+    localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+  };
 
   const handleExportExcel = async () => {
     await ReportService.generateAndDownloadMonthlyReport(
@@ -194,7 +210,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         )}
 
         {activeTab === 'TEACHERS' && (
-          <TeacherManagementTable teachers={teachers} onTeachersChange={setTeachers} />
+          <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
         )}
 
         {activeTab === 'SETTINGS' && <SystemSettingsForm />}
