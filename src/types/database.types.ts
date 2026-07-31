@@ -1,0 +1,103 @@
+/**
+ * SMART ABSENSI GURU - STRICT DATABASE TYPESHEET
+ */
+
+export type RoleCode = 'GURU' | 'KEPSEK' | 'ADMIN' | 'OPERATOR';
+
+export type AttendanceStatus =
+  | 'HADIR'
+  | 'TERLAMBAT'
+  | 'ALFA'
+  | 'IZIN'
+  | 'SAKIT'
+  | 'DINAS_LUAR'
+  | 'BELUM_ABSEN';
+
+export type LeaveType = 'SAKIT' | 'IZIN' | 'DINAS_LUAR' | 'KOREKSI_ABSEN';
+
+export type ApprovalStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+
+export type VerificationMethod = 'QR_GPS' | 'MANUAL_OPERATOR' | 'SYSTEM_AUTO';
+
+export type AttendanceSource = 'QR' | 'MANUAL' | 'OFFLINE_SYNC';
+
+export type NotificationType = 'IN_APP' | 'WHATSAPP' | 'SYSTEM';
+
+export interface UserProfile {
+  id: string;
+  nip: string | null;
+  full_name: string;
+  phone_number: string;
+  role: RoleCode;
+  position: string;
+  avatar_url: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DeviceBinding {
+  id: string;
+  user_id: string;
+  device_uuid: string;
+  device_model: string;
+  fingerprint_hash: string;
+  registered_at: string;
+  last_used_at: string;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  check_in_time: string | null; // HH:mm
+  check_out_time: string | null; // HH:mm
+  status: AttendanceStatus;
+  check_in_lat: number | null;
+  check_in_lng: number | null;
+  check_in_distance_meters: number | null;
+  verification_method: VerificationMethod;
+  attendance_source: AttendanceSource;
+  is_offline: boolean;
+  created_at: string;
+}
+
+export interface LeaveRequest {
+  id: string;
+  user_id: string;
+  leave_type: LeaveType;
+  start_date: string;
+  end_date: string;
+  reason: string;
+  attachment_url: string | null;
+  approval_status: ApprovalStatus;
+  approval_deadline: string;
+  approved_by?: string | null;
+  approval_notes?: string | null;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  request_id?: string;
+  actor_id: string;
+  actor_role: RoleCode;
+  action_type: string;
+  target_entity: string;
+  before_value: string | null;
+  after_value: string | null;
+  change_reason: string | null;
+  ip_address: string;
+  device: string;
+  created_at: string;
+}
+
+export interface SystemSettings {
+  app_name: string;
+  institution_name: string;
+  work_checkin_start: string;
+  work_checkin_end: string;
+  work_checkout_start: string;
+  geofence_lat: number;
+  geofence_lng: number;
+  geofence_radius: number;
+}

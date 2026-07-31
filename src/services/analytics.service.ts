@@ -1,0 +1,123 @@
+import type { AttendanceRecord, LeaveRequest, UserProfile } from '../types/database.types';
+
+export interface DailyAttendanceSummary {
+  date: string;
+  totalTeachers: number;
+  totalPresent: number;
+  totalLate: number;
+  totalLeave: number;
+  totalSick: number;
+  totalOfficialDuty: number;
+  totalUnabsented: number;
+  attendancePercentage: number;
+}
+
+export interface AttendanceTrendPoint {
+  label: string; // e.g. "Senin", "Minggu 1", or "Tgl 01"
+  presentCount: number;
+  lateCount: number;
+  absentCount: number;
+  percentage: number;
+}
+
+export interface ExecutiveDashboardAnalytics {
+  dailySummary: DailyAttendanceSummary;
+  weeklyTrend: AttendanceTrendPoint[];
+  monthlyPercentage: number;
+  pendingApprovalsCount: number;
+  unabsentedTeachers: UserProfile[];
+}
+
+export class AnalyticsService {
+  /**
+   * Calculates real-time daily attendance metrics and statistics
+   */
+  public static calculateDailySummary(
+    dateStr: string,
+    allTeachers: UserProfile[],
+    attendanceRecords: AttendanceRecord[],
+    leaveRequests: LeaveRequest[]
+  ): DailyAttendanceSummary {
+    const totalTeachers = allTeachers.length;
+    let totalPresent = 0;
+    let totalLate = 0;
+    let totalLeave = 0;
+    let totalSick = 0;
+    let totalOfficialDuty = 0;
+
+    const attendedUserIds = new Set<string>();
+
+    for (const rec of attendanceRecords) {
+      if (rec.date === dateStr) {
+        attendedUserIds.add(rec.user_id);
+        if (rec.status === 'HADIR') totalPresent++;
+        if (rec.status === 'TERLAMBAT') totalLate++;
+      }
+    }
+
+    for (const leave of leaveRequests) {
+      if (leave.approval_status === 'APPROVED') {
+        const start = new Date(leave.start_date);
+        const end = new Date(leave.end_date);
+        const target = new Date(dateStr);
+
+        if (target >= start && target <= end) {
+          attendedUserIds.add(leave.user_id);
+          if (leave.leave_type === 'SAKIT') totalSick++;
+          else if (leave.leave_type === 'IZIN') totalLeave++;
+          else if (leave.leave_type === 'DINAS_LUAR') totalOfficialDuty++;
+        }
+      }
+    }
+
+    const totalAccountedFor = totalPresent + totalLate + totalSick + totalLeave + totalOfficialDuty;
+    const totalUnabsented = Math.max(0, totalTeachers - totalAccountedFor);
+
+    const attendancePercentage = totalTeachers > 0
+      ? Math.round(((totalPresent + totalLate) / totalTeachers) * 1000) / 10
+      : 0;
+
+    return {
+      date: dateStr,
+      totalTeachers,
+      totalPresent,
+      totalLate,
+      totalLeave,
+      totalSick,
+      totalOfficialDuty,
+      totalUnabsented,
+      attendancePercentage,
+    };
+  }
+
+  /**
+   * Identifies list of teachers who have not checked in yet today
+   */
+  public static getUnabsentedTeachers(
+    dateStr: string,
+    allTeachers: UserProfile[],
+    attendanceRecords: AttendanceRecord[],
+    leaveRequests: LeaveRequest[]
+  ): UserProfile[] {
+    const activeUserIds = new Set<string>();
+
+    for (const rec of attendanceRecords) {
+      if (rec.date === dateStr && rec.check_in_time) {
+        activeUserIds.add(rec.user_id);
+      }
+    }
+
+    for (const leave of leaveRequests) {
+      if (leave.approval_status === 'APPROVED') {
+        const start = new Date(leave.start_date);
+        const end = new Date(leave.end_date);
+        const target = new Date(dateStr);
+        if (target >= start && target <= end) {
+          activeUserIds.add(leave.user_id);
+        }
+      }
+    }
+
+    return allTeachers.filter((t) => t.is_active && !activeUserIds.has(t.id));
+  }
+}
