@@ -449,7 +449,7 @@ var AuthService = {
         role: u.role || "GURU",
         position: u.position || "",
         avatar_url: u.avatar_url || "",
-        is_active: u.is_active === true || String(u.is_active) === "true",
+        is_active: u.is_active === true || String(u.is_active) === "true" || u.account_status === "ACTIVE" || String(u.is_active).trim().length === 0,
         must_change_pin: u.must_change_pin === true || String(u.must_change_pin) === "true",
         created_at: u.created_at || ""
       };
@@ -479,6 +479,7 @@ var AuthService = {
         role: payload.role || "GURU",
         position: (payload.position || "").trim(),
         avatar_url: "",
+        is_active: true,
         account_status: "ACTIVE",
         failed_login_count: 0,
         locked_until: "",
@@ -579,11 +580,12 @@ var AuthService = {
         return Utils.errorResponse("USER_NOT_FOUND", "Pengguna tidak ditemukan", null, requestId);
       }
 
-      var currentActive = userRecord.is_active === true || String(userRecord.is_active) === "true";
+      var currentActive = userRecord.is_active === true || String(userRecord.is_active) === "true" || userRecord.account_status === "ACTIVE" || String(userRecord.is_active).trim().length === 0;
       var newActive = !currentActive;
 
       DatabaseManager.updateRecord(DB.SHEETS.USERS, "id", userId, {
         is_active: newActive,
+        account_status: newActive ? "ACTIVE" : "INACTIVE",
         updated_at: Utils.now()
       });
 

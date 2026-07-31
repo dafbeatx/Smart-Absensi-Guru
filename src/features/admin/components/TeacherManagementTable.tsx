@@ -137,6 +137,14 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     );
     onTeachersChange(updated);
 
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      await provider.toggleUserStatus(teacher.id, token);
+    } catch (err) {
+      console.warn('Failed to sync toggleUserStatus to backend:', err);
+    }
+
     await AuditLogger.log({
       actorId: user?.id || 'op_1',
       actorRole: user?.role || 'ADMIN',
