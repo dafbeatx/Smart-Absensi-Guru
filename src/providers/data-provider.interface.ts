@@ -26,6 +26,7 @@ export interface IDataProvider {
 
   // Settings API
   getSettings(): Promise<SystemSettings>;
+  updateSettings(settings: SystemSettings, token: string): Promise<boolean>;
 
   // User Management API (Admin)
   getAllUsers(token: string): Promise<UserProfile[]>;

@@ -113,6 +113,14 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getSettings(): Promise<SystemSettings> {
+    const saved = localStorage.getItem('smart_absensi_system_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved settings:', e);
+      }
+    }
     return {
       app_name: 'Smart Absensi Guru',
       institution_name: 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
@@ -123,6 +131,11 @@ export class MockProvider implements IDataProvider {
       geofence_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
       geofence_radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
     };
+  }
+
+  public async updateSettings(settings: SystemSettings, _token: string): Promise<boolean> {
+    localStorage.setItem('smart_absensi_system_settings', JSON.stringify(settings));
+    return true;
   }
 
   public async getAllUsers(_token: string): Promise<UserProfile[]> {

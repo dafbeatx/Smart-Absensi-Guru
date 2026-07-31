@@ -206,8 +206,13 @@ function doPost(e) {
       // case "TOGGLE_USER_STATUS":
 
       // ── Settings ─────────────────────────────────────────────────────
-      // case "GET_SETTINGS":
-      // case "UPDATE_SETTINGS":
+      case "GET_SETTINGS":
+        result = SettingsService.getSettings(requestId);
+        break;
+
+      case "UPDATE_SETTINGS":
+        result = SettingsService.updateSettings(payload, currentUser, requestId);
+        break;
 
       default:
         result = Utils.errorResponse(
