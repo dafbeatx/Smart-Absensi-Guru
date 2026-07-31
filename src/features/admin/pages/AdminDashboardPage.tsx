@@ -5,6 +5,7 @@ import { Button } from '../../../components/ui/Button';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
+import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
 import { AuditLogTable } from '../components/AuditLogTable';
 import { ReportService } from '../../../services/report.service';
 import { useToastStore } from '../../../store/useToastStore';
@@ -21,6 +22,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   const [activeTab, setActiveTab] = useState<'MY_ATTENDANCE' | 'TEACHERS' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('TEACHERS');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
+  const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
 
   // Status absensi pribadi Admin hari ini (mock/state)
   const [adminAttendance] = useState<{
@@ -141,6 +143,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setIsQrGeneratorOpen(true)}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center gap-1.5"
+              >
+                <span>🖨️</span> Cetak Poster QR Absensi
+              </button>
+
               {/* Tombol Absensi Pribadi Admin */}
               <button
                 onClick={onOpenScanner}
@@ -274,6 +283,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         isOpen={isCorrectionModalOpen}
         onClose={() => setIsCorrectionModalOpen(false)}
         teachers={teachers}
+      />
+
+      {/* Official QR Code Poster Generator Modal */}
+      <QRCodeGeneratorModal
+        isOpen={isQrGeneratorOpen}
+        onClose={() => setIsQrGeneratorOpen(false)}
       />
     </div>
   );

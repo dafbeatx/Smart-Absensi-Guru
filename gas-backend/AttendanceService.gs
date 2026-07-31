@@ -42,20 +42,11 @@ var AttendanceService = {
         }
       }
 
-      // ── Tier 3: Validate Geofence Radius ────────────────────────────
-      var distance = Utils.calculateDistanceMeters(
+      // ── Tier 3: Calculate Distance (Radius Check Bypassed) ────────────
+      var distance = (userLat && userLng) ? Utils.calculateDistanceMeters(
         userLat, userLng,
         SHIFT.GEOFENCE_LAT, SHIFT.GEOFENCE_LNG
-      );
-
-      if (distance > SHIFT.GEOFENCE_RADIUS_METERS) {
-        return Utils.errorResponse(
-          ERRORS.GPS_002.code,
-          ERRORS.GPS_002.message + " (Jarak: " + distance + "m, Maks: " + SHIFT.GEOFENCE_RADIUS_METERS + "m)",
-          { distance_meters: distance, max_radius: SHIFT.GEOFENCE_RADIUS_METERS },
-          requestId
-        );
-      }
+      ) : 0;
 
       // ── Tier 4: Duplicate Check (ATT_005) ───────────────────────────
       var todayRecords = DatabaseManager.findRecords(DB.SHEETS.ATTENDANCE, "user_id", userId);
@@ -176,20 +167,11 @@ var AttendanceService = {
         }
       }
 
-      // ── Tier 3: Validate Geofence Radius ────────────────────────────
-      var distance = Utils.calculateDistanceMeters(
+      // ── Tier 3: Calculate Distance (Radius Check Bypassed) ────────────
+      var distance = (userLat && userLng) ? Utils.calculateDistanceMeters(
         userLat, userLng,
         SHIFT.GEOFENCE_LAT, SHIFT.GEOFENCE_LNG
-      );
-
-      if (distance > SHIFT.GEOFENCE_RADIUS_METERS) {
-        return Utils.errorResponse(
-          ERRORS.GPS_002.code,
-          ERRORS.GPS_002.message + " (Jarak: " + distance + "m, Maks: " + SHIFT.GEOFENCE_RADIUS_METERS + "m)",
-          { distance_meters: distance, max_radius: SHIFT.GEOFENCE_RADIUS_METERS },
-          requestId
-        );
-      }
+      ) : 0;
 
       // ── Tier 4: Validation (Early Check-Out & State) ────────────────
       var currentMinutes = _timeToMinutes(nowTimeShort);
