@@ -93,7 +93,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       [],
       []
     );
-    showToast('success', 'Export Excel Berhasil!', 'Laporan multi-sheet 5-Sheet siap diunduh.');
+    showToast('success', 'Export Excel Berhasil!', 'File Excel resmi Multi-Sheet (.xlsx) siap diunduh.');
+  };
+
+  const handleExportPDF = async () => {
+    await ReportService.generateAndPrintPDFReport(
+      'Juli',
+      '2026',
+      teachers,
+      [],
+      [],
+      []
+    );
+    showToast('info', 'Dokumen PDF Siap!', 'Jendela cetak / simpan ke PDF telah dibuka.');
   };
 
   return (
@@ -216,15 +228,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         {activeTab === 'SETTINGS' && <SystemSettingsForm />}
 
         {activeTab === 'EXPORT' && (
-          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-card space-y-4 text-center">
+          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-card space-y-5 text-center">
             <span className="text-5xl">📊</span>
-            <h3 className="font-extrabold text-slate-900 text-xl">Generator Laporan Excel Multi-Sheet</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-              Unduh berkas laporan bulanan terintegrasi 5-Sheet (Sheet 1: Dashboard Ringkasan, Sheet 2: Rekap Guru, Sheet 3: Detail Harian, Sheet 4: Pengajuan Izin, Sheet 5: Audit Log).
-            </p>
-            <div className="pt-2">
-              <Button variant="primary" onClick={handleExportExcel}>
-                ⚡ Download File Excel Multi-Sheet (.csv/.xlsx)
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-slate-900 text-xl">Generator Laporan Excel (.xlsx) & PDF Resmi</h3>
+              <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
+                Pilih format berkas laporan yang Anda butuhkan. Format Excel (.xlsx) disajikan dalam 5 tab sheet terpisah dengan lebar kolom yang pas, sedangkan format PDF disajikan lengkap dengan Kop Surat sekolah dan lembar tanda tangan resmi.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+              <Button variant="primary" onClick={handleExportExcel} className="flex items-center justify-center gap-2">
+                <span>📊</span> Download File Excel Resmi (.xlsx)
+              </Button>
+              <Button variant="secondary" onClick={handleExportPDF} className="flex items-center justify-center gap-2 bg-slate-900 text-white hover:bg-slate-800">
+                <span>📄</span> Cetak / Simpan Laporan PDF (.pdf)
               </Button>
             </div>
           </div>
