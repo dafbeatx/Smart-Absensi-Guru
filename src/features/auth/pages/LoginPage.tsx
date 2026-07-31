@@ -85,8 +85,12 @@ export const LoginPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Nomor WA / NIP"
-            placeholder="Contoh: 081234567890 atau NIP / ADMIN / KEPSEK"
+            label="Nomor WhatsApp / NIP"
+            type="tel"
+            inputMode="tel"
+            pattern="[0-9]*"
+            autoComplete="tel"
+            placeholder="Masukkan Nomor WA (Contoh: 081234567890)"
             value={identity}
             onChange={(e) => setIdentity(e.target.value)}
             error={identityError}
@@ -96,10 +100,13 @@ export const LoginPage: React.FC = () => {
           <Input
             label="PIN 6-Digit"
             type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="current-password"
             placeholder="••••••"
             maxLength={6}
             value={pin}
-            onChange={(e) => setPin(e.target.value)}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
             error={pinError}
             required
           />
