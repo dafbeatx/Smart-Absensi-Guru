@@ -46,7 +46,7 @@ var DB = {
     Users: [
       "id", "nip", "full_name", "phone_number", "pin_hash",
       "role", "position", "avatar_url",
-      "account_status", "failed_login_count", "locked_until",
+      "account_status", "failed_login_count", "locked_until", "must_change_pin",
       "created_at", "updated_at", "deleted_at"
     ],
     Device_Binding: [
@@ -194,6 +194,7 @@ var FEATURE_FLAGS = {
   ENABLE_REPORT: true,
   ENABLE_NOTIFICATION: true,
   ENABLE_AUDIT: true,
+  ENABLE_STRICT_DEVICE_BINDING: false, // false = Bebas login di Laptop & HP (Auto-rebind). true = Strict 1 HP per Guru.
   ENABLE_MAINTENANCE_MODE: false       // true = semua non-ADMIN diblokir
 };
 

@@ -26,4 +26,8 @@ export class AuthRepository {
   public static async resetDevice(userId: string, token: string): Promise<boolean> {
     return ProviderFactory.getProvider().resetDevice(userId, token);
   }
+
+  public static async changePin(userId: string, newPin: string, token: string): Promise<boolean> {
+    return ProviderFactory.getProvider().changePin(userId, newPin, token);
+  }
 }

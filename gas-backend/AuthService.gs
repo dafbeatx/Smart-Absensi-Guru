@@ -170,18 +170,9 @@ var AuthService = {
       var bindings = DatabaseManager.findRecords(DB.SHEETS.DEVICE_BINDING, "user_id", targetUser.id);
       var boundDevice = bindings.length > 0 ? bindings[0] : null;
 
-      if (boundDevice && String(boundDevice.device_uuid) && String(boundDevice.device_uuid) !== deviceUUID) {
-        // Perangkat berbeda — tolak
-        AuthService._auditLogin(targetUser, "LOGIN_FAILED",
-          "Device mismatch. Bound: " + (boundDevice.device_model || "HP Lain"), requestId);
-
-        return Utils.errorResponse(
-          ERRORS.AUTH_003.code,
-          ERRORS.AUTH_003.message + " Hubungi Admin Website untuk reset perangkat.",
-          { bound_device: boundDevice.device_model || "HP Lain" },
-          requestId
-        );
-      }
+      // Kepsek & Admin selalu bebas login di Laptop & HP. Guru mengikuti flag ENABLE_STRICT_DEVICE_BINDING.
+      var isExecutive = (targetUser.role === ROLES.ADMIN || targetUser.role === ROLES.OPERATOR || targetUser.role === ROLES.KEPSEK);
+      var allowAutoRebind = isExecutive || !FEATURE_FLAGS.ENABLE_STRICT_DEVICE_BINDING;
 
       if (!boundDevice) {
         // First-time login — bind device otomatis
@@ -198,9 +189,29 @@ var AuthService = {
           bound_at: Utils.now(),
           last_active_at: Utils.now()
         });
+      } else if (allowAutoRebind) {
+        // Bebas login di Laptop & HP — Otomatis perbarui perangkat aktif jika PIN benar
+        DatabaseManager.updateRecord(DB.SHEETS.DEVICE_BINDING, "id", boundDevice.id, {
+          device_uuid: deviceUUID,
+          device_model: deviceModel,
+          user_agent: userAgent,
+          last_login: Utils.now(),
+          last_active_at: Utils.now()
+        });
+      } else if (String(boundDevice.device_uuid) !== deviceUUID) {
+        // Jika strict binding diaktifkan khusus Guru: Enforce single device
+        AuthService._auditLogin(targetUser, "LOGIN_FAILED",
+          "Device mismatch. Bound: " + (boundDevice.device_model || "HP Lain"), requestId);
+
+        return Utils.errorResponse(
+          ERRORS.AUTH_003.code,
+          ERRORS.AUTH_003.message + " Hubungi Admin Website untuk reset perangkat.",
+          { bound_device: boundDevice.device_model || "HP Lain" },
+          requestId
+        );
       } else {
         // Update last login info
-        DatabaseManager.updateRecord(DB.SHEETS.DEVICE_BINDING, "user_id", targetUser.id, {
+        DatabaseManager.updateRecord(DB.SHEETS.DEVICE_BINDING, "id", boundDevice.id, {
           last_login: Utils.now(),
           last_active_at: Utils.now(),
           device_model: deviceModel || boundDevice.device_model,
@@ -263,9 +274,62 @@ var AuthService = {
         phone_number: targetUser.phone_number,
         role: targetUser.role,
         position: targetUser.position,
-        avatar_url: targetUser.avatar_url || ""
+        avatar_url: targetUser.avatar_url || "",
+        must_change_pin: targetUser.must_change_pin === true || String(targetUser.must_change_pin) === "true"
       }
     }, requestId);
+  },
+
+  /**
+   * Mengubah PIN pengguna (misal dari PIN default 123456 ke PIN pribadi)
+   */
+  changePIN: function(payload, currentUser, requestId) {
+    return DatabaseManager.executeWithLock(function() {
+      var userId = currentUser.sub || currentUser.id;
+      var newPin = (payload.new_pin || "").trim();
+
+      if (!newPin || newPin.length !== 6 || !/^\d+$/.test(newPin)) {
+        return Utils.errorResponse("AUTH_PIN_INVALID", "PIN 6-digit baru harus berupa angka.", null, requestId);
+      }
+
+      var userRecord = DatabaseManager.findRecord(DB.SHEETS.USERS, "id", userId);
+      if (!userRecord) {
+        return Utils.errorResponse("AUTH_NOT_FOUND", "Pengguna tidak ditemukan.", null, requestId);
+      }
+
+      var rawPhone = String(userRecord.phone_number || "").trim();
+      var newPinHash = Security.hashPIN(newPin, rawPhone);
+
+      DatabaseManager.updateRecord(DB.SHEETS.USERS, "id", userId, {
+        pin_hash: newPinHash,
+        must_change_pin: false,
+        failed_login_count: 0,
+        updated_at: Utils.now()
+      });
+
+      // Audit Log
+      DatabaseManager.appendRecord(DB.SHEETS.AUDIT_LOGS, {
+        id: Utils.generateUUID(),
+        request_id: requestId,
+        actor_id: userId,
+        actor_role: currentUser.role || ROLES.GURU,
+        action_type: "CHANGE_PIN",
+        target_entity: "Users",
+        before_value: "",
+        after_value: JSON.stringify({ pin_changed: true }),
+        change_reason: "Pengguna meriset PIN default ke PIN pilihan pribadi",
+        ip_address: "",
+        user_agent: "",
+        request_method: "POST",
+        execution_ms: "",
+        stacktrace: "",
+        created_at: Utils.now()
+      });
+
+      return Utils.successResponse("PIN_CHANGE_OK", "PIN baru Anda berhasil disimpan!", {
+        must_change_pin: false
+      }, requestId);
+    });
   },
 
   // ═══════════════════════════════════════════════════════════════════════════

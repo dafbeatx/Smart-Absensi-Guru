@@ -24,6 +24,10 @@ export class GasProvider implements IDataProvider {
     return apiClient.post<boolean>('RESET_DEVICE', { user_id: userId, token });
   }
 
+  public async changePin(userId: string, newPin: string, token: string): Promise<boolean> {
+    return apiClient.post<boolean>('CHANGE_PIN', { user_id: userId, new_pin: newPin, token });
+  }
+
   public async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
     return apiClient.post<AttendanceResponseDTO>('SCAN_ATTENDANCE', {
       token: dto.token,

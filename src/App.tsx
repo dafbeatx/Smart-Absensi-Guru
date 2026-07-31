@@ -1,6 +1,7 @@
 import React, { Suspense, useState } from 'react';
 import { useAuthStore } from './store/useAuthStore';
 import { LoginPage } from './features/auth/pages/LoginPage';
+import { ForceChangePinModal } from './features/auth/components/ForceChangePinModal';
 import { ToastContainer } from './components/ui/Toast';
 
 // Code-split role dashboard pages lazily to optimize initial bundle size (~21 KB initial payload)
@@ -86,6 +87,9 @@ export const App: React.FC = () => {
           />
         </Suspense>
       )}
+
+      {/* Mandatory PIN Reset Modal for New/Reset Users */}
+      <ForceChangePinModal />
 
       <ToastContainer />
     </>

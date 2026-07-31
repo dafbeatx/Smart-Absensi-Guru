@@ -32,6 +32,7 @@ export interface UserProfile {
   position: string;
   avatar_url: string | null;
   is_active: boolean;
+  must_change_pin?: boolean;
   created_at: string;
 }
 

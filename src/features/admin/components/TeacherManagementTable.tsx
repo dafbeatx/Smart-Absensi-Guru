@@ -58,6 +58,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       position,
       avatar_url: null,
       is_active: true,
+      must_change_pin: true,
       created_at: new Date().toISOString(),
     };
 
@@ -73,7 +74,11 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       reason: `Pendaftaran akun ${role} baru oleh Admin Website: ${fullName}`,
     });
 
-    showToast('success', 'Pengguna Berhasil Ditambahkan!', `${fullName} (${role}) telah terdaftar.`);
+    showToast(
+      'success',
+      'Pengguna Berhasil Ditambahkan!',
+      `${fullName} (${role}) telah terdaftar dengan PIN awal default: 123456.`
+    );
     setIsAddModalOpen(false);
     setFullName('');
     setNip('');
@@ -84,16 +89,21 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const handleResetPin = async () => {
     if (!selectedTeacher || newPin.length !== 6) return;
 
+    const updated = teachers.map((t) =>
+      t.id === selectedTeacher.id ? { ...t, must_change_pin: true } : t
+    );
+    onTeachersChange(updated);
+
     await AuditLogger.log({
       actorId: user?.id || 'op_1',
       actorRole: user?.role || 'ADMIN',
       actionType: 'RESET_PIN',
       targetEntity: 'Users',
-      newValue: JSON.stringify({ pin_reset: true }),
+      newValue: JSON.stringify({ pin_reset: true, must_change_pin: true }),
       reason: `Reset PIN 6-digit oleh Admin Website untuk ${selectedTeacher.full_name}`,
     });
 
-    showToast('success', 'Reset PIN Berhasil!', `PIN baru untuk ${selectedTeacher.full_name} adalah ${newPin}`);
+    showToast('success', 'Reset PIN Berhasil!', `PIN sementara untuk ${selectedTeacher.full_name} adalah ${newPin} (Wajib reset di login berikutnya).`);
     setIsResetPinOpen(false);
     setSelectedTeacher(null);
     setNewPin('');
@@ -268,6 +278,15 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       {/* Add User Modal */}
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="➕ Pendaftaran Pengguna / Guru Baru">
         <form onSubmit={handleAddTeacher} className="space-y-3">
+          <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs space-y-1">
+            <p className="font-bold flex items-center gap-1">
+              <span>🔑</span> PIN Awal Pengguna: <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-blue-800 font-extrabold">123456</code>
+            </p>
+            <p className="text-[11px] text-blue-700">
+              Pengguna baru akan secara otomatis diminta membuat PIN 6-digit rahasia mereka sendiri saat pertama kali login.
+            </p>
+          </div>
+
           <Input label="Nama Lengkap & Gelar" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
           <Input label="NIP (Opsional / 18 Digit)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />

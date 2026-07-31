@@ -13,6 +13,7 @@ export interface IDataProvider {
   login(dto: LoginDTO): Promise<LoginResponseDTO>;
   verifySession(token: string): Promise<UserProfile>;
   resetDevice(userId: string, token: string): Promise<boolean>;
+  changePin(userId: string, newPin: string, token: string): Promise<boolean>;
 
   // Attendance API
   scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO>;

@@ -13,6 +13,7 @@ export interface AuthState {
   deviceModel: string;
   loginSuccess: (token: string, user: UserProfile) => void;
   logout: () => void;
+  updateUserProfile: (updates: Partial<UserProfile>) => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
 }
@@ -46,6 +47,12 @@ export const useAuthStore = create<AuthState>()(
           error: null,
           isLoading: false,
         });
+      },
+
+      updateUserProfile: (updates: Partial<UserProfile>) => {
+        set((state) => ({
+          user: state.user ? { ...state.user, ...updates } : null,
+        }));
       },
 
       setError: (error: string | null) => set({ error, isLoading: false }),

@@ -41,6 +41,7 @@ export class MockProvider implements IDataProvider {
       position: position,
       avatar_url: null,
       is_active: true,
+      must_change_pin: dto.pin === '123456',
       created_at: new Date().toISOString(),
     };
 
@@ -65,6 +66,11 @@ export class MockProvider implements IDataProvider {
   }
 
   public async resetDevice(_userId: string, _token: string): Promise<boolean> {
+    return true;
+  }
+
+  public async changePin(_userId: string, _newPin: string, _token: string): Promise<boolean> {
+    await new Promise((r) => setTimeout(r, 400));
     return true;
   }
 
