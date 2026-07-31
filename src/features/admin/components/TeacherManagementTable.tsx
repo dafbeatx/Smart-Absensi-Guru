@@ -52,7 +52,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     e.preventDefault();
     const newTeacher: UserProfile = {
       id: 'usr_' + Date.now(),
-      nip,
+      nip: nip || '',
       full_name: fullName,
       phone_number: phone,
       role,
@@ -62,6 +62,13 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       must_change_pin: true,
       created_at: new Date().toISOString(),
     };
+
+    try {
+      const provider = ProviderFactory.getProvider();
+      await provider.createUser(newTeacher, 'authenticated_token');
+    } catch (err) {
+      console.warn('Backend GAS create user notify:', err);
+    }
 
     const updated = [...teachers, newTeacher];
     onTeachersChange(updated);
