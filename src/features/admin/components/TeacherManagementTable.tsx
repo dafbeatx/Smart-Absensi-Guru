@@ -5,6 +5,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { AuditLogger } from '../../../services/audit-logger.service';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
+import { providerFactory } from '../../../providers/provider-factory';
 import type { UserProfile, RoleCode } from '../../../types/database.types';
 
 export interface TeacherManagementTableProps {
@@ -146,6 +147,13 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
     const updated = teachers.filter((t) => t.id !== selectedTeacher.id);
     onTeachersChange(updated);
+
+    try {
+      const provider = providerFactory.getProvider();
+      await provider.deleteUser(selectedTeacher.id, 'authenticated_token');
+    } catch (e) {
+      console.warn('Backend GAS delete notify:', e);
+    }
 
     await AuditLogger.log({
       actorId: user?.id || 'op_1',

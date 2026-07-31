@@ -124,4 +124,30 @@ export class MockProvider implements IDataProvider {
       geofence_radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
     };
   }
+
+  public async getAllUsers(_token: string): Promise<UserProfile[]> {
+    return [];
+  }
+
+  public async createUser(user: Partial<UserProfile>, _token: string): Promise<UserProfile> {
+    return {
+      id: 'usr_mock_' + Date.now(),
+      nip: user.nip || '',
+      full_name: user.full_name || '',
+      phone_number: user.phone_number || '',
+      role: user.role || 'GURU',
+      position: user.position || '',
+      avatar_url: null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  public async deleteUser(_userId: string, _token: string): Promise<boolean> {
+    return true;
+  }
+
+  public async toggleUserStatus(_userId: string, _token: string): Promise<boolean> {
+    return true;
+  }
 }

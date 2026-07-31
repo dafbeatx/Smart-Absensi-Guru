@@ -138,6 +138,27 @@ function doPost(e) {
         result = AuthService.logout(payload, currentUser, requestId);
         break;
 
+      case "CHANGE_PIN":
+        result = AuthService.changePIN(payload, currentUser, requestId);
+        break;
+
+      // ── User Management (Admin) ──────────────────────────────────────
+      case "GET_ALL_USERS":
+        result = AuthService.getAllUsers(currentUser, requestId);
+        break;
+
+      case "CREATE_USER":
+        result = AuthService.createUser(payload, currentUser, requestId);
+        break;
+
+      case "DELETE_USER":
+        result = AuthService.deleteUser(payload, currentUser, requestId);
+        break;
+
+      case "TOGGLE_USER_STATUS":
+        result = AuthService.toggleUserStatus(payload, currentUser, requestId);
+        break;
+
       // ── Attendance ───────────────────────────────────────────────────
       case "SCAN_ATTENDANCE":
         result = AttendanceService.processCheckIn(payload, currentUser, requestId);

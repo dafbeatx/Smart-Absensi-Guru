@@ -26,4 +26,10 @@ export interface IDataProvider {
 
   // Settings API
   getSettings(): Promise<SystemSettings>;
+
+  // User Management API (Admin)
+  getAllUsers(token: string): Promise<UserProfile[]>;
+  createUser(user: Partial<UserProfile>, token: string): Promise<UserProfile>;
+  deleteUser(userId: string, token: string): Promise<boolean>;
+  toggleUserStatus(userId: string, token: string): Promise<boolean>;
 }

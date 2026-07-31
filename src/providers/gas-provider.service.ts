@@ -74,4 +74,20 @@ export class GasProvider implements IDataProvider {
   public async getSettings(): Promise<SystemSettings> {
     return apiClient.get<SystemSettings>('GET_PUBLIC_SETTINGS');
   }
+
+  public async getAllUsers(token: string): Promise<UserProfile[]> {
+    return apiClient.post<UserProfile[]>('GET_ALL_USERS', { token });
+  }
+
+  public async createUser(user: Partial<UserProfile>, token: string): Promise<UserProfile> {
+    return apiClient.post<UserProfile>('CREATE_USER', { ...user, token });
+  }
+
+  public async deleteUser(userId: string, token: string): Promise<boolean> {
+    return apiClient.post<boolean>('DELETE_USER', { target_user_id: userId, token });
+  }
+
+  public async toggleUserStatus(userId: string, token: string): Promise<boolean> {
+    return apiClient.post<boolean>('TOGGLE_USER_STATUS', { target_user_id: userId, token });
+  }
 }

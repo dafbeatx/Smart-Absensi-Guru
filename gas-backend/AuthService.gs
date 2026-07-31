@@ -430,5 +430,167 @@ var AuthService = {
     } catch (e) {
       Logger.log("⚠️ _auditLogin failed: " + e.toString());
     }
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // USER MANAGEMENT (CRUD FOR ADMIN)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  getAllUsers: function(currentUser, requestId) {
+    var allUsers = DatabaseManager.findAll(DB.SHEETS.USERS);
+    var activeUsers = allUsers.filter(function(u) {
+      return !u.deleted_at || String(u.deleted_at).trim().length === 0;
+    }).map(function(u) {
+      return {
+        id: u.id,
+        nip: u.nip || "",
+        full_name: u.full_name || "",
+        phone_number: u.phone_number || "",
+        role: u.role || "GURU",
+        position: u.position || "",
+        avatar_url: u.avatar_url || "",
+        is_active: u.is_active === true || String(u.is_active) === "true",
+        must_change_pin: u.must_change_pin === true || String(u.must_change_pin) === "true",
+        created_at: u.created_at || ""
+      };
+    });
+
+    return Utils.successResponse("USERS_FETCH_OK", "Data pengguna berhasil dimuat", activeUsers, requestId);
+  },
+
+  createUser: function(payload, currentUser, requestId) {
+    return DatabaseManager.executeWithLock(function() {
+      var phone = (payload.phone_number || "").trim();
+      var name = (payload.full_name || "").trim();
+
+      if (!phone || !name) {
+        return Utils.errorResponse("PARAM_MISSING", "Nama dan Nomor WA wajib diisi.", null, requestId);
+      }
+
+      var defaultPin = "123456";
+      var pinHash = Security.hashPIN(defaultPin, phone);
+
+      var newUser = {
+        id: "usr_" + Date.now(),
+        nip: (payload.nip || "").trim(),
+        full_name: name,
+        phone_number: phone,
+        pin_hash: pinHash,
+        role: payload.role || "GURU",
+        position: (payload.position || "").trim(),
+        avatar_url: "",
+        account_status: "ACTIVE",
+        failed_login_count: 0,
+        locked_until: "",
+        must_change_pin: true,
+        created_at: Utils.now(),
+        updated_at: Utils.now(),
+        deleted_at: ""
+      };
+
+      DatabaseManager.appendRecord(DB.SHEETS.USERS, newUser);
+
+      // Audit Log
+      DatabaseManager.appendRecord(DB.SHEETS.AUDIT_LOGS, {
+        id: Utils.generateUUID(),
+        request_id: requestId,
+        actor_id: currentUser.sub || currentUser.id,
+        actor_role: currentUser.role || "ADMIN",
+        action_type: "CREATE_USER",
+        target_entity: "Users",
+        before_value: "",
+        after_value: JSON.stringify(newUser),
+        change_reason: "Admin menambahkan pengguna baru: " + name,
+        ip_address: "",
+        user_agent: "",
+        request_method: "POST",
+        execution_ms: "",
+        stacktrace: "",
+        created_at: Utils.now()
+      });
+
+      return Utils.successResponse("USER_CREATE_OK", "Pengguna baru berhasil dibuat", {
+        id: newUser.id,
+        nip: newUser.nip,
+        full_name: newUser.full_name,
+        phone_number: newUser.phone_number,
+        role: newUser.role,
+        position: newUser.position,
+        avatar_url: "",
+        is_active: true,
+        must_change_pin: true,
+        created_at: newUser.created_at
+      }, requestId);
+    });
+  },
+
+  deleteUser: function(payload, currentUser, requestId) {
+    return DatabaseManager.executeWithLock(function() {
+      var userId = payload.target_user_id || payload.user_id;
+      if (!userId) {
+        return Utils.errorResponse("PARAM_MISSING", "ID Pengguna wajib diisi", null, requestId);
+      }
+
+      var userRecord = DatabaseManager.findRecord(DB.SHEETS.USERS, "id", userId);
+      if (!userRecord) {
+        return Utils.errorResponse("USER_NOT_FOUND", "Pengguna tidak ditemukan", null, requestId);
+      }
+
+      DatabaseManager.updateRecord(DB.SHEETS.USERS, "id", userId, {
+        account_status: "INACTIVE",
+        deleted_at: Utils.now(),
+        updated_at: Utils.now()
+      });
+
+      // Audit Log
+      DatabaseManager.appendRecord(DB.SHEETS.AUDIT_LOGS, {
+        id: Utils.generateUUID(),
+        request_id: requestId,
+        actor_id: currentUser.sub || currentUser.id,
+        actor_role: currentUser.role || "ADMIN",
+        action_type: "DELETE_USER",
+        target_entity: "Users",
+        before_value: JSON.stringify({ full_name: userRecord.full_name }),
+        after_value: JSON.stringify({ deleted_at: Utils.now() }),
+        change_reason: "Admin menghapus akun pengguna dari Spreadsheet: " + userRecord.full_name,
+        ip_address: "",
+        user_agent: "",
+        request_method: "POST",
+        execution_ms: "",
+        stacktrace: "",
+        created_at: Utils.now()
+      });
+
+      return Utils.successResponse("USER_DELETE_OK", "Akun pengguna berhasil dihapus permanen dari Spreadsheet", {
+        deleted_user_id: userId
+      }, requestId);
+    });
+  },
+
+  toggleUserStatus: function(payload, currentUser, requestId) {
+    return DatabaseManager.executeWithLock(function() {
+      var userId = payload.target_user_id || payload.user_id;
+      if (!userId) {
+        return Utils.errorResponse("PARAM_MISSING", "ID Pengguna wajib diisi", null, requestId);
+      }
+
+      var userRecord = DatabaseManager.findRecord(DB.SHEETS.USERS, "id", userId);
+      if (!userRecord) {
+        return Utils.errorResponse("USER_NOT_FOUND", "Pengguna tidak ditemukan", null, requestId);
+      }
+
+      var currentActive = userRecord.is_active === true || String(userRecord.is_active) === "true";
+      var newActive = !currentActive;
+
+      DatabaseManager.updateRecord(DB.SHEETS.USERS, "id", userId, {
+        is_active: newActive,
+        updated_at: Utils.now()
+      });
+
+      return Utils.successResponse("USER_TOGGLE_OK", "Status akun berhasil diperbarui", {
+        user_id: userId,
+        is_active: newActive
+      }, requestId);
+    });
   }
 };
