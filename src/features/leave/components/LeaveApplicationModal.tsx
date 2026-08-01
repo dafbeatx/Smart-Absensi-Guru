@@ -38,6 +38,8 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
         setAttachmentBase64(reader.result as string);
       };
       reader.readAsDataURL(file);
+    } else {
+      setAttachmentBase64('');
     }
   };
 
@@ -138,13 +140,23 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
 
         {/* Photo Attachment Input */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-700">Unggah Bukti (Dokumen / Surat Dokter)</label>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-slate-700">
+              Unggah Bukti (Dokumen / Surat Dokter)
+            </label>
+            <span className="text-[10px] font-extrabold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+              Opsional
+            </span>
+          </div>
           <input
             type="file"
             accept="image/*,.pdf"
             onChange={handleFileChange}
             className="w-full text-xs text-slate-600 border border-slate-200 rounded-2xl p-2 cursor-pointer bg-white file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-none file:font-bold file:bg-emerald-50 file:text-emerald-700"
           />
+          <p className="text-[10px] text-slate-500 italic">
+            *Pengunggahan berkas bersifat opsional. Jika tidak ada lampiran surat dokter/dinas, bidang ini dapat dikosongkan.
+          </p>
         </div>
 
         <div className="pt-2 flex items-center gap-2">
