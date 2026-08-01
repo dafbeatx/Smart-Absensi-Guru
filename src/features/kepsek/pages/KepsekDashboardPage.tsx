@@ -136,9 +136,9 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                 aria-label="Menu"
               >
                 <div className="w-5 h-4 flex flex-col justify-between">
-                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'rotate-45 translate-y-1.75' : ''}`} />
                   <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'opacity-0 scale-0' : ''}`} />
-                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? '-rotate-45 -translate-y-1.75' : ''}`} />
                 </div>
               </button>
 
