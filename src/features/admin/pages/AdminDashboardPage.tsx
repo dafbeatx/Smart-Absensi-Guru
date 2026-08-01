@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
@@ -28,6 +28,22 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close hamburger menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMenuOpen]);
 
   // Status absensi pribadi Admin hari ini (mock/state)
   const [adminAttendance] = useState<{
@@ -133,6 +149,49 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     showToast('info', 'Dokumen PDF Siap!', 'Jendela cetak / simpan ke PDF telah dibuka.');
   };
 
+  const menuItems = [
+    ...(onSwitchToGuruView ? [{
+      icon: '📱',
+      label: 'Mode Tampilan Guru',
+      onClick: () => { onSwitchToGuruView(); setIsMenuOpen(false); },
+      color: 'text-purple-300 hover:bg-purple-600/20',
+    }] : []),
+    {
+      icon: '🖨️',
+      label: 'Cetak Poster QR Absensi',
+      onClick: () => { setIsQrGeneratorOpen(true); setIsMenuOpen(false); },
+      color: 'text-blue-300 hover:bg-blue-600/20',
+    },
+    {
+      icon: '📷',
+      label: 'Scan Absensi Saya',
+      onClick: () => { onOpenScanner?.(); setIsMenuOpen(false); },
+      color: 'text-emerald-300 hover:bg-emerald-600/20',
+    },
+    {
+      icon: '✏️',
+      label: 'Koreksi Manual',
+      onClick: () => { setIsCorrectionModalOpen(true); setIsMenuOpen(false); },
+      color: 'text-amber-300 hover:bg-amber-600/20',
+    },
+    {
+      icon: '🚪',
+      label: 'Keluar',
+      onClick: () => { logout(); setIsMenuOpen(false); },
+      color: 'text-red-300 hover:bg-red-600/20',
+    },
+  ];
+
+  const navTabs = [
+    { id: 'ATTENDANCE_TRACKING', label: '📍 Live Tracking Absensi' },
+    { id: 'TEACHERS', label: '👥 Kelola Master Pengguna' },
+    { id: 'CALENDAR', label: '📅 Kalender Akademik' },
+    { id: 'MY_ATTENDANCE', label: '📷 Absensi Pribadi Saya' },
+    { id: 'SETTINGS', label: '⚙️ Jam Kerja & Geofence' },
+    { id: 'EXPORT', label: '📊 Export Multi-Sheet Excel' },
+    { id: 'AUDIT', label: '📜 Audit Trail Logging' },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-100 pb-24 text-slate-900">
       {/* Admin Website Header */}
@@ -147,70 +206,77 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               <p className="text-xs text-slate-400">SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {onSwitchToGuruView && (
-                <button
-                  onClick={onSwitchToGuruView}
-                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-purple-600/30 flex items-center gap-1.5 border border-purple-400/30"
-                >
-                  <span>📱</span> Mode Tampilan Guru
-                </button>
+            {/* Hamburger Menu */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all border border-slate-700 group"
+                aria-label="Menu"
+              >
+                <div className="w-5 h-4 flex flex-col justify-between">
+                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'opacity-0 scale-0' : ''}`} />
+                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+                </div>
+              </button>
+
+              {/* Dropdown Menu */}
+              {isMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-60 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 z-50 overflow-hidden">
+                  <div className="p-2 space-y-0.5">
+                    {menuItems.map((item, i) => (
+                      <button
+                        key={i}
+                        onClick={item.onClick}
+                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${item.color}`}
+                      >
+                        <span className="text-sm">{item.icon}</span>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
-
-              <button
-                onClick={() => setIsQrGeneratorOpen(true)}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center gap-1.5"
-              >
-                <span>🖨️</span> Cetak Poster QR Absensi
-              </button>
-
-              {/* Tombol Absensi Pribadi Admin */}
-              <button
-                onClick={onOpenScanner}
-                className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-emerald-500/30 flex items-center gap-1.5"
-              >
-                <span>📷</span> Scan Absensi Saya
-              </button>
-
-              <button
-                onClick={() => setIsCorrectionModalOpen(true)}
-                className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold rounded-xl transition-all shadow-md shadow-amber-500/20"
-              >
-                ✏️ Koreksi Manual
-              </button>
-
-              <button
-                onClick={logout}
-                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-colors"
-              >
-                Keluar
-              </button>
             </div>
           </div>
 
-          {/* Navigation Bar */}
-          <div className="flex flex-wrap gap-2 pt-2">
-            {[
-              { id: 'ATTENDANCE_TRACKING', label: '📍 Live Tracking Absensi' },
-              { id: 'TEACHERS', label: '👥 Kelola Master Pengguna' },
-              { id: 'CALENDAR', label: '📅 Kalender Akademik' },
-              { id: 'MY_ATTENDANCE', label: '📷 Absensi Pribadi Saya' },
-              { id: 'SETTINGS', label: '⚙️ Jam Kerja & Geofence' },
-              { id: 'EXPORT', label: '📊 Export Multi-Sheet Excel' },
-              { id: 'AUDIT', label: '📜 Audit Trail Logging' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`py-2 px-4 rounded-xl text-xs font-bold transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-blue-500 text-white font-black shadow-lg shadow-blue-500/25'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* Navigation Bar with Hide/Show Toggle */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={() => setIsNavVisible(!isNavVisible)}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-bold rounded-lg transition-all border border-slate-700 flex items-center gap-1.5 shrink-0"
+              title={isNavVisible ? 'Sembunyikan navigasi' : 'Tampilkan navigasi'}
+            >
+              {isNavVisible ? (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" /></svg>
+                  Hide
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  Show
+                </>
+              )}
+            </button>
+
+            {isNavVisible && (
+              <div className="flex flex-wrap gap-1.5 transition-all">
+                {navTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                    className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-blue-500 text-white font-black shadow-lg shadow-blue-500/25'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </header>
