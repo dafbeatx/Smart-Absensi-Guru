@@ -27,6 +27,12 @@ var AttendanceService = {
         return Utils.errorResponse(ERRORS.ATT_001.code, ERRORS.ATT_001.message, null, requestId);
       }
 
+      // Check if today is registered holiday in Academic Calendar
+      var todayHoliday = HolidayService.isHolidayDate(todayDateStr);
+      if (todayHoliday) {
+        Logger.log("Notice: Check-in on holiday: " + todayHoliday.name);
+      }
+
       // ── Tier 2: Validate Device Binding ─────────────────────────────
       if (deviceUUID) {
         var bindings = DatabaseManager.findRecords(DB.SHEETS.DEVICE_BINDING, "user_id", userId);

@@ -214,6 +214,23 @@ function doPost(e) {
         result = SettingsService.updateSettings(payload, currentUser, requestId);
         break;
 
+      // ── Academic Calendar & Holidays ─────────────────────────────────
+      case "GET_HOLIDAYS":
+        result = HolidayService.getHolidays(requestId);
+        break;
+
+      case "CREATE_HOLIDAY":
+        result = HolidayService.createHoliday(payload, currentUser, requestId);
+        break;
+
+      case "UPDATE_HOLIDAY":
+        result = HolidayService.updateHoliday(payload, currentUser, requestId);
+        break;
+
+      case "DELETE_HOLIDAY":
+        result = HolidayService.deleteHoliday(payload, currentUser, requestId);
+        break;
+
       default:
         result = Utils.errorResponse(
           ERRORS.SYS_004.code,

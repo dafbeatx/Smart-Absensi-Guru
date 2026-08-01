@@ -3,6 +3,7 @@ import type {
   AttendanceRecord,
   LeaveRequest,
   SystemSettings,
+  HolidayRecord,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO } from '../repositories/AttendanceRepository';
@@ -33,4 +34,10 @@ export interface IDataProvider {
   createUser(user: Partial<UserProfile>, token: string): Promise<UserProfile>;
   deleteUser(userId: string, token: string): Promise<boolean>;
   toggleUserStatus(userId: string, token: string): Promise<boolean>;
+
+  // Academic Calendar & Holidays API
+  getHolidays(token?: string): Promise<HolidayRecord[]>;
+  createHoliday(holiday: Omit<HolidayRecord, 'id' | 'created_at'>, token?: string): Promise<HolidayRecord>;
+  updateHoliday(id: string, holiday: Partial<HolidayRecord>, token?: string): Promise<HolidayRecord>;
+  deleteHoliday(id: string, token?: string): Promise<boolean>;
 }

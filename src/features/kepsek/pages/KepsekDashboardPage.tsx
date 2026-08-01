@@ -1,16 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
-import type { LeaveRequest, UserProfile } from '../../../types/database.types';
+import { ProviderFactory } from '../../../providers/provider-factory';
+import type { LeaveRequest, UserProfile, HolidayRecord } from '../../../types/database.types';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
 }
 
 export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpenScanner }) => {
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'APPROVALS' | 'UNABSENTED'>('OVERVIEW');
+  const [todayHoliday, setTodayHoliday] = useState<HolidayRecord | null>(null);
+
+  useEffect(() => {
+    const checkHoliday = async () => {
+      try {
+        const provider = ProviderFactory.getProvider();
+        const holidays = await provider.getHolidays(token || undefined);
+        const todayIso = new Date().toISOString().substring(0, 10);
+        const holidayToday = (holidays || []).find((h) => h.date === todayIso);
+        if (holidayToday) {
+          setTodayHoliday(holidayToday);
+        }
+      } catch (e) {
+        console.warn('Error checking holiday for Kepsek:', e);
+      }
+    };
+    checkHoliday();
+  }, [token]);
 
   // Mock data for executive summary
   const stats = {
@@ -106,6 +125,24 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
       {/* Main Content Body */}
       <main className="max-w-xl mx-auto px-5 -mt-8 space-y-5">
+        {/* Holiday Banner if today is a Holiday */}
+        {todayHoliday && (
+          <div className="bg-purple-600 text-white rounded-3xl p-5 shadow-lg shadow-purple-600/20 border border-purple-500 flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md text-2xl flex items-center justify-center shrink-0">
+              🎉
+            </div>
+            <div className="space-y-1">
+              <span className="px-2 py-0.5 bg-white/20 text-white font-extrabold text-[10px] rounded-full uppercase tracking-wider">
+                {todayHoliday.type === 'NATIONAL_HOLIDAY' ? 'Libur Nasional' : todayHoliday.type === 'SCHOOL_HOLIDAY' ? 'Libur Sekolah' : 'Cuti Bersama'}
+              </span>
+              <h3 className="font-extrabold text-base leading-snug">{todayHoliday.name}</h3>
+              <p className="text-xs text-purple-100 font-medium">
+                Hari ini adalah hari libur resmi pada Kalender Akademik Sekolah.
+              </p>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'OVERVIEW' && (
           <>
             {/* Real-time Kehadiran Card */}

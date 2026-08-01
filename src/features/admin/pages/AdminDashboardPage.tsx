@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
+import { AcademicCalendarManagement } from '../components/AcademicCalendarManagement';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
@@ -22,7 +23,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const { user, logout } = useAuthStore();
   const { showToast } = useToastStore();
 
-  const [activeTab, setActiveTab] = useState<'ATTENDANCE_TRACKING' | 'TEACHERS' | 'MY_ATTENDANCE' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('ATTENDANCE_TRACKING');
+  const [activeTab, setActiveTab] = useState<'ATTENDANCE_TRACKING' | 'TEACHERS' | 'CALENDAR' | 'MY_ATTENDANCE' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('ATTENDANCE_TRACKING');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
@@ -182,6 +183,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             {[
               { id: 'ATTENDANCE_TRACKING', label: '📍 Live Tracking Absensi' },
               { id: 'TEACHERS', label: '👥 Kelola Master Pengguna' },
+              { id: 'CALENDAR', label: '📅 Kalender Akademik' },
               { id: 'MY_ATTENDANCE', label: '📷 Absensi Pribadi Saya' },
               { id: 'SETTINGS', label: '⚙️ Jam Kerja & Geofence' },
               { id: 'EXPORT', label: '📊 Export Multi-Sheet Excel' },
@@ -276,6 +278,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         {activeTab === 'TEACHERS' && (
           <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
         )}
+
+        {activeTab === 'CALENDAR' && <AcademicCalendarManagement />}
 
         {activeTab === 'SETTINGS' && <SystemSettingsForm />}
 

@@ -8,7 +8,7 @@ import { Input } from '../../../components/ui/Input';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { AttendanceCorrectionModal } from '../../admin/components/AttendanceCorrectionModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
-import type { AttendanceRecord } from '../../../types/database.types';
+import type { AttendanceRecord, HolidayRecord } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
   onOpenScanner?: () => void;
@@ -34,8 +34,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [isChangingPin, setIsChangingPin] = useState(false);
 
-  // Today Attendance Status & History
+  // Today Attendance Status, History, & Holiday Info
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
+  const [todayHoliday, setTodayHoliday] = useState<HolidayRecord | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
@@ -67,7 +68,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     },
   ]);
 
-  // Load Today Attendance & History on Mount
+  // Load Today Attendance, Holidays & History on Mount
   useEffect(() => {
     const loadData = async () => {
       if (!user) return;
@@ -79,6 +80,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         // Today Attendance
         const today = await provider.getTodayAttendance(user.id, authToken);
         setTodayAttendance(today);
+
+        // Academic Calendar Holidays
+        const holidays = await provider.getHolidays(authToken);
+        const todayIso = new Date().toISOString().substring(0, 10);
+        const holidayToday = (holidays || []).find((h) => h.date === todayIso);
+        if (holidayToday) {
+          setTodayHoliday(holidayToday);
+        }
 
         // Monthly History
         const history = await provider.getMonthlyAttendance(
@@ -217,6 +226,24 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </button>
               </div>
             </section>
+
+            {/* Holiday Notice Alert Banner if Today is Holiday */}
+            {todayHoliday && (
+              <section className="bg-purple-600 text-white rounded-3xl p-5 shadow-lg shadow-purple-600/20 border border-purple-500 flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md text-2xl flex items-center justify-center shrink-0">
+                  🎉
+                </div>
+                <div className="space-y-1">
+                  <span className="px-2 py-0.5 bg-white/20 text-white font-extrabold text-[10px] rounded-full uppercase tracking-wider">
+                    {todayHoliday.type === 'NATIONAL_HOLIDAY' ? 'Libur Nasional' : todayHoliday.type === 'SCHOOL_HOLIDAY' ? 'Libur Sekolah' : 'Cuti Bersama'}
+                  </span>
+                  <h3 className="font-extrabold text-base leading-snug">{todayHoliday.name}</h3>
+                  <p className="text-xs text-purple-100 font-medium">
+                    Hari ini adalah hari libur resmi pada Kalender Akademik Sekolah. Tidak wajib melakukan absensi harian.
+                  </p>
+                </div>
+              </section>
+            )}
 
             {/* Today Attendance Status Card */}
             <section className="bg-linear-to-br from-emerald-600 to-teal-700 rounded-3xl p-5 text-white shadow-lg shadow-emerald-600/20 relative overflow-hidden space-y-4">

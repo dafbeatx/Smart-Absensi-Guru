@@ -1,6 +1,6 @@
 import { apiClient } from '../lib/api-client';
 import type { IDataProvider } from './data-provider.interface';
-import type { UserProfile, AttendanceRecord, LeaveRequest, SystemSettings } from '../types/database.types';
+import type { UserProfile, AttendanceRecord, LeaveRequest, SystemSettings, HolidayRecord } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
@@ -93,5 +93,22 @@ export class GasProvider implements IDataProvider {
 
   public async toggleUserStatus(userId: string, token: string): Promise<boolean> {
     return apiClient.post<boolean>('TOGGLE_USER_STATUS', { target_user_id: userId, token });
+  }
+
+  // Academic Calendar & Holidays API
+  public async getHolidays(token?: string): Promise<HolidayRecord[]> {
+    return apiClient.post<HolidayRecord[]>('GET_HOLIDAYS', { token });
+  }
+
+  public async createHoliday(holiday: Omit<HolidayRecord, 'id' | 'created_at'>, token?: string): Promise<HolidayRecord> {
+    return apiClient.post<HolidayRecord>('CREATE_HOLIDAY', { ...holiday, token });
+  }
+
+  public async updateHoliday(id: string, holiday: Partial<HolidayRecord>, token?: string): Promise<HolidayRecord> {
+    return apiClient.post<HolidayRecord>('UPDATE_HOLIDAY', { id, ...holiday, token });
+  }
+
+  public async deleteHoliday(id: string, token?: string): Promise<boolean> {
+    return apiClient.post<boolean>('DELETE_HOLIDAY', { id, token });
   }
 }

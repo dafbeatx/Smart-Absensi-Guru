@@ -102,3 +102,14 @@ export interface SystemSettings {
   geofence_lng: number;
   geofence_radius: number;
 }
+
+export type HolidayType = 'NATIONAL_HOLIDAY' | 'SCHOOL_HOLIDAY' | 'CUTI_BERSAMA' | 'OTHER';
+
+export interface HolidayRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+  type: HolidayType;
+  description?: string;
+  created_at: string;
+}
