@@ -152,7 +152,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             type="file"
             accept="image/*,.pdf"
             onChange={handleFileChange}
-            className="w-full text-xs text-slate-600 border border-slate-200 rounded-2xl p-2 cursor-pointer bg-white file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-none file:font-bold file:bg-emerald-50 file:text-emerald-700"
+            className="w-full text-xs text-slate-600 border border-slate-200 rounded-xl p-1.5 cursor-pointer bg-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 font-medium transition-all"
           />
           <p className="text-[10px] text-slate-500 italic">
             *Pengunggahan berkas bersifat opsional. Jika tidak ada lampiran surat dokter/dinas, bidang ini dapat dikosongkan.
