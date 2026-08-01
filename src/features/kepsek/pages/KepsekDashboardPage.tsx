@@ -7,9 +7,10 @@ import type { LeaveRequest, UserProfile, HolidayRecord } from '../../../types/da
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
+  onSwitchToGuruView?: () => void;
 }
 
-export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpenScanner }) => {
+export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpenScanner, onSwitchToGuruView }) => {
   const { user, token, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'APPROVALS' | 'UNABSENTED'>('OVERVIEW');
   const [todayHoliday, setTodayHoliday] = useState<HolidayRecord | null>(null);
@@ -85,6 +86,14 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             </div>
 
             <div className="flex items-center gap-2">
+              {onSwitchToGuruView && (
+                <button
+                  onClick={onSwitchToGuruView}
+                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-purple-600/30 flex items-center gap-1.5 border border-purple-400/30"
+                >
+                  <span>📱</span> Mode Tampilan Guru
+                </button>
+              )}
               <button
                 onClick={onOpenScanner}
                 className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-emerald-500/30 flex items-center gap-1.5"

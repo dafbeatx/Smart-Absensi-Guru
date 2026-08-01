@@ -32,6 +32,7 @@ const QRScannerOverlay = React.lazy(() =>
 export const App: React.FC = () => {
   const { isAuthenticated, user } = useAuthStore();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isPreviewGuruMode, setIsPreviewGuruMode] = useState(false);
 
   if (!isAuthenticated || !user) {
     return (
@@ -42,14 +43,46 @@ export const App: React.FC = () => {
     );
   }
 
-  // Multi-Role Dashboard Router with Lazy Suspense
+  // Multi-Role Dashboard Router with Lazy Suspense & Admin/Kepsek Preview Switcher
   const renderRoleDashboard = () => {
+    // Mode Preview Tampilan Guru untuk Admin/Kepsek
+    if (isPreviewGuruMode && (user.role === 'ADMIN' || user.role === 'OPERATOR' || user.role === 'KEPSEK')) {
+      return (
+        <div>
+          {/* Sticky Floating Developer Switch Bar */}
+          <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 flex items-center justify-between shadow-lg sticky top-0 z-50 border-b border-slate-700">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>📱 Mode Preview Tampilan Guru ({user.role === 'ADMIN' ? 'Admin Access' : 'Kepsek Access'})</span>
+            </div>
+            <button
+              onClick={() => setIsPreviewGuruMode(false)}
+              className="px-3.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95"
+            >
+              <span>🔄</span> Kembali ke Dashboard {user.role === 'ADMIN' ? 'Admin' : 'Kepsek'}
+            </button>
+          </div>
+          <GuruDashboardPage onOpenScanner={() => setIsScannerOpen(true)} />
+        </div>
+      );
+    }
+
     switch (user.role) {
       case 'KEPSEK':
-        return <KepsekDashboardPage onOpenScanner={() => setIsScannerOpen(true)} />;
+        return (
+          <KepsekDashboardPage
+            onOpenScanner={() => setIsScannerOpen(true)}
+            onSwitchToGuruView={() => setIsPreviewGuruMode(true)}
+          />
+        );
       case 'ADMIN':
       case 'OPERATOR':
-        return <AdminDashboardPage onOpenScanner={() => setIsScannerOpen(true)} />;
+        return (
+          <AdminDashboardPage
+            onOpenScanner={() => setIsScannerOpen(true)}
+            onSwitchToGuruView={() => setIsPreviewGuruMode(true)}
+          />
+        );
       case 'GURU':
       default:
         return <GuruDashboardPage onOpenScanner={() => setIsScannerOpen(true)} />;

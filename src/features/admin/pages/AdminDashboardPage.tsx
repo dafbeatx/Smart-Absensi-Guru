@@ -17,9 +17,10 @@ import type { UserProfile } from '../../../types/database.types';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
+  onSwitchToGuruView?: () => void;
 }
 
-export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenScanner }) => {
+export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenScanner, onSwitchToGuruView }) => {
   const { user, logout } = useAuthStore();
   const { showToast } = useToastStore();
 
@@ -147,6 +148,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {onSwitchToGuruView && (
+                <button
+                  onClick={onSwitchToGuruView}
+                  className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-purple-600/30 flex items-center gap-1.5 border border-purple-400/30"
+                >
+                  <span>📱</span> Mode Tampilan Guru
+                </button>
+              )}
+
               <button
                 onClick={() => setIsQrGeneratorOpen(true)}
                 className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center gap-1.5"
