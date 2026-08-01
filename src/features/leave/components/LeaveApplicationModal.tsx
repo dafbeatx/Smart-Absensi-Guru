@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -21,18 +21,21 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
 }) => {
   const { token } = useAuthStore();
   const { showToast } = useToastStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [leaveType, setLeaveType] = useState<LeaveType>('SAKIT');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [reason, setReason] = useState('');
   const [attachmentBase64, setAttachmentBase64] = useState<string>('');
+  const [fileName, setFileName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setFileName(file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
         setAttachmentBase64(reader.result as string);
@@ -40,6 +43,15 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       reader.readAsDataURL(file);
     } else {
       setAttachmentBase64('');
+      setFileName('');
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setAttachmentBase64('');
+    setFileName('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -138,7 +150,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
           />
         </div>
 
-        {/* Photo Attachment Input */}
+        {/* Custom File Upload (hidden native input + styled UI) */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold text-slate-700">
@@ -148,12 +160,35 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
               Opsional
             </span>
           </div>
+          {/* Hidden native file input */}
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/*,.pdf"
             onChange={handleFileChange}
-            className="w-full text-xs text-slate-600 border border-slate-200 rounded-xl p-1.5 cursor-pointer bg-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 font-medium transition-all"
+            className="hidden"
           />
+          {fileName ? (
+            <div className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <span className="text-emerald-600 text-sm">📎</span>
+              <span className="text-xs font-semibold text-emerald-800 truncate flex-1">{fileName}</span>
+              <button
+                type="button"
+                onClick={handleRemoveFile}
+                className="text-red-500 hover:text-red-700 text-xs font-bold px-1.5 py-0.5 rounded hover:bg-red-50 transition-all"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-300 rounded-xl text-xs text-slate-500 font-semibold hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50/50 transition-all cursor-pointer"
+            >
+              <span>📄</span> Pilih Berkas (Gambar / PDF)
+            </button>
+          )}
           <p className="text-[10px] text-slate-500 italic">
             *Pengunggahan berkas bersifat opsional. Jika tidak ada lampiran surat dokter/dinas, bidang ini dapat dikosongkan.
           </p>
