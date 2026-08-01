@@ -35,6 +35,9 @@ var SettingsService = {
         work_checkin_start: settingsData.work_checkin_start || settingsData.checkInStart,
         work_checkin_end: settingsData.work_checkin_end || settingsData.checkInEnd,
         work_checkout_start: settingsData.work_checkout_start || settingsData.checkOutStart,
+        friday_checkout_start: settingsData.friday_checkout_start || settingsData.fridayCheckoutStart || "11:00",
+        saturday_is_holiday: settingsData.saturday_is_holiday !== undefined ? String(settingsData.saturday_is_holiday) : "true",
+        sunday_is_holiday: settingsData.sunday_is_holiday !== undefined ? String(settingsData.sunday_is_holiday) : "true",
         geofence_lat: settingsData.geofence_lat !== undefined ? String(settingsData.geofence_lat) : settingsData.geofenceLat,
         geofence_lng: settingsData.geofence_lng !== undefined ? String(settingsData.geofence_lng) : settingsData.geofenceLng,
         geofence_radius: settingsData.geofence_radius !== undefined ? String(settingsData.geofence_radius) : settingsData.geofenceRadius

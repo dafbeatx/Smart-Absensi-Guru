@@ -97,7 +97,10 @@ export interface SystemSettings {
   institution_name: string;
   work_checkin_start: string;
   work_checkin_end: string;
-  work_checkout_start: string;
+  work_checkout_start: string; // Senin - Kamis (e.g. 15:30)
+  friday_checkout_start?: string; // Khusus Jumat (e.g. 11:00)
+  saturday_is_holiday?: boolean; // Libur Sabtu (default true)
+  sunday_is_holiday?: boolean; // Libur Minggu (default true)
   geofence_lat: number;
   geofence_lng: number;
   geofence_radius: number;

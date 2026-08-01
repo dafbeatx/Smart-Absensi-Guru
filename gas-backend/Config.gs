@@ -129,6 +129,9 @@ var SHIFT = {
   WORK_CHECKIN_START: "06:00",
   WORK_CHECKIN_END: "07:15",
   WORK_CHECKOUT_START: "15:30",
+  FRIDAY_CHECKOUT_START: "11:00",     // Khusus hari Jumat pulang jam 11:00
+  SATURDAY_IS_HOLIDAY: true,          // Sabtu libur rutin
+  SUNDAY_IS_HOLIDAY: true,            // Minggu libur rutin
   WORK_CHECKOUT_END: "17:00",
   LATE_THRESHOLD_MINUTES: 15,         // Terlambat jika > 07:15
   AUTO_ALFA_TIME: "16:30",            // Auto ALFA jika belum absen

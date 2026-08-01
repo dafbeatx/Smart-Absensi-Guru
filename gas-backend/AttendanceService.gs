@@ -180,15 +180,29 @@ var AttendanceService = {
       ) : 0;
 
       // ── Tier 4: Validation (Early Check-Out & State) ────────────────
+      var todayObj = new Date();
+      var dayOfWeek = todayObj.getDay(); // 0 = Minggu, 5 = Jumat, 6 = Sabtu
+      var checkoutStartTime = SHIFT.WORK_CHECKOUT_START;
+
+      // Ambil override dari System_Settings sheet jika ada
+      var fridaySetting = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "friday_checkout_start");
+      var normalCheckoutSetting = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "work_checkout_start");
+
+      if (dayOfWeek === 5) {
+        checkoutStartTime = (fridaySetting && fridaySetting.value) ? fridaySetting.value : (SHIFT.FRIDAY_CHECKOUT_START || "11:00");
+      } else if (normalCheckoutSetting && normalCheckoutSetting.value) {
+        checkoutStartTime = normalCheckoutSetting.value;
+      }
+
       var currentMinutes = _timeToMinutes(nowTimeShort);
-      var checkoutStartMinutes = _timeToMinutes(SHIFT.WORK_CHECKOUT_START);
+      var checkoutStartMinutes = _timeToMinutes(checkoutStartTime);
       
       // Default rule: Ditolak jika belum masuk jam pulang
       if (currentMinutes < checkoutStartMinutes) {
         return Utils.errorResponse(
           ERRORS.ATT_008.code,
-          ERRORS.ATT_008.message + " (Jam pulang dimulai pukul " + SHIFT.WORK_CHECKOUT_START + " WIB)",
-          { checkout_start: SHIFT.WORK_CHECKOUT_START },
+          ERRORS.ATT_008.message + " (Jam pulang hari ini dimulai pukul " + checkoutStartTime + " WIB)",
+          { checkout_start: checkoutStartTime },
           requestId
         );
       }
