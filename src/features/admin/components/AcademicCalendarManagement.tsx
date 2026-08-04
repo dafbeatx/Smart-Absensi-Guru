@@ -218,13 +218,13 @@ export const AcademicCalendarManagement: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
+          <button
+            type="button"
             onClick={handleLoadPresets}
-            className="text-xs py-2 px-3 bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
+            className="text-xs py-2 px-3.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-extrabold rounded-2xl border border-amber-300 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
           >
             <span>⚡</span> Preset Tanggal Merah 2026
-          </Button>
+          </button>
 
           <Button
             variant="primary"
