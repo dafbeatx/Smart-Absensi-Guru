@@ -182,7 +182,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 
           {/* Donut Visual */}
           <div className="flex flex-col items-center justify-center py-2 relative">
-            <div className="w-36 h-36 rounded-full border-[14px] border-slate-100 flex flex-col items-center justify-center relative">
+            <div className="w-36 h-36 rounded-full border-14 border-slate-100 flex flex-col items-center justify-center relative">
               <span className="text-2xl font-black text-[#023246]">0%</span>
               <span className="text-[10px] font-bold text-slate-400">Hadir</span>
               <div className="mt-1 text-center">
@@ -260,7 +260,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
                     <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-xs">
                       👤
                     </div>
-                    <span className="text-xs font-bold text-slate-800 truncate max-w-[140px]">
+                    <span className="text-xs font-bold text-slate-800 truncate max-w-35">
                       {displayName}
                     </span>
                   </div>
