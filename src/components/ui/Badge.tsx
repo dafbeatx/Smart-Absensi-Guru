@@ -29,6 +29,8 @@ export const Badge: React.FC<BadgeProps> = ({
       case 'IZIN':
       case 'SAKIT':
       case 'DINAS':
+      case 'DINAS_LUAR':
+      case 'CUTI':
         badgeVariant = 'info';
         break;
       case 'ALFA':

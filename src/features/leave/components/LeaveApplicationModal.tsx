@@ -109,20 +109,26 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
 
         {/* Jenis Pengajuan Radio Selector */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-700">Jenis Ketidakhadiran</label>
-          <div className="grid grid-cols-3 gap-2">
-            {(['SAKIT', 'IZIN', 'DINAS_LUAR'] as LeaveType[]).map((type) => (
+          <label className="block text-xs font-semibold text-slate-700">Jenis Ketidakhadiran / Cuti</label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(['SAKIT', 'IZIN', 'DINAS_LUAR', 'CUTI'] as LeaveType[]).map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setLeaveType(type)}
-                className={`py-2.5 px-3 rounded-2xl text-xs font-bold border transition-all ${
+                className={`py-2.5 px-2.5 rounded-2xl text-xs font-bold border transition-all ${
                   leaveType === type
                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                {type === 'SAKIT' ? '🤒 Sakit' : type === 'IZIN' ? '📝 Izin' : '💼 Dinas'}
+                {type === 'SAKIT'
+                  ? '🤒 Sakit'
+                  : type === 'IZIN'
+                  ? '📝 Izin'
+                  : type === 'DINAS_LUAR'
+                  ? '💼 Dinas'
+                  : '🏖️ Cuti'}
               </button>
             ))}
           </div>
