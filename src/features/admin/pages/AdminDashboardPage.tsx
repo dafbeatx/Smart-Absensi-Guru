@@ -369,7 +369,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               <Button variant="primary" onClick={handleExportExcel} className="flex items-center justify-center gap-2">
                 <span>📊</span> Download File Excel Resmi (.xlsx)
               </Button>
-              <Button variant="secondary" onClick={handleExportPDF} className="flex items-center justify-center gap-2 bg-slate-900 text-white hover:bg-slate-800">
+              <Button variant="secondary" onClick={handleExportPDF} className="flex items-center justify-center gap-2">
                 <span>📄</span> Cetak / Simpan Laporan PDF (.pdf)
               </Button>
             </div>
