@@ -160,16 +160,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 transition-opacity duration-300 animate-fadeIn lg:hidden"
+            className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-[999] transition-opacity duration-300 animate-fadeIn lg:hidden"
             onClick={onClose}
             aria-hidden="true"
           />
           <aside
-            className="fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-white text-slate-800 z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out lg:hidden translate-x-0 overflow-y-auto"
+            className="fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-white text-slate-800 z-[1000] shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out lg:hidden translate-x-0 overflow-y-auto"
             aria-label="Mobile Navigation Drawer"
           >
             {/* Header with Delta Logo & Close button */}
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-[1001]">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-[#023246] text-white flex items-center justify-center font-black text-lg shadow-sm">
                   ∆
