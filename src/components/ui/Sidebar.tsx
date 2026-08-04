@@ -80,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-emerald-500/20 shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-linear-to-tr from-emerald-600 to-teal-400 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-emerald-500/20 shrink-0">
               {user?.full_name?.charAt(0) || 'A'}
             </div>
             <div className="space-y-0.5 overflow-hidden">
@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all ${
                   isActive
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-extrabold shadow-lg shadow-emerald-500/20 translate-x-1'
+                    ? 'bg-linear-to-r from-emerald-500 to-teal-500 text-slate-950 font-extrabold shadow-lg shadow-emerald-500/20 translate-x-1'
                     : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
                 }`}
               >
