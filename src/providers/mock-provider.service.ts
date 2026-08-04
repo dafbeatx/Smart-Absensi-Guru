@@ -14,13 +14,15 @@ export class MockProvider implements IDataProvider {
     }
 
     let role: 'GURU' | 'KEPSEK' | 'ADMIN' = 'GURU';
-    let name = 'Ahmad Hidayat, S.Pd.';
-    let position = 'Guru Matematika Utama';
+    let name = 'Dafa Maulana, S.Pd';
+    let position = 'Guru Utama / Pendidik';
+    let nip: string | null = null; // Dafa Maulana, S.Pd does not use NIP
 
     if (dto.identity.toUpperCase().includes('KEPSEK') || dto.identity.startsWith('1975')) {
       role = 'KEPSEK';
       name = 'Drs. H. M. Yusuf, M.Pd.';
       position = 'Kepala Sekolah Utama';
+      nip = '197504122003121001';
     } else if (
       dto.identity.toUpperCase().includes('ADMIN') ||
       dto.identity.toUpperCase().includes('OPERATOR') ||
@@ -30,11 +32,12 @@ export class MockProvider implements IDataProvider {
       role = 'ADMIN';
       name = 'Rina Fitriani, S.Kom.';
       position = 'Admin Website & IT Sekolah';
+      nip = '199501012020011001';
     }
 
     const mockUser: UserProfile = {
       id: 'usr_' + role.toLowerCase() + '_1001',
-      nip: dto.identity.includes('19') ? dto.identity : '198507122010011008',
+      nip: nip,
       full_name: name,
       phone_number: dto.identity,
       role: role,
@@ -54,11 +57,11 @@ export class MockProvider implements IDataProvider {
   public async verifySession(_token: string): Promise<UserProfile> {
     return {
       id: 'usr_uuid_1001',
-      nip: '198507122010011008',
-      full_name: 'Ahmad Hidayat, S.Pd.',
+      nip: null,
+      full_name: 'Dafa Maulana, S.Pd',
       phone_number: '081234567890',
       role: 'GURU',
-      position: 'Guru Matematika Utama',
+      position: 'Guru Utama / Pendidik',
       avatar_url: null,
       is_active: true,
       created_at: new Date().toISOString(),

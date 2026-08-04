@@ -534,7 +534,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <div>
                 <h2 className="text-lg font-extrabold text-slate-900">{user?.full_name || 'Guru Smart Absensi'}</h2>
                 <p className="text-xs font-semibold text-emerald-700 mt-0.5">{user?.position || 'Guru Utama'}</p>
-                <p className="text-xs text-slate-400 mt-0.5">NIP. {user?.nip || '-'}</p>
+                {user?.nip ? (
+                  <p className="text-xs text-slate-400 mt-0.5">NIP. {user.nip}</p>
+                ) : null}
               </div>
 
               <div className="pt-2 flex justify-center gap-2">
