@@ -3,6 +3,8 @@ import type { Html5Qrcode } from 'html5-qrcode';
 import { Modal } from '../../../components/ui/Modal';
 import { Badge } from '../../../components/ui/Badge';
 import { SoundService } from '../../../services/audio.service';
+import { NotificationService } from '../../../services/notification-permission.service';
+import { useAuthStore } from '../../../store/useAuthStore';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -69,8 +71,14 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     // Play Absen Success Audio (success.mp3 -> terimakasih.mp3 sequence)!
     SoundService.playAttendanceSuccess();
 
+    const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
+    
+    // Trigger Real-time Push Notification for Admin & Kepsek
+    NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
+
     const result = {
-      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+      timestamp: timestampStr,
       distance: gpsDistance || 12,
       status: 'HADIR (Tepat Waktu)'
     };

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { UserProfile, LeaveRequest } from '../../types/database.types';
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
+import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 
 export interface ExecutiveDashboardOverviewProps {
   roleTitle: 'Admin Website' | 'Kepala Sekolah';
@@ -91,6 +92,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           )}
         </div>
       </div>
+
+      {/* Real-time Web Push Notification Permission Banner for Admin & Kepsek */}
+      <NotificationPermissionBanner />
 
       {/* ── 2. SUMMARY STAT CARDS GRID (5 CARDS IN A ROW) ──────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
