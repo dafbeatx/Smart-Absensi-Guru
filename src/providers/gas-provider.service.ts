@@ -75,6 +75,10 @@ export class GasProvider implements IDataProvider {
     });
   }
 
+  public async getPendingLeaves(token: string): Promise<LeaveRequest[]> {
+    return apiClient.post<LeaveRequest[]>('GET_PENDING_LEAVES', { token });
+  }
+
   public async getSettings(): Promise<SystemSettings> {
     return apiClient.get<SystemSettings>('GET_PUBLIC_SETTINGS');
   }

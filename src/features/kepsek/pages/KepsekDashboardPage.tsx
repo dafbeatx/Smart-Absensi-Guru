@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
+import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
 import { Sidebar } from '../../../components/ui/Sidebar';
 import type { SidebarItem } from '../../../components/ui/Sidebar';
@@ -19,6 +20,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const { user, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
 
   const [teachers, setTeachers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('smart_absensi_teachers');
@@ -61,6 +63,18 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
   };
 
+  const fetchPendingRequests = async () => {
+    try {
+      const tkn = useAuthStore.getState().token || '';
+      if (tkn) {
+        const fetched = await LeaveRepository.getPendingLeaves(tkn);
+        setPendingRequests(fetched || []);
+      }
+    } catch (err) {
+      console.warn('Gagal memuat pengajuan izin:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchUsersFromBackend = async () => {
       try {
@@ -76,22 +90,8 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       }
     };
     fetchUsersFromBackend();
+    fetchPendingRequests();
   }, []);
-
-  const mockPendingApprovals: LeaveRequest[] = [
-    {
-      id: 'leave_101',
-      user_id: 'usr_1002',
-      leave_type: 'SAKIT',
-      start_date: '2026-07-30',
-      end_date: '2026-07-31',
-      reason: 'Demam tinggi dan istirahat dokter',
-      attachment_url: 'https://drive.google.com/mock-surat-dokter.pdf',
-      approval_status: 'PENDING',
-      approval_deadline: '2026-08-01T00:00:00Z',
-      created_at: new Date().toISOString(),
-    },
-  ];
 
   const mockUnabsented: UserProfile[] = [
     {
@@ -110,7 +110,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const sidebarItems: SidebarItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
     { id: 'ACCOUNT_APPLICATIONS', label: 'Account Applications', icon: '👥', badge: teachers.length },
-    { id: 'APPROVALS', label: 'Persetujuan Izin/Cuti', icon: '📝', badge: mockPendingApprovals.length, hasDropdown: true },
+    { id: 'APPROVALS', label: 'Persetujuan Izin/Cuti', icon: '📝', badge: pendingRequests.length, hasDropdown: true },
     { id: 'UNABSENTED', label: 'Daftar Belum Absen', icon: '⚠️', badge: mockUnabsented.length },
   ];
 
@@ -147,6 +147,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             <ExecutiveDashboardOverview
               roleTitle="Kepala Sekolah"
               teachers={teachers}
+              pendingRequests={pendingRequests}
               onOpenScanner={onOpenScanner}
               onSwitchToGuruView={onSwitchToGuruView}
               onNavigateTab={(tab: string) => setActiveTab(tab)}
@@ -162,7 +163,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           {activeTab === 'APPROVALS' && (
             <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
               <h3 className="font-extrabold text-[#023246] text-base">📝 Approval Pengajuan Izin / Cuti Guru</h3>
-              <PendingApprovalWidget />
+              <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
             </div>
           )}
 
@@ -238,7 +239,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           >
             <span className="text-lg">☑️</span>
             <span>Approval</span>
-            <span className="absolute top-1 right-3.5 px-1 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-3 text-center">3</span>
+            {pendingRequests.length > 0 ? (
+              <span className="absolute top-1 right-3.5 px-1 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-3 text-center animate-pulse">
+                {pendingRequests.length}
+              </span>
+            ) : null}
           </button>
 
           <button

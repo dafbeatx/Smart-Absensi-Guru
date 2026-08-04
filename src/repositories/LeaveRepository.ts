@@ -18,4 +18,8 @@ export class LeaveRepository {
   public static async approveLeave(leaveId: string, decision: 'APPROVED' | 'REJECTED', notes: string, token: string): Promise<boolean> {
     return ProviderFactory.getProvider().approveLeave(leaveId, decision, notes, token);
   }
+
+  public static async getPendingLeaves(token: string): Promise<LeaveRequest[]> {
+    return ProviderFactory.getProvider().getPendingLeaves(token);
+  }
 }

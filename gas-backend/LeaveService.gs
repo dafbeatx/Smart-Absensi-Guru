@@ -269,5 +269,19 @@ var LeaveService = {
     }
     
     return injected;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GET PENDING LEAVES (Daftar Pengajuan Izin Menunggu Approval)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  getPendingLeaves: function(currentUser, payload, requestId) {
+    var approverRole = currentUser.role || "";
+    if (approverRole !== ROLES.KEPSEK && approverRole !== ROLES.ADMIN) {
+      return Utils.errorResponse("LEV_AUTH", "Anda tidak memiliki akses untuk melihat daftar izin.", null, requestId);
+    }
+
+    var leaves = DatabaseManager.findRecords(DB.SHEETS.LEAVE_REQUESTS, "approval_status", APPROVAL_STATUS.SUBMITTED);
+    return Utils.successResponse("LEV_LIST_OK", "Daftar pengajuan izin pending.", leaves, requestId);
   }
 };

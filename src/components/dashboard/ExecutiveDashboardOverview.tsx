@@ -31,15 +31,8 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   const izinCount = 0;
   const belumAbsenCount = totalGuruCount - (hadirCount + terlambatCount + izinCount);
 
-  // Sample 5 teachers list
+  // Teachers list from Users sheet
   const recentTeachers = teachers.slice(0, 5);
-  const sampleTeacherNames = [
-    'Ahmad Fauzi, S.Pd',
-    'Siti Nurhaliza, S.Pd',
-    'Dedi Kurniawan, S.Pd',
-    'Rina Marlina, S.Pd',
-    'Muhammad Iqbal, S.Pd',
-  ];
 
   return (
     <div className="space-y-6">
@@ -255,25 +248,30 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           </div>
 
           <div className="space-y-2.5">
-            {sampleTeacherNames.map((name, idx) => {
-              const teacherObj = recentTeachers[idx];
-              const displayName = teacherObj?.full_name || name;
-              return (
-                <div key={idx} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
+            {recentTeachers.length > 0 ? (
+              recentTeachers.map((teacherObj, idx) => (
+                <div key={teacherObj.id || idx} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-xs">
-                      👤
+                    <div className="w-7 h-7 rounded-full bg-[#023246]/10 text-[#023246] flex items-center justify-center font-extrabold text-xs">
+                      {teacherObj.full_name ? teacherObj.full_name.charAt(0) : '👤'}
                     </div>
-                    <span className="text-xs font-bold text-slate-800 truncate max-w-35">
-                      {displayName}
-                    </span>
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-bold text-slate-800 truncate max-w-36">
+                        {teacherObj.full_name}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">{teacherObj.position}</p>
+                    </div>
                   </div>
                   <span className="px-2.5 py-1 text-[10px] font-black rounded-full bg-[#023246] text-white">
                     Belum Absen
                   </span>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              <div className="p-4 text-center text-xs text-slate-400">
+                Belum ada data guru terdaftar di sheet Users.
+              </div>
+            )}
           </div>
 
           <button

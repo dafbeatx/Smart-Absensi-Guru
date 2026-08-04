@@ -12,13 +12,14 @@ import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
 import { AuditLogTable } from '../components/AuditLogTable';
 import { DailyAttendanceTracker } from '../components/DailyAttendanceTracker';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
+import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { ReportService } from '../../../services/report.service';
 import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
-import type { UserProfile } from '../../../types/database.types';
+import type { UserProfile, LeaveRequest } from '../../../types/database.types';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -46,6 +47,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     checkIn: '',
     checkOut: '',
   });
+
+  const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
 
   const [teachers, setTeachers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('smart_absensi_teachers');
@@ -99,6 +102,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
   };
 
+  const fetchPendingRequests = async () => {
+    try {
+      const token = useAuthStore.getState().token || '';
+      if (token) {
+        const fetched = await LeaveRepository.getPendingLeaves(token);
+        setPendingRequests(fetched || []);
+      }
+    } catch (err) {
+      console.warn('Gagal memuat pengajuan izin:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchUsersFromBackend = async () => {
       try {
@@ -114,6 +129,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       }
     };
     fetchUsersFromBackend();
+    fetchPendingRequests();
   }, []);
 
   const handleExportExcel = async () => {
@@ -207,6 +223,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             <ExecutiveDashboardOverview
               roleTitle="Admin Website"
               teachers={teachers}
+              pendingRequests={pendingRequests}
               onOpenScanner={onOpenScanner}
               onSwitchToGuruView={onSwitchToGuruView}
               onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
@@ -230,7 +247,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 <h3 className="font-extrabold text-[#023246] text-sm flex items-center gap-2">
                   <span>📝 Persetujuan Pengajuan Izin / Sakit Guru</span>
                 </h3>
-                <PendingApprovalWidget />
+                <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
               </div>
             </div>
           )}
@@ -292,7 +309,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           {activeTab === 'APPROVAL' && (
             <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
               <h3 className="font-extrabold text-[#023246] text-base">📝 Approval Pengajuan Izin / Sakit</h3>
-              <PendingApprovalWidget />
+              <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
             </div>
           )}
 
@@ -392,7 +409,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           >
             <span className="text-lg">☑️</span>
             <span>Approval</span>
-            <span className="absolute top-1 right-3.5 px-1 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-3 text-center">3</span>
+            {pendingRequests.length > 0 ? (
+              <span className="absolute top-1 right-3.5 px-1 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-3 text-center animate-pulse">
+                {pendingRequests.length}
+              </span>
+            ) : null}
           </button>
 
           <button

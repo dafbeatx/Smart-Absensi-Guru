@@ -176,6 +176,10 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
+  public async getPendingLeaves(_token: string): Promise<LeaveRequest[]> {
+    return [];
+  }
+
   public async getSettings(): Promise<SystemSettings> {
     const saved = localStorage.getItem('smart_absensi_system_settings');
     if (saved) {

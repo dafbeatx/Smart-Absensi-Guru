@@ -25,6 +25,7 @@ export interface IDataProvider {
   // Leave & Approval API
   submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest>;
   approveLeave(leaveId: string, decision: 'APPROVED' | 'REJECTED', notes: string, token: string): Promise<boolean>;
+  getPendingLeaves(token: string): Promise<LeaveRequest[]>;
 
   // Settings API
   getSettings(): Promise<SystemSettings>;

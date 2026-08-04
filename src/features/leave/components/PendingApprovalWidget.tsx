@@ -6,15 +6,17 @@ import { ApprovalEngine } from '../../../services/approval-engine.service';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
-import type { LeaveRequest } from '../../../types/database.types';
+import type { LeaveRequest, UserProfile } from '../../../types/database.types';
 
 export interface PendingApprovalWidgetProps {
   requests?: LeaveRequest[];
+  teachers?: UserProfile[];
   onRefresh?: () => void;
 }
 
 export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
   requests = [],
+  teachers = [],
   onRefresh,
 }) => {
   const { user, token } = useAuthStore();
@@ -78,53 +80,32 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
     }
   };
 
-  const defaultMockRequests: LeaveRequest[] = [
-    {
-      id: 'req_mock_1',
-      user_id: 'Ahmad Fauzi, S.Pd',
-      leave_type: 'SAKIT',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: new Date().toISOString().split('T')[0],
-      reason: 'Demam Tinggi & Flu Berat (Ada Surat Dokter)',
-      attachment_url: null,
-      approval_status: 'PENDING',
-      approval_deadline: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'req_mock_2',
-      user_id: 'Siti Nurhaliza, S.Pd',
-      leave_type: 'IZIN',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: new Date().toISOString().split('T')[0],
-      reason: 'Urusan Keluarga Kandung',
-      attachment_url: null,
-      approval_status: 'PENDING',
-      approval_deadline: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'req_mock_3',
-      user_id: 'Dedi Kurniawan, S.Pd',
-      leave_type: 'DINAS_LUAR',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: new Date().toISOString().split('T')[0],
-      reason: 'Pendampingan Lomba OSN Tingkat Kabupaten',
-      attachment_url: null,
-      approval_status: 'PENDING',
-      approval_deadline: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    },
-  ];
+  // Filter requests to only include those from teachers existing in the Users list (teachers sheet)
+  const displayRequests = teachers.length > 0
+    ? requests.filter((req) =>
+        teachers.some(
+          (t) =>
+            t.id === req.user_id ||
+            t.nip === req.user_id ||
+            t.full_name === req.user_id
+        )
+      )
+    : requests;
 
-  const displayRequests = requests.length > 0 ? requests : defaultMockRequests;
+  const getTeacherDisplayName = (userId: string) => {
+    if (!teachers || teachers.length === 0) return userId;
+    const found = teachers.find(
+      (t) => t.id === userId || t.nip === userId || t.full_name === userId
+    );
+    return found ? found.full_name : userId;
+  };
 
   if (displayRequests.length === 0) {
     return (
       <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center space-y-2">
         <span className="text-3xl">🎉</span>
-        <h4 className="font-extrabold text-slate-800 text-sm">Semua Pengajuan Telah Diproses</h4>
-        <p className="text-xs text-slate-400">Tidak ada pengajuan izin/sakit yang menunggu persetujuan Anda saat ini.</p>
+        <h4 className="font-extrabold text-[#023246] text-sm">Tidak Ada Pengajuan Izin Menunggu Approval</h4>
+        <p className="text-xs text-slate-400">Seluruh pengajuan izin/sakit/cuti guru dari database akan muncul di sini secara otomatis saat diajukan.</p>
       </div>
     );
   }
@@ -149,7 +130,7 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-slate-900 text-sm">Guru ID: {req.user_id}</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">{getTeacherDisplayName(req.user_id)}</h4>
                   <Badge status="IZIN">{req.leave_type}</Badge>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">

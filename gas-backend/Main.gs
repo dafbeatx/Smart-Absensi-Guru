@@ -181,6 +181,10 @@ function doPost(e) {
         result = LeaveService.approveLeave(payload, currentUser, requestId);
         break;
 
+      case "GET_PENDING_LEAVES":
+        result = LeaveService.getPendingLeaves(currentUser, payload, requestId);
+        break;
+
       // ── Dashboard APIs ───────────────────────────────────────────────
       case "GET_GURU_DASHBOARD":
         result = DashboardService.getGuruDashboard(currentUser, payload, requestId);
