@@ -348,6 +348,62 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         isOpen={isTestRunnerOpen}
         onClose={() => setIsTestRunnerOpen(false)}
       />
+
+      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Screen 1 Mockup) ────────────────── */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-lg border-t border-[#D4D4CE]/30 px-3 py-1.5 z-40 shadow-xl lg:hidden">
+        <div className="flex items-center justify-around relative">
+          <button
+            onClick={() => setActiveTab('DASHBOARD')}
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
+              activeTab === 'DASHBOARD' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            }`}
+          >
+            <span className="text-lg">🏠</span>
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ATTENDANCE_TRACKING')}
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
+              activeTab === 'ATTENDANCE_TRACKING' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            }`}
+          >
+            <span className="text-lg">⬡</span>
+            <span>Live Tracking</span>
+          </button>
+
+          {/* Center FAB Poster QR Button */}
+          <div className="relative -top-5 flex flex-col items-center">
+            <button
+              onClick={() => setIsQrGeneratorOpen(true)}
+              className="w-14 h-14 rounded-full bg-[#023246] text-white flex items-center justify-center text-xl shadow-xl shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
+              title="Cetak Poster QR"
+            >
+              🔲
+            </button>
+            <span className="text-[10px] font-extrabold text-[#023246] mt-0.5">Poster QR</span>
+          </div>
+
+          <button
+            onClick={() => setActiveTab('REPORTS')}
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-colors cursor-pointer ${
+              activeTab === 'REPORTS' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            }`}
+          >
+            <span className="text-lg">☑️</span>
+            <span>Approval</span>
+            <span className="absolute top-1 right-3.5 px-1 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-3 text-center">3</span>
+          </button>
+
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 text-slate-400 font-semibold cursor-pointer"
+          >
+            <span className="text-lg">🎛️</span>
+            <span>Menu</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 };
