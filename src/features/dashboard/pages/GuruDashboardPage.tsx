@@ -188,66 +188,68 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-28">
-      {/* Top Branding Header */}
-      <header className="flex items-center justify-between px-5 pt-6 pb-4 bg-white border-b border-slate-100 sticky top-0 z-30 shadow-subtle">
+    <div className="min-h-screen bg-[#F6F6F6] pb-28 text-[#023246]">
+      {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-5 pt-6 pb-3 bg-white border-b border-[#D4D4CE]/20 sticky top-0 z-30 shadow-2xs max-w-md mx-auto">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 font-bold text-xl shadow-sm border border-emerald-500/20">
-            📱
+          <div className="w-9 h-9 rounded-full bg-[#0D7A5F]/10 text-[#0D7A5F] font-black text-lg flex items-center justify-center border border-[#0D7A5F]/20">
+            ∆
           </div>
           <div>
-            <h1 className="font-extrabold text-slate-900 text-base tracking-tight leading-none">
+            <h1 className="font-black text-[#023246] text-sm tracking-tight leading-none uppercase">
               Smart Absensi Guru
             </h1>
-            <p className="text-[11px] font-semibold text-slate-500 mt-1 tracking-wide">
-              SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam
+            <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
+              SMP Terpadu Al-Ittihadiyah
             </p>
           </div>
         </div>
+
         <button
           onClick={() => setActiveTab('NOTIFIKASI')}
-          className="relative p-2.5 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+          className="relative p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
           aria-label="Notifikasi"
         >
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#0D7A5F] rounded-full ring-2 ring-white" />
           )}
-          🔔
+          <span className="text-lg">🔔</span>
         </button>
       </header>
 
-      <main className="px-5 pt-5 space-y-5 max-w-md mx-auto">
+      <main className="px-4 pt-4 space-y-4 max-w-md mx-auto">
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
           <>
-            {/* Hero Profile Card */}
-            <section className="bg-white rounded-3xl p-5 shadow-card border border-slate-100 flex items-center justify-between">
+            {/* 1. Top Profile Header Card */}
+            <section className="bg-white rounded-3xl p-5 shadow-card border border-[#D4D4CE]/30 flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full inline-block">
-                  {getTimeBasedGreeting()}
+                <span className="text-xs font-bold text-[#0D7A5F] flex items-center gap-1">
+                  <span>{getTimeBasedGreeting()}</span>
                 </span>
-                <h2 className="text-lg font-extrabold text-slate-900 leading-snug">
-                  {user?.full_name || 'Ahmad Hidayat, S.Pd.'}
+                <h2 className="text-xl font-extrabold text-[#023246] leading-snug">
+                  {user?.full_name || 'Dafa Maulana, S.Pd'}
                 </h2>
                 <p className="text-xs font-medium text-slate-500">
-                  {user?.nip ? `NIP. ${user.nip}` : user?.position || 'Guru Utama'}
+                  {user?.nip ? `NIP. ${user.nip}` : 'NIP. 199501012020011001'}
                 </p>
               </div>
 
-              <div className="relative flex flex-col items-center">
-                <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xl flex items-center justify-center ring-4 ring-emerald-500/20 shadow-inner">
-                  {user?.full_name ? user.full_name.charAt(0) : 'AH'}
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-2xl flex items-center justify-center shadow-inner border border-[#0D7A5F]/20">
+                  {user?.full_name ? user.full_name.charAt(0) : 'D'}
                 </div>
                 <button
                   onClick={logout}
-                  className="text-[10px] font-bold text-red-600 hover:underline mt-1.5"
+                  className="px-2.5 py-1 bg-[#FEE2E2] hover:bg-[#FCA5A5]/40 text-[#DC2626] font-bold text-[11px] rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                  title="Keluar dari Akun"
                 >
-                  🚪 Keluar
+                  <span>➔</span> Keluar
                 </button>
               </div>
             </section>
 
-            {/* Holiday Notice Alert Banner if Today is Holiday */}
+            {/* Holiday Alert Banner if Today is Holiday */}
             {todayHoliday && (
               <section className="bg-purple-600 text-white rounded-3xl p-5 shadow-lg shadow-purple-600/20 border border-purple-500 flex items-start gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md text-2xl flex items-center justify-center shrink-0">
@@ -265,12 +267,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </section>
             )}
 
-            {/* Today Attendance Status Card */}
-            <section className="bg-linear-to-br from-emerald-600 to-teal-700 rounded-3xl p-5 text-white shadow-lg shadow-emerald-600/20 relative overflow-hidden space-y-4">
-              <div className="flex justify-between items-start">
+            {/* 2. Main Attendance Status Card (Dark Emerald Green #0D7A5F) */}
+            <section className="bg-[#0D7A5F] rounded-3xl p-5 text-white shadow-xl shadow-[#0D7A5F]/20 relative overflow-hidden space-y-4 border border-[#0A6B56]">
+              <div className="flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-xs text-emerald-100 font-medium">Status Kehadiran Hari Ini</p>
-                  <p className="text-xs font-semibold text-emerald-200 mt-0.5">
+                  <p className="text-xs text-white font-extrabold">Status Kehadiran Hari Ini</p>
+                  <p className="text-xs font-semibold text-[#C8F2E0] mt-0.5">
                     {new Date().toLocaleDateString('id-ID', {
                       weekday: 'long',
                       day: 'numeric',
@@ -279,110 +281,144 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     })}
                   </p>
                 </div>
-                <Badge
-                  status={
-                    (todayAttendance?.status as 'HADIR' | 'TERLAMBAT' | 'BELUM_ABSEN') ||
-                    'BELUM_ABSEN'
-                  }
-                  pulse
-                >
+
+                <div className="bg-[#FFF4DC] text-[#B45309] border border-[#FDE68A] font-extrabold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-[#B45309] animate-pulse" />
                   {todayAttendance?.status === 'HADIR'
-                    ? 'Sudah Absen Masuk'
+                    ? 'SUDAH ABSEN MASUK'
                     : todayAttendance?.status === 'TERLAMBAT'
-                    ? 'Terlambat'
-                    : 'Belum Absen Masuk'}
-                </Badge>
+                    ? 'TERLAMBAT'
+                    : 'BELUM ABSEN MASUK'}
+                </div>
               </div>
 
+              {/* Inset Side-by-Side Cards */}
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15">
-                  <p className="text-[11px] text-emerald-100">Jam Masuk</p>
-                  <p className="text-xl font-extrabold text-white mt-0.5">
-                    {todayAttendance?.check_in_time || '-- : --'}
-                  </p>
-                  <span className="text-[10px] text-emerald-200">Batas: 07.15 WIB</span>
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/20 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#C8F2E0] text-[#0D7A5F] flex items-center justify-center font-bold text-sm">
+                      🕒
+                    </div>
+                    <span className="text-xs text-white font-bold">Jam Masuk</span>
+                  </div>
+                  <div>
+                    <p className="text-xl font-extrabold text-white font-mono">
+                      {todayAttendance?.check_in_time || '-- : --'}
+                    </p>
+                    <p className="text-[10px] text-[#C8F2E0] font-medium mt-0.5">Batas: 07.15 WIB</p>
+                  </div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15">
-                  <p className="text-[11px] text-emerald-100">Jam Pulang</p>
-                  <p className="text-xl font-extrabold text-white mt-0.5">
-                    {todayAttendance?.check_out_time || '-- : --'}
-                  </p>
-                  <span className="text-[10px] text-emerald-200">Mulai: 15.30 WIB</span>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/20 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#C8F2E0] text-[#0D7A5F] flex items-center justify-center font-bold text-sm">
+                      🕒
+                    </div>
+                    <span className="text-xs text-white font-bold">Jam Pulang</span>
+                  </div>
+                  <div>
+                    <p className="text-xl font-extrabold text-white font-mono">
+                      {todayAttendance?.check_out_time || '-- : --'}
+                    </p>
+                    <p className="text-[10px] text-[#C8F2E0] font-medium mt-0.5">Mulai: 15.30 WIB</p>
+                  </div>
                 </div>
               </div>
             </section>
 
-            {/* Primary Action Callout Banner */}
+            {/* 3. "Sudah Berada di Sekolah?" Callout Banner */}
             <section
               onClick={onOpenScanner}
-              className="bg-emerald-50 hover:bg-emerald-100/80 rounded-2xl p-4 border border-emerald-200 flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-subtle"
+              className="bg-[#E8FAF2] hover:bg-[#D1F5E5] rounded-2xl p-4 border border-[#A7F3D0] flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-2xs"
             >
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-md group-hover:scale-110 transition-transform">
-                  📷
+                <div className="w-11 h-11 rounded-2xl bg-[#0D7A5F] text-white flex items-center justify-center text-xl shadow-md group-hover:scale-105 transition-transform">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
                 </div>
                 <div>
-                  <h4 className="font-extrabold text-slate-900 text-sm">Sudah Berada di Sekolah?</h4>
+                  <h4 className="font-extrabold text-[#023246] text-sm">Sudah Berada di Sekolah?</h4>
                   <p className="text-xs text-slate-600">Tekan tombol hijau di bawah untuk Scan QR</p>
                 </div>
               </div>
-              <span className="text-emerald-700 font-bold text-lg">➔</span>
+              <span className="text-[#0D7A5F] font-black text-xl">›</span>
             </section>
 
-            {/* Quick Action Shortcuts */}
+            {/* 4. Quick Action Buttons Row */}
             <section className="grid grid-cols-2 gap-3.5">
               <button
                 onClick={handleOpenLeaveModal}
-                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-card flex items-center gap-3 text-left hover:border-emerald-500/50 transition-all active:scale-95 group"
+                className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/30 shadow-card flex items-center justify-between hover:border-[#0D7A5F]/50 transition-all active:scale-95 text-left cursor-pointer"
               >
-                <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-                  📝
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#E8FAF2] text-[#0D7A5F] flex items-center justify-center text-lg">
+                    📝
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-[#023246] text-xs">Ajukan Izin</h4>
+                    <p className="text-[10px] text-slate-500 font-medium">Sakit / Dinas</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm">Ajukan Izin</h4>
-                  <p className="text-[11px] text-slate-500">Sakit / Dinas</p>
-                </div>
+                <span className="text-slate-400 font-bold text-sm">›</span>
               </button>
 
               <button
                 onClick={handleOpenCorrectionModal}
-                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-card flex items-center gap-3 text-left hover:border-emerald-500/50 transition-all active:scale-95 group"
+                className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/30 shadow-card flex items-center justify-between hover:border-[#D97706]/50 transition-all active:scale-95 text-left cursor-pointer"
               >
-                <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-                  ⚠️
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center text-lg">
+                    ⚠️
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-[#023246] text-xs">Koreksi Absen</h4>
+                    <p className="text-[10px] text-slate-500 font-medium">Lupa scan / Kendala</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm">Koreksi Absen</h4>
-                  <p className="text-[11px] text-slate-500">Lupa scan / Kendala</p>
-                </div>
+                <span className="text-slate-400 font-bold text-sm">›</span>
               </button>
             </section>
 
-            {/* Monthly Attendance Progress Card */}
-            <section className="bg-white rounded-3xl p-5 border border-slate-100 shadow-card space-y-3">
+            {/* 5. Monthly Attendance Progress Card */}
+            <section className="bg-white rounded-3xl p-5 border border-[#D4D4CE]/30 shadow-card space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-[#023246] text-xs">Kehadiran Bulan Ini</h3>
-                <span className="text-xs font-extrabold text-[#287094]">{attendancePercentage}%</span>
+                <span className="text-xs font-extrabold text-[#0D7A5F]">{attendancePercentage}%</span>
               </div>
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
+              
+              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex">
                 <div className="bg-[#16A34A] h-full transition-all duration-500" style={{ width: `${hadirPercent}%` }} />
                 <div className="bg-[#D97706] h-full transition-all duration-500" style={{ width: `${terlambatPercent}%` }} />
                 <div className="bg-[#287094] h-full transition-all duration-500" style={{ width: `${izinPercent}%` }} />
                 <div className="bg-[#DC2626] h-full transition-all duration-500" style={{ width: `${alfaPercent}%` }} />
               </div>
-              <div className="flex justify-between text-[11px] font-semibold text-slate-500 pt-1">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Hadir: {hadirCount}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#D97706]" /> Terlambat: {terlambatCount}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#287094]" /> Izin: {izinCount}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#DC2626]" /> Alfa: {alfaCount}
-                </span>
+
+              <div className="grid grid-cols-4 gap-1 text-center divide-x divide-slate-100 pt-1">
+                <div className="space-y-1">
+                  <span className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Hadir
+                  </span>
+                  <p className="font-black text-[#023246] text-sm">{hadirCount}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-[#D97706]" /> Terlambat
+                  </span>
+                  <p className="font-black text-[#023246] text-sm">{terlambatCount}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-[#287094]" /> Izin
+                  </span>
+                  <p className="font-black text-[#023246] text-sm">{izinCount}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-[#DC2626]" /> Alfa
+                  </span>
+                  <p className="font-black text-[#023246] text-sm">{alfaCount}</p>
+                </div>
               </div>
             </section>
           </>
@@ -535,58 +571,59 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       </main>
 
       {/* 5-Item Navigation Bar with Center-Dock FAB */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-lg border-t border-slate-200 px-4 py-2 z-40">
-        <div className="flex items-center justify-between relative">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-lg border-t border-[#D4D4CE]/30 px-3 py-1.5 z-40 shadow-xl">
+        <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('BERANDA')}
-            className={`flex flex-col items-center gap-1 text-[11px] w-14 py-1 transition-colors ${
-              activeTab === 'BERANDA' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
+              activeTab === 'BERANDA' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-xl">🏠</span>
+            <span className="text-lg">🏠</span>
             <span>Beranda</span>
           </button>
 
           <button
             onClick={() => setActiveTab('RIWAYAT')}
-            className={`flex flex-col items-center gap-1 text-[11px] w-14 py-1 transition-colors ${
-              activeTab === 'RIWAYAT' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
+              activeTab === 'RIWAYAT' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-xl">📜</span>
+            <span className="text-lg">📄</span>
             <span>Riwayat</span>
           </button>
 
           {/* Center FAB Scanner Button */}
-          <div className="relative -top-6 flex flex-col items-center">
+          <div className="relative -top-5 flex flex-col items-center">
             <button
               onClick={onOpenScanner}
-              className="w-16 h-16 rounded-full bg-linear-to-tr from-emerald-600 to-emerald-400 text-white flex items-center justify-center text-2xl shadow-fab ring-4 ring-slate-50 active:scale-95 transition-transform"
+              className="w-14 h-14 rounded-full bg-[#0D7A5F] text-white flex items-center justify-center text-xl shadow-xl shadow-[#0D7A5F]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
               aria-label="Scan QR Absensi"
+              title="Pindai QR Code Absensi"
             >
               📷
             </button>
-            <span className="text-[10px] font-bold text-emerald-700 mt-1">Scan QR</span>
+            <span className="text-[10px] font-extrabold text-[#0D7A5F] mt-0.5">Scan QR</span>
           </div>
 
           <button
             onClick={() => setActiveTab('NOTIFIKASI')}
-            className={`flex flex-col items-center gap-1 text-[11px] w-14 py-1 relative transition-colors ${
-              activeTab === 'NOTIFIKASI' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-colors cursor-pointer ${
+              activeTab === 'NOTIFIKASI' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-xl">🔔</span>
+            <span className="text-lg">🔔</span>
             <span>Notifikasi</span>
-            {unreadCount > 0 && <span className="absolute top-1 right-3 w-2 h-2 bg-emerald-500 rounded-full" />}
+            {unreadCount > 0 && <span className="absolute top-1 right-3.5 w-2 h-2 bg-[#0D7A5F] rounded-full" />}
           </button>
 
           <button
             onClick={() => setActiveTab('PROFIL')}
-            className={`flex flex-col items-center gap-1 text-[11px] w-14 py-1 transition-colors ${
-              activeTab === 'PROFIL' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
+              activeTab === 'PROFIL' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-xl">👤</span>
+            <span className="text-lg">👤</span>
             <span>Profil</span>
           </button>
         </div>
