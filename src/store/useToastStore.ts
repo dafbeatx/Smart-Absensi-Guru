@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { SoundService } from '../services/audio.service';
 
 export type ToastType = 'success' | 'warning' | 'error' | 'info';
 
@@ -20,6 +21,14 @@ export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
   showToast: (type, title, message, solution) => {
     const id = Math.random().toString(36).substring(2, 9);
+    
+    // Auto-play audio sound effect based on toast result type
+    if (type === 'success') {
+      SoundService.playSuccess();
+    } else if (type === 'error' || type === 'warning') {
+      SoundService.playError();
+    }
+
     set((state) => ({
       toasts: [...state.toasts, { id, type, title, message, solution }],
     }));
