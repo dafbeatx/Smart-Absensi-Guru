@@ -511,6 +511,45 @@ var AttendanceService = {
         date: date
       }, requestId);
     });
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GET DAILY ATTENDANCE (All records for a specific date)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  getDailyAttendance: function(payload, currentUser, requestId) {
+    var role = currentUser.role || "";
+    if (role !== ROLES.ADMIN && role !== ROLES.KEPSEK) {
+      return Utils.errorResponse("ATT_AUTH", "Anda tidak memiliki akses untuk melihat data absensi harian.", null, requestId);
+    }
+
+    var date = payload.date || Utils.formatDate(new Date()); // default hari ini
+
+    var allRecords = DatabaseManager.findAll(DB.SHEETS.ATTENDANCE);
+    var dailyRecords = [];
+
+    for (var i = 0; i < allRecords.length; i++) {
+      var rec = allRecords[i];
+      var recDate = rec.date;
+      var recDateStr = (recDate instanceof Date) ? Utils.formatDate(recDate) : String(recDate);
+      if (recDateStr === date) {
+        dailyRecords.push({
+          id: rec.id,
+          user_id: rec.user_id,
+          date: recDateStr,
+          check_in_time: rec.check_in_time || "",
+          check_out_time: rec.check_out_time || "",
+          status: rec.status || "",
+          late_minutes: rec.late_minutes || 0,
+          working_duration: rec.working_duration || "",
+          verification_method: rec.verification_method || "",
+          attendance_source: rec.attendance_source || "",
+          created_at: rec.created_at || ""
+        });
+      }
+    }
+
+    return Utils.successResponse("ATT_DAILY_OK", "Data absensi harian berhasil dimuat.", dailyRecords, requestId);
   }
 };
 

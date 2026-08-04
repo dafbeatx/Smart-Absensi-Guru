@@ -1,5 +1,5 @@
-import React from 'react';
-import type { UserProfile, LeaveRequest } from '../../types/database.types';
+import React, { useMemo } from 'react';
+import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../types/database.types';
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 
@@ -7,6 +7,7 @@ export interface ExecutiveDashboardOverviewProps {
   roleTitle: 'Admin Website' | 'Kepala Sekolah';
   teachers: UserProfile[];
   pendingRequests?: LeaveRequest[];
+  attendanceRecords?: AttendanceRecord[];
   onOpenScanner?: () => void;
   onSwitchToGuruView?: () => void;
   onOpenQrGenerator?: () => void;
@@ -19,6 +20,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   roleTitle,
   teachers,
   pendingRequests = [],
+  attendanceRecords = [],
   onSwitchToGuruView,
   onOpenQrGenerator,
   onOpenCorrectionModal,
@@ -26,10 +28,25 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   onNavigateTab,
 }) => {
   const totalGuruCount = teachers.length > 0 ? teachers.length : 12;
-  const hadirCount = 0;
-  const terlambatCount = 0;
-  const izinCount = 0;
-  const belumAbsenCount = totalGuruCount - (hadirCount + terlambatCount + izinCount);
+
+  const { hadirCount, terlambatCount, izinCount, belumAbsenCount } = useMemo(() => {
+    let hadir = 0;
+    let terlambat = 0;
+    let izin = 0;
+    const presentUserIds = new Set<string>();
+
+    for (const rec of attendanceRecords) {
+      presentUserIds.add(rec.user_id);
+      const status = (rec.status || '').toUpperCase();
+      if (status === 'HADIR') hadir++;
+      else if (status === 'TERLAMBAT') terlambat++;
+      else if (status === 'IZIN' || status === 'SAKIT' || status === 'DINAS_LUAR') izin++;
+    }
+
+    const belum = Math.max(0, totalGuruCount - presentUserIds.size);
+
+    return { hadirCount: hadir, terlambatCount: terlambat, izinCount: izin, belumAbsenCount: belum };
+  }, [attendanceRecords, totalGuruCount]);
 
   // Teachers list from Users sheet
   const recentTeachers = teachers.slice(0, 5);

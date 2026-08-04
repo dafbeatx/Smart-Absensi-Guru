@@ -66,6 +66,10 @@ export class GasProvider implements IDataProvider {
     });
   }
 
+  public async getDailyAttendance(date: string, token: string): Promise<AttendanceRecord[]> {
+    return apiClient.post<AttendanceRecord[]>('GET_DAILY_ATTENDANCE', { date, token });
+  }
+
   public async submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest> {
     return apiClient.post<LeaveRequest>('SUBMIT_LEAVE', {
       token: dto.token,

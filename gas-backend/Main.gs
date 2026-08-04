@@ -176,6 +176,10 @@ function doPost(e) {
         result = AttendanceService.correctAttendance(payload, currentUser, requestId);
         break;
 
+      case "GET_DAILY_ATTENDANCE":
+        result = AttendanceService.getDailyAttendance(payload, currentUser, requestId);
+        break;
+
       // ── Leave Management ─────────────────────────────────────────────
       case "SUBMIT_LEAVE":
         result = LeaveService.submitLeave(payload, currentUser, requestId);

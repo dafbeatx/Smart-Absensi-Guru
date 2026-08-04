@@ -162,6 +162,11 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
+  public async getDailyAttendance(_date: string, _token: string): Promise<AttendanceRecord[]> {
+    await new Promise((r) => setTimeout(r, 200));
+    return [];
+  }
+
   public async submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest> {
     return {
       id: 'leave_mock_' + Date.now(),

@@ -22,6 +22,7 @@ export interface IDataProvider {
   getTodayAttendance(userId: string, token: string): Promise<AttendanceRecord | null>;
   getMonthlyAttendance(userId: string, month: string, year: string, token: string): Promise<AttendanceRecord[]>;
   correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean>;
+  getDailyAttendance(date: string, token: string): Promise<AttendanceRecord[]>;
 
   // Leave & Approval API
   submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest>;

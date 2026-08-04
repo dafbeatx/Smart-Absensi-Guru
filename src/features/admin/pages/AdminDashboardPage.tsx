@@ -19,7 +19,7 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
-import type { UserProfile, LeaveRequest } from '../../../types/database.types';
+import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -49,6 +49,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   });
 
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
 
   const [teachers, setTeachers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('smart_absensi_teachers');
@@ -114,6 +115,20 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     }
   };
 
+  const fetchAttendanceRecords = async (date?: string) => {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      if (token) {
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        const records = await provider.getDailyAttendance(targetDate, token);
+        setAttendanceRecords(records || []);
+      }
+    } catch (err) {
+      console.warn('Gagal memuat data absensi harian:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchUsersFromBackend = async () => {
       try {
@@ -130,6 +145,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     };
     fetchUsersFromBackend();
     fetchPendingRequests();
+    fetchAttendanceRecords();
   }, []);
 
   const handleExportExcel = async () => {
@@ -224,6 +240,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               roleTitle="Admin Website"
               teachers={teachers}
               pendingRequests={pendingRequests}
+              attendanceRecords={attendanceRecords}
               onOpenScanner={onOpenScanner}
               onSwitchToGuruView={onSwitchToGuruView}
               onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
@@ -238,6 +255,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             <div className="space-y-6">
               <DailyAttendanceTracker
                 teachers={teachers}
+                attendanceRecords={attendanceRecords}
                 onOpenCorrectionModal={(teacher) => {
                   setSelectedCorrectionTeacher(teacher);
                   setIsCorrectionModalOpen(true);
@@ -352,6 +370,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         }}
         teachers={teachers}
         selectedTeacherId={selectedCorrectionTeacher?.id}
+        onSuccess={() => fetchAttendanceRecords()}
       />
 
       {/* Official QR Code Poster Generator Modal */}
