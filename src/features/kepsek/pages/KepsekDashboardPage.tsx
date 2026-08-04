@@ -149,14 +149,14 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] pb-24 text-[#111827]">
+    <div className="min-h-screen bg-[#FAF8F5] pb-24 text-[#09090B]">
       {/* Sidebar Component */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         title={user?.full_name || 'Kepala Sekolah'}
         roleBadge="👑 Executive Principal Access"
-        roleColor="bg-[#16A34A]/20 text-[#4ADE80] border-[#16A34A]/40"
+        roleColor="bg-[#10B981]/20 text-[#34D399] border-[#10B981]/40"
         items={sidebarItems}
         activeTab={activeTab}
         onSelectTab={(id) => setActiveTab(id as typeof activeTab)}
@@ -165,8 +165,8 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         onLogout={logout}
       />
 
-      {/* Executive Header */}
-      <header className="bg-[#111827] text-white pt-8 pb-16 px-5 rounded-b-[2.5rem] shadow-xl border-b border-[#E5E7EB]/10">
+      {/* Executive Header (Linear / Vercel Dark Theme) */}
+      <header className="bg-[#09090B] text-white pt-8 pb-16 px-5 rounded-b-[2.5rem] shadow-2xl border-b border-[#27272A]">
         <div className="max-w-xl mx-auto space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Top-Left: Sidebar Button & Identity */}
@@ -174,7 +174,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               {/* 1. Sidebar Hamburger Button at Top-Left */}
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="p-3 bg-[#1F2937] hover:bg-[#374151] active:scale-95 text-[#60A5FA] font-bold rounded-2xl transition-all border border-[#374151] flex items-center gap-2 shadow-lg group shrink-0"
+                className="p-3 bg-[#18191E] hover:bg-[#27272A] active:scale-95 text-[#60A5FA] font-bold rounded-2xl transition-all border border-[#27272A] flex items-center gap-2 shadow-lg group shrink-0"
                 aria-label="Buka Sidebar Navigasi"
                 title="Buka Sidebar Navigasi"
               >
@@ -187,11 +187,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               </button>
 
               <div className="space-y-0.5">
-                <span className="inline-block px-2.5 py-0.5 bg-[#16A34A]/20 text-[#4ADE80] font-bold text-[11px] rounded-full border border-[#16A34A]/40">
+                <span className="inline-block px-2.5 py-0.5 bg-[#10B981]/20 text-[#34D399] font-bold text-[11px] rounded-full border border-[#10B981]/40">
                   👑 Executive Principal Access
                 </span>
                 <h1 className="text-lg font-black text-white">{user?.full_name || 'Kepala Sekolah'}</h1>
-                <p className="text-[11px] text-[#9CA3AF]">SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</p>
+                <p className="text-[11px] text-[#A1A1AA]">SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</p>
               </div>
             </div>
 
@@ -200,7 +200,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               <div className="flex items-center gap-2">
                 <button
                   onClick={onSwitchToGuruView}
-                  className="px-3 py-2 bg-[#1F2937] hover:bg-[#374151] hover:border-[#2563EB] text-[#D1D5DB] hover:text-[#60A5FA] text-xs font-bold rounded-2xl border border-[#374151] transition-all flex items-center gap-1.5 shadow-xs"
+                  className="px-3.5 py-2 bg-[#18191E] hover:bg-[#27272A] hover:border-[#2563EB] text-[#D4D4D8] hover:text-white text-xs font-bold rounded-2xl border border-[#27272A] transition-all flex items-center gap-1.5 shadow-xs"
                   title="Switch ke Tampilan Guru"
                 >
                   <span className="text-[#2563EB]">📱</span> Mode Guru
@@ -219,10 +219,10 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                      className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                         activeTab === tab.id
-                          ? 'bg-[#2563EB] text-white font-black shadow-lg shadow-blue-500/30'
-                          : 'bg-[#1F2937] text-[#D1D5DB] hover:bg-[#374151] hover:text-white'
+                          ? 'bg-[#2563EB] text-white font-black shadow-lg shadow-blue-500/30 border border-blue-400/30'
+                          : 'bg-[#18191E] text-[#D4D4D8] hover:bg-[#27272A] hover:text-white border border-[#27272A]'
                       }`}
                     >
                       {tab.label}
@@ -235,7 +235,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             {/* 2. Hide/Show Toggle placed at far right end */}
             <button
               onClick={() => setIsNavVisible(!isNavVisible)}
-              className="px-3 py-2 bg-[#1F2937] hover:bg-[#374151] text-[#9CA3AF] hover:text-white text-xs font-bold rounded-xl transition-all border border-[#374151] flex items-center gap-1.5 shrink-0 shadow-xs"
+              className="px-3 py-2 bg-[#18191E] hover:bg-[#27272A] text-[#A1A1AA] hover:text-white text-xs font-bold rounded-xl transition-all border border-[#27272A] flex items-center gap-1.5 shrink-0 shadow-xs"
               title={isNavVisible ? 'Sembunyikan navigasi' : 'Tampilkan navigasi'}
             >
               {isNavVisible ? (

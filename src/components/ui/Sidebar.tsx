@@ -30,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   title,
   subtitle = 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
   roleBadge,
-  roleColor = 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  roleColor = 'bg-[#2563EB]/20 text-[#60A5FA] border-[#2563EB]/40',
   items,
   activeTab,
   onSelectTab,
@@ -56,31 +56,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Backdrop Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-[#111827]/70 backdrop-blur-xs z-50 transition-opacity duration-300 animate-fadeIn"
+          className="fixed inset-0 bg-[#09090B]/80 backdrop-blur-md z-50 transition-opacity duration-300 animate-fadeIn"
           onClick={onClose}
           aria-hidden="true"
         />
       )}
 
-      {/* Sidebar Panel Drawer */}
+      {/* Sidebar Panel Drawer (Linear / Vercel Dark Theme) */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-[#111827] text-white z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out border-r border-[#374151] ${
+        className={`fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-[#09090B] text-white z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out border-r border-[#27272A] ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-label="Navigation Sidebar"
       >
         {/* Header Section */}
-        <div className="p-5 border-b border-[#374151] space-y-3 relative">
+        <div className="p-5 border-b border-[#27272A] space-y-3 relative bg-[#121316]">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-[#9CA3AF] hover:text-white bg-[#1F2937] hover:bg-[#374151] rounded-xl transition-all"
+            className="absolute top-4 right-4 p-2 text-[#A1A1AA] hover:text-white bg-[#18191E] hover:bg-[#27272A] rounded-xl transition-all border border-[#27272A]"
             aria-label="Tutup Sidebar"
           >
             ✕
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#2563EB] flex items-center justify-center font-black text-xl text-white shadow-lg shadow-blue-500/20 shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#2563EB] flex items-center justify-center font-black text-xl text-white shadow-lg shadow-blue-500/25 shrink-0">
               {user?.full_name?.charAt(0) || 'A'}
             </div>
             <div className="space-y-0.5 overflow-hidden">
@@ -88,14 +88,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {roleBadge}
               </span>
               <h2 className="font-extrabold text-sm text-white truncate">{user?.full_name || title}</h2>
-              <p className="text-[11px] text-[#9CA3AF] truncate">{subtitle}</p>
+              <p className="text-[11px] text-[#A1A1AA] truncate">{subtitle}</p>
             </div>
           </div>
         </div>
 
         {/* Navigation Items */}
         <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
-          <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#9CA3AF]">
+          <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#71717A]">
             📊 Menu Utama & Aplikasi
           </div>
 
@@ -110,8 +110,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all ${
                   isActive
-                    ? 'bg-[#2563EB] text-white font-extrabold shadow-lg shadow-blue-500/30 translate-x-1'
-                    : 'text-[#D1D5DB] hover:bg-[#1F2937] hover:text-white'
+                    ? 'bg-[#2563EB] text-white font-extrabold shadow-lg shadow-blue-500/30 translate-x-1 border border-blue-400/30'
+                    : 'text-[#D4D4D8] hover:bg-[#18191E] hover:text-white'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -135,8 +135,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Quick Actions Footer */}
-        <div className="p-4 border-t border-[#374151] space-y-1.5 bg-[#0F172A]">
-          <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#9CA3AF]">
+        <div className="p-4 border-t border-[#27272A] space-y-1.5 bg-[#0D0E11]">
+          <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#71717A]">
             ⚙️ Akses Cepat
           </div>
 
@@ -146,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onSwitchToGuruView();
                 onClose();
               }}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#A7F3D0] hover:bg-[#1F2937] transition-all"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#A7F3D0] hover:bg-[#18191E] border border-transparent hover:border-[#27272A] transition-all"
             >
               <span>📱</span> Mode Tampilan Guru
             </button>
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onOpenScanner();
                 onClose();
               }}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#60A5FA] hover:bg-[#1F2937] transition-all"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#60A5FA] hover:bg-[#18191E] border border-transparent hover:border-[#27272A] transition-all"
             >
               <span>📷</span> Scan Absensi Saya
             </button>
@@ -169,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onLogout();
               onClose();
             }}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#F87171] hover:bg-[#DC2626]/20 transition-all"
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#F87171] hover:bg-[#EF4444]/20 border border-transparent hover:border-[#EF4444]/40 transition-all"
           >
             <span>🚪</span> Keluar Aplikasi
           </button>
