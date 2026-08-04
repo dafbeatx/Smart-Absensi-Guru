@@ -16,6 +16,8 @@ import { ReportService } from '../../../services/report.service';
 import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
+import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
+import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
 import type { UserProfile } from '../../../types/database.types';
 
 export interface AdminDashboardPageProps {
@@ -27,13 +29,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const { user, logout } = useAuthStore();
   const { showToast } = useToastStore();
 
-  const [activeTab, setActiveTab] = useState<'ATTENDANCE_TRACKING' | 'TEACHERS' | 'CALENDAR' | 'MY_ATTENDANCE' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('ATTENDANCE_TRACKING');
+  const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isNavVisible, setIsNavVisible] = useState(true);
 
   // Status absensi pribadi Admin hari ini (mock/state)
   const [adminAttendance] = useState<{
@@ -140,28 +141,39 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   };
 
   const sidebarItems: SidebarItem[] = [
-    { id: 'ATTENDANCE_TRACKING', label: 'Live Tracking Absensi', icon: '📍' },
-    { id: 'TEACHERS', label: 'Account Applications', icon: '📑', badge: teachers.length },
-    { id: 'CALENDAR', label: 'Kalender Akademik', icon: '📅' },
-    { id: 'MY_ATTENDANCE', label: 'Absensi Pribadi Saya', icon: '📷' },
-    { id: 'SETTINGS', label: 'Jam Kerja & Geofence', icon: '⚙️' },
-    { id: 'EXPORT', label: 'Export Multi-Sheet Excel', icon: '📊' },
-    { id: 'AUDIT', label: 'Audit Trail Logging', icon: '📜' },
+    { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
+    { id: 'ATTENDANCE_TRACKING', label: 'Live Tracking', icon: '👁️' },
+    { id: 'TEACHERS', label: 'Account Applications', icon: '👥', badge: teachers.length },
+    { id: 'CALENDAR', label: 'Kalender', icon: '📅' },
+    { id: 'MY_ATTENDANCE', label: 'Absensi Saya', icon: '📷' },
+    { id: 'APPROVAL', label: 'Approval', icon: '📝', hasDropdown: true },
+    { id: 'CORRECTION', label: 'Koreksi Manual', icon: '✏️' },
+    { id: 'EXPORT', label: 'Laporan', icon: '📊', hasDropdown: true },
+    { id: 'SETTINGS', label: 'Pengaturan', icon: '⚙️', hasDropdown: true },
+    { id: 'AUDIT', label: 'Audit Log', icon: '📜' },
+    { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
+    { id: 'TESTS', label: 'Tests / Diagnostik', icon: '🧪' },
   ];
 
-  const navTabs = [
-    { id: 'ATTENDANCE_TRACKING', label: '📍 Live Tracking' },
-    { id: 'TEACHERS', label: `📑 Account Applications (${teachers.length})` },
-    { id: 'CALENDAR', label: '📅 Kalender' },
-    { id: 'MY_ATTENDANCE', label: '📷 Absensi Saya' },
-    { id: 'SETTINGS', label: '⚙️ Pengaturan' },
-    { id: 'EXPORT', label: '📊 Export Excel' },
-    { id: 'AUDIT', label: '📜 Audit Log' },
-  ];
+  const handleSelectSidebarTab = (id: string) => {
+    if (id === 'CORRECTION') {
+      setIsCorrectionModalOpen(true);
+      return;
+    }
+    if (id === 'QR_POSTER') {
+      setIsQrGeneratorOpen(true);
+      return;
+    }
+    if (id === 'TESTS') {
+      setIsTestRunnerOpen(true);
+      return;
+    }
+    setActiveTab(id);
+  };
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] pb-24 text-[#023246]">
-      {/* Sidebar Navigation */}
+    <div className="min-h-screen bg-[#F6F6F6] text-[#023246] flex flex-col lg:flex-row">
+      {/* ── LEFT SIDEBAR PANEL (DESKTOP & MOBILE) ────────────────────────── */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -170,214 +182,149 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         roleColor="bg-[#287094]/30 text-[#F6F6F6] border-[#287094]"
         items={sidebarItems}
         activeTab={activeTab}
-        onSelectTab={(id) => setActiveTab(id as typeof activeTab)}
+        onSelectTab={handleSelectSidebarTab}
         onSwitchToGuruView={onSwitchToGuruView}
         onOpenScanner={onOpenScanner}
         onLogout={logout}
+        isDesktopFixed={true}
       />
 
-      {/* Admin Website Header (Midnight Navy #023246) */}
-      <header className="bg-[#023246] text-white pt-8 pb-16 px-5 rounded-b-[2.5rem] shadow-xl border-b border-[#D4D4CE]/20">
-        <div className="max-w-5xl mx-auto space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Top-Left: Sidebar Button & Identity */}
-            <div className="flex items-center gap-3.5">
-              {/* 1. Sidebar Hamburger Button at Top-Left */}
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="p-3 bg-[#012332] hover:bg-[#287094] active:scale-95 text-[#F6F6F6] font-bold rounded-2xl transition-all border border-[#D4D4CE]/30 flex items-center gap-2 shadow-lg group shrink-0"
-                aria-label="Buka Sidebar Navigasi"
-                title="Buka Sidebar Navigasi"
-              >
-                <div className="w-5 h-4 flex flex-col justify-between">
-                  <span className="block h-0.5 bg-[#F6F6F6] rounded-full transition-all group-hover:w-full" />
-                  <span className="block h-0.5 bg-[#F6F6F6] rounded-full transition-all" />
-                  <span className="block h-0.5 bg-[#F6F6F6] rounded-full transition-all group-hover:w-full" />
-                </div>
-                <span className="text-xs hidden sm:inline font-bold">Sidebar</span>
-              </button>
+      {/* ── RIGHT MAIN CONTAINER ────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+        {/* Top Header Navbar */}
+        <TopDashboardNavbar
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
+          onLogout={logout}
+        />
 
-              <div className="space-y-0.5">
-                <span className="inline-block px-2.5 py-0.5 bg-[#287094] text-[#F6F6F6] font-bold text-[11px] rounded-full border border-[#D4D4CE]/40">
-                  🛠️ Dashboard Admin Website
-                </span>
-                <h1 className="text-lg font-black text-white">{user?.full_name || 'Rina Fitriani, S.Kom.'}</h1>
-                <p className="text-[11px] text-[#D4D4CE]">SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</p>
+        {/* Main Content Viewport */}
+        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
+          <QueueMonitor />
+
+          {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
+          {activeTab === 'DASHBOARD' && (
+            <ExecutiveDashboardOverview
+              roleTitle="Admin Website"
+              teachers={teachers}
+              onOpenScanner={onOpenScanner}
+              onSwitchToGuruView={onSwitchToGuruView}
+              onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
+              onOpenCorrectionModal={() => setIsCorrectionModalOpen(true)}
+              onOpenTestRunner={() => setIsTestRunnerOpen(true)}
+              onNavigateTab={(tab: string) => setActiveTab(tab)}
+            />
+          )}
+
+          {/* TAB 2: LIVE ATTENDANCE TRACKING */}
+          {activeTab === 'ATTENDANCE_TRACKING' && (
+            <div className="space-y-6">
+              <DailyAttendanceTracker
+                teachers={teachers}
+                onOpenCorrectionModal={(teacher) => {
+                  setSelectedCorrectionTeacher(teacher);
+                  setIsCorrectionModalOpen(true);
+                }}
+              />
+              <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-3">
+                <h3 className="font-extrabold text-[#023246] text-sm flex items-center gap-2">
+                  <span>📝 Persetujuan Pengajuan Izin / Sakit Guru</span>
+                </h3>
+                <PendingApprovalWidget />
               </div>
             </div>
+          )}
 
-            {/* 4 & 5. Action Buttons Group at Top-Right with AWSMCOLOR Palette */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => setIsQrGeneratorOpen(true)}
-                className="px-3.5 py-2 bg-[#012332] hover:bg-[#287094] text-[#F6F6F6] hover:text-white text-xs font-bold rounded-2xl border border-[#D4D4CE]/30 transition-all flex items-center gap-1.5 shadow-xs"
-                title="Cetak Poster QR Absensi"
-              >
-                <span className="text-[#287094]">🖨️</span> Poster QR
-              </button>
-              <button
-                onClick={() => setIsCorrectionModalOpen(true)}
-                className="px-3.5 py-2 bg-[#012332] hover:bg-[#287094] text-[#F6F6F6] hover:text-white text-xs font-bold rounded-2xl border border-[#D4D4CE]/30 transition-all flex items-center gap-1.5 shadow-xs"
-                title="Koreksi Absensi Manual"
-              >
-                <span className="text-[#D97706]">✏️</span> Koreksi
-              </button>
-              <button
-                onClick={() => setIsTestRunnerOpen(true)}
-                className="px-3.5 py-2 bg-[#012332] hover:bg-[#287094] text-[#F6F6F6] hover:text-white text-xs font-bold rounded-2xl border border-[#D4D4CE]/30 transition-all flex items-center gap-1.5 shadow-xs"
-                title="Jalankan Unit Test Suite"
-              >
-                <span className="text-[#16A34A]">🧪</span> Tests
-              </button>
-            </div>
-          </div>
+          {/* TAB 3: ACCOUNT APPLICATIONS / TEACHERS */}
+          {activeTab === 'TEACHERS' && (
+            <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
+          )}
 
-          {/* 2 & 3. Secondary Navigation Bar with Hide Button on Far Right */}
-          <div className="flex items-center justify-between gap-3 pt-2">
-            {/* Scrollable Pill Container */}
-            <div className="flex-1 overflow-x-auto custom-scrollbar">
-              {isNavVisible && (
-                <div className="flex items-center gap-2">
-                  {navTabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                      className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                        activeTab === tab.id
-                          ? 'bg-[#287094] text-white font-black shadow-lg shadow-[#287094]/40 border border-[#D4D4CE]/40'
-                          : 'bg-[#012332] text-[#D4D4CE] hover:bg-[#287094] hover:text-white border border-[#D4D4CE]/20'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+          {/* TAB 4: ACADEMIC CALENDAR */}
+          {activeTab === 'CALENDAR' && <AcademicCalendarManagement />}
+
+          {/* TAB 5: ABSENSI PRIBADI SAYA */}
+          {activeTab === 'MY_ATTENDANCE' && (
+            <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="space-y-1">
+                  <span className="px-2.5 py-0.5 bg-[#287094]/10 text-[#287094] font-bold text-[11px] rounded-full border border-[#287094]/30">
+                    Kartu Absensi Pribadi Admin & Staf
+                  </span>
+                  <h3 className="font-extrabold text-[#023246] text-lg">Absensi Harian Saya</h3>
+                  <p className="text-xs text-slate-500">
+                    Sebagai Admin Website, Anda tetap tercatat dalam daftar kehadiran harian sekolah.
+                  </p>
                 </div>
-              )}
+
+                <Button variant="primary" onClick={onOpenScanner} className="flex items-center gap-2">
+                  <span>📷</span> Scan QR Code Absensi (Masuk / Pulang)
+                </Button>
+              </div>
+
+              {/* Status Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500">Status Kehadiran Hari Ini</p>
+                  <p className="font-black text-[#023246] text-base">
+                    {adminAttendance.status === 'HADIR' ? '✅ HADIR' : adminAttendance.status === 'TERLAMBAT' ? '⚠️ TERLAMBAT' : '⏳ BELUM ABSEN'}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500">Jam Absen Masuk</p>
+                  <p className="font-mono font-bold text-slate-800 text-base">
+                    {adminAttendance.checkIn || '-- : -- WIB'}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500">Jam Absen Pulang</p>
+                  <p className="font-mono font-bold text-slate-800 text-base">
+                    {adminAttendance.checkOut || '-- : -- WIB'}
+                  </p>
+                </div>
+              </div>
             </div>
+          )}
 
-            {/* 2. Hide/Show Toggle placed at far right end */}
-            <button
-              onClick={() => setIsNavVisible(!isNavVisible)}
-              className="px-3 py-2 bg-[#012332] hover:bg-[#287094] text-[#D4D4CE] hover:text-white text-xs font-bold rounded-xl transition-all border border-[#D4D4CE]/30 flex items-center gap-1.5 shrink-0 shadow-xs"
-              title={isNavVisible ? 'Sembunyikan navigasi' : 'Tampilkan navigasi'}
-            >
-              {isNavVisible ? (
-                <>
-                  <svg className="w-3.5 h-3.5 text-[#D4D4CE]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" /></svg>
-                  <span className="hidden sm:inline">Hide</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5 text-[#D4D4CE]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                  <span className="hidden sm:inline">Show</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main className="max-w-5xl mx-auto px-5 -mt-8 space-y-5">
-        <QueueMonitor />
-
-        {/* Live Attendance Tracking Tab */}
-        {activeTab === 'ATTENDANCE_TRACKING' && (
-          <div className="space-y-6">
-            <DailyAttendanceTracker
-              teachers={teachers}
-              onOpenCorrectionModal={(teacher) => {
-                setSelectedCorrectionTeacher(teacher);
-                setIsCorrectionModalOpen(true);
-              }}
-            />
-            
-            {/* Pending Approvals Widget for Admin */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-3">
-              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <span>📝 Persetujuan Pengajuan Izin / Sakit Guru</span>
-              </h3>
+          {/* TAB 6: APPROVAL */}
+          {activeTab === 'APPROVAL' && (
+            <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
+              <h3 className="font-extrabold text-[#023246] text-base">📝 Approval Pengajuan Izin / Sakit</h3>
               <PendingApprovalWidget />
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Card Absensi Pribadi Admin */}
-        {activeTab === 'MY_ATTENDANCE' && (
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-card space-y-5">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          {/* TAB 7: SETTINGS */}
+          {activeTab === 'SETTINGS' && <SystemSettingsForm />}
+
+          {/* TAB 8: LAPORAN / EXPORT */}
+          {activeTab === 'EXPORT' && (
+            <div className="bg-white p-8 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-5 text-center">
+              <span className="text-5xl">📊</span>
               <div className="space-y-1">
-                <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[11px] rounded-full">
-                  Kartu Absensi Pribadi Admin & Staf
-                </span>
-                <h3 className="font-extrabold text-slate-900 text-lg">Absensi Harian Saya</h3>
-                <p className="text-xs text-slate-500">
-                  Sebagai Admin Website, Anda tetap tercatat dalam daftar kehadiran harian sekolah.
+                <h3 className="font-extrabold text-[#023246] text-xl">Generator Laporan Excel (.xlsx) & PDF Resmi</h3>
+                <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
+                  Pilih format berkas laporan yang Anda butuhkan. Format Excel (.xlsx) disajikan dalam 5 tab sheet terpisah dengan lebar kolom yang pas, sedangkan format PDF disajikan lengkap dengan Kop Surat sekolah dan lembar tanda tangan resmi.
                 </p>
               </div>
 
-              <Button variant="primary" onClick={onOpenScanner} className="flex items-center gap-2">
-                <span>📷</span> Scan QR Code Absensi (Masuk / Pulang)
-              </Button>
-            </div>
-
-            {/* Status Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <p className="text-xs font-semibold text-slate-500">Status Kehadiran Hari Ini</p>
-                <p className="font-black text-slate-900 text-base">
-                  {adminAttendance.status === 'HADIR' ? '✅ HADIR' : adminAttendance.status === 'TERLAMBAT' ? '⚠️ TERLAMBAT' : '⏳ BELUM ABSEN'}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <p className="text-xs font-semibold text-slate-500">Jam Absen Masuk</p>
-                <p className="font-mono font-bold text-slate-800 text-base">
-                  {adminAttendance.checkIn || '-- : -- WIB'}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                <p className="text-xs font-semibold text-slate-500">Jam Absen Pulang</p>
-                <p className="font-mono font-bold text-slate-800 text-base">
-                  {adminAttendance.checkOut || '-- : -- WIB'}
-                </p>
+              <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+                <Button variant="primary" onClick={handleExportExcel} className="flex items-center justify-center gap-2">
+                  <span>📊</span> Download File Excel Resmi (.xlsx)
+                </Button>
+                <Button variant="secondary" onClick={handleExportPDF} className="flex items-center justify-center gap-2">
+                  <span>📄</span> Cetak / Simpan Laporan PDF (.pdf)
+                </Button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'TEACHERS' && (
-          <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
-        )}
-
-        {activeTab === 'CALENDAR' && <AcademicCalendarManagement />}
-
-        {activeTab === 'SETTINGS' && <SystemSettingsForm />}
-
-        {activeTab === 'EXPORT' && (
-          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-card space-y-5 text-center">
-            <span className="text-5xl">📊</span>
-            <div className="space-y-1">
-              <h3 className="font-extrabold text-slate-900 text-xl">Generator Laporan Excel (.xlsx) & PDF Resmi</h3>
-              <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
-                Pilih format berkas laporan yang Anda butuhkan. Format Excel (.xlsx) disajikan dalam 5 tab sheet terpisah dengan lebar kolom yang pas, sedangkan format PDF disajikan lengkap dengan Kop Surat sekolah dan lembar tanda tangan resmi.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
-              <Button variant="primary" onClick={handleExportExcel} className="flex items-center justify-center gap-2">
-                <span>📊</span> Download File Excel Resmi (.xlsx)
-              </Button>
-              <Button variant="secondary" onClick={handleExportPDF} className="flex items-center justify-center gap-2">
-                <span>📄</span> Cetak / Simpan Laporan PDF (.pdf)
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'AUDIT' && <AuditLogTable />}
-      </main>
+          {/* TAB 9: AUDIT LOG */}
+          {activeTab === 'AUDIT' && <AuditLogTable />}
+        </main>
+      </div>
 
       {/* Manual Attendance Correction Modal */}
       <AttendanceCorrectionModal

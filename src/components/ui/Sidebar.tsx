@@ -7,6 +7,7 @@ export interface SidebarItem {
   icon: string;
   badge?: number | string;
   color?: string;
+  hasDropdown?: boolean;
 }
 
 export interface SidebarProps {
@@ -22,21 +23,23 @@ export interface SidebarProps {
   onSwitchToGuruView?: () => void;
   onOpenScanner?: () => void;
   onLogout: () => void;
+  isDesktopFixed?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
   title,
-  subtitle = 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
-  roleBadge,
-  roleColor = 'bg-[#287094]/30 text-[#F6F6F6] border-[#287094]',
+  subtitle = 'SMP Terpadu Al-Ittihadiyah',
+  roleBadge: _roleBadge,
+  roleColor: _roleColor = 'bg-[#287094]/30 text-[#F6F6F6] border-[#287094]',
   items,
   activeTab,
   onSelectTab,
   onSwitchToGuruView,
-  onOpenScanner,
+  onOpenScanner: _onOpenScanner,
   onLogout,
+  isDesktopFixed = true,
 }) => {
   const { user } = useAuthStore();
 
@@ -51,73 +54,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  return (
-    <>
-      {/* Backdrop Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-[#023246]/80 backdrop-blur-md z-50 transition-opacity duration-300 animate-fadeIn"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Sidebar Panel Drawer (Midnight Navy #023246) */}
-      <aside
-        className={`fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out border-r border-[#D4D4CE]/20 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-        aria-label="Navigation Sidebar"
-      >
-        {/* Header Section */}
-        <div className="p-5 border-b border-[#D4D4CE]/20 space-y-3 relative bg-[#012332]">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-[#D4D4CE] hover:text-white bg-[#023246] hover:bg-[#287094] rounded-xl transition-all border border-[#D4D4CE]/30"
-            aria-label="Tutup Sidebar"
-          >
-            ✕
-          </button>
-
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#287094] flex items-center justify-center font-black text-xl text-[#F6F6F6] shadow-lg shadow-[#287094]/30 shrink-0 border border-[#D4D4CE]/30">
-              {user?.full_name?.charAt(0) || 'A'}
-            </div>
-            <div className="space-y-0.5 overflow-hidden">
-              <span className={`inline-block px-2.5 py-0.5 font-bold text-[10px] rounded-full border ${roleColor}`}>
-                {roleBadge}
-              </span>
-              <h2 className="font-extrabold text-sm text-[#F6F6F6] truncate">{user?.full_name || title}</h2>
-              <p className="text-[11px] text-[#D4D4CE] truncate">{subtitle}</p>
-            </div>
-          </div>
+  const sidebarContent = (
+    <aside
+      className={`bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col border-r border-[#D4D4CE]/20 h-full w-64 ${
+        isDesktopFixed ? 'hidden lg:flex fixed top-0 left-0 bottom-0' : 'w-64'
+      }`}
+      aria-label="Navigation Sidebar"
+    >
+      {/* Brand Logo Header (Delta Symbol + SMART ABSENSI GURU) */}
+      <div className="p-5 border-b border-[#D4D4CE]/15 flex items-center gap-3 bg-[#012332]">
+        <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-black text-lg text-white shrink-0 shadow-inner">
+          ∆
         </div>
+        <div className="space-y-0.5 overflow-hidden">
+          <h2 className="font-black text-xs tracking-wider text-white uppercase truncate">Smart Absensi Guru</h2>
+          <p className="text-[10px] text-[#D4D4CE] truncate">{subtitle}</p>
+        </div>
+      </div>
 
-        {/* Navigation Items */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
-          <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#D4D4CE]/80">
-            📊 Menu Utama & Aplikasi
-          </div>
-
-          {items.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onSelectTab(item.id);
-                  onClose();
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  isActive
-                    ? 'bg-[#287094] text-white font-extrabold shadow-lg shadow-[#287094]/40 translate-x-1 border border-[#D4D4CE]/40'
-                    : 'text-[#D4D4CE] hover:bg-[#0c4156] hover:text-white border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-base">{item.icon}</span>
-                  <span>{item.label}</span>
-                </div>
+      {/* Navigation Items List */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+        {items.map((item) => {
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                onSelectTab(item.id);
+                onClose();
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                isActive
+                  ? 'bg-[#287094] text-white font-extrabold shadow-md shadow-[#287094]/40 border border-[#D4D4CE]/30'
+                  : 'text-[#D4D4CE] hover:bg-[#0c4156] hover:text-white border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm">{item.icon}</span>
+                <span className="truncate">{item.label}</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
                 {item.badge !== undefined && item.badge !== null && (
                   <span
                     className={`px-2 py-0.5 text-[10px] font-black rounded-full ${
@@ -129,52 +105,73 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {item.badge}
                   </span>
                 )}
-              </button>
-            );
-          })}
-        </div>
+                {item.hasDropdown && <span className="text-[10px] text-[#D4D4CE]/60">▼</span>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Quick Actions Footer */}
-        <div className="p-4 border-t border-[#D4D4CE]/20 space-y-1.5 bg-[#012332]">
-          <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#D4D4CE]/80">
-            ⚙️ Akses Cepat
+      {/* User Profile & Footer Actions */}
+      <div className="p-3.5 border-t border-[#D4D4CE]/15 bg-[#012332] space-y-2">
+        {/* User Card */}
+        <div className="flex items-center justify-between p-2 rounded-xl bg-[#023246]/80 border border-[#D4D4CE]/15">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-[#287094] text-white flex items-center justify-center font-bold text-xs shrink-0 border border-[#D4D4CE]/30">
+              {user?.full_name?.charAt(0) || 'A'}
+            </div>
+            <div className="space-y-0 overflow-hidden text-left">
+              <p className="text-xs font-bold text-white truncate">{user?.full_name || title}</p>
+              <p className="text-[10px] text-[#D4D4CE]/80 truncate">admin@sag.sch.id</p>
+            </div>
           </div>
-
-          {onSwitchToGuruView && (
-            <button
-              onClick={() => {
-                onSwitchToGuruView();
-                onClose();
-              }}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#F6F6F6] hover:bg-[#287094] border border-transparent hover:border-[#D4D4CE]/30 transition-all"
-            >
-              <span>📱</span> Mode Tampilan Guru
-            </button>
-          )}
-
-          {onOpenScanner && (
-            <button
-              onClick={() => {
-                onOpenScanner();
-                onClose();
-              }}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-[#F6F6F6] hover:bg-[#287094] border border-transparent hover:border-[#D4D4CE]/30 transition-all"
-            >
-              <span>📷</span> Scan Absensi Saya
-            </button>
-          )}
-
           <button
-            onClick={() => {
-              onLogout();
-              onClose();
-            }}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-red-300 hover:bg-red-900/40 border border-transparent hover:border-red-500/40 transition-all"
+            onClick={onLogout}
+            className="p-1.5 text-[#D4D4CE] hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-all"
+            title="Keluar / Logout"
+            aria-label="Logout"
           >
-            <span>🚪</span> Keluar Aplikasi
+            ⋮
           </button>
         </div>
-      </aside>
+
+        {/* Quick Mode Switches */}
+        {onSwitchToGuruView && (
+          <button
+            onClick={() => {
+              onSwitchToGuruView();
+              onClose();
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-bold text-[#F6F6F6] bg-[#287094]/30 hover:bg-[#287094] border border-[#287094]/50 transition-all"
+          >
+            <span>📱</span> Switch ke Mode Guru
+          </button>
+        )}
+      </div>
+    </aside>
+  );
+
+  return (
+    <>
+      {/* Permanent Desktop Sidebar */}
+      {isDesktopFixed && sidebarContent}
+
+      {/* Mobile Drawer Overlay & Sidebar */}
+      {isOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-[#023246]/80 backdrop-blur-md z-50 transition-opacity duration-300 animate-fadeIn lg:hidden"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          <aside
+            className="fixed top-0 left-0 bottom-0 w-64 bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out border-r border-[#D4D4CE]/20 lg:hidden translate-x-0"
+            aria-label="Mobile Navigation Sidebar"
+          >
+            {sidebarContent}
+          </aside>
+        </>
+      )}
     </>
   );
 };
