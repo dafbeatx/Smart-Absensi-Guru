@@ -195,15 +195,19 @@ function doPost(e) {
         break;
 
       // ── Reports ──────────────────────────────────────────────────────
-      // case "GENERATE_REPORT":
-      //   result = ReportService.generateMonthlyReport(payload, currentUser, requestId);
-      //   break;
+      case "GENERATE_REPORT":
+      case "GENERATE_MONTHLY_REPORT":
+        result = ReportService.generateMonthlyReport(payload, currentUser, requestId);
+        break;
 
-      // ── Admin User Management ────────────────────────────────────────
-      // case "ADD_USER":
-      // case "RESET_PIN":
-      // case "RESET_DEVICE":
-      // case "TOGGLE_USER_STATUS":
+      // ── Admin User Management & Security ─────────────────────────────
+      case "RESET_DEVICE":
+        result = AuthService.resetDevice(payload, currentUser, requestId);
+        break;
+
+      case "RESET_PIN":
+        result = AuthService.resetPIN(payload, currentUser, requestId);
+        break;
 
       // ── Settings ─────────────────────────────────────────────────────
       case "GET_SETTINGS":

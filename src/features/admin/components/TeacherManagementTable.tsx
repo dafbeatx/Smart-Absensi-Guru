@@ -98,6 +98,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const handleResetPin = async () => {
     if (!selectedTeacher || newPin.length !== 6) return;
 
+    try {
+      await ProviderFactory.getProvider().resetPin(selectedTeacher.id, newPin, useAuthStore.getState().token || '');
+    } catch (e) {
+      console.warn('API resetPin warning:', e);
+    }
+
     const updated = teachers.map((t) =>
       t.id === selectedTeacher.id ? { ...t, must_change_pin: true } : t
     );
@@ -119,6 +125,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   };
 
   const handleResetDevice = async (teacher: UserProfile) => {
+    try {
+      await ProviderFactory.getProvider().resetDevice(teacher.id, useAuthStore.getState().token || '');
+    } catch (e) {
+      console.warn('API resetDevice warning:', e);
+    }
+
     await AuditLogger.log({
       actorId: user?.id || 'op_1',
       actorRole: user?.role || 'ADMIN',

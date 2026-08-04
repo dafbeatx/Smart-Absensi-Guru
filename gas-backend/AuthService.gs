@@ -594,5 +594,99 @@ var AuthService = {
         is_active: newActive
       }, requestId);
     });
+  },
+
+  resetDevice: function(payload, currentUser, requestId) {
+    return DatabaseManager.executeWithLock(function() {
+      var userId = payload.user_id || payload.target_user_id;
+      if (!userId) {
+        return Utils.errorResponse("PARAM_MISSING", "ID Pengguna wajib diisi", null, requestId);
+      }
+
+      var userRecord = DatabaseManager.findRecord(DB.SHEETS.USERS, "id", userId);
+      if (!userRecord) {
+        return Utils.errorResponse("USER_NOT_FOUND", "Pengguna tidak ditemukan", null, requestId);
+      }
+
+      var bindings = DatabaseManager.findRecords(DB.SHEETS.DEVICE_BINDING, "user_id", userId);
+      for (var i = 0; i < bindings.length; i++) {
+        DatabaseManager.deleteRecord(DB.SHEETS.DEVICE_BINDING, "id", bindings[i].id);
+      }
+
+      DatabaseManager.appendRecord(DB.SHEETS.AUDIT_LOGS, {
+        id: Utils.generateUUID(),
+        request_id: requestId,
+        actor_id: currentUser.sub || currentUser.id,
+        actor_role: currentUser.role || "ADMIN",
+        action_type: "RESET_DEVICE",
+        target_entity: "Device_Binding",
+        before_value: JSON.stringify({ count: bindings.length }),
+        after_value: JSON.stringify({ count: 0 }),
+        change_reason: "Admin/Operator mereset ikatan perangkat untuk " + userRecord.full_name,
+        ip_address: "",
+        user_agent: "",
+        request_method: "POST",
+        execution_ms: "",
+        stacktrace: "",
+        created_at: Utils.now()
+      });
+
+      return Utils.successResponse("RESET_DEVICE_OK", "Ikatan perangkat berhasil dilepas", { user_id: userId }, requestId);
+    });
+  },
+
+  resetPIN: function(payload, currentUser, requestId) {
+    return DatabaseManager.executeWithLock(function() {
+      var userId = payload.target_user_id || payload.user_id;
+      var newPin = (payload.new_pin || "123456").trim();
+
+      if (!userId) {
+        return Utils.errorResponse("PARAM_MISSING", "ID Pengguna wajib diisi", null, requestId);
+      }
+
+      if (newPin.length !== 6 || !/^\d+$/.test(newPin)) {
+        return Utils.errorResponse("AUTH_PIN_INVALID", "PIN 6-digit baru harus berupa angka.", null, requestId);
+      }
+
+      var userRecord = DatabaseManager.findRecord(DB.SHEETS.USERS, "id", userId);
+      if (!userRecord) {
+        return Utils.errorResponse("USER_NOT_FOUND", "Pengguna tidak ditemukan.", null, requestId);
+      }
+
+      var rawPhone = String(userRecord.phone_number || "").trim();
+      var newPinHash = Security.hashPIN(newPin, rawPhone);
+
+      DatabaseManager.updateRecord(DB.SHEETS.USERS, "id", userId, {
+        pin_hash: newPinHash,
+        must_change_pin: true,
+        failed_login_count: 0,
+        account_status: ACCOUNT_STATUS.ACTIVE,
+        locked_until: "",
+        updated_at: Utils.now()
+      });
+
+      DatabaseManager.appendRecord(DB.SHEETS.AUDIT_LOGS, {
+        id: Utils.generateUUID(),
+        request_id: requestId,
+        actor_id: currentUser.sub || currentUser.id,
+        actor_role: currentUser.role || "ADMIN",
+        action_type: "RESET_PIN",
+        target_entity: "Users",
+        before_value: "",
+        after_value: JSON.stringify({ must_change_pin: true }),
+        change_reason: "Admin/Operator mereset PIN untuk " + userRecord.full_name,
+        ip_address: "",
+        user_agent: "",
+        request_method: "POST",
+        execution_ms: "",
+        stacktrace: "",
+        created_at: Utils.now()
+      });
+
+      return Utils.successResponse("RESET_PIN_OK", "PIN pengguna berhasil direset", {
+        user_id: userId,
+        must_change_pin: true
+      }, requestId);
+    });
   }
 };

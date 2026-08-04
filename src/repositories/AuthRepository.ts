@@ -30,4 +30,8 @@ export class AuthRepository {
   public static async changePin(userId: string, newPin: string, token: string): Promise<boolean> {
     return ProviderFactory.getProvider().changePin(userId, newPin, token);
   }
+
+  public static async resetPin(userId: string, newPin: string, token: string): Promise<boolean> {
+    return ProviderFactory.getProvider().resetPin(userId, newPin, token);
+  }
 }

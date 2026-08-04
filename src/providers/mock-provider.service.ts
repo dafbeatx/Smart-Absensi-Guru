@@ -74,6 +74,11 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
+  public async resetPin(_userId: string, _newPin: string, _token: string): Promise<boolean> {
+    await new Promise((r) => setTimeout(r, 300));
+    return true;
+  }
+
   public async scanAttendance(_dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
     await new Promise((r) => setTimeout(r, 500));
     return {

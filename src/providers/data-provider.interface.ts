@@ -15,6 +15,7 @@ export interface IDataProvider {
   verifySession(token: string): Promise<UserProfile>;
   resetDevice(userId: string, token: string): Promise<boolean>;
   changePin(userId: string, newPin: string, token: string): Promise<boolean>;
+  resetPin(userId: string, newPin: string, token: string): Promise<boolean>;
 
   // Attendance API
   scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO>;

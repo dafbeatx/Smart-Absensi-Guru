@@ -5,7 +5,8 @@ import { Modal } from '../../../components/ui/Modal';
 import { AuditLogger } from '../../../services/audit-logger.service';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
-import type { UserProfile } from '../../../types/database.types';
+import { ProviderFactory } from '../../../providers/provider-factory';
+import type { UserProfile, RoleCode } from '../../../types/database.types';
 
 export interface TeacherManagementTableProps {
   teachers: UserProfile[];
@@ -20,7 +21,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const { showToast } = useToastStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterRole, setFilterRole] = useState<'ALL' | 'GURU' | 'KEPSEK' | 'OPERATOR'>('ALL');
+  const [filterRole, setFilterRole] = useState<'ALL' | RoleCode>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isResetPinOpen, setIsResetPinOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<UserProfile | null>(null);
@@ -30,7 +31,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [nip, setNip] = useState('');
   const [phone, setPhone] = useState('');
   const [position, setPosition] = useState('');
-  const [role, setRole] = useState<'GURU' | 'KEPSEK' | 'OPERATOR'>('GURU');
+  const [role, setRole] = useState<RoleCode>('GURU');
   const [newPin, setNewPin] = useState('');
 
   const filteredTeachers = teachers.filter((t) => {
@@ -43,38 +44,33 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     return matchesSearch && matchesRole;
   });
 
-  const handleAddTeacher = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddTeacher = async () => {
+    if (!fullName || !phone) return;
+
     const newTeacher: UserProfile = {
       id: 'usr_' + Date.now(),
-      nip,
+      nip: nip || '-',
       full_name: fullName,
       phone_number: phone,
       role,
-      position,
+      position: position || 'Tenaga Pendidik',
       avatar_url: null,
       is_active: true,
-      must_change_pin: true,
       created_at: new Date().toISOString(),
     };
 
-    const updated = [...teachers, newTeacher];
-    onTeachersChange(updated);
+    onTeachersChange([...teachers, newTeacher]);
 
     await AuditLogger.log({
       actorId: user?.id || 'op_1',
       actorRole: 'OPERATOR',
-      actionType: 'ADD_USER',
+      actionType: 'CREATE_USER',
       targetEntity: 'Users',
       newValue: JSON.stringify(newTeacher),
-      reason: `Pendaftaran akun ${role} baru: ${fullName}`,
+      reason: `Menambahkan akun guru baru: ${fullName}`,
     });
 
-    showToast(
-      'success',
-      'Pengguna Berhasil Ditambahkan!',
-      `${fullName} (${role}) telah terdaftar dengan PIN awal default: 123456.`
-    );
+    showToast('success', 'Guru Berhasil Ditambahkan!', `${fullName} telah terdaftar dengan PIN default 123456.`);
     setIsAddModalOpen(false);
     setFullName('');
     setNip('');
@@ -84,6 +80,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
   const handleResetPin = async () => {
     if (!selectedTeacher || newPin.length !== 6) return;
+
+    try {
+      await ProviderFactory.getProvider().resetPin(selectedTeacher.id, newPin, useAuthStore.getState().token || '');
+    } catch (e) {
+      console.warn('API resetPin warning:', e);
+    }
 
     const updated = teachers.map((t) =>
       t.id === selectedTeacher.id ? { ...t, must_change_pin: true } : t
@@ -106,6 +108,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   };
 
   const handleResetDevice = async (teacher: UserProfile) => {
+    try {
+      await ProviderFactory.getProvider().resetDevice(teacher.id, useAuthStore.getState().token || '');
+    } catch (e) {
+      console.warn('API resetDevice warning:', e);
+    }
+
     await AuditLogger.log({
       actorId: user?.id || 'op_1',
       actorRole: 'OPERATOR',
