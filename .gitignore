@@ -33,3 +33,9 @@ dist-ssr
 # Temporary & Workspace storage
 .tempmediaStorage
 brain
+
+# =====================================
+# AI Internal Working Memory
+# =====================================
+.ai/
+.ai/**
