@@ -385,9 +385,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           </div>
 
           <button
-            onClick={() => setActiveTab('REPORTS')}
+            onClick={() => setActiveTab('APPROVAL')}
             className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-colors cursor-pointer ${
-              activeTab === 'REPORTS' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+              activeTab === 'APPROVAL' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">☑️</span>

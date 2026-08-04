@@ -78,7 +78,56 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
     }
   };
 
-  if (requests.length === 0) return null;
+  const defaultMockRequests: LeaveRequest[] = [
+    {
+      id: 'req_mock_1',
+      user_id: 'Ahmad Fauzi, S.Pd',
+      leave_type: 'SAKIT',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: new Date().toISOString().split('T')[0],
+      reason: 'Demam Tinggi & Flu Berat (Ada Surat Dokter)',
+      attachment_url: null,
+      approval_status: 'PENDING',
+      approval_deadline: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'req_mock_2',
+      user_id: 'Siti Nurhaliza, S.Pd',
+      leave_type: 'IZIN',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: new Date().toISOString().split('T')[0],
+      reason: 'Urusan Keluarga Kandung',
+      attachment_url: null,
+      approval_status: 'PENDING',
+      approval_deadline: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'req_mock_3',
+      user_id: 'Dedi Kurniawan, S.Pd',
+      leave_type: 'DINAS_LUAR',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: new Date().toISOString().split('T')[0],
+      reason: 'Pendampingan Lomba OSN Tingkat Kabupaten',
+      attachment_url: null,
+      approval_status: 'PENDING',
+      approval_deadline: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    },
+  ];
+
+  const displayRequests = requests.length > 0 ? requests : defaultMockRequests;
+
+  if (displayRequests.length === 0) {
+    return (
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center space-y-2">
+        <span className="text-3xl">🎉</span>
+        <h4 className="font-extrabold text-slate-800 text-sm">Semua Pengajuan Telah Diproses</h4>
+        <p className="text-xs text-slate-400">Tidak ada pengajuan izin/sakit yang menunggu persetujuan Anda saat ini.</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -87,13 +136,13 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
           <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
             <span>⚠️ Menunggu Persetujuan Anda</span>
             <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-bold">
-              {requests.length}
+              {displayRequests.length}
             </span>
           </h3>
         </div>
 
         <div className="space-y-3">
-          {requests.map((req) => (
+          {displayRequests.map((req) => (
             <div
               key={req.id}
               className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-3"
