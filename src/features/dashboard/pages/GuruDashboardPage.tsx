@@ -230,9 +230,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <h2 className="text-xl font-extrabold text-[#023246] leading-snug">
                   {user?.full_name || 'Dafa Maulana, S.Pd'}
                 </h2>
-                <p className="text-xs font-medium text-slate-500">
-                  {user?.nip ? `NIP. ${user.nip}` : 'NIP. 199501012020011001'}
-                </p>
+                {user?.nip ? (
+                  <p className="text-xs font-medium text-slate-500">
+                    NIP. {user.nip}
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex flex-col items-center gap-2">

@@ -311,7 +311,6 @@ export class ExcelReportGenerator {
             <p><strong>Admin Website / Operator</strong></p>
             <div class="sig-space"></div>
             <p><strong>Rina Fitriani, S.Kom.</strong></p>
-            <p style="font-size: 10px; color: #64748b;">NIP. 199501012020011001</p>
           </div>
         </div>
       </body>
