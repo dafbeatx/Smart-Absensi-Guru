@@ -1,24 +1,56 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+:root {
+  --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+  --color-primary: #2563EB;
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+  --color-danger: #DC2626;
+  --color-background: #FAFAFA;
+  --color-surface: #FFFFFF;
+  --color-text: #111827;
+  --color-text-secondary: #6B7280;
+  --color-border: #E5E7EB;
+}
 
 @layer base {
-  body {
-    background-color: #F8FAFC;
-    color: #0F172A;
-    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  * {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  }
+
+  html, body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    background-color: #FAFAFA;
+    color: #111827;
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: normal;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    font-weight: 700;
+    line-height: 1.6;
+    letter-spacing: normal;
+  }
+
+  p, span, div, button, input, select, textarea, label, td, th, a {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    line-height: 1.6;
+    letter-spacing: normal;
   }
 }
 
-/* Custom Scrollbar for Smooth Ergonomics */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #F8FAFC;
+  background: #FAFAFA;
 }
 
 ::-webkit-scrollbar-thumb {
