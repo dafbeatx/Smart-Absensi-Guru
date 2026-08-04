@@ -1,9 +1,11 @@
 import React from 'react';
-import type { UserProfile } from '../../types/database.types';
+import type { UserProfile, LeaveRequest } from '../../types/database.types';
+import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 
 export interface ExecutiveDashboardOverviewProps {
   roleTitle: 'Admin Website' | 'Kepala Sekolah';
   teachers: UserProfile[];
+  pendingRequests?: LeaveRequest[];
   onOpenScanner?: () => void;
   onSwitchToGuruView?: () => void;
   onOpenQrGenerator?: () => void;
@@ -15,6 +17,7 @@ export interface ExecutiveDashboardOverviewProps {
 export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProps> = ({
   roleTitle,
   teachers,
+  pendingRequests = [],
   onSwitchToGuruView,
   onOpenQrGenerator,
   onOpenCorrectionModal,
@@ -295,36 +298,16 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             </button>
           </div>
 
-          {/* Sample Approval Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400">
-                  <th className="pb-2 font-bold">Nama</th>
-                  <th className="pb-2 font-bold">Jenis</th>
-                  <th className="pb-2 font-bold">Tanggal</th>
-                  <th className="pb-2 font-bold">Alasan</th>
-                  <th className="pb-2 font-bold text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                <tr>
-                  <td className="py-3 font-bold text-[#023246] flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px]">👤</span>
-                    Rina Marlina, S.Pd
-                  </td>
-                  <td className="py-3 text-slate-600 font-medium">Izin</td>
-                  <td className="py-3 text-slate-600 font-mono text-[11px]">06 - 07 Ags 2026</td>
-                  <td className="py-3 text-slate-600 font-medium">Urusan Keluarga</td>
-                  <td className="py-3 text-right">
-                    <span className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
-                      Menunggu Approval
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {/* Dynamic Pending Approvals or Clean Empty State */}
+          {pendingRequests && pendingRequests.length > 0 ? (
+            <PendingApprovalWidget requests={pendingRequests} />
+          ) : (
+            <div className="p-6 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 font-medium space-y-1">
+              <span className="text-xl block">✅</span>
+              <p className="font-bold text-[#023246]">Tidak ada pengajuan izin / sakit yang menunggu approval</p>
+              <p className="text-[11px] text-slate-400">Semua pengajuan dari guru dan staf telah diproses.</p>
+            </div>
+          )}
         </div>
 
         {/* Right Column (Span 1): Sistem Status */}
