@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
+import { Sidebar } from '../../../components/ui/Sidebar';
+import type { SidebarItem } from '../../../components/ui/Sidebar';
 import { AcademicCalendarManagement } from '../components/AcademicCalendarManagement';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
@@ -30,22 +32,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNavVisible, setIsNavVisible] = useState(true);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close hamburger menu on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsMenuOpen(false);
-      }
-    };
-    if (isMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMenuOpen]);
 
   // Status absensi pribadi Admin hari ini (mock/state)
   const [adminAttendance] = useState<{
@@ -151,57 +139,43 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     showToast('info', 'Dokumen PDF Siap!', 'Jendela cetak / simpan ke PDF telah dibuka.');
   };
 
-  const menuItems = [
-    ...(onSwitchToGuruView ? [{
-      icon: '📱',
-      label: 'Mode Tampilan Guru',
-      onClick: () => { onSwitchToGuruView(); setIsMenuOpen(false); },
-      color: 'text-purple-300 hover:bg-purple-600/20',
-    }] : []),
-    {
-      icon: '🖨️',
-      label: 'Cetak Poster QR Absensi',
-      onClick: () => { setIsQrGeneratorOpen(true); setIsMenuOpen(false); },
-      color: 'text-blue-300 hover:bg-blue-600/20',
-    },
-    {
-      icon: '📷',
-      label: 'Scan Absensi Saya',
-      onClick: () => { onOpenScanner?.(); setIsMenuOpen(false); },
-      color: 'text-emerald-300 hover:bg-emerald-600/20',
-    },
-    {
-      icon: '🧪',
-      label: 'Jalankan Unit Test Suite (22 Tests)',
-      onClick: () => { setIsTestRunnerOpen(true); setIsMenuOpen(false); },
-      color: 'text-emerald-300 hover:bg-emerald-600/20',
-    },
-    {
-      icon: '✏️',
-      label: 'Koreksi Manual',
-      onClick: () => { setIsCorrectionModalOpen(true); setIsMenuOpen(false); },
-      color: 'text-amber-300 hover:bg-amber-600/20',
-    },
-    {
-      icon: '🚪',
-      label: 'Keluar',
-      onClick: () => { logout(); setIsMenuOpen(false); },
-      color: 'text-red-300 hover:bg-red-600/20',
-    },
+  const sidebarItems: SidebarItem[] = [
+    { id: 'ATTENDANCE_TRACKING', label: 'Live Tracking Absensi', icon: '📍' },
+    { id: 'TEACHERS', label: 'Account Applications', icon: '📑', badge: teachers.length },
+    { id: 'CALENDAR', label: 'Kalender Akademik', icon: '📅' },
+    { id: 'MY_ATTENDANCE', label: 'Absensi Pribadi Saya', icon: '📷' },
+    { id: 'SETTINGS', label: 'Jam Kerja & Geofence', icon: '⚙️' },
+    { id: 'EXPORT', label: 'Export Multi-Sheet Excel', icon: '📊' },
+    { id: 'AUDIT', label: 'Audit Trail Logging', icon: '📜' },
   ];
 
   const navTabs = [
-    { id: 'ATTENDANCE_TRACKING', label: '📍 Live Tracking Absensi' },
-    { id: 'TEACHERS', label: '👥 Kelola Master Pengguna' },
-    { id: 'CALENDAR', label: '📅 Kalender Akademik' },
-    { id: 'MY_ATTENDANCE', label: '📷 Absensi Pribadi Saya' },
-    { id: 'SETTINGS', label: '⚙️ Jam Kerja & Geofence' },
-    { id: 'EXPORT', label: '📊 Export Multi-Sheet Excel' },
-    { id: 'AUDIT', label: '📜 Audit Trail Logging' },
+    { id: 'ATTENDANCE_TRACKING', label: '📍 Live Tracking' },
+    { id: 'TEACHERS', label: `📑 Account Applications (${teachers.length})` },
+    { id: 'CALENDAR', label: '📅 Kalender' },
+    { id: 'MY_ATTENDANCE', label: '📷 Absensi Saya' },
+    { id: 'SETTINGS', label: '⚙️ Pengaturan' },
+    { id: 'EXPORT', label: '📊 Export Excel' },
+    { id: 'AUDIT', label: '📜 Audit Log' },
   ];
 
   return (
     <div className="min-h-screen bg-slate-100 pb-24 text-slate-900">
+      {/* Sidebar Navigation */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        title={user?.full_name || 'Admin Website'}
+        roleBadge="🛠️ Website Admin Access"
+        roleColor="bg-blue-500/20 text-blue-300 border-blue-500/30"
+        items={sidebarItems}
+        activeTab={activeTab}
+        onSelectTab={(id) => setActiveTab(id as typeof activeTab)}
+        onSwitchToGuruView={onSwitchToGuruView}
+        onOpenScanner={onOpenScanner}
+        onLogout={logout}
+      />
+
       {/* Admin Website Header */}
       <header className="bg-slate-900 text-white pt-8 pb-16 px-5 rounded-b-[2.5rem] shadow-xl">
         <div className="max-w-5xl mx-auto space-y-4">
@@ -214,42 +188,48 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               <p className="text-xs text-slate-400">SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</p>
             </div>
 
-            {/* Hamburger Menu */}
-            <div className="relative" ref={menuRef}>
+            {/* Sidebar & Quick Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
               <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all border border-slate-700 group"
-                aria-label="Menu"
+                onClick={() => setIsQrGeneratorOpen(true)}
+                className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-blue-300 text-xs font-bold rounded-2xl border border-slate-700 transition-all flex items-center gap-1.5"
+                title="Cetak Poster QR Absensi"
               >
-                <div className="w-5 h-4 flex flex-col justify-between">
-                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'rotate-45 translate-y-1.75' : ''}`} />
-                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'opacity-0 scale-0' : ''}`} />
-                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? '-rotate-45 -translate-y-1.75' : ''}`} />
-                </div>
+                <span>🖨️</span> Poster QR
+              </button>
+              <button
+                onClick={() => setIsCorrectionModalOpen(true)}
+                className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-2xl border border-slate-700 transition-all flex items-center gap-1.5"
+                title="Koreksi Absensi Manual"
+              >
+                <span>✏️</span> Koreksi
+              </button>
+              <button
+                onClick={() => setIsTestRunnerOpen(true)}
+                className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-bold rounded-2xl border border-slate-700 transition-all flex items-center gap-1.5"
+                title="Jalankan Unit Test Suite"
+              >
+                <span>🧪</span> Tests
               </button>
 
-              {/* Dropdown Menu */}
-              {isMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-60 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 z-50 overflow-hidden">
-                  <div className="p-2 space-y-0.5">
-                    {menuItems.map((item, i) => (
-                      <button
-                        key={i}
-                        onClick={item.onClick}
-                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${item.color}`}
-                      >
-                        <span className="text-sm">{item.icon}</span>
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
+              {/* Sidebar Drawer Toggle Button */}
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-blue-400 font-bold rounded-2xl transition-all border border-slate-700 flex items-center gap-2 shadow-lg group"
+                aria-label="Buka Sidebar Navigasi"
+              >
+                <div className="w-5 h-4 flex flex-col justify-between">
+                  <span className="block h-0.5 bg-blue-400 rounded-full transition-all group-hover:w-full" />
+                  <span className="block h-0.5 bg-blue-400 rounded-full transition-all" />
+                  <span className="block h-0.5 bg-blue-400 rounded-full transition-all group-hover:w-full" />
                 </div>
-              )}
+                <span className="text-xs hidden sm:inline">Menu Sidebar</span>
+              </button>
             </div>
           </div>
 
           {/* Navigation Bar with Hide/Show Toggle */}
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-1 overflow-x-auto custom-scrollbar">
             <button
               onClick={() => setIsNavVisible(!isNavVisible)}
               className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-bold rounded-lg transition-all border border-slate-700 flex items-center gap-1.5 shrink-0"

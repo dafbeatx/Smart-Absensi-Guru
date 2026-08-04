@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
+import { Sidebar } from '../../../components/ui/Sidebar';
+import type { SidebarItem } from '../../../components/ui/Sidebar';
+import { TeacherManagementTable } from '../../admin/components/TeacherManagementTable';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { LeaveRequest, UserProfile, HolidayRecord } from '../../../types/database.types';
 
@@ -12,24 +15,68 @@ export interface KepsekDashboardPageProps {
 
 export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpenScanner, onSwitchToGuruView }) => {
   const { user, token, logout } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'APPROVALS' | 'UNABSENTED'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ACCOUNT_APPLICATIONS' | 'APPROVALS' | 'UNABSENTED'>('OVERVIEW');
   const [todayHoliday, setTodayHoliday] = useState<HolidayRecord | null>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNavVisible, setIsNavVisible] = useState(true);
-  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close hamburger menu on outside click
+  const [teachers, setTeachers] = useState<UserProfile[]>(() => {
+    const saved = localStorage.getItem('smart_absensi_teachers');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error('Failed to parse saved teachers:', e);
+      }
+    }
+    return [
+      {
+        id: 'usr_1001',
+        nip: '198507122010011008',
+        full_name: 'Ahmad Hidayat, S.Pd.',
+        phone_number: '081234567890',
+        role: 'GURU',
+        position: 'Guru Matematika Utama',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'usr_1002',
+        nip: '199002142018021002',
+        full_name: 'Budi Santoso, M.Pd.',
+        phone_number: '081398765432',
+        role: 'GURU',
+        position: 'Guru Fisika',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+    ];
+  });
+
+  const handleTeachersChange = (updated: UserProfile[]) => {
+    setTeachers(updated);
+    localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+  };
+
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsMenuOpen(false);
+    const fetchUsersFromBackend = async () => {
+      try {
+        const provider = ProviderFactory.getProvider();
+        const tkn = useAuthStore.getState().token || '';
+        const fetched = await provider.getAllUsers(tkn);
+        if (fetched && fetched.length > 0) {
+          setTeachers(fetched);
+          localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
+        }
+      } catch (err) {
+        console.warn('Backend fetch users fallback:', err);
       }
     };
-    if (isMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMenuOpen]);
+    fetchUsersFromBackend();
+  }, []);
 
   useEffect(() => {
     const checkHoliday = async () => {
@@ -50,7 +97,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
   // Mock data for executive summary
   const stats = {
-    totalTeachers: 12,
+    totalTeachers: teachers.length || 12,
     presentCount: 9,
     lateCount: 1,
     leaveCount: 1,
@@ -87,35 +134,37 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     },
   ];
 
-  const menuItems = [
-    ...(onSwitchToGuruView ? [{
-      icon: '📱',
-      label: 'Mode Tampilan Guru',
-      onClick: () => { onSwitchToGuruView(); setIsMenuOpen(false); },
-      color: 'text-purple-300 hover:bg-purple-600/20',
-    }] : []),
-    {
-      icon: '📷',
-      label: 'Scan Absensi Saya',
-      onClick: () => { onOpenScanner?.(); setIsMenuOpen(false); },
-      color: 'text-emerald-300 hover:bg-emerald-600/20',
-    },
-    {
-      icon: '🚪',
-      label: 'Keluar',
-      onClick: () => { logout(); setIsMenuOpen(false); },
-      color: 'text-red-300 hover:bg-red-600/20',
-    },
+  const sidebarItems: SidebarItem[] = [
+    { id: 'OVERVIEW', label: 'Ringkasan Eksekutif', icon: '📊' },
+    { id: 'ACCOUNT_APPLICATIONS', label: 'Account Applications', icon: '📑', badge: teachers.length },
+    { id: 'APPROVALS', label: 'Persetujuan Izin/Cuti', icon: '📝', badge: mockPendingApprovals.length },
+    { id: 'UNABSENTED', label: 'Daftar Belum Absen', icon: '⚠️', badge: mockUnabsented.length },
   ];
 
   const navTabs = [
     { id: 'OVERVIEW', label: '📊 Ringkasan' },
+    { id: 'ACCOUNT_APPLICATIONS', label: `📑 Akun & Pendaftaran (${teachers.length})` },
     { id: 'APPROVALS', label: `📝 Approval (${mockPendingApprovals.length})` },
     { id: 'UNABSENTED', label: `⚠️ Belum Absen (${mockUnabsented.length})` },
   ];
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 text-slate-900">
+      {/* Sidebar Component */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        title={user?.full_name || 'Kepala Sekolah'}
+        roleBadge="👑 Executive Principal Access"
+        roleColor="bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+        items={sidebarItems}
+        activeTab={activeTab}
+        onSelectTab={(id) => setActiveTab(id as typeof activeTab)}
+        onSwitchToGuruView={onSwitchToGuruView}
+        onOpenScanner={onOpenScanner}
+        onLogout={logout}
+      />
+
       {/* Executive Header */}
       <header className="bg-slate-900 text-white pt-8 pb-16 px-5 rounded-b-[2.5rem] shadow-xl">
         <div className="max-w-xl mx-auto space-y-4">
@@ -128,42 +177,23 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               <p className="text-xs text-slate-400">SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</p>
             </div>
 
-            {/* Hamburger Menu */}
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all border border-slate-700 group"
-                aria-label="Menu"
-              >
-                <div className="w-5 h-4 flex flex-col justify-between">
-                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'rotate-45 translate-y-1.75' : ''}`} />
-                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? 'opacity-0 scale-0' : ''}`} />
-                  <span className={`block h-0.5 bg-slate-300 rounded-full transition-all duration-300 group-hover:bg-white ${isMenuOpen ? '-rotate-45 -translate-y-1.75' : ''}`} />
-                </div>
-              </button>
-
-              {/* Dropdown Menu */}
-              {isMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl shadow-black/40 z-50 overflow-hidden">
-                  <div className="p-2 space-y-0.5">
-                    {menuItems.map((item, i) => (
-                      <button
-                        key={i}
-                        onClick={item.onClick}
-                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${item.color}`}
-                      >
-                        <span className="text-sm">{item.icon}</span>
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Sidebar Drawer Toggle Button */}
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-emerald-400 font-bold rounded-2xl transition-all border border-slate-700 flex items-center gap-2 shadow-lg group"
+              aria-label="Buka Sidebar Navigasi"
+            >
+              <div className="w-5 h-4 flex flex-col justify-between">
+                <span className="block h-0.5 bg-emerald-400 rounded-full transition-all group-hover:w-full" />
+                <span className="block h-0.5 bg-emerald-400 rounded-full transition-all" />
+                <span className="block h-0.5 bg-emerald-400 rounded-full transition-all group-hover:w-full" />
+              </div>
+              <span className="text-xs hidden sm:inline">Menu Sidebar</span>
+            </button>
           </div>
 
           {/* Quick Tab Selector with Hide/Show Toggle */}
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-1 overflow-x-auto custom-scrollbar">
             <button
               onClick={() => setIsNavVisible(!isNavVisible)}
               className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-bold rounded-lg transition-all border border-slate-700 flex items-center gap-1.5 shrink-0"
@@ -183,12 +213,12 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             </button>
 
             {isNavVisible && (
-              <div className="flex gap-2 transition-all">
+              <div className="flex gap-2 transition-all shrink-0">
                 {navTabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all ${
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                       activeTab === tab.id
                         ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/25'
                         : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800'
@@ -270,6 +300,25 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             {/* Pending Approvals Widget */}
             <PendingApprovalWidget requests={mockPendingApprovals} />
           </>
+        )}
+
+        {activeTab === 'ACCOUNT_APPLICATIONS' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900 text-white p-4 rounded-3xl border border-slate-800 shadow-md flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-sm flex items-center gap-2">
+                  <span>📑 Account Applications & Kelola Pengguna</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Daftar akun terdaftar & pendaftaran akun guru/staf baru untuk Kepala Sekolah.
+                </p>
+              </div>
+              <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 font-black text-xs rounded-full border border-emerald-500/30">
+                {teachers.length} Akun
+              </span>
+            </div>
+            <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
+          </div>
         )}
 
         {activeTab === 'APPROVALS' && (
