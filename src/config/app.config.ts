@@ -12,6 +12,7 @@ export const APP_CONFIG = {
 
   // Request & Cache Timings
   REQUEST_TIMEOUT_MS: 15000, // 15 Seconds timeout
+  HEAVY_REQUEST_TIMEOUT_MS: 30000, // 30 Seconds timeout for heavy write/mutation operations
   MAX_RETRIES: 3,
   RETRY_DELAY_MS: 1000,
   AUTO_LOGOUT_DAYS: 7,

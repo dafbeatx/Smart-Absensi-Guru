@@ -43,29 +43,68 @@ var SettingsService = {
         geofence_radius: settingsData.geofence_radius !== undefined ? String(settingsData.geofence_radius) : settingsData.geofenceRadius
       };
 
+      var sheet = DatabaseManager.getSheet(DB.SHEETS.SYSTEM_SETTINGS);
+      if (!sheet) throw new Error("Sheet '" + DB.SHEETS.SYSTEM_SETTINGS + "' tidak ditemukan.");
+
+      var data = sheet.getDataRange().getValues();
+      var headers = DB.HEADERS.System_Settings;
+
+      // Jika sheet belum memiliki data sama sekali
+      if (!data || data.length === 0 || (data.length === 1 && !data[0][0])) {
+        data = [headers];
+      }
+
+      var currentHeaders = data[0];
+      var keyCol = currentHeaders.indexOf("key");
+      var valCol = currentHeaders.indexOf("value");
+      var descCol = currentHeaders.indexOf("description");
+      var updatedAtCol = currentHeaders.indexOf("updated_at");
+      var updatedByCol = currentHeaders.indexOf("updated_by");
+
+      if (keyCol === -1 || valCol === -1) {
+        data[0] = headers;
+        keyCol = 0;
+        valCol = 1;
+        descCol = 2;
+        updatedAtCol = 3;
+        updatedByCol = 4;
+      }
+
+      var nowStr = Utils.now();
       var keys = Object.keys(settingsToUpdate);
+
       for (var i = 0; i < keys.length; i++) {
-        var key = keys[i];
-        var val = settingsToUpdate[key];
-        if (val !== undefined && val !== null) {
-          var existing = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", key);
-          if (existing) {
-            DatabaseManager.updateRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", key, {
-              value: String(val),
-              updated_at: Utils.now(),
-              updated_by: actorId
-            });
-          } else {
-            DatabaseManager.appendRecord(DB.SHEETS.SYSTEM_SETTINGS, {
-              key: key,
-              value: String(val),
-              description: key,
-              updated_at: Utils.now(),
-              updated_by: actorId
-            });
+        var k = keys[i];
+        var v = settingsToUpdate[k];
+        if (v === undefined || v === null) continue;
+        var valStr = String(v);
+
+        var foundRowIndex = -1;
+        for (var r = 1; r < data.length; r++) {
+          if (String(data[r][keyCol]) === String(k)) {
+            foundRowIndex = r;
+            break;
           }
         }
+
+        if (foundRowIndex !== -1) {
+          data[foundRowIndex][valCol] = valStr;
+          if (updatedAtCol !== -1) data[foundRowIndex][updatedAtCol] = nowStr;
+          if (updatedByCol !== -1) data[foundRowIndex][updatedByCol] = actorId;
+        } else {
+          var newRow = new Array(headers.length);
+          for (var col = 0; col < headers.length; col++) newRow[col] = "";
+          newRow[keyCol] = k;
+          newRow[valCol] = valStr;
+          if (descCol !== -1) newRow[descCol] = k;
+          if (updatedAtCol !== -1) newRow[updatedAtCol] = nowStr;
+          if (updatedByCol !== -1) newRow[updatedByCol] = actorId;
+          data.push(newRow);
+        }
       }
+
+      // Single Batch Write seluruh data ke Spreadsheet dalam 1 kali API call!
+      sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
 
       // Proactive Cache Invalidation untuk dashboard
       try {

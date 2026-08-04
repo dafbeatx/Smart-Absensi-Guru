@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatTimeForInput } from '../../utils/time.utils';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -17,6 +18,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   ...props
 }, ref) => {
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+
+  const finalProps = { ...props };
+  if (props.type === 'time' && props.value !== undefined) {
+    finalProps.value = formatTimeForInput(props.value);
+  }
 
   return (
     <div className="w-full space-y-1.5">
@@ -41,7 +47,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
               ? 'border border-red-500 focus:ring-red-500'
               : 'border border-slate-200 focus:ring-emerald-500'
           } ${className}`}
-          {...props}
+          {...finalProps}
         />
         {rightIcon && (
           <div className="absolute right-3.5 text-slate-400 flex items-center">

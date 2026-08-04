@@ -63,11 +63,30 @@ class ApiClient {
     }
   }
 
+  private isHeavyAction(action: string): boolean {
+    const HEAVY_ACTIONS = [
+      'UPDATE_SETTINGS',
+      'BULK_CREATE_USERS',
+      'GENERATE_REPORT',
+      'IMPORT_TEACHERS',
+      'RESTORE_DATABASE',
+      'RUN_MIGRATION',
+    ];
+    return HEAVY_ACTIONS.includes(action);
+  }
+
   private async request<T>(
     action: string,
     body: Record<string, unknown> = {},
-    retries: number = APP_CONFIG.MAX_RETRIES
+    retries: number = APP_CONFIG.MAX_RETRIES,
+    customTimeoutMs?: number
   ): Promise<T> {
+    const timeoutMs =
+      customTimeoutMs ||
+      (this.isHeavyAction(action)
+        ? APP_CONFIG.HEAVY_REQUEST_TIMEOUT_MS
+        : APP_CONFIG.REQUEST_TIMEOUT_MS);
+
     const url = `${this.baseUrl}?action=${encodeURIComponent(action)}`;
 
     const payloadWithMeta = {
@@ -76,7 +95,7 @@ class ApiClient {
       client_timestamp: new Date().toISOString(),
     };
 
-    console.log(`📡 [API POST Request] Action: ${action}`, payloadWithMeta);
+    console.log(`📡 [API POST Request] Action: ${action} | Timeout: ${timeoutMs}ms`, payloadWithMeta);
 
     const options: RequestInit = {
       method: 'POST',
@@ -89,7 +108,7 @@ class ApiClient {
     let attempt = 0;
     while (attempt < retries) {
       try {
-        const response = await this.fetchWithTimeout(url, options);
+        const response = await this.fetchWithTimeout(url, options, timeoutMs);
         const json: ApiResponse<T> = await response.json();
 
         console.log(`📩 [API Response Received] Action: ${action}`, json);
@@ -142,18 +161,32 @@ class ApiClient {
     throw new ApiError(getErrorDefinition('SYS_002'), 504);
   }
 
-  public async post<T>(action: string, data: Record<string, unknown> = {}): Promise<T> {
-    return this.request<T>(action, data);
+  public async post<T>(
+    action: string,
+    data: Record<string, unknown> = {},
+    customTimeoutMs?: number
+  ): Promise<T> {
+    return this.request<T>(action, data, APP_CONFIG.MAX_RETRIES, customTimeoutMs);
   }
 
-  public async get<T>(action: string, params: Record<string, string> = {}): Promise<T> {
+  public async get<T>(
+    action: string,
+    params: Record<string, string> = {},
+    customTimeoutMs?: number
+  ): Promise<T> {
+    const timeoutMs =
+      customTimeoutMs ||
+      (this.isHeavyAction(action)
+        ? APP_CONFIG.HEAVY_REQUEST_TIMEOUT_MS
+        : APP_CONFIG.REQUEST_TIMEOUT_MS);
+
     const query = new URLSearchParams({ action, ...params }).toString();
     const url = `${this.baseUrl}?${query}`;
 
-    console.log(`📡 [API GET Request] Action: ${action}`, params);
+    console.log(`📡 [API GET Request] Action: ${action} | Timeout: ${timeoutMs}ms`, params);
 
     try {
-      const response = await this.fetchWithTimeout(url, { method: 'GET' });
+      const response = await this.fetchWithTimeout(url, { method: 'GET' }, timeoutMs);
       const json: ApiResponse<T> = await response.json();
 
       console.log(`📩 [API Response Received] Action: ${action}`, json);

@@ -7,6 +7,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { SystemSettings } from '../../../types/database.types';
+import { formatTimeForInput } from '../../../utils/time.utils';
 
 export const SystemSettingsForm: React.FC = () => {
   const { user } = useAuthStore();
@@ -31,9 +32,9 @@ export const SystemSettingsForm: React.FC = () => {
           const parsed = JSON.parse(savedLocal);
           if (parsed.app_name) setAppName(parsed.app_name);
           if (parsed.institution_name) setInstitution(parsed.institution_name);
-          if (parsed.work_checkin_start) setCheckInStart(parsed.work_checkin_start);
-          if (parsed.work_checkin_end) setCheckInEnd(parsed.work_checkin_end);
-          if (parsed.work_checkout_start) setCheckOutStart(parsed.work_checkout_start);
+          if (parsed.work_checkin_start) setCheckInStart(formatTimeForInput(parsed.work_checkin_start, CONSTANTS.DEFAULTS.WORK_CHECKIN_START));
+          if (parsed.work_checkin_end) setCheckInEnd(formatTimeForInput(parsed.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END));
+          if (parsed.work_checkout_start) setCheckOutStart(formatTimeForInput(parsed.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START));
           if (parsed.geofence_lat !== undefined) setGeofenceLat(String(parsed.geofence_lat));
           if (parsed.geofence_lng !== undefined) setGeofenceLng(String(parsed.geofence_lng));
           if (parsed.geofence_radius !== undefined) setGeofenceRadius(String(parsed.geofence_radius));
@@ -48,14 +49,19 @@ export const SystemSettingsForm: React.FC = () => {
         if (fetched) {
           if (fetched.app_name) setAppName(fetched.app_name);
           if (fetched.institution_name) setInstitution(fetched.institution_name);
-          if (fetched.work_checkin_start) setCheckInStart(fetched.work_checkin_start);
-          if (fetched.work_checkin_end) setCheckInEnd(fetched.work_checkin_end);
-          if (fetched.work_checkout_start) setCheckOutStart(fetched.work_checkout_start);
+          if (fetched.work_checkin_start) setCheckInStart(formatTimeForInput(fetched.work_checkin_start, CONSTANTS.DEFAULTS.WORK_CHECKIN_START));
+          if (fetched.work_checkin_end) setCheckInEnd(formatTimeForInput(fetched.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END));
+          if (fetched.work_checkout_start) setCheckOutStart(formatTimeForInput(fetched.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START));
           if (fetched.geofence_lat !== undefined) setGeofenceLat(String(fetched.geofence_lat));
           if (fetched.geofence_lng !== undefined) setGeofenceLng(String(fetched.geofence_lng));
           if (fetched.geofence_radius !== undefined) setGeofenceRadius(String(fetched.geofence_radius));
 
-          localStorage.setItem('smart_absensi_system_settings', JSON.stringify(fetched));
+          localStorage.setItem('smart_absensi_system_settings', JSON.stringify({
+            ...fetched,
+            work_checkin_start: formatTimeForInput(fetched.work_checkin_start, CONSTANTS.DEFAULTS.WORK_CHECKIN_START),
+            work_checkin_end: formatTimeForInput(fetched.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END),
+            work_checkout_start: formatTimeForInput(fetched.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START),
+          }));
         }
       } catch (err) {
         console.warn('Backend fetch settings fallback:', err);
