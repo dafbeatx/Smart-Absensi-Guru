@@ -2,51 +2,107 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 /**
- * EXACT BRAND PALETTE (AWSMCOLOR Custom Design System)
- * Hex Tokens: #287094, #D4D4CE, #F6F6F6, #023246
+ * SMART ABSENSI GURU - ADAPTIVE DESIGN SYSTEM ARCHITECTURE
+ * Palette: Primary #023246, Secondary #287094, Surface #F6F6F6, Neutral #D4D4CE
+ * 8-Point Grid Spacing Tokens: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64
  */
 :root {
   --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
   
-  /* AWSMCOLOR Brand Swatch Tokens */
-  --color-brand-primary: #287094;   /* Ocean Steel Blue (Primary Accent & Interactive) */
-  --color-brand-gray: #D4D4CE;      /* Muted Platinum Gray (Border & Dividers) */
-  --color-brand-light: #F6F6F6;     /* Off-White Light Surface & Background */
-  --color-brand-navy: #023246;      /* Deep Midnight Navy (Dark Header & Sidebar Panel) */
+  /* Brand Colors */
+  --color-primary: #023246;     /* Deep Midnight Navy */
+  --color-secondary: #287094;   /* Ocean Steel Blue */
+  --color-surface: #F6F6F6;     /* Light Surface */
+  --color-neutral: #D4D4CE;     /* Muted Divider Gray */
 
-  /* Functional Status Accents (Harmonized with Deep Navy & Steel Blue) */
-  --color-status-success: #16A34A;
-  --color-status-warning: #D97706;
-  --color-status-danger: #DC2626;
+  /* Status Colors */
+  --color-success: #16A34A;
+  --color-warning: #D97706;
+  --color-danger: #DC2626;
+  --color-info: #2563EB;
+
+  /* Touch Targets & Components */
+  --touch-target-min: 48px;
+  --button-height: 52px;
+  --button-radius: 16px;
+  --card-radius: 20px;
+  --card-padding: 20px;
+  --fab-diameter: 64px;
+  --bottom-nav-height: 72px;
+
+  /* Safe Area Insets Fallback */
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
 }
 
 @layer base {
   * {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    box-sizing: border-box;
   }
 
-  html, body {
+  html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+
+  body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
     background-color: #F6F6F6;
     color: #023246;
     font-weight: 400;
-    line-height: 1.6;
+    line-height: 1.5; /* Strict 150% Line Height */
     letter-spacing: normal;
+    overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+
+  /* Typography Hierarchy (Exact System Specs) */
+  .text-hero { font-size: 32px; font-weight: 700; line-height: 1.5; }
+  .text-page-title { font-size: 28px; font-weight: 700; line-height: 1.5; }
+  .text-section-title { font-size: 20px; font-weight: 600; line-height: 1.5; }
+  .text-card-title { font-size: 18px; font-weight: 600; line-height: 1.5; }
+  .text-body-custom { font-size: 16px; font-weight: 400; line-height: 1.5; }
+  .text-caption-custom { font-size: 14px; font-weight: 400; line-height: 1.5; }
+  .text-label-custom { font-size: 12px; font-weight: 500; line-height: 1.5; }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-    font-weight: 700;
-    line-height: 1.6;
-    letter-spacing: normal;
+    line-height: 1.5;
   }
+}
 
-  p, span, div, button, input, select, textarea, label, td, th, a {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-    line-height: 1.6;
-    letter-spacing: normal;
-  }
+/* Card & Natural Soft Shadow Classes */
+.adaptive-card {
+  background-color: #FFFFFF;
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid rgba(212, 212, 206, 0.5);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+.adaptive-button {
+  min-height: 52px;
+  min-width: 48px;
+  border-radius: 16px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.adaptive-fab {
+  width: 64px;
+  height: 64px;
+  border-radius: 9999px;
+  box-shadow: 0 10px 25px rgba(2, 50, 70, 0.3);
+}
+
+.adaptive-bottom-nav {
+  min-height: 72px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Custom Glassmorphism & Card Utilities */

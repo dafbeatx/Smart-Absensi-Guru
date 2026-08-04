@@ -19,7 +19,7 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-bold rounded-2xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 select-none';
+  const baseStyles = 'inline-flex items-center justify-center font-bold rounded-[16px] transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 select-none cursor-pointer';
 
   const variants = {
     primary: 'bg-[#287094] hover:bg-[#023246] text-white shadow-md shadow-[#287094]/20 border border-[#287094]',
@@ -30,9 +30,9 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const sizes = {
-    sm: 'text-xs px-3 py-2 gap-1.5 min-h-[36px]',
-    md: 'text-sm px-4 py-3 gap-2 min-h-[48px]', // Touch target 48px
-    lg: 'text-base px-6 py-4 gap-2.5 min-h-[56px]',
+    sm: 'text-xs px-3.5 py-2 gap-1.5 min-h-[48px] min-w-[48px]',
+    md: 'text-sm px-5 py-3 gap-2 min-h-[52px] min-w-[48px]', // Exact 52px height spec
+    lg: 'text-base px-6 py-4 gap-2.5 min-h-[56px] min-w-[48px]',
   };
 
   return (
