@@ -3,6 +3,7 @@ import { useAuthStore } from './store/useAuthStore';
 import { LoginPage } from './features/auth/pages/LoginPage';
 import { ForceChangePinModal } from './features/auth/components/ForceChangePinModal';
 import { ToastContainer } from './components/ui/Toast';
+import { TestRunnerModal } from './components/dev/TestRunnerModal';
 
 // Code-split role dashboard pages lazily to optimize initial bundle size (~21 KB initial payload)
 const GuruDashboardPage = React.lazy(() =>
@@ -33,6 +34,7 @@ export const App: React.FC = () => {
   const { isAuthenticated, user } = useAuthStore();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isPreviewGuruMode, setIsPreviewGuruMode] = useState(false);
+  const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
 
   if (!isAuthenticated || !user) {
     return (
@@ -55,12 +57,20 @@ export const App: React.FC = () => {
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>📱 Mode Preview Tampilan Guru ({user.role === 'ADMIN' ? 'Admin Access' : 'Kepsek Access'})</span>
             </div>
-            <button
-              onClick={() => setIsPreviewGuruMode(false)}
-              className="px-3.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95"
-            >
-              <span>🔄</span> Kembali ke Dashboard {user.role === 'ADMIN' ? 'Admin' : 'Kepsek'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsTestRunnerOpen(true)}
+                className="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95"
+              >
+                <span>🧪</span> Run Unit Tests
+              </button>
+              <button
+                onClick={() => setIsPreviewGuruMode(false)}
+                className="px-3.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95"
+              >
+                <span>🔄</span> Kembali ke Dashboard {user.role === 'ADMIN' ? 'Admin' : 'Kepsek'}
+              </button>
+            </div>
           </div>
           <GuruDashboardPage onOpenScanner={() => setIsScannerOpen(true)} />
         </div>
@@ -123,6 +133,12 @@ export const App: React.FC = () => {
 
       {/* Mandatory PIN Reset Modal for New/Reset Users */}
       <ForceChangePinModal />
+
+      {/* Dev Suite Unit Test Runner Modal */}
+      <TestRunnerModal
+        isOpen={isTestRunnerOpen}
+        onClose={() => setIsTestRunnerOpen(false)}
+      />
 
       <ToastContainer />
     </>

@@ -13,6 +13,7 @@ import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWid
 import { ReportService } from '../../../services/report.service';
 import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
 import type { UserProfile } from '../../../types/database.types';
 
 export interface AdminDashboardPageProps {
@@ -28,6 +29,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
+  const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNavVisible, setIsNavVisible] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -166,6 +168,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       icon: '📷',
       label: 'Scan Absensi Saya',
       onClick: () => { onOpenScanner?.(); setIsMenuOpen(false); },
+      color: 'text-emerald-300 hover:bg-emerald-600/20',
+    },
+    {
+      icon: '🧪',
+      label: 'Jalankan Unit Test Suite (22 Tests)',
+      onClick: () => { setIsTestRunnerOpen(true); setIsMenuOpen(false); },
       color: 'text-emerald-300 hover:bg-emerald-600/20',
     },
     {
@@ -398,6 +406,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       <QRCodeGeneratorModal
         isOpen={isQrGeneratorOpen}
         onClose={() => setIsQrGeneratorOpen(false)}
+      />
+
+      {/* Dev Suite Unit Test Runner Modal */}
+      <TestRunnerModal
+        isOpen={isTestRunnerOpen}
+        onClose={() => setIsTestRunnerOpen(false)}
       />
     </div>
   );
