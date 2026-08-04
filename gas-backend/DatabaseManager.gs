@@ -111,16 +111,36 @@ var DatabaseManager = (function () {
   /**
    * Menjalankan callback di dalam script-level lock (mutex).
    * Timeout 10 detik — cocok untuk 12 guru scan simultan 06:45 WIB.
+   * Mendukung re-entrancy agar dipanggil bersarang (nested) tanpa melepas lock prematur.
    */
   function executeWithLock(callback) {
     var lock = LockService.getScriptLock();
+    var alreadyLocked = false;
+    try {
+      alreadyLocked = lock.hasLock();
+    } catch (e) {
+      alreadyLocked = false;
+    }
+
+    if (alreadyLocked) {
+      return callback();
+    }
+
+    var lockAcquired = false;
     try {
       lock.waitLock(10000);
+      lockAcquired = lock.hasLock();
       return callback();
     } catch (e) {
       throw new Error(ERRORS.SYS_002.message);
     } finally {
-      lock.releaseLock();
+      if (lockAcquired) {
+        try {
+          lock.releaseLock();
+        } catch (releaseErr) {
+          // Ignore error jika lock sudah dilepas
+        }
+      }
     }
   }
 

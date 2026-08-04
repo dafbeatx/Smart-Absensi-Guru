@@ -427,7 +427,9 @@ var AttendanceService = {
       var userRecords = DatabaseManager.findRecords(DB.SHEETS.ATTENDANCE, "user_id", targetUserId);
       var existingRecord = null;
       for (var i = 0; i < userRecords.length; i++) {
-        if (String(userRecords[i].date) === date) {
+        var recDate = userRecords[i].date;
+        var dateStr = (recDate instanceof Date) ? Utils.formatDate(recDate) : String(recDate);
+        if (dateStr === date) {
           existingRecord = userRecords[i];
           break;
         }

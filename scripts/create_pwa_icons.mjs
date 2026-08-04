@@ -1,10 +1,22 @@
 import fs from 'fs';
+import QRCode from 'qrcode';
 
-// A valid 192x192 PNG green icon base64 (Emerald theme)
-const greenPngBase64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+async function generateIcons() {
+  const buf192 = await QRCode.toBuffer('Smart Absensi Guru', {
+    width: 192,
+    margin: 2,
+    color: { dark: '#059669', light: '#F8FAFC' }
+  });
+  const buf512 = await QRCode.toBuffer('Smart Absensi Guru', {
+    width: 512,
+    margin: 4,
+    color: { dark: '#059669', light: '#F8FAFC' }
+  });
 
-const buffer = Buffer.from(greenPngBase64, 'base64');
-fs.writeFileSync('public/pwa-192x192.png', buffer);
-fs.writeFileSync('public/pwa-512x512.png', buffer);
-console.log('Successfully generated public/pwa-192x192.png and public/pwa-512x512.png');
+  fs.writeFileSync('public/pwa-192x192.png', buf192);
+  fs.writeFileSync('public/pwa-512x512.png', buf512);
+  console.log('Successfully generated public/pwa-192x192.png (192x192) and public/pwa-512x512.png (512x512)');
+}
+
+generateIcons();
+
