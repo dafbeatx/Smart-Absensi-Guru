@@ -7,6 +7,7 @@ import { SoundService } from '../../../services/audio.service';
 import { NotificationService } from '../../../services/notification-permission.service';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
+import { AttendanceRepository } from '../../../repositories/AttendanceRepository';
 import { useAuthStore } from '../../../store/useAuthStore';
 
 export interface QRScannerOverlayProps {
@@ -125,9 +126,27 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
     const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
     const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
+    const token = useAuthStore.getState().token || 'MOCK_TOKEN';
+    const deviceUUID = useAuthStore.getState().deviceUUID || 'DEV_UUID';
     
     // Trigger Real-time Push Notification for Admin & Kepsek
     NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
+
+    // Save Attendance Record to Repository / Provider / LocalStorage
+    try {
+      await AttendanceRepository.scanAttendance({
+        token: token,
+        qr_seed: _qrData || 'SEED_SMP_TERPADU',
+        user_lat: currentCoords.latitude,
+        user_lng: currentCoords.longitude,
+        device_uuid: deviceUUID,
+      });
+
+      // Dispatch global window event so dashboards update in real time
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+    } catch (err) {
+      console.error('Failed to save attendance record to provider:', err);
+    }
 
     const result = {
       timestamp: timestampStr,

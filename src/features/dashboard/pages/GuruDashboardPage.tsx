@@ -109,6 +109,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
 
     loadData();
+
+    window.addEventListener('smart_absensi_scanned', loadData);
+    return () => {
+      window.removeEventListener('smart_absensi_scanned', loadData);
+    };
   }, [user, token]);
 
   // Dynamic monthly attendance statistics calculation

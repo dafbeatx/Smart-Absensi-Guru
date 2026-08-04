@@ -82,22 +82,78 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
-  public async scanAttendance(_dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
-    await new Promise((r) => setTimeout(r, 500));
-    return {
-      attendance_id: 'att_mock_' + Date.now(),
+  public async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
+    await new Promise((r) => setTimeout(r, 400));
+    
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    const dateStr = now.toISOString().split('T')[0];
+
+    const existingSaved = localStorage.getItem('smart_absensi_today_attendance');
+    let record: AttendanceRecord = {
+      id: 'att_' + Date.now(),
+      user_id: 'usr_uuid_1001',
+      date: dateStr,
+      check_in_time: timeStr,
+      check_out_time: null,
       status: 'HADIR',
-      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+      check_in_lat: dto.user_lat || -6.2088,
+      check_in_lng: dto.user_lng || 106.8456,
+      check_in_distance_meters: 12,
+      verification_method: 'QR_GPS',
+      attendance_source: 'QR',
+      is_offline: false,
+      created_at: now.toISOString(),
+    };
+
+    if (existingSaved) {
+      try {
+        const parsed = JSON.parse(existingSaved);
+        if (parsed && parsed.check_in_time && !parsed.check_out_time) {
+          // If check-in already recorded, save check-out time!
+          record = {
+            ...parsed,
+            check_out_time: timeStr,
+          };
+        }
+      } catch (e) {
+        console.error('Error parsing today attendance:', e);
+      }
+    }
+
+    localStorage.setItem('smart_absensi_today_attendance', JSON.stringify(record));
+
+    return {
+      attendance_id: record.id,
+      status: record.status,
+      timestamp: timeStr,
       distance_meters: 12,
       geofence_verified: true,
     };
   }
 
   public async getTodayAttendance(_userId: string, _token: string): Promise<AttendanceRecord | null> {
+    const saved = localStorage.getItem('smart_absensi_today_attendance');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse today attendance:', e);
+      }
+    }
     return null;
   }
 
   public async getMonthlyAttendance(_userId: string, _month: string, _year: string, _token: string): Promise<AttendanceRecord[]> {
+    const saved = localStorage.getItem('smart_absensi_today_attendance');
+    if (saved) {
+      try {
+        const rec = JSON.parse(saved);
+        return [rec];
+      } catch (e) {
+        console.error('Failed to parse today attendance for monthly:', e);
+      }
+    }
     return [];
   }
 
