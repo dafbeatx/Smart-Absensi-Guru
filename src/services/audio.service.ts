@@ -13,6 +13,7 @@ class SoundEffectsService {
     // Preload audio files
     if (typeof window !== 'undefined') {
       this.preloadAudio('/audio/success.mp3');
+      this.preloadAudio('/audio/terimakasih.mp3');
       this.preloadAudio('/audio/error.mp3');
       this.preloadAudio('/audio/beep.mp3');
     }
@@ -69,6 +70,45 @@ class SoundEffectsService {
    */
   public playSuccess() {
     this.play('SUCCESS');
+  }
+
+  /**
+   * Khusus Absen Berhasil Tersimpan (Guru & Staf):
+   * Memutar /audio/success.mp3 terlebih dahulu, lalu disusul /audio/terimakasih.mp3!
+   */
+  public playAttendanceSuccess() {
+    if (this.isMuted) return;
+
+    try {
+      const successAudio = new Audio('/audio/success.mp3');
+      const thankYouAudio = new Audio('/audio/terimakasih.mp3');
+
+      let hasPlayedThankYou = false;
+      const playThankYou = () => {
+        if (hasPlayedThankYou) return;
+        hasPlayedThankYou = true;
+        thankYouAudio.currentTime = 0;
+        thankYouAudio.play().catch((err) => {
+          console.warn('Playback terimakasih.mp3:', err);
+        });
+      };
+
+      // Event ketika success.mp3 selesai berbunyi
+      successAudio.onended = playThankYou;
+
+      // Fallback timer setelah 700ms jika event onended terlambat
+      setTimeout(() => {
+        playThankYou();
+      }, 750);
+
+      successAudio.currentTime = 0;
+      successAudio.play().catch(() => {
+        this.playSynthesizedTone('SUCCESS');
+        setTimeout(playThankYou, 400);
+      });
+    } catch {
+      this.playSuccess();
+    }
   }
 
   /**

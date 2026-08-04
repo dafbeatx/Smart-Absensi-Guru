@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Html5Qrcode } from 'html5-qrcode';
 import { Modal } from '../../../components/ui/Modal';
 import { Badge } from '../../../components/ui/Badge';
+import { SoundService } from '../../../services/audio.service';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -64,6 +65,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     if (scannerRef.current && scannerRef.current.isScanning) {
       scannerRef.current.stop().catch(console.error);
     }
+
+    // Play Absen Success Audio (success.mp3 -> terimakasih.mp3 sequence)!
+    SoundService.playAttendanceSuccess();
 
     const result = {
       timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
