@@ -3,6 +3,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { AuditLogger } from '../../../services/audit-logger.service';
+import { AttendanceRepository } from '../../../repositories/AttendanceRepository';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import type { AttendanceStatus, UserProfile } from '../../../types/database.types';
@@ -40,33 +41,54 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
   const [checkInTime, setCheckInTime] = useState('07:00');
   const [reason, setReason] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     if (!reason || reason.trim().length < 5) {
       setErrorMsg('Alasan koreksi absensi wajib diisi minimal 5 karakter.');
       return;
     }
 
-    const teacher = teachers.find((t) => t.id === selectedUserId);
+    setIsLoading(true);
 
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'ADMIN',
-      actionType: 'EDIT_ATTENDANCE',
-      targetEntity: 'Attendance',
-      newValue: JSON.stringify({
-        user_id: selectedUserId,
+    try {
+      const teacher = teachers.find((t) => t.id === selectedUserId);
+      const token = useAuthStore.getState().token || 'MOCK_TOKEN';
+
+      await AttendanceRepository.correctAttendance({
+        token,
+        target_user_id: selectedUserId,
         date,
         status: newStatus,
-        check_in_time: checkInTime,
-      }),
-      reason: `Koreksi Absensi Manual oleh Admin Website untuk ${teacher?.full_name}: ${reason}`,
-    });
+        check_in_time: checkInTime.length === 5 ? `${checkInTime}:00` : checkInTime,
+        reason,
+      });
 
-    showToast('success', 'Koreksi Berhasil Disimpan!', `Absensi ${teacher?.full_name} diubah menjadi ${newStatus}.`);
-    if (onSuccess) onSuccess();
-    onClose();
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'EDIT_ATTENDANCE',
+        targetEntity: 'Attendance',
+        newValue: JSON.stringify({
+          user_id: selectedUserId,
+          date,
+          status: newStatus,
+          check_in_time: checkInTime,
+        }),
+        reason: `Koreksi Absensi Manual oleh Admin Website untuk ${teacher?.full_name}: ${reason}`,
+      });
+
+      showToast('success', 'Koreksi Berhasil Disimpan!', `Absensi ${teacher?.full_name} diubah menjadi ${newStatus}.`);
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal menyimpan koreksi absensi';
+      setErrorMsg(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -130,8 +152,8 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
         </div>
 
         <div className="pt-2 flex gap-2">
-          <Button type="button" variant="secondary" className="w-1/2" onClick={onClose}>Batal</Button>
-          <Button type="submit" variant="primary" className="w-1/2">Simpan Koreksi</Button>
+          <Button type="button" variant="secondary" className="w-1/2" onClick={onClose} disabled={isLoading}>Batal</Button>
+          <Button type="submit" variant="primary" className="w-1/2" isLoading={isLoading}>Simpan Koreksi</Button>
         </div>
       </form>
     </Modal>

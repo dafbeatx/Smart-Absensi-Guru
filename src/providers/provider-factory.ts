@@ -8,7 +8,11 @@ export class ProviderFactory {
 
   public static getProvider(): IDataProvider {
     if (!ProviderFactory.instance) {
-      const configuredProvider = (import.meta.env.VITE_PROVIDER || '').toLowerCase();
+      const configuredProvider = (
+        typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_PROVIDER
+          ? import.meta.env.VITE_PROVIDER
+          : ''
+      ).toLowerCase();
 
       // Check explicit VITE_PROVIDER env or fallback to URL checks
       const isMockMode =

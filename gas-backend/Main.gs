@@ -172,6 +172,10 @@ function doPost(e) {
         result = AttendanceService.syncOfflineQueue(payload, currentUser, requestId);
         break;
 
+      case "CORRECT_ATTENDANCE":
+        result = AttendanceService.correctAttendance(payload, currentUser, requestId);
+        break;
+
       // ── Leave Management ─────────────────────────────────────────────
       case "SUBMIT_LEAVE":
         result = LeaveService.submitLeave(payload, currentUser, requestId);

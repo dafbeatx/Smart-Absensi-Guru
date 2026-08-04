@@ -17,6 +17,15 @@ export interface AttendanceResponseDTO {
   geofence_verified: boolean;
 }
 
+export interface CorrectAttendanceDTO {
+  token: string;
+  target_user_id: string;
+  date: string;
+  status: string;
+  check_in_time: string;
+  reason: string;
+}
+
 export class AttendanceRepository {
   public static async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
     return ProviderFactory.getProvider().scanAttendance(dto);
@@ -28,5 +37,9 @@ export class AttendanceRepository {
 
   public static async getMonthlyHistory(userId: string, month: number, year: number, token: string): Promise<AttendanceRecord[]> {
     return ProviderFactory.getProvider().getMonthlyAttendance(userId, String(month), String(year), token);
+  }
+
+  public static async correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean> {
+    return ProviderFactory.getProvider().correctAttendance(dto);
   }
 }

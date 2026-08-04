@@ -1,7 +1,7 @@
 import type { IDataProvider } from './data-provider.interface';
 import type { UserProfile, AttendanceRecord, LeaveRequest, SystemSettings, HolidayRecord } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
-import type { ScanAttendanceDTO, AttendanceResponseDTO } from '../repositories/AttendanceRepository';
+import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 
@@ -155,6 +155,11 @@ export class MockProvider implements IDataProvider {
       }
     }
     return [];
+  }
+
+  public async correctAttendance(_dto: CorrectAttendanceDTO): Promise<boolean> {
+    await new Promise((r) => setTimeout(r, 300));
+    return true;
   }
 
   public async submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest> {

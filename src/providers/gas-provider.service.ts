@@ -2,7 +2,7 @@ import { apiClient } from '../lib/api-client';
 import type { IDataProvider } from './data-provider.interface';
 import type { UserProfile, AttendanceRecord, LeaveRequest, SystemSettings, HolidayRecord } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
-import type { ScanAttendanceDTO, AttendanceResponseDTO } from '../repositories/AttendanceRepository';
+import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 
 export class GasProvider implements IDataProvider {
@@ -52,6 +52,17 @@ export class GasProvider implements IDataProvider {
       month,
       year,
       token,
+    });
+  }
+
+  public async correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean> {
+    return apiClient.post<boolean>('CORRECT_ATTENDANCE', {
+      token: dto.token,
+      target_user_id: dto.target_user_id,
+      date: dto.date,
+      status: dto.status,
+      check_in_time: dto.check_in_time,
+      reason: dto.reason,
     });
   }
 

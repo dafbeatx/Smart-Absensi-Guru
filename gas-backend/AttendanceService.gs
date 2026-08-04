@@ -384,6 +384,123 @@ var AttendanceService = {
         results: results
       }, requestId);
     });
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CORRECT ATTENDANCE (Koreksi Absensi Manual oleh Admin)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  correctAttendance: function(payload, currentUser, requestId) {
+    return DatabaseManager.executeWithLock(function() {
+      var approverRole = currentUser.role || "";
+      if (approverRole !== ROLES.ADMIN && approverRole !== ROLES.KEPSEK) {
+        return Utils.errorResponse("ATT_AUTH", "Anda tidak memiliki akses untuk mengoreksi absensi.", null, requestId);
+      }
+
+      var targetUserId = payload.target_user_id;
+      var date = payload.date; // YYYY-MM-DD
+      var status = (payload.status || "").toUpperCase();
+      var checkInTime = payload.check_in_time || "07:00:00";
+      var reason = payload.reason || "";
+
+      if (!targetUserId || !date || !status) {
+        return Utils.errorResponse(ERRORS.SYS_005.code, "Data koreksi tidak lengkap.", null, requestId);
+      }
+
+      // Check if user exists in Users sheet
+      var targetUser = DatabaseManager.findRecord(DB.SHEETS.USERS, "id", targetUserId);
+      if (!targetUser) {
+        return Utils.errorResponse("ATT_USER", "User tidak ditemukan.", null, requestId);
+      }
+
+      // Calculate late minutes if status is TERLAMBAT
+      var lateMinutes = 0;
+      if (status === ATT_STATUS.TERLAMBAT) {
+        var checkinEndMinutes = _timeToMinutes(SHIFT.WORK_CHECKIN_END);
+        var checkinMinutes = _timeToMinutes(checkInTime);
+        if (checkinMinutes > checkinEndMinutes) {
+          lateMinutes = checkinMinutes - checkinEndMinutes;
+        }
+      }
+
+      // Find existing record
+      var userRecords = DatabaseManager.findRecords(DB.SHEETS.ATTENDANCE, "user_id", targetUserId);
+      var existingRecord = null;
+      for (var i = 0; i < userRecords.length; i++) {
+        if (String(userRecords[i].date) === date) {
+          existingRecord = userRecords[i];
+          break;
+        }
+      }
+
+      var nowStr = Utils.now();
+      var recordId;
+      var beforeValue = "";
+
+      if (existingRecord) {
+        recordId = existingRecord.id;
+        beforeValue = JSON.stringify(existingRecord);
+        var updates = {
+          status: status,
+          check_in_time: checkInTime,
+          late_minutes: lateMinutes,
+          verification_method: "MANUAL_KOREKSI",
+          verified_by: currentUser.id || currentUser.sub || "",
+          attendance_source: "ADMIN_KOREKSI",
+          updated_at: nowStr
+        };
+        DatabaseManager.updateRecord(DB.SHEETS.ATTENDANCE, "id", recordId, updates);
+      } else {
+        recordId = Utils.generateUUID();
+        var newRecord = {
+          id: recordId,
+          user_id: targetUserId,
+          date: date,
+          check_in_time: checkInTime,
+          check_out_time: "",
+          status: status,
+          late_minutes: lateMinutes,
+          working_duration: "",
+          check_in_lat: 0,
+          check_in_lng: 0,
+          check_in_distance_meters: 0,
+          verification_method: "MANUAL_KOREKSI",
+          verification_level: "FULL",
+          verified_by: currentUser.id || currentUser.sub || "",
+          attendance_source: "ADMIN_KOREKSI",
+          is_offline: false,
+          created_at: nowStr
+        };
+        DatabaseManager.appendRecord(DB.SHEETS.ATTENDANCE, newRecord);
+      }
+
+      // Append Audit Log
+      DatabaseManager.appendRecord(DB.SHEETS.AUDIT_LOGS, {
+        id: Utils.generateUUID(),
+        request_id: requestId,
+        actor_id: currentUser.id || currentUser.sub || "",
+        actor_role: approverRole,
+        action_type: "EDIT_ATTENDANCE",
+        target_entity: "Attendance",
+        before_value: beforeValue,
+        after_value: JSON.stringify({ id: recordId, status: status, date: date }),
+        change_reason: "Koreksi absensi manual: " + reason,
+        ip_address: "",
+        user_agent: "",
+        request_method: "POST",
+        execution_ms: "",
+        stacktrace: "",
+        created_at: nowStr
+      });
+
+      DashboardService.invalidateAttendance(targetUserId);
+
+      return Utils.successResponse("ATT_CORRECT_OK", "Koreksi absensi berhasil disimpan.", {
+        attendance_id: recordId,
+        status: status,
+        date: date
+      }, requestId);
+    });
   }
 };
 

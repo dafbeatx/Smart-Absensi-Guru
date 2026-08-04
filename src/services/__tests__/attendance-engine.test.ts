@@ -7,6 +7,7 @@ import { QRValidationService } from '../qr-validation.service';
 import { GPSService } from '../gps.service';
 import type { GPSCoordinates } from '../gps.service';
 import { AttendanceEngine } from '../attendance-engine.service';
+import { AttendanceRepository } from '../../repositories/AttendanceRepository';
 import { CONSTANTS } from '../../config/constants';
 
 export const runAttendanceEngineTestSuite = async (): Promise<{
@@ -64,6 +65,21 @@ export const runAttendanceEngineTestSuite = async (): Promise<{
     'dev_device_uuid'
   );
   assert('Attendance Engine - Full State Machine Pipeline Execution', pipelineResult.success === true && pipelineResult.step === 'SUCCESS');
+
+  // Test 6: Attendance Correction API Execution
+  try {
+    const correctRes = await AttendanceRepository.correctAttendance({
+      token: 'MOCK_TOKEN',
+      target_user_id: 'usr_uuid_1001',
+      date: '2026-08-05',
+      status: 'HADIR',
+      check_in_time: '07:30:00',
+      reason: 'Koreksi karena HP mati',
+    });
+    assert('Attendance Repository - Correct Attendance Execution', correctRes === true);
+  } catch (err) {
+    assert('Attendance Repository - Correct Attendance Execution', false, String(err));
+  }
 
   return { passed, failed, results };
 };

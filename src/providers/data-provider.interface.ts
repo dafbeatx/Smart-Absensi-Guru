@@ -6,7 +6,7 @@ import type {
   HolidayRecord,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
-import type { ScanAttendanceDTO, AttendanceResponseDTO } from '../repositories/AttendanceRepository';
+import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 
 export interface IDataProvider {
@@ -21,6 +21,7 @@ export interface IDataProvider {
   scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO>;
   getTodayAttendance(userId: string, token: string): Promise<AttendanceRecord | null>;
   getMonthlyAttendance(userId: string, month: string, year: string, token: string): Promise<AttendanceRecord[]>;
+  correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean>;
 
   // Leave & Approval API
   submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest>;
