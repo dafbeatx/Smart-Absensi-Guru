@@ -90,10 +90,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }
 
         // Monthly History
+        const now = new Date();
+        const currentMonthName = now.toLocaleString('id-ID', { month: 'long' });
+        const currentYearStr = now.getFullYear().toString();
+
         const history = await provider.getMonthlyAttendance(
           user.id,
-          'Juli',
-          '2026',
+          currentMonthName,
+          currentYearStr,
           authToken
         );
         setAttendanceHistory(history || []);
@@ -106,6 +110,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
     loadData();
   }, [user, token]);
+
+  // Dynamic monthly attendance statistics calculation
+  const totalDays = attendanceHistory.length;
+  const hadirCount = attendanceHistory.filter(h => h.status === 'HADIR').length;
+  const terlambatCount = attendanceHistory.filter(h => h.status === 'TERLAMBAT').length;
+  const izinCount = attendanceHistory.filter(h => h.status === 'IZIN' || h.status === 'SAKIT' || h.status === 'DINAS_LUAR').length;
+  const alfaCount = attendanceHistory.filter(h => h.status === 'ALFA').length;
+
+  const attendancePercentage = totalDays > 0
+    ? (Math.round(((hadirCount + terlambatCount) / totalDays) * 1000) / 10).toFixed(1)
+    : '0.0';
+
+  const hadirPercent = totalDays > 0 ? (hadirCount / totalDays) * 100 : 0;
+  const terlambatPercent = totalDays > 0 ? (terlambatCount / totalDays) * 100 : 0;
+  const izinPercent = totalDays > 0 ? (izinCount / totalDays) * 100 : 0;
+  const alfaPercent = totalDays > 0 ? (alfaCount / totalDays) * 100 : 0;
 
   const getTimeBasedGreeting = (): string => {
     const hour = new Date().getHours();
@@ -341,26 +361,27 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             {/* Monthly Attendance Progress Card */}
             <section className="bg-white rounded-3xl p-5 border border-slate-100 shadow-card space-y-3">
               <div className="flex justify-between items-center">
-                <h3 className="font-bold text-slate-900 text-xs">Kehadiran Bulan Ini</h3>
-                <span className="text-xs font-extrabold text-emerald-600">95.4%</span>
+                <h3 className="font-bold text-[#023246] text-xs">Kehadiran Bulan Ini</h3>
+                <span className="text-xs font-extrabold text-[#287094]">{attendancePercentage}%</span>
               </div>
               <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
-                <div className="bg-emerald-500 h-full" style={{ width: '90%' }} />
-                <div className="bg-amber-400 h-full" style={{ width: '5.4%' }} />
-                <div className="bg-red-400 h-full" style={{ width: '0%' }} />
+                <div className="bg-[#16A34A] h-full transition-all duration-500" style={{ width: `${hadirPercent}%` }} />
+                <div className="bg-[#D97706] h-full transition-all duration-500" style={{ width: `${terlambatPercent}%` }} />
+                <div className="bg-[#287094] h-full transition-all duration-500" style={{ width: `${izinPercent}%` }} />
+                <div className="bg-[#DC2626] h-full transition-all duration-500" style={{ width: `${alfaPercent}%` }} />
               </div>
               <div className="flex justify-between text-[11px] font-semibold text-slate-500 pt-1">
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Hadir: 18
+                  <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Hadir: {hadirCount}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Terlambat: 1
+                  <span className="w-2 h-2 rounded-full bg-[#D97706]" /> Terlambat: {terlambatCount}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-blue-400" /> Izin: 1
+                  <span className="w-2 h-2 rounded-full bg-[#287094]" /> Izin: {izinCount}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-red-400" /> Alfa: 0
+                  <span className="w-2 h-2 rounded-full bg-[#DC2626]" /> Alfa: {alfaCount}
                 </span>
               </div>
             </section>
