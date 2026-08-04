@@ -127,7 +127,9 @@ var AttendanceService = {
         created_at: Utils.now()
       });
 
-      DashboardService.invalidateAttendance(userId);
+      if (typeof DashboardService !== "undefined" && DashboardService.invalidateAttendance) {
+        DashboardService.invalidateAttendance(userId);
+      }
 
       return Utils.successResponse("ATT_CHECK_IN", "Absensi berhasil dicatat!", {
         attendance_id: attendanceId,
@@ -263,7 +265,9 @@ var AttendanceService = {
         created_at: Utils.now()
       });
 
-      DashboardService.invalidateAttendance(userId);
+      if (typeof DashboardService !== "undefined" && DashboardService.invalidateAttendance) {
+        DashboardService.invalidateAttendance(userId);
+      }
 
       return Utils.successResponse("ATT_CHECK_OUT", "Absensi pulang berhasil dicatat!", {
         attendance_id: existingToday.id,
@@ -377,7 +381,9 @@ var AttendanceService = {
         created_at: Utils.now()
       });
 
-      DashboardService.invalidateAttendance(userId);
+      if (typeof DashboardService !== "undefined" && DashboardService.invalidateAttendance) {
+        DashboardService.invalidateAttendance(userId);
+      }
 
       return Utils.successResponse("ATT_SYNC_OK", "Sinkronisasi offline selesai.", {
         synced_count: syncedCount,
@@ -495,7 +501,9 @@ var AttendanceService = {
         created_at: nowStr
       });
 
-      DashboardService.invalidateAttendance(targetUserId);
+      if (typeof DashboardService !== "undefined" && DashboardService.invalidateAttendance) {
+        DashboardService.invalidateAttendance(targetUserId);
+      }
 
       return Utils.successResponse("ATT_CORRECT_OK", "Koreksi absensi berhasil disimpan.", {
         attendance_id: recordId,
