@@ -2,26 +2,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 /**
- * WORLD-CLASS DESIGN SYSTEM (Inspired by Apple, Vercel, Linear, Notion, Cursor, Anthropic, OpenAI, GitHub)
+ * EXACT BRAND PALETTE (AWSMCOLOR Custom Design System)
+ * Hex Tokens: #287094, #D4D4CE, #F6F6F6, #023246
  */
 :root {
   --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
   
-  /* Brand Tokens */
-  --color-obsidian: #09090B;        /* Vercel / OpenAI Deep Dark */
-  --color-linear-dark: #121316;     /* Linear / Cursor Dark Surface */
-  --color-linear-card: #18191E;     /* Linear Inner Card */
-  --color-apple-blue: #2563EB;      /* Apple / Linear Electric Blue */
-  --color-github-green: #10B981;    /* GitHub / Linear Emerald */
-  --color-cloudflare-amber: #F59E0B;/* Cloudflare Amber */
-  --color-danger-coral: #EF4444;    /* Linear Coral Red */
-  
-  /* Light Neutral Base (Anthropic & Notion Warm Precision) */
-  --color-background: #FAF8F5;
-  --color-surface: #FFFFFF;
-  --color-text: #09090B;
-  --color-text-secondary: #71717A;
-  --color-border: #E4E4E7;
+  /* AWSMCOLOR Brand Swatch Tokens */
+  --color-brand-primary: #287094;   /* Ocean Steel Blue (Primary Accent & Interactive) */
+  --color-brand-gray: #D4D4CE;      /* Muted Platinum Gray (Border & Dividers) */
+  --color-brand-light: #F6F6F6;     /* Off-White Light Surface & Background */
+  --color-brand-navy: #023246;      /* Deep Midnight Navy (Dark Header & Sidebar Panel) */
+
+  /* Functional Status Accents (Harmonized with Deep Navy & Steel Blue) */
+  --color-status-success: #16A34A;
+  --color-status-warning: #D97706;
+  --color-status-danger: #DC2626;
 }
 
 @layer base {
@@ -31,8 +27,8 @@
 
   html, body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-    background-color: #FAF8F5;
-    color: #09090B;
+    background-color: #F6F6F6;
+    color: #023246;
     font-weight: 400;
     line-height: 1.6;
     letter-spacing: normal;
@@ -53,18 +49,18 @@
   }
 }
 
-/* Linear & Vercel Glassmorphism & Shadow Utilities */
-.glass-header {
-  background: rgba(9, 9, 11, 0.95);
+/* Custom Glassmorphism & Card Utilities */
+.brand-glass-header {
+  background: rgba(2, 50, 70, 0.96);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(212, 212, 206, 0.2);
 }
 
 .brand-card {
   background: #FFFFFF;
-  border: 1px solid #E4E4E7;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  border: 1px solid #D4D4CE;
+  box-shadow: 0 1px 3px 0 rgba(2, 50, 70, 0.04), 0 1px 2px -1px rgba(2, 50, 70, 0.04);
 }
 
 /* Custom Scrollbar */
@@ -74,14 +70,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #FAF8F5;
+  background: #F6F6F6;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D4D4D8;
+  background: #D4D4CE;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #A1A1AA;
+  background: #287094;
 }
