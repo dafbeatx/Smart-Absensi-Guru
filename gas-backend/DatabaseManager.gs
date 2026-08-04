@@ -112,13 +112,18 @@ var DatabaseManager = (function () {
    * Menjalankan callback di dalam script-level lock (mutex).
    * Timeout 10 detik — cocok untuk 12 guru scan simultan 06:45 WIB.
    * Mendukung re-entrancy agar dipanggil bersarang (nested) tanpa melepas lock prematur.
+   *
+   * PENTING: Lock acquisition error → SYS_002 "Server sedang sibuk".
+   *          Callback error → di-propagate apa adanya (BUKAN diganti SYS_002).
    */
   function executeWithLock(callback) {
     var lock = LockService.getScriptLock();
+
+    // ── Re-entrancy: jika lock sudah dipegang, langsung jalankan callback ──
     var alreadyLocked = false;
     try {
       alreadyLocked = lock.hasLock();
-    } catch (e) {
+    } catch (ignore) {
       alreadyLocked = false;
     }
 
@@ -126,20 +131,21 @@ var DatabaseManager = (function () {
       return callback();
     }
 
-    var lockAcquired = false;
+    // ── Acquire lock (hanya error timeout yang jadi SYS_002) ──
     try {
       lock.waitLock(10000);
-      lockAcquired = lock.hasLock();
-      return callback();
-    } catch (e) {
+    } catch (lockErr) {
       throw new Error(ERRORS.SYS_002.message);
+    }
+
+    // ── Jalankan callback; error dari callback di-propagate apa adanya ──
+    try {
+      return callback();
     } finally {
-      if (lockAcquired) {
-        try {
-          lock.releaseLock();
-        } catch (releaseErr) {
-          // Ignore error jika lock sudah dilepas
-        }
+      try {
+        lock.releaseLock();
+      } catch (releaseErr) {
+        // Ignore — lock mungkin sudah dilepas
       }
     }
   }
