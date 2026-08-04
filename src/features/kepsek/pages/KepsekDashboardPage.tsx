@@ -115,7 +115,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   ];
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] text-[#023246] flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#F6F6F6] text-[#023246] flex flex-col lg:flex-row dashboard-density-scaled">
       {/* ── LEFT SIDEBAR PANEL (DESKTOP & MOBILE) ────────────────────────── */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -133,7 +133,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       />
 
       {/* ── RIGHT MAIN CONTAINER ────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-56">
         {/* Top Header Navbar */}
         <TopDashboardNavbar
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}

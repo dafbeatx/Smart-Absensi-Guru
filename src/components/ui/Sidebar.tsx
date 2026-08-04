@@ -56,8 +56,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const sidebarContent = (
     <aside
-      className={`bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col border-r border-[#D4D4CE]/20 h-full w-64 ${
-        isDesktopFixed ? 'hidden lg:flex fixed top-0 left-0 bottom-0' : 'w-64'
+      className={`bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col border-r border-[#D4D4CE]/20 h-full w-56 ${
+        isDesktopFixed ? 'hidden lg:flex fixed top-0 left-0 bottom-0' : 'w-56'
       }`}
       aria-label="Navigation Sidebar"
     >
@@ -165,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             aria-hidden="true"
           />
           <aside
-            className="fixed top-0 left-0 bottom-0 w-64 bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out border-r border-[#D4D4CE]/20 lg:hidden translate-x-0"
+            className="fixed top-0 left-0 bottom-0 w-56 bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out border-r border-[#D4D4CE]/20 lg:hidden translate-x-0"
             aria-label="Mobile Navigation Sidebar"
           >
             {sidebarContent}

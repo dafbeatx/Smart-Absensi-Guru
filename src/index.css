@@ -81,3 +81,11 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #287094;
 }
+
+/* Executive Density Scaling: Makes 100% Chrome browser zoom feel spacious & comfortable like 80% zoom */
+@media (min-width: 1024px) {
+  .dashboard-density-scaled {
+    zoom: 0.85;
+  }
+}
+
