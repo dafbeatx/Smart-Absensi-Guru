@@ -124,13 +124,8 @@ export class GPSService {
           });
         },
         (error) => {
-          console.warn('Geolocation Warning, resolving active school fallback coordinates:', error);
-          resolve({
-            latitude: schoolLat,
-            longitude: schoolLng,
-            accuracy: 10,
-            distanceMeters: 0,
-          });
+          console.error('Geolocation Error:', error);
+          reject(getErrorDefinition('GPS_001'));
         },
         options
       );

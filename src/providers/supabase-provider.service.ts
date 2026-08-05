@@ -19,6 +19,7 @@ import type {
   CorrectAttendanceDTO,
 } from '../repositories/AttendanceRepository';
 import { timeToMinutes } from '../utils/time.utils';
+import { hashPin } from '../utils/hash.utils';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters } from '../utils/geofence.utils';
@@ -55,6 +56,13 @@ export class SupabaseProvider implements IDataProvider {
 
     if (user.account_status === 'LOCKED' || user.account_status === 'INACTIVE') {
       throw new Error('Akun Anda sedang terblokir / tidak aktif. Hubungi Admin Sekolah.');
+    }
+
+    const hashedInputPin = await hashPin(dto.pin);
+    const isPinMatch = user.pin_hash === hashedInputPin || user.pin_hash === dto.pin;
+
+    if (!user.pin_hash || !isPinMatch) {
+      throw new Error('PIN 6-digit yang Anda masukkan salah.');
     }
 
     const userProfile: UserProfile = {
@@ -131,9 +139,10 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async changePin(userId: string, newPin: string, _token: string): Promise<boolean> {
+    const hashedPin = await hashPin(newPin);
     const { error } = await this.client
       .from('users')
-      .update({ pin_hash: newPin })
+      .update({ pin_hash: hashedPin })
       .eq('id', userId);
 
     if (error) throw new Error('Gagal mengubah PIN: ' + error.message);
@@ -141,9 +150,10 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async resetPin(userId: string, newPin: string, _token: string): Promise<boolean> {
+    const hashedPin = await hashPin(newPin);
     const { error } = await this.client
       .from('users')
-      .update({ pin_hash: newPin })
+      .update({ pin_hash: hashedPin })
       .eq('id', userId);
 
     if (error) throw new Error('Gagal mereset PIN: ' + error.message);
@@ -450,12 +460,15 @@ export class SupabaseProvider implements IDataProvider {
 
   public async createUser(user: Partial<UserProfile>, _token: string): Promise<UserProfile> {
     const newId = user.id || `usr_${Date.now()}`;
+    const defaultPin = (user as Partial<UserProfile> & { pin?: string }).pin || '123456';
+    const hashedPin = await hashPin(defaultPin);
+
     const newUser = {
       id: newId,
       nip: user.nip || `NIP_${Date.now()}`,
       full_name: user.full_name || 'Guru Baru',
       phone_number: user.phone_number || '080000000000',
-      pin_hash: 'c2bf3192f155981775e0329976378e9324025d57b545fbc5f764a856bf8f4702',
+      pin_hash: hashedPin,
       role: user.role || 'GURU',
       position: user.position || 'Pendidik',
       account_status: 'ACTIVE',

@@ -45,16 +45,12 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       return coords;
     } catch (err: unknown) {
       setIsCheckingGPS(false);
-      // Even if GPS fails, return active school fallback location so user is not rejected falsely
-      const fallbackSettings = GPSService.getGeofenceSettings();
-      const fallbackCoords: GPSCoordinates = {
-        latitude: fallbackSettings.lat,
-        longitude: fallbackSettings.lng,
-        accuracy: 10,
-        distanceMeters: 0,
-      };
-      setGpsCoords(fallbackCoords);
-      return fallbackCoords;
+      setGpsCoords(null);
+      const msg = err && typeof err === 'object' && 'message' in err
+        ? String((err as { message: string }).message)
+        : 'Perizinan lokasi GPS belum diberikan. Harap aktifkan izin lokasi di browser HP Anda.';
+      setGpsError(msg);
+      return null;
     }
   };
 
@@ -100,6 +96,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     }
   }, [isOpen]);
 
+  const geofenceSettings = GPSService.getGeofenceSettings();
+  const allowedRadius = Math.max(geofenceSettings.radius || 50, 500);
+
   const handleScanSuccess = async (_qrData: string) => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
@@ -119,16 +118,14 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       SoundService.playError();
       setRejectionReason('Absensi Ditolak! Perizinan lokasi GPS tidak diizinkan atau lokasi HP Anda tidak dapat terdeteksi. Silakan aktifkan izin lokasi di HP Anda.');
       setIsRejectionModalOpen(true);
+      isProcessingRef.current = false;
       return;
     }
 
-    const geofenceSettings = GPSService.getGeofenceSettings();
-    // Door Poster Mode: Allow up to 500m radius buffer while accurately recording exact GPS coordinates in database
-    const allowedRadius = Math.max(geofenceSettings.radius || 50, 500);
     const validation = GPSService.validateGeofenceRadius(currentCoords, allowedRadius);
 
     if (!validation.isValid) {
-      // REJECT: Absensi diluar lokasi radius yang diizinkan (misal > 500 meter)
+      // REJECT: Absensi diluar lokasi radius yang diizinkan
       SoundService.playError();
       let hint = '';
       if (currentCoords.distanceMeters > 1000) {
@@ -136,22 +133,15 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       }
       setRejectionReason(`Absensi Ditolak! Anda terdeteksi berada ${currentCoords.distanceMeters} meter dari lokasi sekolah. Batas maksimum radius yang diizinkan adalah ${allowedRadius} meter.${hint}`);
       setIsRejectionModalOpen(true);
+      isProcessingRef.current = false;
       return;
     }
 
-    // 2. APPROVE: Lokasi Sesuai (Radius <= 50m)
-    SoundService.playAttendanceSuccess();
-
-    const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-    const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
+    // 2. SAVE ATTENDANCE RECORD (Must succeed BEFORE showing success UI)
     const token = useAuthStore.getState().token || 'MOCK_TOKEN';
     const deviceUUID = useAuthStore.getState().deviceUUID || 'DEV_UUID';
-    
-    // Trigger Real-time Push Notification for Admin & Kepsek
-    NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
-
-    // Save Attendance Record to Repository / Provider / LocalStorage
     let returnedStatus = 'HADIR';
+
     try {
       const res = await AttendanceRepository.scanAttendance({
         token: token,
@@ -165,11 +155,25 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         returnedStatus = res.status;
       }
 
-      // Dispatch global window event so dashboards update in real time
       window.dispatchEvent(new Event('smart_absensi_scanned'));
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to save attendance record to provider:', err);
+      SoundService.playError();
+      const errMsg = err && typeof err === 'object' && 'message' in err
+        ? String((err as { message: string }).message)
+        : 'Gagal menyimpan data absensi ke server. Silakan coba beberapa saat lagi.';
+      setRejectionReason(`Gagal Menyimpan Absensi!\n\n${errMsg}`);
+      setIsRejectionModalOpen(true);
+      isProcessingRef.current = false;
+      return;
     }
+
+    // 3. APPROVE: Sound, Notification & Modal
+    SoundService.playAttendanceSuccess();
+
+    const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
+    NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
 
     const statusLabel = returnedStatus === 'TERLAMBAT' ? 'TERLAMBAT (Terlambat)' : 'HADIR (Tepat Waktu)';
 
@@ -182,7 +186,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     setScanResult(result);
     setIsSuccessModalOpen(true);
 
-    // Auto-Submit 2.0s Timer (No Extra Taps Required)
+    // Auto-Submit 2.0s Timer
     setTimeout(() => {
       setIsSuccessModalOpen(false);
       onSuccess(result);
@@ -191,6 +195,8 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const isWithinRadius = gpsCoords ? gpsCoords.distanceMeters <= allowedRadius : false;
 
   return (
     <>
@@ -248,12 +254,14 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           <div className="bg-red-500/20 border border-red-500/40 text-red-200 text-xs p-4 rounded-2xl text-center space-y-2">
             <p className="font-bold">⚠️ Kendala Akses Kamera</p>
             <p>{cameraError}</p>
-            <button
-              onClick={() => handleScanSuccess('MOCK_QR')}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold mt-2"
-            >
-              Simulasi Absen (Dev Mode)
-            </button>
+            {import.meta.env.DEV && (
+              <button
+                onClick={() => handleScanSuccess('MOCK_QR')}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold mt-2"
+              >
+                Simulasi Absen (Dev Mode)
+              </button>
+            )}
           </div>
         )}
 
@@ -266,15 +274,15 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             </div>
           ) : gpsCoords ? (
             <div className={`border text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold ${
-              gpsCoords.distanceMeters <= 50
+              isWithinRadius
                 ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                 : 'bg-red-500/20 border-red-500/40 text-red-300 animate-pulse'
             }`}>
               <span className={`w-2.5 h-2.5 rounded-full ${
-                gpsCoords.distanceMeters <= 50 ? 'bg-emerald-400 animate-ping' : 'bg-red-500'
+                isWithinRadius ? 'bg-emerald-400 animate-ping' : 'bg-red-500'
               }`} />
               <span>
-                {gpsCoords.distanceMeters <= 50
+                {isWithinRadius
                   ? `🟢 GPS Verified: ${gpsCoords.distanceMeters}m dari Sekolah (Aman)`
                   : `🔴 GPS Out of Range: ${gpsCoords.distanceMeters}m dari Sekolah (Ditolak)`}
               </span>

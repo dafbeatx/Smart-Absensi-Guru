@@ -8,6 +8,7 @@ import { runLeaveApprovalTestSuite } from './__tests__/leave-approval-engine.tes
 import { runAnalyticsReportTestSuite } from './__tests__/analytics-report.test';
 import { runAuditWhatsAppTestSuite } from './__tests__/audit-whatsapp.test';
 import { runFeatureFlagsTestSuite } from '../config/__tests__/feature-flags.test';
+import { runSecurityConsistencyTestSuite } from './__tests__/security-consistency.test';
 
 export interface TestResultItem {
   testName: string;
@@ -45,6 +46,7 @@ export class MasterTestRunner {
       { name: 'Analytics & Multi-Sheet Report Engine', fn: runAnalyticsReportTestSuite },
       { name: 'Audit Log & WhatsApp Integration', fn: runAuditWhatsAppTestSuite },
       { name: 'Feature Flag System', fn: runFeatureFlagsTestSuite },
+      { name: 'Security & Consistency Engine', fn: runSecurityConsistencyTestSuite },
     ];
 
     let totalPassed = 0;
