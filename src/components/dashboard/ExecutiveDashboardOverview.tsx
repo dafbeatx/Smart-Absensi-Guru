@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../types/database.types';
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
-import { evaluateAttendanceStatus } from '../../utils/time.utils';
+import { evaluateAttendanceStatus, getTodayDateInJakarta } from '../../utils/time.utils';
 
 export interface ExecutiveDashboardOverviewProps {
   roleTitle: 'Admin Website' | 'Kepala Sekolah';
@@ -28,24 +28,31 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   onOpenTestRunner,
   onNavigateTab,
 }) => {
+  const todayStr = getTodayDateInJakarta();
   const totalGuruCount = teachers.length > 0 ? teachers.length : 12;
 
   const { hadirCount, terlambatCount, izinCount, belumAbsenCount, totalPresentCount } = useMemo(() => {
     let hadir = 0;
     let terlambat = 0;
     let izin = 0;
-    const presentUserIds = new Set<string>();
+    const todayUserMap = new Map<string, AttendanceRecord>();
 
+    // Deduplicate by user_id for TODAY ONLY
     for (const rec of attendanceRecords) {
-      presentUserIds.add(rec.user_id);
+      if (rec.date === todayStr) {
+        todayUserMap.set(rec.user_id, rec);
+      }
+    }
+
+    todayUserMap.forEach((rec) => {
       const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
       if (effectiveStatus === 'HADIR') hadir++;
       else if (effectiveStatus === 'TERLAMBAT') terlambat++;
       else if (effectiveStatus === 'IZIN' || effectiveStatus === 'SAKIT' || effectiveStatus === 'DINAS_LUAR') izin++;
-    }
+    });
 
     const totalPresent = hadir + terlambat;
-    const belum = Math.max(0, totalGuruCount - presentUserIds.size);
+    const belum = Math.max(0, totalGuruCount - (hadir + terlambat + izin));
 
     return {
       hadirCount: hadir,
@@ -54,16 +61,18 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       belumAbsenCount: belum,
       totalPresentCount: totalPresent,
     };
-  }, [attendanceRecords, totalGuruCount]);
+  }, [attendanceRecords, totalGuruCount, todayStr]);
 
-  const attendancePercentage = totalGuruCount > 0
+  const rawPercentage = totalGuruCount > 0
     ? Math.round((totalPresentCount / totalGuruCount) * 100)
     : 0;
 
-  const hadirPercentage = totalGuruCount > 0 ? Math.round((hadirCount / totalGuruCount) * 100) : 0;
-  const terlambatPercentage = totalGuruCount > 0 ? Math.round((terlambatCount / totalGuruCount) * 100) : 0;
-  const izinPercentage = totalGuruCount > 0 ? Math.round((izinCount / totalGuruCount) * 100) : 0;
-  const belumPercentage = totalGuruCount > 0 ? Math.round((belumAbsenCount / totalGuruCount) * 100) : 0;
+  const attendancePercentage = Math.min(100, Math.max(0, rawPercentage));
+
+  const hadirPercentage = totalGuruCount > 0 ? Math.min(100, Math.round((hadirCount / totalGuruCount) * 100)) : 0;
+  const terlambatPercentage = totalGuruCount > 0 ? Math.min(100, Math.round((terlambatCount / totalGuruCount) * 100)) : 0;
+  const izinPercentage = totalGuruCount > 0 ? Math.min(100, Math.round((izinCount / totalGuruCount) * 100)) : 0;
+  const belumPercentage = totalGuruCount > 0 ? Math.min(100, Math.round((belumAbsenCount / totalGuruCount) * 100)) : 0;
 
   // Teachers list from Users sheet
   const recentTeachers = teachers.slice(0, 5);

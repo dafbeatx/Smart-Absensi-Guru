@@ -46,25 +46,27 @@ export class AnalyticsService {
     let totalSick = 0;
     let totalOfficialDuty = 0;
 
-    const attendedUserIds = new Set<string>();
+    const userAttendanceMap = new Map<string, AttendanceRecord>();
 
     for (const rec of attendanceRecords) {
       if (rec.date === dateStr) {
-        attendedUserIds.add(rec.user_id);
-        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
-        if (effectiveStatus === 'HADIR') totalPresent++;
-        else if (effectiveStatus === 'TERLAMBAT') totalLate++;
+        userAttendanceMap.set(rec.user_id, rec);
       }
     }
 
+    userAttendanceMap.forEach((rec) => {
+      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+      if (effectiveStatus === 'HADIR') totalPresent++;
+      else if (effectiveStatus === 'TERLAMBAT') totalLate++;
+    });
+
     for (const leave of leaveRequests) {
-      if (leave.approval_status === 'APPROVED') {
+      if (leave.approval_status === 'APPROVED' && !userAttendanceMap.has(leave.user_id)) {
         const start = new Date(leave.start_date);
         const end = new Date(leave.end_date);
         const target = new Date(dateStr);
 
         if (target >= start && target <= end) {
-          attendedUserIds.add(leave.user_id);
           if (leave.leave_type === 'SAKIT') totalSick++;
           else if (leave.leave_type === 'IZIN') totalLeave++;
           else if (leave.leave_type === 'DINAS_LUAR') totalOfficialDuty++;
@@ -75,9 +77,11 @@ export class AnalyticsService {
     const totalAccountedFor = totalPresent + totalLate + totalSick + totalLeave + totalOfficialDuty;
     const totalUnabsented = Math.max(0, totalTeachers - totalAccountedFor);
 
-    const attendancePercentage = totalTeachers > 0
+    const rawPercentage = totalTeachers > 0
       ? Math.round(((totalPresent + totalLate) / totalTeachers) * 1000) / 10
       : 0;
+
+    const attendancePercentage = Math.min(100, Math.max(0, rawPercentage));
 
     return {
       date: dateStr,
