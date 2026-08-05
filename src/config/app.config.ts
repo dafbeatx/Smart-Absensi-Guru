@@ -24,6 +24,10 @@ export const APP_CONFIG = {
   IS_DEV: getIsDev(),
   ENABLE_LOGS: getEnvValue('VITE_ENABLE_LOGS', 'false') === 'true',
 
+  // Enterprise Feature Flags & External AI Engine Config
+  GROQ_API_KEY: getEnvValue('VITE_GROQ_API_KEY', ''),
+  GROQ_MODEL: getEnvValue('VITE_GROQ_MODEL', 'llama-3.3-70b-versatile'),
+
   // Request & Cache Timings (Optimized for GAS Web App cold starts & concurrency)
   REQUEST_TIMEOUT_MS: 30000, // 30 Seconds timeout for standard API operations
   HEAVY_REQUEST_TIMEOUT_MS: 60000, // 60 Seconds timeout for heavy write/mutation operations

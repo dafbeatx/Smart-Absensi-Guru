@@ -10,6 +10,7 @@ export interface FeatureFlags {
   ENABLE_PWA: boolean;
   ENABLE_OFFLINE_SYNC: boolean;
   ENABLE_EXCEL_EXPORT: boolean;
+  ENABLE_AI_ASSISTANT: boolean;
 }
 
 const parseEnvBoolean = (key: string, defaultValue: boolean): boolean => {
@@ -28,6 +29,7 @@ export const FEATURE_FLAGS: FeatureFlags = {
   ENABLE_PWA: parseEnvBoolean('VITE_FEATURE_PWA', true),
   ENABLE_OFFLINE_SYNC: parseEnvBoolean('VITE_FEATURE_OFFLINE_SYNC', true),
   ENABLE_EXCEL_EXPORT: parseEnvBoolean('VITE_FEATURE_EXCEL_EXPORT', true),
+  ENABLE_AI_ASSISTANT: parseEnvBoolean('VITE_FEATURE_AI_ASSISTANT', true),
 };
 
 export const isFeatureEnabled = (flag: keyof FeatureFlags): boolean => {
