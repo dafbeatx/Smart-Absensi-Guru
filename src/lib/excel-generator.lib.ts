@@ -35,7 +35,7 @@ export class ExcelReportGenerator {
     lines.push(`TU,${SIGNATORY_OFFICIALS.TU_NAME}`);
     lines.push(``);
     lines.push(`=== SHEET 2: REKAP KEHADIRAN GURU ===`);
-    lines.push(`No,NPP,Nama Guru,Jabatan,Status`);
+    lines.push(`No,NPP,Nama Guru,Jabatan,Jumlah Masuk,Jumlah Izin,Status`);
     lines.push(``);
     lines.push(`=== SHEET 3: DETAIL HARIAN TRANSAKSI ===`);
     lines.push(``);
@@ -59,7 +59,7 @@ export class ExcelReportGenerator {
       ['Periode Laporan', `${payload.month} ${payload.year}`],
       ['Tanggal Cetak', new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })],
       [],
-      ['METRIK EKSEKUTIF', 'JUMLAH / PERSENTASE'],
+      ['METRIK EKSEKUTIF KESELURUHAN', 'JUMLAH / PERSENTASE'],
       ['Total Guru & Staf', payload.summary.totalTeachers],
       ['Total Hadir Tepat Waktu', payload.summary.totalPresent],
       ['Total Terlambat', payload.summary.totalLate],
@@ -79,15 +79,25 @@ export class ExcelReportGenerator {
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan Eksekutif');
 
     // ── SHEET 2: REKAP KEHADIRAN GURU ─────────────────────────────────────────
-    const teacherData = payload.teachers.map((t, index) => ({
-      No: index + 1,
-      NIP: t.nip || '-',
-      'Nama Lengkap & Gelar': t.full_name,
-      Role: t.role,
-      'Jabatan / Bidang Studi': t.position,
-      'No. WhatsApp': t.phone_number,
-      Status: t.is_active ? 'Aktif' : 'Non-Aktif',
-    }));
+    const teacherData = payload.teachers.map((t, index) => {
+      const tRecords = payload.attendanceRecords.filter((r) => r.user_id === t.id);
+      const tPresent = tRecords.filter((r) => r.status === 'HADIR').length;
+      const tLate = tRecords.filter((r) => r.status === 'TERLAMBAT').length;
+      const tTotalMasuk = tPresent + tLate;
+      const tTotalIzin = tRecords.filter((r) => r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR').length;
+
+      return {
+        No: index + 1,
+        NIP: t.nip || '-',
+        'Nama Lengkap & Gelar': t.full_name,
+        Role: t.role,
+        'Jabatan / Bidang Studi': t.position,
+        'Jumlah Masuk (Hari)': tTotalMasuk,
+        'Jumlah Izin / Sakit (Hari)': tTotalIzin,
+        'No. WhatsApp': t.phone_number,
+        Status: t.is_active ? 'Aktif' : 'Non-Aktif',
+      };
+    });
 
     const wsTeachers = XLSX.utils.json_to_sheet(teacherData);
     wsTeachers['!cols'] = [
@@ -96,6 +106,8 @@ export class ExcelReportGenerator {
       { wch: 32 },
       { wch: 12 },
       { wch: 28 },
+      { wch: 18 },
+      { wch: 22 },
       { wch: 18 },
       { wch: 12 },
     ];
@@ -215,11 +227,17 @@ export class ExcelReportGenerator {
   }
 
   /**
-   * Generates a printable, styled PDF document report in a popup window
+   * Generates a printable, styled PDF document report in a popup window (Master School)
    */
   public static generatePrintablePDF(payload: MultiSheetReportPayload): void {
     const printWindow = window.open('', '_blank', 'width=1000,height=800');
     if (!printWindow) return;
+
+    const totalTeachers = payload.summary.totalTeachers || 1;
+    const presentPct = Math.min(100, Math.round((payload.summary.totalPresent / totalTeachers) * 100)) || 0;
+    const latePct = Math.min(100 - presentPct, Math.round((payload.summary.totalLate / totalTeachers) * 100)) || 0;
+    const leavePct = Math.min(100 - presentPct - latePct, Math.round(((payload.summary.totalSick + payload.summary.totalLeave) / totalTeachers) * 100)) || 0;
+    const unabsentPct = Math.max(0, 100 - presentPct - latePct - leavePct);
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -234,18 +252,30 @@ export class ExcelReportGenerator {
           .header h2 { margin: 4px 0; font-size: 14px; font-weight: 600; color: #475569; }
           .header p { margin: 0; font-size: 11px; color: #64748b; }
           .meta-grid { display: flex; justify-content: space-between; background: #f8fafc; padding: 12px 18px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px; font-size: 12px; }
-          .kpi-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 25px; }
+          .kpi-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
           .kpi-card { background: #fff; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; text-align: center; }
           .kpi-card .val { font-size: 18px; font-weight: 800; color: #0f172a; }
           .kpi-card .lbl { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+
+          /* Chart Box Styling */
+          .chart-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px 20px; margin-bottom: 25px; }
+          .chart-title { margin: 0 0 12px 0; font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; text-align: center; letter-spacing: 0.5px; }
+          .stacked-bar-container { background: #e2e8f0; border-radius: 12px; height: 28px; display: flex; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+          .bar-seg { display: flex; items-center; justify-content: center; font-size: 11px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: all 0.3s ease; }
+          .bar-hadir { background: #16a34a; }
+          .bar-terlambat { background: #d97706; }
+          .bar-izin { background: #0284c7; }
+          .bar-alfa { background: #dc2626; }
+          .chart-legend { display: flex; justify-content: space-around; margin-top: 12px; font-size: 11px; font-weight: 600; color: #334155; }
+          .legend-item { display: flex; align-items: center; gap: 6px; }
+          .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
           table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 11px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
           th { background-color: #0f172a; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
           tr:nth-child(even) { background-color: #f8fafc; }
-          .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 9px; }
-          .badge-hadir { background: #dcfce7; color: #15803d; }
-          .badge-terlambat { background: #fef3c7; color: #b45309; }
-          .badge-izin { background: #e0f2fe; color: #0369a1; }
+          .progress-bar-bg { background: #e2e8f0; border-radius: 6px; height: 10px; width: 100%; overflow: hidden; border: 1px solid #cbd5e1; }
+          .progress-bar-fill { background: #16a34a; height: 100%; border-radius: 6px; }
           .signature-section { margin-top: 40px; display: flex; justify-content: space-between; font-size: 11px; }
           .sig-box { text-align: center; width: 240px; }
           .sig-space { height: 65px; }
@@ -282,31 +312,61 @@ export class ExcelReportGenerator {
           <div class="kpi-card"><div class="val" style="color: #dc2626;">${payload.summary.totalUnabsented}</div><div class="lbl">Belum Absen</div></div>
         </div>
 
-        <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-bottom: 8px;">REKAPITULASI MASTER GURU & STAF</h3>
+        <!-- GRAFIK KESELURUHAN SEKOLAH -->
+        <div class="chart-box">
+          <h3 class="chart-title">📊 GRAFIK KESELURUHAN DISTRIBUSI KEHADIRAN SEKOLAH</h3>
+          <div class="stacked-bar-container">
+            ${presentPct > 0 ? `<div class="bar-seg bar-hadir" style="width: ${presentPct}%;">${presentPct}%</div>` : ''}
+            ${latePct > 0 ? `<div class="bar-seg bar-terlambat" style="width: ${latePct}%;">${latePct}%</div>` : ''}
+            ${leavePct > 0 ? `<div class="bar-seg bar-izin" style="width: ${leavePct}%;">${leavePct}%</div>` : ''}
+            ${unabsentPct > 0 ? `<div class="bar-seg bar-alfa" style="width: ${unabsentPct}%;">${unabsentPct}%</div>` : ''}
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#16a34a;"></span> Hadir Tepat Waktu (${payload.summary.totalPresent})</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#d97706;"></span> Terlambat (${payload.summary.totalLate})</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#0284c7;"></span> Izin/Sakit (${payload.summary.totalSick + payload.summary.totalLeave})</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#dc2626;"></span> Belum Absen (${payload.summary.totalUnabsented})</div>
+          </div>
+        </div>
+
+        <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-bottom: 8px;">REKAPITULASI MASTER JUMLAH MASUK & IZIN PER ORANG</h3>
         <table>
           <thead>
             <tr>
               <th style="width: 30px;">No</th>
               <th>NPP</th>
               <th>Nama Lengkap & Gelar</th>
-              <th>Role</th>
-              <th>Jabatan / Bidang Studi</th>
-              <th style="width: 80px;">No. WA</th>
-              <th style="width: 60px;">Status</th>
+              <th>Jabatan / Mapel</th>
+              <th style="width: 90px; text-align: center;">Jumlah Masuk</th>
+              <th style="width: 90px; text-align: center;">Jumlah Izin</th>
+              <th style="width: 110px;">Visual Kehadiran</th>
             </tr>
           </thead>
           <tbody>
-            ${payload.teachers.map((t, index) => `
-              <tr>
-                <td>${index + 1}</td>
-                <td>${t.nip || '-'}</td>
-                <td><strong>${t.full_name}</strong></td>
-                <td>${t.role}</td>
-                <td>${t.position}</td>
-                <td>${t.phone_number}</td>
-                <td><span class="badge badge-hadir">${t.is_active ? 'Aktif' : 'Non-Aktif'}</span></td>
-              </tr>
-            `).join('')}
+            ${payload.teachers.map((t, index) => {
+              const tRecords = payload.attendanceRecords.filter((r) => r.user_id === t.id);
+              const tPresent = tRecords.filter((r) => r.status === 'HADIR').length;
+              const tLate = tRecords.filter((r) => r.status === 'TERLAMBAT').length;
+              const tTotalMasuk = tPresent + tLate;
+              const tTotalIzin = tRecords.filter((r) => r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR').length;
+              const ratioPct = tRecords.length > 0 ? Math.round((tTotalMasuk / tRecords.length) * 100) : 100;
+
+              return `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${t.nip || '-'}</td>
+                  <td><strong>${t.full_name}</strong></td>
+                  <td>${t.position}</td>
+                  <td style="text-align: center;"><strong style="color: #16a34a;">${tTotalMasuk} Hari</strong></td>
+                  <td style="text-align: center;"><strong style="color: #0284c7;">${tTotalIzin} Hari</strong></td>
+                  <td>
+                    <div class="progress-bar-bg">
+                      <div class="progress-bar-fill" style="width: ${ratioPct}%;"></div>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
           </tbody>
         </table>
 
@@ -335,7 +395,7 @@ export class ExcelReportGenerator {
   }
 
   /**
-   * Generates a printable PDF report specifically for an individual teacher
+   * Generates a printable PDF report specifically for an individual teacher with HISTOGRAM CHART
    */
   public static generateIndividualTeacherPDF(
     teacher: UserProfile,
@@ -352,12 +412,33 @@ export class ExcelReportGenerator {
     let totalLeave = 0;
     let totalSick = 0;
 
+    // Histogram Bins for Check-in Times:
+    // Bin 1: < 06:45 (Sangat Awal)
+    // Bin 2: 06:45 - 07:00 (Tepat Waktu)
+    // Bin 3: 07:01 - 07:15 (Toleransi)
+    // Bin 4: > 07:15 (Terlambat)
+    let bin1Count = 0;
+    let bin2Count = 0;
+    let bin3Count = 0;
+    let bin4Count = 0;
+
     teacherRecords.forEach((r) => {
       if (r.status === 'HADIR') totalPresent++;
       else if (r.status === 'TERLAMBAT') totalLate++;
       else if (r.status === 'IZIN') totalLeave++;
       else if (r.status === 'SAKIT') totalSick++;
+
+      if (r.check_in_time) {
+        const timeStr = r.check_in_time.slice(0, 5);
+        if (timeStr < '06:45') bin1Count++;
+        else if (timeStr <= '07:00') bin2Count++;
+        else if (timeStr <= '07:15') bin3Count++;
+        else bin4Count++;
+      }
     });
+
+    const maxBinValue = Math.max(bin1Count, bin2Count, bin3Count, bin4Count, 1);
+    const getBarHeightPercent = (val: number) => Math.max(12, Math.round((val / maxBinValue) * 100));
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -376,6 +457,20 @@ export class ExcelReportGenerator {
           .kpi-card { background: #fff; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; text-align: center; }
           .kpi-card .val { font-size: 18px; font-weight: 800; color: #0f172a; }
           .kpi-card .lbl { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+
+          /* Histogram Box Styling */
+          .histogram-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 18px 24px; margin-bottom: 25px; }
+          .chart-title { margin: 0 0 16px 0; font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; text-align: center; letter-spacing: 0.5px; }
+          .histogram-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; height: 160px; align-items: end; padding-bottom: 10px; border-bottom: 2px solid #cbd5e1; }
+          .histogram-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+          .bar-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 120px; }
+          .histogram-bar { width: 75%; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: all 0.3s ease; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+          .bar-b1 { background: linear-gradient(to top, #15803d, #16a34a); }
+          .bar-b2 { background: linear-gradient(to top, #047857, #10b981); }
+          .bar-b3 { background: linear-gradient(to top, #d97706, #f59e0b); }
+          .bar-b4 { background: linear-gradient(to top, #b91c1c, #ef4444); }
+          .histogram-label { text-align: center; font-size: 10px; font-weight: 700; color: #334155; margin-top: 8px; line-height: 1.3; }
+
           table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 11px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
           th { background-color: #0f172a; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
@@ -415,7 +510,41 @@ export class ExcelReportGenerator {
           <div class="kpi-card"><div class="val" style="color: #16a34a;">${totalPresent}</div><div class="lbl">Hadir Tepat Waktu</div></div>
           <div class="kpi-card"><div class="val" style="color: #d97706;">${totalLate}</div><div class="lbl">Terlambat</div></div>
           <div class="kpi-card"><div class="val" style="color: #0284c7;">${totalLeave + totalSick}</div><div class="lbl">Izin / Sakit</div></div>
-          <div class="kpi-card"><div class="val" style="color: #0f172a;">${teacherRecords.length}</div><div class="lbl">Total Presensi</div></div>
+          <div class="kpi-card"><div class="val" style="color: #0f172a;">${totalPresent + totalLate} Hari</div><div class="lbl">Total Masuk</div></div>
+        </div>
+
+        <!-- GRAFIK HISTOGRAM WAKTU MASUK INDIVIDU -->
+        <div class="histogram-box">
+          <h3 class="chart-title">📊 GRAFIK HISTOGRAM DISTRIBUSI WAKTU MASUK INDIVIDU</h3>
+          <div class="histogram-grid">
+            <div class="histogram-col">
+              <div class="bar-wrapper">
+                <div class="histogram-bar bar-b1" style="height: ${getBarHeightPercent(bin1Count)}%;">${bin1Count}x</div>
+              </div>
+              <div class="histogram-label">&lt; 06.45 WIB<br><b>Sangat Awal</b></div>
+            </div>
+
+            <div class="histogram-col">
+              <div class="bar-wrapper">
+                <div class="histogram-bar bar-b2" style="height: ${getBarHeightPercent(bin2Count)}%;">${bin2Count}x</div>
+              </div>
+              <div class="histogram-label">06.45 - 07.00 WIB<br><b>Tepat Waktu</b></div>
+            </div>
+
+            <div class="histogram-col">
+              <div class="bar-wrapper">
+                <div class="histogram-bar bar-b3" style="height: ${getBarHeightPercent(bin3Count)}%;">${bin3Count}x</div>
+              </div>
+              <div class="histogram-label">07.01 - 07.15 WIB<br><b>Toleransi</b></div>
+            </div>
+
+            <div class="histogram-col">
+              <div class="bar-wrapper">
+                <div class="histogram-bar bar-b4" style="height: ${getBarHeightPercent(bin4Count)}%;">${bin4Count}x</div>
+              </div>
+              <div class="histogram-label">&gt; 07.15 WIB<br><b>Terlambat</b></div>
+            </div>
+          </div>
         </div>
 
         <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-bottom: 8px;">RINCIAN PRESENSI HARIAN</h3>
@@ -485,6 +614,10 @@ export class ExcelReportGenerator {
   ): void {
     const wb = XLSX.utils.book_new();
     const teacherRecords = records.filter((r) => r.user_id === teacher.id);
+    const tPresent = teacherRecords.filter((r) => r.status === 'HADIR').length;
+    const tLate = teacherRecords.filter((r) => r.status === 'TERLAMBAT').length;
+    const tTotalMasuk = tPresent + tLate;
+    const tTotalIzin = teacherRecords.filter((r) => r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR').length;
 
     const summaryData = [
       ['LAPORAN PRESENSI INDIVIDU GURU & STAF'],
@@ -495,13 +628,19 @@ export class ExcelReportGenerator {
       ['Periode Laporan', `${month} ${year}`],
       ['Tanggal Cetak', new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })],
       [],
+      ['RINGKASAN TOTAL INDIVIDU'],
+      ['Total Hadir Tepat Waktu', tPresent],
+      ['Total Terlambat', tLate],
+      ['Jumlah Masuk (Hari)', tTotalMasuk],
+      ['Jumlah Izin / Sakit (Hari)', tTotalIzin],
+      [],
       ['PENANDATANGAN RESMI'],
       ['TU (Tata Usaha)', SIGNATORY_OFFICIALS.TU_NAME],
       ['Kepala Sekolah', SIGNATORY_OFFICIALS.KEPSEK_NAME],
     ];
 
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-    wsSummary['!cols'] = [{ wch: 25 }, { wch: 45 }];
+    wsSummary['!cols'] = [{ wch: 28 }, { wch: 45 }];
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan Guru');
 
     const attendanceData = teacherRecords.map((a, index) => ({
