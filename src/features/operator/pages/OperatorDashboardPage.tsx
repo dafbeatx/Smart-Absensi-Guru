@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
@@ -7,7 +7,8 @@ import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionMod
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { AuditLogTable } from '../components/AuditLogTable';
-import type { UserProfile } from '../../../types/database.types';
+import { ProviderFactory } from '../../../providers/provider-factory';
+import type { UserProfile, AttendanceRecord } from '../../../types/database.types';
 
 export const OperatorDashboardPage: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -47,10 +48,36 @@ export const OperatorDashboardPage: React.FC = () => {
       role: 'KEPSEK',
       position: 'Kepala Sekolah Utama',
       avatar_url: null,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-  ]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+
+  const fetchAttendanceRecords = async () => {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      const yearStr = new Date().getFullYear().toString();
+      const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+      const allRecs: AttendanceRecord[] = [];
+
+      for (const t of teachers) {
+        const recs = await provider.getMonthlyAttendance(t.id, monthStr, yearStr, token);
+        allRecs.push(...recs);
+      }
+      setAttendanceRecords(allRecs);
+    } catch (err) {
+      console.warn('Gagal memuat rekap absensi bulanan di operator:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendanceRecords();
+    const handleScannedEvent = () => fetchAttendanceRecords();
+    window.addEventListener('smart_absensi_scanned', handleScannedEvent);
+    window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
+    return () => {
+      window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
+      window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
+    };
+  }, [teachers.length]);
 
   const handleExportExcel = async () => {
     setIsExportModalOpen(true);
@@ -150,7 +177,7 @@ export const OperatorDashboardPage: React.FC = () => {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         teachers={teachers}
-        attendanceRecords={[]}
+        attendanceRecords={attendanceRecords}
       />
     </div>
   );

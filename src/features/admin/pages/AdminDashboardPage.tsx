@@ -140,6 +140,24 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     }
   };
 
+  const fetchAttendanceRecords = async () => {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      const yearStr = new Date().getFullYear().toString();
+      const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+      const allRecs: AttendanceRecord[] = [];
+
+      for (const t of teachers) {
+        const recs = await provider.getMonthlyAttendance(t.id, monthStr, yearStr, token);
+        allRecs.push(...recs);
+      }
+      setAttendanceRecords(allRecs);
+    } catch (err) {
+      console.warn('Gagal memuat rekap absensi bulanan:', err);
+    }
+  };
+
   useEffect(() => {
     // 1. Instantly populate from local storage cache for instant UI rendering
     const cachedTeachers = localStorage.getItem('smart_absensi_teachers');
@@ -199,10 +217,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     };
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
+    window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
+      window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
     };
-  }, [user?.id]);
+  }, [user?.id, teachers.length]);
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 

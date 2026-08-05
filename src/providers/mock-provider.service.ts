@@ -237,6 +237,20 @@ export class MockProvider implements IDataProvider {
     safeSetStorage(`smart_absensi_today_attendance_${userId}_${dateStr}`, JSON.stringify(record));
     safeSetStorage('smart_absensi_today_attendance', JSON.stringify(record));
 
+    // Save to global mock attendance history storage
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    try {
+      const savedAll = safeGetStorage(ALL_KEY);
+      let allRecords: AttendanceRecord[] = savedAll ? JSON.parse(savedAll) : [];
+      if (!Array.isArray(allRecords)) allRecords = [];
+      const idx = allRecords.findIndex((r) => r.user_id === record.user_id && r.date === record.date);
+      if (idx >= 0) allRecords[idx] = record;
+      else allRecords.push(record);
+      safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
+    } catch (e) {
+      console.error('Failed to save to all attendance history:', e);
+    }
+
     return {
       attendance_id: record.id,
       status: record.status,
@@ -272,30 +286,102 @@ export class MockProvider implements IDataProvider {
     }
 
     const monthPrefix = `${year}-${paddedMonth}`;
-    const todayStr = getTodayDateInJakarta();
-    const records: AttendanceRecord[] = [];
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    let allRecords: AttendanceRecord[] = [];
+    try {
+      const savedAll = safeGetStorage(ALL_KEY);
+      if (savedAll) {
+        const parsed = JSON.parse(savedAll);
+        if (Array.isArray(parsed)) allRecords = parsed;
+      }
+    } catch (e) {
+      console.error('Failed to parse all attendance history:', e);
+    }
 
-    const saved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`) || safeGetStorage('smart_absensi_today_attendance');
-    if (saved) {
+    const todayStr = getTodayDateInJakarta();
+    const savedToday = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`) || safeGetStorage('smart_absensi_today_attendance');
+    if (savedToday) {
       try {
-        const rec: AttendanceRecord = JSON.parse(saved);
-        if (rec && rec.user_id === userId && rec.date.startsWith(monthPrefix)) {
-          records.push(rec);
+        const rec: AttendanceRecord = JSON.parse(savedToday);
+        if (rec && rec.user_id === userId && !allRecords.some((r) => r.user_id === userId && r.date === rec.date)) {
+          allRecords.push(rec);
         }
       } catch (e) {
         console.error('Failed to parse today attendance for monthly:', e);
       }
     }
-    return records;
+
+    return allRecords.filter((r) => (r.user_id === userId || userId === 'ALL') && r.date.startsWith(monthPrefix));
   }
 
-  public async correctAttendance(_dto: CorrectAttendanceDTO): Promise<boolean> {
-    await new Promise((r) => setTimeout(r, 300));
+  public async correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean> {
+    await new Promise((r) => setTimeout(r, 200));
+
+    let finalStatus = (dto.status || 'HADIR') as AttendanceStatus;
+    if (dto.status === 'HADIR' && dto.check_in_time) {
+      const cleanTime = dto.check_in_time.slice(0, 5);
+      if (cleanTime > '07:15') {
+        finalStatus = 'TERLAMBAT';
+      }
+    }
+
+    const record: AttendanceRecord = {
+      id: `att_${dto.target_user_id}_${dto.date}`,
+      user_id: dto.target_user_id,
+      date: dto.date,
+      check_in_time: dto.check_in_time ? (dto.check_in_time.length === 5 ? `${dto.check_in_time}:00` : dto.check_in_time) : '07:00:00',
+      check_out_time: dto.check_out_time ? (dto.check_out_time.length === 5 ? `${dto.check_out_time}:00` : dto.check_out_time) : null,
+      status: finalStatus,
+      verification_method: 'MANUAL_CORRECTION',
+      attendance_source: 'ADMIN_MANUAL',
+      check_in_lat: -6.2,
+      check_in_lng: 106.8,
+      check_in_distance_meters: 10,
+      is_offline: false,
+      created_at: new Date().toISOString(),
+    };
+
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    try {
+      const savedAll = safeGetStorage(ALL_KEY);
+      let allRecords: AttendanceRecord[] = savedAll ? JSON.parse(savedAll) : [];
+      if (!Array.isArray(allRecords)) allRecords = [];
+      const idx = allRecords.findIndex((r) => r.user_id === record.user_id && r.date === record.date);
+      if (idx >= 0) allRecords[idx] = record;
+      else allRecords.push(record);
+      safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
+    } catch (e) {
+      console.error('Failed to save correction to all attendance history:', e);
+    }
+
+    const todayStr = getTodayDateInJakarta();
+    if (dto.date === todayStr) {
+      safeSetStorage(`smart_absensi_today_attendance_${dto.target_user_id}_${todayStr}`, JSON.stringify(record));
+      safeSetStorage('smart_absensi_today_attendance', JSON.stringify(record));
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    }
+
     return true;
   }
 
-  public async getDailyAttendance(_date: string, _token: string): Promise<AttendanceRecord[]> {
-    await new Promise((r) => setTimeout(r, 200));
+  public async getDailyAttendance(date: string, _token: string): Promise<AttendanceRecord[]> {
+    const targetDate = date || getTodayDateInJakarta();
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    try {
+      const savedAll = safeGetStorage(ALL_KEY);
+      if (savedAll) {
+        const parsed = JSON.parse(savedAll);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((r: AttendanceRecord) => r.date === targetDate);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse daily attendance:', e);
+    }
     return [];
   }
 
