@@ -38,7 +38,7 @@ export const SkeletonList: React.FC<{ count?: number }> = ({ count = 4 }) => {
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex items-center justify-between animate-pulse">
           <div className="flex items-center gap-3 w-3/4">
-            <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
+            <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
             <div className="space-y-1.5 w-full">
               <Skeleton className="h-3.5 w-1/2" />
               <Skeleton className="h-2.5 w-1/3" />
