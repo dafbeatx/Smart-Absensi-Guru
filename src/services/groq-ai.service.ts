@@ -18,8 +18,105 @@ export interface AttendanceMetricsPayload {
   dateStr?: string;
 }
 
+export interface ScanRejectionDiagnosisParams {
+  rawQrData?: string;
+  distanceMeters?: number;
+  allowedRadius?: number;
+  gpsAccuracy?: number;
+  userRole?: string;
+  errorType: 'INVALID_QR' | 'OUT_OF_GEOFENCE' | 'MISSING_GPS' | 'CAMERA_ERROR' | 'UNKNOWN';
+}
+
+export interface ScanRejectionDiagnosisResult {
+  diagnosisTitle: string;
+  diagnosisDetail: string;
+  actionSuggestion: string;
+  suggestedFixMethod: 'MANUAL_CODE' | 'GPS_BYPASS' | 'RETRY' | 'AUTO_CORRECTION';
+  prefilledCorrectionReason: string;
+}
+
 export class GroqAIService {
   private static API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+  /**
+   * Diagnoses barcode/QR code scan rejection and generates AI solution & auto-correction draft
+   */
+  public static async diagnoseScanRejection(
+    params: ScanRejectionDiagnosisParams
+  ): Promise<ScanRejectionDiagnosisResult> {
+    const role = params.userRole || 'GURU';
+
+    const prompt = `Anda adalah "AI Barcode Diagnostic Engine" untuk aplikasi Smart Absensi Guru.
+Pengguna (${role}) mengalami penolakan (REJECTED) saat mencoba scan barcode/QR presensi.
+
+Data Diagnosa:
+- Tipe Failure: ${params.errorType}
+- Scanned Text: "${params.rawQrData || 'N/A'}"
+- Jarak terdeteksi: ${params.distanceMeters ?? 'N/A'} meter (Radius Maksimum: ${params.allowedRadius ?? 100} meter)
+- Akurasi GPS HP: ±${params.gpsAccuracy ?? 'N/A'} meter
+
+Berikan analisis diagnosa mendalam dan berikan HANYA format JSON berikut (tanpa markdown codeblock):
+{
+  "diagnosisTitle": "judul singkat diagnosa AI",
+  "diagnosisDetail": "penjelasan detail 1-2 kalimat mengapa scan direject",
+  "actionSuggestion": "langkah praktis perbaikan untuk user",
+  "suggestedFixMethod": "MANUAL_CODE",
+  "prefilledCorrectionReason": "kalimat alasan koreksi otomatis yang siap dikirim"
+}
+*Note for suggestedFixMethod: pilihlah salah satu dari ["MANUAL_CODE", "GPS_BYPASS", "RETRY", "AUTO_CORRECTION"]*`;
+
+    const apiOutput = await this.callGroqAPI([
+      { role: 'system', content: 'Anda adalah AI Barcode Diagnostic Engine yang membalas HANYA dalam JSON valid.' },
+      { role: 'user', content: prompt },
+    ]);
+
+    if (apiOutput) {
+      try {
+        const cleaned = apiOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        return {
+          diagnosisTitle: parsed.diagnosisTitle || 'Analisis Diagnosa AI',
+          diagnosisDetail: parsed.diagnosisDetail || 'Terjadi kendala verifikasi barcode/lokasi presensi.',
+          actionSuggestion: parsed.actionSuggestion || 'Gunakan metode input kode manual atau koordinat GPS.',
+          suggestedFixMethod: parsed.suggestedFixMethod || (params.errorType === 'INVALID_QR' ? 'MANUAL_CODE' : 'GPS_BYPASS'),
+          prefilledCorrectionReason: parsed.prefilledCorrectionReason || `Pengajuan koreksi presensi ${role} karena kendala pemindaian barcode (${params.errorType}).`,
+        };
+      } catch (err) {
+        logger.warn('GroqAIService', 'Failed to parse Groq AI diagnosis JSON, using smart fallback', err);
+      }
+    }
+
+    // Smart Local Fallback Diagnosis Engine (if offline or API key missing)
+    if (params.errorType === 'OUT_OF_GEOFENCE') {
+      const dist = params.distanceMeters || 120;
+      const radius = params.allowedRadius || 100;
+      return {
+        diagnosisTitle: '📍 Lokasi Terdeteksi Di Luar Radius Sekolah',
+        diagnosisDetail: `HP Anda terdeteksi berada ${dist} meter dari pusat sekolah (batas maksimum ${radius}m). Hal ini biasanya terjadi karena pembacaan GPS meleset di dalam ruangan.`,
+        actionSuggestion: 'Dekati area terbuka/pintu kantor atau gunakan tombol "Absen via GPS Sekolah".',
+        suggestedFixMethod: 'GPS_BYPASS',
+        prefilledCorrectionReason: `Pengajuan koreksi presensi ${role} akibat GPS meleset (${dist}m di luar radius ${radius}m saat di sekolah).`,
+      };
+    }
+
+    if (params.errorType === 'INVALID_QR') {
+      return {
+        diagnosisTitle: '📷 Format Barcode / QR Tidak Dikenali',
+        diagnosisDetail: `String barcode "${params.rawQrData || 'N/A'}" tidak sesuai dengan seed resmi sekolah. Kemungkinan poster terkena pantulan cahaya, buram, atau menggunakan format fisik lama.`,
+        actionSuggestion: 'Gunakan tombol "Input Kode Barcode Manual" untuk mengetik kode poster langsung.',
+        suggestedFixMethod: 'MANUAL_CODE',
+        prefilledCorrectionReason: `Pengajuan koreksi presensi ${role} dikarenakan fisik barcode/QR poster di sekolah tidak terbaca sempurna.`,
+      };
+    }
+
+    return {
+      diagnosisTitle: '⚠️ Verifikasi Presensi Belum Berhasil',
+      diagnosisDetail: 'Terjadi kendala sinyal atau pemindaian kamera saat memproses data presensi Anda.',
+      actionSuggestion: 'Coba pindai ulang atau ajukan koreksi presensi otomatis ke Admin/Kepsek.',
+      suggestedFixMethod: 'AUTO_CORRECTION',
+      prefilledCorrectionReason: `Pengajuan koreksi presensi ${role} dikarenakan kendala sistem pemindaian barcode.`,
+    };
+  }
 
   /**
    * Helper method to call Groq API directly with fallback handling
@@ -191,3 +288,4 @@ Berikan jawaban yang ramah, singkat, akurat, dan membantu dalam bahasa Indonesia
     return `Terima kasih atas pertanyaan Anda mengenai "${question}". Poin utama presensi sekolah berjalan sesuai aturan geofence GPS dan QR Code resmi.`;
   }
 }
+

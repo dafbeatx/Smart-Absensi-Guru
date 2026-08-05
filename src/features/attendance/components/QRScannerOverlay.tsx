@@ -9,6 +9,10 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { AttendanceRepository } from '../../../repositories/AttendanceRepository';
 import { QRValidationService } from '../../../services/qr-validation.service';
+import { GroqAIService } from '../../../services/groq-ai.service';
+import type { ScanRejectionDiagnosisResult } from '../../../services/groq-ai.service';
+import { ManualQRCodeModal } from './ManualQRCodeModal';
+import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -33,6 +37,10 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
+  const [aiDiagnosis, setAiDiagnosis] = useState<ScanRejectionDiagnosisResult | null>(null);
+
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
 
   const [scanResult, setScanResult] = useState<{
     timestamp: string;
@@ -131,6 +139,13 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     if (!qrValidation.isValid) {
       logger.warn('QRScannerOverlay', 'QR Code validation failed / invalid payload');
       SoundService.playError();
+      const userRole = useAuthStore.getState().user?.role || 'GURU';
+      GroqAIService.diagnoseScanRejection({
+        rawQrData: _qrData,
+        userRole,
+        errorType: 'INVALID_QR',
+      }).then(setAiDiagnosis).catch(console.warn);
+
       setRejectionReason('Absensi Ditolak! QR Code tidak valid / bukan QR resmi absensi.');
       setIsRejectionModalOpen(true);
       isProcessingRef.current = false;
@@ -146,6 +161,12 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     if (!currentCoords) {
       logger.warn('QRScannerOverlay', 'Attendance rejected due to missing GPS coords');
       SoundService.playError();
+      const userRole = useAuthStore.getState().user?.role || 'GURU';
+      GroqAIService.diagnoseScanRejection({
+        userRole,
+        errorType: 'MISSING_GPS',
+      }).then(setAiDiagnosis).catch(console.warn);
+
       setRejectionReason('Absensi Ditolak! Perizinan lokasi GPS tidak diizinkan atau lokasi HP Anda tidak dapat terdeteksi. Silakan aktifkan izin lokasi di HP Anda.');
       setIsRejectionModalOpen(true);
       isProcessingRef.current = false;
@@ -161,6 +182,16 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         allowedRadius,
       });
       SoundService.playError();
+      const userRole = useAuthStore.getState().user?.role || 'GURU';
+      GroqAIService.diagnoseScanRejection({
+        rawQrData: _qrData,
+        distanceMeters: currentCoords.distanceMeters,
+        allowedRadius,
+        gpsAccuracy: currentCoords.accuracy,
+        userRole,
+        errorType: 'OUT_OF_GEOFENCE',
+      }).then(setAiDiagnosis).catch(console.warn);
+
       let hint = '';
       if (currentCoords.distanceMeters > 1000) {
         hint = '\n\n💡 Catatan: Jarak terdeteksi di atas 1 KM dari sekolah. Pastikan koordinat lokasi sekolah di Pengaturan sudah benar.';
@@ -237,6 +268,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     }, 2200);
   };
 
+  const handleBypassGPSCheckIn = async () => {
+    setIsRejectionModalOpen(false);
+    await handleScanSuccess(CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED);
+  };
+
   if (!isOpen) return null;
 
   const isWithinRadius = gpsCoords ? gpsCoords.distanceMeters <= allowedRadius : false;
@@ -249,7 +285,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         <div className="flex justify-between items-center text-white pt-2 z-10">
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-lg hover:bg-white/20 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-lg hover:bg-white/20 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
             aria-label="Tutup Pemindai"
           >
             ✕
@@ -258,9 +294,14 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             <h3 className="font-extrabold text-base tracking-tight">Pindai QR Code Absensi</h3>
             <p className="text-[11px] font-medium text-emerald-400">Pintu Kantor Utama Sekolah</p>
           </div>
-          <div className="w-10 h-10 flex items-center justify-center text-xl" aria-hidden="true">
-            💡
-          </div>
+          <button
+            onClick={() => setIsManualModalOpen(true)}
+            className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+            title="Input Kode Barcode Manual"
+          >
+            <span>⌨️</span>
+            <span className="hidden sm:inline">Manual</span>
+          </button>
         </div>
 
         {/* Camera Scanner Viewfinder Box */}
@@ -308,7 +349,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           </div>
         )}
 
-        {/* Status Geofence Indicators Badges */}
+        {/* Status Geofence Indicators Badges & Fallback Buttons */}
         <div className="space-y-3 max-w-xs mx-auto text-center pb-6 z-10">
           {isCheckingGPS ? (
             <div className="bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold">
@@ -316,7 +357,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
               <span>⏳ Mengukur Koordinat GPS (3 sampel)...</span>
             </div>
           ) : gpsCoords ? (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className={`border text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold ${
                 isWithinRadius
                   ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
@@ -331,16 +372,23 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                     : `🔴 Di Luar Radius: ${gpsCoords.distanceMeters}m (maks. ${allowedRadius}m)`}
                 </span>
               </div>
-              <div className="text-[10px] text-slate-400 text-center">
-                📡 Akurasi GPS: ±{Math.round(gpsCoords.accuracy)}m
+              
+              <div className="flex justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsManualModalOpen(true)}
+                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl backdrop-blur-md transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <span>⌨️ Kode Manual</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={fetchGPSLocation}
+                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold rounded-xl backdrop-blur-md transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <span>🔄 Ukur GPS</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={fetchGPSLocation}
-                className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer block mx-auto"
-              >
-                🔄 Ukur Ulang GPS
-              </button>
             </div>
           ) : null}
           <p className="text-[11px] text-slate-400">Arahkan kamera HP Anda ke QR Code yang dipajang di sekolah</p>
@@ -400,20 +448,21 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         </div>
       </Modal>
 
-      {/* Rejection Modal Overlay (Absensi Ditolak Diluar Lokasi / GPS Off) */}
+      {/* Rejection Modal Overlay with AI Diagnostic Engine & 4 Recovery Actions */}
       <Modal isOpen={isRejectionModalOpen} onClose={() => setIsRejectionModalOpen(false)}>
         <div className="text-center space-y-4 py-2">
           
-          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-4xl mx-auto ring-8 ring-red-50 animate-bounce">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto ring-8 ring-red-50 animate-bounce">
             ✕
           </div>
 
           <div>
-            <h3 className="font-extrabold text-red-600 text-xl">ABSENSI DITOLAK!</h3>
-            <p className="text-xs text-slate-500 mt-1">Terdeteksi diluar lokasi / kendala lokasi GPS</p>
+            <h3 className="font-extrabold text-red-600 text-lg">ABSENSI DITOLAK!</h3>
+            <p className="text-xs text-slate-500 mt-1">Terdeteksi kendala verifikasi barcode / lokasi</p>
           </div>
 
-          <div className="bg-red-50/70 p-4 rounded-2xl space-y-2 text-left text-xs text-slate-700 border border-red-200">
+          {/* Standard Error Details */}
+          <div className="bg-red-50/70 p-3.5 rounded-2xl space-y-2 text-left text-xs text-slate-700 border border-red-200">
             <div className="flex justify-between items-center pb-2 border-b border-red-200/60">
               <span className="text-slate-500 font-semibold">Status Presensi</span>
               <span className="px-2.5 py-0.5 bg-red-600 text-white font-extrabold text-[10px] rounded-full">
@@ -422,26 +471,101 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             </div>
             <div className="space-y-1 pt-1">
               <span className="text-slate-500 font-bold block">Alasan Penolakan:</span>
-              <p className="font-semibold text-red-950 leading-relaxed bg-white p-2.5 rounded-xl border border-red-200">
+              <p className="font-semibold text-red-950 leading-relaxed bg-white p-2 rounded-xl border border-red-200 text-[11px]">
                 {rejectionReason}
               </p>
             </div>
           </div>
 
-          <div className="pt-2 flex justify-center gap-2">
-            <Button
-              variant="danger"
-              className="w-full text-xs py-2.5 font-bold cursor-pointer"
-              onClick={() => {
-                setIsRejectionModalOpen(false);
-                fetchGPSLocation();
-              }}
-            >
-              🔄 Coba Pindai Ulang
-            </Button>
+          {/* Groq AI Diagnostic Card */}
+          {aiDiagnosis && (
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-3.5 rounded-2xl border border-emerald-200 text-left text-xs space-y-2">
+              <div className="flex items-center gap-2 border-b border-emerald-200/80 pb-2">
+                <span className="text-lg">🤖</span>
+                <div>
+                  <h4 className="font-extrabold text-emerald-950 text-xs flex items-center gap-1.5">
+                    {aiDiagnosis.diagnosisTitle}
+                    <span className="px-1.5 py-0.2 bg-emerald-600 text-white text-[9px] font-bold rounded-full">Groq AI</span>
+                  </h4>
+                  <p className="text-[10px] text-emerald-700 font-medium">{aiDiagnosis.diagnosisDetail}</p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-emerald-900 block">💡 Solusi Rekomendasi AI:</span>
+                <p className="text-[11px] text-slate-700 font-medium bg-white p-2 rounded-xl border border-emerald-200/60 leading-relaxed">
+                  {aiDiagnosis.actionSuggestion}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 4 Action Recovery Buttons */}
+          <div className="pt-2 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRejectionModalOpen(false);
+                  fetchGPSLocation();
+                }}
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 transition-all cursor-pointer"
+              >
+                🔄 Pindai Ulang
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRejectionModalOpen(false);
+                  setIsManualModalOpen(true);
+                }}
+                className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                ⌨️ Kode Manual
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleBypassGPSCheckIn}
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                📍 Absen via GPS
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRejectionModalOpen(false);
+                  setIsCorrectionModalOpen(true);
+                }}
+                className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                ⚡ Auto-Koreksi AI
+              </button>
+            </div>
           </div>
         </div>
       </Modal>
+
+      {/* Manual QR Code Input Modal */}
+      <ManualQRCodeModal
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
+        onSubmitCode={(code) => {
+          handleScanSuccess(code);
+        }}
+      />
+
+      {/* Guru Correction Request Modal for AI Auto-Correction */}
+      <GuruCorrectionRequestModal
+        isOpen={isCorrectionModalOpen}
+        onClose={() => setIsCorrectionModalOpen(false)}
+        onSuccess={() => {
+          onClose();
+        }}
+      />
     </>
   );
 };
+

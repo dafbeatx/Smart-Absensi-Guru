@@ -59,5 +59,29 @@ export const runGroqAITestSuite = async (): Promise<{
     typeof botAnswer === 'string' && botAnswer.length > 10
   );
 
+  // Test 5: AI Scan Rejection Diagnosis for Invalid QR
+  const invalidQrDiag = await GroqAIService.diagnoseScanRejection({
+    rawQrData: 'RANDOM_BAD_QR',
+    userRole: 'GURU',
+    errorType: 'INVALID_QR',
+  });
+  assert(
+    'Groq AI - Diagnoses Invalid QR Barcode Scan Failure',
+    invalidQrDiag.suggestedFixMethod === 'MANUAL_CODE' && typeof invalidQrDiag.diagnosisTitle === 'string'
+  );
+
+  // Test 6: AI Scan Rejection Diagnosis for Out of Geofence
+  const geofenceDiag = await GroqAIService.diagnoseScanRejection({
+    rawQrData: 'SMART_ABSENSI_OFFICIAL_QR_2026',
+    distanceMeters: 185,
+    allowedRadius: 100,
+    userRole: 'KEPSEK',
+    errorType: 'OUT_OF_GEOFENCE',
+  });
+  assert(
+    'Groq AI - Diagnoses Out of Geofence Rejection with AI Action Suggestion',
+    geofenceDiag.suggestedFixMethod === 'GPS_BYPASS' && geofenceDiag.prefilledCorrectionReason.includes('GPS')
+  );
+
   return { passed, failed, results };
 };
