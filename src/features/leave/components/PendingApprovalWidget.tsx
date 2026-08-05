@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
+import { EmptyState } from '../../../components/ui/EmptyState';
 import { ApprovalEngine } from '../../../services/approval-engine.service';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -102,11 +103,11 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
 
   if (displayRequests.length === 0) {
     return (
-      <div className="bg-white p-6 rounded-3xl border border-slate-100 text-center space-y-2">
-        <span className="text-3xl">🎉</span>
-        <h4 className="font-extrabold text-[#023246] text-sm">Tidak Ada Pengajuan Izin Menunggu Approval</h4>
-        <p className="text-xs text-slate-400">Seluruh pengajuan izin/sakit/cuti guru dari database akan muncul di sini secara otomatis saat diajukan.</p>
-      </div>
+      <EmptyState
+        icon="📝"
+        title="Belum Ada Pengajuan Izin / Cuti"
+        description="Seluruh pengajuan izin, sakit, atau cuti guru akan muncul di sini secara otomatis untuk mendapatkan persetujuan."
+      />
     );
   }
 

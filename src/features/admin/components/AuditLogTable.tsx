@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
+import { EmptyState } from '../../../components/ui/EmptyState';
 import type { AuditLog } from '../../../types/database.types';
 
 export interface AuditLogTableProps {
@@ -114,6 +115,14 @@ export const AuditLogTable: React.FC<AuditLogTableProps> = ({
           </tbody>
         </table>
       </div>
+
+      {filteredLogs.length === 0 && (
+        <EmptyState
+          icon="📜"
+          title="Belum Ada Aktivitas Audit Log"
+          description="Seluruh pencatatan riwayat perubahan data, reset PIN, dan approval akan muncul di sini secara otomatis."
+        />
+      )}
 
       {/* Log Detail Inspector Modal */}
       <Modal isOpen={Boolean(selectedLog)} onClose={() => setSelectedLog(null)} title="🔍 Inspeksi Detail Audit Log Entry">

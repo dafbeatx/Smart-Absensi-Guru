@@ -5,6 +5,8 @@ import { Badge } from '../../../components/ui/Badge';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
+import { SkeletonList, SkeletonCard } from '../../../components/ui/Skeleton';
+import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -530,14 +532,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Catatan Harian {activeMonthName} {selectedYear}</h3>
                 
                 {isLoadingHistory ? (
-                  <div className="py-8 text-center text-slate-400 text-xs font-semibold animate-pulse">
-                    Memuat riwayat bulanan...
-                  </div>
+                  <SkeletonList count={4} />
                 ) : attendanceHistory.length === 0 ? (
-                  <div className="py-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 text-xs font-semibold space-y-1">
-                    <p className="text-lg">📭</p>
-                    <p>Belum ada rekaman presensi pada {activeMonthName} {selectedYear}.</p>
-                  </div>
+                  <EmptyState
+                    icon="📅"
+                    title="Belum Ada Presensi Bulan Ini"
+                    description={`Belum ada rekaman presensi pada ${activeMonthName} ${selectedYear}. Mulai dengan melakukan scan QR Code absensi.`}
+                  />
                 ) : (
                   attendanceHistory.map((rec) => (
                     <div key={rec.id} className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200 flex items-center justify-between text-xs transition-colors">
