@@ -3,6 +3,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
+import { GroqAIService } from '../../../services/groq-ai.service';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { logger } from '../../../utils/logger.utils';
@@ -25,6 +26,7 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
   const [targetStatus, setTargetStatus] = useState<'HADIR' | 'IZIN' | 'SAKIT'>('HADIR');
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAiPolishing, setIsAiPolishing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,11 +116,29 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
         </div>
 
         <div className="space-y-1">
-          <label className="block text-xs font-semibold text-slate-700">Alasan Lengkap Koreksi</label>
+          <div className="flex justify-between items-center">
+            <label className="block text-xs font-semibold text-slate-700">Alasan Lengkap Koreksi</label>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!reason.trim()) return;
+                setIsAiPolishing(true);
+                const res = await GroqAIService.analyzeLeaveReason(reason, 'KOREKSI_ABSEN');
+                setReason(res.polishedReason);
+                setIsAiPolishing(false);
+                showToast('info', '✨ Kalimat Disempurnakan oleh Groq AI!', res.summary);
+              }}
+              disabled={isAiPolishing || !reason.trim()}
+              className="text-[11px] text-emerald-600 hover:text-emerald-700 font-extrabold flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+            >
+              <span>✨</span>
+              <span>{isAiPolishing ? 'Menyempurnakan...' : 'Sempurnakan dengan AI'}</span>
+            </button>
+          </div>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Tuliskan alasan jelas mengapa perlu dilakukan koreksi absensi..."
+            placeholder="Tuliskan alasan jelas mengapa perlu dilakukan koreksi absensi (misal: kendala barcode direject)..."
             rows={3}
             required
             className="w-full bg-white border border-slate-200 text-slate-800 text-xs font-medium rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"

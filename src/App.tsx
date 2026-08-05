@@ -4,6 +4,7 @@ import { LoginPage } from './features/auth/pages/LoginPage';
 import { ForceChangePinModal } from './features/auth/components/ForceChangePinModal';
 import { ToastContainer } from './components/ui/Toast';
 import { TestRunnerModal } from './components/dev/TestRunnerModal';
+import { AIAssistantDrawer } from './components/ui/AIAssistantDrawer';
 import { GPSService } from './services/gps.service';
 
 // Helper: retry a dynamic import once by reloading the page when the chunk
@@ -224,6 +225,7 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      <AIAssistantDrawer />
       <ToastContainer />
     </>
   );

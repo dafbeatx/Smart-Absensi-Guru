@@ -9,6 +9,7 @@ import { runAnalyticsReportTestSuite } from './__tests__/analytics-report.test';
 import { runAuditWhatsAppTestSuite } from './__tests__/audit-whatsapp.test';
 import { runFeatureFlagsTestSuite } from '../config/__tests__/feature-flags.test';
 import { runSecurityConsistencyTestSuite } from './__tests__/security-consistency.test';
+import { runGroqAITestSuite } from './__tests__/groq-ai.test';
 
 export interface TestResultItem {
   testName: string;
@@ -46,6 +47,7 @@ export class MasterTestRunner {
       { name: 'Analytics & Multi-Sheet Report Engine', fn: runAnalyticsReportTestSuite },
       { name: 'Audit Log & WhatsApp Integration', fn: runAuditWhatsAppTestSuite },
       { name: 'Feature Flag System', fn: runFeatureFlagsTestSuite },
+      { name: 'Groq AI Engine & Smart Assistant', fn: runGroqAITestSuite },
       { name: 'Security & Consistency Engine', fn: runSecurityConsistencyTestSuite },
     ];
 
