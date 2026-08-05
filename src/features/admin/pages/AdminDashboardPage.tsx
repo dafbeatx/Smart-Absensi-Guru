@@ -14,8 +14,6 @@ import { AuditLogTable } from '../components/AuditLogTable';
 import { DailyAttendanceTracker } from '../components/DailyAttendanceTracker';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
-import { ReportService } from '../../../services/report.service';
-import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
@@ -33,7 +31,6 @@ export interface AdminDashboardPageProps {
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenScanner, onSwitchToGuruView }) => {
   const { user, logout } = useAuthStore();
-  const { showToast } = useToastStore();
 
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
@@ -466,7 +463,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         onClose={() => setIsExportModalOpen(false)}
         teachers={teachers}
         attendanceRecords={attendanceRecords}
-        leaveRequests={pendingLeaves}
       />
 
       {/* Dev Suite Unit Test Runner Modal */}

@@ -7,13 +7,10 @@ import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionMod
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { AuditLogTable } from '../components/AuditLogTable';
-import { ReportService } from '../../../services/report.service';
-import { useToastStore } from '../../../store/useToastStore';
 import type { UserProfile } from '../../../types/database.types';
 
 export const OperatorDashboardPage: React.FC = () => {
   const { user, logout } = useAuthStore();
-  const { showToast } = useToastStore();
 
   const [activeTab, setActiveTab] = useState<'TEACHERS' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('TEACHERS');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
