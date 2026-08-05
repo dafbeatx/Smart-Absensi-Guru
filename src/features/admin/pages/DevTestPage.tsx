@@ -176,7 +176,7 @@ export const DevTestPage: React.FC<{ onBackToDashboard?: () => void }> = ({ onBa
       )}
 
       {/* Test Items Checklist Card */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden divide-y divide-slate-100">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-slate-50 p-4 font-extrabold text-xs text-slate-700 flex justify-between items-center">
           <span>CHECKLIST pengujian SISTEM</span>
           <span>{testItems.length > 0 ? `${testItems.filter((i) => i.status === 'passed').length}/${testItems.length} Lulus` : 'Belum Dijalankan'}</span>
@@ -192,7 +192,7 @@ export const DevTestPage: React.FC<{ onBackToDashboard?: () => void }> = ({ onBa
           testItems.map((item, idx) => {
             const isExpanded = expandedIndex === idx;
             return (
-              <div key={item.id} className="p-4 hover:bg-slate-50/80 transition-colors">
+              <div key={item.id} className="p-4 hover:bg-slate-50/80 transition-colors border-t border-slate-100">
                 <div className="flex items-center justify-between gap-3 cursor-pointer" onClick={() => setExpandedIndex(isExpanded ? null : idx)}>
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
