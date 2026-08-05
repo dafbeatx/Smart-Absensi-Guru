@@ -28,6 +28,7 @@ export interface CorrectAttendanceDTO {
   date: string;
   status: string;
   check_in_time: string;
+  check_out_time?: string;
   reason: string;
 }
 
@@ -63,13 +64,27 @@ export class AttendanceRepository {
       throw new Error('Akses Ditolak! Role GURU tidak diizinkan mengubah absensi secara langsung. Silakan gunakan menu Ajukan Koreksi Absen.');
     }
 
+    // Auto-evaluate HADIR vs TERLAMBAT cutoff at 07:15
+    let finalStatus = dto.status;
+    if (dto.status === 'HADIR' && dto.check_in_time) {
+      const cleanTime = dto.check_in_time.slice(0, 5);
+      if (cleanTime > '07:15') {
+        finalStatus = 'TERLAMBAT';
+      }
+    }
+
+    const payload = {
+      ...dto,
+      status: finalStatus,
+    };
+
     logger.info('AttendanceRepository', 'Executing correctAttendance via active provider', {
-      target_user_id: dto.target_user_id,
-      date: dto.date,
-      status: dto.status,
+      target_user_id: payload.target_user_id,
+      date: payload.date,
+      status: payload.status,
     });
     try {
-      const result = await ProviderFactory.getProvider().correctAttendance(dto);
+      const result = await ProviderFactory.getProvider().correctAttendance(payload);
       logger.info('AttendanceRepository', 'correctAttendance success');
       return result;
     } catch (err) {

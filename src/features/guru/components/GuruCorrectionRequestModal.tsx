@@ -23,6 +23,8 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
   const { showToast } = useToastStore();
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [checkInTime, setCheckInTime] = useState('07:00');
+  const [checkOutTime, setCheckOutTime] = useState('14:00');
   const [targetStatus, setTargetStatus] = useState<'HADIR' | 'IZIN' | 'SAKIT'>('HADIR');
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +43,7 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
     setIsLoading(true);
 
     try {
-      const fullReason = `[Pengajuan Koreksi Absen ${date} menjadi ${targetStatus}]: ${reason.trim()}`;
+      const fullReason = `[Pengajuan Koreksi Absen ${date} (Masuk: ${checkInTime}, Pulang: ${checkOutTime}) menjadi ${targetStatus}]: ${reason.trim()}`;
 
       await LeaveRepository.submitLeave({
         token: token || 'MOCK_TOKEN',
@@ -92,14 +94,10 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
           />
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-slate-700">Tanggal yang Dikoreksi</label>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-          />
+        <div className="grid grid-cols-3 gap-2">
+          <Input label="Tanggal Absensi" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
+          <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
         </div>
 
         <div className="space-y-1">
@@ -109,10 +107,13 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
             onChange={(e) => setTargetStatus(e.target.value as 'HADIR' | 'IZIN' | 'SAKIT')}
             className="w-full bg-white border border-slate-200 text-slate-800 text-xs font-bold rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
-            <option value="HADIR">✅ Hadir Tepat Waktu</option>
+            <option value="HADIR">✅ HADIR / MASUK</option>
             <option value="IZIN">📝 Izin Resmi</option>
             <option value="SAKIT">🏥 Sakit</option>
           </select>
+          <p className="text-[11px] text-amber-800 font-medium bg-amber-50 p-2 rounded-xl border border-amber-200 mt-1 leading-relaxed">
+            💡 <strong>Catatan:</strong> Status TERLAMBAT akan dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul <strong>07:15 WIB</strong>.
+          </p>
         </div>
 
         <div className="space-y-1">

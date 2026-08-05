@@ -393,6 +393,7 @@ export class SupabaseProvider implements IDataProvider {
         date: dto.date,
         status: dto.status,
         check_in_time: dto.check_in_time || '07:00:00',
+        check_out_time: dto.check_out_time ? (dto.check_out_time.length === 5 ? `${dto.check_out_time}:00` : dto.check_out_time) : null,
       },
       { onConflict: 'user_id,date' }
     );

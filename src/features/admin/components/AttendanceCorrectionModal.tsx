@@ -39,6 +39,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
   }, [selectedTeacherId, teachers]);
   const [newStatus, setNewStatus] = useState<AttendanceStatus>('HADIR');
   const [checkInTime, setCheckInTime] = useState('07:00');
+  const [checkOutTime, setCheckOutTime] = useState('14:00');
   const [reason, setReason] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,6 +64,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
         date,
         status: newStatus,
         check_in_time: checkInTime.length === 5 ? `${checkInTime}:00` : checkInTime,
+        check_out_time: checkOutTime ? (checkOutTime.length === 5 ? `${checkOutTime}:00` : checkOutTime) : undefined,
         reason,
       });
 
@@ -76,6 +78,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
           date,
           status: newStatus,
           check_in_time: checkInTime,
+          check_out_time: checkOutTime,
         }),
         reason: `Koreksi Absensi Manual oleh Admin Website untuk ${teacher?.full_name}: ${reason}`,
       });
@@ -115,15 +118,16 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           <Input label="Tanggal Absensi" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
+          <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
         </div>
 
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-slate-700">Status Kehadiran Baru</label>
-          <div className="grid grid-cols-3 gap-2">
-            {(['HADIR', 'TERLAMBAT', 'IZIN', 'SAKIT', 'DINAS_LUAR', 'ALFA'] as AttendanceStatus[]).map((st) => (
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {(['HADIR', 'IZIN', 'SAKIT', 'DINAS_LUAR', 'ALFA'] as AttendanceStatus[]).map((st) => (
               <button
                 key={st}
                 type="button"
@@ -134,10 +138,13 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                {st}
+                {st === 'HADIR' ? 'HADIR / MASUK' : st}
               </button>
             ))}
           </div>
+          <p className="text-[11px] text-amber-800 font-medium bg-amber-50 p-2.5 rounded-xl border border-amber-200 mt-1 leading-relaxed">
+            💡 <strong>Catatan:</strong> Status TERLAMBAT akan dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul <strong>07:15 WIB</strong>.
+          </p>
         </div>
 
         <div className="space-y-1.5">
