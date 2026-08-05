@@ -8,6 +8,7 @@ import { Input } from '../../../components/ui/Input';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { GPSService } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
 import type {
