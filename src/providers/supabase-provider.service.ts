@@ -61,6 +61,13 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     const hashedInputPin = await hashPin(dto.pin);
+    logger.info('SupabaseProvider', 'PIN comparison debug', {
+      storedHashPrefix: user.pin_hash ? user.pin_hash.substring(0, 8) + '...' : '(null)',
+      inputHashPrefix: hashedInputPin.substring(0, 8) + '...',
+      storedLen: user.pin_hash?.length ?? 0,
+      inputLen: hashedInputPin.length,
+      match: user.pin_hash === hashedInputPin,
+    });
     const isPinMatch = user.pin_hash === hashedInputPin || user.pin_hash === dto.pin;
 
     if (!user.pin_hash || !isPinMatch) {

@@ -6,30 +6,58 @@ import { ToastContainer } from './components/ui/Toast';
 import { TestRunnerModal } from './components/dev/TestRunnerModal';
 import { GPSService } from './services/gps.service';
 
+// Helper: retry a dynamic import once by reloading the page when the chunk
+// is missing (stale deployment).  Uses sessionStorage to prevent infinite loops.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lazyRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  chunkName: string
+): React.LazyExoticComponent<T> {
+  return React.lazy(() =>
+    factory().catch((err: unknown) => {
+      const key = `chunk_retry_${chunkName}`;
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1');
+        window.location.reload();
+      }
+      throw err; // re-throw so ErrorBoundary still catches if reload didn't help
+    })
+  );
+}
+
 // Code-split role dashboard pages lazily to optimize initial bundle size (~21 KB initial payload)
-const GuruDashboardPage = React.lazy(() =>
-  import('./features/dashboard/pages/GuruDashboardPage').then((m) => ({
-    default: m.GuruDashboardPage,
-  }))
+const GuruDashboardPage = lazyRetry(
+  () =>
+    import('./features/dashboard/pages/GuruDashboardPage').then((m) => ({
+      default: m.GuruDashboardPage,
+    })),
+  'GuruDashboardPage'
 );
 
-const KepsekDashboardPage = React.lazy(() =>
-  import('./features/kepsek/pages/KepsekDashboardPage').then((m) => ({
-    default: m.KepsekDashboardPage,
-  }))
+const KepsekDashboardPage = lazyRetry(
+  () =>
+    import('./features/kepsek/pages/KepsekDashboardPage').then((m) => ({
+      default: m.KepsekDashboardPage,
+    })),
+  'KepsekDashboardPage'
 );
 
-const AdminDashboardPage = React.lazy(() =>
-  import('./features/admin/pages/AdminDashboardPage').then((m) => ({
-    default: m.AdminDashboardPage,
-  }))
+const AdminDashboardPage = lazyRetry(
+  () =>
+    import('./features/admin/pages/AdminDashboardPage').then((m) => ({
+      default: m.AdminDashboardPage,
+    })),
+  'AdminDashboardPage'
 );
 
-const QRScannerOverlay = React.lazy(() =>
-  import('./features/attendance/components/QRScannerOverlay').then((m) => ({
-    default: m.QRScannerOverlay,
-  }))
+const QRScannerOverlay = lazyRetry(
+  () =>
+    import('./features/attendance/components/QRScannerOverlay').then((m) => ({
+      default: m.QRScannerOverlay,
+    })),
+  'QRScannerOverlay'
 );
+
 
 export const App: React.FC = () => {
   const { isAuthenticated, user } = useAuthStore();
