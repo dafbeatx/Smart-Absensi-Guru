@@ -75,56 +75,47 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="✏️ Ajukan Koreksi Absensi Guru">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-2xl text-xs text-blue-800 space-y-1">
-          <p className="font-bold flex items-center gap-1.5">
-            <span>ℹ️</span> Alur Pengajuan Koreksi Guru
-          </p>
-          <p className="leading-relaxed">
-            Pengajuan ini akan dikirim sebagai <strong>Request Pending</strong> ke Admin & Kepala Sekolah. Data absensi baru akan terupdate setelah disetujui.
-          </p>
-        </div>
-
+    <Modal isOpen={isOpen} onClose={onClose} title="✏️ Ajukan Koreksi Absensi Guru" maxWidth="xl">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {errorMsg && (
-          <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
+          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-semibold">
             ⚠️ {errorMsg}
           </div>
         )}
 
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-slate-700">Nama Guru</label>
-          <input
-            type="text"
-            disabled
-            value={user?.full_name || 'Guru Pengajar'}
-            className="w-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl p-2.5"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-700">Nama Guru</label>
+            <input
+              type="text"
+              disabled
+              value={user?.full_name || 'Guru Pengajar'}
+              className="w-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl p-2.5"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-700">Status yang Diharapkan</label>
+            <select
+              value={targetStatus}
+              onChange={(e) => setTargetStatus(e.target.value as 'HADIR' | 'IZIN' | 'SAKIT')}
+              className="w-full bg-white border border-slate-200 text-slate-800 text-xs font-bold rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="HADIR">✅ HADIR / MASUK</option>
+              <option value="IZIN">📝 Izin Resmi</option>
+              <option value="SAKIT">🏥 Sakit</option>
+            </select>
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-3">
           <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
           <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
           <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
         </div>
-        <p className="text-[11px] text-slate-500 font-medium -mt-2">
-          📅 Guru dapat mengajukan koreksi untuk tanggal yang tertinggal (tanggal lampau hingga hari ini), tetapi tidak dapat memilih tanggal mendatang.
-        </p>
 
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-slate-700">Status yang Diharapkan</label>
-          <select
-            value={targetStatus}
-            onChange={(e) => setTargetStatus(e.target.value as 'HADIR' | 'IZIN' | 'SAKIT')}
-            className="w-full bg-white border border-slate-200 text-slate-800 text-xs font-bold rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          >
-            <option value="HADIR">✅ HADIR / MASUK</option>
-            <option value="IZIN">📝 Izin Resmi</option>
-            <option value="SAKIT">🏥 Sakit</option>
-          </select>
-          <p className="text-[11px] text-amber-800 font-medium bg-amber-50 p-2 rounded-xl border border-amber-200 mt-1 leading-relaxed">
-            💡 <strong>Catatan:</strong> Status TERLAMBAT akan dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul <strong>07:15 WIB</strong>.
-          </p>
+        <div className="bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-xl text-[11px] text-amber-900 leading-relaxed font-medium">
+          💡 <strong>Catatan:</strong> Pengajuan akan dikirim sebagai <i>Request Pending</i> ke Admin/Kepsek. Tanggal lampau diizinkan (maksimal hari ini). Jam masuk &gt; 07:15 WIB otomatis dievaluasi <strong>TERLAMBAT</strong>.
         </div>
 
         <div className="space-y-1">
@@ -151,7 +142,7 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Tuliskan alasan jelas mengapa perlu dilakukan koreksi absensi (misal: kendala barcode direject)..."
-            rows={3}
+            rows={2}
             required
             className="w-full bg-white border border-slate-200 text-slate-800 text-xs font-medium rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />

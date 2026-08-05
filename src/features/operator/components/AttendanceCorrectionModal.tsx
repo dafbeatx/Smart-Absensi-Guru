@@ -71,20 +71,20 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="✏️ Koreksi & Input Absensi Manual">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose} title="✏️ Koreksi & Input Absensi Manual" maxWidth="xl">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {errorMsg && (
-          <div className="p-3 rounded-xl bg-red-50 text-red-700 text-xs font-semibold">
+          <div className="p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-semibold">
             ⚠️ {errorMsg}
           </div>
         )}
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <label className="block text-xs font-semibold text-slate-700">Pilih Guru</label>
           <select
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-2xl p-3 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
           >
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>
@@ -94,16 +94,13 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
           </select>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-3">
           <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
           <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
           <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
         </div>
-        <p className="text-[11px] text-slate-500 font-medium -mt-2">
-          📅 Anda dapat menginput tanggal yang tertinggal (tanggal lampau hingga hari ini), tetapi tidak dapat memilih tanggal mendatang.
-        </p>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <label className="block text-xs font-semibold text-slate-700">Status Kehadiran Baru</label>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {(['HADIR', 'IZIN', 'SAKIT', 'DINAS_LUAR', 'ALFA'] as AttendanceStatus[]).map((st) => (
@@ -111,9 +108,9 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
                 key={st}
                 type="button"
                 onClick={() => setNewStatus(st)}
-                className={`py-2 px-2.5 rounded-xl text-[11px] font-bold border transition-all ${
+                className={`py-2 px-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
                   newStatus === st
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -121,25 +118,26 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-amber-800 font-medium bg-amber-50 p-2.5 rounded-xl border border-amber-200 mt-1 leading-relaxed">
-            💡 <strong>Catatan:</strong> Status TERLAMBAT akan dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul <strong>07:15 WIB</strong>.
-          </p>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-xl text-[11px] text-amber-900 leading-relaxed font-medium">
+          💡 <strong>Catatan:</strong> Pengisian tanggal lampau diizinkan (maksimal hari ini). Status <strong>TERLAMBAT</strong> dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul 07:15 WIB.
+        </div>
+
+        <div className="space-y-1">
           <label className="block text-xs font-semibold text-slate-700">Alasan Perubahan / Koreksi (Wajib Audit Log)</label>
           <textarea
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Tuliskan alasan audit koreksi (contoh: HP Guru mati, verifikasi fisik hadir)..."
-            className="w-full bg-white border border-slate-200 rounded-2xl p-3 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
           />
         </div>
 
-        <div className="pt-2 flex gap-2">
-          <Button type="button" variant="secondary" className="w-1/2" onClick={onClose}>Batal</Button>
-          <Button type="submit" variant="primary" className="w-1/2">Simpan Koreksi</Button>
+        <div className="pt-2 flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="primary">Simpan Koreksi</Button>
         </div>
       </form>
     </Modal>
