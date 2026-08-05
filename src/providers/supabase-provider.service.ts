@@ -406,7 +406,7 @@ export class SupabaseProvider implements IDataProvider {
     const { data } = await this.client
       .from('attendance')
       .select('*')
-      .eq('date', date);
+      .eq('date', targetDate);
 
     return (data || []).map((row) => ({
       id: row.id,
