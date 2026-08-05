@@ -685,93 +685,135 @@ export class SupabaseProvider implements IDataProvider {
     currentDeviceUUID: string,
     _token: string
   ): Promise<{ status: 'ACTIVE' | 'UNBOUND' | 'DIFFERENT_DEVICE' | 'NEEDS_ADMIN_RESET'; message: string; registered_uuid?: string }> {
-    const { data: binding } = await this.client
-      .from('device_bindings')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+    try {
+      const { data: binding, error } = await this.client
+        .from('device_bindings')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-    if (!binding) {
+      if (error) {
+        // Tabel belum ada atau belum ada RLS policy — fallback ke ACTIVE
+        logger.warn('SupabaseProvider', 'device_bindings query error (tabel mungkin belum dibuat):', error.message);
+        return {
+          status: 'ACTIVE',
+          message: 'Perangkat aktif (tabel device_bindings belum ada, jalankan CREATE_TABLES.sql).',
+          registered_uuid: currentDeviceUUID,
+        };
+      }
+
+      if (!binding) {
+        // Auto-register device pertama kali
+        await this.client.from('device_bindings').insert({
+          user_id: userId,
+          device_uuid: currentDeviceUUID,
+          bound_at: new Date().toISOString(),
+        }).select().maybeSingle();
+
+        return {
+          status: 'UNBOUND',
+          message: 'Perangkat belum terikat. Lakukan absensi pertama untuk mengikat HP ini.',
+          registered_uuid: currentDeviceUUID,
+        };
+      }
+
+      if (binding.device_uuid === currentDeviceUUID) {
+        return {
+          status: 'ACTIVE',
+          message: 'Terikat Aktif dengan HP ini',
+          registered_uuid: binding.device_uuid,
+        };
+      }
+
       return {
-        status: 'UNBOUND',
-        message: 'Perangkat belum terikat. Lakukan absensi pertama untuk mengikat HP ini.',
+        status: 'DIFFERENT_DEVICE',
+        message: 'Terdeteksi Menggunakan HP Berbeda! Mohon ajukan reset device ke Admin/Operator jika Anda ganti HP.',
+        registered_uuid: binding.device_uuid,
+      };
+    } catch (err) {
+      logger.error('SupabaseProvider', 'checkDeviceBinding exception:', err);
+      return {
+        status: 'ACTIVE',
+        message: 'Gagal memeriksa binding perangkat. Lanjutkan sebagai aktif.',
         registered_uuid: currentDeviceUUID,
       };
     }
-
-    if (binding.device_uuid === currentDeviceUUID) {
-      return {
-        status: 'ACTIVE',
-        message: 'Terikat Aktif dengan HP ini',
-        registered_uuid: binding.device_uuid,
-      };
-    }
-
-    return {
-      status: 'DIFFERENT_DEVICE',
-      message: 'Terdeteksi Menggunakan HP Berbeda! Mohon ajukan reset device ke Admin/Operator jika Anda ganti HP.',
-      registered_uuid: binding.device_uuid,
-    };
   }
 
   public async getNotifications(userId: string, _token: string): Promise<any[]> {
-    const { data } = await this.client
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (data && data.length > 0) {
-      return data.map((n) => ({
-        id: n.id,
-        user_id: n.user_id,
-        title: n.title,
-        message: n.message,
-        type: n.type || 'INFO',
-        is_read: n.is_read || false,
-        created_at: n.created_at,
-      }));
-    }
-
-    return [
+    const fallbackNotifications = [
       {
-        id: 'n1',
+        id: 'n_default_1',
         user_id: userId,
-        title: '☀️ Selalu Absen Masuk Tepat Waktu',
+        title: 'Selalu Absen Masuk Tepat Waktu',
         message: 'Batas toleransi absen masuk adalah sesuai jam operasional sekolah. Gunakan QR Code resmi di sekolah.',
         type: 'INFO',
         is_read: false,
         created_at: new Date().toISOString(),
       },
       {
-        id: 'n2',
+        id: 'n_default_2',
         user_id: userId,
-        title: '🔒 Keamanan Perangkat (Device Binding)',
+        title: 'Keamanan Perangkat (Device Binding)',
         message: 'Akun Anda terikat pada HP aktif. Pembatasan 1 akun 1 HP aktif.',
         type: 'SUCCESS',
         is_read: false,
         created_at: new Date().toISOString(),
       },
       {
-        id: 'n3',
+        id: 'n_default_3',
         user_id: userId,
-        title: '🔑 Pengingat PIN Keamanan',
+        title: 'Pengingat PIN Keamanan',
         message: 'Apabila Anda masih menggunakan PIN default 123456, segera ubah PIN melalui tab Profil.',
         type: 'WARNING',
         is_read: true,
         created_at: new Date().toISOString(),
       },
     ];
+
+    try {
+      const { data, error } = await this.client
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'notifications query error (tabel mungkin belum dibuat):', error.message);
+        return fallbackNotifications;
+      }
+
+      if (data && data.length > 0) {
+        return data.map((n) => ({
+          id: n.id,
+          user_id: n.user_id,
+          title: n.title,
+          message: n.message,
+          type: n.type || 'INFO',
+          is_read: n.is_read || false,
+          created_at: n.created_at,
+        }));
+      }
+
+      return fallbackNotifications;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'getNotifications exception:', err);
+      return fallbackNotifications;
+    }
   }
 
   public async markNotificationAsRead(notificationId: string, _token: string): Promise<boolean> {
-    const { error } = await this.client
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
+    try {
+      const { error } = await this.client
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
 
-    if (error) {
-      console.warn('Supabase mark notification read fallback:', error.message);
+      if (error) {
+        logger.warn('SupabaseProvider', 'markNotificationAsRead error:', error.message);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'markNotificationAsRead exception:', err);
     }
     return true;
   }
