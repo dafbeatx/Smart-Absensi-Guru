@@ -1,7 +1,7 @@
-import { CONSTANTS } from '../config/constants';
 import { getErrorDefinition } from '../config/error-codes';
 import type { ErrorDefinition } from '../config/error-codes';
 import { calculateDistanceMeters } from './geofence.utils';
+import { GPSService } from '../services/gps.service';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -28,17 +28,22 @@ export const validateIdentity = (identity: string): ValidationResult => {
 export const validateGPSGeofence = (
   userLat: number,
   userLng: number,
-  schoolLat: number = CONSTANTS.DEFAULTS.GEOFENCE_LAT,
-  schoolLng: number = CONSTANTS.DEFAULTS.GEOFENCE_LNG,
-  allowedRadiusMeters: number = CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS
+  schoolLat?: number,
+  schoolLng?: number,
+  allowedRadiusMeters?: number
 ): ValidationResult & { distanceMeters: number } => {
   if (!userLat || !userLng || isNaN(userLat) || isNaN(userLng)) {
     return { isValid: false, error: getErrorDefinition('GPS_001'), distanceMeters: 99999 };
   }
 
-  const distance = calculateDistanceMeters(userLat, userLng, schoolLat, schoolLng);
+  const settings = GPSService.getGeofenceSettings();
+  const targetLat = schoolLat !== undefined ? schoolLat : settings.lat;
+  const targetLng = schoolLng !== undefined ? schoolLng : settings.lng;
+  const radius = allowedRadiusMeters !== undefined ? allowedRadiusMeters : settings.radius;
 
-  if (distance > allowedRadiusMeters) {
+  const distance = calculateDistanceMeters(userLat, userLng, targetLat, targetLng);
+
+  if (distance > radius) {
     return {
       isValid: false,
       error: getErrorDefinition('GPS_002'),

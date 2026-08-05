@@ -18,9 +18,46 @@ export interface GPSValidationResult {
 
 export class GPSService {
   /**
-   * Reads browser location and validates against school geofence
+   * Reads configured geofence settings from localStorage or fallback defaults
    */
-  public static async getCurrentPosition(): Promise<GPSCoordinates> {
+  public static getGeofenceSettings(): { lat: number; lng: number; radius: number } {
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {
+        const saved = localStorage.getItem('smart_absensi_system_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const lat = parseFloat(parsed.geofence_lat);
+          const lng = parseFloat(parsed.geofence_lng);
+          const radius = parseInt(parsed.geofence_radius, 10);
+
+          return {
+            lat: !isNaN(lat) ? lat : CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+            lng: !isNaN(lng) ? lng : CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+            radius: !isNaN(radius) && radius > 0 ? radius : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+          };
+        }
+      }
+    } catch {
+      // Ignore non-browser or storage parse errors
+    }
+    return {
+      lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+      lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+      radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+    };
+  }
+
+  /**
+   * Reads browser location and calculates distance against configured school geofence
+   */
+  public static async getCurrentPosition(
+    targetLat?: number,
+    targetLng?: number
+  ): Promise<GPSCoordinates> {
+    const settings = this.getGeofenceSettings();
+    const schoolLat = targetLat !== undefined ? targetLat : settings.lat;
+    const schoolLng = targetLng !== undefined ? targetLng : settings.lng;
+
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(getErrorDefinition('GPS_001'));
@@ -37,29 +74,29 @@ export class GPSService {
         (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
-          const accuracy = position.coords.accuracy;
+          const accuracy = position.coords.accuracy || 0;
 
-          const distance = calculateDistanceMeters(
+          const rawDistance = calculateDistanceMeters(
             lat,
             lng,
-            CONSTANTS.DEFAULTS.GEOFENCE_LAT,
-            CONSTANTS.DEFAULTS.GEOFENCE_LNG
+            schoolLat,
+            schoolLng
           );
+
+          // Apply GPS accuracy tolerance buffer (up to 30m) to prevent false rejections
+          const accuracyBuffer = Math.min(Math.round(accuracy / 2), 30);
+          const effectiveDistance = Math.max(0, rawDistance - accuracyBuffer);
 
           resolve({
             latitude: lat,
             longitude: lng,
             accuracy,
-            distanceMeters: distance,
+            distanceMeters: effectiveDistance,
           });
         },
         (error) => {
           console.error('Geolocation Error:', error);
-          if (error.code === error.PERMISSION_DENIED) {
-            reject(getErrorDefinition('GPS_001'));
-          } else {
-            reject(getErrorDefinition('GPS_001'));
-          }
+          reject(getErrorDefinition('GPS_001'));
         },
         options
       );
@@ -71,9 +108,11 @@ export class GPSService {
    */
   public static validateGeofenceRadius(
     coords: GPSCoordinates,
-    allowedRadiusMeters: number = CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS
+    allowedRadiusMeters?: number
   ): GPSValidationResult {
-    if (coords.distanceMeters > allowedRadiusMeters) {
+    const radius = allowedRadiusMeters ?? this.getGeofenceSettings().radius;
+
+    if (coords.distanceMeters > radius) {
       return {
         isValid: false,
         coords,

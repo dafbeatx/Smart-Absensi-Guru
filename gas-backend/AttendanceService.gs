@@ -48,10 +48,14 @@ var AttendanceService = {
         }
       }
 
-      // ── Tier 3: Calculate Distance (Radius Check Bypassed) ────────────
+      // ── Tier 3: Calculate Distance ────────────────────────────────────
+      var geofenceLatRec = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "geofence_lat");
+      var geofenceLngRec = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "geofence_lng");
+      var targetLat = (geofenceLatRec && geofenceLatRec.value) ? parseFloat(geofenceLatRec.value) : SHIFT.GEOFENCE_LAT;
+      var targetLng = (geofenceLngRec && geofenceLngRec.value) ? parseFloat(geofenceLngRec.value) : SHIFT.GEOFENCE_LNG;
       var distance = (userLat && userLng) ? Utils.calculateDistanceMeters(
         userLat, userLng,
-        SHIFT.GEOFENCE_LAT, SHIFT.GEOFENCE_LNG
+        targetLat, targetLng
       ) : 0;
 
       // ── Tier 4: Duplicate Check (ATT_005) ───────────────────────────
@@ -175,10 +179,14 @@ var AttendanceService = {
         }
       }
 
-      // ── Tier 3: Calculate Distance (Radius Check Bypassed) ────────────
+      // ── Tier 3: Calculate Distance ────────────────────────────────────
+      var geofenceLatRec = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "geofence_lat");
+      var geofenceLngRec = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "geofence_lng");
+      var targetLat = (geofenceLatRec && geofenceLatRec.value) ? parseFloat(geofenceLatRec.value) : SHIFT.GEOFENCE_LAT;
+      var targetLng = (geofenceLngRec && geofenceLngRec.value) ? parseFloat(geofenceLngRec.value) : SHIFT.GEOFENCE_LNG;
       var distance = (userLat && userLng) ? Utils.calculateDistanceMeters(
         userLat, userLng,
-        SHIFT.GEOFENCE_LAT, SHIFT.GEOFENCE_LNG
+        targetLat, targetLng
       ) : 0;
 
       // ── Tier 4: Validation (Early Check-Out & State) ────────────────

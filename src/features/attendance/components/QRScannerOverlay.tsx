@@ -111,12 +111,13 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       return;
     }
 
-    const validation = GPSService.validateGeofenceRadius(currentCoords, 50);
+    const geofenceSettings = GPSService.getGeofenceSettings();
+    const validation = GPSService.validateGeofenceRadius(currentCoords, geofenceSettings.radius);
 
     if (!validation.isValid) {
-      // REJECT: Absensi diluar lokasi radius 50 meter
+      // REJECT: Absensi diluar lokasi radius yang diizinkan
       SoundService.playError();
-      setRejectionReason(`Absensi Ditolak! Anda terdeteksi berada ${currentCoords.distanceMeters} meter dari gerbang sekolah. Batas maksimum radius yang diizinkan adalah 50 meter.`);
+      setRejectionReason(`Absensi Ditolak! Anda terdeteksi berada ${currentCoords.distanceMeters} meter dari lokasi sekolah. Batas maksimum radius yang diizinkan adalah ${geofenceSettings.radius} meter.`);
       setIsRejectionModalOpen(true);
       return;
     }

@@ -71,6 +71,30 @@ export const SystemSettingsForm: React.FC = () => {
     loadSettings();
   }, []);
 
+  const [isGettingGps, setIsGettingGps] = useState(false);
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      showToast('error', 'GPS Tidak Didukung', 'Browser Anda tidak mendukung fitur Geolocation GPS.');
+      return;
+    }
+
+    setIsGettingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeofenceLat(pos.coords.latitude.toFixed(6));
+        setGeofenceLng(pos.coords.longitude.toFixed(6));
+        setIsGettingGps(false);
+        showToast('success', 'Koordinat GPS Berhasil Diambil!', `Lat: ${pos.coords.latitude.toFixed(6)}, Lng: ${pos.coords.longitude.toFixed(6)}`);
+      },
+      (err) => {
+        setIsGettingGps(false);
+        showToast('error', 'Gagal Mengambil GPS', err.message || 'Pastikan izin akses lokasi GPS pada browser sudah diperbolehkan.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -138,7 +162,19 @@ export const SystemSettingsForm: React.FC = () => {
 
       {/* Section 3: GPS Geofence */}
       <div className="space-y-3 pt-1 border-t border-slate-100">
-        <h4 className="font-bold text-xs text-slate-700">Koordinat GPS Papan QR & Radius Geofence</h4>
+        <div className="flex items-center justify-between">
+          <h4 className="font-bold text-xs text-slate-700">Koordinat GPS Papan QR & Radius Geofence</h4>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleGetCurrentLocation}
+            isLoading={isGettingGps}
+            className="text-xs py-1 px-3 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+          >
+            📍 Ambil Lokasi GPS Saat Ini
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Input label="Latitude Sekolah" value={geofenceLat} onChange={(e) => setGeofenceLat(e.target.value)} required />
           <Input label="Longitude Sekolah" value={geofenceLng} onChange={(e) => setGeofenceLng(e.target.value)} required />

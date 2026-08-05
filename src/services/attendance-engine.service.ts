@@ -56,22 +56,23 @@ export class AttendanceEngine {
 
       // Step 2: Reading & Validating GPS Geofence
       notify('VALIDATING_GPS');
+      const geofenceSettings = GPSService.getGeofenceSettings();
       let gpsCoords: GPSCoordinates;
       try {
-        gpsCoords = await GPSService.getCurrentPosition();
+        gpsCoords = await GPSService.getCurrentPosition(geofenceSettings.lat, geofenceSettings.lng);
         // Fallback for dev/test mode if actual browser GPS is outside school geofence
         if (
           (qrRawData.includes('TEST') || qrRawData.includes('DEV') || token.includes('DEV_')) &&
-          gpsCoords.distanceMeters > 50
+          gpsCoords.distanceMeters > geofenceSettings.radius
         ) {
-          gpsCoords = { latitude: -6.200000, longitude: 106.816667, accuracy: 5, distanceMeters: 12 };
+          gpsCoords = { latitude: geofenceSettings.lat, longitude: geofenceSettings.lng, accuracy: 5, distanceMeters: 12 };
         }
       } catch {
         // Fallback GPS simulation for dev / emulator mode if physical GPS unavailable
-        gpsCoords = { latitude: -6.200000, longitude: 106.816667, accuracy: 5, distanceMeters: 12 };
+        gpsCoords = { latitude: geofenceSettings.lat, longitude: geofenceSettings.lng, accuracy: 5, distanceMeters: 12 };
       }
 
-      const gpsResult = GPSService.validateGeofenceRadius(gpsCoords);
+      const gpsResult = GPSService.validateGeofenceRadius(gpsCoords, geofenceSettings.radius);
       if (!gpsResult.isValid) {
         return {
           success: false,
