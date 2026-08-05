@@ -70,7 +70,11 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated) {
       GPSService.syncGeofenceSettings().catch(console.warn);
+      GPSService.startBackgroundWarmUp();
     }
+    return () => {
+      GPSService.stopBackgroundWarmUp();
+    };
   }, [isAuthenticated]);
 
   if (!isAuthenticated || !user) {

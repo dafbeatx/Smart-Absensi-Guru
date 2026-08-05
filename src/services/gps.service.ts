@@ -18,7 +18,83 @@ export interface GPSValidationResult {
   error?: ErrorDefinition;
 }
 
+export interface CachedGPSFix {
+  coords: GPSCoordinates;
+  timestamp: number;
+}
+
 export class GPSService {
+  private static cachedFix: CachedGPSFix | null = null;
+  private static watchId: number | null = null;
+
+  /**
+   * Starts background GPS position warming up via watchPosition.
+   * Called as soon as App/Dashboard is opened to pre-heat GPS coordinates in background.
+   */
+  public static startBackgroundWarmUp(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+    if (this.watchId !== null) return;
+
+    const settings = this.getGeofenceSettings();
+
+    try {
+      this.watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const accuracy = position.coords.accuracy || 0;
+          const rawDistance = calculateDistanceMeters(lat, lng, settings.lat, settings.lng);
+          const accuracyBuffer = Math.min(Math.round(accuracy / 2), 30);
+          const effectiveDistance = Math.max(0, rawDistance - accuracyBuffer);
+
+          this.cachedFix = {
+            coords: {
+              latitude: lat,
+              longitude: lng,
+              accuracy,
+              distanceMeters: effectiveDistance,
+            },
+            timestamp: Date.now(),
+          };
+          logger.info('GPSService', 'Background GPS warm-up fix updated:', this.cachedFix.coords);
+        },
+        (err) => {
+          logger.warn('GPSService', 'Background GPS warm-up error:', err.message);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 10000,
+          timeout: 10000,
+        }
+      );
+    } catch (e) {
+      logger.warn('GPSService', 'Failed to start watchPosition warm-up:', e);
+    }
+  }
+
+  /**
+   * Stops background GPS warm-up watcher.
+   */
+  public static stopBackgroundWarmUp(): void {
+    if (typeof navigator !== 'undefined' && navigator.geolocation && this.watchId !== null) {
+      navigator.geolocation.clearWatch(this.watchId);
+      this.watchId = null;
+    }
+  }
+
+  /**
+   * Returns warm cached GPS fix if age < 15 seconds and accuracy <= 40 meters.
+   */
+  public static getWarmCachedFix(maxAgeMs = 15000, maxAccuracyMeters = 40): GPSCoordinates | null {
+    if (!this.cachedFix) return null;
+    const age = Date.now() - this.cachedFix.timestamp;
+    if (age <= maxAgeMs && this.cachedFix.coords.accuracy <= maxAccuracyMeters) {
+      logger.info('GPSService', 'Using warm cached GPS fix (< 15s age, high accuracy):', this.cachedFix.coords);
+      return this.cachedFix.coords;
+    }
+    return null;
+  }
+
   /**
    * Reads configured geofence settings from localStorage or fallback defaults
    */
@@ -110,31 +186,36 @@ export class GPSService {
         {
           enableHighAccuracy: true,
           timeout: timeoutMs,
-          maximumAge: 0, // Force fresh reading – never use cached positions
+          maximumAge: 10000,
         }
       );
     });
   }
 
   /**
-   * Reads browser location using multi-sample strategy:
-   * - Takes up to SAMPLE_COUNT readings spaced ~INTERVAL_MS apart
-   * - Returns the sample with the best (lowest) accuracy value
-   * - Gives up after all retries regardless of samples collected
+   * Reads browser location using parallel warm-cache + fast sample strategy:
+   * - First checks warm cached GPS fix (< 15s age) for instant response (< 5ms)
+   * - If not ready, takes fast single/double sample spaced ~800ms apart
    */
   public static async getCurrentPosition(
     targetLat?: number,
     targetLng?: number
   ): Promise<GPSCoordinates> {
+    // 1. Instant check: Use pre-heated warm cached fix if available
+    const warmFix = this.getWarmCachedFix();
+    if (warmFix) {
+      return warmFix;
+    }
+
     const settings = this.getGeofenceSettings();
     const schoolLat = targetLat !== undefined ? targetLat : settings.lat;
     const schoolLng = targetLng !== undefined ? targetLng : settings.lng;
 
-    const SAMPLE_COUNT = 3;
-    const SAMPLE_TIMEOUT_MS = 8000; // per sample
-    const INTERVAL_MS = 1500;       // delay between samples
+    const SAMPLE_COUNT = 2;
+    const SAMPLE_TIMEOUT_MS = 4000; // per sample
+    const INTERVAL_MS = 800;        // delay between samples
 
-    logger.info('GPSService', `Requesting GPS location (${SAMPLE_COUNT} samples)...`);
+    logger.info('GPSService', `Requesting fast GPS location (${SAMPLE_COUNT} samples)...`);
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       logger.error('GPSService', 'Geolocation API is not supported by browser');
@@ -153,37 +234,34 @@ export class GPSService {
           distanceMeters: sample.distanceMeters,
         });
 
-        // If we already have a good enough reading, stop early
-        if (sample.accuracy <= 10) {
+        // Update cached fix
+        this.cachedFix = { coords: sample, timestamp: Date.now() };
+
+        // Stop early if good accuracy
+        if (sample.accuracy <= 25) {
           logger.info('GPSService', 'High-accuracy sample obtained early, stopping collection.');
           break;
         }
 
-        // Wait before next sample (skip delay after last)
         if (i < SAMPLE_COUNT - 1) {
           await new Promise((r) => setTimeout(r, INTERVAL_MS));
         }
       } catch (err) {
         lastError = err;
         logger.warn('GPSService', `GPS sample ${i + 1} failed:`, err);
-        // Don't abort – try next sample
       }
     }
 
     if (samples.length === 0) {
+      if (this.cachedFix) {
+        logger.info('GPSService', 'Falling back to latest cached fix:', this.cachedFix.coords);
+        return this.cachedFix.coords;
+      }
       logger.error('GPSService', 'All GPS samples failed, last error:', lastError);
       throw getErrorDefinition('GPS_001');
     }
 
-    // Pick sample with best (lowest) accuracy value
     const best = samples.reduce((prev, curr) => (curr.accuracy < prev.accuracy ? curr : prev));
-
-    logger.info('GPSService', 'Best GPS sample selected:', {
-      accuracy: best.accuracy,
-      distanceMeters: best.distanceMeters,
-      totalSamples: samples.length,
-    });
-
     return best;
   }
 

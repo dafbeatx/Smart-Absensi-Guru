@@ -353,7 +353,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           {isCheckingGPS ? (
             <div className="bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold">
               <span className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
-              <span>⏳ Mengukur Koordinat GPS (3 sampel)...</span>
+              <span>📍 Memastikan Anda berada di area sekolah...</span>
             </div>
           ) : gpsCoords ? (
             <div className="space-y-2">
