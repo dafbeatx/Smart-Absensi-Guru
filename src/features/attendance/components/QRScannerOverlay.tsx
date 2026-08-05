@@ -9,6 +9,7 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { AttendanceRepository } from '../../../repositories/AttendanceRepository';
 import { QRValidationService } from '../../../services/qr-validation.service';
+import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { logger } from '../../../utils/logger.utils';
@@ -110,7 +111,8 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   }, [isOpen]);
 
   const geofenceSettings = GPSService.getGeofenceSettings();
-  const allowedRadius = Math.max(geofenceSettings.radius || 50, 500);
+  // Use shared helper — same logic as SupabaseProvider backend
+  const allowedRadius = getEffectiveAllowedRadius(geofenceSettings.radius);
 
   const handleScanSuccess = async (_qrData: string) => {
     if (isProcessingRef.current) return;
@@ -185,6 +187,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         user_lat: currentCoords.latitude,
         user_lng: currentCoords.longitude,
         device_uuid: deviceUUID,
+        gps_accuracy: currentCoords.accuracy,
       });
 
       logger.info('QRScannerOverlay', 'Attendance saved successfully:', res);
@@ -310,22 +313,34 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           {isCheckingGPS ? (
             <div className="bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold">
               <span className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
-              <span>⏳ Mengukur Koordinat GPS...</span>
+              <span>⏳ Mengukur Koordinat GPS (3 sampel)...</span>
             </div>
           ) : gpsCoords ? (
-            <div className={`border text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold ${
-              isWithinRadius
-                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                : 'bg-red-500/20 border-red-500/40 text-red-300 animate-pulse'
-            }`}>
-              <span className={`w-2.5 h-2.5 rounded-full ${
-                isWithinRadius ? 'bg-emerald-400 animate-ping' : 'bg-red-500'
-              }`} />
-              <span>
-                {isWithinRadius
-                  ? `🟢 GPS Verified: ${gpsCoords.distanceMeters}m dari Sekolah (Aman)`
-                  : `🔴 GPS Out of Range: ${gpsCoords.distanceMeters}m dari Sekolah (Ditolak)`}
-              </span>
+            <div className="space-y-1">
+              <div className={`border text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold ${
+                isWithinRadius
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                  : 'bg-red-500/20 border-red-500/40 text-red-300 animate-pulse'
+              }`}>
+                <span className={`w-2.5 h-2.5 rounded-full ${
+                  isWithinRadius ? 'bg-emerald-400 animate-ping' : 'bg-red-500'
+                }`} />
+                <span>
+                  {isWithinRadius
+                    ? `🟢 GPS OK: ${gpsCoords.distanceMeters}m dari Sekolah`
+                    : `🔴 Di Luar Radius: ${gpsCoords.distanceMeters}m (maks. ${allowedRadius}m)`}
+                </span>
+              </div>
+              <div className="text-[10px] text-slate-400 text-center">
+                📡 Akurasi GPS: ±{Math.round(gpsCoords.accuracy)}m
+              </div>
+              <button
+                type="button"
+                onClick={fetchGPSLocation}
+                className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer block mx-auto"
+              >
+                🔄 Ukur Ulang GPS
+              </button>
             </div>
           ) : null}
           <p className="text-[11px] text-slate-400">Arahkan kamera HP Anda ke QR Code yang dipajang di sekolah</p>

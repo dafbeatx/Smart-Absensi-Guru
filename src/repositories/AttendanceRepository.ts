@@ -9,6 +9,8 @@ export interface ScanAttendanceDTO {
   user_lat: number;
   user_lng: number;
   device_uuid: string;
+  /** GPS accuracy in meters at time of scan – used for audit logging */
+  gps_accuracy?: number;
 }
 
 export interface AttendanceResponseDTO {

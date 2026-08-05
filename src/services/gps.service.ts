@@ -1,7 +1,7 @@
 import { CONSTANTS } from '../config/constants';
 import { getErrorDefinition } from '../config/error-codes';
 import type { ErrorDefinition } from '../config/error-codes';
-import { calculateDistanceMeters } from '../utils/geofence.utils';
+import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
 import { ProviderFactory } from '../providers/provider-factory';
 import { logger } from '../utils/logger.utils';
 
@@ -77,53 +77,25 @@ export class GPSService {
   }
 
   /**
-   * Reads browser location and calculates distance against configured school geofence
+   * Takes a single raw geolocation sample and wraps it as a Promise.
    */
-  public static async getCurrentPosition(
-    targetLat?: number,
-    targetLng?: number
+  private static takeSingleSample(
+    schoolLat: number,
+    schoolLng: number,
+    timeoutMs: number
   ): Promise<GPSCoordinates> {
-    const settings = this.getGeofenceSettings();
-    const schoolLat = targetLat !== undefined ? targetLat : settings.lat;
-    const schoolLng = targetLng !== undefined ? targetLng : settings.lng;
-
-    logger.info('GPSService', 'Requesting GPS location from browser...');
-
     return new Promise((resolve, reject) => {
-      if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        logger.error('GPSService', 'Geolocation API is not supported by browser');
-        reject(getErrorDefinition('GPS_001'));
-        return;
-      }
-
-      const options: PositionOptions = {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 30000,
-      };
-
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           const accuracy = position.coords.accuracy || 0;
 
-          const rawDistance = calculateDistanceMeters(
-            lat,
-            lng,
-            schoolLat,
-            schoolLng
-          );
+          const rawDistance = calculateDistanceMeters(lat, lng, schoolLat, schoolLng);
 
+          // Buffer: subtract half of GPS accuracy (capped at 30m) from distance
           const accuracyBuffer = Math.min(Math.round(accuracy / 2), 30);
           const effectiveDistance = Math.max(0, rawDistance - accuracyBuffer);
-
-          logger.info('GPSService', 'GPS location retrieved successfully:', {
-            lat,
-            lng,
-            accuracy,
-            effectiveDistance,
-          });
 
           resolve({
             latitude: lat,
@@ -133,22 +105,98 @@ export class GPSService {
           });
         },
         (error) => {
-          logger.error('GPSService', `Geolocation Error (Code ${error.code}): ${error.message}`, error);
-          reject(getErrorDefinition('GPS_001'));
+          reject(error);
         },
-        options
+        {
+          enableHighAccuracy: true,
+          timeout: timeoutMs,
+          maximumAge: 0, // Force fresh reading – never use cached positions
+        }
       );
     });
   }
 
   /**
-   * Validates coordinates against allowed school geofence radius
+   * Reads browser location using multi-sample strategy:
+   * - Takes up to SAMPLE_COUNT readings spaced ~INTERVAL_MS apart
+   * - Returns the sample with the best (lowest) accuracy value
+   * - Gives up after all retries regardless of samples collected
+   */
+  public static async getCurrentPosition(
+    targetLat?: number,
+    targetLng?: number
+  ): Promise<GPSCoordinates> {
+    const settings = this.getGeofenceSettings();
+    const schoolLat = targetLat !== undefined ? targetLat : settings.lat;
+    const schoolLng = targetLng !== undefined ? targetLng : settings.lng;
+
+    const SAMPLE_COUNT = 3;
+    const SAMPLE_TIMEOUT_MS = 8000; // per sample
+    const INTERVAL_MS = 1500;       // delay between samples
+
+    logger.info('GPSService', `Requesting GPS location (${SAMPLE_COUNT} samples)...`);
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      logger.error('GPSService', 'Geolocation API is not supported by browser');
+      throw getErrorDefinition('GPS_001');
+    }
+
+    const samples: GPSCoordinates[] = [];
+    let lastError: unknown = null;
+
+    for (let i = 0; i < SAMPLE_COUNT; i++) {
+      try {
+        const sample = await this.takeSingleSample(schoolLat, schoolLng, SAMPLE_TIMEOUT_MS);
+        samples.push(sample);
+        logger.info('GPSService', `GPS sample ${i + 1}/${SAMPLE_COUNT}:`, {
+          accuracy: sample.accuracy,
+          distanceMeters: sample.distanceMeters,
+        });
+
+        // If we already have a good enough reading, stop early
+        if (sample.accuracy <= 10) {
+          logger.info('GPSService', 'High-accuracy sample obtained early, stopping collection.');
+          break;
+        }
+
+        // Wait before next sample (skip delay after last)
+        if (i < SAMPLE_COUNT - 1) {
+          await new Promise((r) => setTimeout(r, INTERVAL_MS));
+        }
+      } catch (err) {
+        lastError = err;
+        logger.warn('GPSService', `GPS sample ${i + 1} failed:`, err);
+        // Don't abort – try next sample
+      }
+    }
+
+    if (samples.length === 0) {
+      logger.error('GPSService', 'All GPS samples failed, last error:', lastError);
+      throw getErrorDefinition('GPS_001');
+    }
+
+    // Pick sample with best (lowest) accuracy value
+    const best = samples.reduce((prev, curr) => (curr.accuracy < prev.accuracy ? curr : prev));
+
+    logger.info('GPSService', 'Best GPS sample selected:', {
+      accuracy: best.accuracy,
+      distanceMeters: best.distanceMeters,
+      totalSamples: samples.length,
+    });
+
+    return best;
+  }
+
+  /**
+   * Validates coordinates against allowed school geofence radius.
+   * Uses getEffectiveAllowedRadius for consistent 100m floor enforcement.
    */
   public static validateGeofenceRadius(
     coords: GPSCoordinates,
     allowedRadiusMeters?: number
   ): GPSValidationResult {
-    const radius = allowedRadiusMeters ?? this.getGeofenceSettings().radius;
+    const configuredRadius = allowedRadiusMeters ?? this.getGeofenceSettings().radius;
+    const radius = getEffectiveAllowedRadius(configuredRadius);
 
     if (coords.distanceMeters > radius) {
       return {

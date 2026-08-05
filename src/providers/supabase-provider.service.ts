@@ -23,7 +23,8 @@ import { hashPin } from '../utils/hash.utils';
 import { useAuthStore } from '../store/useAuthStore';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
-import { calculateDistanceMeters } from '../utils/geofence.utils';
+import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
+import { logger } from '../utils/logger.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -175,9 +176,18 @@ export class SupabaseProvider implements IDataProvider {
       settings.geofence_lng
     );
 
-    if (distanceMeters > settings.geofence_radius) {
+    // Use shared effective radius — same rule applied on the frontend
+    const allowedRadius = getEffectiveAllowedRadius(settings.geofence_radius);
+
+    logger.info('SupabaseProvider', 'scanAttendance geofence check', {
+      distanceMeters,
+      allowedRadius,
+      gps_accuracy: dto.gps_accuracy,
+    });
+
+    if (distanceMeters > allowedRadius) {
       throw new Error(
-        `Absensi Ditolak! Anda terdeteksi berada ${distanceMeters} meter dari gerbang sekolah. Radius maksimal: ${settings.geofence_radius}m.`
+        `Absensi Ditolak! Anda terdeteksi berada ${distanceMeters} meter dari gerbang sekolah. Radius maksimal: ${allowedRadius}m.`
       );
     }
 
