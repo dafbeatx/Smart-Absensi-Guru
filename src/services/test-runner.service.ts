@@ -30,8 +30,12 @@ export interface MasterTestSummary {
   suites: TestSuiteResult[];
 }
 
+import { ProviderFactory } from '../providers/provider-factory';
+import { MockProvider } from '../providers/mock-provider.service';
+
 export class MasterTestRunner {
   public static async runAll(): Promise<MasterTestSummary> {
+    ProviderFactory.setProvider(new MockProvider());
     const startTime = Date.now();
     const suites: TestSuiteResult[] = [];
 
