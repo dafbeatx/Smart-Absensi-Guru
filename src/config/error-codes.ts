@@ -12,7 +12,7 @@ export const ERROR_CODES: Record<string, ErrorDefinition> = {
   // Authentication Errors (AUTH_xxx)
   AUTH_001: {
     code: 'AUTH_001',
-    message: 'Nomor WA / NIP atau PIN 6-digit tidak boleh kosong.',
+    message: 'Nomor WA / NPP atau PIN 6-digit tidak boleh kosong.',
     solution: 'Pastikan Anda telah mengisi seluruh kolom login.',
   },
   AUTH_002: {

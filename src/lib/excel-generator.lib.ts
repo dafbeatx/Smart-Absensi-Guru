@@ -26,7 +26,7 @@ export class ExcelReportGenerator {
     lines.push(`Total Guru,${payload.summary.totalTeachers}`);
     lines.push(``);
     lines.push(`=== SHEET 2: REKAP KEHADIRAN GURU ===`);
-    lines.push(`No,NIP,Nama Guru,Jabatan,Status`);
+    lines.push(`No,NPP,Nama Guru,Jabatan,Status`);
     lines.push(``);
     lines.push(`=== SHEET 3: DETAIL HARIAN TRANSAKSI ===`);
     lines.push(``);
@@ -274,7 +274,7 @@ export class ExcelReportGenerator {
           <thead>
             <tr>
               <th style="width: 30px;">No</th>
-              <th>NIP</th>
+              <th>NPP</th>
               <th>Nama Lengkap & Gelar</th>
               <th>Role</th>
               <th>Jabatan / Bidang Studi</th>
@@ -303,7 +303,7 @@ export class ExcelReportGenerator {
             <p><strong>Kepala Sekolah</strong></p>
             <div class="sig-space"></div>
             <p><strong>Drs. H. M. Yusuf, M.Pd.</strong></p>
-            <p style="font-size: 10px; color: #64748b;">NIP. 197504122003121001</p>
+            <p style="font-size: 10px; color: #64748b;">NPP. 197504122003121001</p>
           </div>
 
           <div class="sig-box">

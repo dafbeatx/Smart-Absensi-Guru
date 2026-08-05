@@ -76,7 +76,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
           >
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.full_name} ({t.nip || 'No NIP'})
+                {t.full_name} ({t.nip || 'No NPP'})
               </option>
             ))}
           </select>

@@ -213,7 +213,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="🔍 Cari nama guru, NIP, atau mata pelajaran..."
+              placeholder="🔍 Cari nama guru, NPP, atau mata pelajaran..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-3.5 pr-4 py-2 bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -281,7 +281,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500">
-                        NIP: {teacher.nip || '-'} • {teacher.position || 'Tenaga Pendidik'}
+                        NPP: {teacher.nip || '-'} • {teacher.position || 'Tenaga Pendidik'}
                       </p>
                     </div>
                   </div>

@@ -26,7 +26,7 @@ export const LoginPage: React.FC = () => {
 
     const identityVal = validateIdentity(identity);
     if (!identityVal.isValid) {
-      setIdentityError(identityVal.error?.message || 'Nomor WA atau NIP tidak valid.');
+      setIdentityError(identityVal.error?.message || 'Nomor WA atau NPP tidak valid.');
       return;
     }
 
@@ -49,7 +49,7 @@ export const LoginPage: React.FC = () => {
       loginSuccess(res.token, res.user);
     } catch (err: unknown) {
       setIsLoading(false);
-      const msg = err instanceof Error ? err.message : 'Login gagal. Periksa kembali NIP/WA dan PIN Anda.';
+      const msg = err instanceof Error ? err.message : 'Login gagal. Periksa kembali NPP/WA dan PIN Anda.';
       console.error('⛔ [LoginPage Submit Error]:', err);
       setErrorMessage(msg);
     }
@@ -85,7 +85,7 @@ export const LoginPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Nomor WhatsApp / NIP"
+            label="Nomor WhatsApp / NPP"
             type="tel"
             inputMode="tel"
             pattern="[0-9]*"

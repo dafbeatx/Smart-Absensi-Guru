@@ -220,7 +220,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       {/* Filter & Search Bar */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Input
-          placeholder="Cari Nama, NIP, atau WA..."
+          placeholder="Cari Nama, NPP, atau WA..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -247,7 +247,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
             <tr>
-              <th className="p-3">Nama & NIP</th>
+              <th className="p-3">Nama & NPP</th>
               <th className="p-3">Role & Jabatan</th>
               <th className="p-3">Kontak WA</th>
               <th className="p-3">Status</th>
@@ -259,7 +259,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               <tr key={t.id} className="hover:bg-slate-50/50">
                 <td className="p-3">
                   <p className="font-bold text-slate-900">{t.full_name}</p>
-                  <p className="text-[10px] text-slate-400">NIP: {t.nip || '-'}</p>
+                  <p className="text-[10px] text-slate-400">NPP: {t.nip || '-'}</p>
                 </td>
                 <td className="p-3">
                   <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
@@ -330,7 +330,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           </div>
 
           <Input label="Nama Lengkap & Gelar" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-          <Input label="NIP (Opsional / 18 Digit)" value={nip} onChange={(e) => setNip(e.target.value)} />
+          <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
           <Input label="Jabatan / Bidang Studi" value={position} onChange={(e) => setPosition(e.target.value)} required />
 
@@ -381,7 +381,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               <p className="font-bold text-sm">Apakah Anda yakin ingin menghapus akun ini?</p>
               <div className="text-xs space-y-1 bg-white p-3 rounded-xl border border-red-100 font-medium text-slate-700">
                 <p><span className="font-bold">Nama:</span> {selectedTeacher.full_name}</p>
-                <p><span className="font-bold">NIP:</span> {selectedTeacher.nip || '-'}</p>
+                <p><span className="font-bold">NPP:</span> {selectedTeacher.nip || '-'}</p>
                 <p><span className="font-bold">Role:</span> {selectedTeacher.role === 'ADMIN' ? 'ADMIN WEBSITE' : selectedTeacher.role}</p>
                 <p><span className="font-bold">Jabatan:</span> {selectedTeacher.position}</p>
               </div>

@@ -49,7 +49,7 @@ export class SupabaseProvider implements IDataProvider {
       .single();
 
     if (error || !user) {
-      throw new Error('Akun pengguna tidak ditemukan. Periksa No HP / NIP Anda.');
+      throw new Error('Akun pengguna tidak ditemukan. Periksa No HP / NPP Anda.');
     }
 
     if (user.account_status === 'LOCKED' || user.account_status === 'INACTIVE') {

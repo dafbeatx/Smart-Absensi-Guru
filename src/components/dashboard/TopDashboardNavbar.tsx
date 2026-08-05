@@ -44,7 +44,7 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
             </span>
             <input
               type="text"
-              placeholder="Cari guru, NIP, atau mata pelajaran..."
+              placeholder="Cari guru, NPP, atau mata pelajaran..."
               className="navbar-search-input"
             />
             <span className="absolute inset-y-0 right-2.5 flex items-center pointer-events-none">
