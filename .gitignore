@@ -36,7 +36,9 @@ dist-ssr
 brain
 
 # =====================================
-# AI Internal Working Memory
+# AI Internal Working Memory & SQL Seeds
 # =====================================
 .ai/
 .ai/**
+sql/
+*.sql
