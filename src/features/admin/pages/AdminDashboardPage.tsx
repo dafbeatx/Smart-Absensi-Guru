@@ -9,6 +9,7 @@ import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
+import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { AuditLogTable } from '../components/AuditLogTable';
 import { DailyAttendanceTracker } from '../components/DailyAttendanceTracker';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
@@ -206,28 +207,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     };
   }, [user?.id]);
 
-  const handleExportExcel = async () => {
-    await ReportService.generateAndDownloadMonthlyReport(
-      'Juli',
-      '2026',
-      teachers,
-      [],
-      [],
-      []
-    );
-    showToast('success', 'Export Excel Berhasil!', 'File Excel resmi Multi-Sheet (.xlsx) siap diunduh.');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const handleExportExcel = () => {
+    setIsExportModalOpen(true);
   };
 
-  const handleExportPDF = async () => {
-    await ReportService.generateAndPrintPDFReport(
-      'Juli',
-      '2026',
-      teachers,
-      [],
-      [],
-      []
-    );
-    showToast('info', 'Dokumen PDF Siap!', 'Jendela cetak / simpan ke PDF telah dibuka.');
+  const handleExportPDF = () => {
+    setIsExportModalOpen(true);
   };
 
   const sidebarItems: SidebarItem[] = [
@@ -471,6 +458,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       <QRCodeGeneratorModal
         isOpen={isQrGeneratorOpen}
         onClose={() => setIsQrGeneratorOpen(false)}
+      />
+
+      {/* Export Report Selector Modal (Master & Individual Teacher) */}
+      <ExportReportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        teachers={teachers}
+        attendanceRecords={attendanceRecords}
+        leaveRequests={pendingLeaves}
       />
 
       {/* Dev Suite Unit Test Runner Modal */}

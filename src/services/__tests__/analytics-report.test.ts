@@ -55,7 +55,7 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     unabsented.length === 1 && unabsented[0].id === 'usr_3'
   );
 
-  // Test 3: 5-Sheet Excel Data Generation
+  // Test 3: 5-Sheet Excel Data Generation & Signatory Official Sync
   const reportPayload: MultiSheetReportPayload = {
     month: 'Juli',
     year: '2026',
@@ -72,7 +72,9 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     csvContent.includes('SHEET 2: REKAP KEHADIRAN GURU') &&
     csvContent.includes('SHEET 3: DETAIL HARIAN TRANSAKSI') &&
     csvContent.includes('SHEET 4: PENGAJUAN IZIN') &&
-    csvContent.includes('SHEET 5: AUDIT LOG RINGKAS')
+    csvContent.includes('SHEET 5: AUDIT LOG RINGKAS') &&
+    csvContent.includes('Farhan Sopian Sahid, S.Pd.I') &&
+    csvContent.includes('Mira Nurdianti, S.Pd')
   );
 
   // Test 4: Dashboard Cache Expiration Rule

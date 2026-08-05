@@ -2,7 +2,6 @@ import { ExcelReportGenerator } from '../lib/excel-generator.lib';
 import type { MultiSheetReportPayload } from '../lib/excel-generator.lib';
 import { AnalyticsService } from './analytics.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../types/database.types';
-
 import { getTodayDateInJakarta } from '../utils/time.utils';
 
 export class ReportService {
@@ -34,7 +33,7 @@ export class ReportService {
   }
 
   /**
-   * Generates and triggers download for Native 5-Sheet Excel (.xlsx) Report
+   * Generates and triggers download for Native 5-Sheet Excel (.xlsx) Report (Master School)
    */
   public static async generateAndDownloadMonthlyReport(
     month: string,
@@ -50,7 +49,7 @@ export class ReportService {
   }
 
   /**
-   * Generates and opens a styled printable PDF Report in a popup window
+   * Generates and opens a styled printable PDF Report in a popup window (Master School)
    */
   public static async generateAndPrintPDFReport(
     month: string,
@@ -62,6 +61,32 @@ export class ReportService {
   ): Promise<boolean> {
     const payload = this.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs);
     ExcelReportGenerator.generatePrintablePDF(payload);
+    return true;
+  }
+
+  /**
+   * Generates Individual Teacher Attendance Report in PDF
+   */
+  public static async generateAndPrintIndividualPDFReport(
+    teacher: UserProfile,
+    month: string,
+    year: string,
+    attendanceRecords: AttendanceRecord[]
+  ): Promise<boolean> {
+    ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords);
+    return true;
+  }
+
+  /**
+   * Generates Individual Teacher Attendance Report in Excel (.xlsx)
+   */
+  public static async generateAndDownloadIndividualReport(
+    teacher: UserProfile,
+    month: string,
+    year: string,
+    attendanceRecords: AttendanceRecord[]
+  ): Promise<boolean> {
+    ExcelReportGenerator.generateIndividualTeacherXLSX(teacher, month, year, attendanceRecords);
     return true;
   }
 }

@@ -4,6 +4,7 @@ import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
+import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { AuditLogTable } from '../components/AuditLogTable';
 import { ReportService } from '../../../services/report.service';
@@ -16,6 +17,7 @@ export const OperatorDashboardPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'TEACHERS' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('TEACHERS');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const [teachers, setTeachers] = useState<UserProfile[]>([
     {
@@ -54,15 +56,7 @@ export const OperatorDashboardPage: React.FC = () => {
   ]);
 
   const handleExportExcel = async () => {
-    await ReportService.generateAndDownloadMonthlyReport(
-      'Juli',
-      '2026',
-      teachers,
-      [],
-      [],
-      []
-    );
-    showToast('success', 'Export Excel Berhasil!', 'Laporan multi-sheet 5-Sheet siap diunduh.');
+    setIsExportModalOpen(true);
   };
 
   return (
@@ -152,6 +146,14 @@ export const OperatorDashboardPage: React.FC = () => {
         isOpen={isCorrectionModalOpen}
         onClose={() => setIsCorrectionModalOpen(false)}
         teachers={teachers}
+      />
+
+      {/* Export Report Selector Modal */}
+      <ExportReportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        teachers={teachers}
+        attendanceRecords={[]}
       />
     </div>
   );
