@@ -9,7 +9,7 @@ import { TeacherManagementTable } from '../../admin/components/TeacherManagement
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
-import type { LeaveRequest, UserProfile } from '../../../types/database.types';
+import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -63,6 +63,8 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
   };
 
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+
   const fetchPendingRequests = async () => {
     try {
       const tkn = useAuthStore.getState().token || '';
@@ -72,6 +74,20 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       }
     } catch (err) {
       console.warn('Gagal memuat pengajuan izin:', err);
+    }
+  };
+
+  const fetchAttendanceRecords = async () => {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const tkn = useAuthStore.getState().token || '';
+      if (tkn) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const records = await provider.getDailyAttendance(todayStr, tkn);
+        setAttendanceRecords(records || []);
+      }
+    } catch (err) {
+      console.warn('Kepsek fetch attendance records error:', err);
     }
   };
 
@@ -91,6 +107,16 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     };
     fetchUsersFromBackend();
     fetchPendingRequests();
+    fetchAttendanceRecords();
+
+    const handleScannedEvent = () => {
+      fetchAttendanceRecords();
+    };
+
+    window.addEventListener('smart_absensi_scanned', handleScannedEvent);
+    return () => {
+      window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
+    };
   }, []);
 
   const mockUnabsented: UserProfile[] = [
@@ -148,6 +174,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               roleTitle="Kepala Sekolah"
               teachers={teachers}
               pendingRequests={pendingRequests}
+              attendanceRecords={attendanceRecords}
               onOpenScanner={onOpenScanner}
               onSwitchToGuruView={onSwitchToGuruView}
               onNavigateTab={(tab: string) => setActiveTab(tab)}

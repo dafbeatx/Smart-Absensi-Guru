@@ -30,7 +30,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 }) => {
   const totalGuruCount = teachers.length > 0 ? teachers.length : 12;
 
-  const { hadirCount, terlambatCount, izinCount, belumAbsenCount } = useMemo(() => {
+  const { hadirCount, terlambatCount, izinCount, belumAbsenCount, totalPresentCount } = useMemo(() => {
     let hadir = 0;
     let terlambat = 0;
     let izin = 0;
@@ -44,10 +44,26 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       else if (effectiveStatus === 'IZIN' || effectiveStatus === 'SAKIT' || effectiveStatus === 'DINAS_LUAR') izin++;
     }
 
+    const totalPresent = hadir + terlambat;
     const belum = Math.max(0, totalGuruCount - presentUserIds.size);
 
-    return { hadirCount: hadir, terlambatCount: terlambat, izinCount: izin, belumAbsenCount: belum };
+    return {
+      hadirCount: hadir,
+      terlambatCount: terlambat,
+      izinCount: izin,
+      belumAbsenCount: belum,
+      totalPresentCount: totalPresent,
+    };
   }, [attendanceRecords, totalGuruCount]);
+
+  const attendancePercentage = totalGuruCount > 0
+    ? Math.round((totalPresentCount / totalGuruCount) * 100)
+    : 0;
+
+  const hadirPercentage = totalGuruCount > 0 ? Math.round((hadirCount / totalGuruCount) * 100) : 0;
+  const terlambatPercentage = totalGuruCount > 0 ? Math.round((terlambatCount / totalGuruCount) * 100) : 0;
+  const izinPercentage = totalGuruCount > 0 ? Math.round((izinCount / totalGuruCount) * 100) : 0;
+  const belumPercentage = totalGuruCount > 0 ? Math.round((belumAbsenCount / totalGuruCount) * 100) : 0;
 
   // Teachers list from Users sheet
   const recentTeachers = teachers.slice(0, 5);
@@ -134,7 +150,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
               <p className="text-xs font-bold text-slate-700 mt-1">Hadir Tepat</p>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 font-semibold">0% dari total</p>
+          <p className="text-[10px] text-slate-400 font-semibold">{hadirPercentage}% dari total</p>
         </div>
 
         {/* Card 3: Terlambat */}
@@ -148,7 +164,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
               <p className="text-xs font-bold text-slate-700 mt-1">Terlambat</p>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 font-semibold">0% dari total</p>
+          <p className="text-[10px] text-slate-400 font-semibold">{terlambatPercentage}% dari total</p>
         </div>
 
         {/* Card 4: Izin / Sakit */}
@@ -162,7 +178,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
               <p className="text-xs font-bold text-slate-700 mt-1">Izin / Sakit</p>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 font-semibold">0% dari total</p>
+          <p className="text-[10px] text-slate-400 font-semibold">{izinPercentage}% dari total</p>
         </div>
 
         {/* Card 5: Belum Absen */}
@@ -176,7 +192,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
               <p className="text-xs font-bold text-slate-700 mt-1">Belum Absen</p>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 font-semibold">100% dari total</p>
+          <p className="text-[10px] text-slate-400 font-semibold">{belumPercentage}% dari total</p>
         </div>
       </div>
 
@@ -195,33 +211,52 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             </select>
           </div>
 
-          {/* Donut Visual */}
+          {/* Dynamic SVG Donut Visual */}
           <div className="flex flex-col items-center justify-center py-2 relative">
-            <div className="w-36 h-36 rounded-full border-14 border-slate-100 flex flex-col items-center justify-center relative">
-              <span className="text-2xl font-black text-[#023246]">0%</span>
-              <span className="text-[10px] font-bold text-slate-400">Hadir</span>
-              <div className="mt-1 text-center">
-                <span className="text-xs font-extrabold text-[#023246] block">{belumAbsenCount}</span>
-                <span className="text-[9px] text-slate-400 block">Belum Absen</span>
+            <div className="relative w-36 h-36 flex items-center justify-center">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <path
+                  className="text-slate-100"
+                  strokeWidth="3.5"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-[#16A34A] transition-all duration-1000 ease-out"
+                  strokeDasharray={`${attendancePercentage}, 100`}
+                  strokeWidth="3.8"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
+                <span className="text-2xl font-black text-[#023246]">{attendancePercentage}%</span>
+                <span className="text-[10px] font-bold text-emerald-600">Kehadiran</span>
+                <div className="mt-0.5 text-center">
+                  <span className="text-[10px] font-bold text-slate-500 block">{totalPresentCount}/{totalGuruCount} Guru</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Legend */}
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-600">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-xs bg-[#16A34A]" />
-              <span>Hadir (0)</span>
+              <span>Hadir ({hadirCount})</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-xs bg-[#D97706]" />
-              <span>Terlambat (0)</span>
+              <span>Terlambat ({terlambatCount})</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-xs bg-[#287094]" />
-              <span>Izin/Sakit (0)</span>
+              <span>Izin/Sakit ({izinCount})</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-xs bg-slate-300" />
               <span>Belum Absen ({belumAbsenCount})</span>
             </div>
