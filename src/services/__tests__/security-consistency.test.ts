@@ -10,6 +10,9 @@ import { QRValidationService } from '../qr-validation.service';
 import { CONSTANTS } from '../../config/constants';
 import { sanitizeMeta } from '../../utils/logger.utils';
 import { handleAppError } from '../../utils/error.utils';
+import { isDevTestModeEnabled, canAccessDevTestMode } from '../../utils/dev-test.utils';
+import { DevTestRunnerService } from '../dev-test-runner.service';
+import type { UserProfile } from '../../types/database.types';
 import type { LoginDTO } from '../../repositories/AuthRepository';
 
 export const runSecurityConsistencyTestSuite = async (): Promise<{
@@ -100,6 +103,45 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
   const outCoords = { latitude: -6.2, longitude: 106.8, accuracy: 5, distanceMeters: 550 };
   const invalidCheck = GPSService.validateGeofenceRadius(outCoords, allowedRadius);
   assert('UI & Validation Radius Indicator - Reject Out of Range (550m > 500m)', invalidCheck.isValid === false);
+
+  // 9. Developer Test Mode Security Guards & Runner
+  const devEnabled = isDevTestModeEnabled();
+  assert('Dev Test Guard - isDevTestModeEnabled returns boolean', typeof devEnabled === 'boolean');
+
+  const mockAdminUser: UserProfile = {
+    id: 'usr_admin',
+    nip: '198001012005011001',
+    full_name: 'Admin Test',
+    phone_number: '081234567890',
+    role: 'ADMIN',
+    position: 'Administrator',
+    avatar_url: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+  const mockGuruUser: UserProfile = {
+    id: 'usr_guru',
+    nip: '198501012010012002',
+    full_name: 'Guru Test',
+    phone_number: '081234567891',
+    role: 'GURU',
+    position: 'Guru Matematika',
+    avatar_url: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+
+  assert('Dev Test Guard - ADMIN Allowed when enabled', canAccessDevTestMode(mockAdminUser) === devEnabled);
+  assert('Dev Test Guard - GURU Strictly Denied', canAccessDevTestMode(mockGuruUser) === false);
+  assert('Dev Test Guard - Guest Strictly Denied', canAccessDevTestMode(null) === false);
+
+  // 10. Developer Test Runner Diagnostics Suite Execution
+  const summary = await DevTestRunnerService.runDiagnostics(mockAdminUser);
+  assert('Dev Test Runner - Diagnostics Suite Finished', summary.items.length === 10);
+  assert('Dev Test Runner - Official QR Validation Item Passed', summary.items.some((i) => i.id === 'test_qr' && i.status === 'passed'));
+
+  const markdownReport = DevTestRunnerService.generateMarkdownReport(summary, mockAdminUser);
+  assert('Dev Test Runner - Markdown Report Generated', markdownReport.includes('SMART ABSENSI GURU - LAPORAN DIAGNOSTIK'));
 
   return { passed, failed, results };
 };

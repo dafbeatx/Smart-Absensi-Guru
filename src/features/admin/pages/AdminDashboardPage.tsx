@@ -19,6 +19,8 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
+import { DevTestPage } from './DevTestPage';
+import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
 
 export interface AdminDashboardPageProps {
@@ -224,6 +226,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'AUDIT', label: 'Audit Log', icon: '📜' },
     { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
     { id: 'TESTS', label: 'Tests / Diagnostik', icon: '🧪' },
+    ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 
   const handleSelectSidebarTab = (id: string) => {
@@ -397,6 +400,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
           {/* TAB 9: AUDIT LOG */}
           {activeTab === 'AUDIT' && <AuditLogTable />}
+
+          {/* TAB 10: DEVELOPER TEST MODE */}
+          {activeTab === 'DEV_TEST' && <DevTestPage onBackToDashboard={() => setActiveTab('DASHBOARD')} />}
         </main>
       </div>
 

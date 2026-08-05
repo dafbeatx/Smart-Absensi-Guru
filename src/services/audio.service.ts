@@ -23,6 +23,7 @@ class SoundEffectsService {
    * Preload file audio ke dalam cache memori browser
    */
   private preloadAudio(url: string) {
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
     try {
       const audio = new Audio(url);
       audio.preload = 'auto';
@@ -37,6 +38,7 @@ class SoundEffectsService {
    */
   public play(type: SoundType) {
     if (this.isMuted) return;
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
 
     let soundUrl = '/audio/success.mp3';
     if (type === 'ERROR' || type === 'WARNING') {
@@ -78,6 +80,7 @@ class SoundEffectsService {
    */
   public playAttendanceSuccess() {
     if (this.isMuted) return;
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
 
     try {
       const successAudio = new Audio('/audio/success.mp3');

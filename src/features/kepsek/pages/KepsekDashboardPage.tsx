@@ -9,6 +9,8 @@ import { TeacherManagementTable } from '../../admin/components/TeacherManagement
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
+import { DevTestPage } from '../../admin/pages/DevTestPage';
+import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
 
 export interface KepsekDashboardPageProps {
@@ -138,6 +140,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     { id: 'ACCOUNT_APPLICATIONS', label: 'Account Applications', icon: '👥', badge: teachers.length },
     { id: 'APPROVALS', label: 'Persetujuan Izin/Cuti', icon: '📝', badge: pendingRequests.length, hasDropdown: true },
     { id: 'UNABSENTED', label: 'Daftar Belum Absen', icon: '⚠️', badge: mockUnabsented.length },
+    ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 
   return (
@@ -219,6 +222,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                 ))}
               </div>
             </div>
+          )}
+
+          {/* TAB 5: DEVELOPER TEST MODE */}
+          {activeTab === 'DEV_TEST' && (
+            <DevTestPage onBackToDashboard={() => setActiveTab('DASHBOARD')} />
           )}
         </main>
       </div>
