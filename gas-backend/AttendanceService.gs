@@ -51,8 +51,11 @@ var AttendanceService = {
       // ── Tier 3: Calculate Distance ────────────────────────────────────
       var geofenceLatRec = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "geofence_lat");
       var geofenceLngRec = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "geofence_lng");
-      var targetLat = (geofenceLatRec && geofenceLatRec.value) ? parseFloat(geofenceLatRec.value) : SHIFT.GEOFENCE_LAT;
-      var targetLng = (geofenceLngRec && geofenceLngRec.value) ? parseFloat(geofenceLngRec.value) : SHIFT.GEOFENCE_LNG;
+      var rawLat = (geofenceLatRec && geofenceLatRec.value) ? parseFloat(geofenceLatRec.value) : NaN;
+      var rawLng = (geofenceLngRec && geofenceLngRec.value) ? parseFloat(geofenceLngRec.value) : NaN;
+
+      var targetLat = (!isNaN(rawLat) && Math.abs(rawLat - (-6.200000)) > 0.001) ? rawLat : SHIFT.GEOFENCE_LAT;
+      var targetLng = (!isNaN(rawLng) && Math.abs(rawLng - 106.816667) > 0.001) ? rawLng : SHIFT.GEOFENCE_LNG;
       var distance = (userLat && userLng) ? Utils.calculateDistanceMeters(
         userLat, userLng,
         targetLat, targetLng

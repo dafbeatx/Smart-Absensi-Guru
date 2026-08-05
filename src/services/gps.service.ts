@@ -27,9 +27,15 @@ export class GPSService {
         const saved = localStorage.getItem('smart_absensi_system_settings');
         if (saved) {
           const parsed = JSON.parse(saved);
-          const lat = parseFloat(parsed.geofence_lat);
-          const lng = parseFloat(parsed.geofence_lng);
+          let lat = parseFloat(parsed.geofence_lat);
+          let lng = parseFloat(parsed.geofence_lng);
           const radius = parseInt(parsed.geofence_radius, 10);
+
+          // Auto-migrate legacy Jakarta default coordinates (-6.2, 106.816667) to actual school coordinates
+          if (lat === -6.200000 || lat === -6.2 || (lat > -6.21 && lat < -6.19 && lng > 106.81 && lng < 106.82)) {
+            lat = CONSTANTS.DEFAULTS.GEOFENCE_LAT;
+            lng = CONSTANTS.DEFAULTS.GEOFENCE_LNG;
+          }
 
           return {
             lat: !isNaN(lat) ? lat : CONSTANTS.DEFAULTS.GEOFENCE_LAT,
