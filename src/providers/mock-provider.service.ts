@@ -187,45 +187,13 @@ export class MockProvider implements IDataProvider {
             check_in_time: timeStr,
             check_out_time: null,
             status: initialStatus,
-            check_in_lat: dto.user_lat,
-            check_in_lng: dto.user_lng,
-            check_in_distance_meters: 12,
-            verification_method: 'QR_GPS',
-            attendance_source: 'QR',
-            is_offline: false,
-            created_at: new Date().toISOString(),
-          };
-        }
-      } catch {
-        record = {
-          id: 'att_' + Date.now(),
-          user_id: userId,
-          date: dateStr,
-          check_in_time: timeStr,
-          check_out_time: null,
-          status: initialStatus,
-          check_in_lat: dto.user_lat,
-          check_in_lng: dto.user_lng,
-          check_in_distance_meters: 12,
-          verification_method: 'QR_GPS',
-          attendance_source: 'QR',
-          is_offline: false,
-          created_at: new Date().toISOString(),
-        };
-      }
-    }
-            user_id: userId,
-            date: dateStr,
-            check_in_time: timeStr,
-            check_out_time: null,
-            status: initialStatus,
             check_in_lat: dto.user_lat || -6.2088,
             check_in_lng: dto.user_lng || 106.8456,
             check_in_distance_meters: 12,
             verification_method: 'QR_GPS',
             attendance_source: 'QR',
             is_offline: false,
-            created_at: now.toISOString(),
+            created_at: new Date().toISOString(),
           };
           action = 'CHECK_IN';
         }
@@ -243,7 +211,7 @@ export class MockProvider implements IDataProvider {
           verification_method: 'QR_GPS',
           attendance_source: 'QR',
           is_offline: false,
-          created_at: now.toISOString(),
+          created_at: new Date().toISOString(),
         };
         action = 'CHECK_IN';
       }
@@ -261,7 +229,7 @@ export class MockProvider implements IDataProvider {
         verification_method: 'QR_GPS',
         attendance_source: 'QR',
         is_offline: false,
-        created_at: now.toISOString(),
+        created_at: new Date().toISOString(),
       };
       action = 'CHECK_IN';
     }
