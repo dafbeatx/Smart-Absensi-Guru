@@ -1,5 +1,5 @@
 import type { IDataProvider } from './data-provider.interface';
-import type { UserProfile, AttendanceRecord, LeaveRequest, SystemSettings, HolidayRecord } from '../types/database.types';
+import type { UserProfile, AttendanceRecord, LeaveRequest, SystemSettings, HolidayRecord, AttendanceStatus } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
