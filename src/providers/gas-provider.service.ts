@@ -110,6 +110,10 @@ export class GasProvider implements IDataProvider {
     return apiClient.post<UserProfile>('CREATE_USER', { ...user, token });
   }
 
+  public async updateUser(userId: string, updates: Partial<UserProfile>, token: string): Promise<boolean> {
+    return apiClient.post<boolean>('UPDATE_USER', { target_user_id: userId, updates, token });
+  }
+
   public async deleteUser(userId: string, token: string): Promise<boolean> {
     return apiClient.post<boolean>('DELETE_USER', { target_user_id: userId, token });
   }

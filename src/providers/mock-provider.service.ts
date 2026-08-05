@@ -258,6 +258,10 @@ export class MockProvider implements IDataProvider {
     };
   }
 
+  public async updateUser(_userId: string, _updates: Partial<UserProfile>, _token: string): Promise<boolean> {
+    return true;
+  }
+
   public async deleteUser(_userId: string, _token: string): Promise<boolean> {
     return true;
   }

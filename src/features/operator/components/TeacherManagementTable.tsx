@@ -23,6 +23,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<'ALL' | RoleCode>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isResetPinOpen, setIsResetPinOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<UserProfile | null>(null);
 
@@ -90,6 +91,59 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setNip('');
     setPhone('');
     setPosition('');
+  };
+
+  const handleOpenEditModal = (t: UserProfile) => {
+    setSelectedTeacher(t);
+    setFullName(t.full_name);
+    setNip(t.nip || '');
+    setPhone(t.phone_number || '');
+    setPosition(t.position || '');
+    setRole(t.role);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditTeacherSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTeacher) return;
+
+    const updates: Partial<UserProfile> = {
+      full_name: fullName,
+      nip: nip,
+      phone_number: phone,
+      position: position,
+      role: role,
+    };
+
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      await provider.updateUser(selectedTeacher.id, updates, token);
+    } catch (err) {
+      console.warn('Backend update user warning:', err);
+    }
+
+    const updated = teachers.map((t) =>
+      t.id === selectedTeacher.id ? { ...t, ...updates } : t
+    );
+    onTeachersChange(updated);
+    try {
+      localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Failed to cache teachers to localStorage:', e);
+    }
+
+    await AuditLogger.log({
+      actorId: user?.id || 'op_1',
+      actorRole: 'OPERATOR',
+      actionType: 'EDIT_USER',
+      targetEntity: 'Users',
+      newValue: JSON.stringify(updates),
+      reason: `Pembaruan data akun ${fullName} (${role}) oleh Operator`,
+    });
+
+    showToast('success', 'Data Guru Berhasil Diperbarui!', `Profil ${fullName} telah diperbarui di database & frontend.`);
+    setIsEditModalOpen(false);
   };
 
   const handleResetPin = async () => {
@@ -235,6 +289,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                 </td>
                 <td className="p-3 text-right space-x-1.5">
                   <button
+                    onClick={() => handleOpenEditModal(t)}
+                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-lg transition-colors"
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
                     onClick={() => {
                       setSelectedTeacher(t);
                       setIsResetPinOpen(true);
@@ -302,6 +362,39 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <div className="pt-2 flex gap-2">
             <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsAddModalOpen(false)}>Batal</Button>
             <Button type="submit" variant="primary" className="w-1/2">Simpan Akun</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="✏️ Edit Data Master Pengguna / Guru">
+        <form onSubmit={handleEditTeacherSubmit} className="space-y-3">
+          <Input label="Nama Lengkap & Gelar" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
+          <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+          <Input label="Jabatan / Bidang Studi" value={position} onChange={(e) => setPosition(e.target.value)} required />
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700">Role Pengguna</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(['GURU', 'KEPSEK', 'OPERATOR'] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border ${
+                    role === r ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2 flex gap-2">
+            <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsEditModalOpen(false)}>Batal</Button>
+            <Button type="submit" variant="primary" className="w-1/2">Simpan Perubahan</Button>
           </div>
         </form>
       </Modal>

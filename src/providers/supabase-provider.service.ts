@@ -470,6 +470,20 @@ export class SupabaseProvider implements IDataProvider {
     };
   }
 
+  public async updateUser(userId: string, updates: Partial<UserProfile>, _token: string): Promise<boolean> {
+    const payload: Record<string, unknown> = {};
+    if (updates.full_name !== undefined) payload.full_name = updates.full_name;
+    if (updates.nip !== undefined) payload.nip = updates.nip;
+    if (updates.phone_number !== undefined) payload.phone_number = updates.phone_number;
+    if (updates.role !== undefined) payload.role = updates.role;
+    if (updates.position !== undefined) payload.position = updates.position;
+    if (updates.is_active !== undefined) payload.account_status = updates.is_active ? 'ACTIVE' : 'INACTIVE';
+
+    const { error } = await this.client.from('users').update(payload).eq('id', userId);
+    if (error) throw new Error('Gagal memperbarui data pengguna: ' + error.message);
+    return true;
+  }
+
   public async deleteUser(userId: string, _token: string): Promise<boolean> {
     const { error } = await this.client.from('users').delete().eq('id', userId);
     if (error) throw new Error('Gagal menghapus pengguna: ' + error.message);

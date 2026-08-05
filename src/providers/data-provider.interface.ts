@@ -36,6 +36,7 @@ export interface IDataProvider {
   // User Management API (Admin)
   getAllUsers(token: string): Promise<UserProfile[]>;
   createUser(user: Partial<UserProfile>, token: string): Promise<UserProfile>;
+  updateUser(userId: string, updates: Partial<UserProfile>, token: string): Promise<boolean>;
   deleteUser(userId: string, token: string): Promise<boolean>;
   toggleUserStatus(userId: string, token: string): Promise<boolean>;
 
