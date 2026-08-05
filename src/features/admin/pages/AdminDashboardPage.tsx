@@ -110,17 +110,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     }
   };
 
-  const fetchAttendanceRecords = async (date?: string) => {
+  const fetchAttendanceRecords = async () => {
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
-      if (token) {
-        const targetDate = date || getTodayDateInJakarta();
-        const records = await provider.getDailyAttendance(targetDate, token);
-        setAttendanceRecords(records || []);
+      const yearStr = new Date().getFullYear().toString();
+      const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+      const allRecs: AttendanceRecord[] = [];
+
+      for (const t of teachers) {
+        const recs = await provider.getMonthlyAttendance(t.id, monthStr, yearStr, token);
+        allRecs.push(...recs);
       }
+      setAttendanceRecords(allRecs);
     } catch (err) {
-      console.warn('Gagal memuat data absensi harian:', err);
+      console.warn('Gagal memuat rekap absensi bulanan:', err);
     }
   };
 
@@ -137,24 +141,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       console.warn('Gagal memuat absensi pribadi admin:', err);
     } finally {
       setIsLoadingMyAttendance(false);
-    }
-  };
-
-  const fetchAttendanceRecords = async () => {
-    try {
-      const provider = ProviderFactory.getProvider();
-      const token = useAuthStore.getState().token || '';
-      const yearStr = new Date().getFullYear().toString();
-      const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
-      const allRecs: AttendanceRecord[] = [];
-
-      for (const t of teachers) {
-        const recs = await provider.getMonthlyAttendance(t.id, monthStr, yearStr, token);
-        allRecs.push(...recs);
-      }
-      setAttendanceRecords(allRecs);
-    } catch (err) {
-      console.warn('Gagal memuat rekap absensi bulanan:', err);
     }
   };
 

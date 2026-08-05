@@ -43,11 +43,16 @@ export const OperatorDashboardPage: React.FC = () => {
     {
       id: 'usr_1003',
       nip: '197504122003121001',
-      full_name: 'Drs. H. M. Yusuf, M.Pd.',
+      full_name: 'Farhan Sopian Sahid, S.Pd.I',
       phone_number: '081298765432',
       role: 'KEPSEK',
       position: 'Kepala Sekolah Utama',
       avatar_url: null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    },
+  ]);
+
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
 
   const fetchAttendanceRecords = async () => {
@@ -93,7 +98,7 @@ export const OperatorDashboardPage: React.FC = () => {
               <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-300 font-bold text-xs rounded-full border border-blue-500/30">
                 🛠️ Admin Website Console
               </span>
-              <h1 className="text-xl font-black text-white">{user?.full_name || 'Rina Fitriani, S.Kom.'}</h1>
+              <h1 className="text-xl font-black text-white">{user?.full_name || 'Mira Nurdianti, S.Pd'}</h1>
               <p className="text-xs text-slate-400">SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</p>
             </div>
 
