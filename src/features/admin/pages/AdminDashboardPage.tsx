@@ -39,16 +39,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Status absensi pribadi Admin hari ini (mock/state)
-  const [adminAttendance] = useState<{
-    status: string;
-    checkIn: string;
-    checkOut: string;
-  }>({
-    status: 'BELUM_ABSEN',
-    checkIn: '',
-    checkOut: '',
-  });
+  // Status absensi pribadi Admin hari ini (real data from DB)
+  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
+  const [isLoadingMyAttendance, setIsLoadingMyAttendance] = useState(false);
 
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -131,6 +124,22 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     }
   };
 
+  // Fetch admin's own today attendance from DB
+  const fetchMyAttendance = async () => {
+    if (!user) return;
+    setIsLoadingMyAttendance(true);
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      const record = await provider.getTodayAttendance(user.id, token);
+      setTodayAttendance(record);
+    } catch (err) {
+      console.warn('Gagal memuat absensi pribadi admin:', err);
+    } finally {
+      setIsLoadingMyAttendance(false);
+    }
+  };
+
   useEffect(() => {
     // 1. Instantly populate from local storage cache for instant UI rendering
     const cachedTeachers = localStorage.getItem('smart_absensi_teachers');
@@ -172,6 +181,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
         // Step 3: Sync Daily Attendance Records
         await fetchAttendanceRecords();
+
+        await new Promise((r) => setTimeout(r, 300));
+
+        // Step 4: Sync Admin's Own Today Attendance
+        await fetchMyAttendance();
       } catch (err) {
         console.warn('Backend sync sequence error:', err);
       }
@@ -181,13 +195,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
     const handleScannedEvent = () => {
       fetchAttendanceRecords();
+      fetchMyAttendance();
     };
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
     };
-  }, []);
+  }, [user?.id]);
 
   const handleExportExcel = async () => {
     await ReportService.generateAndDownloadMonthlyReport(
@@ -339,29 +354,61 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 </Button>
               </div>
 
-              {/* Status Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                  <p className="text-xs font-semibold text-slate-500">Status Kehadiran Hari Ini</p>
-                  <p className="font-black text-[#023246] text-base">
-                    {adminAttendance.status === 'HADIR' ? '✅ HADIR' : adminAttendance.status === 'TERLAMBAT' ? '⚠️ TERLAMBAT' : '⏳ BELUM ABSEN'}
-                  </p>
+              {isLoadingMyAttendance ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-8 h-8 border-4 border-[#287094] border-t-transparent rounded-full animate-spin" />
                 </div>
+              ) : (
+                <>
+                  {/* Status Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                      <p className="text-xs font-semibold text-slate-500">Status Kehadiran Hari Ini</p>
+                      <p className="font-black text-[#023246] text-base">
+                        {todayAttendance
+                          ? todayAttendance.status === 'HADIR'
+                            ? '✅ HADIR'
+                            : todayAttendance.status === 'TERLAMBAT'
+                              ? '⚠️ TERLAMBAT'
+                              : `📋 ${todayAttendance.status}`
+                          : '⏳ BELUM ABSEN'}
+                      </p>
+                    </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                  <p className="text-xs font-semibold text-slate-500">Jam Absen Masuk</p>
-                  <p className="font-mono font-bold text-slate-800 text-base">
-                    {adminAttendance.checkIn || '-- : -- WIB'}
-                  </p>
-                </div>
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                      <p className="text-xs font-semibold text-slate-500">Jam Absen Masuk</p>
+                      <p className="font-mono font-bold text-slate-800 text-base">
+                        {todayAttendance?.check_in_time
+                          ? `${todayAttendance.check_in_time} WIB`
+                          : '-- : -- WIB'}
+                      </p>
+                    </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                  <p className="text-xs font-semibold text-slate-500">Jam Absen Pulang</p>
-                  <p className="font-mono font-bold text-slate-800 text-base">
-                    {adminAttendance.checkOut || '-- : -- WIB'}
-                  </p>
-                </div>
-              </div>
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                      <p className="text-xs font-semibold text-slate-500">Jam Absen Pulang</p>
+                      <p className="font-mono font-bold text-slate-800 text-base">
+                        {todayAttendance?.check_out_time
+                          ? `${todayAttendance.check_out_time} WIB`
+                          : '-- : -- WIB'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Extra info: distance & verification */}
+                  {todayAttendance && (
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      {todayAttendance.check_in_distance_meters != null && (
+                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-full border border-emerald-200">
+                          📍 Jarak: {todayAttendance.check_in_distance_meters.toFixed(0)}m dari sekolah
+                        </span>
+                      )}
+                      <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-full border border-blue-200">
+                        🔐 Verifikasi: {todayAttendance.verification_method === 'QR_GPS' ? 'QR + GPS' : todayAttendance.verification_method}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
