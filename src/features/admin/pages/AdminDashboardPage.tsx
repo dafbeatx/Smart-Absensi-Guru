@@ -22,8 +22,6 @@ import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
 
-import { getTodayDateInJakarta } from '../../../utils/time.utils';
-
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
   onSwitchToGuruView?: () => void;
