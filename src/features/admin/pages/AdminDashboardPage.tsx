@@ -130,22 +130,52 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   };
 
   useEffect(() => {
-    const fetchUsersFromBackend = async () => {
+    // 1. Instantly populate from local storage cache for instant UI rendering
+    const cachedTeachers = localStorage.getItem('smart_absensi_teachers');
+    if (cachedTeachers) {
+      try {
+        const parsed = JSON.parse(cachedTeachers);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTeachers(parsed);
+        }
+      } catch (e) {
+        console.warn('Failed to parse cached teachers:', e);
+      }
+    }
+
+    // 2. Sequentially sync from backend with controlled delays to prevent GAS request queueing
+    const syncBackendDataSequentially = async () => {
       try {
         const provider = ProviderFactory.getProvider();
         const token = useAuthStore.getState().token || '';
-        const fetched = await provider.getAllUsers(token);
-        if (fetched && fetched.length > 0) {
-          setTeachers(fetched);
-          localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
+        if (!token) return;
+
+        // Step 1: Sync Users List
+        try {
+          const fetched = await provider.getAllUsers(token);
+          if (fetched && fetched.length > 0) {
+            setTeachers(fetched);
+            localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
+          }
+        } catch (err) {
+          console.warn('Backend fetch users fallback:', err);
         }
+
+        await new Promise((r) => setTimeout(r, 300));
+
+        // Step 2: Sync Pending Leave Requests
+        await fetchPendingRequests();
+
+        await new Promise((r) => setTimeout(r, 300));
+
+        // Step 3: Sync Daily Attendance Records
+        await fetchAttendanceRecords();
       } catch (err) {
-        console.warn('Backend fetch users fallback:', err);
+        console.warn('Backend sync sequence error:', err);
       }
     };
-    fetchUsersFromBackend();
-    fetchPendingRequests();
-    fetchAttendanceRecords();
+
+    syncBackendDataSequentially();
   }, []);
 
   const handleExportExcel = async () => {

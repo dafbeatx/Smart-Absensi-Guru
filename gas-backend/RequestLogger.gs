@@ -27,56 +27,20 @@ var RequestLogger = {
    */
   logRequest: function(params) {
     try {
-      DatabaseManager.appendRecord(DB.SHEETS.REQUEST_LOGS, {
-        id: Utils.generateUUID(),
-        request_id: params.requestId || "",
-        action: params.action || "UNKNOWN",
-        method: params.method || "POST",
-        actor_id: params.actorId || "",
-        actor_role: params.actorRole || "",
-        ip_address: params.ipAddress || "",
-        user_agent: params.userAgent || "",
-        payload_size_bytes: params.payloadSize || 0,
-        response_code: "",
-        execution_ms: "",
-        success: "",
-        created_at: Utils.now()
-      });
+      Logger.log("📥 [Request] " + (params.action || "UNKNOWN") + " | RequestID: " + (params.requestId || ""));
     } catch (e) {
       // Logger gagal tidak boleh mematikan request utama
-      Logger.log("⚠️ RequestLogger.logRequest failed: " + e.toString());
     }
   },
 
   /**
-   * Update request log setelah response selesai (execution time & status).
-   * Karena appendRecord sudah dilakukan, kita update baris terakhir.
-   *
-   * @param {string} requestId
-   * @param {number} executionMs
-   * @param {boolean} success
-   * @param {string} responseCode
-   * @param {string} [actorId]
-   * @param {string} [actorRole]
+   * Log execution summary ke Apps Script transcript tanpa overhead Google Sheet.
    */
   logResponse: function(requestId, executionMs, success, responseCode, actorId, actorRole) {
     try {
-      var updates = {
-        execution_ms: executionMs,
-        success: success,
-        response_code: responseCode || ""
-      };
-      if (actorId) updates.actor_id = actorId;
-      if (actorRole) updates.actor_role = actorRole;
-
-      DatabaseManager.updateRecord(
-        DB.SHEETS.REQUEST_LOGS,
-        "request_id",
-        requestId,
-        updates
-      );
+      Logger.log("📤 [Response] RequestID: " + requestId + " | Time: " + executionMs + "ms | Success: " + success + " | Code: " + (responseCode || "200"));
     } catch (e) {
-      Logger.log("⚠️ RequestLogger.logResponse failed: " + e.toString());
+      // Logger gagal tidak boleh mematikan request utama
     }
   },
 

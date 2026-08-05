@@ -24,11 +24,11 @@ export const APP_CONFIG = {
   IS_DEV: getIsDev(),
   ENABLE_LOGS: getEnvValue('VITE_ENABLE_LOGS', 'false') === 'true',
 
-  // Request & Cache Timings
-  REQUEST_TIMEOUT_MS: 15000, // 15 Seconds timeout
-  HEAVY_REQUEST_TIMEOUT_MS: 30000, // 30 Seconds timeout for heavy write/mutation operations
-  MAX_RETRIES: 3,
-  RETRY_DELAY_MS: 1000,
+  // Request & Cache Timings (Optimized for GAS Web App cold starts & concurrency)
+  REQUEST_TIMEOUT_MS: 30000, // 30 Seconds timeout for standard API operations
+  HEAVY_REQUEST_TIMEOUT_MS: 60000, // 60 Seconds timeout for heavy write/mutation operations
+  MAX_RETRIES: 2,
+  RETRY_DELAY_MS: 1500,
   AUTO_LOGOUT_DAYS: 7,
   SUCCESS_MODAL_DISMISS_MS: 2000,
 } as const;
