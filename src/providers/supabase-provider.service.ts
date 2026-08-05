@@ -18,7 +18,7 @@ import type {
   AttendanceResponseDTO,
   CorrectAttendanceDTO,
 } from '../repositories/AttendanceRepository';
-import { timeToMinutes } from '../utils/time.utils';
+import { timeToMinutes, getTodayDateInJakarta, getCurrentTimeInJakarta } from '../utils/time.utils';
 import { hashPin } from '../utils/hash.utils';
 import { useAuthStore } from '../store/useAuthStore';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
@@ -198,15 +198,11 @@ export class SupabaseProvider implements IDataProvider {
       );
     }
 
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    const timeStr = `${hours}:${minutes}:${seconds}`;
+    const todayStr = getTodayDateInJakarta();
+    const timeStr = getCurrentTimeInJakarta();
 
     const checkinEnd = settings.work_checkin_end || '07:15';
-    const currentMin = now.getHours() * 60 + now.getMinutes();
+    const currentMin = timeToMinutes(timeStr);
     const cutoffMin = timeToMinutes(checkinEnd);
 
     const status: AttendanceStatus = currentMin > cutoffMin ? 'TERLAMBAT' : 'HADIR';
@@ -256,8 +252,8 @@ export class SupabaseProvider implements IDataProvider {
       .maybeSingle();
 
     if (existing) {
-      if (existing.check_in_time && !existing.check_out_time) {
-        // Record Check-out (Absen Pulang)
+      if (existing.check_in_time) {
+        // Record or Update Check-out (Absen Pulang ke jam scan WIB terbaru)
         const { error: updateErr } = await this.client
           .from('attendance')
           .update({ check_out_time: timeStr })
@@ -274,17 +270,6 @@ export class SupabaseProvider implements IDataProvider {
           distance_meters: distanceMeters,
           geofence_verified: true,
           attendance_action: 'CHECK_OUT',
-        };
-      }
-
-      if (existing.check_in_time && existing.check_out_time) {
-        return {
-          attendance_id: existing.id,
-          status: (existing.status as AttendanceStatus) || status,
-          timestamp: `${timeStr} WIB`,
-          distance_meters: distanceMeters,
-          geofence_verified: true,
-          attendance_action: 'ALREADY_COMPLETED',
         };
       }
     }
@@ -320,7 +305,7 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getTodayAttendance(userId: string, _token: string): Promise<AttendanceRecord | null> {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayDateInJakarta();
     const { data } = await this.client
       .from('attendance')
       .select('*')
@@ -417,6 +402,7 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getDailyAttendance(date: string, _token: string): Promise<AttendanceRecord[]> {
+    const targetDate = date || getTodayDateInJakarta();
     const { data } = await this.client
       .from('attendance')
       .select('*')

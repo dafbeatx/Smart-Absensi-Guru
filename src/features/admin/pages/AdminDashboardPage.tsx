@@ -23,6 +23,8 @@ import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
 
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
+
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
   onSwitchToGuruView?: () => void;
@@ -115,7 +117,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
       if (token) {
-        const targetDate = date || new Date().toISOString().split('T')[0];
+        const targetDate = date || getTodayDateInJakarta();
         const records = await provider.getDailyAttendance(targetDate, token);
         setAttendanceRecords(records || []);
       }

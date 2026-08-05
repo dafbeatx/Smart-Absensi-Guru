@@ -79,3 +79,43 @@ export function formatTimeForInput(value: unknown, defaultValue: string = ''): s
 
   return defaultValue;
 }
+
+/**
+ * Returns today's date string formatted as "YYYY-MM-DD" strictly in Asia/Jakarta timezone (WIB/GMT+7).
+ * Avoids the bug where Date.prototype.toISOString().split('T')[0] yields yesterday's date between 00:00 - 06:59 WIB.
+ */
+export function getTodayDateInJakarta(timeZone: string = 'Asia/Jakarta'): string {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(new Date());
+  } catch {
+    return new Date().toISOString().substring(0, 10);
+  }
+}
+
+/**
+ * Returns current time string formatted as "HH:mm:ss" strictly in Asia/Jakarta timezone (WIB/GMT+7).
+ */
+export function getCurrentTimeInJakarta(timeZone: string = 'Asia/Jakarta'): string {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    return formatter.format(new Date());
+  } catch {
+    const d = new Date();
+    return [d.getHours(), d.getMinutes(), d.getSeconds()]
+      .map((n) => String(n).padStart(2, '0'))
+      .join(':');
+  }
+}
+

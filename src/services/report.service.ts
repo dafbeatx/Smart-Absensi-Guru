@@ -3,6 +3,8 @@ import type { MultiSheetReportPayload } from '../lib/excel-generator.lib';
 import { AnalyticsService } from './analytics.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../types/database.types';
 
+import { getTodayDateInJakarta } from '../utils/time.utils';
+
 export class ReportService {
   private static preparePayload(
     month: string,
@@ -12,7 +14,7 @@ export class ReportService {
     leaveRequests: LeaveRequest[],
     auditLogs: AuditLog[]
   ): MultiSheetReportPayload {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayDateInJakarta();
     const summary = AnalyticsService.calculateDailySummary(
       todayStr,
       teachers,

@@ -10,6 +10,7 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
 import { DevTestPage } from '../../admin/pages/DevTestPage';
+import { evaluateAttendanceStatus, getTodayDateInJakarta } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
 
@@ -84,7 +85,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       const provider = ProviderFactory.getProvider();
       const tkn = useAuthStore.getState().token || '';
       if (tkn) {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getTodayDateInJakarta();
         const records = await provider.getDailyAttendance(todayStr, tkn);
         setAttendanceRecords(records || []);
       }

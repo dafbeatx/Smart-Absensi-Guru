@@ -15,6 +15,7 @@ import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } f
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
+import { getTodayDateInJakarta, getCurrentTimeInJakarta, timeToMinutes } from '../utils/time.utils';
 
 const memoryStore = new Map<string, string>();
 
@@ -147,27 +148,14 @@ export class MockProvider implements IDataProvider {
   public async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
     await new Promise((r) => setTimeout(r, 400));
     
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    const timeStr = `${hours}:${minutes}:${seconds}`;
-    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = getCurrentTimeInJakarta();
+    const dateStr = getTodayDateInJakarta();
 
     const settings = await this.getSettings();
     const checkInEndStr = settings.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
-    const parseMinutes = (tStr: string) => {
-      const clean = tStr.replace(/[^\d:]/g, '');
-      const parts = clean.split(':');
-      if (parts.length >= 2) {
-        return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-      }
-      return 0;
-    };
-
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const cutoffMinutes = parseMinutes(checkInEndStr);
+    const nowMinutes = timeToMinutes(timeStr);
+    const cutoffMinutes = timeToMinutes(checkInEndStr);
 
     let initialStatus: AttendanceStatus = 'HADIR';
     if (nowMinutes > cutoffMinutes) {
@@ -184,25 +172,48 @@ export class MockProvider implements IDataProvider {
     if (existingSaved) {
       try {
         const parsed = JSON.parse(existingSaved);
-        if (parsed && parsed.check_in_time && !parsed.check_out_time) {
-          // Check-out (Absen Pulang)
+        if (parsed && parsed.check_in_time) {
+          // Check-out / Update Check-out (Absen Pulang)
           record = {
             ...parsed,
             check_out_time: timeStr,
           };
           action = 'CHECK_OUT';
-        } else if (parsed && parsed.check_in_time && parsed.check_out_time) {
-          return {
-            attendance_id: parsed.id,
-            status: parsed.status,
-            timestamp: timeStr,
-            distance_meters: 12,
-            geofence_verified: true,
-            attendance_action: 'ALREADY_COMPLETED',
-          };
         } else {
           record = {
             id: 'att_' + Date.now(),
+            user_id: userId,
+            date: dateStr,
+            check_in_time: timeStr,
+            check_out_time: null,
+            status: initialStatus,
+            check_in_lat: dto.user_lat,
+            check_in_lng: dto.user_lng,
+            check_in_distance_meters: 12,
+            verification_method: 'QR_GPS',
+            attendance_source: 'QR',
+            is_offline: false,
+            created_at: new Date().toISOString(),
+          };
+        }
+      } catch {
+        record = {
+          id: 'att_' + Date.now(),
+          user_id: userId,
+          date: dateStr,
+          check_in_time: timeStr,
+          check_out_time: null,
+          status: initialStatus,
+          check_in_lat: dto.user_lat,
+          check_in_lng: dto.user_lng,
+          check_in_distance_meters: 12,
+          verification_method: 'QR_GPS',
+          attendance_source: 'QR',
+          is_offline: false,
+          created_at: new Date().toISOString(),
+        };
+      }
+    }
             user_id: userId,
             date: dateStr,
             check_in_time: timeStr,
@@ -269,7 +280,7 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getTodayAttendance(userId: string, _token: string): Promise<AttendanceRecord | null> {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayDateInJakarta();
     const saved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`) || safeGetStorage('smart_absensi_today_attendance');
     if (saved) {
       try {
@@ -293,7 +304,7 @@ export class MockProvider implements IDataProvider {
     }
 
     const monthPrefix = `${year}-${paddedMonth}`;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getTodayDateInJakarta();
     const records: AttendanceRecord[] = [];
 
     const saved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`) || safeGetStorage('smart_absensi_today_attendance');
