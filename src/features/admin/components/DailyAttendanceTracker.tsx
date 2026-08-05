@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus } from '../../../types/database.types';
 import { AnalyticsService } from '../../../services/analytics.service';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
+import { evaluateAttendanceStatus } from '../../../utils/time.utils';
 
 export interface DailyAttendanceTrackerProps {
   teachers: UserProfile[];
@@ -42,9 +43,10 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     // Map attendance records
     for (const rec of attendanceRecords) {
       if (rec.date === selectedDate) {
+        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
         map.set(rec.user_id, {
           record: rec,
-          status: rec.status,
+          status: effectiveStatus,
           checkInTime: rec.check_in_time ? rec.check_in_time.substring(0, 5) : undefined,
           checkOutTime: rec.check_out_time ? rec.check_out_time.substring(0, 5) : undefined,
         });

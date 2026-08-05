@@ -18,6 +18,7 @@ import type {
   AttendanceResponseDTO,
   CorrectAttendanceDTO,
 } from '../repositories/AttendanceRepository';
+import { timeToMinutes } from '../utils/time.utils';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters } from '../utils/geofence.utils';
@@ -171,10 +172,16 @@ export class SupabaseProvider implements IDataProvider {
 
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
-    const timeStr = now.toLocaleTimeString('id-ID', { hour12: false });
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}:${seconds}`;
 
     const checkinEnd = settings.work_checkin_end || '07:15';
-    const status: AttendanceStatus = timeStr > checkinEnd ? 'TERLAMBAT' : 'HADIR';
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+    const cutoffMin = timeToMinutes(checkinEnd);
+
+    const status: AttendanceStatus = currentMin > cutoffMin ? 'TERLAMBAT' : 'HADIR';
 
     const userId = dto.token.split('_')[2] || 'usr_guru_001';
     const attId = `att_${userId}_${todayStr}`;

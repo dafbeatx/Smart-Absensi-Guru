@@ -1,4 +1,5 @@
 import type { AttendanceRecord, LeaveRequest, UserProfile } from '../types/database.types';
+import { evaluateAttendanceStatus } from '../utils/time.utils';
 
 export interface DailyAttendanceSummary {
   date: string;
@@ -50,8 +51,9 @@ export class AnalyticsService {
     for (const rec of attendanceRecords) {
       if (rec.date === dateStr) {
         attendedUserIds.add(rec.user_id);
-        if (rec.status === 'HADIR') totalPresent++;
-        if (rec.status === 'TERLAMBAT') totalLate++;
+        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+        if (effectiveStatus === 'HADIR') totalPresent++;
+        else if (effectiveStatus === 'TERLAMBAT') totalLate++;
       }
     }
 

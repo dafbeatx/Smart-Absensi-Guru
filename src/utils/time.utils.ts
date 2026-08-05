@@ -1,16 +1,56 @@
 /**
  * Helper utility for formatting and sanitizing time values for HTML5 <input type="time">
+ * and intelligent attendance status evaluation (HADIR vs TERLAMBAT).
  */
+
+/**
+ * Converts any time string ("07:48", "07.48.15", "07:15:00") into total minutes from midnight for bulletproof time comparisons.
+ * Examples:
+ * - "07:15" -> 435
+ * - "07.48.15" -> 468
+ */
+export function timeToMinutes(timeStr: unknown): number {
+  if (!timeStr) return 0;
+  const str = String(timeStr).replace(/\./g, ':').trim();
+  const parts = str.split(':');
+  if (parts.length >= 2) {
+    const hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
+    return hours * 60 + minutes;
+  }
+  return 0;
+}
+
+/**
+ * Intelligently evaluates whether a check-in time is HADIR (On Time) or TERLAMBAT (Late).
+ * If check-in time is strictly greater than checkinEnd (default 07:15), returns 'TERLAMBAT'.
+ */
+export function evaluateAttendanceStatus(
+  checkInTime: string | null | undefined,
+  checkinEnd: string = '07:15',
+  currentStatus?: string
+): 'HADIR' | 'TERLAMBAT' | 'IZIN' | 'SAKIT' | 'DINAS_LUAR' | 'ALFA' {
+  if (currentStatus && currentStatus !== 'HADIR' && currentStatus !== 'TERLAMBAT' && currentStatus !== 'BELUM_ABSEN') {
+    return currentStatus as 'IZIN' | 'SAKIT' | 'DINAS_LUAR' | 'ALFA';
+  }
+
+  if (!checkInTime) {
+    return currentStatus === 'TERLAMBAT' ? 'TERLAMBAT' : (currentStatus as 'HADIR' || 'HADIR');
+  }
+
+  const checkInMin = timeToMinutes(checkInTime);
+  const cutoffMin = timeToMinutes(checkinEnd);
+
+  if (checkInMin > cutoffMin) {
+    return 'TERLAMBAT';
+  }
+
+  return 'HADIR';
+}
 
 /**
  * Normalizes any time or date-time value (ISO string, HH:mm:ss, HH:mm)
  * into standard 24-hour "HH:mm" format required by HTML5 <input type="time">.
- * 
- * Examples:
- * - "1899-12-29T22:52:48.000Z" -> "06:00"
- * - "1899-12-30T00:07:48.000Z" -> "07:15"
- * - "07:15:00"                -> "07:15"
- * - "7:5"                     -> "07:05"
  */
 export function formatTimeForInput(value: unknown, defaultValue: string = ''): string {
   if (value === null || value === undefined) return defaultValue;
@@ -18,11 +58,9 @@ export function formatTimeForInput(value: unknown, defaultValue: string = ''): s
   const str = String(value).trim();
   if (!str) return defaultValue;
 
-  // 1. Handle ISO date-time strings (e.g. from Google Sheets / Google Apps Script ISO serialization)
   if (str.includes('T')) {
     const d = new Date(str);
     if (!isNaN(d.getTime())) {
-      // Calculate total seconds from local midnight to account for sub-minute LMT offsets (e.g., 1899 dates)
       const totalSeconds = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
       const roundedMinutes = Math.round(totalSeconds / 60);
       const hours = String(Math.floor(roundedMinutes / 60) % 24).padStart(2, '0');
@@ -31,8 +69,8 @@ export function formatTimeForInput(value: unknown, defaultValue: string = ''): s
     }
   }
 
-  // 2. Handle HH:mm or HH:mm:ss strings
-  const timeMatch = str.match(/(\d{1,2}):(\d{2})/);
+  const normalizedStr = str.replace(/\./g, ':');
+  const timeMatch = normalizedStr.match(/(\d{1,2}):(\d{2})/);
   if (timeMatch) {
     const hours = String(timeMatch[1]).padStart(2, '0');
     const minutes = String(timeMatch[2]).padStart(2, '0');

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../types/database.types';
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
+import { evaluateAttendanceStatus } from '../../utils/time.utils';
 
 export interface ExecutiveDashboardOverviewProps {
   roleTitle: 'Admin Website' | 'Kepala Sekolah';
@@ -37,10 +38,10 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 
     for (const rec of attendanceRecords) {
       presentUserIds.add(rec.user_id);
-      const status = (rec.status || '').toUpperCase();
-      if (status === 'HADIR') hadir++;
-      else if (status === 'TERLAMBAT') terlambat++;
-      else if (status === 'IZIN' || status === 'SAKIT' || status === 'DINAS_LUAR') izin++;
+      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+      if (effectiveStatus === 'HADIR') hadir++;
+      else if (effectiveStatus === 'TERLAMBAT') terlambat++;
+      else if (effectiveStatus === 'IZIN' || effectiveStatus === 'SAKIT' || effectiveStatus === 'DINAS_LUAR') izin++;
     }
 
     const belum = Math.max(0, totalGuruCount - presentUserIds.size);
