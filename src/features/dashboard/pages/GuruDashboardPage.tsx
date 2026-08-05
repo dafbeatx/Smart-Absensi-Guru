@@ -8,6 +8,7 @@ import { Input } from '../../../components/ui/Input';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { AttendanceCorrectionModal } from '../../admin/components/AttendanceCorrectionModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { evaluateAttendanceStatus } from '../../../utils/time.utils';
 import type { AttendanceRecord, HolidayRecord } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
@@ -289,14 +290,34 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </p>
                 </div>
 
-                <div className="bg-[#FFF4DC] text-[#B45309] border border-[#FDE68A] font-extrabold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0">
-                  <span className="w-2 h-2 rounded-full bg-[#B45309] animate-pulse" />
-                  {todayAttendance?.status === 'HADIR'
-                    ? 'SUDAH ABSEN MASUK'
-                    : todayAttendance?.status === 'TERLAMBAT'
-                    ? 'TERLAMBAT'
-                    : 'BELUM ABSEN MASUK'}
-                </div>
+                {(() => {
+                  const status = todayAttendance
+                    ? evaluateAttendanceStatus(todayAttendance.check_in_time, '07:15', todayAttendance.status)
+                    : 'BELUM_ABSEN';
+
+                  if (status === 'HADIR') {
+                    return (
+                      <div className="bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 font-extrabold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        SUDAH ABSEN (TEPAT WAKTU)
+                      </div>
+                    );
+                  }
+                  if (status === 'TERLAMBAT') {
+                    return (
+                      <div className="bg-amber-500/20 text-amber-200 border border-amber-400/40 font-extrabold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        TERLAMBAT
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="bg-[#FFF4DC] text-[#B45309] border border-[#FDE68A] font-extrabold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0">
+                      <span className="w-2 h-2 rounded-full bg-[#B45309] animate-pulse" />
+                      BELUM ABSEN MASUK
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Inset Side-by-Side Cards */}
@@ -467,11 +488,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                     <Badge
                       status={
-                        (item.status as 'HADIR' | 'TERLAMBAT' | 'SAKIT' | 'IZIN' | 'ALFA') ||
-                        'HADIR'
+                        evaluateAttendanceStatus(item.check_in_time, '07:15', item.status) as
+                          | 'HADIR'
+                          | 'TERLAMBAT'
+                          | 'SAKIT'
+                          | 'IZIN'
+                          | 'ALFA'
                       }
                     >
-                      {item.status}
+                      {evaluateAttendanceStatus(item.check_in_time, '07:15', item.status)}
                     </Badge>
                   </div>
                 ))}
