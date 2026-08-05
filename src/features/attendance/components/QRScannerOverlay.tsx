@@ -11,6 +11,7 @@ import { AttendanceRepository } from '../../../repositories/AttendanceRepository
 import { QRValidationService } from '../../../services/qr-validation.service';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { logger } from '../../../utils/logger.utils';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -39,11 +40,13 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const fetchGPSLocation = async () => {
     setIsCheckingGPS(true);
     setGpsError(null);
+    logger.info('QRScannerOverlay', 'Fetching GPS location...');
     try {
       await GPSService.syncGeofenceSettings();
       const coords = await GPSService.getCurrentPosition();
       setGpsCoords(coords);
       setIsCheckingGPS(false);
+      logger.info('QRScannerOverlay', 'GPS location obtained:', coords);
       return coords;
     } catch (err: unknown) {
       setIsCheckingGPS(false);
@@ -51,6 +54,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       const msg = err && typeof err === 'object' && 'message' in err
         ? String((err as { message: string }).message)
         : 'Perizinan lokasi GPS belum diberikan. Harap aktifkan izin lokasi di browser HP Anda.';
+      logger.error('QRScannerOverlay', 'GPS location error:', msg);
       setGpsError(msg);
       return null;
     }
@@ -60,6 +64,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     let isMounted = true;
 
     if (isOpen) {
+      logger.info('QRScannerOverlay', 'QR Scanner Overlay opened');
       isProcessingRef.current = false;
       setCameraError(null);
       fetchGPSLocation();
@@ -68,6 +73,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       import('html5-qrcode').then(({ Html5Qrcode }) => {
         if (!isMounted) return;
 
+        logger.info('QRScannerOverlay', 'Starting camera scanner engine...');
         const html5QrCode = new Html5Qrcode("reader");
         scannerRef.current = html5QrCode;
 
@@ -81,18 +87,18 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           },
           () => {}
         ).catch((err) => {
-          console.error("Camera access error:", err);
+          logger.error('QRScannerOverlay', 'Camera access error:', err);
           setCameraError("Kamera tidak dapat diakses. Pastikan Anda telah memberikan izin kamera di browser HP.");
         });
       }).catch((err) => {
-        console.error("Failed to load QR engine chunk:", err);
+        logger.error('QRScannerOverlay', 'Failed to load QR engine chunk:', err);
         setCameraError("Gagal memuat engine QR scanner. Periksa koneksi internet Anda.");
       });
 
       return () => {
         isMounted = false;
         if (scannerRef.current && scannerRef.current.isScanning) {
-          scannerRef.current.stop().catch(console.error);
+          scannerRef.current.stop().catch((err) => logger.warn('QRScannerOverlay', 'Scanner stop error:', err));
         }
       };
     }
@@ -105,20 +111,18 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
+    logger.info('QRScannerOverlay', 'QR Code detected by camera', { rawData: _qrData });
+
     if (scannerRef.current && scannerRef.current.isScanning) {
-      scannerRef.current.stop().catch(console.error);
+      scannerRef.current.stop().catch((err) => logger.warn('QRScannerOverlay', 'Scanner stop error:', err));
     }
 
     // 1. Validate QR Code payload freshness and official poster seed
     const qrValidation = QRValidationService.validateQRFreshness(_qrData);
-    if (import.meta.env.DEV) {
-      console.log('⚡ [DEV DEBUG] QR Code Scanned:', {
-        rawData: _qrData,
-        validation: qrValidation,
-      });
-    }
+    logger.info('QRScannerOverlay', 'QR Validation result:', qrValidation);
 
     if (!qrValidation.isValid) {
+      logger.warn('QRScannerOverlay', 'QR Code validation failed / invalid payload');
       SoundService.playError();
       setRejectionReason('Absensi Ditolak! QR Code tidak valid / bukan QR resmi absensi.');
       setIsRejectionModalOpen(true);
@@ -133,7 +137,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     }
 
     if (!currentCoords) {
-      // REJECT: Perizinan lokasi GPS ditolak/tidak aktif
+      logger.warn('QRScannerOverlay', 'Attendance rejected due to missing GPS coords');
       SoundService.playError();
       setRejectionReason('Absensi Ditolak! Perizinan lokasi GPS tidak diizinkan atau lokasi HP Anda tidak dapat terdeteksi. Silakan aktifkan izin lokasi di HP Anda.');
       setIsRejectionModalOpen(true);
@@ -142,9 +146,13 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     }
 
     const validation = GPSService.validateGeofenceRadius(currentCoords, allowedRadius);
+    logger.info('QRScannerOverlay', 'Geofence validation result:', validation);
 
     if (!validation.isValid) {
-      // REJECT: Absensi diluar lokasi radius yang diizinkan
+      logger.warn('QRScannerOverlay', 'Attendance rejected: Out of allowed radius', {
+        distance: currentCoords.distanceMeters,
+        allowedRadius,
+      });
       SoundService.playError();
       let hint = '';
       if (currentCoords.distanceMeters > 1000) {
@@ -164,15 +172,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     const scanSeed = _qrData || CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
 
     try {
-      if (import.meta.env.DEV) {
-        console.log('⚡ [DEV DEBUG] Executing scanAttendance DTO:', {
-          qr_seed: scanSeed,
-          lat: currentCoords.latitude,
-          lng: currentCoords.longitude,
-          device_uuid: deviceUUID,
-        });
-      }
-
+      logger.info('QRScannerOverlay', 'Sending scanAttendance payload to repository...');
       const res = await AttendanceRepository.scanAttendance({
         token: token,
         qr_seed: scanSeed,
@@ -181,9 +181,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         device_uuid: deviceUUID,
       });
 
-      if (import.meta.env.DEV) {
-        console.log('⚡ [DEV DEBUG] scanAttendance Response:', res);
-      }
+      logger.info('QRScannerOverlay', 'Attendance saved successfully:', res);
 
       if (res && res.status) {
         returnedStatus = res.status;
@@ -191,9 +189,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
       window.dispatchEvent(new Event('smart_absensi_scanned'));
     } catch (err: unknown) {
-      if (import.meta.env.DEV) {
-        console.error('⚡ [DEV DEBUG] scanAttendance Error:', err);
-      }
+      logger.error('QRScannerOverlay', 'Failed to save attendance record:', err);
       SoundService.playError();
       const errMsg = err && typeof err === 'object' && 'message' in err
         ? String((err as { message: string }).message)

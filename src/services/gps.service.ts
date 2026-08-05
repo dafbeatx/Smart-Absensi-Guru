@@ -3,6 +3,7 @@ import { getErrorDefinition } from '../config/error-codes';
 import type { ErrorDefinition } from '../config/error-codes';
 import { calculateDistanceMeters } from '../utils/geofence.utils';
 import { ProviderFactory } from '../providers/provider-factory';
+import { logger } from '../utils/logger.utils';
 
 export interface GPSCoordinates {
   latitude: number;
@@ -31,7 +32,6 @@ export class GPSService {
           let lng = parseFloat(parsed.geofence_lng);
           const radius = parseInt(parsed.geofence_radius, 10);
 
-          // Auto-migrate legacy Jakarta default coordinates (-6.2, 106.816667) to actual school coordinates
           if (lat === -6.200000 || lat === -6.2 || (lat > -6.21 && lat < -6.19 && lng > 106.81 && lng < 106.82)) {
             lat = CONSTANTS.DEFAULTS.GEOFENCE_LAT;
             lng = CONSTANTS.DEFAULTS.GEOFENCE_LNG;
@@ -71,7 +71,7 @@ export class GPSService {
         localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updated));
       }
     } catch (e) {
-      console.warn('Failed to sync geofence settings from provider:', e);
+      logger.warn('GPSService', 'Failed to sync geofence settings from provider:', e);
     }
     return this.getGeofenceSettings();
   }
@@ -87,8 +87,11 @@ export class GPSService {
     const schoolLat = targetLat !== undefined ? targetLat : settings.lat;
     const schoolLng = targetLng !== undefined ? targetLng : settings.lng;
 
+    logger.info('GPSService', 'Requesting GPS location from browser...');
+
     return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        logger.error('GPSService', 'Geolocation API is not supported by browser');
         reject(getErrorDefinition('GPS_001'));
         return;
       }
@@ -112,9 +115,15 @@ export class GPSService {
             schoolLng
           );
 
-          // Apply GPS accuracy tolerance buffer (up to 30m) to prevent false rejections
           const accuracyBuffer = Math.min(Math.round(accuracy / 2), 30);
           const effectiveDistance = Math.max(0, rawDistance - accuracyBuffer);
+
+          logger.info('GPSService', 'GPS location retrieved successfully:', {
+            lat,
+            lng,
+            accuracy,
+            effectiveDistance,
+          });
 
           resolve({
             latitude: lat,
@@ -124,7 +133,7 @@ export class GPSService {
           });
         },
         (error) => {
-          console.error('Geolocation Error:', error);
+          logger.error('GPSService', `Geolocation Error (Code ${error.code}): ${error.message}`, error);
           reject(getErrorDefinition('GPS_001'));
         },
         options

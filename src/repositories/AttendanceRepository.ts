@@ -1,5 +1,6 @@
 import { ProviderFactory } from '../providers/provider-factory';
 import type { AttendanceRecord } from '../types/database.types';
+import { logger } from '../utils/logger.utils';
 
 export interface ScanAttendanceDTO {
   token: string;
@@ -28,7 +29,19 @@ export interface CorrectAttendanceDTO {
 
 export class AttendanceRepository {
   public static async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
-    return ProviderFactory.getProvider().scanAttendance(dto);
+    logger.info('AttendanceRepository', 'Executing scanAttendance via active provider', {
+      lat: dto.user_lat,
+      lng: dto.user_lng,
+      qr_seed: dto.qr_seed,
+    });
+    try {
+      const result = await ProviderFactory.getProvider().scanAttendance(dto);
+      logger.info('AttendanceRepository', 'scanAttendance success:', result);
+      return result;
+    } catch (err) {
+      logger.error('AttendanceRepository', 'scanAttendance failed:', err);
+      throw err;
+    }
   }
 
   public static async getTodayAttendance(userId: string, token: string): Promise<AttendanceRecord | null> {
@@ -40,6 +53,18 @@ export class AttendanceRepository {
   }
 
   public static async correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean> {
-    return ProviderFactory.getProvider().correctAttendance(dto);
+    logger.info('AttendanceRepository', 'Executing correctAttendance via active provider', {
+      target_user_id: dto.target_user_id,
+      date: dto.date,
+      status: dto.status,
+    });
+    try {
+      const result = await ProviderFactory.getProvider().correctAttendance(dto);
+      logger.info('AttendanceRepository', 'correctAttendance success');
+      return result;
+    } catch (err) {
+      logger.error('AttendanceRepository', 'correctAttendance failed:', err);
+      throw err;
+    }
   }
 }

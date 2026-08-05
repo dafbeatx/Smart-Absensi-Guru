@@ -5,6 +5,8 @@ import { Input } from '../../../components/ui/Input';
 import { getOrCreateDeviceUUID, getDeviceModelString } from '../../../utils/device.utils';
 import { validatePIN, validateIdentity } from '../../../utils/validation.utils';
 import { AuthRepository } from '../../../repositories/AuthRepository';
+import { logger } from '../../../utils/logger.utils';
+import { handleAppError, notifySuccess } from '../../../utils/error.utils';
 
 export const LoginPage: React.FC = () => {
   const [identity, setIdentity] = useState('');
@@ -37,6 +39,8 @@ export const LoginPage: React.FC = () => {
     }
 
     setIsLoading(true);
+    const maskedIdentity = identity.length > 4 ? `${identity.substring(0, 4)}***` : identity;
+    logger.info('LoginPage', `Attempting login for identity: ${maskedIdentity}`);
 
     try {
       const res = await AuthRepository.login({
@@ -46,12 +50,13 @@ export const LoginPage: React.FC = () => {
         device_model: deviceModel,
       });
 
+      logger.info('LoginPage', `Login successful for user: ${res.user.full_name} (${res.user.role})`);
+      notifySuccess('Login Berhasil!', `Selamat datang kembali, ${res.user.full_name}`);
       loginSuccess(res.token, res.user);
     } catch (err: unknown) {
       setIsLoading(false);
-      const msg = err instanceof Error ? err.message : 'Login gagal. Periksa kembali NPP/WA dan PIN Anda.';
-      console.error('⛔ [LoginPage Submit Error]:', err);
-      setErrorMessage(msg);
+      const cleanMsg = handleAppError(err, 'LoginPage', 'Kendala Login', false);
+      setErrorMessage(cleanMsg);
     }
   };
 

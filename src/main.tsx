@@ -1,10 +1,29 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './index.css';
+import App from './App.tsx';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { logger } from './utils/logger.utils';
+
+// Global Unhandled Error & Promise Rejection Handlers
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    logger.error('GlobalWindow', 'Unhandled Promise Rejection:', event.reason);
+  });
+
+  window.addEventListener('error', (event) => {
+    logger.error('GlobalWindow', 'Unhandled Global Error:', {
+      message: event.message,
+      filename: event.filename,
+      lineno: event.lineno,
+    });
+  });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
-)
+);
