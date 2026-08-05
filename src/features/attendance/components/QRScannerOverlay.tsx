@@ -33,7 +33,12 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
-  const [scanResult, setScanResult] = useState<{ timestamp: string; distance: number; status: string } | null>(null);
+  const [scanResult, setScanResult] = useState<{
+    timestamp: string;
+    distance: number;
+    status: string;
+    action?: 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED';
+  } | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isProcessingRef = useRef(false);
 
@@ -168,6 +173,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     const token = useAuthStore.getState().token || 'MOCK_TOKEN';
     const deviceUUID = useAuthStore.getState().deviceUUID || 'DEV_UUID';
     let returnedStatus = 'HADIR';
+    let returnedAction: 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED' = 'CHECK_IN';
 
     const scanSeed = _qrData || CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
 
@@ -183,8 +189,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
       logger.info('QRScannerOverlay', 'Attendance saved successfully:', res);
 
-      if (res && res.status) {
-        returnedStatus = res.status;
+      if (res) {
+        if (res.status) returnedStatus = res.status;
+        if (res.attendance_action) returnedAction = res.attendance_action;
       }
 
       window.dispatchEvent(new Event('smart_absensi_scanned'));
@@ -212,7 +219,8 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     const result = {
       timestamp: timestampStr,
       distance: currentCoords.distanceMeters,
-      status: statusLabel
+      status: statusLabel,
+      action: returnedAction,
     };
 
     setScanResult(result);
@@ -223,7 +231,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       setIsSuccessModalOpen(false);
       onSuccess(result);
       onClose();
-    }, 2000);
+    }, 2200);
   };
 
   if (!isOpen) return null;
@@ -325,17 +333,35 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
       </div>
 
-      {/* Auto-Submit Success Modal Overlay (2.0s Duration) */}
+      {/* Auto-Submit Success Modal Overlay (2.2s Duration) */}
       <Modal isOpen={isSuccessModalOpen} onClose={() => {}}>
         <div className="text-center space-y-4 py-2">
           
-          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-4xl mx-auto ring-8 ring-emerald-50 animate-bounce">
-            ✓
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto ring-8 animate-bounce ${
+            scanResult?.action === 'CHECK_OUT'
+              ? 'bg-blue-100 text-blue-600 ring-blue-50'
+              : scanResult?.action === 'ALREADY_COMPLETED'
+              ? 'bg-amber-100 text-amber-600 ring-amber-50'
+              : 'bg-emerald-100 text-emerald-600 ring-emerald-50'
+          }`}>
+            {scanResult?.action === 'CHECK_OUT' ? '🌇' : scanResult?.action === 'ALREADY_COMPLETED' ? 'ℹ️' : '✓'}
           </div>
 
           <div>
-            <h3 className="font-extrabold text-slate-900 text-xl">ABSENSI BERHASIL!</h3>
-            <p className="text-xs text-slate-500 mt-1">Data kehadiran otomatis tersimpan</p>
+            <h3 className="font-extrabold text-slate-900 text-xl">
+              {scanResult?.action === 'CHECK_OUT'
+                ? 'ABSEN PULANG BERHASIL!'
+                : scanResult?.action === 'ALREADY_COMPLETED'
+                ? 'PRESENSI HARI INI LENGKAP!'
+                : 'ABSEN MASUK BERHASIL!'}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              {scanResult?.action === 'CHECK_OUT'
+                ? 'Terima kasih atas pengabdian Anda hari ini!'
+                : scanResult?.action === 'ALREADY_COMPLETED'
+                ? 'Anda sudah melakukan presensi masuk dan pulang hari ini.'
+                : 'Selamat bertugas! Data presensi otomatis tersimpan.'}
+            </p>
           </div>
 
           <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-left text-xs text-slate-600 border border-slate-100">

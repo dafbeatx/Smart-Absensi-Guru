@@ -6,24 +6,49 @@ import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
-import { AttendanceCorrectionModal } from '../../admin/components/AttendanceCorrectionModal';
+import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
-import { evaluateAttendanceStatus } from '../../../utils/time.utils';
-import type { AttendanceRecord, HolidayRecord } from '../../../types/database.types';
+import { CONSTANTS } from '../../../config/constants';
+import { handleAppError } from '../../../utils/error.utils';
+import type {
+  AttendanceRecord,
+  HolidayRecord,
+  UserProfile,
+  SystemSettings,
+  AppNotification,
+  DeviceBindingCheckResult,
+} from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
   onOpenScanner?: () => void;
   onOpenLeaveForm?: () => void;
   onOpenCorrectionForm?: () => void;
+  previewUser?: UserProfile;
+  isPreviewMode?: boolean;
 }
 
 export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   onOpenScanner,
   onOpenLeaveForm,
   onOpenCorrectionForm,
+  previewUser,
+  isPreviewMode = false,
 }) => {
-  const { user, token, logout, deviceUUID, deviceModel } = useAuthStore();
+  const { user: authUser, token, logout, deviceUUID } = useAuthStore();
   const { showToast } = useToastStore();
+
+  // Effective user: previewUser when in Preview Mode, otherwise authUser
+  const effectiveUser: UserProfile = previewUser || authUser || {
+    id: 'usr_guru_sample',
+    nip: '198905202014021003',
+    full_name: 'Dafa Maulana, S.Pd',
+    phone_number: '081234567890',
+    role: 'GURU',
+    position: 'Guru Utama / Pendidik',
+    avatar_url: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
@@ -35,103 +60,127 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [isChangingPin, setIsChangingPin] = useState(false);
 
+  // System Settings & Work Schedule State
+  const [settings, setSettings] = useState<SystemSettings>({
+    app_name: 'Smart Absensi Guru',
+    institution_name: 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
+    work_checkin_start: CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
+    work_checkin_end: CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
+    work_checkout_start: CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
+    geofence_lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+    geofence_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+    geofence_radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+  });
+
+  // Date selection state for monthly history
+  const currentDate = new Date();
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
+
   // Today Attendance Status, History, & Holiday Info
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [todayHoliday, setTodayHoliday] = useState<HolidayRecord | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  // Notifications List State
-  const [notifications, setNotifications] = useState([
-    {
-      id: 'n1',
-      title: '☀️ Selalu Absen Masuk Tepat Waktu',
-      message: 'Batas toleransi absen masuk adalah pukul 07.15 WIB. Gunakan QR Code di gerbang/ruang guru.',
-      time: 'Hari ini 06.30 WIB',
-      read: false,
-      type: 'INFO',
-    },
-    {
-      id: 'n2',
-      title: '🔒 Keamanan Perangkat (Device Binding)',
-      message: `Akun Anda terikat pada HP (${deviceModel || 'Perangkat Utama'}). Pembatasan 1 akun 1 HP aktif.`,
-      time: 'Hari ini 06.00 WIB',
-      read: false,
-      type: 'SUCCESS',
-    },
-    {
-      id: 'n3',
-      title: '🔑 Pengingat Reset PIN',
-      message: 'Apabila Anda masih menggunakan PIN default 123456, segera ubah PIN melalui tab Profil.',
-      time: 'Kemarin',
-      read: true,
-      type: 'WARNING',
-    },
-  ]);
+  // Notifications List State (Backend-Driven)
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [deviceBindingStatus, setDeviceBindingStatus] = useState<DeviceBindingCheckResult>({
+    status: 'ACTIVE',
+    message: 'Memeriksa status perangkat...',
+  });
 
-  // Load Today Attendance, Holidays & History on Mount
+  // Load Settings, Today Attendance, Holidays, Monthly History, Notifications, & Device Binding
   useEffect(() => {
-    const loadData = async () => {
-      if (!user) return;
-      setIsLoadingHistory(true);
-      try {
-        const provider = ProviderFactory.getProvider();
-        const authToken = token || '';
-        
-        // Today Attendance
-        const today = await provider.getTodayAttendance(user.id, authToken);
-        setTodayAttendance(today);
+    const loadAllData = async () => {
+      if (!effectiveUser) return;
+      const provider = ProviderFactory.getProvider();
+      const authToken = token || '';
 
-        // Academic Calendar Holidays
+      // 1. Settings
+      try {
+        const sysSettings = await provider.getSettings();
+        if (sysSettings) setSettings(sysSettings);
+      } catch (err) {
+        handleAppError(err, 'GuruDashboard.loadSettings', 'Gagal memuat pengaturan jam kerja', false);
+      }
+
+      // 2. Today Attendance
+      try {
+        const today = await provider.getTodayAttendance(effectiveUser.id, authToken);
+        setTodayAttendance(today);
+      } catch (err) {
+        handleAppError(err, 'GuruDashboard.loadTodayAttendance', 'Gagal memuat presensi hari ini', false);
+      }
+
+      // 3. Holidays
+      try {
         const holidays = await provider.getHolidays(authToken);
         const todayIso = new Date().toISOString().substring(0, 10);
         const holidayToday = (holidays || []).find((h) => h.date === todayIso);
-        if (holidayToday) {
-          setTodayHoliday(holidayToday);
-        }
+        setTodayHoliday(holidayToday || null);
+      } catch (err) {
+        handleAppError(err, 'GuruDashboard.loadHolidays', 'Gagal memuat data hari libur', false);
+      }
 
-        // Monthly History
-        const now = new Date();
-        const currentMonthName = now.toLocaleString('id-ID', { month: 'long' });
-        const currentYearStr = now.getFullYear().toString();
-
+      // 4. Monthly Attendance History
+      setIsLoadingHistory(true);
+      try {
         const history = await provider.getMonthlyAttendance(
-          user.id,
-          currentMonthName,
-          currentYearStr,
+          effectiveUser.id,
+          String(selectedMonth),
+          String(selectedYear),
           authToken
         );
         setAttendanceHistory(history || []);
       } catch (err) {
-        console.warn('Fallback attendance history:', err);
+        handleAppError(err, 'GuruDashboard.loadMonthlyAttendance', 'Gagal memuat riwayat bulanan', false);
       } finally {
         setIsLoadingHistory(false);
       }
+
+      // 5. Backend-Driven Notifications
+      try {
+        const notifs = await provider.getNotifications(effectiveUser.id, authToken);
+        setNotifications(notifs || []);
+      } catch (err) {
+        handleAppError(err, 'GuruDashboard.loadNotifications', 'Gagal memuat notifikasi', false);
+      }
+
+      // 6. Device Binding Status Check
+      try {
+        const bindingRes = await provider.checkDeviceBinding(effectiveUser.id, deviceUUID || 'DEV_UUID', authToken);
+        setDeviceBindingStatus(bindingRes);
+      } catch (err) {
+        handleAppError(err, 'GuruDashboard.checkDeviceBinding', 'Gagal memeriksa status perangkat', false);
+      }
     };
 
-    loadData();
+    loadAllData();
 
-    window.addEventListener('smart_absensi_scanned', loadData);
+    const handleScannedEvent = () => loadAllData();
+    window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     return () => {
-      window.removeEventListener('smart_absensi_scanned', loadData);
+      window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
     };
-  }, [user, token]);
+  }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);
 
   // Dynamic monthly attendance statistics calculation
   const totalDays = attendanceHistory.length;
-  const hadirCount = attendanceHistory.filter(h => h.status === 'HADIR').length;
-  const terlambatCount = attendanceHistory.filter(h => h.status === 'TERLAMBAT').length;
-  const izinCount = attendanceHistory.filter(h => h.status === 'IZIN' || h.status === 'SAKIT' || h.status === 'DINAS_LUAR').length;
-  const alfaCount = attendanceHistory.filter(h => h.status === 'ALFA').length;
+  const hadirCount = attendanceHistory.filter((h) => h.status === 'HADIR').length;
+  const terlambatCount = attendanceHistory.filter((h) => h.status === 'TERLAMBAT').length;
 
   const attendancePercentage = totalDays > 0
     ? (Math.round(((hadirCount + terlambatCount) / totalDays) * 1000) / 10).toFixed(1)
     : '0.0';
 
-  const hadirPercent = totalDays > 0 ? (hadirCount / totalDays) * 100 : 0;
   const terlambatPercent = totalDays > 0 ? (terlambatCount / totalDays) * 100 : 0;
-  const izinPercent = totalDays > 0 ? (izinCount / totalDays) * 100 : 0;
-  const alfaPercent = totalDays > 0 ? (alfaCount / totalDays) * 100 : 0;
+
+  const monthNamesIndonesian = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  const activeMonthName = monthNamesIndonesian[selectedMonth - 1] || 'Bulan Ini';
 
   const getTimeBasedGreeting = (): string => {
     const hour = new Date().getHours();
@@ -139,6 +188,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     if (hour < 15) return '🌤️ Selamat Siang';
     if (hour < 18) return '🌆 Selamat Sore';
     return '🌙 Selamat Malam';
+  };
+
+  const handleOpenScannerClick = () => {
+    if (isPreviewMode) {
+      showToast('warning', 'Mode Preview Terdeteksi', 'Scan QR nyata tidak tersedia dalam Mode Preview simulasi Admin.');
+      return;
+    }
+    if (onOpenScanner) onOpenScanner();
   };
 
   const handleOpenLeaveModal = () => {
@@ -157,9 +214,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
   };
 
-  const handleMarkAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    showToast('info', 'Notifikasi Diperbarui', 'Semua notifikasi telah ditandai dibaca.');
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const authToken = token || '';
+      for (const n of notifications) {
+        if (!n.is_read) {
+          await provider.markNotificationAsRead(n.id, authToken);
+        }
+      }
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      showToast('info', 'Notifikasi Diperbarui', 'Semua notifikasi telah ditandai dibaca.');
+    } catch (err) {
+      handleAppError(err, 'GuruDashboard.markRead', 'Gagal memperbarui notifikasi');
+    }
   };
 
   const handleChangePinSubmit = async (e: React.FormEvent) => {
@@ -177,26 +245,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     try {
       const provider = ProviderFactory.getProvider();
       const authToken = token || '';
-      await provider.changePin(user?.id || '', newPin, authToken);
+      await provider.changePin(effectiveUser.id, newPin, authToken);
 
       showToast('success', 'Ganti PIN Berhasil!', 'PIN akun Anda telah diperbarui. Gunakan PIN baru di login berikutnya.');
       setIsChangePinOpen(false);
       setNewPin('');
       setConfirmPin('');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memperbarui PIN';
-      showToast('error', 'Gagal Reset PIN', msg);
+      handleAppError(err, 'GuruDashboard.changePin', 'Gagal memperbarui PIN');
     } finally {
       setIsChangingPin(false);
     }
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
     <div className="min-h-screen bg-[#F6F6F6] pb-28 text-[#023246]">
+      {/* ── PREVIEW MODE WARNING BANNER ───────────────────────────────────── */}
+      {isPreviewMode && (
+        <div className="bg-purple-900 text-purple-100 px-4 py-2 text-xs font-bold text-center border-b border-purple-700 flex items-center justify-center gap-2">
+          <span>⚠️</span> MODE PREVIEW GURU (ADMIN/KEPSEK ACCESS) — Menggunakan data simulasi guru.
+        </div>
+      )}
+
       {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-5 pt-6 pb-3 bg-white border-b border-[#D4D4CE]/20 sticky top-0 z-30 shadow-2xs max-w-md mx-auto">
+      <header className="flex items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-[#D4D4CE]/20 sticky top-0 z-30 shadow-2xs max-w-md mx-auto">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-[#0D7A5F]/10 text-[#0D7A5F] font-black text-lg flex items-center justify-center border border-[#0D7A5F]/20">
             ∆
@@ -206,7 +280,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               Smart Absensi Guru
             </h1>
             <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
-              SMP Terpadu Al-Ittihadiyah
+              {settings.institution_name}
             </p>
           </div>
         </div>
@@ -234,383 +308,323 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <span>{getTimeBasedGreeting()}</span>
                 </span>
                 <h2 className="text-xl font-extrabold text-[#023246] leading-snug">
-                  {user?.full_name || 'Dafa Maulana, S.Pd'}
+                  {effectiveUser.full_name}
                 </h2>
-                {user?.nip ? (
+                {effectiveUser.nip ? (
                   <p className="text-xs font-medium text-slate-500">
-                    NPP. {user.nip}
+                    NPP/NIP. {effectiveUser.nip}
                   </p>
                 ) : null}
               </div>
 
               <div className="flex flex-col items-center gap-2">
                 <div className="w-14 h-14 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-2xl flex items-center justify-center shadow-inner border border-[#0D7A5F]/20">
-                  {user?.full_name ? user.full_name.charAt(0) : 'D'}
+                  {effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'}
                 </div>
                 <button
-                  onClick={logout}
-                  className="px-2.5 py-1 bg-[#FEE2E2] hover:bg-[#FCA5A5]/40 text-[#DC2626] font-bold text-[11px] rounded-xl flex items-center gap-1 transition-all cursor-pointer"
-                  title="Keluar dari Akun"
+                  onClick={() => setActiveTab('PROFIL')}
+                  className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-[#023246] text-[10px] font-bold rounded-full border border-slate-200 transition-colors cursor-pointer"
                 >
-                  <span>➔</span> Keluar
+                  Profil Guru
                 </button>
               </div>
             </section>
 
-            {/* Holiday Alert Banner if Today is Holiday */}
-            {todayHoliday && (
-              <section className="bg-purple-600 text-white rounded-3xl p-5 shadow-lg shadow-purple-600/20 border border-purple-500 flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md text-2xl flex items-center justify-center shrink-0">
-                  🎉
-                </div>
-                <div className="space-y-1">
-                  <span className="px-2 py-0.5 bg-white/20 text-white font-extrabold text-[10px] rounded-full uppercase tracking-wider">
-                    {todayHoliday.type === 'NATIONAL_HOLIDAY' ? 'Libur Nasional' : todayHoliday.type === 'SCHOOL_HOLIDAY' ? 'Libur Sekolah' : 'Cuti Bersama'}
+            {/* 2. Today Attendance & Work Schedule Card */}
+            <section className="bg-white rounded-3xl p-5 shadow-card border border-[#D4D4CE]/30 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-extrabold text-[#0D7A5F] tracking-wider uppercase">
+                    Status Presensi Hari Ini
                   </span>
-                  <h3 className="font-extrabold text-base leading-snug">{todayHoliday.name}</h3>
-                  <p className="text-xs text-purple-100 font-medium">
-                    Hari ini adalah hari libur resmi pada Kalender Akademik Sekolah. Tidak wajib melakukan absensi harian.
-                  </p>
-                </div>
-              </section>
-            )}
-
-            {/* 2. Main Attendance Status Card (Dark Emerald Green #0D7A5F) */}
-            <section className="bg-[#0D7A5F] rounded-3xl p-5 text-white shadow-xl shadow-[#0D7A5F]/20 relative overflow-hidden space-y-4 border border-[#0A6B56]">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs text-white font-extrabold">Status Kehadiran Hari Ini</p>
-                  <p className="text-xs font-semibold text-[#C8F2E0] mt-0.5">
-                    {new Date().toLocaleDateString('id-ID', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
 
-                {(() => {
-                  const status = todayAttendance
-                    ? evaluateAttendanceStatus(todayAttendance.check_in_time, '07:15', todayAttendance.status)
-                    : 'BELUM_ABSEN';
-
-                  if (status === 'HADIR') {
-                    return (
-                      <div className="bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 font-extrabold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        SUDAH ABSEN (TEPAT WAKTU)
-                      </div>
-                    );
-                  }
-                  if (status === 'TERLAMBAT') {
-                    return (
-                      <div className="bg-amber-500/20 text-amber-200 border border-amber-400/40 font-extrabold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                        TERLAMBAT
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className="bg-[#FFF4DC] text-[#B45309] border border-[#FDE68A] font-extrabold text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-2xs shrink-0">
-                      <span className="w-2 h-2 rounded-full bg-[#B45309] animate-pulse" />
-                      BELUM ABSEN MASUK
-                    </div>
-                  );
-                })()}
+                {todayHoliday ? (
+                  <Badge status="SAKIT">🎉 {todayHoliday.name}</Badge>
+                ) : todayAttendance ? (
+                  <Badge status={todayAttendance.status}>
+                    {todayAttendance.status === 'HADIR'
+                      ? '✅ Hadir Tepat Waktu'
+                      : todayAttendance.status === 'TERLAMBAT'
+                      ? '⚠️ Terlambat'
+                      : todayAttendance.status}
+                  </Badge>
+                ) : (
+                  <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200">
+                    ⏳ Belum Presensi
+                  </span>
+                )}
               </div>
 
-              {/* Inset Side-by-Side Cards */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/20 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#C8F2E0] text-[#0D7A5F] flex items-center justify-center font-bold text-sm">
-                      🕒
-                    </div>
-                    <span className="text-xs text-white font-bold">Jam Masuk</span>
-                  </div>
-                  <div>
-                    <p className="text-xl font-extrabold text-white font-mono">
-                      {todayAttendance?.check_in_time || '-- : --'}
-                    </p>
-                    <p className="text-[10px] text-[#C8F2E0] font-medium mt-0.5">Batas: 07.15 WIB</p>
-                  </div>
+              {/* Dynamic Work Hours Display from Settings */}
+              <div className="bg-[#F6F6F6] p-3.5 rounded-2xl flex items-center justify-between text-xs border border-slate-200/60">
+                <div className="space-y-0.5">
+                  <span className="text-slate-500 font-bold block text-[10px] uppercase">Batas Absen Masuk</span>
+                  <span className="font-black text-[#023246] text-sm">{settings.work_checkin_end} WIB</span>
                 </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/20 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#C8F2E0] text-[#0D7A5F] flex items-center justify-center font-bold text-sm">
-                      🕒
-                    </div>
-                    <span className="text-xs text-white font-bold">Jam Pulang</span>
-                  </div>
-                  <div>
-                    <p className="text-xl font-extrabold text-white font-mono">
-                      {todayAttendance?.check_out_time || '-- : --'}
-                    </p>
-                    <p className="text-[10px] text-[#C8F2E0] font-medium mt-0.5">Mulai: 15.30 WIB</p>
-                  </div>
+                <div className="h-8 w-px bg-slate-300" />
+                <div className="space-y-0.5 text-right">
+                  <span className="text-slate-500 font-bold block text-[10px] uppercase">Mulai Absen Pulang</span>
+                  <span className="font-black text-[#023246] text-sm">{settings.work_checkout_start} WIB</span>
                 </div>
               </div>
+
+              {/* Check-In / Check-Out Log Details */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-2xl bg-emerald-50/60 border border-emerald-200/60 space-y-1">
+                  <span className="text-[10px] font-extrabold text-emerald-800 uppercase block">Jam Masuk</span>
+                  <p className="font-black text-emerald-950 text-base">
+                    {todayAttendance?.check_in_time ? todayAttendance.check_in_time.substring(0, 5) : '--:--'}
+                  </p>
+                  <span className="text-[10px] text-emerald-700 font-semibold block">
+                    {todayAttendance?.check_in_time ? 'Terdaftar Valid' : 'Belum Absen Masuk'}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-blue-50/60 border border-blue-200/60 space-y-1">
+                  <span className="text-[10px] font-extrabold text-blue-800 uppercase block">Jam Pulang</span>
+                  <p className="font-black text-blue-950 text-base">
+                    {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
+                  </p>
+                  <span className="text-[10px] text-blue-700 font-semibold block">
+                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai' : 'Belum Absen Pulang'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Button: Scan QR */}
+              <Button
+                variant="primary"
+                onClick={handleOpenScannerClick}
+                className="w-full py-3.5 text-xs font-black shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>🔲</span> PINDAI QR CODE ABSENSI (SCANNER HP)
+              </Button>
             </section>
 
-            {/* 3. "Sudah Berada di Sekolah?" Callout Banner */}
-            <section
-              onClick={onOpenScanner}
-              className="bg-[#E8FAF2] hover:bg-[#D1F5E5] rounded-2xl p-4 border border-[#A7F3D0] flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] group shadow-2xs"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#0D7A5F] text-white flex items-center justify-center text-xl shadow-md group-hover:scale-105 transition-transform">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-[#023246] text-sm">Sudah Berada di Sekolah?</h4>
-                  <p className="text-xs text-slate-600">Tekan tombol hijau di bawah untuk Scan QR</p>
-                </div>
-              </div>
-              <span className="text-[#0D7A5F] font-black text-xl">›</span>
-            </section>
-
-            {/* 4. Quick Action Buttons Row */}
-            <section className="grid grid-cols-2 gap-3.5">
+            {/* 3. Quick Action Feature Grid */}
+            <section className="grid grid-cols-2 gap-3">
               <button
                 onClick={handleOpenLeaveModal}
-                className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/30 shadow-card flex items-center justify-between hover:border-[#0D7A5F]/50 transition-all active:scale-95 text-left cursor-pointer"
+                className="p-4 bg-white hover:bg-slate-50 rounded-3xl border border-[#D4D4CE]/30 shadow-card transition-all text-left space-y-2 cursor-pointer group"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#E8FAF2] text-[#0D7A5F] flex items-center justify-center text-lg">
-                    📝
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-[#023246] text-xs">Ajukan Izin</h4>
-                    <p className="text-[10px] text-slate-500 font-medium">Sakit / Dinas</p>
-                  </div>
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold group-hover:scale-105 transition-transform">
+                  📝
                 </div>
-                <span className="text-slate-400 font-bold text-sm">›</span>
+                <div>
+                  <h3 className="font-black text-[#023246] text-xs">Ajukan Izin / Cuti</h3>
+                  <p className="text-[10px] text-slate-500 font-medium">Sakit, Izin, Dinas & Cuti</p>
+                </div>
               </button>
 
               <button
                 onClick={handleOpenCorrectionModal}
-                className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/30 shadow-card flex items-center justify-between hover:border-[#D97706]/50 transition-all active:scale-95 text-left cursor-pointer"
+                className="p-4 bg-white hover:bg-slate-50 rounded-3xl border border-[#D4D4CE]/30 shadow-card transition-all text-left space-y-2 cursor-pointer group"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#FEF3C7] text-[#D97706] flex items-center justify-center text-lg">
-                    ⚠️
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-[#023246] text-xs">Koreksi Absen</h4>
-                    <p className="text-[10px] text-slate-500 font-medium">Lupa scan / Kendala</p>
-                  </div>
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold group-hover:scale-105 transition-transform">
+                  ✏️
                 </div>
-                <span className="text-slate-400 font-bold text-sm">›</span>
+                <div>
+                  <h3 className="font-black text-[#023246] text-xs">Ajukan Koreksi Absen</h3>
+                  <p className="text-[10px] text-slate-500 font-medium">Permohonan ke Admin</p>
+                </div>
               </button>
-            </section>
-
-            {/* 5. Monthly Attendance Progress Card */}
-            <section className="bg-white rounded-3xl p-5 border border-[#D4D4CE]/30 shadow-card space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold text-[#023246] text-xs">Kehadiran Bulan Ini</h3>
-                <span className="text-xs font-extrabold text-[#0D7A5F]">{attendancePercentage}%</span>
-              </div>
-              
-              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex">
-                <div className="bg-[#16A34A] h-full transition-all duration-500" style={{ width: `${hadirPercent}%` }} />
-                <div className="bg-[#D97706] h-full transition-all duration-500" style={{ width: `${terlambatPercent}%` }} />
-                <div className="bg-[#287094] h-full transition-all duration-500" style={{ width: `${izinPercent}%` }} />
-                <div className="bg-[#DC2626] h-full transition-all duration-500" style={{ width: `${alfaPercent}%` }} />
-              </div>
-
-              <div className="grid grid-cols-4 gap-1 text-center divide-x divide-slate-100 pt-1">
-                <div className="space-y-1">
-                  <span className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-[#16A34A]" /> Hadir
-                  </span>
-                  <p className="font-black text-[#023246] text-sm">{hadirCount}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-[#D97706]" /> Terlambat
-                  </span>
-                  <p className="font-black text-[#023246] text-sm">{terlambatCount}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-[#287094]" /> Izin
-                  </span>
-                  <p className="font-black text-[#023246] text-sm">{izinCount}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="flex items-center justify-center gap-1 text-[10px] text-slate-500 font-semibold">
-                    <span className="w-2 h-2 rounded-full bg-[#DC2626]" /> Alfa
-                  </span>
-                  <p className="font-black text-[#023246] text-sm">{alfaCount}</p>
-                </div>
-              </div>
             </section>
           </>
         )}
 
-        {/* ── TAB 2: RIWAYAT ABSENSI ─────────────────────────────────────── */}
+        {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}
         {activeTab === 'RIWAYAT' && (
           <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-extrabold text-slate-900">📜 Riwayat Kehadiran</h2>
-                <p className="text-xs text-slate-500">Catatan absensi harian bulan Juli 2026</p>
-              </div>
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl">
-                Juli 2026
-              </span>
-            </div>
+            <div className="bg-white p-5 rounded-3xl border border-[#D4D4CE]/30 shadow-card space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div>
+                  <h2 className="font-black text-[#023246] text-base">Presensi & Statistik Bulanan</h2>
+                  <p className="text-xs text-slate-400 font-semibold">Tampilkan data presensi per bulan</p>
+                </div>
 
-            {isLoadingHistory ? (
-              <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 text-xs font-semibold text-slate-400">
-                ⏳ Memuat data riwayat...
-              </div>
-            ) : attendanceHistory.length > 0 ? (
-              <div className="space-y-2.5">
-                {attendanceHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-white p-4 rounded-2xl border border-slate-100 shadow-subtle flex items-center justify-between"
+                {/* Dynamic Month / Year Filter Controls */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
+                    className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 outline-none"
                   >
-                    <div className="space-y-0.5">
-                      <p className="text-xs font-extrabold text-slate-900">{item.date}</p>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        Masuk: <span className="font-bold text-slate-800">{item.check_in_time || '--:--'}</span> | Pulang:{' '}
-                        <span className="font-bold text-slate-800">{item.check_out_time || '--:--'}</span>
-                      </p>
-                      <p className="text-[10px] text-slate-400">
-                        Verifikasi: {item.verification_method} ({item.check_in_distance_meters || 0}m dari sekolah)
-                      </p>
-                    </div>
-                    <Badge
-                      status={
-                        evaluateAttendanceStatus(item.check_in_time, '07:15', item.status) as
-                          | 'HADIR'
-                          | 'TERLAMBAT'
-                          | 'SAKIT'
-                          | 'IZIN'
-                          | 'ALFA'
-                      }
-                    >
-                      {evaluateAttendanceStatus(item.check_in_time, '07:15', item.status)}
-                    </Badge>
+                    {monthNamesIndonesian.map((mName, idx) => (
+                      <option key={idx + 1} value={idx + 1}>
+                        {mName}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
+                    className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 outline-none"
+                  >
+                    <option value={2026}>2026</option>
+                    <option value={2025}>2025</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Dynamic Stats Cards */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 bg-[#C8F2E0]/40 rounded-2xl border border-[#0D7A5F]/20 space-y-1">
+                  <span className="text-[10px] font-bold text-[#0D7A5F] block uppercase">Kehadiran {activeMonthName}</span>
+                  <p className="text-xl font-black text-[#023246]">{attendancePercentage}%</p>
+                  <span className="text-[10px] text-slate-500 font-semibold block">{hadirCount + terlambatCount} dari {totalDays} Hari Presensi</span>
+                </div>
+
+                <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 space-y-1">
+                  <span className="text-[10px] font-bold text-amber-800 block uppercase">Terlambat</span>
+                  <p className="text-xl font-black text-amber-950">{terlambatCount} <span className="text-xs font-bold text-amber-700">Kali</span></p>
+                  <span className="text-[10px] text-slate-500 font-semibold block">{terlambatPercent.toFixed(0)}% dari presensi</span>
+                </div>
+              </div>
+
+              {/* Detailed Attendance Log Table / List */}
+              <div className="space-y-2 pt-2">
+                <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Catatan Harian {activeMonthName} {selectedYear}</h3>
+                
+                {isLoadingHistory ? (
+                  <div className="py-8 text-center text-slate-400 text-xs font-semibold animate-pulse">
+                    Memuat riwayat bulanan...
                   </div>
-                ))}
+                ) : attendanceHistory.length === 0 ? (
+                  <div className="py-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 text-xs font-semibold space-y-1">
+                    <p className="text-lg">📭</p>
+                    <p>Belum ada rekaman presensi pada {activeMonthName} {selectedYear}.</p>
+                  </div>
+                ) : (
+                  attendanceHistory.map((rec) => (
+                    <div key={rec.id} className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200 flex items-center justify-between text-xs transition-colors">
+                      <div className="space-y-0.5">
+                        <p className="font-extrabold text-[#023246]">{rec.date}</p>
+                        <p className="text-[10px] text-slate-500 font-semibold">
+                          Masuk: {rec.check_in_time ? rec.check_in_time.substring(0, 5) : '--:--'} • Pulang: {rec.check_out_time ? rec.check_out_time.substring(0, 5) : '--:--'}
+                        </p>
+                      </div>
+
+                      <Badge status={rec.status}>
+                        {rec.status === 'HADIR' ? 'Hadir' : rec.status === 'TERLAMBAT' ? 'Terlambat' : rec.status}
+                      </Badge>
+                    </div>
+                  ))
+                )}
               </div>
-            ) : (
-              <div className="bg-white rounded-3xl p-6 border border-slate-100 text-center space-y-2">
-                <span className="text-4xl">📅</span>
-                <h3 className="font-bold text-slate-800 text-sm">Belum Ada Riwayat Tambahan</h3>
-                <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                  Catatan absensi Anda akan otomatis tercatat setiap kali Anda memindai QR Code di sekolah.
-                </p>
-              </div>
-            )}
+            </div>
           </section>
         )}
 
         {/* ── TAB 3: NOTIFIKASI ───────────────────────────────────────────── */}
         {activeTab === 'NOTIFIKASI' && (
           <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-extrabold text-slate-900">🔔 Pusat Notifikasi</h2>
-                <p className="text-xs text-slate-500">Pemberitahuan & informasi absensi</p>
-              </div>
-              {unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllNotificationsRead}
-                  className="text-[11px] font-bold text-emerald-700 hover:underline"
-                >
-                  Tandai Semua Dibaca
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-2.5">
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`p-4 rounded-2xl border transition-all ${
-                    n.read
-                      ? 'bg-white border-slate-100'
-                      : 'bg-emerald-50/60 border-emerald-200/80 shadow-subtle'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <h4 className="font-extrabold text-slate-900 text-xs">{n.title}</h4>
-                    <span className="text-[10px] text-slate-400 font-medium">{n.time}</span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">{n.message}</p>
+            <div className="bg-white p-5 rounded-3xl border border-[#D4D4CE]/30 shadow-card space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h2 className="font-black text-[#023246] text-base">Notifikasi Sistem & Pengumuman</h2>
+                  <p className="text-xs text-slate-400 font-semibold">{unreadCount} belum dibaca</p>
                 </div>
-              ))}
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllNotificationsRead}
+                    className="text-xs font-bold text-[#0D7A5F] hover:underline cursor-pointer"
+                  >
+                    Tandai Dibaca
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-2.5">
+                {notifications.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-6">Tidak ada notifikasi baru.</p>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`p-4 rounded-2xl border text-xs space-y-1 transition-all ${
+                        !n.is_read ? 'bg-[#C8F2E0]/20 border-[#0D7A5F]/30' : 'bg-slate-50 border-slate-200 opacity-80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-extrabold text-[#023246] text-xs">{n.title}</h3>
+                        {!n.is_read && <span className="w-2 h-2 rounded-full bg-[#0D7A5F]" />}
+                      </div>
+                      <p className="text-[11px] text-slate-600 font-medium leading-relaxed">{n.message}</p>
+                      <span className="text-[9px] text-slate-400 font-mono block pt-1">{n.created_at ? new Date(n.created_at).toLocaleDateString('id-ID') : 'Hari ini'}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </section>
         )}
 
-        {/* ── TAB 4: PROFIL GURU ──────────────────────────────────────────── */}
+        {/* ── TAB 4: PROFIL ───────────────────────────────────────────────── */}
         {activeTab === 'PROFIL' && (
           <section className="space-y-4">
-            {/* Main Profile Identity Card */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-card text-center space-y-3">
-              <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-700 font-black text-3xl flex items-center justify-center ring-4 ring-emerald-500/20 mx-auto shadow-inner">
-                {user?.full_name ? user.full_name.charAt(0) : 'AH'}
-              </div>
-
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-900">{user?.full_name || 'Guru Smart Absensi'}</h2>
-                <p className="text-xs font-semibold text-emerald-700 mt-0.5">{user?.position || 'Guru Utama'}</p>
-                {user?.nip ? (
-                  <p className="text-xs text-slate-400 mt-0.5">NPP. {user.nip}</p>
-                ) : null}
-              </div>
-
-              <div className="pt-2 flex justify-center gap-2">
-                <Button variant="secondary" className="text-xs py-2 px-4" onClick={() => setIsChangePinOpen(true)}>
-                  🔑 Ganti PIN Akun
-                </Button>
-                <Button variant="danger" className="text-xs py-2 px-4" onClick={logout}>
-                  🚪 Keluar
-                </Button>
-              </div>
-            </div>
-
-            {/* Device Binding Status Card */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-card space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-xl">
-                  📱
+            <div className="bg-white p-5 rounded-3xl border border-[#D4D4CE]/30 shadow-card space-y-5">
+              <div className="text-center space-y-2 pb-4 border-b border-slate-100">
+                <div className="w-20 h-20 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-3xl flex items-center justify-center mx-auto shadow-inner border-2 border-[#0D7A5F]/20">
+                  {effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'}
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-xs">Status Ikatan Perangkat (Device Binding)</h3>
-                  <p className="text-[11px] text-emerald-600 font-bold mt-0.5">✅ Terikat Aktif Pada HP Ini</p>
+                  <h2 className="font-black text-[#023246] text-lg">{effectiveUser.full_name}</h2>
+                  <p className="text-xs text-slate-500 font-semibold">{effectiveUser.position || 'Guru Pengajar'}</p>
                 </div>
               </div>
 
-              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1 text-[11px]">
-                <p className="text-slate-500"><strong>Model Perangkat:</strong> {deviceModel || 'Smartphone Utama'}</p>
-                <p className="text-slate-500"><strong>Device UUID:</strong> <span className="font-mono text-slate-700">{deviceUUID || 'uuid-bound-active'}</span></p>
+              {/* Device Binding Status Section */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700">Status Binding Perangkat HP</span>
+                  <span className={`px-2.5 py-0.5 text-[10px] font-extrabold rounded-full border ${
+                    deviceBindingStatus.status === 'ACTIVE'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                      : 'bg-amber-100 text-amber-800 border-amber-200'
+                  }`}>
+                    {deviceBindingStatus.status === 'ACTIVE' ? '🔒 TERIKAT AKTIF' : '⚠️ PERLU PERHATIAN'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                  {deviceBindingStatus.message}
+                </p>
               </div>
 
-              <p className="text-[10px] text-slate-400 italic leading-snug">
-                Sistem keamanan membatasi 1 akun hanya dapat digunakan pada 1 HP terikat. Hubungi Admin Website jika perlu berpindah HP.
-              </p>
+              {/* Action Buttons */}
+              <div className="space-y-2.5 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsChangePinOpen(true)}
+                  className="w-full text-xs font-bold py-3 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>🔑</span> UBAH PIN KEAMANAN 6-DIGIT
+                </Button>
+
+                <Button
+                  variant="danger"
+                  onClick={logout}
+                  className="w-full text-xs font-bold py-3 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>🚪</span> KELUAR DARI AKUN (LOGOUT)
+                </Button>
+              </div>
             </div>
           </section>
         )}
       </main>
 
-      {/* 5-Item Navigation Bar with Center-Dock FAB */}
+      {/* ── MOBILE BOTTOM NAVIGATION DOCK ──────────────────────────────────── */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-lg border-t border-[#D4D4CE]/30 px-3 py-1.5 z-40 shadow-xl">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('BERANDA')}
             className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'BERANDA' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
+              activeTab === 'BERANDA' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">🏠</span>
@@ -620,41 +634,39 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <button
             onClick={() => setActiveTab('RIWAYAT')}
             className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'RIWAYAT' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
+              activeTab === 'RIWAYAT' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
             }`}
           >
-            <span className="text-lg">📄</span>
+            <span className="text-lg">📊</span>
             <span>Riwayat</span>
           </button>
 
           {/* Center FAB Scanner Button */}
           <div className="relative -top-5 flex flex-col items-center">
             <button
-              onClick={onOpenScanner}
+              onClick={handleOpenScannerClick}
               className="w-14 h-14 rounded-full bg-[#0D7A5F] text-white flex items-center justify-center text-xl shadow-xl shadow-[#0D7A5F]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
-              aria-label="Scan QR Absensi"
-              title="Pindai QR Code Absensi"
+              title="Pindai QR Code"
             >
-              📷
+              🔲
             </button>
-            <span className="text-[10px] font-extrabold text-[#0D7A5F] mt-0.5">Scan QR</span>
           </div>
 
           <button
             onClick={() => setActiveTab('NOTIFIKASI')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-colors cursor-pointer ${
-              activeTab === 'NOTIFIKASI' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer relative ${
+              activeTab === 'NOTIFIKASI' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
             }`}
           >
+            {unreadCount > 0 && <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-[#0D7A5F]" />}
             <span className="text-lg">🔔</span>
-            <span>Notifikasi</span>
-            {unreadCount > 0 && <span className="absolute top-1 right-3.5 w-2 h-2 bg-[#0D7A5F] rounded-full" />}
+            <span>Notif</span>
           </button>
 
           <button
             onClick={() => setActiveTab('PROFIL')}
             className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'PROFIL' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
+              activeTab === 'PROFIL' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">👤</span>
@@ -663,43 +675,56 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         </div>
       </nav>
 
-      {/* Internal Modals */}
+      {/* Leave Application Modal */}
       <LeaveApplicationModal
         isOpen={isLeaveModalOpen}
         onClose={() => setIsLeaveModalOpen(false)}
+        onSuccess={() => {
+          showToast('success', 'Pengajuan Terikirim', 'Izin Anda akan ditinjau oleh Kepala Sekolah.');
+        }}
       />
 
-      <AttendanceCorrectionModal
+      {/* Dedicated Guru Correction Request Modal */}
+      <GuruCorrectionRequestModal
         isOpen={isCorrectionModalOpen}
         onClose={() => setIsCorrectionModalOpen(false)}
-        teachers={user ? [user] : []}
+        onSuccess={() => {
+          showToast('success', 'Pengajuan Terkirim', 'Permohonan koreksi absen akan ditinjau Admin.');
+        }}
       />
 
       {/* Change PIN Modal */}
-      <Modal isOpen={isChangePinOpen} onClose={() => setIsChangePinOpen(false)} title="🔑 Ganti PIN Akun">
-        <form onSubmit={handleChangePinSubmit} className="space-y-4">
-          <Input
-            label="PIN Baru (6 Digit Angka)"
-            type="password"
-            maxLength={6}
-            value={newPin}
-            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-            placeholder="Masukkan 6 angka PIN baru"
-          />
-          <Input
-            label="Konfirmasi PIN Baru"
-            type="password"
-            maxLength={6}
-            value={confirmPin}
-            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-            placeholder="Ulangi 6 angka PIN baru"
-          />
+      <Modal isOpen={isChangePinOpen} onClose={() => setIsChangePinOpen(false)} title="🔑 Ubah PIN Keamanan 6-Digit">
+        <form onSubmit={handleChangePinSubmit} className="space-y-4 py-1">
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-700">PIN Baru (6 Angka)</label>
+            <Input
+              type="password"
+              maxLength={6}
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Masukkan 6 angka PIN baru"
+              required
+            />
+          </div>
 
-          <div className="pt-2 flex items-center gap-2">
-            <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsChangePinOpen(false)}>
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-700">Konfirmasi PIN Baru</label>
+            <Input
+              type="password"
+              maxLength={6}
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Ulangi 6 angka PIN baru"
+              required
+            />
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2">
+            <Button variant="secondary" type="button" onClick={() => setIsChangePinOpen(false)}>
               Batal
             </Button>
-            <Button type="submit" variant="primary" className="w-1/2" isLoading={isChangingPin}>
+            <Button variant="primary" type="submit" isLoading={isChangingPin}>
               Simpan PIN Baru
             </Button>
           </div>

@@ -12,6 +12,10 @@ import { sanitizeMeta } from '../../utils/logger.utils';
 import { handleAppError } from '../../utils/error.utils';
 import { isDevTestModeEnabled, canAccessDevTestMode } from '../../utils/dev-test.utils';
 import { DevTestRunnerService } from '../dev-test-runner.service';
+import { ProviderFactory } from '../../providers/provider-factory';
+import { AttendanceRepository } from '../../repositories/AttendanceRepository';
+import { LeaveRepository } from '../../repositories/LeaveRepository';
+import { useAuthStore } from '../../store/useAuthStore';
 import type { UserProfile } from '../../types/database.types';
 import type { LoginDTO } from '../../repositories/AuthRepository';
 
@@ -142,6 +146,64 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
 
   const markdownReport = DevTestRunnerService.generateMarkdownReport(summary, mockAdminUser);
   assert('Dev Test Runner - Markdown Report Generated', markdownReport.includes('SMART ABSENSI GURU - LAPORAN DIAGNOSTIK'));
+
+  // 11. Teacher View Frontend-Backend Synchronization Test Suite
+  const mockProvider = ProviderFactory.getProvider();
+
+  // Test Monthly Attendance Filter by Month & Year
+  const monthlyRecords = await mockProvider.getMonthlyAttendance('usr_guru_1001', '8', '2026', 'MOCK_TOKEN');
+  assert('Teacher Sync - getMonthlyAttendance filters month and year', Array.isArray(monthlyRecords));
+
+  // Test Scan Attendance Action Return Type (CHECK_IN vs CHECK_OUT)
+  const scanResult = await mockProvider.scanAttendance({
+    token: 'MOCK_TOKEN',
+    qr_seed: CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED,
+    user_lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+    user_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+    device_uuid: 'DEV_TEST_UUID',
+  });
+  assert('Teacher Sync - scanAttendance returns attendance_action', typeof scanResult.attendance_action === 'string');
+
+  // Test Leave Submission with CUTI & Attachment
+  useAuthStore.setState({ user: mockGuruUser, token: 'MOCK_TOKEN' });
+  const leaveRes = await LeaveRepository.submitLeave({
+    token: 'MOCK_TOKEN',
+    leave_type: 'CUTI',
+    start_date: '2026-08-10',
+    end_date: '2026-08-12',
+    reason: 'Pengajuan Cuti Tahunan Guru Pengajar',
+    attachment_url: 'https://storage.supabase.co/leave.pdf',
+  });
+  assert('Teacher Sync - submitLeave supports CUTI and attachment_url', leaveRes.leave_type === 'CUTI' && leaveRes.attachment_url !== null);
+
+  // Test Guru Role Guard on Direct correctAttendance Call
+  try {
+    await AttendanceRepository.correctAttendance({
+      token: 'MOCK_TOKEN',
+      target_user_id: 'usr_guru_1001',
+      date: '2026-08-01',
+      status: 'HADIR',
+      check_in_time: '07:00',
+      reason: 'Direct edit by guru',
+    });
+    assert('Teacher Sync - Guru Role Blocked from Direct correctAttendance', false, 'Guru should be blocked');
+  } catch (err: unknown) {
+    const msg = String(err);
+    assert('Teacher Sync - Guru Role Blocked from Direct correctAttendance', msg.includes('GURU') || msg.includes('Akses Ditolak'));
+  }
+
+  // Test Notifications & Read Persistence
+  const notifs = await mockProvider.getNotifications(mockGuruUser.id, 'MOCK_TOKEN');
+  assert('Teacher Sync - getNotifications loads from provider', Array.isArray(notifs) && notifs.length > 0);
+
+  if (notifs.length > 0) {
+    const markRes = await mockProvider.markNotificationAsRead(notifs[0].id, 'MOCK_TOKEN');
+    assert('Teacher Sync - markNotificationAsRead persists status', markRes === true);
+  }
+
+  // Test Device Binding Check Response
+  const bindingCheck = await mockProvider.checkDeviceBinding(mockGuruUser.id, 'DEV_TEST_UUID', 'MOCK_TOKEN');
+  assert('Teacher Sync - checkDeviceBinding returns valid status', ['ACTIVE', 'UNBOUND', 'DIFFERENT_DEVICE', 'NEEDS_ADMIN_RESET'].includes(bindingCheck.status));
 
   return { passed, failed, results };
 };

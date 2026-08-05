@@ -237,11 +237,19 @@ export class SupabaseProvider implements IDataProvider {
           timestamp: `${timeStr} WIB (Absen Pulang)`,
           distance_meters: distanceMeters,
           geofence_verified: true,
+          attendance_action: 'CHECK_OUT',
         };
       }
 
       if (existing.check_in_time && existing.check_out_time) {
-        throw new Error('Anda sudah melakukan presensi masuk dan pulang untuk hari ini.');
+        return {
+          attendance_id: existing.id,
+          status: (existing.status as AttendanceStatus) || status,
+          timestamp: `${timeStr} WIB`,
+          distance_meters: distanceMeters,
+          geofence_verified: true,
+          attendance_action: 'ALREADY_COMPLETED',
+        };
       }
     }
 
@@ -271,6 +279,7 @@ export class SupabaseProvider implements IDataProvider {
       timestamp: `${timeStr} WIB`,
       distance_meters: distanceMeters,
       geofence_verified: true,
+      attendance_action: 'CHECK_IN',
     };
   }
 
@@ -304,14 +313,33 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getMonthlyAttendance(
     userId: string,
-    _month: string,
-    _year: string,
+    month: string,
+    year: string,
     _token: string
   ): Promise<AttendanceRecord[]> {
+    const monthMap: Record<string, string> = {
+      januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+      juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', desember: '12',
+    };
+
+    let paddedMonth = month.padStart(2, '0');
+    if (monthMap[month.toLowerCase()]) {
+      paddedMonth = monthMap[month.toLowerCase()];
+    }
+
+    const startDate = `${year}-${paddedMonth}-01`;
+    // Find last day of month
+    const yearNum = parseInt(year, 10) || new Date().getFullYear();
+    const monthNum = parseInt(paddedMonth, 10) || (new Date().getMonth() + 1);
+    const lastDayNum = new Date(yearNum, monthNum, 0).getDate();
+    const endDate = `${year}-${paddedMonth}-${String(lastDayNum).padStart(2, '0')}`;
+
     const { data } = await this.client
       .from('attendance')
       .select('*')
       .eq('user_id', userId)
+      .gte('date', startDate)
+      .lte('date', endDate)
       .order('date', { ascending: false });
 
     return (data || []).map((row) => ({
@@ -332,6 +360,11 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean> {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'OPERATOR')) {
+      throw new Error('Akses Ditolak! Role GURU tidak diizinkan mengubah absensi secara langsung. Silakan gunakan menu Ajukan Koreksi Absen.');
+    }
+
     const { error } = await this.client.from('attendance').upsert(
       {
         id: `att_${dto.target_user_id}_${dto.date}`,
@@ -373,16 +406,22 @@ export class SupabaseProvider implements IDataProvider {
   // ─── LEAVE & APPROVAL API ─────────────────────────────────────────────────
 
   public async submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest> {
+    const activeUser = useAuthStore.getState().user;
+    if (!activeUser || !activeUser.id) {
+      throw new Error('Sesi pengguna tidak valid. Silakan login ulang.');
+    }
+
     const leaveId = `lev_${Date.now()}`;
-    const userId = dto.token.split('_')[2] || 'usr_guru_001';
+    const attachmentUrl = dto.attachment_url || dto.attachment_base64 || null;
 
     const newLeave = {
       id: leaveId,
-      user_id: userId,
+      user_id: activeUser.id,
       type: dto.leave_type,
       start_date: dto.start_date,
       end_date: dto.end_date,
       reason: dto.reason,
+      attachment_url: attachmentUrl,
       status: 'PENDING',
     };
 
@@ -391,12 +430,12 @@ export class SupabaseProvider implements IDataProvider {
 
     return {
       id: leaveId,
-      user_id: userId,
+      user_id: activeUser.id,
       leave_type: dto.leave_type as LeaveType,
       start_date: dto.start_date,
       end_date: dto.end_date,
       reason: dto.reason,
-      attachment_url: dto.attachment_base64 || null,
+      attachment_url: attachmentUrl,
       approval_status: 'PENDING',
       approval_deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
       created_at: new Date().toISOString(),
@@ -626,6 +665,104 @@ export class SupabaseProvider implements IDataProvider {
   public async deleteHoliday(id: string, _token?: string): Promise<boolean> {
     const { error } = await this.client.from('holidays').delete().eq('id', id);
     if (error) throw new Error('Gagal menghapus hari libur: ' + error.message);
+    return true;
+  }
+
+  // ─── DEVICE BINDING & NOTIFICATIONS API ─────────────────────────────────
+
+  public async checkDeviceBinding(
+    userId: string,
+    currentDeviceUUID: string,
+    _token: string
+  ): Promise<{ status: 'ACTIVE' | 'UNBOUND' | 'DIFFERENT_DEVICE' | 'NEEDS_ADMIN_RESET'; message: string; registered_uuid?: string }> {
+    const { data: binding } = await this.client
+      .from('device_bindings')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!binding) {
+      return {
+        status: 'UNBOUND',
+        message: 'Perangkat belum terikat. Lakukan absensi pertama untuk mengikat HP ini.',
+        registered_uuid: currentDeviceUUID,
+      };
+    }
+
+    if (binding.device_uuid === currentDeviceUUID) {
+      return {
+        status: 'ACTIVE',
+        message: 'Terikat Aktif dengan HP ini',
+        registered_uuid: binding.device_uuid,
+      };
+    }
+
+    return {
+      status: 'DIFFERENT_DEVICE',
+      message: 'Terdeteksi Menggunakan HP Berbeda! Mohon ajukan reset device ke Admin/Operator jika Anda ganti HP.',
+      registered_uuid: binding.device_uuid,
+    };
+  }
+
+  public async getNotifications(userId: string, _token: string): Promise<any[]> {
+    const { data } = await this.client
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (data && data.length > 0) {
+      return data.map((n) => ({
+        id: n.id,
+        user_id: n.user_id,
+        title: n.title,
+        message: n.message,
+        type: n.type || 'INFO',
+        is_read: n.is_read || false,
+        created_at: n.created_at,
+      }));
+    }
+
+    return [
+      {
+        id: 'n1',
+        user_id: userId,
+        title: '☀️ Selalu Absen Masuk Tepat Waktu',
+        message: 'Batas toleransi absen masuk adalah sesuai jam operasional sekolah. Gunakan QR Code resmi di sekolah.',
+        type: 'INFO',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'n2',
+        user_id: userId,
+        title: '🔒 Keamanan Perangkat (Device Binding)',
+        message: 'Akun Anda terikat pada HP aktif. Pembatasan 1 akun 1 HP aktif.',
+        type: 'SUCCESS',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'n3',
+        user_id: userId,
+        title: '🔑 Pengingat PIN Keamanan',
+        message: 'Apabila Anda masih menggunakan PIN default 123456, segera ubah PIN melalui tab Profil.',
+        type: 'WARNING',
+        is_read: true,
+        created_at: new Date().toISOString(),
+      },
+    ];
+  }
+
+  public async markNotificationAsRead(notificationId: string, _token: string): Promise<boolean> {
+    const { error } = await this.client
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+
+    if (error) {
+      console.warn('Supabase mark notification read fallback:', error.message);
+    }
     return true;
   }
 }

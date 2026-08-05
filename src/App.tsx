@@ -79,7 +79,21 @@ export const App: React.FC = () => {
               </button>
             </div>
           </div>
-          <GuruDashboardPage onOpenScanner={() => setIsScannerOpen(true)} />
+          <GuruDashboardPage
+            onOpenScanner={() => setIsScannerOpen(true)}
+            isPreviewMode={true}
+            previewUser={{
+              id: 'usr_guru_preview_001',
+              nip: '198905202014021003',
+              full_name: 'Dafa Maulana, S.Pd (Simulasi)',
+              phone_number: '081234567890',
+              role: 'GURU',
+              position: 'Guru Utama / Pendidik (Preview)',
+              avatar_url: null,
+              is_active: true,
+              created_at: new Date().toISOString(),
+            }}
+          />
         </div>
       );
     }

@@ -13,7 +13,7 @@ export type AttendanceStatus =
   | 'DINAS_LUAR'
   | 'BELUM_ABSEN';
 
-export type LeaveType = 'SAKIT' | 'IZIN' | 'DINAS_LUAR' | 'KOREKSI_ABSEN';
+export type LeaveType = 'SAKIT' | 'IZIN' | 'DINAS_LUAR' | 'CUTI' | 'KOREKSI_ABSEN';
 
 export type ApprovalStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
 
@@ -21,7 +21,27 @@ export type VerificationMethod = 'QR_GPS' | 'MANUAL_OPERATOR' | 'SYSTEM_AUTO';
 
 export type AttendanceSource = 'QR' | 'MANUAL' | 'OFFLINE_SYNC';
 
-export type NotificationType = 'IN_APP' | 'WHATSAPP' | 'SYSTEM';
+export type NotificationType = 'IN_APP' | 'WHATSAPP' | 'SYSTEM' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+
+export type AttendanceAction = 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED';
+
+export type DeviceBindingStatus = 'ACTIVE' | 'UNBOUND' | 'DIFFERENT_DEVICE' | 'NEEDS_ADMIN_RESET';
+
+export interface DeviceBindingCheckResult {
+  status: DeviceBindingStatus;
+  message: string;
+  registered_uuid?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  is_read: boolean;
+  created_at: string;
+}
 
 export interface UserProfile {
   id: string;

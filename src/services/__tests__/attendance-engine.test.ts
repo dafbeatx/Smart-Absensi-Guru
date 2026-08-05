@@ -68,6 +68,21 @@ export const runAttendanceEngineTestSuite = async (): Promise<{
 
   // Test 6: Attendance Correction API Execution
   try {
+    const { useAuthStore } = await import('../../store/useAuthStore');
+    useAuthStore.setState({
+      user: {
+        id: 'usr_admin_1001',
+        nip: '199501012020011001',
+        full_name: 'Admin Test',
+        phone_number: '081234567890',
+        role: 'ADMIN',
+        position: 'Admin IT',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+    });
+
     const correctRes = await AttendanceRepository.correctAttendance({
       token: 'MOCK_TOKEN',
       target_user_id: 'usr_uuid_1001',

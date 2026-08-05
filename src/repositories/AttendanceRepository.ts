@@ -1,5 +1,6 @@
 import { ProviderFactory } from '../providers/provider-factory';
-import type { AttendanceRecord } from '../types/database.types';
+import type { AttendanceRecord, AttendanceAction } from '../types/database.types';
+import { useAuthStore } from '../store/useAuthStore';
 import { logger } from '../utils/logger.utils';
 
 export interface ScanAttendanceDTO {
@@ -16,6 +17,7 @@ export interface AttendanceResponseDTO {
   timestamp: string;
   distance_meters: number;
   geofence_verified: boolean;
+  attendance_action?: AttendanceAction;
 }
 
 export interface CorrectAttendanceDTO {
@@ -48,11 +50,17 @@ export class AttendanceRepository {
     return ProviderFactory.getProvider().getTodayAttendance(userId, token);
   }
 
-  public static async getMonthlyHistory(userId: string, month: number, year: number, token: string): Promise<AttendanceRecord[]> {
+  public static async getMonthlyHistory(userId: string, month: number | string, year: number | string, token: string): Promise<AttendanceRecord[]> {
     return ProviderFactory.getProvider().getMonthlyAttendance(userId, String(month), String(year), token);
   }
 
   public static async correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean> {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'OPERATOR')) {
+      logger.warn('AttendanceRepository', 'Unauthorized correctAttendance attempt by role:', currentUser?.role);
+      throw new Error('Akses Ditolak! Role GURU tidak diizinkan mengubah absensi secara langsung. Silakan gunakan menu Ajukan Koreksi Absen.');
+    }
+
     logger.info('AttendanceRepository', 'Executing correctAttendance via active provider', {
       target_user_id: dto.target_user_id,
       date: dto.date,

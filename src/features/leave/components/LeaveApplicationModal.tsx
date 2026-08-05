@@ -36,6 +36,21 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      if (!allowedTypes.includes(file.type)) {
+        showToast('error', 'Format File Tidak Didukung', 'Gunakan format PNG, JPG, JPEG, atau PDF.');
+        handleRemoveFile();
+        return;
+      }
+
+      if (file.size > maxSize) {
+        showToast('error', 'Ukuran File Melebihi Batas', 'Ukuran file lampiran maksimal adalah 5 MB.');
+        handleRemoveFile();
+        return;
+      }
+
       setFileName(file.name);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -76,6 +91,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
         start_date: startDate,
         end_date: endDate,
         reason,
+        attachment_url: attachmentBase64 || undefined,
         attachment_base64: attachmentBase64,
       });
 

@@ -4,6 +4,8 @@ import type {
   LeaveRequest,
   SystemSettings,
   HolidayRecord,
+  AppNotification,
+  DeviceBindingCheckResult,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -16,6 +18,7 @@ export interface IDataProvider {
   resetDevice(userId: string, token: string): Promise<boolean>;
   changePin(userId: string, newPin: string, token: string): Promise<boolean>;
   resetPin(userId: string, newPin: string, token: string): Promise<boolean>;
+  checkDeviceBinding(userId: string, currentDeviceUUID: string, token: string): Promise<DeviceBindingCheckResult>;
 
   // Attendance API
   scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO>;
@@ -28,6 +31,10 @@ export interface IDataProvider {
   submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest>;
   approveLeave(leaveId: string, decision: 'APPROVED' | 'REJECTED', notes: string, token: string): Promise<boolean>;
   getPendingLeaves(token: string): Promise<LeaveRequest[]>;
+
+  // Notification API
+  getNotifications(userId: string, token: string): Promise<AppNotification[]>;
+  markNotificationAsRead(notificationId: string, token: string): Promise<boolean>;
 
   // Settings API
   getSettings(): Promise<SystemSettings>;

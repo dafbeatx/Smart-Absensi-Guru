@@ -1,10 +1,45 @@
 import type { IDataProvider } from './data-provider.interface';
-import type { UserProfile, AttendanceRecord, LeaveRequest, SystemSettings, HolidayRecord, AttendanceStatus } from '../types/database.types';
+import type {
+  UserProfile,
+  AttendanceRecord,
+  LeaveRequest,
+  SystemSettings,
+  HolidayRecord,
+  AttendanceStatus,
+  AppNotification,
+  DeviceBindingCheckResult,
+  AttendanceAction,
+} from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
+
+const memoryStore = new Map<string, string>();
+
+function safeGetStorage(key: string): string | null {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {
+      return localStorage.getItem(key);
+    }
+  } catch {
+    // Memory fallback
+  }
+  return memoryStore.get(key) || null;
+}
+
+function safeSetStorage(key: string, val: string): void {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.setItem === 'function') {
+      localStorage.setItem(key, val);
+      return;
+    }
+  } catch {
+    // Memory fallback
+  }
+  memoryStore.set(key, val);
+}
 
 export class MockProvider implements IDataProvider {
   public async login(dto: LoginDTO): Promise<LoginResponseDTO> {
@@ -17,7 +52,7 @@ export class MockProvider implements IDataProvider {
     let role: 'GURU' | 'KEPSEK' | 'ADMIN' = 'GURU';
     let name = 'Dafa Maulana, S.Pd';
     let position = 'Guru Utama / Pendidik';
-    let nip: string | null = null; // Dafa Maulana, S.Pd does not use NIP
+    let nip: string | null = null;
 
     if (dto.identity.toUpperCase().includes('KEPSEK') || dto.identity.startsWith('1975')) {
       role = 'KEPSEK';
@@ -83,17 +118,45 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
+  public async checkDeviceBinding(userId: string, currentDeviceUUID: string, _token: string): Promise<DeviceBindingCheckResult> {
+    const boundUUID = safeGetStorage(`smart_absensi_bound_device_${userId}`);
+    if (!boundUUID) {
+      safeSetStorage(`smart_absensi_bound_device_${userId}`, currentDeviceUUID);
+      return {
+        status: 'ACTIVE',
+        message: 'Perangkat terikat aktif dengan HP ini.',
+        registered_uuid: currentDeviceUUID,
+      };
+    }
+
+    if (boundUUID === currentDeviceUUID) {
+      return {
+        status: 'ACTIVE',
+        message: 'Terikat Aktif dengan HP ini',
+        registered_uuid: boundUUID,
+      };
+    }
+
+    return {
+      status: 'DIFFERENT_DEVICE',
+      message: 'Terdeteksi Menggunakan HP Berbeda! Mohon ajukan reset device ke Admin/Operator jika Anda ganti HP.',
+      registered_uuid: boundUUID,
+    };
+  }
+
   public async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
     await new Promise((r) => setTimeout(r, 400));
     
     const now = new Date();
-    const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}:${seconds}`;
     const dateStr = now.toISOString().split('T')[0];
 
     const settings = await this.getSettings();
     const checkInEndStr = settings.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
-    // Helper to parse HH:mm or HH:mm:ss to minutes
     const parseMinutes = (tStr: string) => {
       const clean = tStr.replace(/[^\d:]/g, '');
       const parts = clean.split(':');
@@ -114,39 +177,86 @@ export class MockProvider implements IDataProvider {
     const sessionUser = useAuthStore.getState().user;
     const userId = sessionUser?.id || 'usr_uuid_1001';
 
-    const existingSaved = localStorage.getItem('smart_absensi_today_attendance');
-    let record: AttendanceRecord = {
-      id: 'att_' + Date.now(),
-      user_id: userId,
-      date: dateStr,
-      check_in_time: timeStr,
-      check_out_time: null,
-      status: initialStatus,
-      check_in_lat: dto.user_lat || -6.2088,
-      check_in_lng: dto.user_lng || 106.8456,
-      check_in_distance_meters: 12,
-      verification_method: 'QR_GPS',
-      attendance_source: 'QR',
-      is_offline: false,
-      created_at: now.toISOString(),
-    };
+    const existingSaved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${dateStr}`);
+    let record: AttendanceRecord;
+    let action: AttendanceAction = 'CHECK_IN';
 
     if (existingSaved) {
       try {
         const parsed = JSON.parse(existingSaved);
         if (parsed && parsed.check_in_time && !parsed.check_out_time) {
-          // If check-in already recorded, save check-out time!
+          // Check-out (Absen Pulang)
           record = {
             ...parsed,
             check_out_time: timeStr,
           };
+          action = 'CHECK_OUT';
+        } else if (parsed && parsed.check_in_time && parsed.check_out_time) {
+          return {
+            attendance_id: parsed.id,
+            status: parsed.status,
+            timestamp: timeStr,
+            distance_meters: 12,
+            geofence_verified: true,
+            attendance_action: 'ALREADY_COMPLETED',
+          };
+        } else {
+          record = {
+            id: 'att_' + Date.now(),
+            user_id: userId,
+            date: dateStr,
+            check_in_time: timeStr,
+            check_out_time: null,
+            status: initialStatus,
+            check_in_lat: dto.user_lat || -6.2088,
+            check_in_lng: dto.user_lng || 106.8456,
+            check_in_distance_meters: 12,
+            verification_method: 'QR_GPS',
+            attendance_source: 'QR',
+            is_offline: false,
+            created_at: now.toISOString(),
+          };
+          action = 'CHECK_IN';
         }
-      } catch (e) {
-        console.error('Error parsing today attendance:', e);
+      } catch {
+        record = {
+          id: 'att_' + Date.now(),
+          user_id: userId,
+          date: dateStr,
+          check_in_time: timeStr,
+          check_out_time: null,
+          status: initialStatus,
+          check_in_lat: dto.user_lat || -6.2088,
+          check_in_lng: dto.user_lng || 106.8456,
+          check_in_distance_meters: 12,
+          verification_method: 'QR_GPS',
+          attendance_source: 'QR',
+          is_offline: false,
+          created_at: now.toISOString(),
+        };
+        action = 'CHECK_IN';
       }
+    } else {
+      record = {
+        id: 'att_' + Date.now(),
+        user_id: userId,
+        date: dateStr,
+        check_in_time: timeStr,
+        check_out_time: null,
+        status: initialStatus,
+        check_in_lat: dto.user_lat || -6.2088,
+        check_in_lng: dto.user_lng || 106.8456,
+        check_in_distance_meters: 12,
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        is_offline: false,
+        created_at: now.toISOString(),
+      };
+      action = 'CHECK_IN';
     }
 
-    localStorage.setItem('smart_absensi_today_attendance', JSON.stringify(record));
+    safeSetStorage(`smart_absensi_today_attendance_${userId}_${dateStr}`, JSON.stringify(record));
+    safeSetStorage('smart_absensi_today_attendance', JSON.stringify(record));
 
     return {
       attendance_id: record.id,
@@ -154,11 +264,13 @@ export class MockProvider implements IDataProvider {
       timestamp: timeStr,
       distance_meters: 12,
       geofence_verified: true,
+      attendance_action: action,
     };
   }
 
-  public async getTodayAttendance(_userId: string, _token: string): Promise<AttendanceRecord | null> {
-    const saved = localStorage.getItem('smart_absensi_today_attendance');
+  public async getTodayAttendance(userId: string, _token: string): Promise<AttendanceRecord | null> {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const saved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`) || safeGetStorage('smart_absensi_today_attendance');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -169,17 +281,33 @@ export class MockProvider implements IDataProvider {
     return null;
   }
 
-  public async getMonthlyAttendance(_userId: string, _month: string, _year: string, _token: string): Promise<AttendanceRecord[]> {
-    const saved = localStorage.getItem('smart_absensi_today_attendance');
+  public async getMonthlyAttendance(userId: string, month: string, year: string, _token: string): Promise<AttendanceRecord[]> {
+    const monthMap: Record<string, string> = {
+      januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+      juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', desember: '12',
+    };
+
+    let paddedMonth = month.padStart(2, '0');
+    if (monthMap[month.toLowerCase()]) {
+      paddedMonth = monthMap[month.toLowerCase()];
+    }
+
+    const monthPrefix = `${year}-${paddedMonth}`;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const records: AttendanceRecord[] = [];
+
+    const saved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`) || safeGetStorage('smart_absensi_today_attendance');
     if (saved) {
       try {
-        const rec = JSON.parse(saved);
-        return [rec];
+        const rec: AttendanceRecord = JSON.parse(saved);
+        if (rec && rec.user_id === userId && rec.date.startsWith(monthPrefix)) {
+          records.push(rec);
+        }
       } catch (e) {
         console.error('Failed to parse today attendance for monthly:', e);
       }
     }
-    return [];
+    return records;
   }
 
   public async correctAttendance(_dto: CorrectAttendanceDTO): Promise<boolean> {
@@ -193,18 +321,34 @@ export class MockProvider implements IDataProvider {
   }
 
   public async submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest> {
-    return {
+    const activeUser = useAuthStore.getState().user;
+    if (!activeUser || !activeUser.id) {
+      throw new Error('Sesi pengguna tidak valid. Silakan login ulang.');
+    }
+
+    const leaveRecord: LeaveRequest = {
       id: 'leave_mock_' + Date.now(),
-      user_id: 'usr_uuid_1001',
+      user_id: activeUser.id,
       leave_type: dto.leave_type,
       start_date: dto.start_date,
       end_date: dto.end_date,
       reason: dto.reason,
-      attachment_url: dto.attachment_base64 ? 'https://drive.google.com/mock-file' : null,
+      attachment_url: dto.attachment_url || dto.attachment_base64 || null,
       approval_status: 'PENDING',
       approval_deadline: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
       created_at: new Date().toISOString(),
     };
+
+    const savedLeaves = safeGetStorage('smart_absensi_leaves') || '[]';
+    try {
+      const parsed = JSON.parse(savedLeaves);
+      parsed.push(leaveRecord);
+      safeSetStorage('smart_absensi_leaves', JSON.stringify(parsed));
+    } catch {
+      safeSetStorage('smart_absensi_leaves', JSON.stringify([leaveRecord]));
+    }
+
+    return leaveRecord;
   }
 
   public async approveLeave(_leaveId: string, _decision: 'APPROVED' | 'REJECTED', _notes: string, _token: string): Promise<boolean> {
@@ -212,11 +356,75 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getPendingLeaves(_token: string): Promise<LeaveRequest[]> {
+    const saved = safeGetStorage('smart_absensi_leaves');
+    if (saved) {
+      try {
+        const list: LeaveRequest[] = JSON.parse(saved);
+        return list.filter((l) => l.approval_status === 'PENDING');
+      } catch (e) {
+        console.error('Failed to parse leaves:', e);
+      }
+    }
     return [];
   }
 
+  public async getNotifications(userId: string, _token: string): Promise<AppNotification[]> {
+    const key = `smart_absensi_notifications_${userId}`;
+    const saved = safeGetStorage(key);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse notifications:', e);
+      }
+    }
+
+    const defaults: AppNotification[] = [
+      {
+        id: 'n1',
+        user_id: userId,
+        title: '☀️ Selalu Absen Masuk Tepat Waktu',
+        message: 'Batas toleransi absen masuk adalah sesuai jam operasional sekolah. Gunakan QR Code resmi di sekolah.',
+        type: 'INFO',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'n2',
+        user_id: userId,
+        title: '🔒 Keamanan Perangkat (Device Binding)',
+        message: 'Akun Anda terikat pada HP aktif. Pembatasan 1 akun 1 HP aktif.',
+        type: 'SUCCESS',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'n3',
+        user_id: userId,
+        title: '🔑 Pengingat PIN Kemanan',
+        message: 'Apabila Anda masih menggunakan PIN default 123456, segera ubah PIN melalui tab Profil.',
+        type: 'WARNING',
+        is_read: true,
+        created_at: new Date().toISOString(),
+      },
+    ];
+
+    safeSetStorage(key, JSON.stringify(defaults));
+    return defaults;
+  }
+
+  public async markNotificationAsRead(notificationId: string, token: string): Promise<boolean> {
+    const sessionUser = useAuthStore.getState().user;
+    const userId = sessionUser?.id || 'usr_uuid_1001';
+    const key = `smart_absensi_notifications_${userId}`;
+    const notifications = await this.getNotifications(userId, token);
+    const updated = notifications.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n));
+    safeSetStorage(key, JSON.stringify(updated));
+    return true;
+  }
+
   public async getSettings(): Promise<SystemSettings> {
-    const saved = localStorage.getItem('smart_absensi_system_settings');
+    const saved = safeGetStorage('smart_absensi_system_settings');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -240,7 +448,7 @@ export class MockProvider implements IDataProvider {
   }
 
   public async updateSettings(settings: SystemSettings, _token: string): Promise<boolean> {
-    localStorage.setItem('smart_absensi_system_settings', JSON.stringify(settings));
+    safeSetStorage('smart_absensi_system_settings', JSON.stringify(settings));
     return true;
   }
 
@@ -276,7 +484,7 @@ export class MockProvider implements IDataProvider {
 
   // Academic Calendar & Holidays API Implementation
   public async getHolidays(_token?: string): Promise<HolidayRecord[]> {
-    const saved = localStorage.getItem('smart_absensi_holidays');
+    const saved = safeGetStorage('smart_absensi_holidays');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -308,7 +516,7 @@ export class MockProvider implements IDataProvider {
       { id: 'hol_1019', date: '2026-12-28', name: 'Libur Akhir Semester Ganjil T.A 2026/2027', type: 'SCHOOL_HOLIDAY', description: 'Libur Semester Sekolah', created_at: new Date().toISOString() },
     ];
 
-    localStorage.setItem('smart_absensi_holidays', JSON.stringify(defaultHolidays));
+    safeSetStorage('smart_absensi_holidays', JSON.stringify(defaultHolidays));
     return defaultHolidays;
   }
 
@@ -320,7 +528,7 @@ export class MockProvider implements IDataProvider {
       created_at: new Date().toISOString(),
     };
     const updated = [...list, newRecord];
-    localStorage.setItem('smart_absensi_holidays', JSON.stringify(updated));
+    safeSetStorage('smart_absensi_holidays', JSON.stringify(updated));
     return newRecord;
   }
 
@@ -335,14 +543,14 @@ export class MockProvider implements IDataProvider {
       return item;
     });
     if (!targetRecord) throw new Error('Hari libur tidak ditemukan');
-    localStorage.setItem('smart_absensi_holidays', JSON.stringify(updated));
+    safeSetStorage('smart_absensi_holidays', JSON.stringify(updated));
     return targetRecord;
   }
 
   public async deleteHoliday(id: string, _token?: string): Promise<boolean> {
     const list = await this.getHolidays();
     const updated = list.filter((item) => item.id !== id);
-    localStorage.setItem('smart_absensi_holidays', JSON.stringify(updated));
+    safeSetStorage('smart_absensi_holidays', JSON.stringify(updated));
     return true;
   }
 }
