@@ -99,15 +99,41 @@ export const SystemSettingsForm: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    const parseCoord = (val: string, isLat: boolean): number => {
+      let str = String(val).trim().replace(',', '.');
+      if (!str.includes('.')) {
+        const raw = parseFloat(str);
+        if (!isNaN(raw) && Math.abs(raw) > 180) {
+          if (isLat && str.startsWith('-')) {
+            str = str.substring(0, 2) + '.' + str.substring(2);
+          } else if (isLat) {
+            str = str.substring(0, 1) + '.' + str.substring(1);
+          } else if (str.length >= 8) {
+            str = str.substring(0, 3) + '.' + str.substring(3);
+          }
+        }
+      }
+      const parsed = parseFloat(str);
+      return !isNaN(parsed) ? parsed : (isLat ? CONSTANTS.DEFAULTS.GEOFENCE_LAT : CONSTANTS.DEFAULTS.GEOFENCE_LNG);
+    };
+
+    const finalLat = parseCoord(geofenceLat, true);
+    const finalLng = parseCoord(geofenceLng, false);
+    const finalRadius = parseInt(geofenceRadius, 10) || CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS;
+
+    setGeofenceLat(String(finalLat));
+    setGeofenceLng(String(finalLng));
+    setGeofenceRadius(String(finalRadius));
+
     const updatedSettings: SystemSettings = {
       app_name: appName,
       institution_name: institution,
       work_checkin_start: checkInStart,
       work_checkin_end: checkInEnd,
       work_checkout_start: checkOutStart,
-      geofence_lat: parseFloat(geofenceLat) || CONSTANTS.DEFAULTS.GEOFENCE_LAT,
-      geofence_lng: parseFloat(geofenceLng) || CONSTANTS.DEFAULTS.GEOFENCE_LNG,
-      geofence_radius: parseInt(geofenceRadius, 10) || CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+      geofence_lat: finalLat,
+      geofence_lng: finalLng,
+      geofence_radius: finalRadius,
     };
 
     // 1. Persist to localStorage
