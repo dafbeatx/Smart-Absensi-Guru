@@ -23,6 +23,27 @@ export const SystemSettingsForm: React.FC = () => {
   const [geofenceRadius, setGeofenceRadius] = useState(String(CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS));
   const [isLoading, setIsLoading] = useState(false);
 
+  const sanitizeCoord = (val: unknown, isLat: boolean): string => {
+    if (val === undefined || val === null || val === '') {
+      return String(isLat ? CONSTANTS.DEFAULTS.GEOFENCE_LAT : CONSTANTS.DEFAULTS.GEOFENCE_LNG);
+    }
+    let str = String(val).trim().replace(',', '.');
+    if (!str.includes('.')) {
+      const raw = parseFloat(str);
+      if (!isNaN(raw) && Math.abs(raw) > 180) {
+        if (isLat && str.startsWith('-')) {
+          str = str.substring(0, 2) + '.' + str.substring(2);
+        } else if (isLat) {
+          str = str.substring(0, 1) + '.' + str.substring(1);
+        } else if (str.length >= 8) {
+          str = str.substring(0, 3) + '.' + str.substring(3);
+        }
+      }
+    }
+    const parsed = parseFloat(str);
+    return !isNaN(parsed) ? String(parsed) : String(isLat ? CONSTANTS.DEFAULTS.GEOFENCE_LAT : CONSTANTS.DEFAULTS.GEOFENCE_LNG);
+  };
+
   // Load existing settings from localStorage and Provider API
   useEffect(() => {
     const loadSettings = async () => {
@@ -35,8 +56,8 @@ export const SystemSettingsForm: React.FC = () => {
           if (parsed.work_checkin_start) setCheckInStart(formatTimeForInput(parsed.work_checkin_start, CONSTANTS.DEFAULTS.WORK_CHECKIN_START));
           if (parsed.work_checkin_end) setCheckInEnd(formatTimeForInput(parsed.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END));
           if (parsed.work_checkout_start) setCheckOutStart(formatTimeForInput(parsed.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START));
-          if (parsed.geofence_lat !== undefined) setGeofenceLat(String(parsed.geofence_lat));
-          if (parsed.geofence_lng !== undefined) setGeofenceLng(String(parsed.geofence_lng));
+          if (parsed.geofence_lat !== undefined) setGeofenceLat(sanitizeCoord(parsed.geofence_lat, true));
+          if (parsed.geofence_lng !== undefined) setGeofenceLng(sanitizeCoord(parsed.geofence_lng, false));
           if (parsed.geofence_radius !== undefined) setGeofenceRadius(String(parsed.geofence_radius));
         } catch (e) {
           console.error('Failed to parse local settings:', e);
@@ -52,12 +73,14 @@ export const SystemSettingsForm: React.FC = () => {
           if (fetched.work_checkin_start) setCheckInStart(formatTimeForInput(fetched.work_checkin_start, CONSTANTS.DEFAULTS.WORK_CHECKIN_START));
           if (fetched.work_checkin_end) setCheckInEnd(formatTimeForInput(fetched.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END));
           if (fetched.work_checkout_start) setCheckOutStart(formatTimeForInput(fetched.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START));
-          if (fetched.geofence_lat !== undefined) setGeofenceLat(String(fetched.geofence_lat));
-          if (fetched.geofence_lng !== undefined) setGeofenceLng(String(fetched.geofence_lng));
+          if (fetched.geofence_lat !== undefined) setGeofenceLat(sanitizeCoord(fetched.geofence_lat, true));
+          if (fetched.geofence_lng !== undefined) setGeofenceLng(sanitizeCoord(fetched.geofence_lng, false));
           if (fetched.geofence_radius !== undefined) setGeofenceRadius(String(fetched.geofence_radius));
 
           localStorage.setItem('smart_absensi_system_settings', JSON.stringify({
             ...fetched,
+            geofence_lat: parseFloat(sanitizeCoord(fetched.geofence_lat, true)),
+            geofence_lng: parseFloat(sanitizeCoord(fetched.geofence_lng, false)),
             work_checkin_start: formatTimeForInput(fetched.work_checkin_start, CONSTANTS.DEFAULTS.WORK_CHECKIN_START),
             work_checkin_end: formatTimeForInput(fetched.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END),
             work_checkout_start: formatTimeForInput(fetched.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START),
