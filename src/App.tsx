@@ -36,6 +36,7 @@ export const App: React.FC = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isPreviewGuruMode, setIsPreviewGuruMode] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
+  const [isPreviewScannerBlocked, setIsPreviewScannerBlocked] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -80,7 +81,10 @@ export const App: React.FC = () => {
             </div>
           </div>
           <GuruDashboardPage
-            onOpenScanner={() => setIsScannerOpen(true)}
+            onOpenScanner={() => {
+              // Blokir scan nyata di mode preview — user preview tidak ada di DB
+              setIsPreviewScannerBlocked(true);
+            }}
             isPreviewMode={true}
             previewUser={{
               id: 'usr_guru_preview_001',
@@ -160,6 +164,37 @@ export const App: React.FC = () => {
         isOpen={isTestRunnerOpen}
         onClose={() => setIsTestRunnerOpen(false)}
       />
+
+      {/* Preview Mode QR Scanner Blocked Modal */}
+      {isPreviewScannerBlocked && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+          onClick={() => setIsPreviewScannerBlocked(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center text-3xl mx-auto">
+              📱
+            </div>
+            <div>
+              <h3 className="font-extrabold text-slate-800 text-lg">Mode Preview Aktif</h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Fitur scan QR absensi tidak dapat digunakan dalam Mode Preview Tampilan Guru.
+                <br /><br />
+                Ini adalah tampilan simulasi untuk Admin/Kepsek. Untuk scan absensi nyata, login menggunakan akun Guru aktif.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsPreviewScannerBlocked(false)}
+              className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-2xl text-sm transition-all active:scale-95 cursor-pointer"
+            >
+              🔙 Kembali ke Preview
+            </button>
+          </div>
+        </div>
+      )}
 
       <ToastContainer />
     </>

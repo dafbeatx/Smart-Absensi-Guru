@@ -219,6 +219,25 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error('Sesi pengguna tidak valid. Silakan login ulang ke aplikasi.');
     }
 
+    // Verifikasi user exist di public.users sebelum insert
+    // (mencegah FK violation jika user preview / token kadaluarsa)
+    const { data: userExists, error: userCheckError } = await this.client
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (userCheckError) {
+      logger.warn('SupabaseProvider', 'User existence check error:', userCheckError.message);
+    }
+
+    if (!userExists) {
+      logger.error('SupabaseProvider', 'scanAttendance: userId not found in public.users', { userId });
+      throw new Error(
+        'Akun guru tidak ditemukan di database. Pastikan akun Anda sudah terdaftar di sistem dan tidak sedang dalam Mode Preview. Hubungi Admin jika masalah berlanjut.'
+      );
+    }
+
     const attId = `att_${userId}_${todayStr}`;
 
     // Check if user has already checked in today
