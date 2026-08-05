@@ -1,11 +1,13 @@
 /**
  * SMART ABSENSI GURU - SECURITY & CONSISTENCY TEST SUITE
- * Unit tests verifying GPS security, PIN hashing, Supabase authentication, and radius consistency.
+ * Unit tests verifying GPS security, PIN hashing, Supabase authentication, QR poster validation, and radius consistency.
  */
 
 import { GPSService } from '../gps.service';
 import { hashPin } from '../../utils/hash.utils';
 import { SupabaseProvider } from '../../providers/supabase-provider.service';
+import { QRValidationService } from '../qr-validation.service';
+import { CONSTANTS } from '../../config/constants';
 import type { LoginDTO } from '../../repositories/AuthRepository';
 
 export const runSecurityConsistencyTestSuite = async (): Promise<{
@@ -38,7 +40,19 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
   const hashRaw = await hashPin(pinRaw);
   assert('PIN Hashing - Never Stores Plaintext', hashRaw !== pinRaw && hashRaw.length === 64);
 
-  // 3. Test SupabaseProvider Login PIN Validation (Wrong PIN Rejected)
+  // 3. Test Official Poster QR Validation
+  const officialSeed = CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
+  const officialResult = QRValidationService.validateQRFreshness(officialSeed);
+  assert('QR Validation - Official Poster Seed SMART_ABSENSI_OFFICIAL_QR_2026 Is Valid', officialResult.isValid === true);
+
+  // 4. Test Invalid / Random QR Validation
+  const invalidResult = QRValidationService.validateQRFreshness('RANDOM_INVALID_QR_CODE_123');
+  assert('QR Validation - Random Invalid String Is Rejected', invalidResult.isValid === false && invalidResult.error?.code === 'QR_002');
+
+  const emptyResult = QRValidationService.validateQRFreshness('');
+  assert('QR Validation - Empty QR String Is Rejected', emptyResult.isValid === false && emptyResult.error?.code === 'QR_002');
+
+  // 5. Test SupabaseProvider Login PIN Validation (Wrong PIN Rejected)
   const supabaseProvider = new SupabaseProvider();
   try {
     const wrongLoginDto: LoginDTO = {
@@ -54,7 +68,7 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Supabase Login - Reject Invalid PIN', msg.includes('PIN') || msg.includes('tidak ditemukan'));
   }
 
-  // 4. Test GPS Service Geofence Validation Consistency
+  // 6. Test GPS Service Geofence Validation Consistency
   const allowedRadius = 500;
   const testCoords = { latitude: -6.2, longitude: 106.8, accuracy: 5, distanceMeters: 450 };
   const validCheck = GPSService.validateGeofenceRadius(testCoords, allowedRadius);

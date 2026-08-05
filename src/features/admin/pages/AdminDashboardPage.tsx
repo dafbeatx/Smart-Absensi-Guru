@@ -176,6 +176,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     };
 
     syncBackendDataSequentially();
+
+    const handleScannedEvent = () => {
+      fetchAttendanceRecords();
+    };
+
+    window.addEventListener('smart_absensi_scanned', handleScannedEvent);
+    return () => {
+      window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
+    };
   }, []);
 
   const handleExportExcel = async () => {

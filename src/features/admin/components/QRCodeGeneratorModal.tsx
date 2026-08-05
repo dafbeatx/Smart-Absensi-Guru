@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { APP_CONFIG } from '../../../config/app.config';
+import { CONSTANTS } from '../../../config/constants';
 
 export interface QRCodeGeneratorModalProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
   onClose,
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [qrPayload] = useState<string>('SMART_ABSENSI_OFFICIAL_QR_2026');
+  const qrPayload = CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
 
   useEffect(() => {
     if (isOpen) {

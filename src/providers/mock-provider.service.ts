@@ -4,6 +4,7 @@ import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository'
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
+import { useAuthStore } from '../store/useAuthStore';
 
 export class MockProvider implements IDataProvider {
   public async login(dto: LoginDTO): Promise<LoginResponseDTO> {
@@ -110,10 +111,13 @@ export class MockProvider implements IDataProvider {
       initialStatus = 'TERLAMBAT';
     }
 
+    const sessionUser = useAuthStore.getState().user;
+    const userId = sessionUser?.id || 'usr_uuid_1001';
+
     const existingSaved = localStorage.getItem('smart_absensi_today_attendance');
     let record: AttendanceRecord = {
       id: 'att_' + Date.now(),
-      user_id: 'usr_uuid_1001',
+      user_id: userId,
       date: dateStr,
       check_in_time: timeStr,
       check_out_time: null,

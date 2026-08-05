@@ -8,6 +8,8 @@ import { NotificationService } from '../../../services/notification-permission.s
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { AttendanceRepository } from '../../../repositories/AttendanceRepository';
+import { QRValidationService } from '../../../services/qr-validation.service';
+import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
 
 export interface QRScannerOverlayProps {
@@ -107,7 +109,24 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       scannerRef.current.stop().catch(console.error);
     }
 
-    // 1. Fetch & Validate Geofence Radius GPS Location
+    // 1. Validate QR Code payload freshness and official poster seed
+    const qrValidation = QRValidationService.validateQRFreshness(_qrData);
+    if (import.meta.env.DEV) {
+      console.log('⚡ [DEV DEBUG] QR Code Scanned:', {
+        rawData: _qrData,
+        validation: qrValidation,
+      });
+    }
+
+    if (!qrValidation.isValid) {
+      SoundService.playError();
+      setRejectionReason('Absensi Ditolak! QR Code tidak valid / bukan QR resmi absensi.');
+      setIsRejectionModalOpen(true);
+      isProcessingRef.current = false;
+      return;
+    }
+
+    // 2. Fetch & Validate Geofence Radius GPS Location
     let currentCoords = gpsCoords;
     if (!currentCoords) {
       currentCoords = await fetchGPSLocation();
@@ -137,19 +156,34 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       return;
     }
 
-    // 2. SAVE ATTENDANCE RECORD (Must succeed BEFORE showing success UI)
+    // 3. SAVE ATTENDANCE RECORD (Must succeed BEFORE showing success UI)
     const token = useAuthStore.getState().token || 'MOCK_TOKEN';
     const deviceUUID = useAuthStore.getState().deviceUUID || 'DEV_UUID';
     let returnedStatus = 'HADIR';
 
+    const scanSeed = _qrData || CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
+
     try {
+      if (import.meta.env.DEV) {
+        console.log('⚡ [DEV DEBUG] Executing scanAttendance DTO:', {
+          qr_seed: scanSeed,
+          lat: currentCoords.latitude,
+          lng: currentCoords.longitude,
+          device_uuid: deviceUUID,
+        });
+      }
+
       const res = await AttendanceRepository.scanAttendance({
         token: token,
-        qr_seed: _qrData || 'SEED_SMP_TERPADU',
+        qr_seed: scanSeed,
         user_lat: currentCoords.latitude,
         user_lng: currentCoords.longitude,
         device_uuid: deviceUUID,
       });
+
+      if (import.meta.env.DEV) {
+        console.log('⚡ [DEV DEBUG] scanAttendance Response:', res);
+      }
 
       if (res && res.status) {
         returnedStatus = res.status;
@@ -157,7 +191,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
       window.dispatchEvent(new Event('smart_absensi_scanned'));
     } catch (err: unknown) {
-      console.error('Failed to save attendance record to provider:', err);
+      if (import.meta.env.DEV) {
+        console.error('⚡ [DEV DEBUG] scanAttendance Error:', err);
+      }
       SoundService.playError();
       const errMsg = err && typeof err === 'object' && 'message' in err
         ? String((err as { message: string }).message)

@@ -20,6 +20,7 @@ import type {
 } from '../repositories/AttendanceRepository';
 import { timeToMinutes } from '../utils/time.utils';
 import { hashPin } from '../utils/hash.utils';
+import { useAuthStore } from '../store/useAuthStore';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters } from '../utils/geofence.utils';
@@ -193,9 +194,58 @@ export class SupabaseProvider implements IDataProvider {
 
     const status: AttendanceStatus = currentMin > cutoffMin ? 'TERLAMBAT' : 'HADIR';
 
-    const userId = dto.token.split('_')[2] || 'usr_guru_001';
+    // Safely retrieve user ID from active auth store or token
+    const sessionUser = useAuthStore.getState().user;
+    let userId = sessionUser?.id;
+
+    if (!userId && dto.token) {
+      const parts = dto.token.split('_');
+      if (parts.length >= 3) {
+        userId = parts[2];
+      }
+    }
+
+    if (!userId) {
+      throw new Error('Sesi pengguna tidak valid. Silakan login ulang ke aplikasi.');
+    }
+
     const attId = `att_${userId}_${todayStr}`;
 
+    // Check if user has already checked in today
+    const { data: existing } = await this.client
+      .from('attendance')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', todayStr)
+      .maybeSingle();
+
+    if (existing) {
+      if (existing.check_in_time && !existing.check_out_time) {
+        // Record Check-out (Absen Pulang)
+        const { error: updateErr } = await this.client
+          .from('attendance')
+          .update({ check_out_time: timeStr })
+          .eq('id', existing.id);
+
+        if (updateErr) {
+          throw new Error('Gagal mencatat absensi pulang: ' + updateErr.message);
+        }
+
+        return {
+          attendance_id: existing.id,
+          status: (existing.status as AttendanceStatus) || status,
+          timestamp: `${timeStr} WIB (Absen Pulang)`,
+          distance_meters: distanceMeters,
+          geofence_verified: true,
+        };
+      }
+
+      if (existing.check_in_time && existing.check_out_time) {
+        throw new Error('Anda sudah melakukan presensi masuk dan pulang untuk hari ini.');
+      }
+    }
+
+    // Insert new check-in record
     const { error } = await this.client.from('attendance').upsert(
       {
         id: attId,
