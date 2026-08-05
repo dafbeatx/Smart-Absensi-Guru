@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Html5Qrcode } from 'html5-qrcode';
 import { Modal } from '../../../components/ui/Modal';
 import { Badge } from '../../../components/ui/Badge';
-import { Button } from '../../../components/ui/Button';
 import { SoundService } from '../../../services/audio.service';
 import { NotificationService } from '../../../services/notification-permission.service';
 import { GPSService } from '../../../services/gps.service';
@@ -479,7 +478,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
           {/* Groq AI Diagnostic Card */}
           {aiDiagnosis && (
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-3.5 rounded-2xl border border-emerald-200 text-left text-xs space-y-2">
+            <div className="bg-linear-to-br from-emerald-50 to-teal-50 p-3.5 rounded-2xl border border-emerald-200 text-left text-xs space-y-2">
               <div className="flex items-center gap-2 border-b border-emerald-200/80 pb-2">
                 <span className="text-lg">🤖</span>
                 <div>
