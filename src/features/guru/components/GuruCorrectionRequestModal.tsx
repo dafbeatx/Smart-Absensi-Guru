@@ -8,6 +8,8 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { logger } from '../../../utils/logger.utils';
 
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
+
 export interface GuruCorrectionRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -21,8 +23,9 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
 }) => {
   const { token, user } = useAuthStore();
   const { showToast } = useToastStore();
+  const todayStr = getTodayDateInJakarta();
 
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(todayStr);
   const [checkInTime, setCheckInTime] = useState('07:00');
   const [checkOutTime, setCheckOutTime] = useState('14:00');
   const [targetStatus, setTargetStatus] = useState<'HADIR' | 'IZIN' | 'SAKIT'>('HADIR');
@@ -34,6 +37,11 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (date > todayStr) {
+      setErrorMsg(`Tanggal absensi (${date}) tidak boleh melebihi tanggal hari ini (${todayStr}). Pengajuan tanggal mendatang tidak diizinkan!`);
+      return;
+    }
 
     if (!reason || reason.trim().length < 10) {
       setErrorMsg('Alasan pengajuan koreksi wajib diisi minimal 10 karakter (misal: "Kendala sinyal HP saat scan QR").');
@@ -95,10 +103,13 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <Input label="Tanggal Absensi" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
           <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
           <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
         </div>
+        <p className="text-[11px] text-slate-500 font-medium -mt-2">
+          📅 Guru dapat mengajukan koreksi untuk tanggal yang tertinggal (tanggal lampau hingga hari ini), tetapi tidak dapat memilih tanggal mendatang.
+        </p>
 
         <div className="space-y-1">
           <label className="block text-xs font-semibold text-slate-700">Status yang Diharapkan</label>

@@ -8,6 +8,8 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import type { AttendanceStatus, UserProfile } from '../../../types/database.types';
 
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
+
 export interface AttendanceCorrectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -25,9 +27,10 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
 }) => {
   const { user } = useAuthStore();
   const { showToast } = useToastStore();
+  const todayStr = getTodayDateInJakarta();
 
   const [selectedUserId, setSelectedUserId] = useState(selectedTeacherId || teachers[0]?.id || '');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(todayStr);
 
   // Sync selectedUserId when selectedTeacherId prop changes or modal opens
   React.useEffect(() => {
@@ -47,6 +50,12 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (date > todayStr) {
+      setErrorMsg(`Tanggal absensi (${date}) tidak boleh melebihi tanggal hari ini (${todayStr}). Pengisian tanggal mendatang tidak diizinkan!`);
+      return;
+    }
+
     if (!reason || reason.trim().length < 5) {
       setErrorMsg('Alasan koreksi absensi wajib diisi minimal 5 karakter.');
       return;
@@ -83,7 +92,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
         reason: `Koreksi Absensi Manual oleh Admin Website untuk ${teacher?.full_name}: ${reason}`,
       });
 
-      showToast('success', 'Koreksi Berhasil Disimpan!', `Absensi ${teacher?.full_name} diubah menjadi ${newStatus}.`);
+      showToast('success', 'Koreksi Berhasil Disimpan!', `Absensi ${teacher?.full_name} tanggal ${date} diubah menjadi ${newStatus}.`);
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: unknown) {
@@ -119,10 +128,13 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <Input label="Tanggal Absensi" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
           <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
           <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
         </div>
+        <p className="text-[11px] text-slate-500 font-medium -mt-2">
+          📅 Anda dapat menginput tanggal yang tertinggal (tanggal lampau hingga hari ini), tetapi tidak dapat memilih tanggal mendatang.
+        </p>
 
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-slate-700">Status Kehadiran Baru</label>
