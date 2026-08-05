@@ -10,7 +10,7 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
 import { DevTestPage } from '../../admin/pages/DevTestPage';
-import { evaluateAttendanceStatus, getTodayDateInJakarta } from '../../../utils/time.utils';
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
 
