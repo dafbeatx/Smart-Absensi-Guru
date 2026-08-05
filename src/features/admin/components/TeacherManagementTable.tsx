@@ -73,6 +73,11 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
     const updated = [...teachers, newTeacher];
     onTeachersChange(updated);
+    try {
+      localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Failed to cache teachers to localStorage:', e);
+    }
 
     await AuditLogger.log({
       actorId: user?.id || 'op_1',

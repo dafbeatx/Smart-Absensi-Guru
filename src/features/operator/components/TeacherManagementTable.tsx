@@ -59,7 +59,21 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       created_at: new Date().toISOString(),
     };
 
-    onTeachersChange([...teachers, newTeacher]);
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      await provider.createUser(newTeacher, token);
+    } catch (err) {
+      console.warn('Backend create user notify:', err);
+    }
+
+    const updated = [...teachers, newTeacher];
+    onTeachersChange(updated);
+    try {
+      localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Failed to cache teachers to localStorage:', e);
+    }
 
     await AuditLogger.log({
       actorId: user?.id || 'op_1',
