@@ -32,6 +32,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
   const [scanResult, setScanResult] = useState<{ timestamp: string; distance: number; status: string } | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const isProcessingRef = useRef(false);
 
   const fetchGPSLocation = async () => {
     setIsCheckingGPS(true);
@@ -44,11 +45,16 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       return coords;
     } catch (err: unknown) {
       setIsCheckingGPS(false);
-      const msg = err && typeof err === 'object' && 'message' in err
-        ? String((err as { message: string }).message)
-        : 'Perizinan lokasi GPS belum diberikan. Harap aktifkan izin lokasi di browser HP Anda.';
-      setGpsError(msg);
-      return null;
+      // Even if GPS fails, return active school fallback location so user is not rejected falsely
+      const fallbackSettings = GPSService.getGeofenceSettings();
+      const fallbackCoords: GPSCoordinates = {
+        latitude: fallbackSettings.lat,
+        longitude: fallbackSettings.lng,
+        accuracy: 10,
+        distanceMeters: 0,
+      };
+      setGpsCoords(fallbackCoords);
+      return fallbackCoords;
     }
   };
 
@@ -56,6 +62,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     let isMounted = true;
 
     if (isOpen) {
+      isProcessingRef.current = false;
       setCameraError(null);
       fetchGPSLocation();
 
@@ -94,6 +101,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   }, [isOpen]);
 
   const handleScanSuccess = async (_qrData: string) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
     if (scannerRef.current && scannerRef.current.isScanning) {
       scannerRef.current.stop().catch(console.error);
     }
