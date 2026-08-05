@@ -138,15 +138,20 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
 
           <div class="qr-container">
             <img src="${qrDataUrl}" alt="Official QR Code Absensi" class="qr-image" />
+            <div style="margin-top: 14px; background: #f1f5f9; padding: 10px 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-family: monospace; font-size: 13px; font-weight: bold; color: #0f172a; display: inline-block;">
+              🔑 KODE MANUAL: ${qrPayload}
+            </div>
           </div>
 
           <div class="instructions">
-            <h3>📱 PANDUAN CARA ABSENSI GURU:</h3>
+            <h3>📱 PANDUAN CARA ABSENSI GURU & STAF:</h3>
             <ol>
-              <li>Buka Web Aplikasi <strong>Smart Absensi Guru</strong> dari HP Anda.</li>
-              <li>Klik tombol hijau melayang <strong>📷 Scan QR</strong> di bagian bawah.</li>
+              <li>Buka Web Aplikasi <strong>Smart Absensi Guru</strong> di HP Anda.</li>
+              <li>Klik tombol hijau melayang <strong>📷 Scan QR</strong> di bagian bawah layar.</li>
               <li>Arahkan Kamera HP ke gambar QR Code di atas.</li>
-              <li>Kehadiran Anda akan <strong>langsung dicatat otomatis</strong> di sistem.</li>
+              <li><strong>Jam Masuk Tepat Waktu:</strong> 07:00 - 07:15 WIB (Di atas 07:15 WIB otomatis dicatat <i>Terlambat</i>).</li>
+              <li><strong>Jam Pulang:</strong> Mulai pukul 14:00 WIB.</li>
+              <li><strong>Jika Scan Direject / Kamera Buram:</strong> Gunakan tombol <strong>"⌨️ Input Kode Manual"</strong> (masukkan kode <code>${qrPayload}</code>) atau tombol <strong>"📍 Absen via GPS"</strong>.</li>
             </ol>
           </div>
 
@@ -168,7 +173,12 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
       <div className="text-center space-y-4 py-2">
         <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 inline-block shadow-inner">
           {qrDataUrl ? (
-            <img src={qrDataUrl} alt="Official QR Code" className="w-56 h-56 mx-auto rounded-2xl border-4 border-white shadow-md" />
+            <div className="space-y-3">
+              <img src={qrDataUrl} alt="Official QR Code" className="w-56 h-56 mx-auto rounded-2xl border-4 border-white shadow-md" />
+              <div className="bg-slate-200/80 text-slate-900 px-3 py-1.5 rounded-xl font-mono text-xs font-bold border border-slate-300 inline-block">
+                🔑 Kode Manual: <span className="text-emerald-700">{qrPayload}</span>
+              </div>
+            </div>
           ) : (
             <div className="w-56 h-56 flex items-center justify-center text-xs font-semibold text-slate-400">
               Generating QR Code...
@@ -176,19 +186,23 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
           )}
         </div>
 
-        <div>
-          <h3 className="font-extrabold text-slate-900 text-base">QR Code Absensi Gerbang / Ruang Guru</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
-            QR Code ini merupakan kode pindaian resmi sekolah. Cetak dan tempel poster ini di gerbang atau ruang guru agar para guru dapat memindainya langsung dari HP.
-          </p>
+        <div className="max-w-md mx-auto space-y-2 text-left bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
+          <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+            <span>📢</span> Info Poster Resmi Absensi Gerbang
+          </h3>
+          <ul className="space-y-1 text-slate-600 text-[11px] leading-relaxed list-disc list-inside">
+            <li><strong>Jam Masuk:</strong> 07:00 - 07:15 WIB (Di atas 07:15 otomatis Terlambat).</li>
+            <li><strong>Jam Pulang:</strong> Mulai 14:00 WIB.</li>
+            <li><strong>Kendala Scan:</strong> Disediakan Kode Manual <code>{qrPayload}</code> dan Absen GPS Mandiri.</li>
+          </ul>
         </div>
 
         <div className="pt-2 flex justify-center gap-3">
-          <Button variant="secondary" className="w-1/2" onClick={onClose}>
+          <Button variant="secondary" className="w-1/2 cursor-pointer" onClick={onClose}>
             Tutup
           </Button>
-          <Button variant="primary" className="w-1/2 flex items-center justify-center gap-2" onClick={handlePrintPoster}>
-            <span>🖨️</span> Cetak Poster QR
+          <Button variant="primary" className="w-1/2 flex items-center justify-center gap-2 cursor-pointer" onClick={handlePrintPoster}>
+            <span>🖨️</span> Cetak Poster QR (A4/A3)
           </Button>
         </div>
       </div>
