@@ -83,16 +83,38 @@ export class GPSService {
   }
 
   /**
-   * Returns warm cached GPS fix if age < 15 seconds and accuracy <= 40 meters.
+   * Returns warm cached GPS fix if age <= maxAgeMs and accuracy <= maxAccuracyMeters.
+   * Thresholds are configurable from CONSTANTS.DEFAULTS or override parameters.
    */
-  public static getWarmCachedFix(maxAgeMs = 15000, maxAccuracyMeters = 40): GPSCoordinates | null {
+  public static getWarmCachedFix(
+    maxAgeMs = CONSTANTS.DEFAULTS.GPS_CACHE_MAX_AGE_MS,
+    maxAccuracyMeters = CONSTANTS.DEFAULTS.GPS_CACHE_MIN_ACCURACY_METERS
+  ): GPSCoordinates | null {
     if (!this.cachedFix) return null;
     const age = Date.now() - this.cachedFix.timestamp;
     if (age <= maxAgeMs && this.cachedFix.coords.accuracy <= maxAccuracyMeters) {
-      logger.info('GPSService', 'Using warm cached GPS fix (< 15s age, high accuracy):', this.cachedFix.coords);
+      logger.info('GPSService', `Using warm cached GPS fix (age: ${age}ms <= ${maxAgeMs}ms, accuracy: ${this.cachedFix.coords.accuracy}m <= ${maxAccuracyMeters}m):`, this.cachedFix.coords);
       return this.cachedFix.coords;
     }
     return null;
+  }
+
+  /**
+   * Helper method to report current GPS Health Status for Dashboard pre-scan UI indicator
+   */
+  public static getGPSHealthStatus(): { status: 'READY' | 'REFINING' | 'OFF'; text: string; accuracy?: number } {
+    if (!this.cachedFix) {
+      return { status: 'REFINING', text: '📍 Mengukur lokasi GPS...' };
+    }
+    const age = Date.now() - this.cachedFix.timestamp;
+    if (age <= 30000) {
+      const acc = Math.round(this.cachedFix.coords.accuracy);
+      if (acc <= CONSTANTS.DEFAULTS.GPS_CACHE_MIN_ACCURACY_METERS) {
+        return { status: 'READY', text: `🟢 GPS Siap (${acc}m)`, accuracy: acc };
+      }
+      return { status: 'REFINING', text: `🟡 Akurasi GPS (${acc}m)...`, accuracy: acc };
+    }
+    return { status: 'REFINING', text: '📍 Memperbarui GPS...' };
   }
 
   /**

@@ -10,11 +10,15 @@
       ]
     },
     {
-      "source": "/og-image.(jpg|png)",
+      "source": "/og-image.jpg",
       "headers": [
         {
+          "key": "Content-Type",
+          "value": "image/jpeg"
+        },
+        {
           "key": "Cache-Control",
-          "value": "public, max-age=86400, must-revalidate"
+          "value": "public, max-age=86400, s-maxage=31536000, must-revalidate"
         },
         {
           "key": "Access-Control-Allow-Origin",

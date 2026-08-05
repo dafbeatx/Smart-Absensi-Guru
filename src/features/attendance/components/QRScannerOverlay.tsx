@@ -151,10 +151,29 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       return;
     }
 
-    // 2. Fetch & Validate Geofence Radius GPS Location
+    // 2. Fetch & Validate Geofence Radius GPS Location with Auto-Retry Pipeline (up to 3x)
     let currentCoords = gpsCoords;
     if (!currentCoords) {
       currentCoords = await fetchGPSLocation();
+    }
+
+    let validation = currentCoords ? GPSService.validateGeofenceRadius(currentCoords, allowedRadius) : { isValid: false };
+
+    // Auto-retry up to 3 times if initial coords are missing, inaccurate (>40m), or out-of-bounds
+    if (!currentCoords || !validation.isValid || currentCoords.accuracy > CONSTANTS.DEFAULTS.GPS_CACHE_MIN_ACCURACY_METERS) {
+      logger.info('QRScannerOverlay', 'GPS fix requires refinement, starting Auto-Retry pipeline (up to 3x)...');
+      for (let retry = 0; retry < CONSTANTS.DEFAULTS.GPS_AUTO_RETRY_COUNT; retry++) {
+        const freshCoords = await fetchGPSLocation();
+        if (freshCoords) {
+          currentCoords = freshCoords;
+          validation = GPSService.validateGeofenceRadius(currentCoords, allowedRadius);
+          if (validation.isValid && currentCoords.accuracy <= CONSTANTS.DEFAULTS.GPS_CACHE_MIN_ACCURACY_METERS) {
+            logger.info('QRScannerOverlay', `High accuracy GPS fix achieved on retry ${retry + 1}:`, currentCoords);
+            break;
+          }
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      }
     }
 
     if (!currentCoords) {
@@ -171,9 +190,6 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       isProcessingRef.current = false;
       return;
     }
-
-    const validation = GPSService.validateGeofenceRadius(currentCoords, allowedRadius);
-    logger.info('QRScannerOverlay', 'Geofence validation result:', validation);
 
     if (!validation.isValid) {
       logger.warn('QRScannerOverlay', 'Attendance rejected: Out of allowed radius', {

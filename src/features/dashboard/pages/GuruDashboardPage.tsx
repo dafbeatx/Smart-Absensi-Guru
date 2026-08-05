@@ -90,6 +90,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     message: 'Memeriksa status perangkat...',
   });
 
+  // Pre-scan GPS Health Status State
+  const [gpsHealth, setGpsHealth] = useState<{ status: 'READY' | 'REFINING' | 'OFF'; text: string; accuracy?: number }>({
+    status: 'REFINING',
+    text: '📍 Mengukur lokasi GPS...',
+  });
+
+  useEffect(() => {
+    GPSService.startBackgroundWarmUp();
+    setGpsHealth(GPSService.getGPSHealthStatus());
+
+    const interval = setInterval(() => {
+      setGpsHealth(GPSService.getGPSHealthStatus());
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Load Settings, Today Attendance, Holidays, Monthly History, Notifications, & Device Binding
   useEffect(() => {
     const loadAllData = async () => {
@@ -395,10 +412,31 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               </div>
 
-              {/* Action Button: Scan QR */}
+              {/* Pre-Scan GPS Health Status Indicator & Camera Pre-Warm Handler */}
+              <div className="flex items-center justify-between bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200/80 text-xs">
+                <span className="font-semibold text-slate-600 flex items-center gap-1.5">
+                  <span>📍 GPS Readiness:</span>
+                </span>
+                <span className={`font-extrabold flex items-center gap-1.5 ${
+                  gpsHealth.status === 'READY' ? 'text-emerald-700' : 'text-amber-700 animate-pulse'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${
+                    gpsHealth.status === 'READY' ? 'bg-emerald-500' : 'bg-amber-500 animate-ping'
+                  }`} />
+                  <span>{gpsHealth.text}</span>
+                </span>
+              </div>
+
+              {/* Action Button: Scan QR with Camera Pre-Warm */}
               <Button
                 variant="primary"
                 onClick={handleOpenScannerClick}
+                onMouseEnter={() => {
+                  import('html5-qrcode').catch(() => {});
+                }}
+                onTouchStart={() => {
+                  import('html5-qrcode').catch(() => {});
+                }}
                 className="w-full py-3.5 text-xs font-black shadow-lg flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>🔲</span> PINDAI QR CODE ABSENSI (SCANNER HP)
