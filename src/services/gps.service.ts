@@ -2,6 +2,7 @@ import { CONSTANTS } from '../config/constants';
 import { getErrorDefinition } from '../config/error-codes';
 import type { ErrorDefinition } from '../config/error-codes';
 import { calculateDistanceMeters } from '../utils/geofence.utils';
+import { ProviderFactory } from '../providers/provider-factory';
 
 export interface GPSCoordinates {
   latitude: number;
@@ -45,6 +46,28 @@ export class GPSService {
       lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
       radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
     };
+  }
+
+  /**
+   * Fetches latest system settings from provider backend and caches to localStorage
+   */
+  public static async syncGeofenceSettings(): Promise<{ lat: number; lng: number; radius: number }> {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const settings = await provider.getSettings();
+      if (settings && typeof localStorage !== 'undefined' && localStorage && typeof localStorage.setItem === 'function') {
+        const existing = localStorage.getItem('smart_absensi_system_settings');
+        const parsed = existing ? JSON.parse(existing) : {};
+        const updated = {
+          ...parsed,
+          ...settings,
+        };
+        localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.warn('Failed to sync geofence settings from provider:', e);
+    }
+    return this.getGeofenceSettings();
   }
 
   /**

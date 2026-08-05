@@ -37,6 +37,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     setIsCheckingGPS(true);
     setGpsError(null);
     try {
+      await GPSService.syncGeofenceSettings();
       const coords = await GPSService.getCurrentPosition();
       setGpsCoords(coords);
       setIsCheckingGPS(false);
@@ -117,7 +118,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     if (!validation.isValid) {
       // REJECT: Absensi diluar lokasi radius yang diizinkan
       SoundService.playError();
-      setRejectionReason(`Absensi Ditolak! Anda terdeteksi berada ${currentCoords.distanceMeters} meter dari lokasi sekolah. Batas maksimum radius yang diizinkan adalah ${geofenceSettings.radius} meter.`);
+      let hint = '';
+      if (currentCoords.distanceMeters > 500) {
+        hint = '\n\n💡 Catatan: Jarak terdeteksi sangat jauh. Pastikan Admin/Operator Sekolah sudah menyimpan koordinat lokasi sekolah di menu "Pengaturan Jam Kerja & Geofence Sekolah".';
+      }
+      setRejectionReason(`Absensi Ditolak! Anda terdeteksi berada ${currentCoords.distanceMeters} meter dari lokasi sekolah. Batas maksimum radius yang diizinkan adalah ${geofenceSettings.radius} meter.${hint}`);
       setIsRejectionModalOpen(true);
       return;
     }

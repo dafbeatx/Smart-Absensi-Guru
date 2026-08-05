@@ -1,9 +1,10 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useAuthStore } from './store/useAuthStore';
 import { LoginPage } from './features/auth/pages/LoginPage';
 import { ForceChangePinModal } from './features/auth/components/ForceChangePinModal';
 import { ToastContainer } from './components/ui/Toast';
 import { TestRunnerModal } from './components/dev/TestRunnerModal';
+import { GPSService } from './services/gps.service';
 
 // Code-split role dashboard pages lazily to optimize initial bundle size (~21 KB initial payload)
 const GuruDashboardPage = React.lazy(() =>
@@ -35,6 +36,12 @@ export const App: React.FC = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isPreviewGuruMode, setIsPreviewGuruMode] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      GPSService.syncGeofenceSettings().catch(console.warn);
+    }
+  }, [isAuthenticated]);
 
   if (!isAuthenticated || !user) {
     return (
