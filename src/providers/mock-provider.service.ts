@@ -89,6 +89,27 @@ export class MockProvider implements IDataProvider {
     const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
     const dateStr = now.toISOString().split('T')[0];
 
+    const settings = await this.getSettings();
+    const checkInEndStr = settings.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+
+    // Helper to parse HH:mm or HH:mm:ss to minutes
+    const parseMinutes = (tStr: string) => {
+      const clean = tStr.replace(/[^\d:]/g, '');
+      const parts = clean.split(':');
+      if (parts.length >= 2) {
+        return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+      }
+      return 0;
+    };
+
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const cutoffMinutes = parseMinutes(checkInEndStr);
+
+    let initialStatus: AttendanceStatus = 'HADIR';
+    if (nowMinutes > cutoffMinutes) {
+      initialStatus = 'TERLAMBAT';
+    }
+
     const existingSaved = localStorage.getItem('smart_absensi_today_attendance');
     let record: AttendanceRecord = {
       id: 'att_' + Date.now(),
@@ -96,7 +117,7 @@ export class MockProvider implements IDataProvider {
       date: dateStr,
       check_in_time: timeStr,
       check_out_time: null,
-      status: 'HADIR',
+      status: initialStatus,
       check_in_lat: dto.user_lat || -6.2088,
       check_in_lng: dto.user_lng || 106.8456,
       check_in_distance_meters: 12,

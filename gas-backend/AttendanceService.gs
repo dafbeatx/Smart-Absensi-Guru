@@ -81,8 +81,10 @@ var AttendanceService = {
       var status = ATT_STATUS.HADIR;
       var lateMinutes = 0;
 
-      // Hitung keterlambatan
-      var checkinEndMinutes = _timeToMinutes(SHIFT.WORK_CHECKIN_END);
+      // Hitung keterlambatan berdasarkan work_checkin_end dari System_Settings sheet
+      var checkinEndSetting = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "work_checkin_end");
+      var checkinEndStr = (checkinEndSetting && checkinEndSetting.value) ? checkinEndSetting.value : SHIFT.WORK_CHECKIN_END;
+      var checkinEndMinutes = _timeToMinutes(checkinEndStr);
       var currentMinutes = _timeToMinutes(nowTimeShort);
       if (currentMinutes > checkinEndMinutes) {
         status = ATT_STATUS.TERLAMBAT;
@@ -430,7 +432,9 @@ var AttendanceService = {
       // Calculate late minutes if status is TERLAMBAT
       var lateMinutes = 0;
       if (status === ATT_STATUS.TERLAMBAT) {
-        var checkinEndMinutes = _timeToMinutes(SHIFT.WORK_CHECKIN_END);
+        var checkinEndSetting = DatabaseManager.findRecord(DB.SHEETS.SYSTEM_SETTINGS, "key", "work_checkin_end");
+        var checkinEndStr = (checkinEndSetting && checkinEndSetting.value) ? checkinEndSetting.value : SHIFT.WORK_CHECKIN_END;
+        var checkinEndMinutes = _timeToMinutes(checkinEndStr);
         var checkinMinutes = _timeToMinutes(checkInTime);
         if (checkinMinutes > checkinEndMinutes) {
           lateMinutes = checkinMinutes - checkinEndMinutes;

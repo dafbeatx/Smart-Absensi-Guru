@@ -134,8 +134,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
 
     // Save Attendance Record to Repository / Provider / LocalStorage
+    let returnedStatus = 'HADIR';
     try {
-      await AttendanceRepository.scanAttendance({
+      const res = await AttendanceRepository.scanAttendance({
         token: token,
         qr_seed: _qrData || 'SEED_SMP_TERPADU',
         user_lat: currentCoords.latitude,
@@ -143,16 +144,22 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         device_uuid: deviceUUID,
       });
 
+      if (res && res.status) {
+        returnedStatus = res.status;
+      }
+
       // Dispatch global window event so dashboards update in real time
       window.dispatchEvent(new Event('smart_absensi_scanned'));
     } catch (err) {
       console.error('Failed to save attendance record to provider:', err);
     }
 
+    const statusLabel = returnedStatus === 'TERLAMBAT' ? 'TERLAMBAT (Terlambat)' : 'HADIR (Tepat Waktu)';
+
     const result = {
       timestamp: timestampStr,
       distance: currentCoords.distanceMeters,
-      status: 'HADIR (Tepat Waktu)'
+      status: statusLabel
     };
 
     setScanResult(result);
