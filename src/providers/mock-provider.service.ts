@@ -105,7 +105,15 @@ export class MockProvider implements IDataProvider {
     };
   }
 
-  public async resetDevice(_userId: string, _token: string): Promise<boolean> {
+  public async resetDevice(userId: string, _token: string): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(`smart_absensi_bound_device_${userId}`);
+        window.dispatchEvent(new CustomEvent('smart_absensi_device_reset', { detail: { userId } }));
+      } catch (e) {
+        console.warn('Failed to reset device binding in localStorage:', e);
+      }
+    }
     return true;
   }
 
@@ -125,7 +133,7 @@ export class MockProvider implements IDataProvider {
       safeSetStorage(`smart_absensi_bound_device_${userId}`, currentDeviceUUID);
       return {
         status: 'ACTIVE',
-        message: 'Perangkat terikat aktif dengan HP ini.',
+        message: 'Perangkat terikat aktif dengan HP ini. Pembatasan 1 akun 1 HP aktif.',
         registered_uuid: currentDeviceUUID,
       };
     }
@@ -133,7 +141,7 @@ export class MockProvider implements IDataProvider {
     if (boundUUID === currentDeviceUUID) {
       return {
         status: 'ACTIVE',
-        message: 'Terikat Aktif dengan HP ini',
+        message: 'Perangkat terikat aktif dengan HP ini. Pembatasan 1 akun 1 HP aktif.',
         registered_uuid: boundUUID,
       };
     }

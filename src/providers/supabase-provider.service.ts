@@ -129,7 +129,20 @@ export class SupabaseProvider implements IDataProvider {
     throw new Error('Sesi pengguna tidak valid. Silakan login kembali.');
   }
 
-  public async resetDevice(_userId: string, _token: string): Promise<boolean> {
+  public async resetDevice(userId: string, _token: string): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(`smart_absensi_bound_device_${userId}`);
+        window.dispatchEvent(new CustomEvent('smart_absensi_device_reset', { detail: { userId } }));
+      } catch (e) {
+        console.warn('Failed to reset device binding in localStorage:', e);
+      }
+    }
+    try {
+      await this.client.from('device_bindings').delete().eq('user_id', userId);
+    } catch (e) {
+      logger.warn('SupabaseProvider', 'Failed to delete device binding from DB:', e);
+    }
     return true;
   }
 
