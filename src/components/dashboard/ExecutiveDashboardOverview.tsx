@@ -257,8 +257,49 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
     return result;
   }, [attendanceRecords, totalGuruCount, timeRange, todayStr]);
 
-  // Teachers list from Users sheet
-  const recentTeachers = teachers.slice(0, 5);
+  // Synchronized 5 Latest Teachers Scanned Today
+  const recentlyScannedTeachers = useMemo(() => {
+    const todayISO = todayStr;
+    const todayRecs = attendanceRecords.filter(
+      (r) => r.date === todayISO && (r.check_in_time || r.status)
+    );
+
+    // Sort by check-in time descending (latest scan first)
+    const sorted = [...todayRecs].sort((a, b) => {
+      const timeA = a.check_in_time || '00:00';
+      const timeB = b.check_in_time || '00:00';
+      return timeB.localeCompare(timeA);
+    });
+
+    const teacherMap = new Map<string, UserProfile>();
+    teachers.forEach((t) => teacherMap.set(t.id, t));
+
+    const scanned = [];
+    for (const rec of sorted) {
+      const teacherObj = teacherMap.get(rec.user_id) || {
+        id: rec.user_id,
+        full_name: 'Guru Pengajar',
+        position: 'Tenaga Pendidik',
+        role: 'GURU',
+        phone_number: '',
+        nip: null,
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+
+      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+      scanned.push({
+        teacher: teacherObj,
+        record: rec,
+        status: effectiveStatus,
+      });
+
+      if (scanned.length >= 5) break;
+    }
+
+    return scanned;
+  }, [attendanceRecords, teachers, todayStr]);
 
   return (
     <div className="space-y-6">
@@ -549,37 +590,65 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           </div>
         </div>
 
-        {/* Column 3: 5 Guru Terbaru Absen / Belum Absen */}
+        {/* Column 3: 5 Guru Terbaru Absen (Synchronized Real-Time) */}
         <div className="bg-white p-5 rounded-3xl border border-[#D4D4CE]/40 shadow-card flex flex-col justify-between space-y-3">
           <div>
             <h3 className="font-extrabold text-[#023246] text-sm">5 Guru Terbaru Absen</h3>
-            <p className="text-[11px] text-slate-400">Belum ada yang absen hari ini</p>
+            <p className="text-[11px] text-slate-400 font-medium">
+              {recentlyScannedTeachers.length > 0
+                ? `${recentlyScannedTeachers.length} guru melakukan presensi hari ini`
+                : 'Belum ada guru yang melakukan scan hari ini'}
+            </p>
           </div>
 
           <div className="space-y-2.5">
-            {recentTeachers.length > 0 ? (
-              recentTeachers.map((teacherObj, idx) => (
-                <div key={teacherObj.id || idx} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-[#023246]/10 text-[#023246] flex items-center justify-center font-extrabold text-xs">
+            {recentlyScannedTeachers.length > 0 ? (
+              recentlyScannedTeachers.map(({ teacher, record, status }, idx) => (
+                <div key={record.id || idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-slate-100/80 transition-colors border border-slate-200/60">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-[#0D7A5F] text-white flex items-center justify-center font-extrabold text-xs shrink-0 shadow-xs">
+                      {teacher.full_name ? teacher.full_name.charAt(0) : '👤'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-extrabold text-slate-900 truncate">
+                        {teacher.full_name}
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-semibold truncate">
+                        Masuk: {record.check_in_time ? record.check_in_time.substring(0, 5) + ' WIB' : '--:--'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className={`px-2 py-0.5 text-[9px] font-black rounded-lg border shrink-0 ${
+                    status === 'HADIR'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : status === 'TERLAMBAT'
+                      ? 'bg-amber-100 text-amber-800 border-amber-300'
+                      : 'bg-blue-100 text-blue-800 border-blue-300'
+                  }`}>
+                    {status === 'HADIR' ? '✓ Hadir' : status === 'TERLAMBAT' ? '🕒 Terlambat' : status}
+                  </span>
+                </div>
+              ))
+            ) : (
+              teachers.slice(0, 5).map((teacherObj, idx) => (
+                <div key={teacherObj.id || idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/60 border border-slate-200/50">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-extrabold text-xs shrink-0">
                       {teacherObj.full_name ? teacherObj.full_name.charAt(0) : '👤'}
                     </div>
-                    <div className="overflow-hidden">
-                      <p className="text-xs font-bold text-slate-800 truncate max-w-36">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-700 truncate">
                         {teacherObj.full_name}
                       </p>
                       <p className="text-[10px] text-slate-400 truncate">{teacherObj.position}</p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 text-[10px] font-black rounded-full bg-[#023246] text-white">
-                    Belum Absen
+                  <span className="px-2 py-0.5 text-[9px] font-bold rounded-lg bg-slate-100 text-slate-500 border border-slate-200">
+                    ⏳ Belum Absen
                   </span>
                 </div>
               ))
-            ) : (
-              <div className="p-4 text-center text-xs text-slate-400">
-                Belum ada data guru terdaftar di sheet Users.
-              </div>
             )}
           </div>
 
