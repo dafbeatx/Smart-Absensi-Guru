@@ -532,7 +532,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
                   {/* Dynamic Height Bar */}
                   <div
                     style={{ height: `${barHeight}%` }}
-                    className={`w-full max-w-[28px] ${barBg} rounded-t-sm transition-all duration-300 shadow-xs flex items-center justify-center`}
+                    className={`w-full max-w-7 ${barBg} rounded-t-sm transition-all duration-300 shadow-xs flex items-center justify-center`}
                   >
                     <span className="text-[8px] font-black text-white drop-shadow-xs hidden group-hover:inline sm:inline">
                       {item.percentage}%
