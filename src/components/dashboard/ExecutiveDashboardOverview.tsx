@@ -46,10 +46,21 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
     }, 400);
   };
 
-  const { hadirCount, terlambatCount, izinCount, belumAbsenCount, totalPresentCount } = useMemo(() => {
+  const {
+    hadirCount,
+    terlambatCount,
+    izinCount,
+    belumAbsenCount,
+    totalPresentCount,
+    completeCheckOutCount,
+    pendingCheckOutCount,
+  } = useMemo(() => {
     let hadir = 0;
     let terlambat = 0;
     let izin = 0;
+    let completeCheckOut = 0;
+    let pendingCheckOut = 0;
+
     const todayUserMap = new Map<string, AttendanceRecord>();
 
     // Deduplicate by user_id for TODAY ONLY
@@ -64,6 +75,13 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       if (effectiveStatus === 'HADIR') hadir++;
       else if (effectiveStatus === 'TERLAMBAT') terlambat++;
       else if (effectiveStatus === 'IZIN' || effectiveStatus === 'SAKIT' || effectiveStatus === 'DINAS_LUAR') izin++;
+
+      // Check if BOTH check-in and check-out exist
+      if (rec.check_in_time && rec.check_out_time) {
+        completeCheckOut++;
+      } else if (rec.check_in_time && !rec.check_out_time) {
+        pendingCheckOut++;
+      }
     });
 
     const totalPresent = hadir + terlambat;
@@ -75,11 +93,15 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       izinCount: izin,
       belumAbsenCount: belum,
       totalPresentCount: totalPresent,
+      completeCheckOutCount: completeCheckOut,
+      pendingCheckOutCount: pendingCheckOut,
     };
   }, [attendanceRecords, totalGuruCount, todayStr]);
 
+  // Full 100% requires both check-in AND check-out. Check-in only gets 50% weight.
+  const weightedScore = (completeCheckOutCount + izinCount) + (pendingCheckOutCount * 0.5);
   const rawPercentage = totalGuruCount > 0
-    ? Math.round((totalPresentCount / totalGuruCount) * 100)
+    ? Math.round((weightedScore / totalGuruCount) * 100)
     : 0;
 
   const attendancePercentage = Math.min(100, Math.max(0, rawPercentage));
@@ -143,15 +165,22 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         const userMap = new Map<string, AttendanceRecord>();
         dayRecs.forEach((r) => userMap.set(r.user_id, r));
 
+        let dayScore = 0;
         let presentCount = 0;
         userMap.forEach((r) => {
           if (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.check_in_time) {
             presentCount++;
+            // 1.0 if check-out exists (or leave), 0.5 if check-in only
+            if (r.check_out_time || r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR') {
+              dayScore += 1.0;
+            } else {
+              dayScore += 0.5;
+            }
           }
         });
 
         const pct = totalGuru > 0 && userMap.size > 0
-          ? Math.min(100, Math.round((presentCount / totalGuru) * 100))
+          ? Math.min(100, Math.round((dayScore / totalGuru) * 100))
           : 0;
 
         result.push({
@@ -159,7 +188,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           percentage: pct,
           count: presentCount,
           totalGuru,
-          info: userMap.size > 0 ? `${presentCount}/${totalGuru} Guru (${pct}%)` : 'Belum Ada Data Presensi (0%)',
+          info: userMap.size > 0 ? `${presentCount}/${totalGuru} Guru (Nilai Presensi: ${pct}%)` : 'Belum Ada Data Presensi (0%)',
         });
       }
       return result;
@@ -176,6 +205,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 
         const label = `${dStart.getDate()}/${dStart.getMonth() + 1}-${dEnd.getDate()}/${dEnd.getMonth() + 1}`;
 
+        let totalScore = 0;
         let totalPresent = 0;
         let dayCount = 0;
         let hasData = false;
@@ -191,17 +221,27 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           dayRecs.forEach((r) => userMap.set(r.user_id, r));
 
           let dayPresent = 0;
+          let dayScore = 0;
           userMap.forEach((r) => {
-            if (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.check_in_time) dayPresent++;
+            if (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.check_in_time) {
+              dayPresent++;
+              if (r.check_out_time || r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR') {
+                dayScore += 1.0;
+              } else {
+                dayScore += 0.5;
+              }
+            }
           });
 
           totalPresent += dayPresent;
+          totalScore += dayScore;
           dayCount++;
         }
 
+        const avgScore = dayCount > 0 ? totalScore / dayCount : 0;
         const avgPresent = dayCount > 0 ? Math.round(totalPresent / dayCount) : 0;
         const pct = hasData && totalGuru > 0
-          ? Math.min(100, Math.round((avgPresent / totalGuru) * 100))
+          ? Math.min(100, Math.round((avgScore / totalGuru) * 100))
           : 0;
 
         result.push({
@@ -209,7 +249,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           percentage: pct,
           count: avgPresent,
           totalGuru,
-          info: hasData ? `Rata-rata ${avgPresent}/${totalGuru} Guru (${pct}%)` : 'Belum Ada Data Presensi (0%)',
+          info: hasData ? `Rata-rata Presensi Lengkap: ${pct}%` : 'Belum Ada Data Presensi (0%)',
         });
       }
       return result;
@@ -238,13 +278,21 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 
       if (monthRecs.length > 0) {
         hasData = true;
-        const userMap = new Map<string, number>();
+        const userMap = new Map<string, { totalDays: number; completeDays: number }>();
         monthRecs.forEach((r) => {
           if (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.check_in_time) {
-            userMap.set(r.user_id, (userMap.get(r.user_id) || 0) + 1);
+            const cur = userMap.get(r.user_id) || { totalDays: 0, completeDays: 0 };
+            cur.totalDays += 1;
+            if (r.check_out_time || r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR') {
+              cur.completeDays += 1;
+            } else {
+              cur.completeDays += 0.5;
+            }
+            userMap.set(r.user_id, cur);
           }
         });
-        const avgDays = Array.from(userMap.values()).reduce((a, b) => a + b, 0) / (userMap.size || 1);
+        const totalWeightedDays = Array.from(userMap.values()).reduce((a, b) => a + b.completeDays, 0);
+        const avgDays = totalWeightedDays / (userMap.size || 1);
         avgPct = Math.min(100, Math.round((avgDays / 22) * 100));
         estimatedGuru = Math.round((avgPct / 100) * totalGuru);
       }
@@ -254,7 +302,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         percentage: avgPct,
         count: estimatedGuru,
         totalGuru,
-        info: hasData ? `Rata-rata Presensi: ${avgPct}%` : 'Belum Ada Data Presensi (0%)',
+        info: hasData ? `Rata-rata Presensi Lengkap: ${avgPct}%` : 'Belum Ada Data Presensi (0%)',
       });
     }
     return result;
@@ -494,9 +542,11 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
                 <span className="text-2xl font-black text-[#023246]">{attendancePercentage}%</span>
-                <span className="text-[10px] font-bold text-emerald-600">Kehadiran</span>
+                <span className="text-[10px] font-extrabold text-emerald-600">Kelengkapan</span>
                 <div className="mt-0.5 text-center">
-                  <span className="text-[10px] font-bold text-slate-500 block">{totalPresentCount}/{totalGuruCount} Guru</span>
+                  <span className="text-[9px] font-bold text-slate-500 block">
+                    {completeCheckOutCount}/{totalGuruCount} Lengkap (Masuk & Pulang)
+                  </span>
                 </div>
               </div>
             </div>
@@ -506,11 +556,11 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[11px] text-slate-600">
             <div className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-xs bg-[#16A34A]" />
-              <span>Hadir ({hadirCount})</span>
+              <span>Lengkap ({completeCheckOutCount})</span>
             </div>
             <div className="flex items-center gap-1.5 font-medium">
-              <span className="w-2.5 h-2.5 rounded-xs bg-[#D97706]" />
-              <span>Terlambat ({terlambatCount})</span>
+              <span className="w-2.5 h-2.5 rounded-xs bg-amber-500" />
+              <span>Masuk Saja ({pendingCheckOutCount})</span>
             </div>
             <div className="flex items-center gap-1.5 font-medium">
               <span className="w-2.5 h-2.5 rounded-xs bg-[#287094]" />
