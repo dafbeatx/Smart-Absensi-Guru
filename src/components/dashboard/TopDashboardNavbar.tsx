@@ -1,4 +1,4 @@
-import React from 'react';
+import { NotificationBellDropdown } from './NotificationBellDropdown';
 
 export interface TopDashboardNavbarProps {
   onToggleSidebar: () => void;
@@ -66,16 +66,8 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
             </button>
           )}
 
-          {/* Notification Bell with Badge 3 */}
-          <button
-            className="relative p-2 text-slate-600 hover:text-[#023246] hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
-            aria-label="Notifications"
-          >
-            <span className="text-lg">🔔</span>
-            <span className="absolute top-1 right-1 px-1 py-0.2 text-[9px] font-black bg-red-500 text-white rounded-full min-w-3.5 text-center ring-2 ring-white">
-              3
-            </span>
-          </button>
+          {/* Dynamic Realtime Notification Bell Dropdown */}
+          <NotificationBellDropdown />
 
           {/* Logout button on desktop */}
           <button
