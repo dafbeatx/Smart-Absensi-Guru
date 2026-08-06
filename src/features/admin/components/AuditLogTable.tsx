@@ -1,51 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import type { AuditLog } from '../../../types/database.types';
+import { AuditLogger } from '../../../services/audit-logger.service';
 
 export interface AuditLogTableProps {
   auditLogs?: AuditLog[];
 }
 
 export const AuditLogTable: React.FC<AuditLogTableProps> = ({
-  auditLogs = [],
+  auditLogs,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [logs, setLogs] = useState<AuditLog[]>(() => auditLogs || AuditLogger.getLogs());
 
-  const mockLogs: AuditLog[] = auditLogs.length > 0 ? auditLogs : [
-    {
-      id: 'audit_1001',
-      request_id: 'req_87f9a12b',
-      actor_id: 'usr_op_1',
-      actor_role: 'ADMIN',
-      action_type: 'RESET_PIN',
-      target_entity: 'Users',
-      before_value: JSON.stringify({ pin_hash: 'OLD_HASH' }),
-      after_value: JSON.stringify({ pin_hash: 'NEW_HASH' }),
-      change_reason: 'Reset PIN Guru Ahmad Hidayat karena lupa PIN',
-      ip_address: '192.168.1.105',
-      device: 'Chrome Windows 11',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'audit_1002',
-      request_id: 'req_98b1c34d',
-      actor_id: 'usr_kepsek_1',
-      actor_role: 'KEPSEK',
-      action_type: 'APPROVE_LEAVE',
-      target_entity: 'Leave_Requests',
-      before_value: JSON.stringify({ approval_status: 'PENDING' }),
-      after_value: JSON.stringify({ approval_status: 'APPROVED' }),
-      change_reason: 'Disetujui Kepsek: Surat dokter lengkap',
-      ip_address: '192.168.1.102',
-      device: 'Safari iPhone 15',
-      created_at: new Date().toISOString(),
-    },
-  ];
+  useEffect(() => {
+    if (auditLogs && auditLogs.length > 0) {
+      setLogs(auditLogs);
+    } else {
+      setLogs(AuditLogger.getLogs());
+    }
+  }, [auditLogs]);
 
-  const filteredLogs = mockLogs.filter(
+  useEffect(() => {
+    const handleUpdate = () => {
+      setLogs(AuditLogger.getLogs());
+    };
+
+    window.addEventListener('smart_absensi_audit_log_added', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('smart_absensi_audit_log_added', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const activeLogs = logs;
+
+  const filteredLogs = activeLogs.filter(
     (l) =>
       l.action_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
       l.actor_role.toLowerCase().includes(searchQuery.toLowerCase()) ||
