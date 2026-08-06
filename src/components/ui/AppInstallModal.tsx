@@ -185,11 +185,11 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
       {!isOpen && !isStandalone && (
         <button
           onClick={() => setInternalIsOpen(true)}
-          className="fixed bottom-20 right-4 z-40 bg-[#023246] hover:bg-[#03445e] text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-xl border-2 border-emerald-400 flex items-center gap-2 transition-all active:scale-95 animate-bounce"
+          className="fixed bottom-36 right-4 sm:bottom-20 sm:right-28 z-40 bg-[#023246] hover:bg-[#03445e] text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-xl border-2 border-emerald-400 flex items-center gap-1.5 transition-all active:scale-95 animate-bounce"
           title="Install Aplikasi Smart Absensi Guru ke HP"
         >
-          <img src="/school-logo.png" alt="Icon" className="w-5 h-5 object-contain rounded-full bg-white p-0.5" />
-          <span>📲 Install App</span>
+          <img src="/school-logo.png" alt="Icon" className="w-4 h-4 object-contain rounded-full bg-white p-0.5" />
+          <span className="text-[11px]">📲 Install App</span>
         </button>
       )}
     </>

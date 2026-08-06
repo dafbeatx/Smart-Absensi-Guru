@@ -67,22 +67,38 @@ export const AIAssistantDrawer: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   return (
     <>
-      {/* Floating Action Button */}
+      {/* Floating Action Button - Positioned at bottom-24 on mobile to NOT cover bottom tab bar (Profil/Notif) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-40 bg-linear-to-r from-emerald-600 to-teal-700 text-white p-3.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 font-bold text-xs ring-4 ring-emerald-500/20 cursor-pointer"
+        className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40 bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-3.5 py-2.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 font-bold text-xs ring-4 ring-emerald-500/20 cursor-pointer"
         aria-label="Tanya Smart AI Assistant"
       >
-        <span className="text-xl animate-bounce">✨</span>
-        <span className="hidden sm:inline font-semibold">Tanya AI</span>
+        <span className="text-lg animate-bounce">✨</span>
+        <span className="font-semibold text-xs">Tanya AI</span>
       </button>
 
-      {/* Drawer Overlay */}
+      {/* Drawer Overlay with Backdrop Click to Exit */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between border-l border-slate-200">
+        <div
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-xs animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between border-l border-slate-200"
+          >
             {/* Header */}
             <div className="bg-slate-900 text-white p-4 flex items-center justify-between shadow-md">
               <div className="flex items-center gap-3">
@@ -99,11 +115,15 @@ export const AIAssistantDrawer: React.FC = () => {
                   <p className="text-[11px] text-slate-400 font-medium">Asisten Pintar Presensi Sekolah</p>
                 </div>
               </div>
+
+              {/* Prominent Easy Close Button for Smartphones */}
               <button
                 onClick={() => setIsOpen(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition-all cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center gap-1.5 text-xs font-extrabold transition-all cursor-pointer border border-white/20"
+                aria-label="Tutup Chat AI"
               >
-                ✕
+                <span>✕</span>
+                <span>Tutup</span>
               </button>
             </div>
 
@@ -164,23 +184,35 @@ export const AIAssistantDrawer: React.FC = () => {
               )}
             </div>
 
-            {/* Footer Input Box */}
-            <div className="p-3 bg-white border-t border-slate-200 flex gap-2 items-center">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Tulis pertanyaan seputar absensi..."
-                className="flex-1 bg-slate-100 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
-              />
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={isLoading || !inputText.trim()}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer"
-              >
-                Kirim
-              </button>
+            {/* Footer Input Box & Mobile Exit Button */}
+            <div className="p-3 bg-white border-t border-slate-200 space-y-2">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                  placeholder="Tulis pertanyaan seputar absensi..."
+                  className="flex-1 bg-slate-100 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                />
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={isLoading || !inputText.trim()}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer"
+                >
+                  Kirim
+                </button>
+              </div>
+              <div className="flex justify-between items-center text-[11px] text-slate-400 px-1 pt-0.5">
+                <span>Tekan Esc atau ketuk luar untuk keluar</span>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="text-slate-500 hover:text-slate-900 font-bold underline cursor-pointer"
+                >
+                  Tutup Chat AI
+                </button>
+              </div>
             </div>
           </div>
         </div>
