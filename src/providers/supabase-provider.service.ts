@@ -95,15 +95,17 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async verifySession(token: string): Promise<UserProfile> {
+    const activeUser = useAuthStore.getState().user;
     const parts = token.split('_');
-    const userId = parts.length >= 3 ? parts[2] : null;
+    const userIdFromToken = parts.length >= 3 ? parts[2] : null;
+    const searchId = activeUser?.id || userIdFromToken;
 
-    if (userId) {
+    if (searchId) {
       const { data: user } = await this.client
         .from('users')
         .select('*')
-        .eq('id', userId)
-        .single();
+        .or(`id.eq.${searchId},nip.eq.${activeUser?.nip || searchId},phone_number.eq.${activeUser?.phone_number || searchId}`)
+        .maybeSingle();
 
       if (user) {
         return {
@@ -120,27 +122,11 @@ export class SupabaseProvider implements IDataProvider {
       }
     }
 
-    const { data: firstUser } = await this.client
-      .from('users')
-      .select('*')
-      .limit(1)
-      .single();
-
-    if (!firstUser) {
-      throw new Error('Sesi tidak valid.');
+    if (activeUser) {
+      return activeUser;
     }
 
-    return {
-      id: firstUser.id,
-      nip: firstUser.nip,
-      full_name: firstUser.full_name,
-      phone_number: firstUser.phone_number,
-      role: firstUser.role,
-      position: firstUser.position,
-      avatar_url: null,
-      is_active: true,
-      created_at: firstUser.created_at,
-    };
+    throw new Error('Sesi pengguna tidak valid. Silakan login kembali.');
   }
 
   public async resetDevice(_userId: string, _token: string): Promise<boolean> {

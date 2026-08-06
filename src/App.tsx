@@ -73,7 +73,8 @@ export const App: React.FC = () => {
     if (isAuthenticated && token) {
       AuthRepository.verifySession(token)
         .then((latestUser) => {
-          if (latestUser && latestUser.role !== user?.role) {
+          const isSameUser = latestUser && (latestUser.id === user?.id || latestUser.phone_number === user?.phone_number || (user?.nip && latestUser.nip === user?.nip));
+          if (isSameUser && latestUser.role !== user?.role) {
             useAuthStore.getState().updateUserProfile({
               role: latestUser.role,
               full_name: latestUser.full_name,
