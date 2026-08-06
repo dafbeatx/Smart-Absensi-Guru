@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../types/database.types';
 import type { DailyAttendanceSummary } from '../services/analytics.service';
 import { APP_CONFIG } from '../config/app.config';
+import { CONSTANTS } from '../config/constants';
 
 export const SIGNATORY_OFFICIALS = {
   KEPSEK_NAME: 'Farhan Sopian Sahid, S.Pd.I',
@@ -654,7 +655,7 @@ export class ExcelReportGenerator {
     }));
 
     const wsAttendance = XLSX.utils.json_to_sheet(attendanceData.length > 0 ? attendanceData : [
-      { No: 1, Tanggal: new Date().toISOString().split('T')[0], 'Jam Masuk': '07:00', 'Jam Pulang': '14:00', Status: 'HADIR', Verifikasi: 'QR_GPS', 'Jarak GPS (m)': 12 }
+      { No: 1, Tanggal: new Date().toISOString().split('T')[0], 'Jam Masuk': CONSTANTS.DEFAULTS.WORK_CHECKIN_START, 'Jam Pulang': CONSTANTS.DEFAULTS.WORK_CHECKOUT_START, Status: 'HADIR', Verifikasi: 'QR_GPS', 'Jarak GPS (m)': 12 }
     ]);
     wsAttendance['!cols'] = [
       { wch: 6 },

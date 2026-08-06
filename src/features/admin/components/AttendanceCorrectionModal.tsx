@@ -7,6 +7,7 @@ import { AttendanceRepository } from '../../../repositories/AttendanceRepository
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import type { AttendanceStatus, UserProfile } from '../../../types/database.types';
+import { CONSTANTS } from '../../../config/constants';
 
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 
@@ -41,8 +42,8 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
     }
   }, [selectedTeacherId, teachers]);
   const [newStatus, setNewStatus] = useState<AttendanceStatus>('HADIR');
-  const [checkInTime, setCheckInTime] = useState('07:00');
-  const [checkOutTime, setCheckOutTime] = useState('14:00');
+  const [checkInTime, setCheckInTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
+  const [checkOutTime, setCheckOutTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
   const [reason, setReason] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);

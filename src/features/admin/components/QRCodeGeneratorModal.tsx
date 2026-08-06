@@ -4,6 +4,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { APP_CONFIG } from '../../../config/app.config';
 import { CONSTANTS } from '../../../config/constants';
+import { ProviderFactory } from '../../../providers/provider-factory';
 
 export interface QRCodeGeneratorModalProps {
   isOpen: boolean;
@@ -17,8 +18,58 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const qrPayload = CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
 
+  const [settings, setSettings] = useState<{
+    work_checkin_start: string;
+    work_checkin_end: string;
+    work_checkout_start: string;
+    friday_checkout_start: string;
+    institution_name: string;
+  }>({
+    work_checkin_start: CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
+    work_checkin_end: CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
+    work_checkout_start: CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
+    friday_checkout_start: CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START,
+    institution_name: APP_CONFIG.INSTITUTION_NAME,
+  });
+
   useEffect(() => {
     if (isOpen) {
+      // 1. Load local saved settings
+      const savedLocal = localStorage.getItem('smart_absensi_system_settings');
+      if (savedLocal) {
+        try {
+          const parsed = JSON.parse(savedLocal);
+          setSettings((prev) => ({
+            ...prev,
+            work_checkin_start: parsed.work_checkin_start || prev.work_checkin_start,
+            work_checkin_end: parsed.work_checkin_end || prev.work_checkin_end,
+            work_checkout_start: parsed.work_checkout_start || prev.work_checkout_start,
+            friday_checkout_start: parsed.friday_checkout_start || prev.friday_checkout_start,
+            institution_name: parsed.institution_name || prev.institution_name,
+          }));
+        } catch (e) {
+          console.error('Failed to parse local settings in QRCodeGeneratorModal:', e);
+        }
+      }
+
+      // 2. Fetch authoritative settings from provider
+      ProviderFactory.getProvider()
+        .getSettings()
+        .then((fetched) => {
+          if (fetched) {
+            setSettings({
+              work_checkin_start: fetched.work_checkin_start || CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
+              work_checkin_end: fetched.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
+              work_checkout_start: fetched.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
+              friday_checkout_start: fetched.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START,
+              institution_name: fetched.institution_name || APP_CONFIG.INSTITUTION_NAME,
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn('Failed to fetch settings from provider in QRCodeGeneratorModal:', err);
+        });
+
       QRCode.toDataURL(qrPayload, {
         width: 400,
         margin: 2,
@@ -131,7 +182,7 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
 
         <div class="poster-box">
           <div class="header">
-            <h1>${APP_CONFIG.INSTITUTION_NAME}</h1>
+            <h1>${settings.institution_name}</h1>
             <h2>POSTER RESMI QR CODE ABSENSI GURU & STAF</h2>
             <p>Sistem Absensi Berbasis QR Code & Digital Scan (${APP_CONFIG.APP_NAME})</p>
           </div>
@@ -149,14 +200,14 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
               <li>Buka Web Aplikasi <strong>Smart Absensi Guru</strong> di HP Anda.</li>
               <li>Klik tombol hijau melayang <strong>📷 Scan QR</strong> di bagian bawah layar.</li>
               <li>Arahkan Kamera HP ke gambar QR Code di atas.</li>
-              <li><strong>Jam Masuk Tepat Waktu:</strong> 07:00 - 07:15 WIB (Di atas 07:15 WIB otomatis dicatat <i>Terlambat</i>).</li>
-              <li><strong>Jam Pulang:</strong> Mulai pukul 14:00 WIB.</li>
+              <li><strong>Jam Masuk Tepat Waktu:</strong> ${settings.work_checkin_start} - ${settings.work_checkin_end} WIB (Di atas ${settings.work_checkin_end} WIB otomatis dicatat <i>Terlambat</i>).</li>
+              <li><strong>Jam Pulang:</strong> Mulai pukul ${settings.work_checkout_start} WIB (Jumat: pukul ${settings.friday_checkout_start} WIB).</li>
               <li><strong>Jika Scan Direject / Kamera Buram:</strong> Gunakan tombol <strong>"⌨️ Input Kode Manual"</strong> (masukkan kode <code>${qrPayload}</code>) atau tombol <strong>"📍 Absen via GPS"</strong>.</li>
             </ol>
           </div>
 
           <div class="footer-note">
-            SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam — Official Attendance Gate QR Code
+            ${settings.institution_name} — Official Attendance Gate QR Code
           </div>
         </div>
       </body>
@@ -191,8 +242,8 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
             <span>📢</span> Info Poster Resmi Absensi Gerbang
           </h3>
           <ul className="space-y-1 text-slate-600 text-[11px] leading-relaxed list-disc list-inside">
-            <li><strong>Jam Masuk:</strong> 07:00 - 07:15 WIB (Di atas 07:15 otomatis Terlambat).</li>
-            <li><strong>Jam Pulang:</strong> Mulai 14:00 WIB.</li>
+            <li><strong>Jam Masuk:</strong> {settings.work_checkin_start} - {settings.work_checkin_end} WIB (Di atas {settings.work_checkin_end} otomatis Terlambat).</li>
+            <li><strong>Jam Pulang:</strong> Mulai {settings.work_checkout_start} WIB (Jumat {settings.friday_checkout_start} WIB).</li>
             <li><strong>Kendala Scan:</strong> Disediakan Kode Manual <code>{qrPayload}</code> dan Absen GPS Mandiri.</li>
           </ul>
         </div>

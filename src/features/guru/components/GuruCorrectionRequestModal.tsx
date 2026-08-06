@@ -7,6 +7,7 @@ import { GroqAIService } from '../../../services/groq-ai.service';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { logger } from '../../../utils/logger.utils';
+import { CONSTANTS } from '../../../config/constants';
 
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 
@@ -26,8 +27,8 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
   const todayStr = getTodayDateInJakarta();
 
   const [date, setDate] = useState(todayStr);
-  const [checkInTime, setCheckInTime] = useState('07:00');
-  const [checkOutTime, setCheckOutTime] = useState('14:00');
+  const [checkInTime, setCheckInTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
+  const [checkOutTime, setCheckOutTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
   const [targetStatus, setTargetStatus] = useState<'HADIR' | 'IZIN' | 'SAKIT'>('HADIR');
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
