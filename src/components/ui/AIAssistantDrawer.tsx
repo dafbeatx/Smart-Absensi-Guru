@@ -82,7 +82,7 @@ export const AIAssistantDrawer: React.FC = () => {
       {/* Floating Action Button - Positioned at bottom-24 on mobile to NOT cover bottom tab bar (Profil/Notif) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40 bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-3.5 py-2.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 font-bold text-xs ring-4 ring-emerald-500/20 cursor-pointer"
+        className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40 bg-linear-to-r from-emerald-600 to-teal-700 text-white px-3.5 py-2.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 font-bold text-xs ring-4 ring-emerald-500/20 cursor-pointer"
         aria-label="Tanya Smart AI Assistant"
       >
         <span className="text-lg animate-bounce">✨</span>
