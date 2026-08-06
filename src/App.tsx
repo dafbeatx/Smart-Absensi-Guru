@@ -6,6 +6,7 @@ import { ToastContainer } from './components/ui/Toast';
 import { TestRunnerModal } from './components/dev/TestRunnerModal';
 import { AIAssistantDrawer } from './components/ui/AIAssistantDrawer';
 import { AppInstallModal } from './components/ui/AppInstallModal';
+import { QueueMonitor } from './components/ui/QueueMonitor';
 import { GPSService } from './services/gps.service';
 import { AuthRepository } from './repositories/AuthRepository';
 
@@ -244,6 +245,7 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      <QueueMonitor />
       <AIAssistantDrawer />
       <AppInstallModal />
       <ToastContainer />

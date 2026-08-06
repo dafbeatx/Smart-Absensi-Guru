@@ -46,6 +46,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     distance: number;
     status: string;
     action?: 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED';
+    isOffline?: boolean;
   } | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isProcessingRef = useRef(false);
@@ -238,12 +239,14 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
       logger.info('QRScannerOverlay', 'Attendance saved successfully:', res);
 
-      if (res) {
-        if (res.status) returnedStatus = res.status;
-        if (res.attendance_action) returnedAction = res.attendance_action;
-      }
+    let isOfflineRecord = false;
+    if (res) {
+      if (res.status) returnedStatus = res.status;
+      if (res.attendance_action) returnedAction = res.attendance_action;
+      if (res.is_offline) isOfflineRecord = true;
+    }
 
-      window.dispatchEvent(new Event('smart_absensi_scanned'));
+    window.dispatchEvent(new Event('smart_absensi_scanned'));
     } catch (err: unknown) {
       logger.error('QRScannerOverlay', 'Failed to save attendance record:', err);
       SoundService.playError();
@@ -263,13 +266,14 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
     NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
 
-    const statusLabel = returnedStatus === 'TERLAMBAT' ? 'TERLAMBAT (Terlambat)' : 'HADIR (Tepat Waktu)';
+    const statusLabel = returnedStatus === 'TERLAMBAT' ? 'TERLAMBAT (Terlambat)' : returnedStatus.includes('OFFLINE') ? 'HADIR (MODE OFFLINE)' : 'HADIR (Tepat Waktu)';
 
     const result = {
       timestamp: timestampStr,
       distance: currentCoords.distanceMeters,
       status: statusLabel,
       action: returnedAction,
+      isOffline: isOfflineRecord,
     };
 
     setScanResult(result);
@@ -441,6 +445,18 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                 : 'Selamat bertugas! Data presensi otomatis tersimpan.'}
             </p>
           </div>
+
+          {scanResult?.isOffline && (
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl text-left text-xs text-emerald-900 flex items-start gap-2.5 shadow-xs">
+              <span className="text-xl shrink-0">📶</span>
+              <div className="space-y-0.5">
+                <p className="font-extrabold text-emerald-950 text-xs">Presensi Tersimpan (Mode Offline)</p>
+                <p className="text-[11px] text-emerald-700 leading-snug">
+                  Data presensi tersimpan aman di HP. Otomatis terkirim ke server saat terhubung ke Wi-Fi / internet.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-left text-xs text-slate-600 border border-slate-100">
             <div className="flex justify-between">

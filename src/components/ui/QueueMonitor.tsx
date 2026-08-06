@@ -12,14 +12,20 @@ export const QueueMonitor: React.FC = () => {
   if (pendingItems.length === 0 && syncState === 'IDLE') return null;
 
   return (
-    <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-card space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🔄</span>
-          <div>
-            <h4 className="font-extrabold text-slate-900 text-xs">Status Sinkronisasi Offline</h4>
-            <p className="text-[11px] text-slate-500">
-              {pendingItems.length} transaksi mengantre di IndexedDB
+    <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 animate-bounce-once">
+      <div className="bg-slate-900 text-white rounded-2xl p-3.5 shadow-2xl border border-emerald-500/40 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
+            <span className="text-base animate-spin">📶</span>
+          </div>
+          <div className="min-w-0">
+            <h4 className="font-extrabold text-white text-xs truncate">
+              {pendingItems.length} Absensi Offline Mengantre
+            </h4>
+            <p className="text-[10px] text-slate-300 truncate">
+              {syncState === 'SYNCING'
+                ? 'Sedang menyinkronkan ke server...'
+                : 'Akan otomatis terkirim saat ada internet/WiFi'}
             </p>
           </div>
         </div>
@@ -27,22 +33,16 @@ export const QueueMonitor: React.FC = () => {
         <button
           onClick={() => SyncEngine.processSyncQueue()}
           disabled={syncState === 'SYNCING'}
-          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-[11px] rounded-xl disabled:opacity-50 transition-all shrink-0 cursor-pointer shadow-md"
         >
-          {syncState === 'SYNCING' ? 'Syncing...' : '⚡ Sync Sekarang'}
+          {syncState === 'SYNCING' ? 'Syncing...' : '⚡ Sync'}
         </button>
       </div>
 
-      {syncState === 'SYNCING' && (
-        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <div className="bg-emerald-500 h-full w-full animate-pulse" />
-        </div>
-      )}
-
       {syncState === 'SUCCESS' && lastSyncedCount > 0 && (
-        <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-          <span>✓</span> {lastSyncedCount} data absensi berhasil disinkronkan.
-        </p>
+        <div className="mt-1 bg-emerald-700 text-white text-[10px] font-bold px-3 py-1 rounded-xl text-center shadow-md animate-fade-in">
+          ✓ {lastSyncedCount} data absensi offline berhasil dikirim!
+        </div>
       )}
     </div>
   );
