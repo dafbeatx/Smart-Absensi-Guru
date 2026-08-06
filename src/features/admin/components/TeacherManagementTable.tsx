@@ -141,6 +141,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       console.warn('Failed to cache teachers to localStorage:', e);
     }
 
+    if (user && (user.id === selectedTeacher.id || user.nip === selectedTeacher.nip)) {
+      useAuthStore.getState().updateUserProfile(updates);
+    }
+
     await AuditLogger.log({
       actorId: user?.id || 'op_1',
       actorRole: user?.role || 'ADMIN',

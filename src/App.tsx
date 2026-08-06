@@ -6,6 +6,7 @@ import { ToastContainer } from './components/ui/Toast';
 import { TestRunnerModal } from './components/dev/TestRunnerModal';
 import { AIAssistantDrawer } from './components/ui/AIAssistantDrawer';
 import { GPSService } from './services/gps.service';
+import { AuthRepository } from './repositories/AuthRepository';
 
 // Helper: retry a dynamic import once by reloading the page when the chunk
 // is missing (stale deployment).  Uses sessionStorage to prevent infinite loops.
@@ -61,21 +62,33 @@ const QRScannerOverlay = lazyRetry(
 
 
 export const App: React.FC = () => {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, token } = useAuthStore();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isPreviewGuruMode, setIsPreviewGuruMode] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isPreviewScannerBlocked, setIsPreviewScannerBlocked] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && token) {
+      AuthRepository.verifySession(token)
+        .then((latestUser) => {
+          if (latestUser && latestUser.role !== user?.role) {
+            useAuthStore.getState().updateUserProfile({
+              role: latestUser.role,
+              full_name: latestUser.full_name,
+              position: latestUser.position,
+            });
+          }
+        })
+        .catch(console.warn);
+
       GPSService.syncGeofenceSettings().catch(console.warn);
       GPSService.startBackgroundWarmUp();
     }
     return () => {
       GPSService.stopBackgroundWarmUp();
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, token, user?.role]);
 
   if (!isAuthenticated || !user) {
     return (
