@@ -45,6 +45,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     timestamp: string;
     distance: number;
     status: string;
+    rawStatus?: string;
     action?: 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED';
     isOffline?: boolean;
   } | null>(null);
@@ -266,12 +267,18 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
     NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
 
-    const statusLabel = returnedStatus === 'TERLAMBAT' ? 'TERLAMBAT (Terlambat)' : returnedStatus.includes('OFFLINE') ? 'HADIR (MODE OFFLINE)' : 'HADIR (Tepat Waktu)';
+    const isLate = returnedStatus === 'TERLAMBAT';
+    const statusText = isLate
+      ? 'Terlambat'
+      : isOfflineRecord
+      ? 'Hadir (Mode Offline)'
+      : 'Hadir Tepat Waktu';
 
     const result = {
       timestamp: timestampStr,
       distance: currentCoords.distanceMeters,
-      status: statusLabel,
+      status: statusText,
+      rawStatus: returnedStatus,
       action: returnedAction,
       isOffline: isOfflineRecord,
     };
@@ -422,17 +429,21 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto ring-8 animate-bounce ${
             scanResult?.action === 'CHECK_OUT'
               ? 'bg-blue-100 text-blue-600 ring-blue-50'
+              : scanResult?.rawStatus === 'TERLAMBAT'
+              ? 'bg-amber-100 text-amber-600 ring-amber-50'
               : scanResult?.action === 'ALREADY_COMPLETED'
               ? 'bg-amber-100 text-amber-600 ring-amber-50'
               : 'bg-emerald-100 text-emerald-600 ring-emerald-50'
           }`}>
-            {scanResult?.action === 'CHECK_OUT' ? '🌇' : scanResult?.action === 'ALREADY_COMPLETED' ? 'ℹ️' : '✓'}
+            {scanResult?.action === 'CHECK_OUT' ? '🌇' : scanResult?.rawStatus === 'TERLAMBAT' ? '⚠️' : scanResult?.action === 'ALREADY_COMPLETED' ? 'ℹ️' : '✓'}
           </div>
 
           <div>
             <h3 className="font-extrabold text-slate-900 text-xl">
               {scanResult?.action === 'CHECK_OUT'
                 ? 'ABSEN PULANG BERHASIL!'
+                : scanResult?.rawStatus === 'TERLAMBAT'
+                ? 'ABSEN MASUK (TERLAMBAT)'
                 : scanResult?.action === 'ALREADY_COMPLETED'
                 ? 'PRESENSI HARI INI LENGKAP!'
                 : 'ABSEN MASUK BERHASIL!'}
@@ -440,6 +451,8 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             <p className="text-xs text-slate-500 mt-1">
               {scanResult?.action === 'CHECK_OUT'
                 ? 'Terima kasih atas pengabdian Anda hari ini!'
+                : scanResult?.rawStatus === 'TERLAMBAT'
+                ? 'Presensi Anda tercatat, namun melewati batas jam masuk (07:15 WIB).'
                 : scanResult?.action === 'ALREADY_COMPLETED'
                 ? 'Anda sudah melakukan presensi masuk dan pulang hari ini.'
                 : 'Selamat bertugas! Data presensi otomatis tersimpan.'}
@@ -478,7 +491,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-left text-xs text-slate-600 border border-slate-100">
             <div className="flex justify-between">
               <span className="text-slate-400">Status Absen</span>
-              <Badge status="HADIR">{scanResult?.status || 'Hadir Tepat Waktu'}</Badge>
+              <Badge status={scanResult?.rawStatus === 'TERLAMBAT' ? 'TERLAMBAT' : 'HADIR'}>
+                {scanResult?.status || (scanResult?.rawStatus === 'TERLAMBAT' ? 'Terlambat' : 'Hadir Tepat Waktu')}
+              </Badge>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Waktu Presensi</span>
