@@ -669,7 +669,7 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<HolidayRecord> {
     const newId = `hol_${Date.now()}`;
-    const newRec = {
+    const fullRec = {
       id: newId,
       date: holiday.date,
       name: holiday.name,
@@ -677,11 +677,20 @@ export class SupabaseProvider implements IDataProvider {
       description: holiday.description,
     };
 
-    const { error } = await this.client.from('holidays').insert(newRec);
+    let { error } = await this.client.from('holidays').insert(fullRec);
+
+    // Fallback retry if 'type' column is missing in Supabase schema cache
+    if (error && (error.message.includes("Could not find the 'type' column") || error.code === 'PGRST204')) {
+      logger.warn('SupabaseProvider', "'type' column missing on holidays table. Retrying insert without 'type' column...");
+      const { type, ...recWithoutType } = fullRec;
+      const retry = await this.client.from('holidays').insert(recWithoutType);
+      error = retry.error;
+    }
+
     if (error) throw new Error('Gagal menambahkan hari libur: ' + error.message);
 
     return {
-      ...newRec,
+      ...fullRec,
       created_at: new Date().toISOString(),
     };
   }
@@ -691,7 +700,17 @@ export class SupabaseProvider implements IDataProvider {
     holiday: Partial<HolidayRecord>,
     _token?: string
   ): Promise<HolidayRecord> {
-    const { error } = await this.client.from('holidays').update(holiday).eq('id', id);
+    let { error } = await this.client.from('holidays').update(holiday).eq('id', id);
+
+    // Fallback retry if 'type' column is missing in Supabase schema cache
+    if (error && (error.message.includes("Could not find the 'type' column") || error.code === 'PGRST204')) {
+      logger.warn('SupabaseProvider', "'type' column missing on holidays table. Retrying update without 'type' column...");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { type, ...holidayWithoutType } = holiday as any;
+      const retry = await this.client.from('holidays').update(holidayWithoutType).eq('id', id);
+      error = retry.error;
+    }
+
     if (error) throw new Error('Gagal memperbarui hari libur: ' + error.message);
 
     return {
