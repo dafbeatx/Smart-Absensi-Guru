@@ -65,11 +65,13 @@ export class SyncEngine {
       for (const item of pendingItems as OfflineAttendanceRecord[]) {
         try {
           await provider.scanAttendance({
-            token: 'SYNC_OFFLINE_TOKEN',
+            token: `SYNC_${item.user_id}_TOKEN`,
             qr_seed: item.qr_seed,
             user_lat: item.user_lat,
             user_lng: item.user_lng,
             device_uuid: item.user_id,
+            user_id: item.user_id,
+            timestamp: item.timestamp,
           });
 
           // Remove successfully synced item from IndexedDB
@@ -79,7 +81,7 @@ export class SyncEngine {
           console.error(`Failed to sync item ${item.id}:`, err);
           // Increment retry count in IndexedDB
           item.retry_count = (item.retry_count || 0) + 1;
-          if (item.retry_count > 5) {
+          if (item.retry_count > 10) {
             item.sync_status = 'FAILED';
           }
           await indexedDBService.enqueue(item);
@@ -91,12 +93,20 @@ export class SyncEngine {
       if (syncedCount > 0) {
         store.setLastSyncedCount(syncedCount);
         store.setSyncState('SUCCESS');
+
+        // Dispatch real-time events to update Admin & Guru Live Tracking views
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('smart_absensi_scanned'));
+          window.dispatchEvent(new CustomEvent('smart_absensi_records_updated'));
+          window.dispatchEvent(new Event('storage'));
+        }
+
         useToastStore
           .getState()
           .showToast(
             'success',
             'Sinkronisasi Berhasil!',
-            `${syncedCount} data absensi offline berhasil dikirim ke server.`
+            `${syncedCount} data absensi offline (absen masuk/pulang) berhasil dikirim ke server.`
           );
       } else {
         store.setSyncState('IDLE');

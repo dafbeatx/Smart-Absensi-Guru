@@ -156,7 +156,12 @@ export class MockProvider implements IDataProvider {
   public async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
     await new Promise((r) => setTimeout(r, 400));
     
-    const timeStr = getCurrentTimeInJakarta();
+    const sessionUser = useAuthStore.getState().user;
+    const userId = dto.user_id || sessionUser?.id || 'usr_uuid_1001';
+
+    const timeStr = dto.timestamp
+      ? new Date(dto.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'
+      : getCurrentTimeInJakarta();
     const dateStr = getTodayDateInJakarta();
 
     const settings = await this.getSettings();
@@ -169,9 +174,6 @@ export class MockProvider implements IDataProvider {
     if (nowMinutes > cutoffMinutes) {
       initialStatus = 'TERLAMBAT';
     }
-
-    const sessionUser = useAuthStore.getState().user;
-    const userId = sessionUser?.id || 'usr_uuid_1001';
 
     const existingSaved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${dateStr}`);
     let record: AttendanceRecord;

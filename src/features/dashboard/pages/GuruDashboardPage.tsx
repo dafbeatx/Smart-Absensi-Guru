@@ -251,8 +251,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
     const handleScannedEvent = () => loadAllData();
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
+    window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
+      window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
     };
   }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);
 

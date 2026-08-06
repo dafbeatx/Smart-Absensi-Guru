@@ -198,7 +198,9 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     const todayStr = getTodayDateInJakarta();
-    const timeStr = getCurrentTimeInJakarta();
+    const timeStr = dto.timestamp
+      ? new Date(dto.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'
+      : getCurrentTimeInJakarta();
 
     const checkinEnd = settings.work_checkin_end || '07:15';
     const currentMin = timeToMinutes(timeStr);
@@ -206,13 +208,13 @@ export class SupabaseProvider implements IDataProvider {
 
     const status: AttendanceStatus = currentMin > cutoffMin ? 'TERLAMBAT' : 'HADIR';
 
-    // Safely retrieve user ID from active auth store or token
+    // Safely retrieve user ID from dto, active auth store, or token
     const sessionUser = useAuthStore.getState().user;
-    let userId = sessionUser?.id;
+    let userId = dto.user_id || sessionUser?.id;
 
     if (!userId && dto.token) {
       const parts = dto.token.split('_');
-      if (parts.length >= 3) {
+      if (parts.length >= 3 && parts[2] !== 'TOKEN') {
         userId = parts[2];
       }
     }
