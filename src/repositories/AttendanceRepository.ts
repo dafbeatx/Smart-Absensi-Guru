@@ -78,13 +78,22 @@ export class AttendanceRepository {
     }
 
     try {
-      const result = await ProviderFactory.getProvider().scanAttendance(dto);
+      // Race online provider scan vs 2500ms timeout for weak/slow 2G/3G/4G connections
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Koneksi internet lambat / sinyal lemah (Timeout 2.5s). Mengalihkan ke simpan offline...')), 2500)
+      );
+
+      const result = await Promise.race([
+        ProviderFactory.getProvider().scanAttendance(dto),
+        timeoutPromise,
+      ]);
+
       logger.info('AttendanceRepository', 'scanAttendance success:', result);
       return result;
     } catch (err: unknown) {
-      logger.error('AttendanceRepository', 'scanAttendance failed online, attempting offline fallback:', err);
+      logger.warn('AttendanceRepository', 'scanAttendance failed or timed out on weak network, switching to offline IndexedDB fallback:', err);
       
-      // If network fetch fails, fallback to IndexedDB Queue
+      // If network fetch fails or times out, fallback to IndexedDB Queue
       const userId = useAuthStore.getState().user?.id || 'usr_offline';
       const recordId = 'att_offline_' + Date.now();
 
