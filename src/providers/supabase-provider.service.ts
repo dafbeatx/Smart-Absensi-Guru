@@ -223,15 +223,48 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     // Verifikasi user exist di public.users sebelum insert
-    // (mencegah FK violation jika user preview / token kadaluarsa)
-    const { data: userExists, error: userCheckError } = await this.client
+    // (mencegah FK violation jika user preview / token kadaluarsa / akun dibuat di local store)
+    let { data: userExists, error: userCheckError } = await this.client
       .from('users')
-      .select('id')
-      .eq('id', userId)
+      .select('id, nip, full_name')
+      .or(`id.eq.${userId},nip.eq.${sessionUser?.nip || userId}`)
       .maybeSingle();
 
     if (userCheckError) {
       logger.warn('SupabaseProvider', 'User existence check error:', userCheckError.message);
+    }
+
+    // Jika user ditemukan via NIP atau ID lain, pastikan userId menggunakan ID asli dari Supabase
+    if (userExists?.id) {
+      userId = userExists.id;
+    }
+
+    // Fallback: Jika akun belum ada di Supabase public.users tetapi sessionUser aktif di HP guru,
+    // lakukan auto-sync/upsert profil guru agar absensi tidak gagal (tertolak).
+    if (!userExists && sessionUser) {
+      logger.info('SupabaseProvider', 'Auto-syncing session user to public.users table', { userId, name: sessionUser.full_name });
+      const defaultPinHash = await hashPin('123456');
+      const newUserRecord = {
+        id: sessionUser.id || userId,
+        nip: sessionUser.nip || `NIP_${Date.now()}`,
+        full_name: sessionUser.full_name || 'Guru Active',
+        phone_number: sessionUser.phone_number || '080000000000',
+        pin_hash: defaultPinHash,
+        role: sessionUser.role || 'GURU',
+        position: sessionUser.position || 'Pendidik',
+        account_status: 'ACTIVE',
+      };
+
+      const { error: autoSyncErr } = await this.client
+        .from('users')
+        .upsert(newUserRecord, { onConflict: 'id' });
+
+      if (!autoSyncErr) {
+        userId = newUserRecord.id;
+        userExists = { id: newUserRecord.id, nip: newUserRecord.nip, full_name: newUserRecord.full_name };
+      } else {
+        logger.error('SupabaseProvider', 'Failed auto-sync user to database:', autoSyncErr.message);
+      }
     }
 
     if (!userExists) {
