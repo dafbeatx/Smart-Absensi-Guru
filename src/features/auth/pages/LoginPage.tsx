@@ -65,8 +65,8 @@ export const LoginPage: React.FC = () => {
       <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
         {/* Branding Hierarchy */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 bg-emerald-500 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-emerald-500/30">
-            📱
+          <div className="w-16 h-16 bg-white p-1 rounded-2xl mx-auto flex items-center justify-center shadow-lg border border-slate-200 ring-4 ring-emerald-50">
+            <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-xl" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">SMART ABSENSI GURU</h1>
           <p className="text-xs font-semibold text-slate-600">

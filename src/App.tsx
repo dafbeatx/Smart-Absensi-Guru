@@ -5,6 +5,7 @@ import { ForceChangePinModal } from './features/auth/components/ForceChangePinMo
 import { ToastContainer } from './components/ui/Toast';
 import { TestRunnerModal } from './components/dev/TestRunnerModal';
 import { AIAssistantDrawer } from './components/ui/AIAssistantDrawer';
+import { AppInstallModal } from './components/ui/AppInstallModal';
 import { GPSService } from './services/gps.service';
 import { AuthRepository } from './repositories/AuthRepository';
 
@@ -243,6 +244,7 @@ export const App: React.FC = () => {
       )}
 
       <AIAssistantDrawer />
+      <AppInstallModal />
       <ToastContainer />
     </>
   );

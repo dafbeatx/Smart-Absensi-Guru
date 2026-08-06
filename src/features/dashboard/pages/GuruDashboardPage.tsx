@@ -292,8 +292,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 pt-5 pb-3 bg-white border-b border-[#D4D4CE]/20 sticky top-0 z-30 shadow-2xs max-w-md mx-auto">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#0D7A5F]/10 text-[#0D7A5F] font-black text-lg flex items-center justify-center border border-[#0D7A5F]/20">
-            ∆
+          <div className="w-10 h-10 rounded-full bg-white p-0.5 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-md ring-2 ring-emerald-50">
+            <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
           </div>
           <div>
             <h1 className="font-black text-[#023246] text-sm tracking-tight leading-none uppercase">

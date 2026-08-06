@@ -28,8 +28,8 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
 
           {/* Mobile Center Brand Logo (Visible on mobile screens) */}
           <div className="flex sm:hidden items-center gap-2 overflow-hidden">
-            <div className="w-7 h-7 rounded-full bg-[#023246] text-white flex items-center justify-center font-black text-xs shrink-0">
-              ∆
+            <div className="w-8 h-8 rounded-full bg-white p-0.5 border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
+              <img src="/school-logo.png" alt="Logo" className="w-full h-full object-contain rounded-full" />
             </div>
             <div className="space-y-0 overflow-hidden text-left">
               <h2 className="font-black text-xs text-[#023246] uppercase tracking-wide truncate">Smart Absensi Guru</h2>

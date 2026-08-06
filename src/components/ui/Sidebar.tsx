@@ -63,8 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* Brand Logo Header (Delta Symbol + SMART ABSENSI GURU) */}
       <div className="p-5 border-b border-[#D4D4CE]/15 flex items-center gap-3 bg-[#012332]">
-        <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-black text-lg text-white shrink-0 shadow-inner">
-          ∆
+        <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-white/30 flex items-center justify-center shrink-0 shadow-md">
+          <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
         </div>
         <div className="space-y-0.5 overflow-hidden">
           <h2 className="font-black text-xs tracking-wider text-white uppercase truncate">Smart Absensi Guru</h2>
@@ -171,8 +171,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Header with Delta Logo & Close button */}
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-1001">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#023246] text-white flex items-center justify-center font-black text-lg shadow-sm">
-                  ∆
+                <div className="w-9 h-9 rounded-full bg-slate-100 p-0.5 border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
+                  <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
                 </div>
                 <div className="space-y-0.5 overflow-hidden text-left">
                   <h2 className="font-black text-xs tracking-wider text-[#023246] uppercase truncate">Smart Absensi Guru</h2>
