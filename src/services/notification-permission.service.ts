@@ -93,6 +93,11 @@ class NotificationPermissionService {
         console.warn('Error displaying native notification:', e);
       }
     }
+
+    // 3. Dispatch internal custom event for instant UI bell update
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smart_absensi_notification_pushed', { detail: payload }));
+    }
   }
 
   /**

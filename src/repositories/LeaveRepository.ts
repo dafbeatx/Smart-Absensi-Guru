@@ -22,11 +22,21 @@ export class LeaveRepository {
     }
 
     logger.info('LeaveRepository', 'Submitting leave application for user:', { userId: activeUser.id, leave_type: dto.leave_type });
-    return ProviderFactory.getProvider().submitLeave(dto);
+    const res = await ProviderFactory.getProvider().submitLeave(dto);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_leave_updated'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    }
+    return res;
   }
 
   public static async approveLeave(leaveId: string, decision: 'APPROVED' | 'REJECTED', notes: string, token: string): Promise<boolean> {
-    return ProviderFactory.getProvider().approveLeave(leaveId, decision, notes, token);
+    const res = await ProviderFactory.getProvider().approveLeave(leaveId, decision, notes, token);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_leave_updated'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    }
+    return res;
   }
 
   public static async getPendingLeaves(token: string): Promise<LeaveRequest[]> {

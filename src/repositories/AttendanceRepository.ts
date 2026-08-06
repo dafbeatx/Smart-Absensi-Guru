@@ -165,6 +165,10 @@ export class AttendanceRepository {
     try {
       const result = await ProviderFactory.getProvider().correctAttendance(payload);
       logger.info('AttendanceRepository', 'correctAttendance success');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('smart_absensi_scanned'));
+        window.dispatchEvent(new Event('smart_absensi_records_updated'));
+      }
       return result;
     } catch (err) {
       logger.error('AttendanceRepository', 'correctAttendance failed:', err);

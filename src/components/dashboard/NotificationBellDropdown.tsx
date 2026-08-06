@@ -22,10 +22,46 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'MY_STATUS' | 'TEACHER_SCAN' | 'LEAVES'>('ALL');
   const [notifications, setNotifications] = useState<DynamicNotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
   const { user, token } = useAuthStore();
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const getStorageKey = (userId?: string) => `smart_absensi_read_notifications_${userId || 'guest'}`;
+
+  // Helper to load read notification IDs from LocalStorage
+  const loadReadIdsFromStorage = (userId?: string): Set<string> => {
+    if (typeof window === 'undefined' || !userId) return new Set();
+    try {
+      const saved = localStorage.getItem(getStorageKey(userId));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+    } catch (e) {
+      console.warn('Failed to parse read notification IDs from storage:', e);
+    }
+    return new Set();
+  };
+
+  const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIdsFromStorage(user?.id));
+
+  // Sync readIds when user changes or on storage change
+  useEffect(() => {
+    if (user?.id) {
+      setReadIds(loadReadIdsFromStorage(user.id));
+    }
+  }, [user?.id]);
+
+  const saveReadIds = (newSet: Set<string>) => {
+    setReadIds(newSet);
+    if (user?.id && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(getStorageKey(user.id), JSON.stringify(Array.from(newSet)));
+      } catch (e) {
+        console.warn('Failed to save read notification IDs to storage:', e);
+      }
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -134,7 +170,41 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         }
       }
 
-      setNotifications(items);
+      // 4. DB System Notifications from Provider
+      const dbNotifs = await provider.getNotifications(user.id, authToken).catch(() => []);
+      if (Array.isArray(dbNotifs)) {
+        dbNotifs.forEach((dbItem) => {
+          if (!dbItem || !dbItem.id) return;
+          const badgeMap: Record<string, 'ALERT' | 'SUCCESS' | 'INFO' | 'WARNING'> = {
+            ALERT: 'ALERT',
+            SUCCESS: 'SUCCESS',
+            WARNING: 'WARNING',
+            INFO: 'INFO',
+          };
+          items.push({
+            id: dbItem.id,
+            category: 'SYSTEM_ALERT',
+            title: dbItem.title || 'Notifikasi Sistem',
+            message: dbItem.message || '',
+            time: dbItem.created_at ? new Date(dbItem.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Sistem',
+            badgeType: badgeMap[dbItem.type] || 'INFO',
+            isRead: Boolean(dbItem.is_read),
+          });
+        });
+      }
+
+      // Deduplicate items by ID
+      const uniqueItems: DynamicNotificationItem[] = [];
+      const seenIds = new Set<string>();
+
+      items.forEach((item) => {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          uniqueItems.push(item);
+        }
+      });
+
+      setNotifications(uniqueItems);
     } catch (err) {
       console.warn('Failed to load dynamic notification items:', err);
     } finally {
@@ -142,17 +212,69 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
     }
   };
 
+  // Setup periodic polling & real-time event listeners
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(loadNotifications, 30000); // refresh every 30s
-    return () => clearInterval(interval);
+    const interval = setInterval(loadNotifications, 15000); // refresh every 15s
+
+    const handleRealtimeUpdate = () => {
+      loadNotifications();
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (user?.id && e.key === getStorageKey(user.id)) {
+        setReadIds(loadReadIdsFromStorage(user.id));
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadNotifications();
+      }
+    };
+
+    window.addEventListener('smart_absensi_scanned', handleRealtimeUpdate);
+    window.addEventListener('smart_absensi_records_updated', handleRealtimeUpdate);
+    window.addEventListener('smart_absensi_leave_updated', handleRealtimeUpdate);
+    window.addEventListener('smart_absensi_notification_pushed', handleRealtimeUpdate);
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('smart_absensi_scanned', handleRealtimeUpdate);
+      window.removeEventListener('smart_absensi_records_updated', handleRealtimeUpdate);
+      window.removeEventListener('smart_absensi_leave_updated', handleRealtimeUpdate);
+      window.removeEventListener('smart_absensi_notification_pushed', handleRealtimeUpdate);
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [user?.id]);
 
-  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
+  const unreadCount = notifications.filter((n) => !n.isRead && !readIds.has(n.id)).length;
 
   const handleMarkAllAsRead = () => {
-    const allIds = new Set(notifications.map((n) => n.id));
-    setReadIds(allIds);
+    const updated = new Set(readIds);
+    notifications.forEach((n) => updated.add(n.id));
+    saveReadIds(updated);
+
+    const provider = ProviderFactory.getProvider();
+    const authToken = token || 'MOCK_TOKEN';
+    notifications.forEach((n) => {
+      provider.markNotificationAsRead(n.id, authToken).catch(() => {});
+    });
+  };
+
+  const markItemAsRead = (id: string) => {
+    if (!readIds.has(id)) {
+      const updated = new Set(readIds);
+      updated.add(id);
+      saveReadIds(updated);
+
+      const provider = ProviderFactory.getProvider();
+      const authToken = token || 'MOCK_TOKEN';
+      provider.markNotificationAsRead(id, authToken).catch(() => {});
+    }
   };
 
   const filteredNotifications = notifications.filter((n) => {
@@ -266,13 +388,11 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
               </div>
             ) : (
               filteredNotifications.map((n) => {
-                const isRead = readIds.has(n.id);
+                const isRead = n.isRead || readIds.has(n.id);
                 return (
                   <div
                     key={n.id}
-                    onClick={() => {
-                      setReadIds((prev) => new Set(prev).add(n.id));
-                    }}
+                    onClick={() => markItemAsRead(n.id)}
                     className={`p-3 rounded-2xl transition-all cursor-pointer flex gap-3 text-xs ${
                       isRead ? 'bg-white opacity-70 hover:opacity-100' : 'bg-emerald-50/50 hover:bg-emerald-50 border-l-4 border-emerald-500'
                     }`}
