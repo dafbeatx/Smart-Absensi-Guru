@@ -6,6 +6,7 @@ import { Sidebar } from '../../../components/ui/Sidebar';
 import type { SidebarItem } from '../../../components/ui/Sidebar';
 import { AcademicCalendarManagement } from '../components/AcademicCalendarManagement';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
+import { TeachingScheduleManagement } from '../components/TeachingScheduleManagement';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
@@ -224,6 +225,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
     { id: 'ATTENDANCE_TRACKING', label: 'Live Tracking', icon: '👁️' },
     { id: 'TEACHERS', label: 'Account Applications', icon: '👥', badge: teachers.length },
+    { id: 'SCHEDULE', label: 'Jadwal Mengajar', icon: '🗓️' },
     { id: 'CALENDAR', label: 'Kalender', icon: '📅' },
     { id: 'MY_ATTENDANCE', label: 'Absensi Saya', icon: '📷' },
     { id: 'APPLY_LEAVE', label: 'Pengajuan Izin / Cuti', icon: '📄' },
@@ -331,6 +333,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
           {/* TAB 4: ACADEMIC CALENDAR */}
           {activeTab === 'CALENDAR' && <AcademicCalendarManagement />}
+
+          {/* TAB: TEACHING SCHEDULE MANAGEMENT */}
+          {activeTab === 'SCHEDULE' && <TeachingScheduleManagement teachers={teachers} />}
 
           {/* TAB 5: ABSENSI PRIBADI SAYA */}
           {activeTab === 'MY_ATTENDANCE' && (

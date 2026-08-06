@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { TeachingSlot } from '../../../types/database.types';
+import { useAuthStore } from '../../../store/useAuthStore';
 
 interface TeachingScheduleModalProps {
   isOpen: boolean;
@@ -12,16 +13,57 @@ export const defaultTeachingSchedule: TeachingSlot[] = [];
 export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
   isOpen,
   onClose,
-  schedule = defaultTeachingSchedule,
+  schedule,
 }) => {
+  const { user } = useAuthStore();
   const days = ['Semua', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
   const [selectedDay, setSelectedDay] = useState('Semua');
+  const [activeSchedules, setActiveSchedules] = useState<TeachingSlot[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const loadSchedules = () => {
+      if (schedule && schedule.length > 0) {
+        setActiveSchedules(schedule);
+        return;
+      }
+
+      const saved = localStorage.getItem('smart_absensi_teaching_schedules');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            // Filter slots assigned to this logged-in teacher
+            const userSlots = parsed.filter(
+              (s: any) =>
+                s.user_id === user?.id ||
+                (user?.full_name && s.teacher_name === user.full_name)
+            );
+            setActiveSchedules(userSlots);
+            return;
+          }
+        } catch (e) {
+          console.warn('Failed to parse cached teaching schedules:', e);
+        }
+      }
+
+      setActiveSchedules([]);
+    };
+
+    loadSchedules();
+
+    window.addEventListener('smart_absensi_schedules_updated', loadSchedules);
+    return () => {
+      window.removeEventListener('smart_absensi_schedules_updated', loadSchedules);
+    };
+  }, [isOpen, schedule, user?.id, user?.full_name]);
 
   if (!isOpen) return null;
 
   const filteredSchedule = selectedDay === 'Semua' 
-    ? schedule 
-    : schedule.filter(s => s.day === selectedDay);
+    ? activeSchedules 
+    : activeSchedules.filter(s => s.day === selectedDay);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
