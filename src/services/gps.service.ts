@@ -183,6 +183,7 @@ export class GPSService {
     timeoutMs: number
   ): Promise<GPSCoordinates> {
     return new Promise((resolve, reject) => {
+      // Stage 1: High Accuracy (Hardware Satellite GPS)
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const lat = position.coords.latitude;
@@ -190,8 +191,6 @@ export class GPSService {
           const accuracy = position.coords.accuracy || 0;
 
           const rawDistance = calculateDistanceMeters(lat, lng, schoolLat, schoolLng);
-
-          // Buffer: subtract half of GPS accuracy (capped at 30m) from distance
           const accuracyBuffer = Math.min(Math.round(accuracy / 2), 30);
           const effectiveDistance = Math.max(0, rawDistance - accuracyBuffer);
 
@@ -202,8 +201,36 @@ export class GPSService {
             distanceMeters: effectiveDistance,
           });
         },
-        (error) => {
-          reject(error);
+        (primaryErr) => {
+          logger.warn('GPSService', 'High-accuracy GPS sample failed/timed out, trying standard accuracy fallback:', primaryErr?.message || primaryErr);
+          
+          // Stage 2: Fallback Standard Accuracy (WiFi / Cell Triangulation for Android / MIUI compatibility)
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPos) => {
+              const lat = fallbackPos.coords.latitude;
+              const lng = fallbackPos.coords.longitude;
+              const accuracy = fallbackPos.coords.accuracy || 0;
+
+              const rawDistance = calculateDistanceMeters(lat, lng, schoolLat, schoolLng);
+              const accuracyBuffer = Math.min(Math.round(accuracy / 2), 30);
+              const effectiveDistance = Math.max(0, rawDistance - accuracyBuffer);
+
+              resolve({
+                latitude: lat,
+                longitude: lng,
+                accuracy,
+                distanceMeters: effectiveDistance,
+              });
+            },
+            (fallbackErr) => {
+              reject(fallbackErr || primaryErr);
+            },
+            {
+              enableHighAccuracy: false,
+              timeout: timeoutMs + 2000,
+              maximumAge: 15000,
+            }
+          );
         },
         {
           enableHighAccuracy: true,

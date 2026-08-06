@@ -8,6 +8,7 @@ import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { SystemSettings } from '../../../types/database.types';
 import { formatTimeForInput } from '../../../utils/time.utils';
+import { GPSService } from '../../../services/gps.service';
 
 export const SystemSettingsForm: React.FC = () => {
   const { user } = useAuthStore();
@@ -110,26 +111,19 @@ export const SystemSettingsForm: React.FC = () => {
     loadSettings();
   }, []);
 
-  const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      showToast('error', 'GPS Tidak Didukung', 'Browser Anda tidak mendukung fitur Geolocation GPS.');
-      return;
-    }
-
+  const handleGetCurrentLocation = async () => {
     setIsGettingGps(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeofenceLat(pos.coords.latitude.toFixed(6));
-        setGeofenceLng(pos.coords.longitude.toFixed(6));
-        setIsGettingGps(false);
-        showToast('success', 'Koordinat GPS Berhasil Diambil!', `Lat: ${pos.coords.latitude.toFixed(6)}, Lng: ${pos.coords.longitude.toFixed(6)}`);
-      },
-      (err) => {
-        setIsGettingGps(false);
-        showToast('error', 'Gagal Mengambil GPS', err.message || 'Pastikan izin akses lokasi GPS pada browser sudah diperbolehkan.');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    try {
+      const coords = await GPSService.getCurrentPosition();
+      setGeofenceLat(coords.latitude.toFixed(6));
+      setGeofenceLng(coords.longitude.toFixed(6));
+      setIsGettingGps(false);
+      showToast('success', 'Koordinat GPS Berhasil Diambil!', `Lat: ${coords.latitude.toFixed(6)}, Lng: ${coords.longitude.toFixed(6)} (Akurasi: ${Math.round(coords.accuracy)}m)`);
+    } catch (err: unknown) {
+      setIsGettingGps(false);
+      const msg = err instanceof Error ? err.message : 'Pastikan izin akses lokasi GPS pada browser sudah diperbolehkan.';
+      showToast('error', 'Gagal Mengambil GPS', msg);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
