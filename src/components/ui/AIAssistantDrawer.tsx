@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GroqAIService } from '../../services/groq-ai.service';
 import { isFeatureEnabled } from '../../config/feature-flags.config';
 import { useAuthStore } from '../../store/useAuthStore';
