@@ -368,7 +368,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             <h1 className="font-black text-[#023246] text-xs sm:text-sm tracking-tight leading-tight uppercase truncate">
               Smart Absensi Guru
             </h1>
-            <p className="text-[9px] sm:text-[10px] font-semibold text-slate-500 mt-0.5 truncate max-w-[200px] sm:max-w-xs">
+            <p className="text-[9px] sm:text-[10px] font-semibold text-slate-500 mt-0.5 truncate max-w-50 sm:max-w-xs">
               {settings.institution_name}
             </p>
           </div>
