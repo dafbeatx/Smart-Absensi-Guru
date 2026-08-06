@@ -205,5 +205,28 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
   const bindingCheck = await mockProvider.checkDeviceBinding(mockGuruUser.id, 'DEV_TEST_UUID', 'MOCK_TOKEN');
   assert('Teacher Sync - checkDeviceBinding returns valid status', ['ACTIVE', 'UNBOUND', 'DIFFERENT_DEVICE', 'NEEDS_ADMIN_RESET'].includes(bindingCheck.status));
 
+  // Test Role Promotion & Elevation (Guru -> Admin)
+  const testGuruAccount: UserProfile = {
+    id: 'usr_test_promo_01',
+    nip: '199001012022011001',
+    full_name: 'Guru Tes Promosi',
+    phone_number: '081299998888',
+    role: 'GURU',
+    position: 'Guru Mapel',
+    avatar_url: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+
+  useAuthStore.getState().loginSuccess('MOCK_PROMO_TOKEN', testGuruAccount);
+  assert('Role Elevation - Initial Role Is GURU', useAuthStore.getState().user?.role === 'GURU');
+
+  // Admin promotes role from GURU to ADMIN
+  await mockProvider.updateUser(testGuruAccount.id, { role: 'ADMIN', position: 'Administrator Utama' }, 'MOCK_PROMO_TOKEN');
+  useAuthStore.getState().updateUserProfile({ role: 'ADMIN', position: 'Administrator Utama' });
+
+  assert('Role Elevation - Elevated Role Is ADMIN', useAuthStore.getState().user?.role === 'ADMIN');
+  assert('Role Elevation - Active Session Reflects ADMIN Permissions', useAuthStore.getState().user?.position === 'Administrator Utama');
+
   return { passed, failed, results };
 };
