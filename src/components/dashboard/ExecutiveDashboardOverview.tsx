@@ -117,7 +117,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             if (mins >= slot.min && mins < slot.max) count++;
           }
         });
-        const pct = Math.min(100, Math.round((count / totalGuru) * 100));
+        const pct = totalGuru > 0 && todayRecs.length > 0
+          ? Math.min(100, Math.round((count / totalGuru) * 100))
+          : 0;
         return {
           label: slot.label,
           percentage: pct,
@@ -148,18 +150,16 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           }
         });
 
-        // Fallback simulation for past days if empty so chart displays trend curve
-        if (userMap.size === 0 && i > 0) {
-          presentCount = Math.max(8, Math.round(totalGuru * (0.85 + ((i * 3) % 4) * 0.04)));
-        }
+        const pct = totalGuru > 0 && userMap.size > 0
+          ? Math.min(100, Math.round((presentCount / totalGuru) * 100))
+          : 0;
 
-        const pct = Math.min(100, Math.round((presentCount / totalGuru) * 100));
         result.push({
           label: dateLabel,
           percentage: pct,
           count: presentCount,
           totalGuru,
-          info: `${presentCount}/${totalGuru} Guru (${pct}%)`,
+          info: userMap.size > 0 ? `${presentCount}/${totalGuru} Guru (${pct}%)` : 'Belum Ada Data Presensi (0%)',
         });
       }
       return result;
@@ -178,6 +178,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 
         let totalPresent = 0;
         let dayCount = 0;
+        let hasData = false;
 
         for (let dayOffset = 0; dayOffset < 5; dayOffset++) {
           const curD = new Date(dStart);
@@ -185,6 +186,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           const curISO = curD.toISOString().split('T')[0];
 
           const dayRecs = attendanceRecords.filter((r) => r.date === curISO);
+          if (dayRecs.length > 0) hasData = true;
           const userMap = new Map<string, AttendanceRecord>();
           dayRecs.forEach((r) => userMap.set(r.user_id, r));
 
@@ -193,22 +195,21 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             if (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.check_in_time) dayPresent++;
           });
 
-          if (userMap.size === 0) {
-            dayPresent = Math.round(totalGuru * 0.88);
-          }
-
           totalPresent += dayPresent;
           dayCount++;
         }
 
-        const avgPresent = Math.round(totalPresent / dayCount);
-        const pct = Math.min(100, Math.round((avgPresent / totalGuru) * 100));
+        const avgPresent = dayCount > 0 ? Math.round(totalPresent / dayCount) : 0;
+        const pct = hasData && totalGuru > 0
+          ? Math.min(100, Math.round((avgPresent / totalGuru) * 100))
+          : 0;
+
         result.push({
           label,
           percentage: pct,
           count: avgPresent,
           totalGuru,
-          info: `Rata-rata ${avgPresent}/${totalGuru} Guru (${pct}%)`,
+          info: hasData ? `Rata-rata ${avgPresent}/${totalGuru} Guru (${pct}%)` : 'Belum Ada Data Presensi (0%)',
         });
       }
       return result;
@@ -231,8 +232,12 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         return parts[0] === yearStr && parts[1] === monthStr;
       });
 
-      let avgPct = 90;
+      let avgPct = 0;
+      let estimatedGuru = 0;
+      let hasData = false;
+
       if (monthRecs.length > 0) {
+        hasData = true;
         const userMap = new Map<string, number>();
         monthRecs.forEach((r) => {
           if (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.check_in_time) {
@@ -241,17 +246,15 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         });
         const avgDays = Array.from(userMap.values()).reduce((a, b) => a + b, 0) / (userMap.size || 1);
         avgPct = Math.min(100, Math.round((avgDays / 22) * 100));
-      } else {
-        avgPct = Math.max(82, Math.min(98, 88 + ((i * 5) % 11)));
+        estimatedGuru = Math.round((avgPct / 100) * totalGuru);
       }
 
-      const estimatedGuru = Math.round((avgPct / 100) * totalGuru);
       result.push({
         label,
         percentage: avgPct,
         count: estimatedGuru,
         totalGuru,
-        info: `Rata-rata Presensi: ${avgPct}%`,
+        info: hasData ? `Rata-rata Presensi: ${avgPct}%` : 'Belum Ada Data Presensi (0%)',
       });
     }
     return result;
@@ -521,19 +524,19 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         </div>
 
         {/* Column 2: Synchronized Interactive Trend Kehadiran Chart */}
-        <div className="bg-white p-5 rounded-3xl border border-[#D4D4CE]/40 shadow-card flex flex-col justify-between space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 className="font-extrabold text-[#023246] text-sm">
-                Trend Kehadiran {timeRange === '1_DAY' ? '(Hari Ini)' : timeRange === '7_DAYS' ? '(7 Hari Terakhir)' : timeRange === '1_MONTH' ? '(1 Bulan / Sebulan)' : '(1 Tahun / Setahun)'}
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-[#D4D4CE]/40 shadow-card flex flex-col justify-between space-y-4 overflow-hidden min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
+            <div className="min-w-0">
+              <h3 className="font-extrabold text-[#023246] text-sm truncate">
+                Trend Kehadiran {timeRange === '1_DAY' ? '(Hari Ini)' : timeRange === '7_DAYS' ? '(7 Hari Terakhir)' : timeRange === '1_MONTH' ? '(1 Bulan)' : '(1 Tahun)'}
               </h3>
-              <p className="text-[11px] text-slate-400 font-medium">Grafik presensi terintegrasi real-time</p>
+              <p className="text-[11px] text-slate-400 font-medium truncate">Grafik presensi terintegrasi real-time</p>
             </div>
 
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value as TimeRangeOption)}
-              className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none cursor-pointer transition-colors shadow-2xs"
+              className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl px-2.5 py-1.5 outline-none cursor-pointer transition-colors shadow-2xs shrink-0"
             >
               <option value="1_DAY">⏱️ 1 Hari (Hari Ini)</option>
               <option value="7_DAYS">📅 7 Hari Terakhir</option>
@@ -543,9 +546,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           </div>
 
           {/* Dynamic Graph Grid Visual */}
-          <div className="h-44 border-b border-l border-slate-200 relative flex items-end justify-between px-1.5 pb-1 text-[10px] text-slate-500 font-mono pt-6">
+          <div className="h-44 border-b border-l border-slate-200 relative flex items-end justify-between px-1 pb-1 text-[10px] text-slate-500 font-mono pt-6 w-full overflow-hidden gap-0.5 sm:gap-1">
             {/* Horizontal Grid lines */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[9px] text-slate-300">
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[9px] text-slate-300 z-0">
               <div className="border-b border-dashed border-slate-100 w-full pt-1">100%</div>
               <div className="border-b border-dashed border-slate-100 w-full">75%</div>
               <div className="border-b border-dashed border-slate-100 w-full">50%</div>
@@ -555,33 +558,39 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 
             {/* Dynamic Bars */}
             {trendData.map((item, idx) => {
-              const barHeight = Math.max(8, item.percentage);
+              const barHeight = item.percentage > 0 ? Math.max(6, item.percentage) : 0;
               const barBg =
                 item.percentage >= 80
                   ? 'bg-emerald-500 hover:bg-emerald-600'
                   : item.percentage >= 50
                   ? 'bg-amber-500 hover:bg-amber-600'
-                  : 'bg-rose-500 hover:bg-rose-600';
+                  : item.percentage > 0
+                  ? 'bg-rose-500 hover:bg-rose-600'
+                  : 'bg-slate-200';
 
               return (
-                <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full group z-10 px-0.5 relative">
+                <div key={idx} className="flex-1 min-w-0 flex flex-col items-center justify-end h-full group z-10 relative overflow-hidden">
                   {/* Tooltip on Hover */}
                   <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 absolute -top-8 bg-slate-900 text-white text-[9px] font-sans font-bold px-2 py-1 rounded-md shadow-lg pointer-events-none whitespace-nowrap z-30">
                     {item.label}: {item.info}
                   </div>
 
                   {/* Dynamic Height Bar */}
-                  <div
-                    style={{ height: `${barHeight}%` }}
-                    className={`w-full max-w-7 ${barBg} rounded-t-sm transition-all duration-300 shadow-xs flex items-center justify-center`}
-                  >
-                    <span className="text-[8px] font-black text-white drop-shadow-xs hidden group-hover:inline sm:inline">
-                      {item.percentage}%
-                    </span>
-                  </div>
+                  {item.percentage > 0 ? (
+                    <div
+                      style={{ height: `${barHeight}%` }}
+                      className={`w-full ${barBg} rounded-t-xs transition-all duration-300 shadow-2xs flex items-center justify-center`}
+                    >
+                      <span className="text-[7px] sm:text-[8px] font-black text-white drop-shadow-xs hidden group-hover:inline sm:inline">
+                        {item.percentage}%
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="w-full h-0.5 bg-slate-200 rounded-full" />
+                  )}
 
                   {/* X-Axis Day/Month Label */}
-                  <span className="text-[9px] font-bold text-slate-600 mt-1 truncate max-w-full text-center">
+                  <span className="text-[7.5px] sm:text-[9px] font-bold text-slate-600 mt-1 truncate max-w-full text-center leading-none tracking-tighter">
                     {item.label}
                   </span>
                 </div>
