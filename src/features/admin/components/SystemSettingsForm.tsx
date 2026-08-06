@@ -9,6 +9,7 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import type { SystemSettings } from '../../../types/database.types';
 import { formatTimeForInput } from '../../../utils/time.utils';
 import { GPSService } from '../../../services/gps.service';
+import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 
 export const SystemSettingsForm: React.FC = () => {
   const { user } = useAuthStore();
@@ -324,6 +325,26 @@ export const SystemSettingsForm: React.FC = () => {
           <Input label="Longitude Sekolah" value={geofenceLng} onChange={(e) => setGeofenceLng(e.target.value)} required />
           <Input label="Radius Izin Absensi (Meter)" type="number" value={geofenceRadius} onChange={(e) => setGeofenceRadius(e.target.value)} required />
         </div>
+
+        {/* Interactive OpenStreetMap Selector */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between text-xs text-slate-600 font-bold">
+            <span>🗺️ Pratinjau & Pilih Posisi Sekolah pada Peta Interaktif (OpenStreetMap)</span>
+            <span className="text-[10px] text-emerald-600 font-normal">💡 Klik pada peta untuk ubah titik lokasi</span>
+          </div>
+          <LiveLocationMap
+            schoolLat={parseFloat(geofenceLat) || CONSTANTS.DEFAULTS.GEOFENCE_LAT}
+            schoolLng={parseFloat(geofenceLng) || CONSTANTS.DEFAULTS.GEOFENCE_LNG}
+            allowedRadius={parseInt(geofenceRadius, 10) || CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS}
+            interactive={true}
+            onSelectLocation={({ lat, lng }) => {
+              setGeofenceLat(String(lat.toFixed(6)));
+              setGeofenceLng(String(lng.toFixed(6)));
+            }}
+            height="260px"
+          />
+        </div>
+
         <p className="text-[11px] text-slate-500">
           Guru dapat melakukan absensi jika posisi GPS berada dalam radius <strong>{geofenceRadius} meter</strong> dari koordinat di atas.
         </p>

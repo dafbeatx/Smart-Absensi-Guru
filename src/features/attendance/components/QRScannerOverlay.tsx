@@ -16,6 +16,7 @@ import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { logger } from '../../../utils/logger.utils';
+import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [isCheckingGPS, setIsCheckingGPS] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showLiveMap, setShowLiveMap] = useState(false);
   
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
@@ -404,10 +406,17 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
               <div className="flex justify-center gap-2 pt-1">
                 <button
                   type="button"
+                  onClick={() => setShowLiveMap(true)}
+                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold rounded-xl backdrop-blur-md transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <span>🗺️ Peta Live GPS</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsManualModalOpen(true)}
                   className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl backdrop-blur-md transition-all cursor-pointer flex items-center gap-1"
                 >
-                  <span>⌨️ Kode Manual</span>
+                  <span>⌨️ Manual</span>
                 </button>
                 <button
                   type="button"
@@ -423,6 +432,34 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         </div>
 
       </div>
+
+      {/* Live Location OpenStreetMap Modal */}
+      <Modal isOpen={showLiveMap} onClose={() => setShowLiveMap(false)} title="🗺️ Live Map Posisi Real-time (OpenStreetMap)">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-xs font-medium text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <span>
+              Status: <b className={isWithinRadius ? 'text-emerald-600' : 'text-red-600'}>{isWithinRadius ? '🟢 Dalam Radius Safe-Zone' : '🔴 Di Luar Radius Sekolah'}</b>
+            </span>
+            <span className="font-mono text-[11px] text-slate-500">
+              Akurasi: ±{gpsCoords?.accuracy ? Math.round(gpsCoords.accuracy) : 0}m
+            </span>
+          </div>
+
+          <LiveLocationMap
+            userLat={gpsCoords?.latitude}
+            userLng={gpsCoords?.longitude}
+            schoolLat={geofenceSettings.lat}
+            schoolLng={geofenceSettings.lng}
+            allowedRadius={allowedRadius}
+            accuracy={gpsCoords?.accuracy}
+            height="320px"
+          />
+
+          <p className="text-[11px] text-slate-500 text-center">
+            Peta berbasis <b>OpenStreetMap & Leaflet.js</b> (100% Bebas Kuota API & Gratis). Pin biru menandakan posisi HP Anda secara realtime.
+          </p>
+        </div>
+      </Modal>
 
       {/* Auto-Submit Success Modal Overlay (2.2s Duration) */}
       <Modal isOpen={isSuccessModalOpen} onClose={() => {}}>
