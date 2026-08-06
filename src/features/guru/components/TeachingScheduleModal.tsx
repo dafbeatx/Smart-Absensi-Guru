@@ -7,16 +7,7 @@ interface TeachingScheduleModalProps {
   schedule?: TeachingSlot[];
 }
 
-export const defaultTeachingSchedule: TeachingSlot[] = [
-  { id: '1', day: 'Senin', time: '07:30 - 08:50 WIB', className: 'Kelas VII-A', subject: 'Matematika Terpadu', room: 'Ruang Teori 7A' },
-  { id: '2', day: 'Senin', time: '09:00 - 10:20 WIB', className: 'Kelas VIII-B', subject: 'Matematika Lanjutan', room: 'Ruang Teori 8B' },
-  { id: '3', day: 'Selasa', time: '08:00 - 09:20 WIB', className: 'Kelas IX-A', subject: 'Matematika UN / Asesmen', room: 'Lab Komputer A' },
-  { id: '4', day: 'Selasa', time: '10:30 - 11:50 WIB', className: 'Kelas VII-B', subject: 'Matematika Terpadu', room: 'Ruang Teori 7B' },
-  { id: '5', day: 'Rabu', time: '07:30 - 08:50 WIB', className: 'Kelas VIII-A', subject: 'Matematika Lanjutan', room: 'Ruang Teori 8A' },
-  { id: '6', day: 'Rabu', time: '09:00 - 10:20 WIB', className: 'Kelas IX-B', subject: 'Matematika UN / Asesmen', room: 'Lab Komputer B' },
-  { id: '7', day: 'Kamis', time: '08:00 - 09:20 WIB', className: 'Kelas VII-A', subject: 'Pengayaan & Remedial', room: 'Ruang Teori 7A' },
-  { id: '8', day: 'Jumat', time: '07:30 - 08:30 WIB', className: 'Kelas IX-A', subject: 'Bimbingan Matematika', room: 'Ruang Teori 9A' },
-];
+export const defaultTeachingSchedule: TeachingSlot[] = [];
 
 export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
   isOpen,
@@ -75,10 +66,14 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
         {/* Schedule Items List */}
         <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
           {filteredSchedule.length === 0 ? (
-            <div className="text-center py-10 text-slate-400 text-xs font-medium space-y-1">
-              <span className="text-2xl block">☕</span>
-              <p className="font-bold text-slate-600">Tidak Ada Jadwal Mengajar</p>
-              <p className="text-[11px]">Tidak ada jam mengajar pada hari {selectedDay}.</p>
+            <div className="text-center py-12 text-slate-400 text-xs font-medium space-y-1.5 px-4">
+              <span className="text-3xl block">📋</span>
+              <p className="font-extrabold text-[#023246]">Belum Ada Jadwal Mengajar</p>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
+                {selectedDay === 'Semua'
+                  ? 'Admin/Operator sekolah belum menginput jadwal mengajar untuk akun Anda. Silakan hubungi bagian kurikulum.'
+                  : `Tidak ada jadwal mengajar pada hari ${selectedDay}.`}
+              </p>
             </div>
           ) : (
             filteredSchedule.map((slot) => (
