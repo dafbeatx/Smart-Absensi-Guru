@@ -1,0 +1,6 @@
+{
+  "name": "Smart Absensi Guru",
+  "description": "Aplikasi Smart Absensi Guru Mobile PWA untuk SMP Terpadu Al-Ittihadiyah dengan pemindaian QR Code, Geofencing GPS, Pengajuan Izin/Cuti, dan Riwayat Presensi.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

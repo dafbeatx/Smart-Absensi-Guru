@@ -122,7 +122,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div className="space-y-0 overflow-hidden text-left">
               <p className="text-xs font-bold text-white truncate">{user?.full_name || title}</p>
-              <p className="text-[10px] text-[#D4D4CE]/80 truncate">admin@sag.sch.id</p>
+              <p className="text-[10px] text-[#D4D4CE]/80 truncate">
+                {user?.phone_number || (user?.nip ? `NIP. ${user.nip}` : '081234567890')}
+              </p>
             </div>
           </div>
           <button
@@ -198,7 +200,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <div className="space-y-0.5">
                   <h3 className="font-extrabold text-[#023246] text-sm">{user?.full_name || title}</h3>
-                  <p className="text-xs text-slate-400">admin@sag.sch.id</p>
+                  <p className="text-xs text-slate-400">
+                    {user?.phone_number || (user?.nip ? `NIP. ${user.nip}` : '081234567890')}
+                  </p>
                 </div>
                 <span className="px-3 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-extrabold rounded-full flex items-center gap-1">
                   ● Online
