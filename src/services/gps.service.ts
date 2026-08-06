@@ -100,6 +100,13 @@ export class GPSService {
   }
 
   /**
+   * Returns latest cached GPS coordinates regardless of age
+   */
+  public static getLatestCoords(): GPSCoordinates | null {
+    return this.cachedFix ? this.cachedFix.coords : null;
+  }
+
+  /**
    * Helper method to report current GPS Health Status for Dashboard pre-scan UI indicator
    */
   public static getGPSHealthStatus(): { status: 'READY' | 'REFINING' | 'OFF'; text: string; accuracy?: number } {

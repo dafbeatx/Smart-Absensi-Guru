@@ -11,8 +11,10 @@ import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationMo
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { GPSService } from '../../../services/gps.service';
+import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
+import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -93,18 +95,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     message: 'Memeriksa status perangkat...',
   });
 
-  // Pre-scan GPS Health Status State
+  // Pre-scan GPS Health Status & Realtime Coordinates State
   const [gpsHealth, setGpsHealth] = useState<{ status: 'READY' | 'REFINING' | 'OFF'; text: string; accuracy?: number }>({
     status: 'REFINING',
     text: '📍 Mengukur lokasi GPS...',
   });
+  const [userCoords, setUserCoords] = useState<GPSCoordinates | null>(() => GPSService.getLatestCoords());
 
   useEffect(() => {
     GPSService.startBackgroundWarmUp();
     setGpsHealth(GPSService.getGPSHealthStatus());
+    setUserCoords(GPSService.getLatestCoords());
 
     const interval = setInterval(() => {
       setGpsHealth(GPSService.getGPSHealthStatus());
+      setUserCoords(GPSService.getLatestCoords());
     }, 2000);
 
     return () => clearInterval(interval);
@@ -428,6 +433,27 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   }`} />
                   <span>{gpsHealth.text}</span>
                 </span>
+              </div>
+
+              {/* Live OpenStreetMap Preview Box under GPS Readiness */}
+              <div className="space-y-1.5 pt-0.5">
+                <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700 px-1">
+                  <span className="flex items-center gap-1">
+                    <span>🗺️</span> Peta Lokasi Real-time Anda
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {userCoords ? `±${Math.round(userCoords.accuracy)}m` : 'Mendeteksi...'}
+                  </span>
+                </div>
+                <LiveLocationMap
+                  userLat={userCoords?.latitude}
+                  userLng={userCoords?.longitude}
+                  schoolLat={settings.geofence_lat || CONSTANTS.DEFAULTS.GEOFENCE_LAT}
+                  schoolLng={settings.geofence_lng || CONSTANTS.DEFAULTS.GEOFENCE_LNG}
+                  allowedRadius={settings.geofence_radius || CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS}
+                  accuracy={userCoords?.accuracy}
+                  height="210px"
+                />
               </div>
 
               {/* Action Button: Scan QR with Camera Pre-Warm */}
