@@ -223,6 +223,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     const deviceUUID = useAuthStore.getState().deviceUUID || 'DEV_UUID';
     let returnedStatus = 'HADIR';
     let returnedAction: 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED' = 'CHECK_IN';
+    let isOfflineRecord = false;
 
     const scanSeed = _qrData || CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
 
@@ -239,12 +240,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
       logger.info('QRScannerOverlay', 'Attendance saved successfully:', res);
 
-    let isOfflineRecord = false;
-    if (res) {
-      if (res.status) returnedStatus = res.status;
-      if (res.attendance_action) returnedAction = res.attendance_action;
-      if (res.is_offline) isOfflineRecord = true;
-    }
+      if (res) {
+        if (res.status) returnedStatus = res.status;
+        if (res.attendance_action) returnedAction = res.attendance_action;
+        if (res.is_offline) isOfflineRecord = true;
+      }
 
     window.dispatchEvent(new Event('smart_absensi_scanned'));
     } catch (err: unknown) {
