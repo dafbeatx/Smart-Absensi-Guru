@@ -173,6 +173,7 @@ export const SystemSettingsForm: React.FC = () => {
 
     // 1. Persist to localStorage
     localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updatedSettings));
+    window.dispatchEvent(new Event('smart_absensi_settings_updated'));
 
     // 2. Persist to backend / Google Sheets
     try {
