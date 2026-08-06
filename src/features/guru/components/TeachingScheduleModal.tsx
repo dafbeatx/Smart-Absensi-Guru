@@ -34,7 +34,7 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      <div className="bg-white w-full max-w-[420px] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[88vh]">
+      <div className="bg-white w-full max-w-105 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[88vh]">
         
         {/* Header */}
         <div className="bg-[#023246] text-white p-4 px-5 flex items-center justify-between">
