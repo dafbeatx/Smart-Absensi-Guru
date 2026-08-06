@@ -67,6 +67,8 @@ export const AIAssistantDrawer: React.FC = () => {
     }
   };
 
+  const [isFloatingHidden, setIsFloatingHidden] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsOpen(false);
@@ -79,15 +81,30 @@ export const AIAssistantDrawer: React.FC = () => {
 
   return (
     <>
-      {/* Floating Action Button - Positioned at bottom-24 on mobile to NOT cover bottom tab bar (Profil/Notif) */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40 bg-linear-to-r from-emerald-600 to-teal-700 text-white px-3.5 py-2.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 font-bold text-xs ring-4 ring-emerald-500/20 cursor-pointer"
-        aria-label="Tanya Smart AI Assistant"
-      >
-        <span className="text-lg animate-bounce">✨</span>
-        <span className="font-semibold text-xs">Tanya AI</span>
-      </button>
+      {/* Floating Action Button with Dismiss (X) Control */}
+      {!isFloatingHidden && !isOpen && (
+        <div className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40 flex items-center gap-1 bg-linear-to-r from-emerald-600 to-teal-700 p-1 pl-3 rounded-full shadow-2xl ring-4 ring-emerald-500/20 transition-all hover:scale-105">
+          <button
+            onClick={() => setIsOpen(true)}
+            className="flex items-center gap-2 text-white font-bold text-xs cursor-pointer py-1.5 pr-1.5"
+            aria-label="Buka Smart AI Assistant"
+          >
+            <span className="text-lg animate-bounce">✨</span>
+            <span className="font-semibold text-xs whitespace-nowrap">Tanya AI</span>
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsFloatingHidden(true);
+            }}
+            className="w-6 h-6 rounded-full bg-slate-900/40 hover:bg-slate-900 text-white text-xs font-bold flex items-center justify-center transition-colors cursor-pointer border border-white/20 shrink-0"
+            title="Sembunyikan Tombol Tanya AI"
+            aria-label="Sembunyikan Tombol"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Drawer Overlay with Backdrop Click to Exit */}
       {isOpen && (
