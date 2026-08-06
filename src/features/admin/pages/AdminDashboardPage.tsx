@@ -13,6 +13,7 @@ import { ExportReportModal } from '../../../components/dashboard/ExportReportMod
 import { AuditLogTable } from '../components/AuditLogTable';
 import { DailyAttendanceTracker } from '../components/DailyAttendanceTracker';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
+import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
@@ -36,6 +37,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
   // Status absensi pribadi Admin hari ini (real data from DB)
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
@@ -224,7 +226,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'TEACHERS', label: 'Account Applications', icon: '👥', badge: teachers.length },
     { id: 'CALENDAR', label: 'Kalender', icon: '📅' },
     { id: 'MY_ATTENDANCE', label: 'Absensi Saya', icon: '📷' },
-    { id: 'APPROVAL', label: 'Approval', icon: '📝', hasDropdown: true },
+    { id: 'APPLY_LEAVE', label: 'Pengajuan Izin / Cuti', icon: '📄' },
+    { id: 'APPROVAL', label: 'Approval Cuti Guru', icon: '📝', hasDropdown: true },
     { id: 'CORRECTION', label: 'Koreksi Manual', icon: '✏️' },
     { id: 'EXPORT', label: 'Laporan', icon: '📊', hasDropdown: true },
     { id: 'SETTINGS', label: 'Pengaturan', icon: '⚙️', hasDropdown: true },
@@ -235,6 +238,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   ];
 
   const handleSelectSidebarTab = (id: string) => {
+    if (id === 'APPLY_LEAVE') {
+      setIsLeaveModalOpen(true);
+      return;
+    }
     if (id === 'CORRECTION') {
       setIsCorrectionModalOpen(true);
       return;
@@ -473,6 +480,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       <TestRunnerModal
         isOpen={isTestRunnerOpen}
         onClose={() => setIsTestRunnerOpen(false)}
+      />
+
+      {/* Admin / Staff Leave Application Modal */}
+      <LeaveApplicationModal
+        isOpen={isLeaveModalOpen}
+        onClose={() => setIsLeaveModalOpen(false)}
+        onSuccess={() => {
+          fetchPendingRequests();
+        }}
       />
 
       {/* ── MOBILE BOTTOM NAVIGATION DOCK (Screen 1 Mockup) ────────────────── */}
