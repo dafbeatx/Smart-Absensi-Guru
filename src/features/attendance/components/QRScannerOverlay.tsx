@@ -120,8 +120,10 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   }, [isOpen]);
 
   const geofenceSettings = GPSService.getGeofenceSettings();
-  // Use shared helper — same logic as SupabaseProvider backend
-  const allowedRadius = getEffectiveAllowedRadius(geofenceSettings.radius);
+  const isOfflineMode = typeof navigator !== 'undefined' && !navigator.onLine;
+  const rawAllowed = getEffectiveAllowedRadius(geofenceSettings.radius);
+  // Ensure allowedRadius is at least 500m in offline mode to prevent mobile AGPS drift false-rejections
+  const allowedRadius = isOfflineMode ? Math.max(rawAllowed, 500) : Math.max(rawAllowed, 100);
 
   const handleScanSuccess = async (_qrData: string) => {
     if (isProcessingRef.current) return;
