@@ -279,12 +279,12 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     setScanResult(result);
     setIsSuccessModalOpen(true);
 
-    // Auto-Submit 2.0s Timer
+    // Auto-Submit 3.5s Timer to give teachers enough time to read reassurance popup
     setTimeout(() => {
       setIsSuccessModalOpen(false);
       onSuccess(result);
       onClose();
-    }, 2200);
+    }, 3500);
   };
 
   const handleBypassGPSCheckIn = async () => {
@@ -446,35 +446,66 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             </p>
           </div>
 
-          {scanResult?.isOffline && (
-            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl text-left text-xs text-emerald-900 flex items-start gap-2.5 shadow-xs">
-              <span className="text-xl shrink-0">📶</span>
-              <div className="space-y-0.5">
-                <p className="font-extrabold text-emerald-950 text-xs">Presensi Tersimpan (Mode Offline)</p>
-                <p className="text-[11px] text-emerald-700 leading-snug">
-                  Data presensi tersimpan aman di HP. Otomatis terkirim ke server saat terhubung ke Wi-Fi / internet.
-                </p>
+          {scanResult?.isOffline ? (
+            <div className="bg-amber-50/90 border-2 border-amber-300 p-3.5 rounded-2xl text-left text-xs text-amber-950 space-y-1.5 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📶</span>
+                <h4 className="font-extrabold text-amber-950 text-xs uppercase tracking-tight">
+                  PRESENSI TERSIMPAN LOKAL (SINYAL LEMAH / OFFLINE)
+                </h4>
               </div>
+              <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
+                <strong>Jangan Khawatir!</strong> Jam <strong>{scanResult?.timestamp}</strong> &amp; lokasi GPS Anda sudah <strong>resmi dikunci &amp; tersimpan aman di HP</strong>. Anda <strong>TIDAK PERLU scan ulang!</strong>
+              </p>
+              <div className="text-[10px] text-amber-900 bg-white/80 p-2 rounded-xl border border-amber-200/80 font-medium">
+                ⚡ Data tersimpan di HP &amp; akan otomatis terunggah ke server begitu internet / Wi-Fi terhubung kembali.
+              </div>
+            </div>
+          ) : (
+            <div className="bg-emerald-50/90 border border-emerald-300 p-3.5 rounded-2xl text-left text-xs text-emerald-950 space-y-1 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🌐</span>
+                <h4 className="font-extrabold text-emerald-950 text-xs uppercase tracking-tight">
+                  TERHUBUNG REALTIME KE SERVER
+                </h4>
+              </div>
+              <p className="text-[11px] text-emerald-800 leading-relaxed font-medium">
+                Presensi Anda pada jam <strong>{scanResult?.timestamp}</strong> telah berhasil terunggah &amp; terverifikasi langsung ke server sekolah.
+              </p>
             </div>
           )}
 
           <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-left text-xs text-slate-600 border border-slate-100">
             <div className="flex justify-between">
-              <span className="text-slate-400">Status</span>
-              <Badge status="HADIR">Hadir Tepat Waktu</Badge>
+              <span className="text-slate-400">Status Absen</span>
+              <Badge status="HADIR">{scanResult?.status || 'Hadir Tepat Waktu'}</Badge>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Waktu Absen</span>
+              <span className="text-slate-400">Waktu Presensi</span>
               <span className="font-bold text-emerald-600">{scanResult?.timestamp}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Lokasi Verified</span>
+              <span className="text-slate-400">Lokasi GPS Verified</span>
               <span className="font-medium text-emerald-600">🟢 Area Sekolah ({scanResult?.distance}m)</span>
             </div>
           </div>
 
-          <p className="text-[11px] text-slate-400 animate-pulse font-medium">
-            Mengalihkan ke Dashboard dalam 2 detik...
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSuccessModalOpen(false);
+                if (scanResult) onSuccess(scanResult);
+                onClose();
+              }}
+              className="w-full py-3 bg-[#023246] hover:bg-[#022535] text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98"
+            >
+              ✓ SIAP, SAYA MENGERTI
+            </button>
+          </div>
+
+          <p className="text-[10px] text-slate-400 animate-pulse font-medium">
+            Mengalihkan ke Dashboard dalam beberapa detik...
           </p>
         </div>
       </Modal>
