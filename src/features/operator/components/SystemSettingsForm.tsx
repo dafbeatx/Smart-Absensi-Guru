@@ -198,8 +198,8 @@ export const SystemSettingsForm: React.FC = () => {
         <h4 className="font-bold text-xs text-slate-700">Batas Waktu Shift Absensi</h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Input label="Jam Mulai Masuk" type="time" value={checkInStart} onChange={(e) => setCheckInStart(e.target.value)} required />
-          <Input label="Batas Tepat Waktu (07.15)" type="time" value={checkInEnd} onChange={(e) => setCheckInEnd(e.target.value)} required />
-          <Input label="Jam Buka Pulang (15.30)" type="time" value={checkOutStart} onChange={(e) => setCheckOutStart(e.target.value)} required />
+          <Input label="Batas Tepat Waktu (07.30)" type="time" value={checkInEnd} onChange={(e) => setCheckInEnd(e.target.value)} required />
+          <Input label="Jam Buka Pulang (13.00)" type="time" value={checkOutStart} onChange={(e) => setCheckOutStart(e.target.value)} required />
         </div>
       </div>
 

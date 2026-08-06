@@ -59,7 +59,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           id: 'notif_my_status_pending',
           category: 'MY_STATUS',
           title: '⚠️ Status Presensi Anda Hari Ini',
-          message: `Halo ${user.full_name}, Anda BELUM melakukan presensi masuk hari ini. Batas waktu tepat waktu adalah pukul 07:15 WIB.`,
+          message: `Halo ${user.full_name}, Anda BELUM melakukan presensi masuk hari ini. Batas waktu tepat waktu adalah pukul 07:30 WIB.`,
           time: 'Hari ini',
           badgeType: 'ALERT',
           isRead: false,

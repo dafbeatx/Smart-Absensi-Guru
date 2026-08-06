@@ -452,7 +452,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
               {scanResult?.action === 'CHECK_OUT'
                 ? 'Terima kasih atas pengabdian Anda hari ini!'
                 : scanResult?.rawStatus === 'TERLAMBAT'
-                ? 'Presensi Anda tercatat, namun melewati batas jam masuk (07:15 WIB).'
+                ? 'Presensi Anda tercatat, namun melewati batas jam masuk (07:30 WIB).'
                 : scanResult?.action === 'ALREADY_COMPLETED'
                 ? 'Anda sudah melakukan presensi masuk dan pulang hari ini.'
                 : 'Selamat bertugas! Data presensi otomatis tersimpan.'}
