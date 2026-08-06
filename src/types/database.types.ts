@@ -136,3 +136,13 @@ export interface HolidayRecord {
   description?: string;
   created_at: string;
 }
+
+export interface TeachingSlot {
+  id: string;
+  day: string;
+  time: string;
+  className: string;
+  subject: string;
+  room: string;
+}
+

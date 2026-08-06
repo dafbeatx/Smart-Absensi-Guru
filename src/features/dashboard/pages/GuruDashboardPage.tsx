@@ -9,6 +9,7 @@ import { SkeletonList } from '../../../components/ui/Skeleton';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
+import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { GPSService } from '../../../services/gps.service';
@@ -60,6 +61,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
 
   // Change PIN Form State
@@ -537,30 +539,43 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             </section>
 
             {/* 3. Quick Action Feature Grid */}
-            <section className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            <section className="grid grid-cols-3 gap-2 sm:gap-3">
               <button
                 onClick={handleOpenLeaveModal}
-                className="p-3 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card transition-all text-left flex items-center gap-2.5 sm:block sm:space-y-2 cursor-pointer group"
+                className="p-2.5 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-1.5 cursor-pointer group"
               >
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-base sm:text-xl font-bold group-hover:scale-105 transition-transform shrink-0">
                   📝
                 </div>
                 <div>
-                  <h3 className="font-black text-[#023246] text-xs">Ajukan Izin / Cuti</h3>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium hidden xs:block">Sakit, Izin & Cuti</p>
+                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight">Izin / Cuti</h3>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium hidden sm:block">Sakit & Cuti</p>
                 </div>
               </button>
 
               <button
                 onClick={handleOpenCorrectionModal}
-                className="p-3 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card transition-all text-left flex items-center gap-2.5 sm:block sm:space-y-2 cursor-pointer group"
+                className="p-2.5 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-1.5 cursor-pointer group"
               >
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-base sm:text-xl font-bold group-hover:scale-105 transition-transform shrink-0">
                   ✏️
                 </div>
                 <div>
-                  <h3 className="font-black text-[#023246] text-xs">Ajukan Koreksi</h3>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium hidden xs:block">Permohonan ke Admin</p>
+                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight">Koreksi Absen</h3>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium hidden sm:block">Ke Admin</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setIsScheduleModalOpen(true)}
+                className="p-2.5 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-1.5 cursor-pointer group"
+              >
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 text-[#0D7A5F] flex items-center justify-center text-base sm:text-xl font-bold group-hover:scale-105 transition-transform shrink-0">
+                  📅
+                </div>
+                <div>
+                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight">Jadwal Mengajar</h3>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium hidden sm:block">Jam Kelas</p>
                 </div>
               </button>
             </section>
@@ -1038,6 +1053,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           </div>
         </form>
       </Modal>
+
+      {/* Teaching Schedule Modal */}
+      <TeachingScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+      />
     </div>
   );
 };
