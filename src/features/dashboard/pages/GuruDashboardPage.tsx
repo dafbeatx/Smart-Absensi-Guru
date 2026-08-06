@@ -10,6 +10,7 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
@@ -22,6 +23,7 @@ import type {
   SystemSettings,
   AppNotification,
   DeviceBindingCheckResult,
+  LeaveRequest,
 } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
@@ -88,6 +90,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
+  // Leave History State (Sub-tab inside Riwayat)
+  const [historySubTab, setHistorySubTab] = useState<'ATTENDANCE' | 'LEAVES'>('ATTENDANCE');
+  const [userLeaves, setUserLeaves] = useState<LeaveRequest[]>([]);
+  const [isLoadingLeaves, setIsLoadingLeaves] = useState(false);
+
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [deviceBindingStatus, setDeviceBindingStatus] = useState<DeviceBindingCheckResult>({
@@ -114,6 +121,35 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
     return () => clearInterval(interval);
   }, []);
+
+  const loadUserLeaves = async () => {
+    if (!effectiveUser) return;
+    setIsLoadingLeaves(true);
+    try {
+      const leaves = await LeaveRepository.getUserLeaves(effectiveUser.id, token || '');
+      setUserLeaves(leaves);
+    } catch (err) {
+      console.warn('Failed to load user leaves:', err);
+    } finally {
+      setIsLoadingLeaves(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUserLeaves();
+
+    const handleLeaveUpdate = () => {
+      loadUserLeaves();
+    };
+
+    window.addEventListener('smart_absensi_leave_updated', handleLeaveUpdate);
+    window.addEventListener('storage', handleLeaveUpdate);
+
+    return () => {
+      window.removeEventListener('smart_absensi_leave_updated', handleLeaveUpdate);
+      window.removeEventListener('storage', handleLeaveUpdate);
+    };
+  }, [effectiveUser?.id]);
 
   // Load Settings, Today Attendance, Holidays, Monthly History, Notifications, & Device Binding
   useEffect(() => {
@@ -507,81 +543,234 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {activeTab === 'RIWAYAT' && (
           <section className="space-y-4">
             <div className="bg-white p-5 rounded-3xl border border-[#D4D4CE]/30 shadow-card space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                <div>
-                  <h2 className="font-black text-[#023246] text-base">Presensi & Statistik Bulanan</h2>
-                  <p className="text-xs text-slate-400 font-semibold">Tampilkan data presensi per bulan</p>
-                </div>
+              {/* Riwayat Category Sub-Tab Switcher */}
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1 border border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => setHistorySubTab('ATTENDANCE')}
+                  className={`flex-1 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    historySubTab === 'ATTENDANCE'
+                      ? 'bg-white text-[#023246] shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <span>📅 Presensi Harian</span>
+                  <span className="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[10px]">
+                    {attendanceHistory.length}
+                  </span>
+                </button>
 
-                {/* Dynamic Month / Year Filter Controls */}
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
-                    className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 outline-none"
-                  >
-                    {monthNamesIndonesian.map((mName, idx) => (
-                      <option key={idx + 1} value={idx + 1}>
-                        {mName}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
-                    className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 outline-none"
-                  >
-                    <option value={2026}>2026</option>
-                    <option value={2025}>2025</option>
-                  </select>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setHistorySubTab('LEAVES')}
+                  className={`flex-1 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    historySubTab === 'LEAVES'
+                      ? 'bg-white text-[#023246] shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <span>📝 Riwayat Izin</span>
+                  <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[10px]">
+                    {userLeaves.length}
+                  </span>
+                </button>
               </div>
 
-              {/* Dynamic Stats Cards */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3.5 bg-[#C8F2E0]/40 rounded-2xl border border-[#0D7A5F]/20 space-y-1">
-                  <span className="text-[10px] font-bold text-[#0D7A5F] block uppercase">Kehadiran {activeMonthName}</span>
-                  <p className="text-xl font-black text-[#023246]">{attendancePercentage}%</p>
-                  <span className="text-[10px] text-slate-500 font-semibold block">{hadirCount + terlambatCount} dari {totalDays} Hari Presensi</span>
-                </div>
-
-                <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 space-y-1">
-                  <span className="text-[10px] font-bold text-amber-800 block uppercase">Terlambat</span>
-                  <p className="text-xl font-black text-amber-950">{terlambatCount} <span className="text-xs font-bold text-amber-700">Kali</span></p>
-                  <span className="text-[10px] text-slate-500 font-semibold block">{terlambatPercent.toFixed(0)}% dari presensi</span>
-                </div>
-              </div>
-
-              {/* Detailed Attendance Log Table / List */}
-              <div className="space-y-2 pt-2">
-                <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Catatan Harian {activeMonthName} {selectedYear}</h3>
-                
-                {isLoadingHistory ? (
-                  <SkeletonList count={4} />
-                ) : attendanceHistory.length === 0 ? (
-                  <EmptyState
-                    icon="📅"
-                    title="Belum Ada Presensi Bulan Ini"
-                    description={`Belum ada rekaman presensi pada ${activeMonthName} ${selectedYear}. Mulai dengan melakukan scan QR Code absensi.`}
-                  />
-                ) : (
-                  attendanceHistory.map((rec) => (
-                    <div key={rec.id} className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200 flex items-center justify-between text-xs transition-colors">
-                      <div className="space-y-0.5">
-                        <p className="font-extrabold text-[#023246]">{rec.date}</p>
-                        <p className="text-[10px] text-slate-500 font-semibold">
-                          Masuk: {rec.check_in_time ? rec.check_in_time.substring(0, 5) : '--:--'} • Pulang: {rec.check_out_time ? rec.check_out_time.substring(0, 5) : '--:--'}
-                        </p>
-                      </div>
-
-                      <Badge status={rec.status}>
-                        {rec.status === 'HADIR' ? 'Hadir' : rec.status === 'TERLAMBAT' ? 'Terlambat' : rec.status}
-                      </Badge>
+              {/* SUB-TAB 1: PRESENSI HARIAN */}
+              {historySubTab === 'ATTENDANCE' && (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div>
+                      <h2 className="font-black text-[#023246] text-base">Presensi & Statistik Bulanan</h2>
+                      <p className="text-xs text-slate-400 font-semibold">Tampilkan data presensi per bulan</p>
                     </div>
-                  ))
-                )}
-              </div>
+
+                    {/* Dynamic Month / Year Filter Controls */}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(parseInt(e.target.value, 10))}
+                        className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 outline-none"
+                      >
+                        {monthNamesIndonesian.map((mName, idx) => (
+                          <option key={idx + 1} value={idx + 1}>
+                            {mName}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
+                        className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 outline-none"
+                      >
+                        <option value={2026}>2026</option>
+                        <option value={2025}>2025</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Stats Cards */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="p-3.5 bg-[#C8F2E0]/40 rounded-2xl border border-[#0D7A5F]/20 space-y-1">
+                      <span className="text-[10px] font-bold text-[#0D7A5F] block uppercase">Kehadiran {activeMonthName}</span>
+                      <p className="text-xl font-black text-[#023246]">{attendancePercentage}%</p>
+                      <span className="text-[10px] text-slate-500 font-semibold block">{hadirCount + terlambatCount} dari {totalDays} Hari Presensi</span>
+                    </div>
+
+                    <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 space-y-1">
+                      <span className="text-[10px] font-bold text-amber-800 block uppercase">Terlambat</span>
+                      <p className="text-xl font-black text-amber-950">{terlambatCount} <span className="text-xs font-bold text-amber-700">Kali</span></p>
+                      <span className="text-[10px] text-slate-500 font-semibold block">{terlambatPercent.toFixed(0)}% dari presensi</span>
+                    </div>
+                  </div>
+
+                  {/* Detailed Attendance Log Table / List */}
+                  <div className="space-y-2 pt-2">
+                    <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Catatan Harian {activeMonthName} {selectedYear}</h3>
+                    
+                    {isLoadingHistory ? (
+                      <SkeletonList count={4} />
+                    ) : attendanceHistory.length === 0 ? (
+                      <EmptyState
+                        icon="📅"
+                        title="Belum Ada Presensi Bulan Ini"
+                        description={`Belum ada rekaman presensi pada ${activeMonthName} ${selectedYear}. Mulai dengan melakukan scan QR Code absensi.`}
+                      />
+                    ) : (
+                      attendanceHistory.map((rec) => (
+                        <div key={rec.id} className="p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200 flex items-center justify-between text-xs transition-colors">
+                          <div className="space-y-0.5">
+                            <p className="font-extrabold text-[#023246]">{rec.date}</p>
+                            <p className="text-[10px] text-slate-500 font-semibold">
+                              Masuk: {rec.check_in_time ? rec.check_in_time.substring(0, 5) : '--:--'} • Pulang: {rec.check_out_time ? rec.check_out_time.substring(0, 5) : '--:--'}
+                            </p>
+                          </div>
+
+                          <Badge status={rec.status}>
+                            {rec.status === 'HADIR' ? 'Hadir' : rec.status === 'TERLAMBAT' ? 'Terlambat' : rec.status}
+                          </Badge>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SUB-TAB 2: RIWAYAT PENGAJUAN IZIN / CUTI */}
+              {historySubTab === 'LEAVES' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div>
+                      <h2 className="font-black text-[#023246] text-base">Riwayat Permohonan Izin & Cuti</h2>
+                      <p className="text-xs text-slate-400 font-semibold">Daftar pengajuan izin yang pernah dikirim</p>
+                    </div>
+
+                    <Button
+                      variant="primary"
+                      onClick={() => setIsLeaveModalOpen(true)}
+                      className="px-3 py-1.5 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>➕ Ajukan Izin</span>
+                    </Button>
+                  </div>
+
+                  {/* Leaves Overview Badges Summary */}
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-2.5 bg-amber-50 rounded-2xl border border-amber-200">
+                      <span className="text-[9px] font-bold text-amber-800 uppercase block">Menunggu</span>
+                      <p className="text-base font-black text-amber-950">
+                        {userLeaves.filter((l) => l.approval_status === 'PENDING').length}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-emerald-50 rounded-2xl border border-emerald-200">
+                      <span className="text-[9px] font-bold text-emerald-800 uppercase block">Disetujui</span>
+                      <p className="text-base font-black text-emerald-950">
+                        {userLeaves.filter((l) => l.approval_status === 'APPROVED').length}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-red-50 rounded-2xl border border-red-200">
+                      <span className="text-[9px] font-bold text-red-800 uppercase block">Ditolak</span>
+                      <p className="text-base font-black text-red-950">
+                        {userLeaves.filter((l) => l.approval_status === 'REJECTED').length}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* List of Leave Applications */}
+                  <div className="space-y-2.5 pt-1">
+                    {isLoadingLeaves ? (
+                      <SkeletonList count={3} />
+                    ) : userLeaves.length === 0 ? (
+                      <EmptyState
+                        icon="📝"
+                        title="Belum Ada Pengajuan Izin"
+                        description="Anda belum pernah mengajukan izin atau cuti. Tekan tombol 'Ajukan Izin' di atas jika Anda perlu izin tidak hadir."
+                      />
+                    ) : (
+                      userLeaves.map((leave) => {
+                        const statusColor =
+                          leave.approval_status === 'APPROVED'
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : leave.approval_status === 'REJECTED'
+                            ? 'bg-red-100 text-red-800 border-red-300'
+                            : 'bg-amber-100 text-amber-800 border-amber-300';
+
+                        const statusText =
+                          leave.approval_status === 'APPROVED'
+                            ? '✓ DISETUJUI'
+                            : leave.approval_status === 'REJECTED'
+                            ? '✕ DITOLAK'
+                            : '⏳ MENUNGGU REVIEW';
+
+                        return (
+                          <div
+                            key={leave.id}
+                            className="p-4 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200 text-xs space-y-2 transition-all"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-200 mb-1">
+                                  {leave.leave_type}
+                                </span>
+                                <h4 className="font-extrabold text-slate-900 text-xs">
+                                  {leave.start_date} {leave.end_date !== leave.start_date ? `s/d ${leave.end_date}` : ''}
+                                </h4>
+                              </div>
+
+                              <span className={`px-2 py-0.5 text-[10px] font-black rounded-lg border ${statusColor}`}>
+                                {statusText}
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-slate-600 font-medium leading-relaxed bg-white p-2.5 rounded-xl border border-slate-200">
+                              "{leave.reason}"
+                            </p>
+
+                            {leave.attachment_url && (
+                              <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-bold">
+                                <span>📎</span> Ada Lampiran Surat/Bukti Foto
+                              </div>
+                            )}
+
+                            {leave.approval_notes && (
+                              <p className="text-[10px] text-slate-500 font-semibold italic bg-amber-50/60 p-2 rounded-lg border border-amber-200/60">
+                                Catatan Kepala Sekolah: {leave.approval_notes}
+                              </p>
+                            )}
+
+                            <span className="text-[9px] text-slate-400 font-mono block pt-0.5">
+                              Diajukan pada: {new Date(leave.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         )}

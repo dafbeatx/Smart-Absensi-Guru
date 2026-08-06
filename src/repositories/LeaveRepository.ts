@@ -65,4 +65,22 @@ export class LeaveRepository {
   public static async getPendingLeaves(token: string): Promise<LeaveRequest[]> {
     return ProviderFactory.getProvider().getPendingLeaves(token);
   }
+
+  public static async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('smart_absensi_leaves');
+      if (saved) {
+        const list: LeaveRequest[] = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          return list
+            .filter((l) => l.user_id === userId || !l.user_id)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
+      }
+    } catch (e) {
+      logger.warn('LeaveRepository', 'Failed to parse user leaves:', e);
+    }
+    return [];
+  }
 }
