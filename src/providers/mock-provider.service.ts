@@ -51,9 +51,9 @@ export class MockProvider implements IDataProvider {
     }
 
     let role: 'GURU' | 'KEPSEK' | 'ADMIN' = 'GURU';
-    let name = 'Dafa Maulana, S.Pd';
+    let name = 'Guru Pengajar, S.Pd';
     let position = 'Guru Utama / Pendidik';
-    let nip: string | null = null;
+    let nip: string | null = '198905202014021003';
 
     if (dto.identity.toUpperCase().includes('KEPSEK') || dto.identity.startsWith('1975')) {
       role = 'KEPSEK';
@@ -91,11 +91,37 @@ export class MockProvider implements IDataProvider {
     };
   }
 
-  public async verifySession(_token: string): Promise<UserProfile> {
+  public async verifySession(token: string): Promise<UserProfile> {
+    if (token && token.includes('ADMIN')) {
+      return {
+        id: 'usr_admin_1001',
+        nip: '199501012020011001',
+        full_name: 'Rina Fitriani, S.Kom.',
+        phone_number: '0895351251395',
+        role: 'ADMIN',
+        position: 'Admin Website & IT Sekolah',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+    }
+    if (token && token.includes('KEPSEK')) {
+      return {
+        id: 'usr_kepsek_1001',
+        nip: '197504122003121001',
+        full_name: 'Drs. H. M. Yusuf, M.Pd.',
+        phone_number: '081234567891',
+        role: 'KEPSEK',
+        position: 'Kepala Sekolah Utama',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+    }
     return {
-      id: 'usr_uuid_1001',
-      nip: null,
-      full_name: 'Dafa Maulana, S.Pd',
+      id: 'usr_guru_1001',
+      nip: '198905202014021003',
+      full_name: 'Guru Pengajar, S.Pd',
       phone_number: '081234567890',
       role: 'GURU',
       position: 'Guru Utama / Pendidik',

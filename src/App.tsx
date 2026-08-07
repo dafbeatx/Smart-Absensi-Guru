@@ -136,15 +136,15 @@ export const App: React.FC = () => {
             }}
             isPreviewMode={true}
             previewUser={{
-              id: 'usr_guru_preview_001',
-              nip: '198905202014021003',
-              full_name: 'Dafa Maulana, S.Pd (Simulasi)',
-              phone_number: '081234567890',
+              id: user.id || 'usr_guru_preview_001',
+              nip: user.nip || '-',
+              full_name: user.full_name,
+              phone_number: user.phone_number || '-',
               role: 'GURU',
-              position: 'Guru Utama / Pendidik (Preview)',
-              avatar_url: null,
+              position: user.position ? `${user.position} (Mode Preview)` : 'Pengguna (Mode Preview)',
+              avatar_url: user.avatar_url || null,
               is_active: true,
-              created_at: new Date().toISOString(),
+              created_at: user.created_at || new Date().toISOString(),
             }}
           />
         </div>

@@ -49,7 +49,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const effectiveUser: UserProfile = previewUser || authUser || {
     id: 'usr_guru_sample',
     nip: '198905202014021003',
-    full_name: 'Dafa Maulana, S.Pd',
+    full_name: authUser?.full_name || 'Guru Utama',
     phone_number: '081234567890',
     role: 'GURU',
     position: 'Guru Utama / Pendidik',
