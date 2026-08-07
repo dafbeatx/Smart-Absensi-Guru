@@ -108,43 +108,34 @@ export const App: React.FC = () => {
     if (isPreviewGuruMode && (user.role === 'ADMIN' || user.role === 'OPERATOR' || user.role === 'KEPSEK')) {
       return (
         <div>
-          {/* Sticky Floating Developer Switch Bar */}
+          {/* Sticky Floating Switch Bar */}
           <div className="bg-slate-900 text-white text-xs font-bold px-4 py-2.5 flex items-center justify-between shadow-lg sticky top-0 z-50 border-b border-slate-700">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>📱 Mode Preview Tampilan Guru ({user.role === 'ADMIN' ? 'Admin Access' : 'Kepsek Access'})</span>
+              <span>📱 Mode Tampilan Guru (Tersinkronisasi Real-time: {user.full_name})</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsTestRunnerOpen(true)}
-                className="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95"
+                className="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
               >
                 <span>🧪</span> Run Unit Tests
               </button>
               <button
                 onClick={() => setIsPreviewGuruMode(false)}
-                className="px-3.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95"
+                className="px-3.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-lg text-[11px] transition-all flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
               >
                 <span>🔄</span> Kembali ke Dashboard {user.role === 'ADMIN' ? 'Admin' : 'Kepsek'}
               </button>
             </div>
           </div>
           <GuruDashboardPage
-            onOpenScanner={() => {
-              // Blokir scan nyata di mode preview — user preview tidak ada di DB
-              setIsPreviewScannerBlocked(true);
-            }}
-            isPreviewMode={true}
+            onOpenScanner={() => setIsScannerOpen(true)}
+            isPreviewMode={false}
             previewUser={{
-              id: user.id || 'usr_guru_preview_001',
-              nip: user.nip || '-',
-              full_name: user.full_name,
-              phone_number: user.phone_number || '-',
+              ...user,
               role: 'GURU',
-              position: user.position ? `${user.position} (Mode Preview)` : 'Pengguna (Mode Preview)',
-              avatar_url: user.avatar_url || null,
-              is_active: true,
-              created_at: user.created_at || new Date().toISOString(),
+              position: user.position || 'Pendidik / Tenaga Kependidikan',
             }}
           />
         </div>

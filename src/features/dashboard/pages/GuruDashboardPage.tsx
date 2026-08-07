@@ -286,10 +286,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   };
 
   const handleOpenScannerClick = () => {
-    if (isPreviewMode) {
-      showToast('warning', 'Mode Preview Terdeteksi', 'Scan QR nyata tidak tersedia dalam Mode Preview simulasi Admin.');
-      return;
-    }
     if (onOpenScanner) onOpenScanner();
   };
 
