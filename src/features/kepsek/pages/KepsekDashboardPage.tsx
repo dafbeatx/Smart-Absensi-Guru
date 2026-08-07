@@ -152,7 +152,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
   const sidebarItems: SidebarItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
-    { id: 'ACCOUNT_APPLICATIONS', label: 'Account Applications', icon: '👥', badge: teachers.length },
+    { id: 'ACCOUNT_APPLICATIONS', label: 'Account Applications', icon: '👥' },
     { id: 'APPROVALS', label: 'Persetujuan Izin/Cuti', icon: '📝', badge: pendingRequests.length, hasDropdown: true },
     { id: 'UNABSENTED', label: 'Daftar Belum Absen', icon: '⚠️', badge: unabsentedTeachers.length },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
