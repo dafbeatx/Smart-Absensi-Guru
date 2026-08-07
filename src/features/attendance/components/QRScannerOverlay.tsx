@@ -436,6 +436,12 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       {/* Live Location OpenStreetMap Modal */}
       <Modal isOpen={showLiveMap} onClose={() => setShowLiveMap(false)} title="🗺️ Live Map Posisi Real-time (OpenStreetMap)">
         <div className="space-y-3">
+          {isOfflineMode && (
+            <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">
+              ⚡ Mode Offline: radius toleransi sementara {allowedRadius}m
+            </div>
+          )}
+
           <div className="flex items-center justify-between text-xs font-medium text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
             <span>
               Status: <b className={isWithinRadius ? 'text-emerald-600' : 'text-red-600'}>{isWithinRadius ? '🟢 Dalam Radius Safe-Zone' : '🔴 Di Luar Radius Sekolah'}</b>

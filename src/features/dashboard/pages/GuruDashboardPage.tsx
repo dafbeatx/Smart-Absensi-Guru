@@ -18,6 +18,7 @@ import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
 import { isDateOffDay } from '../../../utils/time.utils';
+import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
@@ -861,25 +862,39 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
 
               {/* Live OpenStreetMap Preview Box under GPS Readiness */}
-              <div className="space-y-1 pt-0.5">
-                <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-extrabold text-slate-700 px-0.5">
-                  <span className="flex items-center gap-1">
-                    <span>🗺️</span> Peta Lokasi Real-time Anda
-                  </span>
-                  <span className="text-[9px] text-slate-400 font-mono">
-                    {userCoords ? `±${Math.round(userCoords.accuracy)}m` : 'Mendeteksi...'}
-                  </span>
-                </div>
-                <LiveLocationMap
-                  userLat={userCoords?.latitude}
-                  userLng={userCoords?.longitude}
-                  schoolLat={settings.geofence_lat || CONSTANTS.DEFAULTS.GEOFENCE_LAT}
-                  schoolLng={settings.geofence_lng || CONSTANTS.DEFAULTS.GEOFENCE_LNG}
-                  allowedRadius={settings.geofence_radius || CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS}
-                  accuracy={userCoords?.accuracy}
-                  height="165px"
-                />
-              </div>
+              {(() => {
+                const isOfflineMode = typeof navigator !== 'undefined' && !navigator.onLine;
+                const rawAllowed = getEffectiveAllowedRadius(settings.geofence_radius);
+                const effectiveAllowedRadius = isOfflineMode ? Math.max(rawAllowed, 500) : rawAllowed;
+
+                return (
+                  <div className="space-y-1 pt-0.5">
+                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-extrabold text-slate-700 px-0.5">
+                      <span className="flex items-center gap-1">
+                        <span>🗺️</span> Peta Lokasi Real-time Anda
+                      </span>
+                      {isOfflineMode ? (
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-extrabold rounded-md text-[9px] truncate max-w-[210px]">
+                          ⚡ Mode Offline: radius toleransi sementara 500m
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-slate-400 font-mono">
+                          {userCoords ? `±${Math.round(userCoords.accuracy)}m` : 'Mendeteksi...'}
+                        </span>
+                      )}
+                    </div>
+                    <LiveLocationMap
+                      userLat={userCoords?.latitude}
+                      userLng={userCoords?.longitude}
+                      schoolLat={settings.geofence_lat || CONSTANTS.DEFAULTS.GEOFENCE_LAT}
+                      schoolLng={settings.geofence_lng || CONSTANTS.DEFAULTS.GEOFENCE_LNG}
+                      allowedRadius={effectiveAllowedRadius}
+                      accuracy={userCoords?.accuracy}
+                      height="165px"
+                    />
+                  </div>
+                );
+              })()}
 
               {/* Action Button or Off-Day Informative Banner */}
               {isTodayOff.isOff ? (
