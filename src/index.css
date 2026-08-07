@@ -170,4 +170,20 @@
   color: #94a3b8;
 }
 
+/* 🔔 Bell Ringing & Shaking Animation for Real-time Notifications */
+@keyframes bell-ring {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(18deg); }
+  30% { transform: rotate(-18deg); }
+  45% { transform: rotate(12deg); }
+  60% { transform: rotate(-12deg); }
+  75% { transform: rotate(6deg); }
+  85% { transform: rotate(-6deg); }
+  100% { transform: rotate(0); }
+}
 
+.animate-bell-ring {
+  display: inline-block;
+  animation: bell-ring 1s ease-in-out infinite;
+  transform-origin: top center;
+}

@@ -19,6 +19,7 @@ import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
+import { SoundService } from '../../../services/audio.service';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -377,6 +378,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const prevGuruUnreadRef = React.useRef<number>(0);
+
+  // Play audio chime when new unread notification arrives for Guru
+  useEffect(() => {
+    if (unreadCount > prevGuruUnreadRef.current && prevGuruUnreadRef.current >= 0) {
+      SoundService.playNotificationChime();
+    }
+    prevGuruUnreadRef.current = unreadCount;
+  }, [unreadCount]);
 
   return (
     <div className="min-h-screen bg-[#F6F6F6] pb-28 text-[#023246]">
@@ -408,10 +418,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0"
           aria-label="Notifikasi"
         >
+          <span className={`text-base sm:text-lg transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>
+            🔔
+          </span>
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#0D7A5F] rounded-full ring-2 ring-white" />
+            <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.2 text-[9px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white shadow-xs shadow-red-500/50 animate-pulse">
+              {unreadCount}
+            </span>
           )}
-          <span className="text-base sm:text-lg">🔔</span>
         </button>
       </header>
 
@@ -1057,8 +1071,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               activeTab === 'NOTIFIKASI' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
             }`}
           >
-            {unreadCount > 0 && <span className="absolute top-1 right-2.5 w-1.5 h-1.5 rounded-full bg-[#0D7A5F]" />}
-            <span className="text-base sm:text-lg">🔔</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 right-2 px-1 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-3.5 text-center ring-1.5 ring-white animate-pulse">
+                {unreadCount}
+              </span>
+            )}
+            <span className={`text-base sm:text-lg ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>🔔</span>
             <span>Notif</span>
           </button>
 

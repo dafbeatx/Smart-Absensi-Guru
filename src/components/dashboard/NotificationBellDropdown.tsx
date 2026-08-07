@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { ProviderFactory } from '../../providers/provider-factory';
+import { SoundService } from '../../services/audio.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile } from '../../types/database.types';
 
 export interface DynamicNotificationItem {
@@ -252,6 +253,15 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   }, [user?.id]);
 
   const unreadCount = notifications.filter((n) => !n.isRead && !readIds.has(n.id)).length;
+  const prevUnreadCountRef = useRef<number>(0);
+
+  // Play audio chime sound when new unread notification arrives
+  useEffect(() => {
+    if (unreadCount > prevUnreadCountRef.current && prevUnreadCountRef.current >= 0) {
+      SoundService.playNotificationChime();
+    }
+    prevUnreadCountRef.current = unreadCount;
+  }, [unreadCount]);
 
   const handleMarkAllAsRead = () => {
     const updated = new Set(readIds);
@@ -296,9 +306,11 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         aria-label="Pusat Notifikasi Presensi"
         title="Pusat Notifikasi Presensi"
       >
-        <span className="text-lg">🔔</span>
+        <span className={`text-lg transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>
+          🔔
+        </span>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 px-1.5 py-0.2 text-[9px] font-black bg-red-500 text-white rounded-full min-w-4 text-center ring-2 ring-white animate-pulse">
+          <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.2 text-[9px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white shadow-xs shadow-red-500/50 animate-pulse">
             {unreadCount}
           </span>
         )}
