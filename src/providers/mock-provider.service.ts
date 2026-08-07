@@ -365,7 +365,7 @@ export class MockProvider implements IDataProvider {
       id: `att_${dto.target_user_id}_${dto.date}`,
       user_id: dto.target_user_id,
       date: dto.date,
-      check_in_time: dto.check_in_time ? (dto.check_in_time.length === 5 ? `${dto.check_in_time}:00` : dto.check_in_time) : '07:00:00',
+      check_in_time: dto.check_in_time && dto.check_in_time.trim().length > 0 ? (dto.check_in_time.length === 5 ? `${dto.check_in_time}:00` : dto.check_in_time) : (finalStatus === 'HADIR' || finalStatus === 'TERLAMBAT' ? '07:00:00' : null),
       check_out_time: dto.check_out_time ? (dto.check_out_time.length === 5 ? `${dto.check_out_time}:00` : dto.check_out_time) : null,
       status: finalStatus,
       verification_method: 'MANUAL_OPERATOR',

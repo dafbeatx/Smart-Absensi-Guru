@@ -52,7 +52,8 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
     setIsLoading(true);
 
     try {
-      const fullReason = `[Pengajuan Koreksi Absen ${date} (Masuk: ${checkInTime}, Pulang: ${checkOutTime}) menjadi ${targetStatus}]: ${reason.trim()}`;
+      const timeInfo = targetStatus === 'HADIR' ? ` (Masuk: ${checkInTime}, Pulang: ${checkOutTime})` : '';
+      const fullReason = `[Pengajuan Koreksi Absen ${date}${timeInfo} menjadi ${targetStatus}]: ${reason.trim()}`;
 
       await LeaveRepository.submitLeave({
         token: token || 'MOCK_TOKEN',
@@ -109,14 +110,24 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
-          <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
-          <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
-        </div>
+        {targetStatus === 'HADIR' ? (
+          <div className="grid grid-cols-3 gap-3">
+            <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
+            <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
+            <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
+            <div className="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] text-blue-900 flex items-center gap-2">
+              <span>ℹ️</span>
+              <span>Untuk pengajuan status <strong>{targetStatus}</strong>, jam masuk & jam pulang tidak diperlukan.</span>
+            </div>
+          </div>
+        )}
 
         <div className="bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-xl text-[11px] text-amber-900 leading-relaxed font-medium">
-          💡 <strong>Catatan:</strong> Pengajuan akan dikirim sebagai <i>Request Pending</i> ke Admin/Kepsek. Tanggal lampau diizinkan (maksimal hari ini). Jam masuk &gt; 07:15 WIB otomatis dievaluasi <strong>TERLAMBAT</strong>.
+          💡 <strong>Catatan:</strong> Pengajuan akan dikirim sebagai <i>Request Pending</i> ke Admin/Kepsek. Tanggal lampau diizinkan (maksimal hari ini). {targetStatus === 'HADIR' ? 'Jam masuk > 07:15 WIB otomatis dievaluasi TERLAMBAT.' : `Status ${targetStatus} akan diajukan tanpa mencatat jam presensi fisik.`}
         </div>
 
         <div className="space-y-1">

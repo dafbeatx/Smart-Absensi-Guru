@@ -73,8 +73,8 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
         target_user_id: selectedUserId,
         date,
         status: newStatus,
-        check_in_time: checkInTime.length === 5 ? `${checkInTime}:00` : checkInTime,
-        check_out_time: checkOutTime ? (checkOutTime.length === 5 ? `${checkOutTime}:00` : checkOutTime) : undefined,
+        check_in_time: newStatus === 'HADIR' ? (checkInTime.length === 5 ? `${checkInTime}:00` : checkInTime) : '',
+        check_out_time: newStatus === 'HADIR' && checkOutTime ? (checkOutTime.length === 5 ? `${checkOutTime}:00` : checkOutTime) : undefined,
         reason,
       });
 
@@ -87,8 +87,8 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
           user_id: selectedUserId,
           date,
           status: newStatus,
-          check_in_time: checkInTime,
-          check_out_time: checkOutTime,
+          check_in_time: newStatus === 'HADIR' ? checkInTime : null,
+          check_out_time: newStatus === 'HADIR' ? checkOutTime : null,
         }),
         reason: `Koreksi Absensi Manual oleh Admin Website untuk ${teacher?.full_name}: ${reason}`,
       });
@@ -128,11 +128,21 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
           </select>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
-          <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
-          <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
-        </div>
+        {newStatus === 'HADIR' ? (
+          <div className="grid grid-cols-3 gap-3">
+            <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
+            <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
+            <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
+            <div className="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] text-blue-900 flex items-center gap-2">
+              <span>ℹ️</span>
+              <span>Untuk status <strong>{newStatus}</strong>, jam masuk & jam pulang tidak diperlukan (dikoreksi tanpa jam presensi).</span>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-1">
           <label className="block text-xs font-semibold text-slate-700">Status Kehadiran Baru</label>
@@ -155,7 +165,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
         </div>
 
         <div className="bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-xl text-[11px] text-amber-900 leading-relaxed font-medium">
-          💡 <strong>Catatan:</strong> Pengisian tanggal lampau diizinkan (maksimal hari ini). Status <strong>TERLAMBAT</strong> dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul 07:15 WIB.
+          💡 <strong>Catatan:</strong> Pengisian tanggal lampau diizinkan (maksimal hari ini). {newStatus === 'HADIR' ? 'Status TERLAMBAT dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul 07:15 WIB.' : `Status ${newStatus} akan dicatat secara resmi tanpa mencatat jam absensi fisik.`}
         </div>
 
         <div className="space-y-1">
