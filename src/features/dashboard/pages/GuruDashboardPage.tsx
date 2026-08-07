@@ -20,6 +20,8 @@ import { handleAppError } from '../../../utils/error.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
+import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
+import { SyncEngine } from '../../../services/sync-engine.service';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -153,6 +155,30 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     month: 'long',
     year: 'numeric',
   });
+
+  // Real-time Network Connection & Offline Queue State
+  const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const { pendingItems, syncState } = useSyncQueueStore();
+
+  useEffect(() => {
+    SyncEngine.initAutoSync();
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      SyncEngine.processSyncQueue();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const loadUserLeaves = async () => {
     if (!effectiveUser) return;
@@ -456,6 +482,49 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <span className="text-[10px] sm:text-xs font-bold text-emerald-300">WIB</span>
                 </div>
               </div>
+            </div>
+
+            {/* 0.5. Live Network Signal & Offline Mode Status Card */}
+            <div className={`p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all shadow-xs flex items-center justify-between gap-3 ${
+              isOnline
+                ? 'bg-emerald-50/80 border-emerald-200/80 text-emerald-950'
+                : 'bg-amber-50 border-amber-300 text-amber-950 shadow-md animate-pulse'
+            }`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 border ${
+                  isOnline
+                    ? 'bg-emerald-100 border-emerald-300 text-emerald-700'
+                    : 'bg-amber-100 border-amber-400 text-amber-800'
+                }`}>
+                  {isOnline ? '📶' : '⚡'}
+                </div>
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-extrabold text-xs sm:text-sm">
+                    <span className={`w-2 h-2 rounded-full ${
+                      isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-ping'
+                    }`} />
+                    <span>{isOnline ? 'Sinyal Terhubung (Mode Online)' : 'Mode Offline (Sinyal Lemah / Putus)'}</span>
+                  </div>
+                  <p className="text-[10px] sm:text-xs font-medium opacity-85 truncate">
+                    {isOnline
+                      ? pendingItems.length > 0
+                        ? `${pendingItems.length} presensi offline mengantre untuk dikirim.`
+                        : 'Semua data presensi tersinkronisasi otomatis ke server.'
+                      : 'Absensi tetap aman disimpan di HP & dikirim saat sinyal pulih.'}
+                  </p>
+                </div>
+              </div>
+
+              {pendingItems.length > 0 && (
+                <button
+                  onClick={() => SyncEngine.processSyncQueue()}
+                  disabled={syncState === 'SYNCING'}
+                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all active:scale-95 disabled:opacity-50 shrink-0 cursor-pointer flex items-center gap-1"
+                >
+                  <span>{syncState === 'SYNCING' ? '⏳' : '🔄'}</span>
+                  <span>{syncState === 'SYNCING' ? 'Syncing...' : `Sync (${pendingItems.length})`}</span>
+                </button>
+              )}
             </div>
 
             {/* 1. Top Profile Header Card */}
