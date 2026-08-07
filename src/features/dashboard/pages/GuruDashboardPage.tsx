@@ -10,6 +10,7 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
+import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { GPSService } from '../../../services/gps.service';
@@ -62,6 +63,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
 
   // Change PIN Form State
@@ -920,6 +922,29 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               </div>
 
+              {/* Syarat & Ketentuan Section */}
+              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#0D7A5F]/5 border border-[#0D7A5F]/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📜</span>
+                    <span className="font-bold text-xs text-[#023246]">Syarat & Ketentuan Presensi</span>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-[#0D7A5F] bg-[#0D7A5F]/10 px-2 py-0.5 rounded-full">
+                    Resmi
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Aturan penggunaan presensi digital, geofence GPS, binding HP, serta tata cara pengajuan izin & koreksi absen.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsTermsModalOpen(true)}
+                  className="w-full mt-1 py-2 px-3 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
+                >
+                  <span>📋</span> Lihat Syarat & Ketentuan Lengkap
+                </button>
+              </div>
+
               {/* Action Buttons */}
               <div className="space-y-2 pt-1">
                 <Button
@@ -1060,6 +1085,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <TeachingScheduleModal
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
+      />
+
+      {/* Terms & Conditions Modal */}
+      <TermsAndConditionsModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
       />
     </div>
   );
