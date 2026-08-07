@@ -25,6 +25,7 @@ import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
 import { logger } from '../utils/logger.utils';
+import { convertToWebP } from '../utils/image.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -688,8 +689,21 @@ export class SupabaseProvider implements IDataProvider {
 
   public async uploadAvatar(userId: string, file: File): Promise<string> {
     try {
-      const ext = file.name.split('.').pop() || 'jpg';
-      const filePath = `teacher_${userId}_${Date.now()}.${ext}`;
+      // Auto-convert to WebP format (max 400x400px, 80% quality) to save Supabase Storage (~20-30KB per photo)
+      let fileToUpload = file;
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        try {
+          fileToUpload = await convertToWebP(file, 400, 400, 0.8);
+          logger.info('SupabaseProvider', 'Image converted to WebP successfully', {
+            originalSize: `${(file.size / 1024).toFixed(1)} KB`,
+            webpSize: `${(fileToUpload.size / 1024).toFixed(1)} KB`,
+          });
+        } catch (convErr) {
+          logger.warn('SupabaseProvider', 'Failed to convert image to WebP, uploading original file', { userId, convErr });
+        }
+      }
+
+      const filePath = `teacher_${userId}_${Date.now()}.webp`;
 
       // Try bucket 'avatas 1', fallback to 'avatas-1' or 'avatars'
       const bucketsToTry = ['avatas 1', 'avatas-1', 'avatars'];
@@ -699,7 +713,7 @@ export class SupabaseProvider implements IDataProvider {
       for (const bucketName of bucketsToTry) {
         const { error: uploadError } = await this.client.storage
           .from(bucketName)
-          .upload(filePath, file, { upsert: true, contentType: file.type });
+          .upload(filePath, fileToUpload, { upsert: true, contentType: 'image/webp' });
 
         if (!uploadError) {
           const { data } = this.client.storage.from(bucketName).getPublicUrl(filePath);
@@ -714,7 +728,7 @@ export class SupabaseProvider implements IDataProvider {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = (err) => reject(err);
-          reader.readAsDataURL(file);
+          reader.readAsDataURL(fileToUpload);
         });
       }
 

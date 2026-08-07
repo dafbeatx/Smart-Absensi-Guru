@@ -7,6 +7,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { UserProfile, RoleCode } from '../../../types/database.types';
+import { convertToWebP } from '../../../utils/image.utils';
 
 export interface TeacherManagementTableProps {
   teachers: UserProfile[];
@@ -119,30 +120,39 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('error', 'File Terlalu Besar', 'Maksimal ukuran foto profile adalah 5MB.');
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('error', 'File Terlalu Besar', 'Maksimal ukuran foto profile adalah 10MB.');
       return;
     }
 
     setIsUploadingAvatar(true);
     try {
+      // Auto convert to WebP (max 400x400px, 80% quality)
+      const webpFile = await convertToWebP(file, 400, 400, 0.8);
+      const originalKb = (file.size / 1024).toFixed(1);
+      const compressedKb = (webpFile.size / 1024).toFixed(1);
+
       const provider = ProviderFactory.getProvider();
       let uploadedUrl = '';
       if (selectedTeacher && 'uploadAvatar' in provider && typeof (provider as any).uploadAvatar === 'function') {
-        uploadedUrl = await (provider as any).uploadAvatar(selectedTeacher.id, file);
+        uploadedUrl = await (provider as any).uploadAvatar(selectedTeacher.id, webpFile);
       } else {
         uploadedUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = (err) => reject(err);
-          reader.readAsDataURL(file);
+          reader.readAsDataURL(webpFile);
         });
       }
       setAvatarUrl(uploadedUrl);
-      showToast('info', 'Pratinjau Foto Dibuat', 'Klik "Simpan Perubahan" untuk menetapkan foto profil baru.');
+      showToast(
+        'success',
+        'Foto Berhasil Dikompresi (WebP)!',
+        `Ukuran foto diperkecil dari ${originalKb} KB menjadi ${compressedKb} KB (Hemat Storage Supabase).`
+      );
     } catch (err) {
       console.warn('Failed to upload avatar:', err);
-      showToast('error', 'Gagal Unggah Foto', 'Gagal memproses foto profil.');
+      showToast('error', 'Gagal Unggah Foto', 'Gagal memproses & mengompresi foto profil.');
     } finally {
       setIsUploadingAvatar(false);
     }
