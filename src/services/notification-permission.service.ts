@@ -137,6 +137,19 @@ class NotificationPermissionService {
       teacherName,
     });
   }
+
+  /**
+   * Helper: Trigger Notifikasi Keputusan Izin untuk Guru
+   */
+  public notifyLeaveDecision(teacherName: string, decision: 'APPROVED' | 'REJECTED', leaveType: string) {
+    const isApproved = decision === 'APPROVED';
+    this.sendNativeNotification({
+      title: isApproved ? `✅ Pengajuan ${leaveType} Disetujui` : `❌ Pengajuan ${leaveType} Ditolak`,
+      body: `Permohonan ${leaveType} Anda telah ${isApproved ? 'disetujui' : 'ditolak'} oleh Kepsek/Admin.`,
+      type: 'LEAVE_REQUEST',
+      teacherName,
+    });
+  }
 }
 
 export const NotificationService = new NotificationPermissionService();

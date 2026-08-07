@@ -3,6 +3,7 @@ import type { LeaveRequest, LeaveType } from '../types/database.types';
 import { useAuthStore } from '../store/useAuthStore';
 import { logger } from '../utils/logger.utils';
 import { AuditLogger } from '../services/audit-logger.service';
+import { NotificationService } from '../services/notification-permission.service';
 
 export interface SubmitLeaveDTO {
   token: string;
@@ -34,6 +35,9 @@ export class LeaveRepository {
       reason: `Pengajuan ${dto.leave_type}: ${dto.reason}`,
     }).catch(() => {});
 
+    // Trigger Push Notification for Admin / Kepsek
+    NotificationService.notifyTeacherLeaveRequest(activeUser.full_name || 'Guru', dto.leave_type, dto.reason);
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('smart_absensi_leave_updated'));
       window.dispatchEvent(new Event('smart_absensi_records_updated'));
@@ -54,6 +58,9 @@ export class LeaveRepository {
       newValue: { approval_status: decision },
       reason: notes || `Keputusan ${decision} permohonan izin ID ${leaveId}`,
     }).catch(() => {});
+
+    // Trigger Push Notification for Guru
+    NotificationService.notifyLeaveDecision(activeUser?.full_name || 'Guru', decision, 'Izin');
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('smart_absensi_leave_updated'));

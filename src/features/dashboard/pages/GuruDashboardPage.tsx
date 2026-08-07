@@ -24,6 +24,7 @@ import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
 import { VoiceSettingsCard } from '../../../components/dashboard/VoiceSettingsCard';
+import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
 import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
 import type {
@@ -661,6 +662,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       </header>
 
       <main className="px-3 sm:px-4 pt-3 sm:pt-4 space-y-3 sm:space-y-4 max-w-md mx-auto">
+        <NotificationPermissionBanner />
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
           <>
