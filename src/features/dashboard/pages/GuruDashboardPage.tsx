@@ -101,8 +101,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  // Leave History State (Sub-tab inside Riwayat)
+  // Leave & Calendar History State
   const [historySubTab, setHistorySubTab] = useState<'ATTENDANCE' | 'LEAVES'>('ATTENDANCE');
+  const [historyViewMode, setHistoryViewMode] = useState<'CALENDAR' | 'LIST'>('CALENDAR');
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<{
+    dateStr: string;
+    record?: AttendanceRecord;
+    isHoliday?: boolean;
+    holidayDesc?: string;
+  } | null>(null);
+  const [allHolidays, setAllHolidays] = useState<HolidayRecord[]>([]);
   const [userLeaves, setUserLeaves] = useState<LeaveRequest[]>([]);
   const [isLoadingLeaves, setIsLoadingLeaves] = useState(false);
 
@@ -277,6 +285,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       // 3. Holidays
       try {
         const holidays = await provider.getHolidays(authToken);
+        setAllHolidays(holidays || []);
         const todayIso = new Date().toISOString().substring(0, 10);
         const holidayToday = (holidays || []).find((h) => h.date === todayIso);
         setTodayHoliday(holidayToday || null);
@@ -427,6 +436,173 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
     prevGuruUnreadRef.current = unreadCount;
   }, [unreadCount]);
+
+  // Helper to render interactive monthly calendar grid
+  const renderCalendarGrid = () => {
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+    const firstDayObj = new Date(selectedYear, selectedMonth - 1, 1);
+    const rawFirstDay = firstDayObj.getDay(); // 0 = Sun, 1 = Mon... 6 = Sat
+    const startPadding = rawFirstDay === 0 ? 6 : rawFirstDay - 1; // Mon = 0 start
+
+    const monthStr = String(selectedMonth).padStart(2, '0');
+    const todayIso = new Date().toISOString().substring(0, 10);
+    const daysOfWeek = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+
+    const cells: Array<{
+      isPadding: boolean;
+      key: string;
+      dayNumber?: number;
+      dateStr?: string;
+      record?: AttendanceRecord;
+      isHoliday?: boolean;
+      holidayDesc?: string;
+      isToday?: boolean;
+      isWeekend?: boolean;
+    }> = [];
+
+    for (let p = 0; p < startPadding; p++) {
+      cells.push({ isPadding: true, key: `pad-prev-${p}` });
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayStr = String(day).padStart(2, '0');
+      const dateStr = `${selectedYear}-${monthStr}-${dayStr}`;
+      const dayDate = new Date(selectedYear, selectedMonth - 1, day);
+      const dayOfWeek = dayDate.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+      const record = attendanceHistory.find((r) => r.date === dateStr);
+      const holiday = allHolidays.find((h) => h.date === dateStr);
+      const isHoliday = isWeekend || !!holiday;
+
+      cells.push({
+        isPadding: false,
+        key: dateStr,
+        dayNumber: day,
+        dateStr,
+        record,
+        isHoliday,
+        holidayDesc: holiday ? holiday.description : isWeekend ? 'Libur Akhir Pekan' : undefined,
+        isToday: dateStr === todayIso,
+        isWeekend,
+      });
+    }
+
+    const totalCells = cells.length;
+    const remainder = totalCells % 7;
+    if (remainder !== 0) {
+      const trailingPadding = 7 - remainder;
+      for (let t = 0; t < trailingPadding; t++) {
+        cells.push({ isPadding: true, key: `pad-next-${t}` });
+      }
+    }
+
+    return (
+      <div className="space-y-3 pt-1">
+        {/* Days of Week Header */}
+        <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider bg-slate-100/90 p-2 rounded-2xl border border-slate-200/80 shadow-2xs">
+          {daysOfWeek.map((d, i) => (
+            <div key={d} className={i >= 5 ? 'text-red-500 font-black' : ''}>
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Day Tiles Grid */}
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          {cells.map((cell) => {
+            if (cell.isPadding) {
+              return (
+                <div
+                  key={cell.key}
+                  className="aspect-square rounded-2xl bg-slate-50/40 border border-dashed border-slate-200/50 opacity-30 pointer-events-none"
+                />
+              );
+            }
+
+            const rec = cell.record;
+            const status = rec?.status;
+
+            let tileClass = 'bg-white border-slate-200/80 hover:border-emerald-500 hover:bg-emerald-50/20';
+            let badgeClass = 'text-slate-400 bg-slate-100';
+            let labelText = '';
+
+            if (rec) {
+              if (status === 'HADIR') {
+                tileClass = 'bg-emerald-500/10 border-emerald-400/80 hover:bg-emerald-500/20 text-emerald-950 shadow-2xs';
+                badgeClass = 'bg-emerald-600 text-white font-black';
+                labelText = rec.check_in_time ? rec.check_in_time.substring(0, 5) : 'Hadir';
+              } else if (status === 'TERLAMBAT') {
+                tileClass = 'bg-amber-500/10 border-amber-400/80 hover:bg-amber-500/20 text-amber-950 shadow-2xs';
+                badgeClass = 'bg-amber-600 text-white font-black';
+                labelText = rec.check_in_time ? rec.check_in_time.substring(0, 5) : 'Lambat';
+              } else if (status === 'IZIN' || status === 'SAKIT' || status === 'DINAS_LUAR') {
+                tileClass = 'bg-blue-500/10 border-blue-400/80 hover:bg-blue-500/20 text-blue-950 shadow-2xs';
+                badgeClass = 'bg-blue-600 text-white font-black';
+                labelText = status === 'DINAS_LUAR' ? 'Dinas' : status;
+              } else if (status === 'ALFA') {
+                tileClass = 'bg-red-500/10 border-red-400/80 hover:bg-red-500/20 text-red-950 shadow-2xs';
+                badgeClass = 'bg-red-600 text-white font-black';
+                labelText = 'Alfa';
+              }
+            } else if (cell.isHoliday) {
+              tileClass = 'bg-slate-100 border-slate-200 text-slate-400';
+              badgeClass = 'bg-slate-200 text-slate-600 font-bold';
+              labelText = 'Libur';
+            }
+
+            return (
+              <button
+                key={cell.key}
+                type="button"
+                onClick={() =>
+                  setSelectedCalendarDay({
+                    dateStr: cell.dateStr!,
+                    record: cell.record,
+                    isHoliday: cell.isHoliday,
+                    holidayDesc: cell.holidayDesc,
+                  })
+                }
+                className={`aspect-square p-1.5 rounded-2xl border flex flex-col justify-between items-start transition-all cursor-pointer relative group ${tileClass} ${
+                  cell.isToday ? 'ring-2 ring-emerald-500 ring-offset-1 font-black shadow-md' : ''
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className={`text-xs font-black leading-none ${cell.isToday ? 'text-emerald-700' : cell.isWeekend ? 'text-red-500' : 'text-slate-800'}`}>
+                    {cell.dayNumber}
+                  </span>
+                  {cell.isToday && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  )}
+                </div>
+
+                <div className="w-full truncate text-left mt-auto">
+                  {labelText ? (
+                    <span className={`inline-block px-1 py-0.2 rounded text-[8px] sm:text-[9px] font-black truncate max-w-full ${badgeClass}`}>
+                      {labelText}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-slate-300 font-bold block truncate">
+                      {cell.isWeekend ? 'Akhir Pekan' : '-'}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Legend */}
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5 text-[10px] sm:text-xs font-bold text-slate-600 bg-slate-50 p-2.5 rounded-2xl border border-slate-200">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Hadir</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Terlambat</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Izin / Sakit</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Alfa</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-300" /> Libur</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen guru-pattern-bg pb-28 text-[#023246]">
@@ -803,6 +979,37 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                   </div>
 
+                  {/* View Mode Toggle Switcher: CALENDAR vs LIST */}
+                  <div className="flex items-center justify-between gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/80">
+                    <span className="text-[11px] font-extrabold text-slate-700 pl-1">
+                      Mode Tampilan:
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setHistoryViewMode('CALENDAR')}
+                        className={`px-3 py-1 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                          historyViewMode === 'CALENDAR'
+                            ? 'bg-[#023246] text-white shadow-xs'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>📅 Kalender Grid</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistoryViewMode('LIST')}
+                        className={`px-3 py-1 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                          historyViewMode === 'LIST'
+                            ? 'bg-[#023246] text-white shadow-xs'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>📋 Daftar Log</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Dynamic Stats Cards */}
                   <div className="grid grid-cols-2 gap-2.5 sm:gap-3 text-xs">
                     <div className="p-3 bg-[#C8F2E0]/40 rounded-xl sm:rounded-2xl border border-[#0D7A5F]/20 space-y-0.5">
@@ -818,35 +1025,39 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                   </div>
 
-                  {/* Detailed Attendance Log Table / List */}
-                  <div className="space-y-2 pt-1">
-                    <h3 className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Catatan Harian {activeMonthName} {selectedYear}</h3>
-                    
-                    {isLoadingHistory ? (
-                      <SkeletonList count={4} />
-                    ) : attendanceHistory.length === 0 ? (
-                      <EmptyState
-                        icon="📅"
-                        title="Belum Ada Presensi Bulan Ini"
-                        description={`Belum ada rekaman presensi pada ${activeMonthName} ${selectedYear}. Mulai dengan melakukan scan QR Code absensi.`}
-                      />
-                    ) : (
-                      attendanceHistory.map((rec) => (
-                        <div key={rec.id} className="p-3 rounded-xl sm:rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200 flex items-center justify-between text-xs transition-colors">
-                          <div className="space-y-0.5">
-                            <p className="font-extrabold text-[#023246] text-xs">{rec.date}</p>
-                            <p className="text-[10px] text-slate-500 font-semibold">
-                              Masuk: {rec.check_in_time ? rec.check_in_time.substring(0, 5) : '--:--'} • Pulang: {rec.check_out_time ? rec.check_out_time.substring(0, 5) : '--:--'}
-                            </p>
-                          </div>
+                  {/* Calendar Grid Mode vs List Mode */}
+                  {isLoadingHistory ? (
+                    <SkeletonList count={4} />
+                  ) : historyViewMode === 'CALENDAR' ? (
+                    renderCalendarGrid()
+                  ) : (
+                    <div className="space-y-2 pt-1">
+                      <h3 className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Catatan Harian {activeMonthName} {selectedYear}</h3>
+                      
+                      {attendanceHistory.length === 0 ? (
+                        <EmptyState
+                          icon="📅"
+                          title="Belum Ada Presensi Bulan Ini"
+                          description={`Belum ada rekaman presensi pada ${activeMonthName} ${selectedYear}. Mulai dengan melakukan scan QR Code absensi.`}
+                        />
+                      ) : (
+                        attendanceHistory.map((rec) => (
+                          <div key={rec.id} className="p-3 rounded-xl sm:rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200 flex items-center justify-between text-xs transition-colors">
+                            <div className="space-y-0.5">
+                              <p className="font-extrabold text-[#023246] text-xs">{rec.date}</p>
+                              <p className="text-[10px] text-slate-500 font-semibold">
+                                Masuk: {rec.check_in_time ? rec.check_in_time.substring(0, 5) : '--:--'} • Pulang: {rec.check_out_time ? rec.check_out_time.substring(0, 5) : '--:--'}
+                              </p>
+                            </div>
 
-                          <Badge status={rec.status}>
-                            {rec.status === 'HADIR' ? 'Hadir' : rec.status === 'TERLAMBAT' ? 'Terlambat' : rec.status}
-                          </Badge>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                            <Badge status={rec.status}>
+                              {rec.status === 'HADIR' ? 'Hadir' : rec.status === 'TERLAMBAT' ? 'Terlambat' : rec.status}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1273,6 +1484,76 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         isOpen={isTermsModalOpen}
         onClose={() => setIsTermsModalOpen(false)}
       />
+
+      {/* ── DAY DETAIL CALENDAR MODAL ───────────────────────────────────── */}
+      {selectedCalendarDay && (
+        <Modal
+          isOpen={!!selectedCalendarDay}
+          onClose={() => setSelectedCalendarDay(null)}
+          title={`📅 Detail Presensi Tanggal ${selectedCalendarDay.dateStr}`}
+          maxWidth="md"
+        >
+          <div className="space-y-4">
+            <div className="bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-md">
+              <div>
+                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Tanggal Presensi</p>
+                <h3 className="text-sm sm:text-base font-black text-white">{selectedCalendarDay.dateStr}</h3>
+              </div>
+              <Badge status={selectedCalendarDay.record?.status || (selectedCalendarDay.isHoliday ? 'LIBUR' : 'BELUM_ABSEN')}>
+                {selectedCalendarDay.record?.status === 'HADIR'
+                  ? 'Hadir'
+                  : selectedCalendarDay.record?.status === 'TERLAMBAT'
+                  ? 'Terlambat'
+                  : selectedCalendarDay.record?.status || (selectedCalendarDay.isHoliday ? selectedCalendarDay.holidayDesc || 'Libur Sekolah' : 'Belum Absen')}
+              </Badge>
+            </div>
+
+            {selectedCalendarDay.record ? (
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Jam Masuk</span>
+                  <p className="text-sm font-black text-slate-900">
+                    {selectedCalendarDay.record.check_in_time ? `${selectedCalendarDay.record.check_in_time.substring(0, 5)} WIB` : 'Tidak Ada Data'}
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Jam Pulang</span>
+                  <p className="text-sm font-black text-slate-900">
+                    {selectedCalendarDay.record.check_out_time ? `${selectedCalendarDay.record.check_out_time.substring(0, 5)} WIB` : 'Belum Absen Pulang'}
+                  </p>
+                </div>
+              </div>
+            ) : selectedCalendarDay.isHoliday ? (
+              <div className="p-3.5 bg-slate-100 rounded-2xl border border-slate-200 text-xs text-slate-700 font-bold flex items-center gap-2">
+                <span className="text-lg">🏖️</span>
+                <span>{selectedCalendarDay.holidayDesc || 'Hari Libur Kerja / Akhir Pekan'}</span>
+              </div>
+            ) : (
+              <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 font-bold flex items-center gap-2">
+                <span>⚠️</span>
+                <span>Tidak ada catatan presensi fisik pada tanggal ini.</span>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-between gap-2 border-t border-slate-100">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  setSelectedCalendarDay(null);
+                  handleOpenCorrectionModal();
+                }}
+                className="text-xs font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <span>✏️ Ajukan Koreksi Date Ini</span>
+              </Button>
+              <Button variant="primary" type="button" onClick={() => setSelectedCalendarDay(null)} className="text-xs font-bold cursor-pointer">
+                Tutup
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
