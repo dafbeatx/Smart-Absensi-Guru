@@ -4,6 +4,7 @@ import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
 import { Sidebar } from '../../../components/ui/Sidebar';
 import type { SidebarItem } from '../../../components/ui/Sidebar';
+import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { AcademicCalendarManagement } from '../components/AcademicCalendarManagement';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { TeachingScheduleManagement } from '../components/TeachingScheduleManagement';
@@ -353,7 +354,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 </div>
 
                 <Button variant="primary" onClick={onOpenScanner} className="flex items-center gap-2">
-                  <span>📷</span> Scan QR Code Absensi (Masuk / Pulang)
+                  <QrCodeScanIcon className="w-5 h-5 text-white" />
+                  <span>Scan QR Code Absensi (Masuk / Pulang)</span>
                 </Button>
               </div>
 

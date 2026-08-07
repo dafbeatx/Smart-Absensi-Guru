@@ -18,6 +18,7 @@ import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
+import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -585,7 +586,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 }}
                 className="w-full py-3 text-xs sm:text-sm font-black shadow-md flex items-center justify-center gap-2 cursor-pointer rounded-xl sm:rounded-2xl"
               >
-                <span>🔲</span> PINDAI QR CODE ABSENSI (SCANNER HP)
+                <QrCodeScanIcon className="w-5 h-5 text-white" />
+                <span>PINDAI QR CODE ABSENSI (SCANNER HP)</span>
               </Button>
             </section>
 
@@ -1042,10 +1044,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <div className="relative -top-4 sm:-top-5 flex flex-col items-center">
             <button
               onClick={handleOpenScannerClick}
-              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#0D7A5F] text-white flex items-center justify-center text-lg sm:text-xl shadow-lg shadow-[#0D7A5F]/30 ring-3 ring-white active:scale-95 transition-transform cursor-pointer"
-              title="Pindai QR Code"
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#0D7A5F] text-white flex items-center justify-center shadow-lg shadow-[#0D7A5F]/30 ring-3 ring-white active:scale-95 transition-transform cursor-pointer"
+              title="Pindai QR Code (Icon by ChilliColor - Flaticon)"
             >
-              🔲
+              <QrCodeScanIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </button>
           </div>
 
