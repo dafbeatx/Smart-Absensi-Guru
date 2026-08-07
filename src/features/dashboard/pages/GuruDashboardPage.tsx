@@ -128,6 +128,30 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  // Live running digital clock state
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const clockTimer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(clockTimer);
+  }, []);
+
+  const formattedTimeStr = currentTime.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).replace(/\./g, ':');
+
+  const formattedFullDateStr = currentTime.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
   const loadUserLeaves = async () => {
     if (!effectiveUser) return;
     setIsLoadingLeaves(true);
@@ -394,6 +418,31 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
           <>
+            {/* 0. Live Digital Running Clock Widget */}
+            <div className="bg-gradient-to-r from-[#023246] via-[#1E5670] to-[#0D7A5F] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-card border border-emerald-500/30 flex items-center justify-between gap-3 relative overflow-hidden">
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none" />
+              
+              <div className="space-y-0.5 min-w-0 z-10">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-300 uppercase tracking-wider">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                  </span>
+                  <span>Waktu Server (WIB)</span>
+                </div>
+                <p className="text-xs sm:text-sm font-semibold text-slate-200 truncate capitalize">
+                  📅 {formattedFullDateStr}
+                </p>
+              </div>
+
+              <div className="bg-black/30 backdrop-blur-md px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl border border-white/10 shrink-0 text-right z-10 shadow-inner">
+                <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-white flex items-center justify-end gap-1">
+                  <span>{formattedTimeStr}</span>
+                  <span className="text-[10px] sm:text-xs font-bold text-emerald-300">WIB</span>
+                </div>
+              </div>
+            </div>
+
             {/* 1. Top Profile Header Card */}
             <section className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-xs sm:shadow-card border border-[#D4D4CE]/30 flex items-center justify-between gap-3">
               <div className="space-y-0.5 min-w-0">
