@@ -182,11 +182,21 @@ export class AttendanceRepository {
       throw new Error('Akses Ditolak! Role GURU tidak diizinkan mengubah absensi secara langsung. Silakan gunakan menu Ajukan Koreksi Absen.');
     }
 
-    // Auto-evaluate HADIR vs TERLAMBAT cutoff at 07:15
+    // Auto-evaluate HADIR vs TERLAMBAT cutoff based on settings.work_checkin_end
     let finalStatus = dto.status;
     if (dto.status === 'HADIR' && dto.check_in_time) {
+      let checkinEnd = '07:15';
+      try {
+        const sysSettings = await ProviderFactory.getProvider().getSettings();
+        if (sysSettings?.work_checkin_end) {
+          checkinEnd = sysSettings.work_checkin_end.slice(0, 5);
+        }
+      } catch (e) {
+        logger.warn('AttendanceRepository', 'Failed to fetch settings for checkin cutoff:', e);
+      }
+
       const cleanTime = dto.check_in_time.slice(0, 5);
-      if (cleanTime > '07:15') {
+      if (cleanTime > checkinEnd) {
         finalStatus = 'TERLAMBAT';
       }
     }

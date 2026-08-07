@@ -8,6 +8,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import type { AttendanceStatus, UserProfile } from '../../../types/database.types';
 import { CONSTANTS } from '../../../config/constants';
+import { ProviderFactory } from '../../../providers/provider-factory';
 
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 
@@ -32,15 +33,21 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
 
   const [selectedUserId, setSelectedUserId] = useState(selectedTeacherId || teachers[0]?.id || '');
   const [date, setDate] = useState(todayStr);
+  const [checkinEnd, setCheckinEnd] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_END);
 
   // Sync selectedUserId when selectedTeacherId prop changes or modal opens
   React.useEffect(() => {
+    if (isOpen) {
+      ProviderFactory.getProvider().getSettings().then((st) => {
+        if (st?.work_checkin_end) setCheckinEnd(st.work_checkin_end.slice(0, 5));
+      }).catch(() => {});
+    }
     if (selectedTeacherId) {
       setSelectedUserId(selectedTeacherId);
     } else if (teachers.length > 0) {
       setSelectedUserId(teachers[0].id);
     }
-  }, [selectedTeacherId, teachers]);
+  }, [isOpen, selectedTeacherId, teachers]);
   const [newStatus, setNewStatus] = useState<AttendanceStatus>('HADIR');
   const [checkInTime, setCheckInTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
   const [checkOutTime, setCheckOutTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
@@ -165,7 +172,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
         </div>
 
         <div className="bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-xl text-[11px] text-amber-900 leading-relaxed font-medium">
-          💡 <strong>Catatan:</strong> Pengisian tanggal lampau diizinkan (maksimal hari ini). {newStatus === 'HADIR' ? 'Status TERLAMBAT dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul 07:15 WIB.' : `Status ${newStatus} akan dicatat secara resmi tanpa mencatat jam absensi fisik.`}
+          💡 <strong>Catatan:</strong> Pengisian tanggal lampau diizinkan (maksimal hari ini). {newStatus === 'HADIR' ? `Status TERLAMBAT dievaluasi otomatis oleh sistem jika Jam Masuk di atas pukul ${checkinEnd} WIB.` : `Status ${newStatus} akan dicatat secara resmi tanpa mencatat jam absensi fisik.`}
         </div>
 
         <div className="space-y-1">

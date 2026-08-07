@@ -358,8 +358,17 @@ export class MockProvider implements IDataProvider {
 
     let finalStatus = (dto.status || 'HADIR') as AttendanceStatus;
     if (dto.status === 'HADIR' && dto.check_in_time) {
+      let checkinEnd = '07:15';
+      try {
+        const settings = await this.getSettings();
+        if (settings?.work_checkin_end) {
+          checkinEnd = settings.work_checkin_end.slice(0, 5);
+        }
+      } catch {
+        // fallback
+      }
       const cleanTime = dto.check_in_time.slice(0, 5);
-      if (cleanTime > '07:15') {
+      if (cleanTime > checkinEnd) {
         finalStatus = 'TERLAMBAT';
       }
     }

@@ -8,6 +8,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { logger } from '../../../utils/logger.utils';
 import { CONSTANTS } from '../../../config/constants';
+import { ProviderFactory } from '../../../providers/provider-factory';
 
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 
@@ -34,6 +35,15 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
   const [isLoading, setIsLoading] = useState(false);
   const [isAiPolishing, setIsAiPolishing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [checkinEnd, setCheckinEnd] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_END);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      ProviderFactory.getProvider().getSettings().then((st) => {
+        if (st?.work_checkin_end) setCheckinEnd(st.work_checkin_end.slice(0, 5));
+      }).catch(() => {});
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,7 +137,7 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
         )}
 
         <div className="bg-amber-50/80 border border-amber-200/80 p-2.5 rounded-xl text-[11px] text-amber-900 leading-relaxed font-medium">
-          💡 <strong>Catatan:</strong> Pengajuan akan dikirim sebagai <i>Request Pending</i> ke Admin/Kepsek. Tanggal lampau diizinkan (maksimal hari ini). {targetStatus === 'HADIR' ? 'Jam masuk > 07:15 WIB otomatis dievaluasi TERLAMBAT.' : `Status ${targetStatus} akan diajukan tanpa mencatat jam presensi fisik.`}
+          💡 <strong>Catatan:</strong> Pengajuan akan dikirim sebagai <i>Request Pending</i> ke Admin/Kepsek. Tanggal lampau diizinkan (maksimal hari ini). {targetStatus === 'HADIR' ? `Jam masuk > ${checkinEnd} WIB otomatis dievaluasi TERLAMBAT.` : `Status ${targetStatus} akan diajukan tanpa mencatat jam presensi fisik.`}
         </div>
 
         <div className="space-y-1">
