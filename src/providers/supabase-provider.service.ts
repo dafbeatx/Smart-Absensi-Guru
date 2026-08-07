@@ -678,11 +678,57 @@ export class SupabaseProvider implements IDataProvider {
     if (updates.phone_number !== undefined) payload.phone_number = updates.phone_number;
     if (updates.role !== undefined) payload.role = updates.role;
     if (updates.position !== undefined) payload.position = updates.position;
+    if (updates.avatar_url !== undefined) payload.avatar_url = updates.avatar_url;
     if (updates.is_active !== undefined) payload.account_status = updates.is_active ? 'ACTIVE' : 'INACTIVE';
 
     const { error } = await this.client.from('users').update(payload).eq('id', userId);
     if (error) throw new Error('Gagal memperbarui data pengguna: ' + error.message);
     return true;
+  }
+
+  public async uploadAvatar(userId: string, file: File): Promise<string> {
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filePath = `teacher_${userId}_${Date.now()}.${ext}`;
+
+      // Try bucket 'avatas 1', fallback to 'avatas-1' or 'avatars'
+      const bucketsToTry = ['avatas 1', 'avatas-1', 'avatars'];
+      let publicUrl = '';
+      let uploadSuccess = false;
+
+      for (const bucketName of bucketsToTry) {
+        const { error: uploadError } = await this.client.storage
+          .from(bucketName)
+          .upload(filePath, file, { upsert: true, contentType: file.type });
+
+        if (!uploadError) {
+          const { data } = this.client.storage.from(bucketName).getPublicUrl(filePath);
+          publicUrl = data.publicUrl;
+          uploadSuccess = true;
+          break;
+        }
+      }
+
+      if (!uploadSuccess || !publicUrl) {
+        publicUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      await this.updateUser(userId, { avatar_url: publicUrl }, '');
+      return publicUrl;
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'uploadAvatar fallback to base64 Data URI', { userId, err });
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+      });
+    }
   }
 
   public async deleteUser(userId: string, _token: string): Promise<boolean> {

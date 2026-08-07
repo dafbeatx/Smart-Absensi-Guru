@@ -35,6 +35,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [position, setPosition] = useState('');
   const [role, setRole] = useState<RoleCode>('GURU');
   const [newPin, setNewPin] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const filteredTeachers = teachers.filter((t) => {
     const matchesSearch =
@@ -58,7 +60,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       phone_number: phone,
       role,
       position,
-      avatar_url: null,
+      avatar_url: avatarUrl,
       is_active: true,
       must_change_pin: true,
       created_at: new Date().toISOString(),
@@ -99,6 +101,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setNip('');
     setPhone('');
     setPosition('');
+    setAvatarUrl(null);
   };
 
   const handleOpenEditModal = (t: UserProfile) => {
@@ -108,7 +111,41 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setPhone(t.phone_number || '');
     setPosition(t.position || '');
     setRole(t.role);
+    setAvatarUrl(t.avatar_url || null);
     setIsEditModalOpen(true);
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('error', 'File Terlalu Besar', 'Maksimal ukuran foto profile adalah 5MB.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const provider = ProviderFactory.getProvider();
+      let uploadedUrl = '';
+      if (selectedTeacher && 'uploadAvatar' in provider && typeof (provider as any).uploadAvatar === 'function') {
+        uploadedUrl = await (provider as any).uploadAvatar(selectedTeacher.id, file);
+      } else {
+        uploadedUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
+      }
+      setAvatarUrl(uploadedUrl);
+      showToast('info', 'Pratinjau Foto Dibuat', 'Klik "Simpan Perubahan" untuk menetapkan foto profil baru.');
+    } catch (err) {
+      console.warn('Failed to upload avatar:', err);
+      showToast('error', 'Gagal Unggah Foto', 'Gagal memproses foto profil.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const handleEditTeacherSubmit = async (e: React.FormEvent) => {
@@ -121,6 +158,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       phone_number: phone,
       position: position,
       role: role,
+      avatar_url: avatarUrl,
     };
 
     try {
@@ -316,8 +354,19 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
             {filteredTeachers.map((t) => (
               <tr key={t.id} className="hover:bg-slate-50/50">
                 <td className="p-3">
-                  <p className="font-bold text-slate-900">{t.full_name}</p>
-                  <p className="text-[10px] text-slate-400">NPP: {t.nip || '-'}</p>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
+                      {t.avatar_url ? (
+                        <img src={t.avatar_url} alt={t.full_name} className="w-full h-full object-cover" />
+                      ) : (
+                        t.full_name.charAt(0)
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900">{t.full_name}</p>
+                      <p className="text-[10px] text-slate-400">NPP: {t.nip || '-'}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="p-3">
                   <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
@@ -426,6 +475,43 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       {/* Edit User Modal */}
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="✏️ Edit Data Master Pengguna / Guru">
         <form onSubmit={handleEditTeacherSubmit} className="space-y-3">
+          {/* Avatar Upload Section */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-sm shrink-0 overflow-hidden border-2 border-emerald-500 shadow-xs">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Foto Profil Guru" className="w-full h-full object-cover" />
+                ) : (
+                  fullName.charAt(0) || '📷'
+                )}
+              </div>
+              <div>
+                <p className="font-bold text-xs text-slate-900">Foto Profil Guru</p>
+                <p className="text-[10px] text-slate-500">Format: JPG, PNG, WebP (Max 5MB)</p>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl(null)}
+                    className="text-[10px] text-red-600 hover:underline font-bold mt-0.5 cursor-pointer"
+                  >
+                    Hapus Foto Profil
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <label className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-2xs shrink-0">
+              {isUploadingAvatar ? 'Memproses...' : '📷 Ganti Foto'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFileChange}
+                className="hidden"
+                disabled={isUploadingAvatar}
+              />
+            </label>
+          </div>
+
           <Input label="Nama Lengkap & Gelar" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
           <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
