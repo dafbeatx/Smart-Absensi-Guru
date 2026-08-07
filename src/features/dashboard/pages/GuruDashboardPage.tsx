@@ -478,11 +478,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       const dateStr = `${selectedYear}-${monthStr}-${dayStr}`;
       const dayDate = new Date(selectedYear, selectedMonth - 1, day);
       const dayOfWeek = dayDate.getDay();
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+      const isSaturday = dayOfWeek === 6;
+      const isSunday = dayOfWeek === 0;
+      const isWeekendHoliday =
+        (isSaturday && settings.saturday_is_holiday !== false) ||
+        (isSunday && settings.sunday_is_holiday !== false);
 
       const record = attendanceHistory.find((r) => r.date === dateStr);
       const holiday = allHolidays.find((h) => h.date === dateStr);
-      const isHoliday = isWeekend || !!holiday;
+      const isHoliday = isWeekendHoliday || !!holiday;
 
       cells.push({
         isPadding: false,
@@ -491,9 +496,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         dateStr,
         record,
         isHoliday,
-        holidayDesc: holiday ? holiday.description : isWeekend ? 'Libur Akhir Pekan' : undefined,
+        holidayDesc: holiday ? holiday.name || holiday.description : isWeekendHoliday ? 'Libur Akhir Pekan' : undefined,
         isToday: dateStr === todayIso,
-        isWeekend,
+        isWeekend: isWeekendHoliday,
       });
     }
 
