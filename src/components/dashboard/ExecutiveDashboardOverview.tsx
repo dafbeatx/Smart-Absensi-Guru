@@ -730,7 +730,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
               <p className="text-[11px] text-slate-400">Daftar pengajuan yang perlu diproses</p>
             </div>
             <button
-              onClick={() => onNavigateTab && onNavigateTab('TEACHERS')}
+              onClick={() => onNavigateTab && onNavigateTab('APPROVALS')}
               className="text-xs font-bold text-[#023246] hover:bg-slate-50 px-3 py-1 rounded-lg border border-slate-200 transition-all cursor-pointer"
             >
               Lihat Semua

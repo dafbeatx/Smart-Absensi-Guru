@@ -186,12 +186,12 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           )}
 
           {/* TAB 2: ACCOUNT APPLICATIONS */}
-          {activeTab === 'ACCOUNT_APPLICATIONS' && (
+          {(activeTab === 'ACCOUNT_APPLICATIONS' || activeTab === 'TEACHERS') && (
             <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
           )}
 
           {/* TAB 3: APPROVALS */}
-          {activeTab === 'APPROVALS' && (
+          {(activeTab === 'APPROVALS' || activeTab === 'APPROVAL') && (
             <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
               <h3 className="font-extrabold text-[#023246] text-base">📝 Approval Pengajuan Izin / Cuti Guru</h3>
               <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />

@@ -327,7 +327,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           )}
 
           {/* TAB 3: ACCOUNT APPLICATIONS / TEACHERS */}
-          {activeTab === 'TEACHERS' && (
+          {(activeTab === 'TEACHERS' || activeTab === 'ACCOUNT_APPLICATIONS') && (
             <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
           )}
 
@@ -415,7 +415,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           )}
 
           {/* TAB 6: APPROVAL */}
-          {activeTab === 'APPROVAL' && (
+          {(activeTab === 'APPROVAL' || activeTab === 'APPROVALS') && (
             <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
               <h3 className="font-extrabold text-[#023246] text-base">📝 Approval Pengajuan Izin / Sakit</h3>
               <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
