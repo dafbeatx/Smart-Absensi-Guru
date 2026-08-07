@@ -483,18 +483,29 @@ export class SupabaseProvider implements IDataProvider {
     const leaveId = `lev_${Date.now()}`;
     const attachmentUrl = dto.attachment_url || dto.attachment_base64 || null;
 
-    const newLeave = {
+    const newLeave: Record<string, any> = {
       id: leaveId,
       user_id: activeUser.id,
       type: dto.leave_type,
       start_date: dto.start_date,
       end_date: dto.end_date,
       reason: dto.reason,
-      attachment_url: attachmentUrl,
       status: 'PENDING',
     };
 
-    const { error } = await this.client.from('leaves').insert(newLeave);
+    if (attachmentUrl) {
+      newLeave.attachment_url = attachmentUrl;
+    }
+
+    let { error } = await this.client.from('leaves').insert(newLeave);
+
+    // Fallback: If Supabase DB schema for leaves table does not have attachment_url column yet
+    if (error && (error.message.includes('attachment_url') || error.message.includes('schema cache'))) {
+      delete newLeave.attachment_url;
+      const retryResult = await this.client.from('leaves').insert(newLeave);
+      error = retryResult.error;
+    }
+
     if (error) throw new Error('Gagal mengajukan izin: ' + error.message);
 
     return {
