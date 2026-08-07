@@ -793,18 +793,29 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 )}
               </div>
 
-              {/* Dynamic Work Hours Display from Settings */}
-              <div className="bg-[#F6F6F6] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl flex items-center justify-between text-xs border border-slate-200/60">
-                <div className="space-y-0.5">
-                  <span className="text-slate-500 font-bold block text-[9px] sm:text-[10px] uppercase">Batas Absen Masuk</span>
-                  <span className="font-black text-[#023246] text-xs sm:text-sm">{settings.work_checkin_end} WIB</span>
-                </div>
-                <div className="h-7 w-px bg-slate-300 mx-1" />
-                <div className="space-y-0.5 text-right">
-                  <span className="text-slate-500 font-bold block text-[9px] sm:text-[10px] uppercase">Mulai Absen Pulang</span>
-                  <span className="font-black text-[#023246] text-xs sm:text-sm">{settings.work_checkout_start} WIB</span>
-                </div>
-              </div>
+              {/* Dynamic Work Hours Display from Settings (Sync Friday Schedule) */}
+              {(() => {
+                const isFriday = new Date().getDay() === 5;
+                const checkoutStart = isFriday
+                  ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
+                  : settings.work_checkout_start;
+
+                return (
+                  <div className="bg-[#F6F6F6] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl flex items-center justify-between text-xs border border-slate-200/60">
+                    <div className="space-y-0.5">
+                      <span className="text-slate-500 font-bold block text-[9px] sm:text-[10px] uppercase">Batas Absen Masuk</span>
+                      <span className="font-black text-[#023246] text-xs sm:text-sm">{settings.work_checkin_end} WIB</span>
+                    </div>
+                    <div className="h-7 w-px bg-slate-300 mx-1" />
+                    <div className="space-y-0.5 text-right">
+                      <span className="text-slate-500 font-bold block text-[9px] sm:text-[10px] uppercase">
+                        Mulai Absen Pulang {isFriday ? '(Jumat)' : ''}
+                      </span>
+                      <span className="font-black text-[#023246] text-xs sm:text-sm">{checkoutStart} WIB</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Check-In / Check-Out Log Details */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs">
