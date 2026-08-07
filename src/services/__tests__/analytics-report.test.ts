@@ -82,5 +82,17 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
   const activeCache = DashboardCacheService.get<{ present: number }>('TEST_METRIC');
   assert('Dashboard Cache - Set and Instant Fetch', activeCache?.present === 42);
 
+  // Test 5: Admin Corrected Attendance with Status IZIN Sync
+  const correctedAttendance: AttendanceRecord[] = [
+    ...mockAttendance,
+    { id: 'att_3', user_id: 'usr_3', date: '2026-07-30', check_in_time: null, check_out_time: null, status: 'IZIN', check_in_lat: 0, check_in_lng: 0, check_in_distance_meters: 0, verification_method: 'MANUAL_OPERATOR', attendance_source: 'MANUAL', is_offline: false, created_at: '' }
+  ];
+  const summaryCorrected = AnalyticsService.calculateDailySummary('2026-07-30', mockTeachers, correctedAttendance, mockLeave);
+  const unabsentedCorrected = AnalyticsService.getUnabsentedTeachers('2026-07-30', mockTeachers, correctedAttendance, mockLeave);
+  assert(
+    'Analytics - Admin Corrected Attendance Status IZIN Sync',
+    summaryCorrected.totalLeave === 1 && summaryCorrected.totalUnabsented === 0 && unabsentedCorrected.length === 0
+  );
+
   return { passed, failed, results };
 };

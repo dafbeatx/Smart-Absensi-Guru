@@ -58,6 +58,9 @@ export class AnalyticsService {
       const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
       if (effectiveStatus === 'HADIR') totalPresent++;
       else if (effectiveStatus === 'TERLAMBAT') totalLate++;
+      else if (effectiveStatus === 'IZIN') totalLeave++;
+      else if (effectiveStatus === 'SAKIT') totalSick++;
+      else if (effectiveStatus === 'DINAS_LUAR') totalOfficialDuty++;
     });
 
     for (const leave of leaveRequests) {
@@ -108,8 +111,11 @@ export class AnalyticsService {
     const activeUserIds = new Set<string>();
 
     for (const rec of attendanceRecords) {
-      if (rec.date === dateStr && rec.check_in_time) {
-        activeUserIds.add(rec.user_id);
+      if (rec.date === dateStr) {
+        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+        if (rec.check_in_time || effectiveStatus === 'HADIR' || effectiveStatus === 'TERLAMBAT' || effectiveStatus === 'IZIN' || effectiveStatus === 'SAKIT' || effectiveStatus === 'DINAS_LUAR') {
+          activeUserIds.add(rec.user_id);
+        }
       }
     }
 
