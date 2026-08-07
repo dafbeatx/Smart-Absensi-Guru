@@ -64,6 +64,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const handleTeachersChange = (updated: UserProfile[]) => {
     setTeachers(updated);
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+    window.dispatchEvent(new Event('smart_absensi_teachers_updated'));
   };
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -108,6 +109,20 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         console.warn('Backend fetch users fallback:', err);
       }
     };
+    const handleSyncTeachers = () => {
+      const saved = localStorage.getItem('smart_absensi_teachers');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setTeachers(parsed);
+        } catch (e) {
+          console.error('Failed to parse teachers:', e);
+        }
+      } else {
+        fetchUsersFromBackend();
+      }
+    };
+
     fetchUsersFromBackend();
     fetchPendingRequests();
     fetchAttendanceRecords();
@@ -117,30 +132,29 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     };
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
+    window.addEventListener('smart_absensi_teachers_updated', handleSyncTeachers);
+    window.addEventListener('storage', handleSyncTeachers);
+
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
+      window.removeEventListener('smart_absensi_teachers_updated', handleSyncTeachers);
+      window.removeEventListener('storage', handleSyncTeachers);
     };
   }, []);
 
-  const mockUnabsented: UserProfile[] = [
-    {
-      id: 'usr_1003',
-      nip: '198803152015032004',
-      full_name: 'Dra. Siti Rahmawati',
-      phone_number: '081298765432',
-      role: 'GURU',
-      position: 'Guru Bahasa Indonesia',
-      avatar_url: null,
-      is_active: true,
-      created_at: new Date().toISOString(),
-    },
-  ];
+  // Dynamic calculation of teachers who haven't absented today from real synced teachers data
+  const unabsentedTeachers = teachers.filter((t) => {
+    const hasAttended = attendanceRecords.some(
+      (r) => r.user_id === t.id && (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR')
+    );
+    return !hasAttended;
+  });
 
   const sidebarItems: SidebarItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
     { id: 'ACCOUNT_APPLICATIONS', label: 'Account Applications', icon: '👥', badge: teachers.length },
     { id: 'APPROVALS', label: 'Persetujuan Izin/Cuti', icon: '📝', badge: pendingRequests.length, hasDropdown: true },
-    { id: 'UNABSENTED', label: 'Daftar Belum Absen', icon: '⚠️', badge: mockUnabsented.length },
+    { id: 'UNABSENTED', label: 'Daftar Belum Absen', icon: '⚠️', badge: unabsentedTeachers.length },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 
@@ -201,27 +215,39 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           {/* TAB 4: UNABSENTED */}
           {activeTab === 'UNABSENTED' && (
             <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
-              <h3 className="font-extrabold text-[#023246] text-base">⚠️ Daftar Guru & Staf Belum Absen</h3>
-              <div className="space-y-2">
-                {mockUnabsented.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                    <div className="space-y-0.5">
-                      <p className="font-extrabold text-[#023246] text-sm">{t.full_name}</p>
-                      <p className="text-xs text-slate-500 font-medium">{t.position} • {t.phone_number}</p>
+              <h3 className="font-extrabold text-[#023246] text-base flex items-center justify-between">
+                <span>⚠️ Daftar Guru & Staf Belum Absen</span>
+                <span className="text-xs font-semibold text-slate-500">{unabsentedTeachers.length} Orang</span>
+              </h3>
+
+              {unabsentedTeachers.length === 0 ? (
+                <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 font-medium space-y-1">
+                  <span className="text-xl block">✅</span>
+                  <p className="font-bold text-[#023246]">Semua Guru & Staf Telah Absen Hari Ini</p>
+                  <p className="text-[11px] text-slate-400">Seluruh personil sekolah yang terdaftar telah memiliki catatan absensi.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {unabsentedTeachers.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                      <div className="space-y-0.5">
+                        <p className="font-extrabold text-[#023246] text-sm">{t.full_name}</p>
+                        <p className="text-xs text-slate-500 font-medium">{t.position || 'Guru / Staf'} • {t.phone_number || '-'}</p>
+                      </div>
+                      <FeatureGate flag="ENABLE_WHATSAPP">
+                        <a
+                          href={`https://wa.me/62${String(t.phone_number || '').replace(/^0/, '')}?text=Assalamu'alaikum%20Bapak/Ibu%20${encodeURIComponent(t.full_name)},%20mohon%20konfirmasi%20kehadiran%20hari%20ini.`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
+                        >
+                          💬 Hubungi WA
+                        </a>
+                      </FeatureGate>
                     </div>
-                    <FeatureGate flag="ENABLE_WHATSAPP">
-                      <a
-                        href={`https://wa.me/62${String(t.phone_number || '').replace(/^0/, '')}?text=Assalamu'alaikum%20Bapak/Ibu%20${encodeURIComponent(t.full_name)},%20mohon%20konfirmasi%20kehadiran%20hari%20ini.`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
-                      >
-                        💬 Hubungi WA
-                      </a>
-                    </FeatureGate>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

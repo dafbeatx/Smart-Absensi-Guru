@@ -97,6 +97,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const handleTeachersChange = (updated: UserProfile[]) => {
     setTeachers(updated);
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+    window.dispatchEvent(new Event('smart_absensi_teachers_updated'));
   };
 
   const fetchPendingRequests = async () => {
