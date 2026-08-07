@@ -10,7 +10,7 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
 import { DevTestPage } from '../../admin/pages/DevTestPage';
-import { getTodayDateInJakarta } from '../../../utils/time.utils';
+import { getTodayDateInJakarta, isDateOffDay } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
 
@@ -142,13 +142,18 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     };
   }, []);
 
-  // Dynamic calculation of teachers who haven't absented today from real synced teachers data
-  const unabsentedTeachers = teachers.filter((t) => {
-    const hasAttended = attendanceRecords.some(
-      (r) => r.user_id === t.id && (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR')
-    );
-    return !hasAttended;
-  });
+  const todayStr = getTodayDateInJakarta();
+  const offCheck = isDateOffDay(todayStr);
+
+  // Dynamic calculation of teachers who haven't absented today (Returns [] on Weekends / Holidays)
+  const unabsentedTeachers = offCheck.isOff
+    ? []
+    : teachers.filter((t) => {
+        const hasAttended = attendanceRecords.some(
+          (r) => r.user_id === t.id && (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR')
+        );
+        return !hasAttended;
+      });
 
   const sidebarItems: SidebarItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },

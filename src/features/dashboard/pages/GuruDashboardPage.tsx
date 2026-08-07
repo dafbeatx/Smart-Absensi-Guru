@@ -17,6 +17,7 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
+import { isDateOffDay } from '../../../utils/time.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
@@ -190,6 +191,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
   }, []);
 
+  // Check if today is a non-working day (Weekend or Holiday)
+  const isTodayOff = isDateOffDay(new Date(), settings, todayHoliday ? [todayHoliday] : allHolidays);
+
   // Indonesian Voice Announcement Initial Welcome Greeting Trigger
   const hasGreetedRef = React.useRef<boolean>(false);
 
@@ -197,10 +201,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     if (!hasGreetedRef.current && effectiveUser?.full_name) {
       hasGreetedRef.current = true;
       setTimeout(() => {
-        SpeechService.speakWelcomeGreeting(effectiveUser.full_name, settings.institution_name);
+        if (isTodayOff.isOff) {
+          const cleanName = effectiveUser.full_name.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\./g, '').trim();
+          SpeechService.speak(`Assalamu'alaikum ${cleanName}. Selamat hari libur, selamat beristirahat.`);
+        } else {
+          SpeechService.speakWelcomeGreeting(effectiveUser.full_name, settings.institution_name);
+        }
       }, 800);
     }
-  }, [effectiveUser?.full_name]);
+  }, [effectiveUser?.full_name, isTodayOff.isOff, settings.institution_name]);
 
   const loadUserLeaves = async () => {
     if (!effectiveUser) return;
@@ -762,7 +771,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </p>
                 </div>
 
-                {todayHoliday ? (
+                {isTodayOff.isOff ? (
+                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 text-[10px] sm:text-xs font-black rounded-full border border-emerald-300 shrink-0 flex items-center gap-1">
+                    <span>🌴</span>
+                    <span>{isTodayOff.reason}</span>
+                  </span>
+                ) : todayHoliday ? (
                   <Badge status="SAKIT">🎉 {todayHoliday.name}</Badge>
                 ) : todayAttendance ? (
                   <Badge status={todayAttendance.status}>
@@ -800,7 +814,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     {todayAttendance?.check_in_time ? todayAttendance.check_in_time.substring(0, 5) : '--:--'}
                   </p>
                   <span className="text-[9px] sm:text-[10px] text-emerald-700 font-semibold block truncate">
-                    {todayAttendance?.check_in_time ? 'Terdaftar Valid' : 'Belum Absen'}
+                    {todayAttendance?.check_in_time ? 'Terdaftar Valid' : isTodayOff.isOff ? 'Hari Libur' : 'Belum Absen'}
                   </span>
                 </div>
 
@@ -810,7 +824,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
                   </p>
                   <span className="text-[9px] sm:text-[10px] text-blue-700 font-semibold block truncate">
-                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai' : 'Belum Absen'}
+                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai' : isTodayOff.isOff ? 'Hari Libur' : 'Belum Absen'}
                   </span>
                 </div>
               </div>
@@ -851,21 +865,33 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 />
               </div>
 
-              {/* Action Button: Scan QR with Camera Pre-Warm */}
-              <Button
-                variant="primary"
-                leftIcon={<QrCodeScanIcon className="w-5 h-5 text-white shrink-0" />}
-                onClick={handleOpenScannerClick}
-                onMouseEnter={() => {
-                  import('html5-qrcode').catch(() => {});
-                }}
-                onTouchStart={() => {
-                  import('html5-qrcode').catch(() => {});
-                }}
-                className="w-full py-3.5 text-xs sm:text-sm font-black tracking-tight shadow-md flex-row items-center justify-center gap-2.5 cursor-pointer rounded-2xl"
-              >
-                PINDAI QR CODE ABSENSI (SCANNER HP)
-              </Button>
+              {/* Action Button or Off-Day Informative Banner */}
+              {isTodayOff.isOff ? (
+                <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-emerald-900 flex items-center gap-3 shadow-2xs">
+                  <span className="text-2xl shrink-0">🌴</span>
+                  <div className="space-y-0.5 text-xs">
+                    <p className="font-extrabold text-emerald-950">Hari Ini Libur ({isTodayOff.reason})</p>
+                    <p className="text-[11px] text-emerald-800 font-medium leading-relaxed">
+                      Sesuai pengaturan jam kerja sekolah, tidak ada kewajiban presensi hari ini. Selamat beristirahat bersama keluarga!
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="primary"
+                  leftIcon={<QrCodeScanIcon className="w-5 h-5 text-white shrink-0" />}
+                  onClick={handleOpenScannerClick}
+                  onMouseEnter={() => {
+                    import('html5-qrcode').catch(() => {});
+                  }}
+                  onTouchStart={() => {
+                    import('html5-qrcode').catch(() => {});
+                  }}
+                  className="w-full py-3.5 text-xs sm:text-sm font-black tracking-tight shadow-md flex-row items-center justify-center gap-2.5 cursor-pointer rounded-2xl"
+                >
+                  PINDAI QR CODE ABSENSI (SCANNER HP)
+                </Button>
+              )}
             </section>
 
             {/* 3. Quick Action Feature Grid */}

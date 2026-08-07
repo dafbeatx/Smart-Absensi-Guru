@@ -119,3 +119,43 @@ export function getCurrentTimeInJakarta(timeZone: string = 'Asia/Jakarta'): stri
   }
 }
 
+/**
+ * Checks if a given date (or date string YYYY-MM-DD / Date object) is a non-working day (Weekend or Holiday)
+ * based on system settings and holiday records.
+ */
+export function isDateOffDay(
+  targetDate: string | Date = new Date(),
+  settings?: { saturday_is_holiday?: boolean; sunday_is_holiday?: boolean } | null,
+  holidays?: Array<{ date: string; name: string }> | null
+): { isOff: boolean; reason: string } {
+  const d = typeof targetDate === 'string' ? new Date(targetDate) : targetDate;
+  if (isNaN(d.getTime())) {
+    return { isOff: false, reason: '' };
+  }
+
+  const dateIso = d.toISOString().substring(0, 10);
+
+  // 1. Check explicit holiday record first
+  if (holidays && holidays.length > 0) {
+    const matchedHoliday = holidays.find((h) => h.date === dateIso);
+    if (matchedHoliday) {
+      return { isOff: true, reason: `Hari Libur: ${matchedHoliday.name}` };
+    }
+  }
+
+  // 2. Check weekend settings (defaulting saturday_is_holiday=true, sunday_is_holiday=true)
+  const day = d.getDay(); // 0 = Sunday, 6 = Saturday
+  const saturdayLibur = settings?.saturday_is_holiday ?? true;
+  const sundayLibur = settings?.sunday_is_holiday ?? true;
+
+  if (day === 6 && saturdayLibur) {
+    return { isOff: true, reason: 'Libur Akhir Pekan (Sabtu)' };
+  }
+  if (day === 0 && sundayLibur) {
+    return { isOff: true, reason: 'Libur Akhir Pekan (Minggu)' };
+  }
+
+  return { isOff: false, reason: '' };
+}
+
+

@@ -3,6 +3,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { ProviderFactory } from '../../providers/provider-factory';
 import { SoundService } from '../../services/audio.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile } from '../../types/database.types';
+import { isDateOffDay } from '../../utils/time.utils';
 
 export interface DynamicNotificationItem {
   id: string;
@@ -138,11 +139,16 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           });
         });
 
-        // Add alert if teachers haven't absented yet
-        const absentedUserIds = new Set(todayAttendanceList.map((a) => a.user_id));
-        const unabsentedCount = allTeachers.filter((t) => t.role === 'GURU' && !absentedUserIds.has(t.id)).length;
+        // Add alert if teachers haven't absented yet (Skip on Off-Days / Weekends)
+        const sysSettings = await provider.getSettings().catch(() => null);
+        const offCheck = isDateOffDay(new Date(), sysSettings);
 
-        if (unabsentedCount > 0) {
+        const absentedUserIds = new Set(todayAttendanceList.map((a) => a.user_id));
+        const unabsentedCount = offCheck.isOff
+          ? 0
+          : allTeachers.filter((t) => t.role === 'GURU' && !absentedUserIds.has(t.id)).length;
+
+        if (!offCheck.isOff && unabsentedCount > 0) {
           items.push({
             id: 'notif_unabsented_summary',
             category: 'SYSTEM_ALERT',

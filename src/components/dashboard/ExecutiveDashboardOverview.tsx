@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../types/database.types';
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
-import { evaluateAttendanceStatus, getTodayDateInJakarta } from '../../utils/time.utils';
+import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay } from '../../utils/time.utils';
 
 export interface ExecutiveDashboardOverviewProps {
   roleTitle: 'Admin Website' | 'Kepala Sekolah';
@@ -85,7 +85,8 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
     });
 
     const totalPresent = hadir + terlambat;
-    const belum = Math.max(0, totalGuruCount - (hadir + terlambat + izin));
+    const offCheck = isDateOffDay(todayStr);
+    const belum = offCheck.isOff ? 0 : Math.max(0, totalGuruCount - (hadir + terlambat + izin));
 
     return {
       hadirCount: hadir,

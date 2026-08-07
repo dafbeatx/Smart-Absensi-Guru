@@ -1,5 +1,5 @@
-import type { AttendanceRecord, LeaveRequest, UserProfile } from '../types/database.types';
-import { evaluateAttendanceStatus } from '../utils/time.utils';
+import type { AttendanceRecord, HolidayRecord, LeaveRequest, SystemSettings, UserProfile } from '../types/database.types';
+import { evaluateAttendanceStatus, isDateOffDay } from '../utils/time.utils';
 
 export interface DailyAttendanceSummary {
   date: string;
@@ -37,7 +37,9 @@ export class AnalyticsService {
     dateStr: string,
     allTeachers: UserProfile[],
     attendanceRecords: AttendanceRecord[],
-    leaveRequests: LeaveRequest[]
+    leaveRequests: LeaveRequest[],
+    systemSettings?: SystemSettings | null,
+    holidays?: HolidayRecord[] | null
   ): DailyAttendanceSummary {
     const totalTeachers = allTeachers.length;
     let totalPresent = 0;
@@ -78,7 +80,10 @@ export class AnalyticsService {
     }
 
     const totalAccountedFor = totalPresent + totalLate + totalSick + totalLeave + totalOfficialDuty;
-    const totalUnabsented = Math.max(0, totalTeachers - totalAccountedFor);
+    const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
+    
+    // On Weekend / Holiday, unabsented is 0 because there is no expectation of attendance
+    const totalUnabsented = offCheck.isOff ? 0 : Math.max(0, totalTeachers - totalAccountedFor);
 
     const rawPercentage = totalTeachers > 0
       ? Math.round(((totalPresent + totalLate) / totalTeachers) * 1000) / 10
@@ -100,14 +105,22 @@ export class AnalyticsService {
   }
 
   /**
-   * Identifies list of teachers who have not checked in yet today
+   * Identifies list of teachers who have not checked in yet today.
+   * Returns empty array [] on Weekends (Sabtu/Minggu) or Holidays.
    */
   public static getUnabsentedTeachers(
     dateStr: string,
     allTeachers: UserProfile[],
     attendanceRecords: AttendanceRecord[],
-    leaveRequests: LeaveRequest[]
+    leaveRequests: LeaveRequest[],
+    systemSettings?: SystemSettings | null,
+    holidays?: HolidayRecord[] | null
   ): UserProfile[] {
+    const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
+    if (offCheck.isOff) {
+      return [];
+    }
+
     const activeUserIds = new Set<string>();
 
     for (const rec of attendanceRecords) {
