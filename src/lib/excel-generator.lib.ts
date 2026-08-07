@@ -228,19 +228,16 @@ export class ExcelReportGenerator {
   }
 
   /**
-   * Generates a printable, styled PDF document report in a popup window (Master School)
+   * Generates the raw HTML content string for the Master PDF Report
    */
-  public static generatePrintablePDF(payload: MultiSheetReportPayload): void {
-    const printWindow = window.open('', '_blank', 'width=1000,height=800');
-    if (!printWindow) return;
-
+  public static getPrintablePDFHTML(payload: MultiSheetReportPayload): string {
     const totalTeachers = payload.summary.totalTeachers || 1;
     const presentPct = Math.min(100, Math.round((payload.summary.totalPresent / totalTeachers) * 100)) || 0;
     const latePct = Math.min(100 - presentPct, Math.round((payload.summary.totalLate / totalTeachers) * 100)) || 0;
     const leavePct = Math.min(100 - presentPct - latePct, Math.round(((payload.summary.totalSick + payload.summary.totalLeave) / totalTeachers) * 100)) || 0;
     const unabsentPct = Math.max(0, 100 - presentPct - latePct - leavePct);
 
-    const htmlContent = `
+    return `
       <!DOCTYPE html>
       <html lang="id">
       <head>
@@ -395,24 +392,35 @@ export class ExcelReportGenerator {
       </body>
       </html>
     `;
-
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    printWindow.focus();
   }
 
   /**
-   * Generates a printable PDF report specifically for an individual teacher with HISTOGRAM CHART
+   * Generates a printable, styled PDF document report in a popup window (Master School)
    */
-  public static generateIndividualTeacherPDF(
+  public static generatePrintablePDF(payload: MultiSheetReportPayload): boolean {
+    const htmlContent = this.getPrintablePDFHTML(payload);
+    try {
+      const printWindow = window.open('', '_blank', 'width=1000,height=800');
+      if (!printWindow) return false;
+
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Generates the raw HTML content string for an individual teacher's PDF report
+   */
+  public static getIndividualTeacherPDFHTML(
     teacher: UserProfile,
     month: string,
     year: string,
     records: AttendanceRecord[]
-  ): void {
-    const printWindow = window.open('', '_blank', 'width=1000,height=800');
-    if (!printWindow) return;
-
+  ): string {
     const teacherRecords = records.filter((r) => r.user_id === teacher.id);
     let totalPresent = 0;
     let totalLate = 0;
@@ -447,7 +455,7 @@ export class ExcelReportGenerator {
     const maxBinValue = Math.max(bin1Count, bin2Count, bin3Count, bin4Count, 1);
     const getBarHeightPercent = (val: number) => Math.max(12, Math.round((val / maxBinValue) * 100));
 
-    const htmlContent = `
+    return `
       <!DOCTYPE html>
       <html lang="id">
       <head>
@@ -610,10 +618,29 @@ export class ExcelReportGenerator {
       </body>
       </html>
     `;
+  }
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    printWindow.focus();
+  /**
+   * Generates a printable PDF report specifically for an individual teacher with HISTOGRAM CHART
+   */
+  public static generateIndividualTeacherPDF(
+    teacher: UserProfile,
+    month: string,
+    year: string,
+    records: AttendanceRecord[]
+  ): boolean {
+    const htmlContent = this.getIndividualTeacherPDFHTML(teacher, month, year, records);
+    try {
+      const printWindow = window.open('', '_blank', 'width=1000,height=800');
+      if (!printWindow) return false;
+
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**

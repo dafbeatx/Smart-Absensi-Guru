@@ -3,7 +3,8 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { ReportService } from '../../services/report.service';
 import { useToastStore } from '../../store/useToastStore';
-import { SIGNATORY_OFFICIALS } from '../../lib/excel-generator.lib';
+import { SIGNATORY_OFFICIALS, ExcelReportGenerator } from '../../lib/excel-generator.lib';
+import { PDFPreviewModal } from './PDFPreviewModal';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../../types/database.types';
 
 export interface ExportReportModalProps {
@@ -39,6 +40,11 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   const [month, setMonth] = useState<string>(monthNames[currentMonthIdx] || 'Agustus');
   const [year, setYear] = useState<string>(String(new Date().getFullYear()));
   const [isLoading, setIsLoading] = useState(false);
+
+  // In-App PDF Preview Fallback State (When Pop-up Blocker is Active)
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewTitle, setPreviewTitle] = useState('');
 
   // Sync default teacher if provided
   React.useEffect(() => {
@@ -85,27 +91,36 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   const handleExportPDF = async () => {
     setIsLoading(true);
     try {
+      let htmlContent = '';
+      let titleStr = '';
+      let windowOpened = false;
+
       if (reportType === 'MASTER') {
-        await ReportService.generateAndPrintPDFReport(
-          month,
-          year,
-          teachers,
-          attendanceRecords,
-          leaveRequests,
-          auditLogs
-        );
-        showToast('info', 'Membuka Laporan PDF', 'Jendela cetak PDF Laporan Rekapitulasi telah dibuka.');
+        titleStr = `Laporan Presensi Master Sekolah - ${month} ${year}`;
+        const payload = ReportService.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs);
+        htmlContent = ExcelReportGenerator.getPrintablePDFHTML(payload);
+        windowOpened = ExcelReportGenerator.generatePrintablePDF(payload);
       } else {
         const teacher = teachers.find((t) => t.id === selectedTeacherId) || teachers[0];
-        await ReportService.generateAndPrintIndividualPDFReport(
-          teacher,
-          month,
-          year,
-          attendanceRecords
-        );
-        showToast('info', 'Membuka Laporan PDF', `Jendela cetak PDF Laporan Presensi ${teacher.full_name} telah dibuka.`);
+        titleStr = `Laporan Presensi Individu - ${teacher.full_name}`;
+        htmlContent = ExcelReportGenerator.getIndividualTeacherPDFHTML(teacher, month, year, attendanceRecords);
+        windowOpened = ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords);
       }
-      onClose();
+
+      if (windowOpened) {
+        showToast('success', 'PDF Dibuka di Tab Baru!', 'Jendela cetak PDF resmi telah terbuka.');
+        onClose();
+      } else {
+        // Pop-up blocker is active on client browser -> Show in-app preview modal
+        setPreviewTitle(titleStr);
+        setPreviewHtml(htmlContent);
+        setIsPreviewModalOpen(true);
+        showToast(
+          'info',
+          'Pratinjau PDF Dibuka',
+          'Pop-up browser terblokir. Menampilkan pratinjau PDF di dalam aplikasi.'
+        );
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal mencetak PDF';
       showToast('error', 'Gagal Cetak PDF', msg);
@@ -117,7 +132,8 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="📊 Generator Laporan Excel (.xlsx) & PDF Resmi">
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} title="📊 Generator Laporan Excel (.xlsx) & PDF Resmi">
       <div className="space-y-4 py-1">
         {/* Signatory Info Banner */}
         <div className="bg-slate-900 text-white p-3.5 rounded-2xl text-xs space-y-1 shadow-md">
@@ -255,5 +271,14 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
         </div>
       </div>
     </Modal>
+
+    {/* In-App PDF Preview Fallback Modal */}
+    <PDFPreviewModal
+      isOpen={isPreviewModalOpen}
+      onClose={() => setIsPreviewModalOpen(false)}
+      title={previewTitle}
+      htmlContent={previewHtml}
+    />
+    </>
   );
 };

@@ -5,7 +5,7 @@ import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../t
 import { getTodayDateInJakarta } from '../utils/time.utils';
 
 export class ReportService {
-  private static preparePayload(
+  public static preparePayload(
     month: string,
     year: string,
     teachers: UserProfile[],
