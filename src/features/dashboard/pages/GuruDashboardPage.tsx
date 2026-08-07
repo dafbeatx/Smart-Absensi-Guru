@@ -21,6 +21,7 @@ import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
+import { VoiceSettingsCard } from '../../../components/dashboard/VoiceSettingsCard';
 import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
 import type {
@@ -189,9 +190,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
   }, []);
 
-  // Indonesian Voice Announcement State & Initial Welcome Greeting Trigger
+  // Indonesian Voice Announcement Initial Welcome Greeting Trigger
   const hasGreetedRef = React.useRef<boolean>(false);
-  const [isVoiceEnabled, setIsVoiceEnabled] = useState<boolean>(() => SpeechService.getIsEnabled());
 
   useEffect(() => {
     if (!hasGreetedRef.current && effectiveUser?.full_name) {
@@ -1287,36 +1287,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               </div>
 
-              {/* Voice Announcement Audio Toggle Card */}
-              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between gap-3 shadow-2xs">
-                <div className="space-y-0.5 min-w-0">
-                  <div className="flex items-center gap-1.5 font-extrabold text-[#023246] text-xs sm:text-sm">
-                    <span>🔊 Asisten Suara AI (Bahasa Indonesia)</span>
-                  </div>
-                  <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed">
-                    Mengucapkan sapaan nama guru & konfirmasi presensi masuk/pulang secara otomatis.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !isVoiceEnabled;
-                    setIsVoiceEnabled(next);
-                    SpeechService.setEnabled(next);
-                    if (next) {
-                      SpeechService.speak(`Asisten suara Bahasa Indonesia diaktifkan.`);
-                    }
-                  }}
-                  className={`px-3.5 py-2 rounded-xl font-extrabold text-xs transition-all shrink-0 cursor-pointer shadow-2xs flex items-center gap-1 ${
-                    isVoiceEnabled
-                      ? 'bg-emerald-700 text-white hover:bg-emerald-800'
-                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                  }`}
-                >
-                  <span>{isVoiceEnabled ? '🔊' : '🔇'}</span>
-                  <span>{isVoiceEnabled ? 'ON' : 'OFF'}</span>
-                </button>
-              </div>
+              {/* Voice Announcement Audio & Customization Card */}
+              <VoiceSettingsCard teacherName={effectiveUser.full_name} institutionName={settings.institution_name} />
 
               {/* Syarat & Ketentuan Section */}
               <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#0D7A5F]/5 border border-[#0D7A5F]/20 space-y-2">
