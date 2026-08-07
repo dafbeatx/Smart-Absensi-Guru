@@ -3,6 +3,7 @@ import type { Html5Qrcode } from 'html5-qrcode';
 import { Modal } from '../../../components/ui/Modal';
 import { Badge } from '../../../components/ui/Badge';
 import { SoundService } from '../../../services/audio.service';
+import { SpeechService } from '../../../services/speech.service';
 import { NotificationService } from '../../../services/notification-permission.service';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
@@ -270,6 +271,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
     const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
     NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
+
+    // 🔉 Trigger Indonesian Voice Announcement for Attendance Confirmation
+    SpeechService.speakAttendanceSuccess(teacherName, returnedAction === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN');
 
     const isLate = returnedStatus === 'TERLAMBAT';
     const statusText = isLate
