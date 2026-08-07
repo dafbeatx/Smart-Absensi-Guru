@@ -66,7 +66,16 @@ export class LeaveRepository {
     return ProviderFactory.getProvider().getPendingLeaves(token);
   }
 
-  public static async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
+  public static async getUserLeaves(userId: string, token: string): Promise<LeaveRequest[]> {
+    try {
+      const leaves = await ProviderFactory.getProvider().getUserLeaves(userId, token);
+      if (Array.isArray(leaves) && leaves.length > 0) {
+        return leaves.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      }
+    } catch (err) {
+      logger.warn('LeaveRepository', 'Provider getUserLeaves failed, falling back to local cache:', err);
+    }
+
     if (typeof window === 'undefined') return [];
     try {
       const saved = localStorage.getItem('smart_absensi_leaves');

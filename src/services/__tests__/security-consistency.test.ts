@@ -248,6 +248,10 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
   const bindingCheck = await mockProvider.checkDeviceBinding(mockGuruUser.id, 'DEV_TEST_UUID', 'MOCK_TOKEN');
   assert('Teacher Sync - checkDeviceBinding returns valid status', ['ACTIVE', 'UNBOUND', 'DIFFERENT_DEVICE', 'NEEDS_ADMIN_RESET'].includes(bindingCheck.status));
 
+  // Test User Leaves Retrieval from Provider
+  const userLeaves = await LeaveRepository.getUserLeaves(mockGuruUser.id, 'MOCK_TOKEN');
+  assert('Teacher Sync - getUserLeaves fetches from provider', Array.isArray(userLeaves));
+
   // Test Role Promotion & Elevation (Guru -> Admin)
   const testGuruAccount: UserProfile = {
     id: 'usr_test_promo_01',

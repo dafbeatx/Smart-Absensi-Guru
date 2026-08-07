@@ -472,6 +472,23 @@ export class MockProvider implements IDataProvider {
     return [];
   }
 
+  public async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
+    const saved = safeGetStorage('smart_absensi_leaves');
+    if (saved) {
+      try {
+        const list: LeaveRequest[] = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          return list
+            .filter((l) => l.user_id === userId || !l.user_id)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
+      } catch (e) {
+        console.error('Failed to parse user leaves:', e);
+      }
+    }
+    return [];
+  }
+
   public async getNotifications(userId: string, _token: string): Promise<AppNotification[]> {
     const key = `smart_absensi_notifications_${userId}`;
     const saved = safeGetStorage(key);

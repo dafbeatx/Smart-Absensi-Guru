@@ -576,6 +576,66 @@ export class SupabaseProvider implements IDataProvider {
     }));
   }
 
+  public async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
+    try {
+      const { data, error } = await this.client
+        .from('leaves')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getUserLeaves query error:', error.message);
+        const saved = localStorage.getItem('smart_absensi_leaves');
+        if (saved) {
+          const list: LeaveRequest[] = JSON.parse(saved);
+          return list.filter((l) => l.user_id === userId || !l.user_id);
+        }
+        return [];
+      }
+
+      const fetchedLeaves: LeaveRequest[] = (data || []).map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        leave_type: (row.type || 'IZIN') as LeaveType,
+        start_date: row.start_date,
+        end_date: row.end_date,
+        reason: row.reason,
+        attachment_url: row.attachment_url || null,
+        approval_status: (row.status || 'PENDING') as ApprovalStatus,
+        approval_deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+        approved_by: row.approved_by || null,
+        approval_notes: row.rejection_notes || null,
+        created_at: row.created_at || new Date().toISOString(),
+      }));
+
+      // Cache to localStorage for offline resilience
+      try {
+        const savedLocal = localStorage.getItem('smart_absensi_leaves');
+        const existingList: LeaveRequest[] = savedLocal ? JSON.parse(savedLocal) : [];
+        const otherUserLeaves = existingList.filter((l) => l.user_id && l.user_id !== userId);
+        const merged = [...fetchedLeaves, ...otherUserLeaves];
+        localStorage.setItem('smart_absensi_leaves', JSON.stringify(merged));
+      } catch {
+        // ignore cache write errors
+      }
+
+      return fetchedLeaves;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'getUserLeaves exception:', err);
+      const saved = localStorage.getItem('smart_absensi_leaves');
+      if (saved) {
+        try {
+          const list: LeaveRequest[] = JSON.parse(saved);
+          return list.filter((l) => l.user_id === userId || !l.user_id);
+        } catch {
+          // ignore
+        }
+      }
+      return [];
+    }
+  }
+
   // ─── SYSTEM SETTINGS API ──────────────────────────────────────────────────
 
   public async getSettings(): Promise<SystemSettings> {
