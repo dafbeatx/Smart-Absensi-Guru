@@ -577,6 +577,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               {/* Action Button: Scan QR with Camera Pre-Warm */}
               <Button
                 variant="primary"
+                leftIcon={<QrCodeScanIcon className="w-5 h-5 text-white shrink-0" />}
                 onClick={handleOpenScannerClick}
                 onMouseEnter={() => {
                   import('html5-qrcode').catch(() => {});
@@ -584,10 +585,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 onTouchStart={() => {
                   import('html5-qrcode').catch(() => {});
                 }}
-                className="w-full py-3 text-xs sm:text-sm font-black shadow-md flex items-center justify-center gap-2 cursor-pointer rounded-xl sm:rounded-2xl"
+                className="w-full py-3.5 text-xs sm:text-sm font-black tracking-tight shadow-md flex-row items-center justify-center gap-2.5 cursor-pointer rounded-2xl"
               >
-                <QrCodeScanIcon className="w-5 h-5 text-white" />
-                <span>PINDAI QR CODE ABSENSI (SCANNER HP)</span>
+                PINDAI QR CODE ABSENSI (SCANNER HP)
               </Button>
             </section>
 
