@@ -874,7 +874,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         <span>🗺️</span> Peta Lokasi Real-time Anda
                       </span>
                       {isOfflineMode ? (
-                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-extrabold rounded-md text-[9px] truncate max-w-[210px]">
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-extrabold rounded-md text-[9px] truncate max-w-xs">
                           ⚡ Mode Offline: radius toleransi sementara 500m
                         </span>
                       ) : (
