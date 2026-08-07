@@ -487,6 +487,41 @@ export class SupabaseProvider implements IDataProvider {
 
   // ─── LEAVE & APPROVAL API ─────────────────────────────────────────────────
 
+  private async uploadLeaveAttachment(
+    userId: string,
+    base64Data: string
+  ): Promise<string | null> {
+    try {
+      const match = base64Data.match(/^data:(image\/[a-zA-Z]+|application\/pdf);base64,(.+)$/);
+      const contentType = match ? match[1] : 'image/jpeg';
+      const base64Str = match ? match[2] : base64Data;
+
+      const ext = contentType.includes('pdf') ? 'pdf' : contentType.includes('png') ? 'png' : 'jpg';
+      const fileName = `leave_${userId}_${Date.now()}.${ext}`;
+
+      const binaryStr = atob(base64Str);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      const bucketsToTry = ['avatas 1', 'avatas-1', 'avatars'];
+      for (const bucketName of bucketsToTry) {
+        const { error: uploadError } = await this.client.storage
+          .from(bucketName)
+          .upload(fileName, bytes, { upsert: true, contentType });
+
+        if (!uploadError) {
+          const { data } = this.client.storage.from(bucketName).getPublicUrl(fileName);
+          if (data?.publicUrl) return data.publicUrl;
+        }
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'uploadLeaveAttachment exception:', err);
+    }
+    return null;
+  }
+
   public async submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest> {
     const activeUser = useAuthStore.getState().user;
     if (!activeUser || !activeUser.id) {
@@ -494,7 +529,19 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     const leaveId = `lev_${Date.now()}`;
-    const attachmentUrl = dto.attachment_url || dto.attachment_base64 || null;
+    let finalAttachmentUrl = dto.attachment_url || null;
+    const userProvidedAttachment = Boolean(dto.attachment_url || dto.attachment_base64);
+
+    if (dto.attachment_base64 && dto.attachment_base64.startsWith('data:')) {
+      const storageUrl = await this.uploadLeaveAttachment(activeUser.id, dto.attachment_base64);
+      if (storageUrl) {
+        finalAttachmentUrl = storageUrl;
+      } else if (!finalAttachmentUrl) {
+        finalAttachmentUrl = dto.attachment_base64;
+      }
+    } else if (!finalAttachmentUrl && dto.attachment_base64) {
+      finalAttachmentUrl = dto.attachment_base64;
+    }
 
     const newLeave: Record<string, any> = {
       id: leaveId,
@@ -506,14 +553,17 @@ export class SupabaseProvider implements IDataProvider {
       status: 'PENDING',
     };
 
-    if (attachmentUrl) {
-      newLeave.attachment_url = attachmentUrl;
+    if (finalAttachmentUrl) {
+      newLeave.attachment_url = finalAttachmentUrl;
     }
 
     let { error } = await this.client.from('leaves').insert(newLeave);
 
-    // Fallback: If Supabase DB schema for leaves table does not have attachment_url column yet
+    // If table schema for leaves table does not have attachment_url column yet
     if (error && (error.message.includes('attachment_url') || error.message.includes('schema cache'))) {
+      if (userProvidedAttachment) {
+        throw new Error('Gagal menyimpan lampiran izin: Kolom attachment_url belum ada pada tabel leaves di Supabase (Jalankan CREATE_TABLES.sql).');
+      }
       delete newLeave.attachment_url;
       const retryResult = await this.client.from('leaves').insert(newLeave);
       error = retryResult.error;
@@ -528,7 +578,7 @@ export class SupabaseProvider implements IDataProvider {
       start_date: dto.start_date,
       end_date: dto.end_date,
       reason: dto.reason,
-      attachment_url: attachmentUrl,
+      attachment_url: finalAttachmentUrl,
       approval_status: 'PENDING',
       approval_deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
       created_at: new Date().toISOString(),
