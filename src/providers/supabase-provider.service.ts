@@ -905,7 +905,7 @@ export class SupabaseProvider implements IDataProvider {
     userId: string,
     currentDeviceUUID: string,
     _token: string
-  ): Promise<{ status: 'ACTIVE' | 'UNBOUND' | 'DIFFERENT_DEVICE' | 'NEEDS_ADMIN_RESET'; message: string; registered_uuid?: string }> {
+  ): Promise<{ status: 'ACTIVE' | 'UNBOUND' | 'DIFFERENT_DEVICE' | 'NEEDS_ADMIN_RESET' | 'UNAVAILABLE'; message: string; registered_uuid?: string }> {
     try {
       const { data: binding, error } = await this.client
         .from('device_bindings')
@@ -914,12 +914,11 @@ export class SupabaseProvider implements IDataProvider {
         .maybeSingle();
 
       if (error) {
-        // Tabel belum ada atau belum ada RLS policy — fallback ke ACTIVE
+        // Tabel belum ada atau belum ada RLS policy — TIDAK boleh return ACTIVE
         logger.warn('SupabaseProvider', 'device_bindings query error (tabel mungkin belum dibuat):', error.message);
         return {
-          status: 'ACTIVE',
-          message: 'Perangkat aktif (tabel device_bindings belum ada, jalankan CREATE_TABLES.sql).',
-          registered_uuid: currentDeviceUUID,
+          status: 'UNAVAILABLE',
+          message: 'Status binding tidak dapat diverifikasi. Tabel device_bindings belum tersedia atau RLS policy error. Hubungi Admin.',
         };
       }
 
@@ -954,9 +953,8 @@ export class SupabaseProvider implements IDataProvider {
     } catch (err) {
       logger.error('SupabaseProvider', 'checkDeviceBinding exception:', err);
       return {
-        status: 'ACTIVE',
-        message: 'Gagal memeriksa binding perangkat. Lanjutkan sebagai aktif.',
-        registered_uuid: currentDeviceUUID,
+        status: 'UNAVAILABLE',
+        message: 'Gagal memeriksa binding perangkat. Koneksi ke server bermasalah.',
       };
     }
   }

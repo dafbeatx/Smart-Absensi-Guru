@@ -119,7 +119,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [deviceBindingStatus, setDeviceBindingStatus] = useState<DeviceBindingCheckResult>({
-    status: 'ACTIVE',
+    status: 'UNAVAILABLE',
     message: 'Memeriksa status perangkat...',
   });
 
@@ -1280,12 +1280,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                       : deviceBindingStatus.status === 'DIFFERENT_DEVICE'
                       ? 'bg-red-100 text-red-800 border-red-300'
+                      : deviceBindingStatus.status === 'UNAVAILABLE'
+                      ? 'bg-orange-100 text-orange-800 border-orange-300'
                       : 'bg-amber-100 text-amber-800 border-amber-300'
                   }`}>
                     {deviceBindingStatus.status === 'ACTIVE'
                       ? '🔒 TERIKAT AKTIF'
                       : deviceBindingStatus.status === 'DIFFERENT_DEVICE'
                       ? '⚠️ HP BERBEDA'
+                      : deviceBindingStatus.status === 'UNAVAILABLE'
+                      ? '⚠️ TIDAK TERVERIFIKASI'
                       : '🟡 PERLU BINDING'}
                   </span>
                 </div>

@@ -246,7 +246,7 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
 
   // Test Device Binding Check Response
   const bindingCheck = await mockProvider.checkDeviceBinding(mockGuruUser.id, 'DEV_TEST_UUID', 'MOCK_TOKEN');
-  assert('Teacher Sync - checkDeviceBinding returns valid status', ['ACTIVE', 'UNBOUND', 'DIFFERENT_DEVICE', 'NEEDS_ADMIN_RESET'].includes(bindingCheck.status));
+  assert('Teacher Sync - checkDeviceBinding returns valid status', ['ACTIVE', 'UNBOUND', 'DIFFERENT_DEVICE', 'NEEDS_ADMIN_RESET', 'UNAVAILABLE'].includes(bindingCheck.status));
 
   // Test User Leaves Retrieval from Provider
   const userLeaves = await LeaveRepository.getUserLeaves(mockGuruUser.id, 'MOCK_TOKEN');
