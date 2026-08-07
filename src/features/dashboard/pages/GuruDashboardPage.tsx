@@ -419,7 +419,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {activeTab === 'BERANDA' && (
           <>
             {/* 0. Live Digital Running Clock Widget */}
-            <div className="bg-gradient-to-r from-[#023246] via-[#1E5670] to-[#0D7A5F] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-card border border-emerald-500/30 flex items-center justify-between gap-3 relative overflow-hidden">
+            <div className="bg-linear-to-r from-[#023246] via-[#1E5670] to-[#0D7A5F] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-card border border-emerald-500/30 flex items-center justify-between gap-3 relative overflow-hidden">
               <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none" />
               
               <div className="space-y-0.5 min-w-0 z-10">
