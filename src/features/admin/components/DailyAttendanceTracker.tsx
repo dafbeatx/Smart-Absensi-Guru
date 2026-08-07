@@ -272,8 +272,12 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                   className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-blue-200 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shrink-0">
-                      {teacher.full_name.charAt(0)}
+                    <div className="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
+                      {teacher.avatar_url ? (
+                        <img src={teacher.avatar_url} alt={teacher.full_name} className="w-full h-full object-cover" />
+                      ) : (
+                        teacher.full_name.charAt(0)
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">

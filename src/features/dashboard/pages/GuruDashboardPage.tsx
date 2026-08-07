@@ -734,8 +734,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
 
               <div className="flex flex-col items-center gap-1 shrink-0">
-                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-lg sm:text-xl flex items-center justify-center shadow-inner border border-[#0D7A5F]/20">
-                  {effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'}
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-lg sm:text-xl flex items-center justify-center shadow-inner border border-[#0D7A5F]/20 overflow-hidden shrink-0">
+                  {effectiveUser.avatar_url ? (
+                    <img src={effectiveUser.avatar_url} alt={effectiveUser.full_name} className="w-full h-full object-cover" />
+                  ) : (
+                    effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'
+                  )}
                 </div>
                 <button
                   onClick={() => setActiveTab('PROFIL')}
@@ -1228,8 +1232,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <section className="space-y-3 sm:space-y-4">
             <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card space-y-4">
               <div className="text-center space-y-1.5 pb-3 border-b border-slate-100">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-2xl sm:text-3xl flex items-center justify-center mx-auto shadow-inner border-2 border-[#0D7A5F]/20">
-                  {effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'}
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-2xl sm:text-3xl flex items-center justify-center mx-auto shadow-inner border-2 border-[#0D7A5F]/20 overflow-hidden shrink-0">
+                  {effectiveUser.avatar_url ? (
+                    <img src={effectiveUser.avatar_url} alt={effectiveUser.full_name} className="w-full h-full object-cover" />
+                  ) : (
+                    effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'
+                  )}
                 </div>
                 <div>
                   <h2 className="font-black text-[#023246] text-base sm:text-lg">{effectiveUser.full_name}</h2>

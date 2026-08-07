@@ -665,8 +665,12 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
               recentlyScannedTeachers.map(({ teacher, record, status }, idx) => (
                 <div key={record.id || idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-slate-100/80 transition-colors border border-slate-200/60">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-[#0D7A5F] text-white flex items-center justify-center font-extrabold text-xs shrink-0 shadow-xs">
-                      {teacher.full_name ? teacher.full_name.charAt(0) : '👤'}
+                    <div className="w-8 h-8 rounded-full bg-[#0D7A5F] text-white flex items-center justify-center font-extrabold text-xs shrink-0 shadow-xs overflow-hidden border border-slate-200">
+                      {teacher.avatar_url ? (
+                        <img src={teacher.avatar_url} alt={teacher.full_name} className="w-full h-full object-cover" />
+                      ) : (
+                        teacher.full_name ? teacher.full_name.charAt(0) : '👤'
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-extrabold text-slate-900 truncate">
@@ -693,8 +697,12 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
               teachers.slice(0, 5).map((teacherObj, idx) => (
                 <div key={teacherObj.id || idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/60 border border-slate-200/50">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-extrabold text-xs shrink-0">
-                      {teacherObj.full_name ? teacherObj.full_name.charAt(0) : '👤'}
+                    <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-extrabold text-xs shrink-0 overflow-hidden border border-slate-300">
+                      {teacherObj.avatar_url ? (
+                        <img src={teacherObj.avatar_url} alt={teacherObj.full_name} className="w-full h-full object-cover" />
+                      ) : (
+                        teacherObj.full_name ? teacherObj.full_name.charAt(0) : '👤'
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-slate-700 truncate">

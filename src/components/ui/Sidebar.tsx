@@ -117,8 +117,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* User Card */}
         <div className="flex items-center justify-between p-2 rounded-xl bg-[#023246]/80 border border-[#D4D4CE]/15">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-8 h-8 rounded-full bg-[#287094] text-white flex items-center justify-center font-bold text-xs shrink-0 border border-[#D4D4CE]/30">
-              {user?.full_name?.charAt(0) || 'A'}
+            <div className="w-8 h-8 rounded-full bg-[#287094] text-white flex items-center justify-center font-bold text-xs shrink-0 border border-[#D4D4CE]/30 overflow-hidden">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.full_name || title} className="w-full h-full object-cover" />
+              ) : (
+                user?.full_name?.charAt(0) || 'A'
+              )}
             </div>
             <div className="space-y-0 overflow-hidden text-left">
               <p className="text-xs font-bold text-white truncate">{user?.full_name || title}</p>
@@ -195,8 +199,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="p-4 space-y-4 flex-1">
               {/* User Profile Card (Screen 2 Mockup) */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col items-center text-center space-y-2">
-                <div className="w-14 h-14 rounded-full bg-slate-200 text-slate-600 font-bold text-xl flex items-center justify-center shadow-inner">
-                  👤
+                <div className="w-14 h-14 rounded-full bg-slate-200 text-slate-600 font-bold text-xl flex items-center justify-center shadow-inner overflow-hidden border border-slate-300">
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.full_name || title} className="w-full h-full object-cover" />
+                  ) : (
+                    user?.full_name?.charAt(0) || '👤'
+                  )}
                 </div>
                 <div className="space-y-0.5">
                   <h3 className="font-extrabold text-[#023246] text-sm">{user?.full_name || title}</h3>
