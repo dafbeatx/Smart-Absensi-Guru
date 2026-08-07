@@ -31,8 +31,13 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(
     defaultTeacherId || teachers[0]?.id || ''
   );
-  const [month] = useState<string>('Juli');
-  const [year] = useState<string>('2026');
+  const monthNames = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  const currentMonthIdx = new Date().getMonth();
+  const [month, setMonth] = useState<string>(monthNames[currentMonthIdx] || 'Agustus');
+  const [year, setYear] = useState<string>(String(new Date().getFullYear()));
   const [isLoading, setIsLoading] = useState(false);
 
   // Sync default teacher if provided
@@ -132,6 +137,38 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             <div>
               <span className="text-slate-400 block text-[10px]">TU (Tata Usaha):</span>
               <strong className="text-white">{SIGNATORY_OFFICIALS.TU_NAME}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Month & Year Selectors */}
+        <div className="space-y-1.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+          <label className="block text-xs font-bold text-slate-800">Periode Bulan & Tahun Laporan</label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="text-[10px] text-slate-500 font-bold block mb-1">Bulan</span>
+              <select
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              >
+                {monthNames.map((mName) => (
+                  <option key={mName} value={mName}>
+                    {mName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-500 font-bold block mb-1">Tahun</span>
+              <select
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-xl p-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              >
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+              </select>
             </div>
           </div>
         </div>

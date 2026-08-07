@@ -293,10 +293,16 @@ export class ExcelReportGenerator {
           </button>
         </div>
 
-        <div class="header">
-          <h1>${APP_CONFIG.INSTITUTION_NAME}</h1>
-          <h2>LAPORAN RESMI KEHADIRAN GURU & STAF</h2>
-          <p>Sistem Absensi Berbasis QR Code & Geofence GPS (${APP_CONFIG.APP_NAME})</p>
+        <div class="header" style="text-align: center; margin-bottom: 20px; border-bottom: none; padding-bottom: 0;">
+          <img src="/kop-surat-al-ittihadiyah.jpg" alt="Kop Surat SMP Terpadu Al-Ittihadiyah" style="width: 100%; max-width: 900px; height: auto; display: block; margin: 0 auto 10px auto;" />
+          <div style="border-bottom: 3px double #15803d; padding-bottom: 8px; margin-bottom: 12px;">
+            <h2 style="margin: 0; font-size: 15px; font-weight: 800; text-transform: uppercase; color: #023246; letter-spacing: 0.5px;">
+              LAPORAN RESMI KEHADIRAN GURU & STAF
+            </h2>
+            <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600;">
+              Sistem Absensi Berbasis QR Code & Geofence GPS (${APP_CONFIG.APP_NAME})
+            </p>
+          </div>
         </div>
 
         <div class="meta-grid">
@@ -492,10 +498,16 @@ export class ExcelReportGenerator {
           </button>
         </div>
 
-        <div class="header">
-          <h1>${APP_CONFIG.INSTITUTION_NAME}</h1>
-          <h2>LAPORAN PRESENSI INDIVIDU GURU & STAF</h2>
-          <p>Sistem Absensi Berbasis Digital Scan & Geofence GPS (${APP_CONFIG.APP_NAME})</p>
+        <div class="header" style="text-align: center; margin-bottom: 20px; border-bottom: none; padding-bottom: 0;">
+          <img src="/kop-surat-al-ittihadiyah.jpg" alt="Kop Surat SMP Terpadu Al-Ittihadiyah" style="width: 100%; max-width: 900px; height: auto; display: block; margin: 0 auto 10px auto;" />
+          <div style="border-bottom: 3px double #15803d; padding-bottom: 8px; margin-bottom: 12px;">
+            <h2 style="margin: 0; font-size: 15px; font-weight: 800; text-transform: uppercase; color: #023246; letter-spacing: 0.5px;">
+              LAPORAN PRESENSI INDIVIDU GURU & STAF
+            </h2>
+            <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600;">
+              Sistem Absensi Berbasis Digital Scan & Geofence GPS (${APP_CONFIG.APP_NAME})
+            </p>
+          </div>
         </div>
 
         <div class="profile-box">
