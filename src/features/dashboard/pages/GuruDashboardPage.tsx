@@ -46,11 +46,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const { user: authUser, token, logout, deviceUUID } = useAuthStore();
   const { showToast } = useToastStore();
 
-  // Effective user: previewUser when in Preview Mode, otherwise authUser
-  const effectiveUser: UserProfile = previewUser || authUser || {
+  const fallbackUser: UserProfile = {
     id: 'usr_guru_sample',
     nip: '198905202014021003',
-    full_name: authUser?.full_name || 'Guru Utama',
+    full_name: 'Guru Utama',
     phone_number: '081234567890',
     role: 'GURU',
     position: 'Guru Utama / Pendidik',
@@ -58,6 +57,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     is_active: true,
     created_at: new Date().toISOString(),
   };
+
+  // Effective user: previewUser when in Preview Mode, otherwise authUser
+  const effectiveUser: UserProfile = previewUser || authUser || fallbackUser;
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);

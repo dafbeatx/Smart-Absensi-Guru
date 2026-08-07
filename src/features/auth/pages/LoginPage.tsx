@@ -43,6 +43,9 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     const maskedIdentity = identity.length > 4 ? `${identity.substring(0, 4)}***` : identity;
     logger.info('LoginPage', `Attempting login for identity: ${maskedIdentity}`);
+    if (turnstileToken) {
+      logger.info('LoginPage', 'Turnstile token present for bot verification.');
+    }
 
     try {
       const res = await AuthRepository.login({
