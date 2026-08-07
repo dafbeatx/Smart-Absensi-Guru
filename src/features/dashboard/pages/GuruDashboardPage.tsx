@@ -429,7 +429,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [unreadCount]);
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] pb-28 text-[#023246]">
+    <div className="min-h-screen guru-pattern-bg pb-28 text-[#023246]">
       {/* ── PREVIEW MODE WARNING BANNER ───────────────────────────────────── */}
       {isPreviewMode && (
         <div className="bg-purple-900 text-purple-100 px-4 py-2 text-xs font-bold text-center border-b border-purple-700 flex items-center justify-center gap-2">
