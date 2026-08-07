@@ -114,7 +114,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   });
 
   // Pre-scan GPS Health Status & Realtime Coordinates State
-  const [gpsHealth, setGpsHealth] = useState<{ status: 'READY' | 'REFINING' | 'OFF'; text: string; accuracy?: number }>({
+  const [gpsHealth, setGpsHealth] = useState<{ status: 'READY' | 'REFINING' | 'OFF' | 'INVALID'; text: string; accuracy?: number }>({
     status: 'REFINING',
     text: '📍 Mengukur lokasi GPS...',
   });

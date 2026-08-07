@@ -10,6 +10,11 @@ export interface GPSCoordinates {
   longitude: number;
   accuracy: number;
   distanceMeters: number;
+  isMock?: boolean;
+  mockReason?: string;
+  speed?: number | null;
+  altitude?: number | null;
+  heading?: number | null;
 }
 
 export interface GPSValidationResult {
@@ -28,6 +33,69 @@ export class GPSService {
   private static watchId: number | null = null;
 
   /**
+   * Evaluates if a given position fix exhibits signs of mock location / location spoofing
+   * or DevTools geolocation override manipulation.
+   */
+  public static detectMockLocation(
+    position: GeolocationPosition,
+    previousFix?: CachedGPSFix | null
+  ): { isMock: boolean; reason?: string } {
+    const coords = position.coords;
+    const rawPosition = position as unknown as Record<string, unknown>;
+    const rawCoords = coords as unknown as Record<string, unknown>;
+
+    // 1. Direct Web Geolocation API Mock Flag (Android Webview / Chrome Mock Providers)
+    if (rawPosition.isMock === true || rawCoords.mocked === true || rawCoords.isMock === true) {
+      return { isMock: true, reason: 'NATIVE_MOCK_FLAG_DETECTED' };
+    }
+
+    // 2. DevTools Geolocation Override & Synthetic Constant Spoofer Check
+    if (coords.latitude === 0 && coords.longitude === 0) {
+      return { isMock: true, reason: 'NULL_ISLAND_COORDINATES' };
+    }
+
+    if (coords.accuracy === 0) {
+      return { isMock: true, reason: 'ZERO_ACCURACY_SYNTHETIC_FIX' };
+    }
+
+    if (Number.isInteger(coords.latitude) && Number.isInteger(coords.longitude) && coords.latitude !== 0) {
+      return { isMock: true, reason: 'EXACT_INTEGER_COORDINATES' };
+    }
+
+    // 3. Telemetry Jump Check (Impossible Speed > 150 km/h)
+    if (previousFix && previousFix.coords) {
+      const timeDeltaSec = (Date.now() - previousFix.timestamp) / 1000;
+      if (timeDeltaSec > 0.1 && timeDeltaSec < 60) {
+        const distanceMoved = calculateDistanceMeters(
+          coords.latitude,
+          coords.longitude,
+          previousFix.coords.latitude,
+          previousFix.coords.longitude
+        );
+        const speedKmh = (distanceMoved / timeDeltaSec) * 3.6;
+        const maxSpeed = CONSTANTS.DEFAULTS.GPS_MOCK_SUSPICIOUS_SPEED_KMH || 150;
+        if (speedKmh > maxSpeed && distanceMoved > 100) {
+          logger.warn('GPSService', `Suspicious speed jump detected: ${speedKmh.toFixed(1)} km/h over ${timeDeltaSec.toFixed(1)}s`);
+          return { isMock: true, reason: `IMPOSSIBLE_SPEED_JUMP_${Math.round(speedKmh)}KMH` };
+        }
+      }
+
+      // 4. Zero-Variance Synthetic Fix Check (DevTools Fixed Location Override)
+      if (
+        timeDeltaSec >= 2 &&
+        Math.abs(coords.latitude - previousFix.coords.latitude) < 1e-12 &&
+        Math.abs(coords.longitude - previousFix.coords.longitude) < 1e-12 &&
+        coords.accuracy === previousFix.coords.accuracy &&
+        coords.altitude === previousFix.coords.altitude
+      ) {
+        return { isMock: true, reason: 'ZERO_VARIANCE_SYNTHETIC_OVERRIDE' };
+      }
+    }
+
+    return { isMock: false };
+  }
+
+  /**
    * Starts background GPS position warming up via watchPosition.
    * Called as soon as App/Dashboard is opened to pre-heat GPS coordinates in background.
    */
@@ -40,6 +108,7 @@ export class GPSService {
     try {
       this.watchId = navigator.geolocation.watchPosition(
         (position) => {
+          const mockCheck = GPSService.detectMockLocation(position, this.cachedFix);
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           const accuracy = position.coords.accuracy || 0;
@@ -53,6 +122,11 @@ export class GPSService {
               longitude: lng,
               accuracy,
               distanceMeters: effectiveDistance,
+              isMock: mockCheck.isMock,
+              mockReason: mockCheck.reason,
+              speed: position.coords.speed,
+              altitude: position.coords.altitude,
+              heading: position.coords.heading,
             },
             timestamp: Date.now(),
           };
@@ -92,7 +166,7 @@ export class GPSService {
   ): GPSCoordinates | null {
     if (!this.cachedFix) return null;
     const age = Date.now() - this.cachedFix.timestamp;
-    if (age <= maxAgeMs && this.cachedFix.coords.accuracy <= maxAccuracyMeters) {
+    if (age <= maxAgeMs && this.cachedFix.coords.accuracy <= maxAccuracyMeters && !this.cachedFix.coords.isMock) {
       logger.info('GPSService', `Using warm cached GPS fix (age: ${age}ms <= ${maxAgeMs}ms, accuracy: ${this.cachedFix.coords.accuracy}m <= ${maxAccuracyMeters}m):`, this.cachedFix.coords);
       return this.cachedFix.coords;
     }
@@ -109,17 +183,23 @@ export class GPSService {
   /**
    * Helper method to report current GPS Health Status for Dashboard pre-scan UI indicator
    */
-  public static getGPSHealthStatus(): { status: 'READY' | 'REFINING' | 'OFF'; text: string; accuracy?: number } {
+  public static getGPSHealthStatus(): { status: 'READY' | 'REFINING' | 'OFF' | 'INVALID'; text: string; accuracy?: number } {
     if (!this.cachedFix) {
       return { status: 'REFINING', text: '📍 Mengukur lokasi GPS...' };
+    }
+    if (this.cachedFix.coords.isMock) {
+      return { status: 'INVALID', text: '⚠️ Fake GPS Terdeteksi!' };
     }
     const age = Date.now() - this.cachedFix.timestamp;
     if (age <= 30000) {
       const acc = Math.round(this.cachedFix.coords.accuracy);
+      const maxAcc = CONSTANTS.DEFAULTS.GPS_MAX_ALLOWED_ACCURACY_METERS || 50;
       if (acc <= CONSTANTS.DEFAULTS.GPS_CACHE_MIN_ACCURACY_METERS) {
         return { status: 'READY', text: `🟢 GPS Siap (${acc}m)`, accuracy: acc };
+      } else if (acc <= maxAcc) {
+        return { status: 'READY', text: `🟡 Sinyal Cukup (${acc}m)`, accuracy: acc };
       }
-      return { status: 'REFINING', text: `🟡 Akurasi GPS (${acc}m)...`, accuracy: acc };
+      return { status: 'REFINING', text: `🔴 Akurasi Lemah (${acc}m > ${maxAcc}m)...`, accuracy: acc };
     }
     return { status: 'REFINING', text: '📍 Memperbarui GPS...' };
   }
@@ -193,6 +273,7 @@ export class GPSService {
       // Stage 1: High Accuracy (Hardware Satellite GPS)
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          const mockCheck = GPSService.detectMockLocation(position, this.cachedFix);
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           const accuracy = position.coords.accuracy || 0;
@@ -206,6 +287,11 @@ export class GPSService {
             longitude: lng,
             accuracy,
             distanceMeters: effectiveDistance,
+            isMock: mockCheck.isMock,
+            mockReason: mockCheck.reason,
+            speed: position.coords.speed,
+            altitude: position.coords.altitude,
+            heading: position.coords.heading,
           });
         },
         (primaryErr) => {
@@ -214,6 +300,7 @@ export class GPSService {
           // Stage 2: Fallback Standard Accuracy (WiFi / Cell Triangulation for Android / MIUI compatibility)
           navigator.geolocation.getCurrentPosition(
             (fallbackPos) => {
+              const mockCheck = GPSService.detectMockLocation(fallbackPos, this.cachedFix);
               const lat = fallbackPos.coords.latitude;
               const lng = fallbackPos.coords.longitude;
               const accuracy = fallbackPos.coords.accuracy || 0;
@@ -227,6 +314,11 @@ export class GPSService {
                 longitude: lng,
                 accuracy,
                 distanceMeters: effectiveDistance,
+                isMock: mockCheck.isMock,
+                mockReason: mockCheck.reason,
+                speed: fallbackPos.coords.speed,
+                altitude: fallbackPos.coords.altitude,
+                heading: fallbackPos.coords.heading,
               });
             },
             (fallbackErr) => {
@@ -288,13 +380,14 @@ export class GPSService {
         logger.info('GPSService', `GPS sample ${i + 1}/${SAMPLE_COUNT}:`, {
           accuracy: sample.accuracy,
           distanceMeters: sample.distanceMeters,
+          isMock: sample.isMock,
         });
 
         // Update cached fix
         this.cachedFix = { coords: sample, timestamp: Date.now() };
 
-        // Stop early if good accuracy
-        if (sample.accuracy <= 25) {
+        // Stop early if good accuracy and not mock
+        if (sample.accuracy <= 25 && !sample.isMock) {
           logger.info('GPSService', 'High-accuracy sample obtained early, stopping collection.');
           break;
         }
@@ -322,13 +415,34 @@ export class GPSService {
   }
 
   /**
-   * Validates coordinates against allowed school geofence radius.
-   * Uses getEffectiveAllowedRadius for consistent 100m floor enforcement.
+   * Validates coordinates against allowed school geofence radius, GPS accuracy limit, and Fake GPS detection.
    */
   public static validateGeofenceRadius(
     coords: GPSCoordinates,
     allowedRadiusMeters?: number
   ): GPSValidationResult {
+    // 1. Fake GPS / Mock Location Check
+    if (coords.isMock) {
+      logger.warn('GPSService', 'Geofence validation failed: Mock location detected', coords.mockReason);
+      return {
+        isValid: false,
+        coords,
+        error: getErrorDefinition('GPS_003'),
+      };
+    }
+
+    // 2. Signal Accuracy Limit Check (> 50 meters rejected)
+    const maxAllowedAccuracy = CONSTANTS.DEFAULTS.GPS_MAX_ALLOWED_ACCURACY_METERS || 50;
+    if (coords.accuracy > maxAllowedAccuracy) {
+      logger.warn('GPSService', `Geofence validation failed: GPS accuracy too low (${coords.accuracy}m > ${maxAllowedAccuracy}m)`);
+      return {
+        isValid: false,
+        coords,
+        error: getErrorDefinition('GPS_004'),
+      };
+    }
+
+    // 3. Allowed Geofence Distance Radius Check
     const configuredRadius = allowedRadiusMeters ?? this.getGeofenceSettings().radius;
     const radius = getEffectiveAllowedRadius(configuredRadius);
 

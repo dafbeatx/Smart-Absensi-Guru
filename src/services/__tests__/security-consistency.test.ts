@@ -98,15 +98,58 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Supabase Login - Reject Invalid PIN', msg.includes('PIN') || msg.includes('tidak ditemukan'));
   }
 
-  // 8. Test GPS Service Geofence Validation Consistency
+  // 8. Test GPS Service Geofence Validation Consistency & Fake GPS Detection
   const allowedRadius = 500;
-  const testCoords = { latitude: -6.2, longitude: 106.8, accuracy: 5, distanceMeters: 450 };
+  const testCoords = { latitude: -6.200123, longitude: 106.800123, accuracy: 5, distanceMeters: 450 };
   const validCheck = GPSService.validateGeofenceRadius(testCoords, allowedRadius);
   assert('UI & Validation Radius Indicator - Consistent Allowed Radius (450m <= 500m)', validCheck.isValid === true);
 
-  const outCoords = { latitude: -6.2, longitude: 106.8, accuracy: 5, distanceMeters: 550 };
+  const outCoords = { latitude: -6.200123, longitude: 106.800123, accuracy: 5, distanceMeters: 550 };
   const invalidCheck = GPSService.validateGeofenceRadius(outCoords, allowedRadius);
   assert('UI & Validation Radius Indicator - Reject Out of Range (550m > 500m)', invalidCheck.isValid === false);
+
+  // 8a. Fake GPS Detection - Native Mock Flag Check
+  const nativeMockPos = {
+    coords: { latitude: -6.613144, longitude: 106.684975, accuracy: 10 },
+    isMock: true,
+  } as unknown as GeolocationPosition;
+  const nativeMockCheck = GPSService.detectMockLocation(nativeMockPos);
+  assert('Fake GPS Detection - Rejects Native Mock Flag', nativeMockCheck.isMock === true && nativeMockCheck.reason === 'NATIVE_MOCK_FLAG_DETECTED');
+
+  // 8b. Fake GPS Detection - DevTools Zero Accuracy
+  const zeroAccPos = {
+    coords: { latitude: -6.613144, longitude: 106.684975, accuracy: 0 },
+  } as unknown as GeolocationPosition;
+  const zeroAccCheck = GPSService.detectMockLocation(zeroAccPos);
+  assert('Fake GPS Detection - Rejects Zero Accuracy Synthetic Fix', zeroAccCheck.isMock === true && zeroAccCheck.reason === 'ZERO_ACCURACY_SYNTHETIC_FIX');
+
+  // 8c. Fake GPS Detection - DevTools Exact Integer Coordinates
+  const integerPos = {
+    coords: { latitude: -6, longitude: 106, accuracy: 5 },
+  } as unknown as GeolocationPosition;
+  const integerCheck = GPSService.detectMockLocation(integerPos);
+  assert('Fake GPS Detection - Rejects DevTools Integer Coordinates', integerCheck.isMock === true && integerCheck.reason === 'EXACT_INTEGER_COORDINATES');
+
+  // 8d. Fake GPS Detection - Telemetry Impossible Speed Jump
+  const prevFix = {
+    coords: { latitude: -6.613144, longitude: 106.684975, accuracy: 5, distanceMeters: 0 },
+    timestamp: Date.now() - 5000, // 5 seconds ago
+  };
+  const farPos = {
+    coords: { latitude: -6.200000, longitude: 106.800000, accuracy: 5 }, // ~48km away in 5s (> 34000 km/h)
+  } as unknown as GeolocationPosition;
+  const speedCheck = GPSService.detectMockLocation(farPos, prevFix);
+  assert('Fake GPS Detection - Rejects Impossible Telemetry Speed Jump (>150km/h)', speedCheck.isMock === true && String(speedCheck.reason).includes('IMPOSSIBLE_SPEED_JUMP'));
+
+  // 8e. GPS Signal Accuracy Limit Check (> 50m rejected)
+  const lowAccCoords = { latitude: -6.613144, longitude: 106.684975, accuracy: 65, distanceMeters: 50 };
+  const lowAccCheck = GPSService.validateGeofenceRadius(lowAccCoords, allowedRadius);
+  assert('GPS Accuracy Check - Rejects Low Accuracy Signal (>50m)', lowAccCheck.isValid === false && lowAccCheck.error?.code === 'GPS_004');
+
+  // 8f. Fake GPS Geofence Validation Rejection
+  const mockGeofenceCoords = { latitude: -6.613144, longitude: 106.684975, accuracy: 5, distanceMeters: 10, isMock: true, mockReason: 'TEST_MOCK' };
+  const mockGeofenceCheck = GPSService.validateGeofenceRadius(mockGeofenceCoords, allowedRadius);
+  assert('GPS Geofence Validation - Rejects Mock Coordinates with GPS_003', mockGeofenceCheck.isValid === false && mockGeofenceCheck.error?.code === 'GPS_003');
 
   // 9. Developer Test Mode Security Guards & Runner
   const devEnabled = isDevTestModeEnabled();

@@ -45,7 +45,12 @@ export const ERROR_CODES: Record<string, ErrorDefinition> = {
   GPS_003: {
     code: 'GPS_003',
     message: 'Terdeteksi indikasi penggunaan Fake GPS / lokasi tiruan.',
-    solution: 'Matikan aplikasi pihak ketiga peniru lokasi pada HP Anda.',
+    solution: 'Matikan aplikasi pihak ketiga peniru lokasi atau fitur geolocation override browser Anda.',
+  },
+  GPS_004: {
+    code: 'GPS_004',
+    message: 'Akurasi sinyal GPS HP Anda terlalu rendah (> 50 meter).',
+    solution: 'Pastikan Anda berada di area terbuka (outdoor) atau nyalakan Wi-Fi untuk meningkatkan presisi lokasi.',
   },
 
   // Attendance & QR Errors (ATT_xxx / QR_xxx)

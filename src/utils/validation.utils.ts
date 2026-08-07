@@ -30,7 +30,9 @@ export const validateGPSGeofence = (
   userLng: number,
   schoolLat?: number,
   schoolLng?: number,
-  allowedRadiusMeters?: number
+  allowedRadiusMeters?: number,
+  accuracy: number = 10,
+  isMock?: boolean
 ): ValidationResult & { distanceMeters: number } => {
   if (!userLat || !userLng || isNaN(userLat) || isNaN(userLng)) {
     return { isValid: false, error: getErrorDefinition('GPS_001'), distanceMeters: 99999 };
@@ -39,14 +41,23 @@ export const validateGPSGeofence = (
   const settings = GPSService.getGeofenceSettings();
   const targetLat = schoolLat !== undefined ? schoolLat : settings.lat;
   const targetLng = schoolLng !== undefined ? schoolLng : settings.lng;
-  const radius = allowedRadiusMeters !== undefined ? allowedRadiusMeters : settings.radius;
 
   const distance = calculateDistanceMeters(userLat, userLng, targetLat, targetLng);
 
-  if (distance > radius) {
+  const coords = {
+    latitude: userLat,
+    longitude: userLng,
+    accuracy,
+    distanceMeters: distance,
+    isMock: isMock === true,
+  };
+
+  const validation = GPSService.validateGeofenceRadius(coords, allowedRadiusMeters);
+
+  if (!validation.isValid) {
     return {
       isValid: false,
-      error: getErrorDefinition('GPS_002'),
+      error: validation.error || getErrorDefinition('GPS_002'),
       distanceMeters: distance,
     };
   }
