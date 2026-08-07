@@ -244,42 +244,48 @@ export class ExcelReportGenerator {
         <meta charset="UTF-8">
         <title>Laporan Absensi Guru - ${payload.month} ${payload.year}</title>
         <style>
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; line-height: 1.5; }
           .header { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
           .header h1 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; }
           .header h2 { margin: 4px 0; font-size: 14px; font-weight: 600; color: #475569; }
           .header p { margin: 0; font-size: 11px; color: #64748b; }
-          .meta-grid { display: flex; justify-content: space-between; background: #f8fafc; padding: 12px 18px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px; font-size: 12px; }
+          .meta-grid { display: flex; justify-content: space-between; background: #f8fafc !important; padding: 12px 18px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px; font-size: 12px; }
           .kpi-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
-          .kpi-card { background: #fff; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; text-align: center; }
+          .kpi-card { background: #fff !important; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; text-align: center; }
           .kpi-card .val { font-size: 18px; font-weight: 800; color: #0f172a; }
           .kpi-card .lbl { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; }
 
           /* Chart Box Styling */
-          .chart-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px 20px; margin-bottom: 25px; }
+          .chart-box { background: #f8fafc !important; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px 20px; margin-bottom: 25px; }
           .chart-title { margin: 0 0 12px 0; font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; text-align: center; letter-spacing: 0.5px; }
-          .stacked-bar-container { background: #e2e8f0; border-radius: 12px; height: 28px; display: flex; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
-          .bar-seg { display: flex; items-center; justify-content: center; font-size: 11px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: all 0.3s ease; }
-          .bar-hadir { background: #16a34a; }
-          .bar-terlambat { background: #d97706; }
-          .bar-izin { background: #0284c7; }
-          .bar-alfa { background: #dc2626; }
+          .stacked-bar-container { background: #e2e8f0 !important; border-radius: 12px; height: 28px; display: flex; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+          .bar-seg { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #ffffff !important; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+          .bar-hadir { background-color: #16a34a !important; background: #16a34a !important; }
+          .bar-terlambat { background-color: #d97706 !important; background: #d97706 !important; }
+          .bar-izin { background-color: #0284c7 !important; background: #0284c7 !important; }
+          .bar-alfa { background-color: #dc2626 !important; background: #dc2626 !important; }
           .chart-legend { display: flex; justify-content: space-around; margin-top: 12px; font-size: 11px; font-weight: 600; color: #334155; }
           .legend-item { display: flex; align-items: center; gap: 6px; }
           .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 
           table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 11px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
-          th { background-color: #0f172a; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
-          tr:nth-child(even) { background-color: #f8fafc; }
-          .progress-bar-bg { background: #e2e8f0; border-radius: 6px; height: 10px; width: 100%; overflow: hidden; border: 1px solid #cbd5e1; }
-          .progress-bar-fill { background: #16a34a; height: 100%; border-radius: 6px; }
+          th { background-color: #0f172a !important; color: #ffffff !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+          tr:nth-child(even) { background-color: #f8fafc !important; }
+          .progress-bar-bg { background-color: #e2e8f0 !important; border-radius: 6px; height: 10px; width: 100%; overflow: hidden; border: 1px solid #cbd5e1; }
+          .progress-bar-fill { background-color: #16a34a !important; background: #16a34a !important; height: 100%; border-radius: 6px; }
           .signature-section { margin-top: 40px; display: flex; justify-content: space-between; font-size: 11px; }
           .sig-box { text-align: center; width: 240px; }
           .sig-space { height: 65px; }
           @media print {
-            body { padding: 0; }
+            body { padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .no-print { display: none; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           }
         </style>
       </head>
@@ -319,17 +325,17 @@ export class ExcelReportGenerator {
         <!-- GRAFIK KESELURUHAN SEKOLAH -->
         <div class="chart-box">
           <h3 class="chart-title">📊 GRAFIK KESELURUHAN DISTRIBUSI KEHADIRAN SEKOLAH</h3>
-          <div class="stacked-bar-container">
-            ${presentPct > 0 ? `<div class="bar-seg bar-hadir" style="width: ${presentPct}%;">${presentPct}%</div>` : ''}
-            ${latePct > 0 ? `<div class="bar-seg bar-terlambat" style="width: ${latePct}%;">${latePct}%</div>` : ''}
-            ${leavePct > 0 ? `<div class="bar-seg bar-izin" style="width: ${leavePct}%;">${leavePct}%</div>` : ''}
-            ${unabsentPct > 0 ? `<div class="bar-seg bar-alfa" style="width: ${unabsentPct}%;">${unabsentPct}%</div>` : ''}
+          <div class="stacked-bar-container" style="background-color: #e2e8f0 !important; background: #e2e8f0 !important;">
+            ${presentPct > 0 ? `<div class="bar-seg bar-hadir" style="width: ${presentPct}%; background-color: #16a34a !important; background: #16a34a !important; color: #ffffff !important;">${presentPct}%</div>` : ''}
+            ${latePct > 0 ? `<div class="bar-seg bar-terlambat" style="width: ${latePct}%; background-color: #d97706 !important; background: #d97706 !important; color: #ffffff !important;">${latePct}%</div>` : ''}
+            ${leavePct > 0 ? `<div class="bar-seg bar-izin" style="width: ${leavePct}%; background-color: #0284c7 !important; background: #0284c7 !important; color: #ffffff !important;">${leavePct}%</div>` : ''}
+            ${unabsentPct > 0 ? `<div class="bar-seg bar-alfa" style="width: ${unabsentPct}%; background-color: #dc2626 !important; background: #dc2626 !important; color: #ffffff !important;">${unabsentPct}%</div>` : ''}
           </div>
           <div class="chart-legend">
-            <div class="legend-item"><span class="legend-dot" style="background:#16a34a;"></span> Hadir Tepat Waktu (${payload.summary.totalPresent})</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#d97706;"></span> Terlambat (${payload.summary.totalLate})</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#0284c7;"></span> Izin/Sakit (${payload.summary.totalSick + payload.summary.totalLeave})</div>
-            <div class="legend-item"><span class="legend-dot" style="background:#dc2626;"></span> Belum Absen (${payload.summary.totalUnabsented})</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color:#16a34a !important; background:#16a34a !important;"></span> Hadir Tepat Waktu (${payload.summary.totalPresent})</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color:#d97706 !important; background:#d97706 !important;"></span> Terlambat (${payload.summary.totalLate})</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color:#0284c7 !important; background:#0284c7 !important;"></span> Izin/Sakit (${payload.summary.totalSick + payload.summary.totalLeave})</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color:#dc2626 !important; background:#dc2626 !important;"></span> Belum Absen (${payload.summary.totalUnabsented})</div>
           </div>
         </div>
 
@@ -343,7 +349,7 @@ export class ExcelReportGenerator {
               <th>Jabatan / Mapel</th>
               <th style="width: 90px; text-align: center;">Jumlah Masuk</th>
               <th style="width: 90px; text-align: center;">Jumlah Izin</th>
-              <th style="width: 110px;">Visual Kehadiran</th>
+              <th style="width: 125px;">Visual Kehadiran</th>
             </tr>
           </thead>
           <tbody>
@@ -364,8 +370,11 @@ export class ExcelReportGenerator {
                   <td style="text-align: center;"><strong style="color: #16a34a;">${tTotalMasuk} Hari</strong></td>
                   <td style="text-align: center;"><strong style="color: #0284c7;">${tTotalIzin} Hari</strong></td>
                   <td>
-                    <div class="progress-bar-bg">
-                      <div class="progress-bar-fill" style="width: ${ratioPct}%;"></div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <div class="progress-bar-bg" style="flex: 1; background-color: #e2e8f0 !important; background: #e2e8f0 !important; border-radius: 6px; height: 10px; overflow: hidden; border: 1px solid #cbd5e1;">
+                        <div class="progress-bar-fill" style="width: ${ratioPct}%; background-color: #16a34a !important; background: #16a34a !important; height: 100%; border-radius: 6px;"></div>
+                      </div>
+                      <span style="font-size: 10px; font-weight: 800; color: #15803d; width: 32px; text-align: right;">${ratioPct}%</span>
                     </div>
                   </td>
                 </tr>
@@ -462,40 +471,46 @@ export class ExcelReportGenerator {
         <meta charset="UTF-8">
         <title>Laporan Presensi Individu - ${teacher.full_name}</title>
         <style>
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; line-height: 1.5; }
           .header { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
           .header h1 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; }
           .header h2 { margin: 4px 0; font-size: 14px; font-weight: 600; color: #16a34a; }
           .header p { margin: 0; font-size: 11px; color: #64748b; }
-          .profile-box { background: #f8fafc; padding: 14px 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; font-size: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+          .profile-box { background: #f8fafc !important; padding: 14px 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; font-size: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
           .kpi-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 25px; }
-          .kpi-card { background: #fff; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; text-align: center; }
+          .kpi-card { background: #fff !important; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; text-align: center; }
           .kpi-card .val { font-size: 18px; font-weight: 800; color: #0f172a; }
           .kpi-card .lbl { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; }
 
           /* Histogram Box Styling */
-          .histogram-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 18px 24px; margin-bottom: 25px; }
+          .histogram-box { background: #f8fafc !important; border: 1px solid #cbd5e1; border-radius: 12px; padding: 18px 24px; margin-bottom: 25px; }
           .chart-title { margin: 0 0 16px 0; font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; text-align: center; letter-spacing: 0.5px; }
           .histogram-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; height: 160px; align-items: end; padding-bottom: 10px; border-bottom: 2px solid #cbd5e1; }
           .histogram-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
           .bar-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 120px; }
-          .histogram-bar { width: 75%; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: all 0.3s ease; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-          .bar-b1 { background: linear-gradient(to top, #15803d, #16a34a); }
-          .bar-b2 { background: linear-gradient(to top, #047857, #10b981); }
-          .bar-b3 { background: linear-gradient(to top, #d97706, #f59e0b); }
-          .bar-b4 { background: linear-gradient(to top, #b91c1c, #ef4444); }
+          .histogram-bar { width: 75%; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #ffffff !important; text-shadow: 0 1px 2px rgba(0,0,0,0.4); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+          .bar-b1 { background-color: #16a34a !important; background: #16a34a !important; }
+          .bar-b2 { background-color: #059669 !important; background: #059669 !important; }
+          .bar-b3 { background-color: #d97706 !important; background: #d97706 !important; }
+          .bar-b4 { background-color: #dc2626 !important; background: #dc2626 !important; }
           .histogram-label { text-align: center; font-size: 10px; font-weight: 700; color: #334155; margin-top: 8px; line-height: 1.3; }
 
           table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 11px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
-          th { background-color: #0f172a; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
-          tr:nth-child(even) { background-color: #f8fafc; }
+          th { background-color: #0f172a !important; color: #ffffff !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+          tr:nth-child(even) { background-color: #f8fafc !important; }
           .signature-section { margin-top: 40px; display: flex; justify-content: space-between; font-size: 11px; }
           .sig-box { text-align: center; width: 240px; }
           .sig-space { height: 65px; }
           @media print {
-            body { padding: 0; }
+            body { padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .no-print { display: none; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           }
         </style>
       </head>
@@ -540,28 +555,28 @@ export class ExcelReportGenerator {
           <div class="histogram-grid">
             <div class="histogram-col">
               <div class="bar-wrapper">
-                <div class="histogram-bar bar-b1" style="height: ${getBarHeightPercent(bin1Count)}%;">${bin1Count}x</div>
+                <div class="histogram-bar bar-b1" style="height: ${getBarHeightPercent(bin1Count)}%; background-color: #16a34a !important; background: #16a34a !important; color: #ffffff !important;">${bin1Count}x</div>
               </div>
               <div class="histogram-label">&lt; 06.45 WIB<br><b>Sangat Awal</b></div>
             </div>
 
             <div class="histogram-col">
               <div class="bar-wrapper">
-                <div class="histogram-bar bar-b2" style="height: ${getBarHeightPercent(bin2Count)}%;">${bin2Count}x</div>
+                <div class="histogram-bar bar-b2" style="height: ${getBarHeightPercent(bin2Count)}%; background-color: #059669 !important; background: #059669 !important; color: #ffffff !important;">${bin2Count}x</div>
               </div>
               <div class="histogram-label">06.45 - 07.00 WIB<br><b>Tepat Waktu</b></div>
             </div>
 
             <div class="histogram-col">
               <div class="bar-wrapper">
-                <div class="histogram-bar bar-b3" style="height: ${getBarHeightPercent(bin3Count)}%;">${bin3Count}x</div>
+                <div class="histogram-bar bar-b3" style="height: ${getBarHeightPercent(bin3Count)}%; background-color: #d97706 !important; background: #d97706 !important; color: #ffffff !important;">${bin3Count}x</div>
               </div>
               <div class="histogram-label">07.01 - 07.15 WIB<br><b>Toleransi</b></div>
             </div>
 
             <div class="histogram-col">
               <div class="bar-wrapper">
-                <div class="histogram-bar bar-b4" style="height: ${getBarHeightPercent(bin4Count)}%;">${bin4Count}x</div>
+                <div class="histogram-bar bar-b4" style="height: ${getBarHeightPercent(bin4Count)}%; background-color: #dc2626 !important; background: #dc2626 !important; color: #ffffff !important;">${bin4Count}x</div>
               </div>
               <div class="histogram-label">&gt; 07.15 WIB<br><b>Terlambat</b></div>
             </div>
