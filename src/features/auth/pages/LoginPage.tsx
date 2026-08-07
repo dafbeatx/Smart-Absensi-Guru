@@ -7,6 +7,7 @@ import { validatePIN, validateIdentity } from '../../../utils/validation.utils';
 import { AuthRepository } from '../../../repositories/AuthRepository';
 import { logger } from '../../../utils/logger.utils';
 import { handleAppError, notifySuccess } from '../../../utils/error.utils';
+import { TurnstileWidget } from '../../../components/ui/TurnstileWidget';
 
 export const LoginPage: React.FC = () => {
   const [identity, setIdentity] = useState('');
@@ -15,6 +16,7 @@ export const LoginPage: React.FC = () => {
   const [identityError, setIdentityError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const { loginSuccess } = useAuthStore();
   const deviceUUID = getOrCreateDeviceUUID();
@@ -114,6 +116,12 @@ export const LoginPage: React.FC = () => {
             onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
             error={pinError}
             required
+          />
+
+          <TurnstileWidget
+            onVerify={(token) => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken(null)}
+            onError={() => setTurnstileToken(null)}
           />
 
           <div className="pt-2">
