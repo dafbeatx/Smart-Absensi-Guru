@@ -14,6 +14,7 @@ export const AIAssistantDrawer: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFloatingHidden, setIsFloatingHidden] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -24,6 +25,16 @@ export const AIAssistantDrawer: React.FC = () => {
   ]);
 
   const user = useAuthStore((state) => state.user);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   if (!isFeatureEnabled('ENABLE_AI_ASSISTANT')) {
     return null;
@@ -66,18 +77,6 @@ export const AIAssistantDrawer: React.FC = () => {
       setIsLoading(false);
     }
   };
-
-  const [isFloatingHidden, setIsFloatingHidden] = useState(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
 
   return (
     <>

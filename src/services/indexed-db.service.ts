@@ -10,6 +10,7 @@ export interface OfflineAttendanceRecord {
   user_lat: number;
   user_lng: number;
   distance_meters: number;
+  gps_accuracy?: number;
   timestamp: string;
   sync_status: 'PENDING' | 'SYNCING' | 'FAILED';
   retry_count: number;

@@ -5,6 +5,7 @@
 export async function hashPin(pin: string): Promise<string> {
   const str = String(pin || '').trim();
 
+  // 1. Modern Web Crypto API (Browser / Node 18+)
   if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.subtle) {
     const encoder = new TextEncoder();
     const data = encoder.encode(str);
@@ -13,16 +14,23 @@ export async function hashPin(pin: string): Promise<string> {
     return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
-  // Node.js fallback
-  try {
-    const cryptoModule = await import('crypto');
-    return cryptoModule.createHash('sha256').update(str).digest('hex');
-  } catch {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
+  // 2. Node.js / Server-side / Test runner environment fallback
+  const isNode = typeof process !== 'undefined' && process.versions && !!process.versions.node;
+  if (isNode) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const req = (globalThis as any).require;
+      const nodeCrypto = typeof req === 'function' ? req('crypto') : null;
+      if (nodeCrypto && typeof nodeCrypto.createHash === 'function') {
+        return nodeCrypto.createHash('sha256').update(str).digest('hex');
+      }
+    } catch {
+      // Fall through to strict error
     }
-    return Math.abs(hash).toString(16).padStart(64, '0');
   }
+
+  // 3. Insecure / obsolete browser environment without crypto.subtle
+  throw new Error(
+    'Penambatan PIN gagal: Browser Anda tidak mendukung Web Crypto API (crypto.subtle). Harap gunakan browser modern dengan koneksi HTTPS.'
+  );
 }

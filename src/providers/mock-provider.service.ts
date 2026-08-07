@@ -208,7 +208,10 @@ export class MockProvider implements IDataProvider {
     if (existingSaved) {
       try {
         const parsed = JSON.parse(existingSaved);
-        if (parsed && parsed.check_in_time) {
+        if (parsed && parsed.check_in_time && parsed.check_out_time) {
+          record = parsed;
+          action = 'ALREADY_COMPLETED';
+        } else if (parsed && parsed.check_in_time) {
           // Check-out / Update Check-out (Absen Pulang)
           record = {
             ...parsed,

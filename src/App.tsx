@@ -70,12 +70,21 @@ export const App: React.FC = () => {
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isPreviewScannerBlocked, setIsPreviewScannerBlocked] = useState(false);
 
+  const userId = user?.id;
+  const userPhone = user?.phone_number;
+  const userNip = user?.nip;
+  const userRole = user?.role;
+
   useEffect(() => {
     if (isAuthenticated && token) {
       AuthRepository.verifySession(token)
         .then((latestUser) => {
-          const isSameUser = latestUser && (latestUser.id === user?.id || latestUser.phone_number === user?.phone_number || (user?.nip && latestUser.nip === user?.nip));
-          if (isSameUser && latestUser.role !== user?.role) {
+          const isSameUser =
+            latestUser &&
+            (latestUser.id === userId ||
+              latestUser.phone_number === userPhone ||
+              (userNip && latestUser.nip === userNip));
+          if (isSameUser && latestUser.role !== userRole) {
             useAuthStore.getState().updateUserProfile({
               role: latestUser.role,
               full_name: latestUser.full_name,
@@ -91,7 +100,7 @@ export const App: React.FC = () => {
     return () => {
       GPSService.stopBackgroundWarmUp();
     };
-  }, [isAuthenticated, token, user?.role]);
+  }, [isAuthenticated, token, userId, userPhone, userNip, userRole]);
 
   if (!isAuthenticated || !user) {
     return (

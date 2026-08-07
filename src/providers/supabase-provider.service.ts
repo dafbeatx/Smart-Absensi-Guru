@@ -287,6 +287,18 @@ export class SupabaseProvider implements IDataProvider {
 
     if (existing) {
       if (existing.check_in_time) {
+        if (existing.check_out_time) {
+          logger.info('SupabaseProvider', 'Attendance check-in and check-out already completed for today', { userId, date: todayStr });
+          return {
+            attendance_id: existing.id,
+            status: (existing.status as AttendanceStatus) || status,
+            timestamp: `${existing.check_out_time} (Presensi Lengkap)`,
+            distance_meters: distanceMeters,
+            geofence_verified: true,
+            attendance_action: 'ALREADY_COMPLETED',
+          };
+        }
+
         // Determine check-out open time based on day of week (Friday vs Monday-Thursday)
         const dayOfWeek = new Date().getDay(); // 5 = Friday
         const targetCheckoutStart = dayOfWeek === 5
@@ -299,7 +311,7 @@ export class SupabaseProvider implements IDataProvider {
           ? `${timeStr} WIB (Pulang Awal < ${targetCheckoutStart})`
           : `${timeStr} WIB (Absen Pulang)`;
 
-        // Record or Update Check-out (Absen Pulang ke jam scan WIB terbaru)
+        // Record or Update Check-out (Absen Pulang ke jam scan WIB pertama)
         const { error: updateErr } = await this.client
           .from('attendance')
           .update({ check_out_time: timeStr })

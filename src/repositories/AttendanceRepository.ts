@@ -13,6 +13,8 @@ export interface ScanAttendanceDTO {
   device_uuid: string;
   user_id?: string;
   timestamp?: string;
+  /** Distance in meters from school geofence center */
+  distance_meters?: number;
   /** GPS accuracy in meters at time of scan – used for audit logging */
   gps_accuracy?: number;
 }
@@ -37,6 +39,33 @@ export interface CorrectAttendanceDTO {
   reason: string;
 }
 
+export function isNetworkOrTimeoutError(err: unknown): boolean {
+  if (!err) return false;
+  const msg = typeof err === 'object' && err !== null && 'message' in err
+    ? String((err as { message: string }).message)
+    : String(err);
+
+  const lower = msg.toLowerCase();
+  const isExplicitNetworkMessage =
+    msg.includes('Failed to fetch') ||
+    msg.includes('NetworkError') ||
+    msg.includes('TypeError: Failed to fetch') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('networkerror') ||
+    lower.includes('koneksi internet') ||
+    lower.includes('sinyal lemah') ||
+    lower.includes('timeout 2.5s') ||
+    (lower.includes('network') && !lower.includes('social network'));
+
+  if (isExplicitNetworkMessage) return true;
+
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return true;
+  }
+
+  return false;
+}
+
 export class AttendanceRepository {
   public static async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
     logger.info('AttendanceRepository', 'Executing scanAttendance via active provider', {
@@ -46,6 +75,7 @@ export class AttendanceRepository {
     });
 
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    const effectiveDistance = dto.distance_meters !== undefined ? dto.distance_meters : 10;
 
     if (isOffline) {
       logger.info('AttendanceRepository', 'Device is offline. Enqueuing attendance to IndexedDB...');
@@ -58,7 +88,8 @@ export class AttendanceRepository {
         qr_seed: dto.qr_seed,
         user_lat: dto.user_lat,
         user_lng: dto.user_lng,
-        distance_meters: 10,
+        distance_meters: effectiveDistance,
+        gps_accuracy: dto.gps_accuracy,
         timestamp: new Date().toISOString(),
         sync_status: 'PENDING',
         retry_count: 0,
@@ -72,7 +103,7 @@ export class AttendanceRepository {
         attendance_id: recordId,
         status: 'HADIR (MODE OFFLINE)',
         timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
-        distance_meters: 10,
+        distance_meters: effectiveDistance,
         geofence_verified: true,
         attendance_action: 'CHECK_IN',
         is_offline: true,
@@ -93,6 +124,11 @@ export class AttendanceRepository {
       logger.info('AttendanceRepository', 'scanAttendance success:', result);
       return result;
     } catch (err: unknown) {
+      if (!isNetworkOrTimeoutError(err)) {
+        logger.warn('AttendanceRepository', 'scanAttendance rejected by backend/validation, rethrowing error to UI:', err);
+        throw err;
+      }
+
       logger.warn('AttendanceRepository', 'scanAttendance failed or timed out on weak network, switching to offline IndexedDB fallback:', err);
       
       // If network fetch fails or times out, fallback to IndexedDB Queue
@@ -106,7 +142,8 @@ export class AttendanceRepository {
           qr_seed: dto.qr_seed,
           user_lat: dto.user_lat,
           user_lng: dto.user_lng,
-          distance_meters: 10,
+          distance_meters: effectiveDistance,
+          gps_accuracy: dto.gps_accuracy,
           timestamp: new Date().toISOString(),
           sync_status: 'PENDING',
           retry_count: 0,
@@ -119,7 +156,7 @@ export class AttendanceRepository {
           attendance_id: recordId,
           status: 'HADIR (MODE OFFLINE)',
           timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
-          distance_meters: 10,
+          distance_meters: effectiveDistance,
           geofence_verified: true,
           attendance_action: 'CHECK_IN',
           is_offline: true,

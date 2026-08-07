@@ -72,6 +72,7 @@ export class SyncEngine {
             device_uuid: item.user_id,
             user_id: item.user_id,
             timestamp: item.timestamp,
+            gps_accuracy: item.gps_accuracy,
           });
 
           // Remove successfully synced item from IndexedDB

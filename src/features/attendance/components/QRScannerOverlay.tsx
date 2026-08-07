@@ -241,6 +241,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         user_lat: currentCoords.latitude,
         user_lng: currentCoords.longitude,
         device_uuid: deviceUUID,
+        distance_meters: currentCoords.distanceMeters,
         gps_accuracy: currentCoords.accuracy,
       });
 
@@ -252,7 +253,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         if (res.is_offline) isOfflineRecord = true;
       }
 
-    window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
     } catch (err: unknown) {
       logger.error('QRScannerOverlay', 'Failed to save attendance record:', err);
       SoundService.playError();
@@ -300,11 +301,6 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       onSuccess(result);
       onClose();
     }, 3500);
-  };
-
-  const handleBypassGPSCheckIn = async () => {
-    setIsRejectionModalOpen(false);
-    await handleScanSuccess(CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED);
   };
 
   if (!isOpen) return null;
@@ -644,11 +640,14 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleBypassGPSCheckIn}
+                onClick={() => {
+                  setIsRejectionModalOpen(false);
+                  fetchGPSLocation();
+                }}
                 className="py-2.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
               >
                 <span>📍</span>
-                <span>Absen GPS</span>
+                <span>Ukur Ulang GPS</span>
               </button>
               <button
                 type="button"
