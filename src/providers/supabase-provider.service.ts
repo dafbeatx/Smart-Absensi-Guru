@@ -962,36 +962,6 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getNotifications(userId: string, _token: string): Promise<any[]> {
-    const fallbackNotifications = [
-      {
-        id: 'n_default_1',
-        user_id: userId,
-        title: 'Selalu Absen Masuk Tepat Waktu',
-        message: 'Batas toleransi absen masuk adalah sesuai jam operasional sekolah. Gunakan QR Code resmi di sekolah.',
-        type: 'INFO',
-        is_read: false,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 'n_default_2',
-        user_id: userId,
-        title: 'Keamanan Perangkat (Device Binding)',
-        message: 'Akun Anda terikat pada HP aktif. Pembatasan 1 akun 1 HP aktif.',
-        type: 'SUCCESS',
-        is_read: false,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 'n_default_3',
-        user_id: userId,
-        title: 'Pengingat PIN Keamanan',
-        message: 'Apabila Anda masih menggunakan PIN default 123456, segera ubah PIN melalui tab Profil.',
-        type: 'WARNING',
-        is_read: true,
-        created_at: new Date().toISOString(),
-      },
-    ];
-
     try {
       const { data, error } = await this.client
         .from('notifications')
@@ -1001,7 +971,7 @@ export class SupabaseProvider implements IDataProvider {
 
       if (error) {
         logger.warn('SupabaseProvider', 'notifications query error (tabel mungkin belum dibuat):', error.message);
-        return fallbackNotifications;
+        return [];
       }
 
       if (data && data.length > 0) {
@@ -1016,25 +986,22 @@ export class SupabaseProvider implements IDataProvider {
         }));
       }
 
-      return fallbackNotifications;
+      return [];
     } catch (err) {
       logger.error('SupabaseProvider', 'getNotifications exception:', err);
-      return fallbackNotifications;
+      return [];
     }
   }
 
   public async markNotificationAsRead(notificationId: string, _token: string): Promise<boolean> {
-    try {
-      const { error } = await this.client
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId);
+    const { error } = await this.client
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
 
-      if (error) {
-        logger.warn('SupabaseProvider', 'markNotificationAsRead error:', error.message);
-      }
-    } catch (err) {
-      logger.warn('SupabaseProvider', 'markNotificationAsRead exception:', err);
+    if (error) {
+      logger.error('SupabaseProvider', 'markNotificationAsRead error:', error.message);
+      throw new Error(`Gagal memperbarui status notifikasi di backend: ${error.message}`);
     }
     return true;
   }
