@@ -132,19 +132,21 @@ class VoiceAnnouncementService {
       const targetURI = customVoiceURI || this.config.selectedVoiceURI;
       const voices = this.getAvailableVoices();
 
+      let voiceToUse: SpeechSynthesisVoice | undefined;
+
       if (targetURI && targetURI !== 'DEFAULT_ID') {
-        const matchedVoice = voices.find((v) => v.voiceURI === targetURI);
-        if (matchedVoice) {
-          utterance.voice = matchedVoice;
-        }
-      } else {
-        // Fallback to first Indonesian voice
-        const idVoice = voices.find(
+        voiceToUse = voices.find((v) => v.voiceURI === targetURI);
+      }
+
+      // Fallback if target voice not found on current device (e.g. switching between HP and Laptop)
+      if (!voiceToUse) {
+        voiceToUse = voices.find(
           (v) => v.lang.includes('id') || v.lang.includes('ID') || v.name.toLowerCase().includes('indonesia')
         );
-        if (idVoice) {
-          utterance.voice = idVoice;
-        }
+      }
+
+      if (voiceToUse) {
+        utterance.voice = voiceToUse;
       }
 
       window.speechSynthesis.speak(utterance);
