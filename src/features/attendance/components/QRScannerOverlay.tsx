@@ -17,6 +17,7 @@ import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { logger } from '../../../utils/logger.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 
@@ -41,6 +42,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [aiDiagnosis, setAiDiagnosis] = useState<ScanRejectionDiagnosisResult | null>(null);
+  const [latenessReason, setLatenessReason] = useState('');
 
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
@@ -325,14 +327,47 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     };
 
     setScanResult(result);
+    setLatenessReason('');
     setIsSuccessModalOpen(true);
 
-    // Auto-Submit 3.5s Timer to give teachers enough time to read reassurance popup
-    setTimeout(() => {
-      setIsSuccessModalOpen(false);
-      onSuccess(result);
-      onClose();
-    }, 3500);
+    // Auto-Close 3.5s Timer ONLY for Hadir Tepat Waktu. For TERLAMBAT, popup remains OPEN until teacher manually saves reason!
+    if (!isLate) {
+      setTimeout(() => {
+        setIsSuccessModalOpen(false);
+        onSuccess(result);
+        onClose();
+      }, 3500);
+    }
+  };
+
+  const handleSaveReasonAndClose = async () => {
+    const currentUser = useAuthStore.getState().user;
+    if (latenessReason.trim() && currentUser) {
+      try {
+        const provider = ProviderFactory.getProvider();
+        const todayStr = getTodayDateInJakarta();
+        const token = useAuthStore.getState().token || '';
+        const recs = await provider.getDailyAttendance(todayStr, token);
+        const myRec = recs.find((r) => r.user_id === currentUser.id);
+        if (myRec && myRec.id) {
+          await provider.correctAttendance({
+            token,
+            target_user_id: currentUser.id,
+            date: todayStr,
+            status: myRec.status,
+            check_in_time: myRec.check_in_time || '07:30',
+            check_out_time: myRec.check_out_time || undefined,
+            reason: `[Alasan Terlambat]: ${latenessReason.trim()}`,
+            notes: `[Alasan Terlambat]: ${latenessReason.trim()}`,
+          });
+        }
+      } catch (e) {
+        console.warn('Error saving lateness reason note:', e);
+      }
+    }
+    setIsSuccessModalOpen(false);
+    if (scanResult) onSuccess(scanResult);
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -582,23 +617,40 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             </div>
           </div>
 
+          {scanResult?.rawStatus === 'TERLAMBAT' && (
+            <div className="space-y-1.5 text-left bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200">
+              <label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                <span>📝</span>
+                <span>Catatan Alasan Terlambat (Dikirim ke Admin & Kepsek):</span>
+              </label>
+              <input
+                type="text"
+                value={latenessReason}
+                onChange={(e) => setLatenessReason(e.target.value)}
+                placeholder="Contoh: Hujan deras / Macet total di jalan utama / Kendala HP"
+                className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
+              />
+              <p className="text-[10px] text-amber-700 font-medium">
+                💡 Catatan alasan ini akan langsung terlampir di laporan rekap absensi Admin & Kepsek.
+              </p>
+            </div>
+          )}
+
           <div className="pt-1">
             <button
               type="button"
-              onClick={() => {
-                setIsSuccessModalOpen(false);
-                if (scanResult) onSuccess(scanResult);
-                onClose();
-              }}
+              onClick={handleSaveReasonAndClose}
               className="w-full py-3 bg-[#023246] hover:bg-[#022535] text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98"
             >
-              ✓ SIAP, SAYA MENGERTI
+              {scanResult?.rawStatus === 'TERLAMBAT' ? '💾 SIMPAN ALASAN & TUTUP' : '✓ SIAP, SAYA MENGERTI'}
             </button>
           </div>
 
-          <p className="text-[10px] text-slate-400 animate-pulse font-medium">
-            Mengalihkan ke Dashboard dalam beberapa detik...
-          </p>
+          {scanResult?.rawStatus !== 'TERLAMBAT' && (
+            <p className="text-[10px] text-slate-400 animate-pulse font-medium">
+              Mengalihkan ke Dashboard dalam beberapa detik...
+            </p>
+          )}
         </div>
       </Modal>
 

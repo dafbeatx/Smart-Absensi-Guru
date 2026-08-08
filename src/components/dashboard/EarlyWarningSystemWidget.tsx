@@ -58,9 +58,9 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
       const stats = teacherStatsMap.get(t.id) || { lateCount: 0, unexcusedCount: 0 };
       const totalAbsences = stats.lateCount + stats.unexcusedCount;
 
-      // Trigger EWS alert if teacher has >=2 latenesses or >=1 unexcused absence
-      if (stats.lateCount >= 2 || stats.unexcusedCount >= 1) {
-        const riskLevel: 'HIGH' | 'MEDIUM' = stats.lateCount >= 3 || stats.unexcusedCount >= 2 ? 'HIGH' : 'MEDIUM';
+      // Trigger EWS alert if teacher has >=4 latenesses (1-3x is normal tolerance) or >=2 unexcused absences
+      if (stats.lateCount >= 4 || stats.unexcusedCount >= 2) {
+        const riskLevel: 'HIGH' | 'MEDIUM' = stats.lateCount >= 6 || stats.unexcusedCount >= 3 ? 'HIGH' : 'MEDIUM';
         results.push({
           teacher: t,
           lateCount: stats.lateCount,
@@ -83,12 +83,12 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
   const handleSendWaReminder = (teacher: UserProfile, lateCount: number) => {
     const phone = teacher.phone_number ? teacher.phone_number.replace(/^0/, '62') : '';
     const msg = encodeURIComponent(
-      `Assalamu'alaikum wr. wb. Yth. Bp/Ibu ${teacher.full_name}, berikut pengingat kedisiplinan presensi sekolah. Bulan ini terdata ${lateCount}x keterlambatan. Mohon melakukan absensi tepat waktu sebelum 07.15 WIB. Terima kasih.`
+      `Assalamu'alaikum wr. wb. Yth. Bapak/Ibu ${teacher.full_name}, semoga senantiasa diberikan kesehatan & kelancaran. Salam hormat, berikut pengingat pembinaan kedisiplinan presensi sekolah. Bulan ini terdata ${lateCount}x keterlambatan. Mohon berkenan Bapak/Ibu dapat hadir lebih awal sebelum pukul 07.15 WIB. Terima kasih atas dedikasi & kerja samanya.`
     );
 
     if (phone) {
       window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
-      showToast('success', 'WhatsApp Dibuka', `Mengarahkan pengingat pesan ke ${teacher.full_name}`);
+      showToast('success', 'WhatsApp Dibuka', `Mengarahkan pesan pengingat santun ke ${teacher.full_name}`);
     } else {
       showToast('warning', 'Nomor HP Tidak Tersedia', `Nomor telepon ${teacher.full_name} belum terdaftar di sistem.`);
     }
@@ -110,7 +110,7 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
               </span>
             </h3>
             <p className="text-[10px] sm:text-xs text-slate-500 font-medium">
-              Deteksi otomatis keterlambatan berulang & potensi kendala kehadiran bulan ini
+              Pembinaan keterlambatan berulang (Toleransi wajar s.d 3x/bulan bebas EWS)
             </p>
           </div>
         </div>

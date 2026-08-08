@@ -37,6 +37,7 @@ export interface CorrectAttendanceDTO {
   check_in_time: string;
   check_out_time?: string;
   reason: string;
+  notes?: string;
 }
 
 export function isNetworkOrTimeoutError(err: unknown): boolean {

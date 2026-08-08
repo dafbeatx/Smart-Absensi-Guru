@@ -79,6 +79,7 @@ export interface AttendanceRecord {
   verification_method: VerificationMethod;
   attendance_source: AttendanceSource;
   is_offline: boolean;
+  notes?: string;
   created_at: string;
 }
 

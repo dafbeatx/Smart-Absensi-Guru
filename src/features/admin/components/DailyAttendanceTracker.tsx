@@ -306,6 +306,11 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                           Masuk: {item.checkInTime} {item.checkOutTime ? `• Pulang: ${item.checkOutTime}` : ''}
                         </p>
                       )}
+                      {(record?.notes || item?.notes) && (
+                        <p className="text-[10px] text-amber-800 font-semibold mt-0.5 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 inline-block">
+                          💬 {record?.notes || item?.notes}
+                        </p>
+                      )}
                       {record?.check_in_distance_meters !== undefined && (
                         <p className="text-[10px] text-slate-400 font-medium">
                           📍 Jarak: {record.check_in_distance_meters}m • {record.verification_method || 'QR_GPS'}
