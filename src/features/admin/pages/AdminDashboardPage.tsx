@@ -24,6 +24,7 @@ import { ExecutiveDashboardOverview } from '../../../components/dashboard/Execut
 import { AdminCommandPaletteModal } from '../../../components/dashboard/AdminCommandPaletteModal';
 import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
+import { isDateOffDay } from '../../../utils/time.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
 
 export interface AdminDashboardPageProps {
@@ -390,7 +391,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                             : todayAttendance.status === 'TERLAMBAT'
                               ? '⚠️ TERLAMBAT'
                               : `📋 ${todayAttendance.status}`
-                          : '⏳ BELUM ABSEN'}
+                          : isDateOffDay(new Date()).isOff
+                            ? '🏖️ LIBUR SEKOLAH'
+                            : '⏳ BELUM ABSEN'}
                       </p>
                     </div>
 

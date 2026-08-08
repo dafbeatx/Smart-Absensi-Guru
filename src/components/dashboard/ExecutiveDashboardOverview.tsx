@@ -113,6 +113,8 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   const izinPercentage = totalGuruCount > 0 ? Math.min(100, Math.round((izinCount / totalGuruCount) * 100)) : 0;
   const belumPercentage = totalGuruCount > 0 ? Math.min(100, Math.round((belumAbsenCount / totalGuruCount) * 100)) : 0;
 
+  const offCheck = useMemo(() => isDateOffDay(todayStr), [todayStr]);
+
   type TimeRangeOption = '1_DAY' | '7_DAYS' | '1_MONTH' | '1_YEAR';
   const [timeRange, setTimeRange] = React.useState<TimeRangeOption>('7_DAYS');
 
@@ -665,6 +667,8 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             <p className="text-[11px] text-slate-400 font-medium">
               {recentlyScannedTeachers.length > 0
                 ? `${recentlyScannedTeachers.length} guru melakukan presensi hari ini`
+                : offCheck.isOff
+                ? `🏖️ Hari ini Libur Sekolah (${offCheck.reason || 'Libur Akhir Pekan'})`
                 : 'Belum ada guru yang melakukan scan hari ini'}
             </p>
           </div>
@@ -720,8 +724,12 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
                       <p className="text-[10px] text-slate-400 truncate">{teacherObj.position}</p>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 text-[9px] font-bold rounded-lg bg-slate-100 text-slate-500 border border-slate-200">
-                    ⏳ Belum Absen
+                  <span className={`px-2 py-0.5 text-[9px] font-bold rounded-lg border ${
+                    offCheck.isOff
+                      ? 'bg-sky-50 text-sky-700 border-sky-200'
+                      : 'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}>
+                    {offCheck.isOff ? '🏖️ Libur Sekolah' : '⏳ Belum Absen'}
                   </span>
                 </div>
               ))

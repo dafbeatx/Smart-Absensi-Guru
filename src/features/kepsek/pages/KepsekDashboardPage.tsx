@@ -225,6 +225,15 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                 <span className="text-xs font-semibold text-slate-500">{unabsentedTeachers.length} Orang</span>
               </h3>
 
+              {isDateOffDay(getTodayDateInJakarta()).isOff && (
+                <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl text-sky-900 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-sm">
+                    <span>🏖️</span> Hari Ini Libur Sekolah ({isDateOffDay(getTodayDateInJakarta()).reason})
+                  </div>
+                  <p className="text-[11px] text-sky-700 font-medium">Tidak ada jadwal / kewajiban presensi bagi guru dan staf hari ini.</p>
+                </div>
+              )}
+
               {unabsentedTeachers.length === 0 ? (
                 <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 font-medium space-y-1">
                   <span className="text-xl block">✅</span>

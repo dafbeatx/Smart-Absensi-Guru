@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus } from '../../../types/database.types';
 import { AnalyticsService } from '../../../services/analytics.service';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
-import { evaluateAttendanceStatus } from '../../../utils/time.utils';
+import { evaluateAttendanceStatus, isDateOffDay } from '../../../utils/time.utils';
 
 export interface DailyAttendanceTrackerProps {
   teachers: UserProfile[];
@@ -110,6 +110,8 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     });
   }, [teachers, teacherAttendanceMap, searchQuery, statusFilter]);
 
+  const isOffDayCheck = useMemo(() => isDateOffDay(selectedDate), [selectedDate]);
+
   const getStatusBadge = (status: AttendanceStatus | 'BELUM_ABSEN') => {
     switch (status) {
       case 'HADIR':
@@ -122,7 +124,11 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         return <span className="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full border border-blue-200">📝 {status}</span>;
       case 'BELUM_ABSEN':
       default:
-        return <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full border border-red-200">⏳ Belum Absen</span>;
+        return isOffDayCheck.isOff ? (
+          <span className="px-2.5 py-1 bg-sky-100 text-sky-800 text-xs font-bold rounded-full border border-sky-200">🏖️ Libur Sekolah</span>
+        ) : (
+          <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full border border-red-200">⏳ Belum Absen</span>
+        );
     }
   };
 
