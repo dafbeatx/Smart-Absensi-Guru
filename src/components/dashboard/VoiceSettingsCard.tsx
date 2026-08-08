@@ -105,7 +105,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
   };
 
   return (
-    <div className="p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-[#023246]/5 border border-emerald-200/80 shadow-sm hover:shadow-md transition-all space-y-3.5">
+    <div className="p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl bg-linear-to-br from-emerald-50/90 via-teal-50/40 to-[#023246]/5 border border-emerald-200/80 shadow-sm hover:shadow-md transition-all space-y-3.5">
       {/* Top Header & Master Quick Toggle */}
       <div className="flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
