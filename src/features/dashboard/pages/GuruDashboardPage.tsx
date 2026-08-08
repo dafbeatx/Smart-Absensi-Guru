@@ -1314,9 +1314,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               {/* Device Binding Status Section */}
               <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between text-xs gap-2">
-                  <span className="font-bold text-slate-700 text-xs">📱 Binding HP</span>
+                  <span className="font-bold text-slate-700 text-xs">📱 Strict Device Binding (1 Akun = 1 HP)</span>
                   <span className={`px-2 py-0.5 text-[9px] sm:text-[10px] font-black rounded-full border shrink-0 ${
-                    deviceBindingStatus.status === 'ACTIVE'
+                    effectiveUser.full_name.toLowerCase().includes('dafa maulana')
+                      ? 'bg-sky-100 text-sky-800 border-sky-300'
+                      : deviceBindingStatus.status === 'ACTIVE'
                       ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                       : deviceBindingStatus.status === 'DIFFERENT_DEVICE'
                       ? 'bg-red-100 text-red-800 border-red-300'
@@ -1324,10 +1326,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       ? 'bg-orange-100 text-orange-800 border-orange-300'
                       : 'bg-amber-100 text-amber-800 border-amber-300'
                   }`}>
-                    {deviceBindingStatus.status === 'ACTIVE'
-                      ? '🔒 TERIKAT AKTIF'
+                    {effectiveUser.full_name.toLowerCase().includes('dafa maulana')
+                      ? '🚀 BYPASS MULTI-DEVICE'
+                      : deviceBindingStatus.status === 'ACTIVE'
+                      ? '🔒 TERIKAT AKTIF (1 HP)'
                       : deviceBindingStatus.status === 'DIFFERENT_DEVICE'
-                      ? '⚠️ HP BERBEDA'
+                      ? '⚠️ HP BERBEDA (DIBLOKIR)'
                       : deviceBindingStatus.status === 'UNAVAILABLE'
                       ? '⚠️ TIDAK TERVERIFIKASI'
                       : '🟡 PERLU BINDING'}

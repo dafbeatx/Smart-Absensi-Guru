@@ -16,6 +16,7 @@ import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrection
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { ProviderFactory } from '../../../providers/provider-factory';
 import { logger } from '../../../utils/logger.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 
@@ -156,6 +157,30 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       setIsRejectionModalOpen(true);
       isProcessingRef.current = false;
       return;
+    }
+
+    // 1.5 Strict Device Binding Check (Exempting Dafa Maulana, S.Pd)
+    const scanUser = useAuthStore.getState().user;
+    const isExempted = scanUser && scanUser.full_name.toLowerCase().includes('dafa maulana');
+
+    if (!isExempted && scanUser) {
+      try {
+        const provider = ProviderFactory.getProvider();
+        const deviceUUID = useAuthStore.getState().deviceUUID || 'DEV_UUID';
+        const token = useAuthStore.getState().token || 'TOKEN';
+        const bindingCheck = await provider.checkDeviceBinding(scanUser.id, deviceUUID, token);
+
+        if (bindingCheck.status === 'DIFFERENT_DEVICE') {
+          logger.warn('QRScannerOverlay', 'Attendance rejected due to Strict Device Binding mismatch');
+          SoundService.playError();
+          setRejectionReason('Absensi Ditolak! HP Ini Tidak Terdaftar.\n\nPembatasan Strict (1 Akun = 1 HP) aktif untuk mencegah titip absen. Silakan gunakan HP pribadi yang terdaftar atau ajukan reset device ke Admin.');
+          setIsRejectionModalOpen(true);
+          isProcessingRef.current = false;
+          return;
+        }
+      } catch (e) {
+        console.warn('Device binding check exception during scan:', e);
+      }
     }
 
     // 2. Fetch & Validate Geofence Radius GPS Location with Auto-Retry Pipeline (up to 3x)

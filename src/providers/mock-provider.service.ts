@@ -154,12 +154,23 @@ export class MockProvider implements IDataProvider {
   }
 
   public async checkDeviceBinding(userId: string, currentDeviceUUID: string, _token: string): Promise<DeviceBindingCheckResult> {
+    const sessionUser = useAuthStore.getState().user;
+    const isExempted = sessionUser && sessionUser.full_name.toLowerCase().includes('dafa maulana');
+
+    if (isExempted) {
+      return {
+        status: 'ACTIVE',
+        message: '🚀 Akses Khusus Dafa Maulana, S.Pd: Multi-Perangkat Aktif (Bypass Pembatasan)',
+        registered_uuid: currentDeviceUUID,
+      };
+    }
+
     const boundUUID = safeGetStorage(`smart_absensi_bound_device_${userId}`);
     if (!boundUUID) {
       safeSetStorage(`smart_absensi_bound_device_${userId}`, currentDeviceUUID);
       return {
         status: 'ACTIVE',
-        message: 'Perangkat terikat aktif dengan HP ini. Pembatasan 1 akun 1 HP aktif.',
+        message: '🔒 Strict Device Binding: HP ini telah terikat aktif dengan akun Anda (1 Akun = 1 HP).',
         registered_uuid: currentDeviceUUID,
       };
     }
@@ -167,14 +178,14 @@ export class MockProvider implements IDataProvider {
     if (boundUUID === currentDeviceUUID) {
       return {
         status: 'ACTIVE',
-        message: 'Perangkat terikat aktif dengan HP ini. Pembatasan 1 akun 1 HP aktif.',
+        message: '🔒 Strict Device Binding: HP ini telah terikat aktif dengan akun Anda (1 Akun = 1 HP).',
         registered_uuid: boundUUID,
       };
     }
 
     return {
       status: 'DIFFERENT_DEVICE',
-      message: 'Terdeteksi Menggunakan HP Berbeda! Mohon ajukan reset device ke Admin/Operator jika Anda ganti HP.',
+      message: '🚨 Terdeteksi HP Berbeda! Pembatasan Strict (1 Akun = 1 HP) aktif. Mencegah titip absen antar guru. Hubungi Admin jika Anda resmi mengganti HP.',
       registered_uuid: boundUUID,
     };
   }
