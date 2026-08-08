@@ -3,12 +3,14 @@ import { NotificationBellDropdown } from './NotificationBellDropdown';
 export interface TopDashboardNavbarProps {
   onToggleSidebar: () => void;
   onOpenQrGenerator?: () => void;
+  onOpenCommandPalette?: () => void;
   onLogout: () => void;
 }
 
 export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
   onToggleSidebar,
   onOpenQrGenerator,
+  onOpenCommandPalette,
   onLogout,
 }) => {
   return (
@@ -37,19 +39,24 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
             </div>
           </div>
 
-          {/* Search Bar with Ctrl / shortcut (Visible on desktop) */}
-          <div className="relative flex-1 hidden sm:block">
-            <span className="absolute inset-y-0 left-3 flex items-center text-slate-400 text-sm pointer-events-none">
+          {/* Search Bar with Ctrl K / Cmd K shortcut */}
+          <div
+            onClick={onOpenCommandPalette}
+            className="relative flex-1 hidden sm:block cursor-pointer group"
+          >
+            <span className="absolute inset-y-0 left-3 flex items-center text-slate-400 group-hover:text-emerald-600 text-sm pointer-events-none transition-colors">
               🔍
             </span>
             <input
               type="text"
-              placeholder="Cari guru, NPP, atau mata pelajaran..."
-              className="navbar-search-input"
+              readOnly
+              onClick={onOpenCommandPalette}
+              placeholder="Cari guru, menu, atau tekan Ctrl + K..."
+              className="navbar-search-input cursor-pointer group-hover:border-emerald-300 transition-all"
             />
             <span className="absolute inset-y-0 right-2.5 flex items-center pointer-events-none">
-              <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-400 bg-white border border-slate-200 rounded-md shadow-2xs">
-                Ctrl /
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-500 bg-slate-100 group-hover:bg-emerald-100 group-hover:text-emerald-800 border border-slate-200 rounded-md shadow-2xs transition-colors">
+                Ctrl K
               </kbd>
             </span>
           </div>

@@ -21,6 +21,7 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
+import { AdminCommandPaletteModal } from '../../../components/dashboard/AdminCommandPaletteModal';
 import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
@@ -40,6 +41,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // Status absensi pribadi Admin hari ini (real data from DB)
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
@@ -207,9 +209,20 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
+      window.removeEventListener('keydown', handleGlobalKeyDown);
     };
   }, [user?.id, teachers.length]);
 
@@ -285,6 +298,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         <TopDashboardNavbar
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onLogout={logout}
         />
 
@@ -558,6 +572,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           </button>
         </div>
       </nav>
+
+      {/* ── COMMAND PALETTE (CTRL + K) SEARCH & NAV MODAL ── */}
+      <AdminCommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        teachers={teachers}
+        onSelectTab={handleSelectSidebarTab}
+        onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
+        onOpenCorrectionModal={() => setIsCorrectionModalOpen(true)}
+        onOpenTestRunner={() => setIsTestRunnerOpen(true)}
+        onSwitchToGuruView={onSwitchToGuruView}
+      />
     </div>
   );
 };
