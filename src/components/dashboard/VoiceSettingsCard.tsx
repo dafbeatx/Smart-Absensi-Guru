@@ -138,7 +138,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
           type="button"
           onClick={handleToggle}
           aria-label={config.isEnabled ? 'Matikan Asisten Suara' : 'Aktifkan Asisten Suara'}
-          className={`min-h-[40px] px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl font-black text-xs transition-all shrink-0 cursor-pointer shadow-xs flex items-center gap-1.5 border active:scale-95 ${
+          className={`h-10 px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl font-black text-xs transition-all shrink-0 cursor-pointer shadow-xs flex items-center gap-1.5 border active:scale-95 ${
             config.isEnabled
               ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-800 shadow-emerald-700/20 ring-2 ring-emerald-500/20'
               : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border-slate-300'
@@ -237,7 +237,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
                 <select
                   value={config.selectedVoiceURI}
                   onChange={(e) => handleChange('selectedVoiceURI', e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-all"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 rounded-xl outline-none ring-offset-1 focus:ring-2 focus:ring-emerald-500 transition-all"
                 >
                   <option value="DEFAULT_ID">🇮🇩 Otomatis (Bahasa Indonesia Standard)</option>
                   {availableVoices.map((v) => (
@@ -395,7 +395,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
                     onFocus={() => setLastFocusedField('welcomeTemplate')}
                     onChange={(e) => handleChange('welcomeTemplate', e.target.value)}
                     placeholder={DEFAULT_VOICE_CONFIG.welcomeTemplate}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs font-medium text-slate-800 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-all"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs font-medium text-slate-800 rounded-xl outline-none ring-offset-1 focus:ring-2 focus:ring-emerald-500 transition-all"
                   />
                 </div>
 
@@ -410,7 +410,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
                     onFocus={() => setLastFocusedField('checkInTemplate')}
                     onChange={(e) => handleChange('checkInTemplate', e.target.value)}
                     placeholder={DEFAULT_VOICE_CONFIG.checkInTemplate}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs font-medium text-slate-800 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-all"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs font-medium text-slate-800 rounded-xl outline-none ring-offset-1 focus:ring-2 focus:ring-emerald-500 transition-all"
                   />
                 </div>
 
@@ -425,7 +425,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
                     onFocus={() => setLastFocusedField('checkOutTemplate')}
                     onChange={(e) => handleChange('checkOutTemplate', e.target.value)}
                     placeholder={DEFAULT_VOICE_CONFIG.checkOutTemplate}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs font-medium text-slate-800 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-all"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs font-medium text-slate-800 rounded-xl outline-none ring-offset-1 focus:ring-2 focus:ring-emerald-500 transition-all"
                   />
                 </div>
               </div>
