@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { ProviderFactory } from '../../providers/provider-factory';
 import { SoundService } from '../../services/audio.service';
+import { NotificationService } from '../../services/notification-permission.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile } from '../../types/database.types';
 import { isDateOffDay } from '../../utils/time.utils';
 
@@ -177,7 +178,21 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         }
       }
 
-      // 4. DB System Notifications from Provider
+      // 4. Real-time Cached Events & System Notifications
+      const cachedNotifs = NotificationService.getCachedNotifications(user.id);
+      cachedNotifs.forEach((cn) => {
+        items.push({
+          id: cn.id || `cn_${Date.now()}_${Math.random()}`,
+          category: cn.type === 'EVENT' ? 'SYSTEM_ALERT' : cn.type === 'LEAVE_REQUEST' ? 'LEAVE_REQUEST' : cn.type === 'CHECK_IN' || cn.type === 'CHECK_OUT' ? 'TEACHER_SCAN' : 'MY_STATUS',
+          title: cn.title,
+          message: cn.body,
+          time: cn.time || 'Realtime',
+          badgeType: cn.type === 'CHECK_IN' || cn.type === 'CHECK_OUT' ? 'SUCCESS' : cn.type === 'LEAVE_REQUEST' ? 'WARNING' : 'INFO',
+          isRead: false,
+        });
+      });
+
+      // 5. DB System Notifications from Provider
       const dbNotifs = await provider.getNotifications(user.id, authToken).catch(() => []);
       if (Array.isArray(dbNotifs)) {
         dbNotifs.forEach((dbItem) => {

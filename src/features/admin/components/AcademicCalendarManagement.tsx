@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { useToastStore } from '../../../store/useToastStore';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { NotificationService } from '../../../services/notification-permission.service';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -100,6 +101,7 @@ export const AcademicCalendarManagement: React.FC = () => {
         showToast('success', 'Perubahan Disimpan', `Hari libur "${formData.name}" berhasil diperbarui.`);
       } else {
         await provider.createHoliday(formData, token || undefined);
+        NotificationService.notifySchoolEvent(formData.name, formData.date, formData.description);
         showToast('success', 'Hari Libur Ditambahkan', `"${formData.name}" berhasil dimasukkan ke Kalender Akademik.`);
       }
       setIsFormModalOpen(false);

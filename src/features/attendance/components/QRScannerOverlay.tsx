@@ -270,8 +270,15 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     SoundService.playAttendanceSuccess();
 
     const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-    const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
-    NotificationService.notifyTeacherCheckIn(teacherName, timestampStr);
+    const currentUser = useAuthStore.getState().user;
+    const teacherName = currentUser?.full_name || 'Guru';
+    const userId = currentUser?.id;
+
+    if (returnedAction === 'CHECK_OUT') {
+      NotificationService.notifyTeacherCheckOut(teacherName, timestampStr, userId);
+    } else {
+      NotificationService.notifyTeacherCheckIn(teacherName, timestampStr, userId);
+    }
 
     // 🔉 Trigger Indonesian Voice Announcement for Attendance Confirmation
     SpeechService.speakAttendanceSuccess(teacherName, returnedAction === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN');
