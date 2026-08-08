@@ -207,7 +207,7 @@ export const AdminCommandPaletteModal: React.FC<AdminCommandPaletteModalProps> =
               setSelectedIndex(0);
             }}
             placeholder="Ketik untuk mencari guru, menu, atau aksi cepat... (Esc untuk menutup)"
-            className="flex-1 bg-transparent text-xs sm:text-sm font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none"
+            className="flex-1 bg-transparent text-xs sm:text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none"
           />
           {searchQuery && (
             <button
