@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../types/database.types';
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
+import { EarlyWarningSystemWidget } from './EarlyWarningSystemWidget';
 import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay } from '../../utils/time.utils';
 
 export interface ExecutiveDashboardOverviewProps {
@@ -431,6 +432,13 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 
       {/* Real-time Web Push Notification Permission Banner for Admin & Kepsek */}
       <NotificationPermissionBanner />
+
+      {/* ── 2.1 EARLY WARNING SYSTEM (EWS) KEDISIPLINAN & SECURITY VERIFICATION ── */}
+      <EarlyWarningSystemWidget
+        teachers={teachers}
+        attendanceRecords={attendanceRecords}
+        onOpenCorrectionModal={onOpenCorrectionModal}
+      />
 
       {/* ── 2. SUMMARY STAT CARDS GRID (5 CARDS IN A ROW) ──────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
