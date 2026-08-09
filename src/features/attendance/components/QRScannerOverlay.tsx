@@ -645,7 +645,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                 setIsSuccessModalOpen(false);
                 setIsMoodModalOpen(true);
               }}
-              className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5"
             >
               <span>💚</span>
               <span>ISI MOOD HARIAN (WELL-BEING CHECK-IN)</span>

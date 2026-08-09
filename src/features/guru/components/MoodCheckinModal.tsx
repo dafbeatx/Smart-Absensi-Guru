@@ -149,8 +149,8 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title="💚 Mood Check-in Harian Guru">
       <div className="space-y-5">
         {/* Header Note */}
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-3.5 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 text-xs text-slate-700 dark:text-slate-300 leading-relaxed flex items-start space-x-2.5">
-          <span className="text-base flex-shrink-0">🌱</span>
+        <div className="bg-linear-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-3.5 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 text-xs text-slate-700 dark:text-slate-300 leading-relaxed flex items-start space-x-2.5">
+          <span className="text-base shrink-0">🌱</span>
           <div>
             <span className="font-semibold text-emerald-800 dark:text-emerald-300 block mb-0.5">
               Kesejahteraan Anda Sangat Berharga

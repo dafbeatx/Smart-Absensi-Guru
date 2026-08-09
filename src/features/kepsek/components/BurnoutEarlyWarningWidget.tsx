@@ -155,7 +155,7 @@ export const BurnoutEarlyWarningWidget: React.FC = () => {
       </div>
 
       {/* Leadership Recommendation Card */}
-      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-4 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/50 space-y-1.5">
+      <div className="bg-linear-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-4 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/50 space-y-1.5">
         <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-extrabold text-xs">
           <span>💡</span>
           <span>Rekomendasi Manajemen Kepsek &amp; Kurikulum:</span>

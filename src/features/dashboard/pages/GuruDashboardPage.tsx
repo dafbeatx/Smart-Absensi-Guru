@@ -755,7 +755,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             </div>
 
             {/* 0.6. Teacher Well-being & Mood Check-in Banner */}
-            <div className="bg-gradient-to-r from-teal-500/10 via-emerald-500/10 to-emerald-600/10 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-emerald-300/60 dark:border-emerald-700/40 transition-all flex items-center justify-between gap-3 shadow-2xs">
+            <div className="bg-linear-to-r from-teal-500/10 via-emerald-500/10 to-emerald-600/10 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-emerald-300/60 dark:border-emerald-700/40 transition-all flex items-center justify-between gap-3 shadow-2xs">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300/80 flex items-center justify-center text-xl shrink-0">
                   {todayMood ? (
