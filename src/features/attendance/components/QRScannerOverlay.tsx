@@ -342,7 +342,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     }
   };
 
-  const handleSaveReasonAndClose = async () => {
+  const handleSaveReasonAndClose = async (openMood: boolean = false) => {
     const currentUser = useAuthStore.getState().user;
     if (latenessReason.trim() && currentUser) {
       try {
@@ -368,8 +368,12 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       }
     }
     setIsSuccessModalOpen(false);
-    if (scanResult) onSuccess(scanResult);
-    onClose();
+    if (openMood) {
+      setIsMoodModalOpen(true);
+    } else {
+      if (scanResult) onSuccess(scanResult);
+      onClose();
+    }
   };
 
   if (!isOpen) return null;
@@ -641,22 +645,25 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           <div className="pt-1 space-y-2">
             <button
               type="button"
-              onClick={() => {
-                setIsSuccessModalOpen(false);
-                setIsMoodModalOpen(true);
-              }}
-              className="w-full py-2.5 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5"
+              onClick={() => handleSaveReasonAndClose(true)}
+              className="w-full py-3 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5 border border-[#0D7A5F]"
             >
               <span>💚</span>
-              <span>ISI MOOD HARIAN (WELL-BEING CHECK-IN)</span>
+              <span>
+                {scanResult?.rawStatus === 'TERLAMBAT'
+                  ? '💾 SIMPAN ALASAN & ISI MOOD HARIAN ✨'
+                  : 'ISI MOOD HARIAN (WELL-BEING CHECK-IN) ✨'}
+              </span>
             </button>
 
             <button
               type="button"
-              onClick={handleSaveReasonAndClose}
+              onClick={() => handleSaveReasonAndClose(false)}
               className="w-full py-2.5 bg-[#023246] hover:bg-[#022535] text-white font-semibold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-xs active:scale-98"
             >
-              {scanResult?.rawStatus === 'TERLAMBAT' ? '💾 SIMPAN ALASAN & TUTUP' : '✓ SIAP, LEWATI MOOD & MASUK DASHBOARD'}
+              {scanResult?.rawStatus === 'TERLAMBAT'
+                ? '💾 SIMPAN ALASAN & TUTUP (TANPA MOOD)'
+                : '✓ SIAP, LEWATI MOOD & MASUK DASHBOARD'}
             </button>
           </div>
 
