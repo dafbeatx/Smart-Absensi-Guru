@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS public.teacher_moods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     mood TEXT NOT NULL CHECK (mood IN ('VERY_HAPPY', 'HAPPY', 'NEUTRAL', 'TIRED', 'STRESSED')),
     note TEXT,
@@ -18,21 +18,16 @@ CREATE INDEX IF NOT EXISTS idx_teacher_moods_user_date ON public.teacher_moods(u
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.teacher_moods ENABLE ROW LEVEL SECURITY;
 
--- Policies:
--- 1. Teachers can insert/update their own mood log
-CREATE POLICY "Users can manage their own mood log"
-ON public.teacher_moods
-FOR ALL
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
+-- Policies for Supabase API access
+DROP POLICY IF EXISTS "teacher_moods_select" ON public.teacher_moods;
+CREATE POLICY "teacher_moods_select" ON public.teacher_moods FOR SELECT USING (true);
 
--- 2. Kepsek / Admin can read anonymized / all mood logs for analytics
-CREATE POLICY "Kepsek and Admin can view mood logs"
-ON public.teacher_moods
-FOR SELECT
-USING (
-    EXISTS (
-        SELECT 1 FROM public.users
-        WHERE id = auth.uid() AND role IN ('KEPSEK', 'ADMIN')
-    )
-);
+DROP POLICY IF EXISTS "teacher_moods_insert" ON public.teacher_moods;
+CREATE POLICY "teacher_moods_insert" ON public.teacher_moods FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "teacher_moods_update" ON public.teacher_moods;
+CREATE POLICY "teacher_moods_update" ON public.teacher_moods FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "teacher_moods_delete" ON public.teacher_moods;
+CREATE POLICY "teacher_moods_delete" ON public.teacher_moods FOR DELETE USING (true);
+
