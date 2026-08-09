@@ -173,7 +173,7 @@ export class MockProvider implements IDataProvider {
       safeSetStorage(`smart_absensi_bound_device_${userId}`, currentDeviceUUID);
       return {
         status: 'ACTIVE',
-        message: '🔒 Strict Device Binding: HP ini telah terikat aktif dengan akun Anda (1 Akun = 1 HP).',
+        message: '🔒 Keamanan Perangkat Presensi: HP ini telah terikat aktif dengan akun Anda (1 Akun = 1 HP).',
         registered_uuid: currentDeviceUUID,
       };
     }
@@ -181,7 +181,7 @@ export class MockProvider implements IDataProvider {
     if (boundUUID === currentDeviceUUID) {
       return {
         status: 'ACTIVE',
-        message: '🔒 Strict Device Binding: HP ini telah terikat aktif dengan akun Anda (1 Akun = 1 HP).',
+        message: '🔒 Keamanan Perangkat Presensi: HP ini telah terikat aktif dengan akun Anda (1 Akun = 1 HP).',
         registered_uuid: boundUUID,
       };
     }

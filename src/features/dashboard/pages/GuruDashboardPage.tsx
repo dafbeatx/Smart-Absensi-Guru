@@ -1369,7 +1369,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               {/* Device Binding Status Section */}
               <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between text-xs gap-2">
-                  <span className="font-bold text-slate-700 text-xs">📱 Strict Device Binding (1 Akun = 1 HP)</span>
+                  <span className="font-bold text-slate-700 text-xs">📱 Keamanan Perangkat Presensi (1 Akun = 1 HP)</span>
                   <span className={`px-2 py-0.5 text-[9px] sm:text-[10px] font-black rounded-full border shrink-0 ${
                     effectiveUser.full_name.toLowerCase().includes('dafa maulana')
                       ? 'bg-sky-100 text-sky-800 border-sky-300'
