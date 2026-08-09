@@ -104,6 +104,7 @@ export const DutyScheduleManagement: React.FC = () => {
 
       await DutyScheduleRepository.saveDutySchedules(payload);
       showToast('success', 'Jadwal Disimpan', 'Jadwal Piket Guru berhasil disimpan dan diperbarui!');
+      await loadData();
     } catch (err) {
       console.error('Gagal menyimpan jadwal piket:', err);
       showToast('error', 'Gagal Menyimpan', 'Gagal menyimpan jadwal piket.');

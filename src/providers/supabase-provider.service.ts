@@ -1222,7 +1222,7 @@ export class SupabaseProvider implements IDataProvider {
         .select('*')
         .order('day_of_week', { ascending: true });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('smart_absensi_duty_schedules', JSON.stringify(data));
         }
@@ -1232,7 +1232,7 @@ export class SupabaseProvider implements IDataProvider {
       logger.warn('SupabaseProvider', 'getDutySchedules error, falling back to local storage:', err);
     }
 
-    // Fallback to local storage or mock seed
+    // Fallback to local storage if DB query fails
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.getDutySchedules();
   }
@@ -1242,19 +1242,35 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<boolean> {
     try {
-      // Clear existing schedule and insert new ones
-      await this.client.from('teacher_duty_schedules').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      // 1. Clear existing schedule in Supabase table
+      const { error: delError } = await this.client
+        .from('teacher_duty_schedules')
+        .delete()
+        .neq('day_of_week', 0); // Deletes all rows since day_of_week is 1..5
+
+      if (delError) {
+        logger.warn('SupabaseProvider', 'Failed to clear teacher_duty_schedules in Supabase:', delError.message);
+      }
+
+      // 2. Insert new schedule records into Supabase (without custom non-UUID strings)
       if (schedules.length > 0) {
-        const { error } = await this.client.from('teacher_duty_schedules').insert(schedules);
-        if (error) {
-          logger.warn('SupabaseProvider', 'Failed to insert teacher_duty_schedules to Supabase:', error.message);
+        const dbPayload = schedules.map((item) => ({
+          day_of_week: item.day_of_week,
+          teacher_id: item.teacher_id,
+          teacher_name: item.teacher_name,
+          notes: item.notes || null,
+        }));
+
+        const { error: insError } = await this.client.from('teacher_duty_schedules').insert(dbPayload);
+        if (insError) {
+          logger.warn('SupabaseProvider', 'Failed to insert teacher_duty_schedules to Supabase:', insError.message);
         }
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'saveDutySchedules DB operation error:', err);
     }
 
-    // Always update local cache for high reliability
+    // 3. Always update local cache for instant UI rendering and offline fallback
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.saveDutySchedules(schedules);
   }
