@@ -777,7 +777,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
             {/* 🌟 0.1. JADWAL PIKET GURU ALERT BANNER (Jika Guru Bertugas Hari Ini) */}
             {isDutyTeacherToday && (
-              <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-2xl sm:rounded-3xl p-4 shadow-lg border border-amber-300/60 relative overflow-hidden animate-fade-in">
+              <div className="bg-linear-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-2xl sm:rounded-3xl p-4 shadow-lg border border-amber-300/60 relative overflow-hidden animate-fade-in">
                 <div className="flex items-start gap-3.5 relative z-10">
                   <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shrink-0 shadow-inner ring-2 ring-white/30">
                     🛡️

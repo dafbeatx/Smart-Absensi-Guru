@@ -595,7 +595,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
           {/* 🌟 SPESIAL GURU PIKET CARD BANNER */}
           {scanResult?.isPiketGuru && (
-            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-4 rounded-2xl text-left shadow-lg border border-amber-300 relative overflow-hidden my-2">
+            <div className="bg-linear-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-4 rounded-2xl text-left shadow-lg border border-amber-300 relative overflow-hidden my-2">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shrink-0 shadow-inner">
                   🛡️

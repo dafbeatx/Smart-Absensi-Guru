@@ -117,7 +117,7 @@ export const DutyScheduleManagement: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#023246] via-[#1E5670] to-[#287094] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-linear-to-r from-[#023246] via-[#1E5670] to-[#287094] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-15 pointer-events-none">
           <span className="text-9xl">🛡️</span>
         </div>
@@ -142,7 +142,7 @@ export const DutyScheduleManagement: React.FC = () => {
             <button
               key={d.day}
               onClick={() => setSelectedDay(d.day)}
-              className={`flex-1 min-w-[110px] py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 min-w-27.5 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
                 isSelected
                   ? `${d.color} text-white shadow-md scale-[1.02]`
                   : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
