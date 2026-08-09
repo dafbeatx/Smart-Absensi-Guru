@@ -192,6 +192,16 @@ class VoiceAnnouncementService {
       this.speak(text);
     }
   }
+
+  /**
+   * Ucapan Konfirmasi Sukses Spesial khusus Presensi Guru Piket Hari Ini
+   */
+  public speakDutyTeacherSuccess(teacherName: string) {
+    const cleanName = teacherName.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\./g, '').trim();
+    const text = `Selamat bertugas menjadi Guru Piket hari ini, ${cleanName}! Semoga amanah dan diberikan kelancaran serta keberkahan dalam bertugas.`;
+    this.speak(text);
+  }
 }
 
 export const SpeechService = new VoiceAnnouncementService();
+

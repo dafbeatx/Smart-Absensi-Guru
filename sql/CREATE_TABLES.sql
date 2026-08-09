@@ -105,3 +105,25 @@ SELECT
   TRUE
 FROM public.users u
 ON CONFLICT DO NOTHING;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. TABEL: teacher_duty_schedules (Jadwal Piket Guru Senin - Jumat)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.teacher_duty_schedules (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  day_of_week   INT NOT NULL CHECK (day_of_week BETWEEN 1 AND 5),
+  teacher_id    TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  teacher_name  TEXT NOT NULL,
+  notes         TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT unique_day_teacher UNIQUE (day_of_week, teacher_id)
+);
+
+ALTER TABLE public.teacher_duty_schedules ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "duty_schedules_select" ON public.teacher_duty_schedules FOR SELECT USING (true);
+CREATE POLICY "duty_schedules_insert" ON public.teacher_duty_schedules FOR INSERT WITH CHECK (true);
+CREATE POLICY "duty_schedules_update" ON public.teacher_duty_schedules FOR UPDATE USING (true);
+CREATE POLICY "duty_schedules_delete" ON public.teacher_duty_schedules FOR DELETE USING (true);
+

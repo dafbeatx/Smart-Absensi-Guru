@@ -8,6 +8,7 @@ import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { AcademicCalendarManagement } from '../components/AcademicCalendarManagement';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { TeachingScheduleManagement } from '../components/TeachingScheduleManagement';
+import { DutyScheduleManagement } from '../components/DutyScheduleManagement';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
@@ -242,6 +243,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'ATTENDANCE_TRACKING', label: 'Live Tracking', icon: '👁️' },
     { id: 'TEACHERS', label: 'Account Applications', icon: '👥' },
     { id: 'SCHEDULE', label: 'Jadwal Mengajar', icon: '🗓️' },
+    { id: 'DUTY_SCHEDULE', label: 'Jadwal Piket Guru', icon: '🛡️' },
     { id: 'CALENDAR', label: 'Kalender', icon: '📅' },
     { id: 'MY_ATTENDANCE', label: 'Absensi Saya', icon: '📷' },
     { id: 'APPLY_LEAVE', label: 'Pengajuan Izin / Cuti', icon: '📄' },
@@ -353,6 +355,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
           {/* TAB: TEACHING SCHEDULE MANAGEMENT */}
           {activeTab === 'SCHEDULE' && <TeachingScheduleManagement teachers={teachers} />}
+
+          {/* TAB: DUTY SCHEDULE MANAGEMENT (Jadwal Piket Guru) */}
+          {activeTab === 'DUTY_SCHEDULE' && <DutyScheduleManagement />}
 
           {/* TAB 5: ABSENSI PRIBADI SAYA */}
           {activeTab === 'MY_ATTENDANCE' && (

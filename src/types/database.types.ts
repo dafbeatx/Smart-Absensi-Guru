@@ -166,4 +166,14 @@ export interface BurnoutAnalytics {
   recommendation: string;
 }
 
+export interface TeacherDutySchedule {
+  id: string;
+  day_of_week: number; // 1 = Senin, 2 = Selasa, 3 = Rabu, 4 = Kamis, 5 = Jumat
+  teacher_id: string;
+  teacher_name: string;
+  notes?: string;
+  created_at: string;
+}
+
+
 

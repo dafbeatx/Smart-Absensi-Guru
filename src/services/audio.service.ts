@@ -115,6 +115,69 @@ class SoundEffectsService {
   }
 
   /**
+   * Khusus Absen Berhasil Tersimpan untuk Guru Piket:
+   * Memutar efek nada audio khas piket guru (dengan nada fanfare sukacita C5->E5->G5->C6)
+   */
+  public playPiketGuruSuccess() {
+    if (this.isMuted) return;
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
+
+    try {
+      const piketAudio = new Audio('/audio/piket_guru.mp3');
+      const thankYouAudio = new Audio('/audio/terimakasih.mp3');
+
+      piketAudio.currentTime = 0;
+      piketAudio
+        .play()
+        .then(() => {
+          setTimeout(() => {
+            thankYouAudio.currentTime = 0;
+            thankYouAudio.play().catch(() => {});
+          }, 800);
+        })
+        .catch(() => {
+          this.playPiketFanfareTone();
+        });
+    } catch {
+      this.playPiketFanfareTone();
+    }
+  }
+
+  /**
+   * Synthesizer Fanfare Sukacita Khusus Guru Piket (C5 -> E5 -> G5 -> C6)
+   */
+  private playPiketFanfareTone() {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      // Uplifting 4-tone melody fanfare: C5, E5, G5, C6
+      const freqs = [523.25, 659.25, 783.99, 1046.50];
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'triangle';
+
+        const startTime = ctx.currentTime + idx * 0.11;
+        const duration = idx === freqs.length - 1 ? 0.45 : 0.22;
+
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.35, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      });
+    } catch {
+      // Audio context fallback
+    }
+  }
+
+
+  /**
    * Shortcut untuk suara GAGAL / ERROR
    */
   public playError() {

@@ -14,6 +14,7 @@ import type {
   TeacherMoodType,
   TeacherMoodLog,
   BurnoutAnalytics,
+  TeacherDutySchedule,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -1212,5 +1213,51 @@ export class SupabaseProvider implements IDataProvider {
       recommendation,
     };
   }
+
+  // Teacher Duty Schedule API (Jadwal Piket Guru Senin - Jumat)
+  public async getDutySchedules(_token?: string): Promise<TeacherDutySchedule[]> {
+    try {
+      const { data, error } = await this.client
+        .from('teacher_duty_schedules')
+        .select('*')
+        .order('day_of_week', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('smart_absensi_duty_schedules', JSON.stringify(data));
+        }
+        return data as TeacherDutySchedule[];
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getDutySchedules error, falling back to local storage:', err);
+    }
+
+    // Fallback to local storage or mock seed
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getDutySchedules();
+  }
+
+  public async saveDutySchedules(
+    schedules: Omit<TeacherDutySchedule, 'id' | 'created_at'>[],
+    _token?: string
+  ): Promise<boolean> {
+    try {
+      // Clear existing schedule and insert new ones
+      await this.client.from('teacher_duty_schedules').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (schedules.length > 0) {
+        const { error } = await this.client.from('teacher_duty_schedules').insert(schedules);
+        if (error) {
+          logger.warn('SupabaseProvider', 'Failed to insert teacher_duty_schedules to Supabase:', error.message);
+        }
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'saveDutySchedules DB operation error:', err);
+    }
+
+    // Always update local cache for high reliability
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.saveDutySchedules(schedules);
+  }
 }
+
 

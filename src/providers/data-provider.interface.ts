@@ -9,6 +9,7 @@ import type {
   TeacherMoodType,
   TeacherMoodLog,
   BurnoutAnalytics,
+  TeacherDutySchedule,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -61,5 +62,10 @@ export interface IDataProvider {
   saveTeacherMood(userId: string, date: string, mood: TeacherMoodType, note?: string, token?: string): Promise<boolean>;
   getTodayTeacherMood(userId: string, date: string, token?: string): Promise<TeacherMoodLog | null>;
   getBurnoutAnalytics(month?: string, year?: string, token?: string): Promise<BurnoutAnalytics>;
+
+  // Teacher Duty Schedule API (Jadwal Piket Guru Senin - Jumat)
+  getDutySchedules(token?: string): Promise<TeacherDutySchedule[]>;
+  saveDutySchedules(schedules: Omit<TeacherDutySchedule, 'id' | 'created_at'>[], token?: string): Promise<boolean>;
 }
+
 

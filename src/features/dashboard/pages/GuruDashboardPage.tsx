@@ -28,6 +28,7 @@ import { VoiceSettingsCard } from '../../../components/dashboard/VoiceSettingsCa
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
 import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
+import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -37,6 +38,7 @@ import type {
   DeviceBindingCheckResult,
   LeaveRequest,
   TeacherMoodLog,
+  TeacherDutySchedule,
 } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
@@ -128,6 +130,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     status: 'UNAVAILABLE',
     message: 'Memeriksa status perangkat...',
   });
+
+  // Teacher Duty Schedule (Jadwal Piket Guru) State
+  const [_dutySchedules, setDutySchedules] = useState<TeacherDutySchedule[]>([]);
+  const [isDutyTeacherToday, setIsDutyTeacherToday] = useState<boolean>(false);
+  const [todayDutyDetails, setTodayDutyDetails] = useState<TeacherDutySchedule | null>(null);
+  const [fellowDutyTeachers, setFellowDutyTeachers] = useState<TeacherDutySchedule[]>([]);
 
   // Pre-scan GPS Health Status & Realtime Coordinates State
   const [gpsHealth, setGpsHealth] = useState<{ status: 'READY' | 'REFINING' | 'OFF' | 'INVALID'; text: string; accuracy?: number }>({
@@ -347,6 +355,62 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setTodayMood(mood);
       } catch (err) {
         console.warn('Failed to load today mood:', err);
+      }
+
+      // 8. Teacher Duty Schedule Check (Jadwal Piket Guru Senin - Jumat)
+      try {
+        const fetchedDuty = await DutyScheduleRepository.getDutySchedules(authToken);
+        setDutySchedules(fetchedDuty || []);
+
+        const todayDayOfWeek = new Date().getDay(); // 1 = Senin, ..., 5 = Jumat
+        if (todayDayOfWeek >= 1 && todayDayOfWeek <= 5) {
+          const todayPikets = (fetchedDuty || []).filter((s) => s.day_of_week === todayDayOfWeek);
+          const myPiket = todayPikets.find(
+            (s) =>
+              s.teacher_id === effectiveUser.id ||
+              s.teacher_name.toLowerCase().includes(effectiveUser.full_name.toLowerCase()) ||
+              effectiveUser.full_name.toLowerCase().includes(s.teacher_name.toLowerCase())
+          );
+
+          if (myPiket) {
+            setIsDutyTeacherToday(true);
+            setTodayDutyDetails(myPiket);
+            setFellowDutyTeachers(todayPikets.filter((s) => s.teacher_id !== myPiket.teacher_id));
+
+            // Inject duty piket reminder to notifications list if not already present
+            const dayNames = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+            const dayName = dayNames[todayDayOfWeek] || 'Hari Ini';
+            const piketNotifId = `notif_piket_${effectiveUser.id}_${getTodayDateInJakarta()}`;
+
+            setNotifications((prev) => {
+              if (prev.some((n) => n.id === piketNotifId || n.title.includes('Jadwal Piket'))) {
+                return prev;
+              }
+              const newNotif: AppNotification = {
+                id: piketNotifId,
+                user_id: effectiveUser.id,
+                title: '🛡️ Pengingat Jadwal Piket Guru Hari Ini',
+                message: `Hari ini (${dayName}) Anda bertugas sebagai Guru Piket. ${
+                  myPiket.notes ? `Tugas: ${myPiket.notes}` : 'Selamat bertugas dan jaga ketertiban sekolah!'
+                }`,
+                type: 'INFO',
+                is_read: false,
+                created_at: new Date().toISOString(),
+              };
+              return [newNotif, ...prev];
+            });
+          } else {
+            setIsDutyTeacherToday(false);
+            setTodayDutyDetails(null);
+            setFellowDutyTeachers([]);
+          }
+        } else {
+          setIsDutyTeacherToday(false);
+          setTodayDutyDetails(null);
+          setFellowDutyTeachers([]);
+        }
+      } catch (err) {
+        console.warn('Failed to check teacher duty schedule:', err);
       }
     };
 
@@ -710,6 +774,42 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* 🌟 0.1. JADWAL PIKET GURU ALERT BANNER (Jika Guru Bertugas Hari Ini) */}
+            {isDutyTeacherToday && (
+              <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-2xl sm:rounded-3xl p-4 shadow-lg border border-amber-300/60 relative overflow-hidden animate-fade-in">
+                <div className="flex items-start gap-3.5 relative z-10">
+                  <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shrink-0 shadow-inner ring-2 ring-white/30">
+                    🛡️
+                  </div>
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-white/25 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Jadwal Piket Hari Ini
+                      </span>
+                    </div>
+                    <h3 className="font-extrabold text-white text-base leading-tight">
+                      Selamat Bertugas Menjadi Guru Piket! 🌟
+                    </h3>
+                    <p className="text-xs text-amber-50 leading-relaxed font-medium">
+                      {todayDutyDetails?.notes
+                        ? todayDutyDetails.notes
+                        : 'Hari ini Anda bertugas sebagai Guru Piket. Mari sambut siswa dengan senyuman dan bina ketertiban sekolah.'}
+                    </p>
+                    {fellowDutyTeachers.length > 0 && (
+                      <div className="pt-2 border-t border-white/20 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="font-semibold text-amber-100">Rekan Piket:</span>
+                        {fellowDutyTeachers.map((t) => (
+                          <span key={t.id} className="bg-white/20 px-2 py-0.5 rounded-md font-bold text-white">
+                            👤 {t.teacher_name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 0.5. Live Network Signal & Offline Mode Status Card */}
             <div className={`p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all shadow-xs flex items-center justify-between gap-3 ${

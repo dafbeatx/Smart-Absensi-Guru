@@ -8,6 +8,7 @@ import { NotificationService } from '../../../services/notification-permission.s
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { AttendanceRepository } from '../../../repositories/AttendanceRepository';
+import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
 import { QRValidationService } from '../../../services/qr-validation.service';
 import { GroqAIService } from '../../../services/groq-ai.service';
 import type { ScanRejectionDiagnosisResult } from '../../../services/groq-ai.service';
@@ -56,6 +57,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     rawStatus?: string;
     action?: 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED';
     isOffline?: boolean;
+    isPiketGuru?: boolean;
   } | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isProcessingRef = useRef(false);
@@ -296,21 +298,34 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     }
 
     // 3. APPROVE: Sound, Notification & Modal
-    SoundService.playAttendanceSuccess();
-
-    const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
     const currentUser = useAuthStore.getState().user;
     const teacherName = currentUser?.full_name || 'Guru';
-    const userId = currentUser?.id;
+    const userId = currentUser?.id || '';
+
+    let isPiketGuruToday = false;
+    try {
+      const token = useAuthStore.getState().token || '';
+      const dutySchedules = await DutyScheduleRepository.getDutySchedules(token);
+      isPiketGuruToday = DutyScheduleRepository.isTeacherDutyToday(userId || teacherName, dutySchedules);
+    } catch (e) {
+      console.warn('Failed to check piket guru duty:', e);
+    }
+
+    if (isPiketGuruToday) {
+      SoundService.playPiketGuruSuccess();
+      SpeechService.speakDutyTeacherSuccess(teacherName);
+    } else {
+      SoundService.playAttendanceSuccess();
+      SpeechService.speakAttendanceSuccess(teacherName, returnedAction === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN');
+    }
+
+    const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
 
     if (returnedAction === 'CHECK_OUT') {
       NotificationService.notifyTeacherCheckOut(teacherName, timestampStr, userId);
     } else {
       NotificationService.notifyTeacherCheckIn(teacherName, timestampStr, userId);
     }
-
-    // 🔉 Trigger Indonesian Voice Announcement for Attendance Confirmation
-    SpeechService.speakAttendanceSuccess(teacherName, returnedAction === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN');
 
     const isLate = returnedStatus === 'TERLAMBAT';
     const statusText = isLate
@@ -326,6 +341,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       rawStatus: returnedStatus,
       action: returnedAction,
       isOffline: isOfflineRecord,
+      isPiketGuru: isPiketGuruToday,
     };
 
     setScanResult(result);
@@ -576,6 +592,28 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                 : 'Selamat bertugas! Data presensi otomatis tersimpan.'}
             </p>
           </div>
+
+          {/* 🌟 SPESIAL GURU PIKET CARD BANNER */}
+          {scanResult?.isPiketGuru && (
+            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-4 rounded-2xl text-left shadow-lg border border-amber-300 relative overflow-hidden my-2">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shrink-0 shadow-inner">
+                  🛡️
+                </div>
+                <div className="space-y-1">
+                  <span className="bg-white/30 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    GURU PIKET HARI INI
+                  </span>
+                  <h4 className="font-extrabold text-white text-sm">
+                    Selamat Bertugas Menjadi Guru Piket! 🌟
+                  </h4>
+                  <p className="text-[11px] text-amber-50 leading-relaxed font-medium">
+                    Semoga dedikasi dan pengabdian Anda hari ini mendatangkan keberkahan, kemudahan, serta kelancaran untuk seluruh kegiatan sekolah. Selamat mengabdi dengan penuh semangat!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {scanResult?.isOffline ? (
             <div className="bg-amber-50/90 border-2 border-amber-300 p-3.5 rounded-2xl text-left text-xs text-amber-950 space-y-1.5 shadow-sm">

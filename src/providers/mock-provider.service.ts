@@ -12,6 +12,7 @@ import type {
   TeacherMoodType,
   TeacherMoodLog,
   BurnoutAnalytics,
+  TeacherDutySchedule,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -787,5 +788,82 @@ export class MockProvider implements IDataProvider {
       recommendation,
     };
   }
+
+  // Teacher Duty Schedule API (Jadwal Piket Guru Senin - Jumat)
+  public async getDutySchedules(_token?: string): Promise<TeacherDutySchedule[]> {
+    const raw = safeGetStorage('smart_absensi_duty_schedules');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.warn('Failed to parse duty schedules from storage:', e);
+      }
+    }
+
+    // Default Seed Mock Duty Schedules (Senin - Jumat)
+    const defaultSchedules: TeacherDutySchedule[] = [
+      {
+        id: 'ds_1',
+        day_of_week: 1, // Senin
+        teacher_id: 'usr_1001',
+        teacher_name: 'Ahmad Hidayat, S.Pd.',
+        notes: 'Penyambutan Siswa di Gerbang Utama & Pengawasan Presensi Pagi',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'ds_2',
+        day_of_week: 2, // Selasa
+        teacher_id: 'usr_1002',
+        teacher_name: 'Budi Santoso, M.Pd.',
+        notes: 'Piket Lapangan & Monitoring Kelancaran KBM Jam Pertama',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'ds_3',
+        day_of_week: 3, // Rabu
+        teacher_id: 'usr_guru_sample',
+        teacher_name: 'Guru Utama',
+        notes: 'Piket Ketertiban Lingkungan & Pengawasan Kedisiplinan Siswa',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'ds_4',
+        day_of_week: 4, // Kamis
+        teacher_id: 'usr_1001',
+        teacher_name: 'Ahmad Hidayat, S.Pd.',
+        notes: 'Monitoring Presensi & Pelaporan Kegiatan Harian',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'ds_5',
+        day_of_week: 5, // Jumat
+        teacher_id: 'usr_1002',
+        teacher_name: 'Budi Santoso, M.Pd.',
+        notes: 'Pengawasan Kegiatan Keagamaan Jumat Bersih & Presensi',
+        created_at: new Date().toISOString(),
+      },
+    ];
+
+    safeSetStorage('smart_absensi_duty_schedules', JSON.stringify(defaultSchedules));
+    return defaultSchedules;
+  }
+
+  public async saveDutySchedules(
+    schedules: Omit<TeacherDutySchedule, 'id' | 'created_at'>[],
+    _token?: string
+  ): Promise<boolean> {
+    const formatted: TeacherDutySchedule[] = schedules.map((item, idx) => ({
+      ...item,
+      id: 'ds_' + Date.now() + '_' + idx,
+      created_at: new Date().toISOString(),
+    }));
+
+    safeSetStorage('smart_absensi_duty_schedules', JSON.stringify(formatted));
+    return true;
+  }
 }
+
 
