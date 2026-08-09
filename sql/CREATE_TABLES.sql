@@ -1,11 +1,12 @@
 -- ============================================================================
--- SMART ABSENSI GURU — MIGRATION: BUAT TABEL YANG BELUM ADA
+-- SMART ABSENSI GURU — MIGRATION: BUAT TABEL YANG BELUM ADA (IDEMPOTENT)
 -- Jalankan Query SQL ini di Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/fwhdjqvtjzesbdcqorsn/sql
 --
--- Tabel yang dibuat:
---   1. device_bindings  — menyimpan binding device UUID per user
---   2. notifications    — menyimpan notifikasi per user
+-- Tabel yang dibuat / dipastikan ada:
+--   1. device_bindings        — menyimpan binding device UUID per user
+--   2. notifications          — menyimpan notifikasi per user
+--   3. teacher_duty_schedules — menyimpan jadwal piket guru (Senin - Jumat)
 -- ============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -25,17 +26,17 @@ CREATE TABLE IF NOT EXISTS public.device_bindings (
 
 ALTER TABLE public.device_bindings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "device_bindings_select" ON public.device_bindings
-  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "device_bindings_select" ON public.device_bindings;
+CREATE POLICY "device_bindings_select" ON public.device_bindings FOR SELECT USING (true);
 
-CREATE POLICY "device_bindings_insert" ON public.device_bindings
-  FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "device_bindings_insert" ON public.device_bindings;
+CREATE POLICY "device_bindings_insert" ON public.device_bindings FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "device_bindings_update" ON public.device_bindings
-  FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "device_bindings_update" ON public.device_bindings;
+CREATE POLICY "device_bindings_update" ON public.device_bindings FOR UPDATE USING (true);
 
-CREATE POLICY "device_bindings_delete" ON public.device_bindings
-  FOR DELETE USING (true);
+DROP POLICY IF EXISTS "device_bindings_delete" ON public.device_bindings;
+CREATE POLICY "device_bindings_delete" ON public.device_bindings FOR DELETE USING (true);
 
 CREATE INDEX IF NOT EXISTS idx_device_bindings_user_id ON public.device_bindings(user_id);
 
@@ -57,17 +58,17 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "notifications_select" ON public.notifications
-  FOR SELECT USING (true);
+DROP POLICY IF EXISTS "notifications_select" ON public.notifications;
+CREATE POLICY "notifications_select" ON public.notifications FOR SELECT USING (true);
 
-CREATE POLICY "notifications_insert" ON public.notifications
-  FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "notifications_insert" ON public.notifications;
+CREATE POLICY "notifications_insert" ON public.notifications FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "notifications_update" ON public.notifications
-  FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "notifications_update" ON public.notifications;
+CREATE POLICY "notifications_update" ON public.notifications FOR UPDATE USING (true);
 
-CREATE POLICY "notifications_delete" ON public.notifications
-  FOR DELETE USING (true);
+DROP POLICY IF EXISTS "notifications_delete" ON public.notifications;
+CREATE POLICY "notifications_delete" ON public.notifications FOR DELETE USING (true);
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id    ON public.notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
@@ -122,8 +123,14 @@ CREATE TABLE IF NOT EXISTS public.teacher_duty_schedules (
 
 ALTER TABLE public.teacher_duty_schedules ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "duty_schedules_select" ON public.teacher_duty_schedules;
 CREATE POLICY "duty_schedules_select" ON public.teacher_duty_schedules FOR SELECT USING (true);
-CREATE POLICY "duty_schedules_insert" ON public.teacher_duty_schedules FOR INSERT WITH CHECK (true);
-CREATE POLICY "duty_schedules_update" ON public.teacher_duty_schedules FOR UPDATE USING (true);
-CREATE POLICY "duty_schedules_delete" ON public.teacher_duty_schedules FOR DELETE USING (true);
 
+DROP POLICY IF EXISTS "duty_schedules_insert" ON public.teacher_duty_schedules;
+CREATE POLICY "duty_schedules_insert" ON public.teacher_duty_schedules FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "duty_schedules_update" ON public.teacher_duty_schedules;
+CREATE POLICY "duty_schedules_update" ON public.teacher_duty_schedules FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "duty_schedules_delete" ON public.teacher_duty_schedules;
+CREATE POLICY "duty_schedules_delete" ON public.teacher_duty_schedules FOR DELETE USING (true);
