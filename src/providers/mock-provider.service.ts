@@ -754,14 +754,7 @@ export class MockProvider implements IDataProvider {
       STRESSED: 0,
     };
 
-    if (logs.length === 0) {
-      // Seed default realistic anonymous distribution for demonstration
-      breakdown.VERY_HAPPY = 5;
-      breakdown.HAPPY = 4;
-      breakdown.NEUTRAL = 2;
-      breakdown.TIRED = 1;
-      breakdown.STRESSED = 0;
-    } else {
+    if (logs.length > 0) {
       logs.forEach((log) => {
         if (breakdown[log.mood] !== undefined) {
           breakdown[log.mood]++;
@@ -769,12 +762,14 @@ export class MockProvider implements IDataProvider {
       });
     }
 
-    const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+    const total = logs.length;
     const tiredAndStressed = breakdown.TIRED + breakdown.STRESSED;
     const stressPercentage = total > 0 ? (tiredAndStressed / total) * 100 : 0;
 
     let burnout_risk_level: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
-    let recommendation = 'Tingkat kesejahteraan dewan guru dalam kondisi prima. Pertahankan iklim kerja kondusif dan apresiasi kinerja guru secara berkala.';
+    let recommendation = total === 0
+      ? 'Belum ada data mood guru yang tercatat. Grafik dan rekomendasi akan muncul secara realtime begitu dewan guru mengisi mood check-in harian.'
+      : 'Tingkat kesejahteraan dewan guru dalam kondisi prima. Pertahankan iklim kerja kondusif dan apresiasi kinerja guru secara berkala.';
 
     if (stressPercentage >= 35) {
       burnout_risk_level = 'HIGH';
