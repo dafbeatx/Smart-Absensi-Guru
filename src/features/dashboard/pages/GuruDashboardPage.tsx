@@ -755,9 +755,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             </div>
 
             {/* 0.6. Teacher Well-being & Mood Check-in Banner */}
-            <div className="bg-linear-to-r from-teal-500/10 via-emerald-500/10 to-emerald-600/10 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-emerald-300/60 dark:border-emerald-700/40 transition-all flex items-center justify-between gap-3 shadow-2xs">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300/80 flex items-center justify-center text-xl shrink-0">
+            <section className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-xs sm:shadow-card border border-[#D4D4CE]/30 flex items-center justify-between gap-3 transition-all hover:border-emerald-300">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-2xl shrink-0 shadow-2xs">
                   {todayMood ? (
                     todayMood.mood === 'VERY_HAPPY' ? '😊' :
                     todayMood.mood === 'HAPPY' ? '🙂' :
@@ -765,30 +765,36 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     todayMood.mood === 'TIRED' ? '😟' : '😫'
                   ) : '💚'}
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100">
-                    <span>Mood Check-in Harian Guru</span>
-                    {todayMood && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                        Tercatat ✨
+                <div className="min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-black text-[#023246] tracking-tight">
+                      Mood Check-in Harian Guru
+                    </h3>
+                    {todayMood ? (
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                        ✓ Tercatat ✨
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                        Belum Diisi
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 truncate">
+                  <p className="text-xs font-semibold text-slate-600 truncate">
                     {todayMood
-                      ? `Perasaan hari ini: ${todayMood.mood === 'VERY_HAPPY' ? 'Semangat 😊' : todayMood.mood === 'HAPPY' ? 'Baik 🙂' : todayMood.mood === 'NEUTRAL' ? 'Biasa 😐' : todayMood.mood === 'TIRED' ? 'Lelah 😟' : 'Stres 😫'}${todayMood.note ? ` (${todayMood.note})` : ''}`
-                      : 'Bagaimana perasaan & kondisi Anda pagi ini? Mari isi mood check-in!'}
+                      ? `Status Mood: ${todayMood.mood === 'VERY_HAPPY' ? 'Semangat 😊' : todayMood.mood === 'HAPPY' ? 'Baik 🙂' : todayMood.mood === 'NEUTRAL' ? 'Biasa 😐' : todayMood.mood === 'TIRED' ? 'Lelah 😟' : 'Stres 😫'}${todayMood.note ? ` • ${todayMood.note}` : ''}`
+                      : 'Bagaimana kondisi & perasaan Bapak/Ibu Guru pagi ini? Mari isi mood check-in!'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsMoodModalOpen(true)}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs rounded-xl shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer flex items-center gap-1.5 border border-[#0D7A5F]"
               >
-                <span>{todayMood ? '✏️ Ubah' : '✨ Isi Mood'}</span>
+                <span>{todayMood ? '✏️ Ubah Mood' : '✨ Isi Mood'}</span>
               </button>
-            </div>
+            </section>
 
             {/* 1. Top Profile Header Card */}
             <section className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-xs sm:shadow-card border border-[#D4D4CE]/30 flex items-center justify-between gap-3">
