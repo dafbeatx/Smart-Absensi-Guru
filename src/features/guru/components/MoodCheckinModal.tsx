@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Modal } from '../../../components/ui/Modal';
-import { Button } from '../../../components/ui/Button';
 import type { TeacherMoodType } from '../../../types/database.types';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -19,9 +18,7 @@ interface MoodOption {
   emoji: string;
   label: string;
   sublabel: string;
-  colorClass: string;
-  bgSelectedClass: string;
-  borderSelectedClass: string;
+  selectedClass: string;
   quote: string;
 }
 
@@ -30,10 +27,8 @@ const MOOD_OPTIONS: MoodOption[] = [
     type: 'VERY_HAPPY',
     emoji: '😊',
     label: 'Semangat',
-    sublabel: 'Prima & Siap Mengajar',
-    colorClass: 'text-emerald-600 dark:text-emerald-400',
-    bgSelectedClass: 'bg-emerald-50 dark:bg-emerald-950/40',
-    borderSelectedClass: 'border-emerald-500 ring-2 ring-emerald-500/20',
+    sublabel: 'Prima & Siap',
+    selectedClass: 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400/40 scale-105',
     quote: 'Energi positif Bapak/Ibu akan menginspirasi murid hari ini! 🌟',
   },
   {
@@ -41,9 +36,7 @@ const MOOD_OPTIONS: MoodOption[] = [
     emoji: '🙂',
     label: 'Baik',
     sublabel: 'Stabil & Kondusif',
-    colorClass: 'text-sky-600 dark:text-sky-400',
-    bgSelectedClass: 'bg-sky-50 dark:bg-sky-950/40',
-    borderSelectedClass: 'border-sky-500 ring-2 ring-sky-500/20',
+    selectedClass: 'bg-sky-600 text-white border-sky-700 shadow-md ring-2 ring-sky-400/40 scale-105',
     quote: 'Semoga hari mengajar berjalan lancar dan penuh berkah! ✨',
   },
   {
@@ -51,29 +44,23 @@ const MOOD_OPTIONS: MoodOption[] = [
     emoji: '😐',
     label: 'Biasa',
     sublabel: 'Rutinitas Normal',
-    colorClass: 'text-amber-600 dark:text-amber-400',
-    bgSelectedClass: 'bg-amber-50 dark:bg-amber-950/40',
-    borderSelectedClass: 'border-amber-500 ring-2 ring-amber-500/20',
+    selectedClass: 'bg-amber-500 text-white border-amber-600 shadow-md ring-2 ring-amber-400/40 scale-105',
     quote: 'Tetap tenang dan jalani hari dengan santai. Semangat! 👍',
   },
   {
     type: 'TIRED',
     emoji: '😟',
     label: 'Lelah',
-    sublabel: 'Cukup Berat / Kurang Fit',
-    colorClass: 'text-orange-600 dark:text-orange-400',
-    bgSelectedClass: 'bg-orange-50 dark:bg-orange-950/40',
-    borderSelectedClass: 'border-orange-500 ring-2 ring-orange-500/20',
+    sublabel: 'Kurang Fit',
+    selectedClass: 'bg-orange-600 text-white border-orange-700 shadow-md ring-2 ring-orange-400/40 scale-105',
     quote: 'Jangan lupa minum air dan beristirahat sejenak di sela KBM. ☕',
   },
   {
     type: 'STRESSED',
     emoji: '😫',
     label: 'Stres',
-    sublabel: 'Beban Padat / Perlu Istirahat',
-    colorClass: 'text-rose-600 dark:text-rose-400',
-    bgSelectedClass: 'bg-rose-50 dark:bg-rose-950/40',
-    borderSelectedClass: 'border-rose-500 ring-2 ring-rose-500/20',
+    sublabel: 'Perlu Istirahat',
+    selectedClass: 'bg-rose-600 text-white border-rose-700 shadow-md ring-2 ring-rose-400/40 scale-105',
     quote: 'Kesehatan Anda adalah yang utama. Terima kasih sudah terus berjuang! ❤️',
   },
 ];
@@ -147,20 +134,22 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="💚 Mood Check-in Harian Guru">
-      <div className="space-y-5">
-        {/* Header Note */}
-        <div className="bg-linear-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-3.5 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 text-xs text-slate-700 dark:text-slate-300 leading-relaxed flex items-start space-x-2.5">
-          <span className="text-base shrink-0">🌱</span>
+      <div className="space-y-4 pt-1">
+        {/* Header Note - High Contrast Light Pastel Banner */}
+        <div className="bg-emerald-50/90 border border-emerald-200/80 p-3.5 rounded-2xl text-xs leading-relaxed flex items-start space-x-3 shadow-2xs">
+          <span className="text-xl shrink-0">🌱</span>
           <div>
-            <span className="font-semibold text-emerald-800 dark:text-emerald-300 block mb-0.5">
+            <span className="font-extrabold text-[#0D7A5F] block mb-0.5 text-xs sm:text-sm">
               Kesejahteraan Anda Sangat Berharga
             </span>
-            Bagaimana perasaan dan tingkat energi Bapak/Ibu Guru pagi ini? Respon Anda dijaga kerahasiaannya untuk evaluasi kenyamanan kerja sekolah.
+            <p className="text-slate-700 font-medium text-xs">
+              Bagaimana perasaan dan tingkat energi Bapak/Ibu Guru pagi ini? Respon Anda dijaga kerahasiaannya untuk evaluasi kenyamanan kerja sekolah.
+            </p>
           </div>
         </div>
 
-        {/* Emoji Selector Grid */}
-        <div className="grid grid-cols-5 gap-2">
+        {/* Emoji Selector Grid - Crisp Modern Cards */}
+        <div className="grid grid-cols-5 gap-2 pt-1">
           {MOOD_OPTIONS.map((option) => {
             const isSelected = selectedMood === option.type;
             return (
@@ -170,14 +159,14 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
                 onClick={() => setSelectedMood(option.type)}
                 className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-200 cursor-pointer text-center relative ${
                   isSelected
-                    ? `${option.bgSelectedClass} ${option.borderSelectedClass} shadow-md scale-105`
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900 opacity-80 hover:opacity-100'
+                    ? option.selectedClass
+                    : 'bg-slate-50 border-slate-200/90 text-slate-800 hover:bg-slate-100 hover:border-slate-300'
                 }`}
               >
-                <span className="text-3xl mb-1.5 transition-transform duration-200 transform group-hover:scale-110">
+                <span className="text-3xl mb-1 transition-transform duration-200 transform group-hover:scale-110">
                   {option.emoji}
                 </span>
-                <span className={`text-xs font-semibold ${option.colorClass}`}>
+                <span className={`text-xs font-black ${isSelected ? 'text-white' : 'text-slate-800'}`}>
                   {option.label}
                 </span>
               </button>
@@ -187,14 +176,14 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
 
         {/* Selected Quote Banner */}
         {currentOption && (
-          <div className="text-center py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs italic text-slate-600 dark:text-slate-400">
+          <div className="text-center py-2.5 px-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-xs italic font-extrabold text-amber-900 shadow-2xs">
             "{currentOption.quote}"
           </div>
         )}
 
         {/* Optional Tag Selector */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-slate-600 dark:text-slate-400 block">
+        <div className="space-y-2 pt-1">
+          <label className="text-xs font-extrabold text-slate-800 block">
             Catatan Ringkas / Faktor Utama (Opsional):
           </label>
           <div className="flex flex-wrap gap-1.5">
@@ -205,10 +194,10 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
                   key={tag}
                   type="button"
                   onClick={() => setSelectedTag(isTagSelected ? '' : tag)}
-                  className={`px-2.5 py-1 text-[11px] rounded-lg border transition-colors ${
+                  className={`px-3 py-1.5 text-xs rounded-xl border transition-all cursor-pointer ${
                     isTagSelected
-                      ? 'bg-emerald-600 text-white border-emerald-600 font-medium'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      ? 'bg-[#0D7A5F] text-white border-[#0D7A5F] font-extrabold shadow-2xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200/90 font-semibold'
                   }`}
                 >
                   {tag}
@@ -219,19 +208,23 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <Button variant="secondary" size="sm" onClick={onClose} disabled={isSubmitting}>
-            Nanti Saja
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleSaveMood}
-            isLoading={isSubmitting}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+        <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer"
           >
-            Simpan Mood ✨
-          </Button>
+            Nanti Saja
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveMood}
+            disabled={isSubmitting}
+            className="px-5 py-2 bg-[#0D7A5F] hover:bg-[#095744] text-white font-black text-xs rounded-xl border border-[#0D7A5F] shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+          >
+            <span>Simpan Mood ✨</span>
+          </button>
         </div>
       </div>
     </Modal>
