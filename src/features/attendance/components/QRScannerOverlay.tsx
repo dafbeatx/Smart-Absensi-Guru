@@ -13,6 +13,7 @@ import { GroqAIService } from '../../../services/groq-ai.service';
 import type { ScanRejectionDiagnosisResult } from '../../../services/groq-ai.service';
 import { ManualQRCodeModal } from './ManualQRCodeModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
+import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -46,6 +47,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
+  const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
 
   const [scanResult, setScanResult] = useState<{
     timestamp: string;
@@ -636,13 +638,25 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             </div>
           )}
 
-          <div className="pt-1">
+          <div className="pt-1 space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSuccessModalOpen(false);
+                setIsMoodModalOpen(true);
+              }}
+              className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5"
+            >
+              <span>💚</span>
+              <span>ISI MOOD HARIAN (WELL-BEING CHECK-IN)</span>
+            </button>
+
             <button
               type="button"
               onClick={handleSaveReasonAndClose}
-              className="w-full py-3 bg-[#023246] hover:bg-[#022535] text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98"
+              className="w-full py-2.5 bg-[#023246] hover:bg-[#022535] text-white font-semibold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-xs active:scale-98"
             >
-              {scanResult?.rawStatus === 'TERLAMBAT' ? '💾 SIMPAN ALASAN & TUTUP' : '✓ SIAP, SAYA MENGERTI'}
+              {scanResult?.rawStatus === 'TERLAMBAT' ? '💾 SIMPAN ALASAN & TUTUP' : '✓ SIAP, LEWATI MOOD & MASUK DASHBOARD'}
             </button>
           </div>
 
@@ -769,6 +783,21 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         isOpen={isCorrectionModalOpen}
         onClose={() => setIsCorrectionModalOpen(false)}
         onSuccess={() => {
+          onClose();
+        }}
+      />
+
+      {/* Guru Daily Mood Check-in Modal */}
+      <MoodCheckinModal
+        isOpen={isMoodModalOpen}
+        onClose={() => {
+          setIsMoodModalOpen(false);
+          if (scanResult) onSuccess(scanResult);
+          onClose();
+        }}
+        onSaved={() => {
+          setIsMoodModalOpen(false);
+          if (scanResult) onSuccess(scanResult);
           onClose();
         }}
       />

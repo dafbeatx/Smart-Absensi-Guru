@@ -3,6 +3,7 @@ import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../types/da
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 import { EarlyWarningSystemWidget } from './EarlyWarningSystemWidget';
+import { BurnoutEarlyWarningWidget } from '../../features/kepsek/components/BurnoutEarlyWarningWidget';
 import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay } from '../../utils/time.utils';
 
 export interface ExecutiveDashboardOverviewProps {
@@ -744,6 +745,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           </button>
         </div>
       </div>
+
+      {/* ── 3.5. TEACHER WELL-BEING & BURNOUT EARLY WARNING WIDGET ────────── */}
+      <BurnoutEarlyWarningWidget />
 
       {/* ── 4. BOTTOM SUB-SECTIONS (APPROVAL & SYSTEM STATUS) ─────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

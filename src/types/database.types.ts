@@ -147,3 +147,23 @@ export interface TeachingSlot {
   room: string;
 }
 
+export type TeacherMoodType = 'VERY_HAPPY' | 'HAPPY' | 'NEUTRAL' | 'TIRED' | 'STRESSED';
+
+export interface TeacherMoodLog {
+  id: string;
+  user_id: string;
+  date: string; // YYYY-MM-DD
+  mood: TeacherMoodType;
+  note?: string;
+  created_at: string;
+}
+
+export interface BurnoutAnalytics {
+  total_responses: number;
+  burnout_risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+  burnout_score: number; // 0 - 100
+  mood_breakdown: Record<TeacherMoodType, number>;
+  recommendation: string;
+}
+
+

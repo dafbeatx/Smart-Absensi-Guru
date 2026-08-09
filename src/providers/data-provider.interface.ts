@@ -6,6 +6,9 @@ import type {
   HolidayRecord,
   AppNotification,
   DeviceBindingCheckResult,
+  TeacherMoodType,
+  TeacherMoodLog,
+  BurnoutAnalytics,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -53,4 +56,10 @@ export interface IDataProvider {
   createHoliday(holiday: Omit<HolidayRecord, 'id' | 'created_at'>, token?: string): Promise<HolidayRecord>;
   updateHoliday(id: string, holiday: Partial<HolidayRecord>, token?: string): Promise<HolidayRecord>;
   deleteHoliday(id: string, token?: string): Promise<boolean>;
+
+  // Teacher Well-being & Mood API
+  saveTeacherMood(userId: string, date: string, mood: TeacherMoodType, note?: string, token?: string): Promise<boolean>;
+  getTodayTeacherMood(userId: string, date: string, token?: string): Promise<TeacherMoodLog | null>;
+  getBurnoutAnalytics(month?: string, year?: string, token?: string): Promise<BurnoutAnalytics>;
 }
+

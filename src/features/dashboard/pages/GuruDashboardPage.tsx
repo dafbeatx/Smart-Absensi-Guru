@@ -9,15 +9,16 @@ import { SkeletonList } from '../../../components/ui/Skeleton';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
-import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
+import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
+import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
-import { isDateOffDay } from '../../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
@@ -35,6 +36,7 @@ import type {
   AppNotification,
   DeviceBindingCheckResult,
   LeaveRequest,
+  TeacherMoodLog,
 } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
@@ -104,6 +106,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [todayHoliday, setTodayHoliday] = useState<HolidayRecord | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [todayMood, setTodayMood] = useState<TeacherMoodLog | null>(null);
+  const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
 
   // Leave & Calendar History State
   const [historySubTab, setHistorySubTab] = useState<'ATTENDANCE' | 'LEAVES'>('ATTENDANCE');
@@ -334,6 +338,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setDeviceBindingStatus(bindingRes);
       } catch (err) {
         handleAppError(err, 'GuruDashboard.checkDeviceBinding', 'Gagal memeriksa status perangkat', false);
+      }
+
+      // 7. Today Teacher Mood Check-in
+      try {
+        const todayStr = getTodayDateInJakarta();
+        const mood = await provider.getTodayTeacherMood(effectiveUser.id, todayStr, authToken);
+        setTodayMood(mood);
+      } catch (err) {
+        console.warn('Failed to load today mood:', err);
       }
     };
 
@@ -739,6 +752,42 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <span>{syncState === 'SYNCING' ? 'Syncing...' : `Sync (${pendingItems.length})`}</span>
                 </button>
               )}
+            </div>
+
+            {/* 0.6. Teacher Well-being & Mood Check-in Banner */}
+            <div className="bg-gradient-to-r from-teal-500/10 via-emerald-500/10 to-emerald-600/10 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-emerald-300/60 dark:border-emerald-700/40 transition-all flex items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300/80 flex items-center justify-center text-xl shrink-0">
+                  {todayMood ? (
+                    todayMood.mood === 'VERY_HAPPY' ? '😊' :
+                    todayMood.mood === 'HAPPY' ? '🙂' :
+                    todayMood.mood === 'NEUTRAL' ? '😐' :
+                    todayMood.mood === 'TIRED' ? '😟' : '😫'
+                  ) : '💚'}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100">
+                    <span>Mood Check-in Harian Guru</span>
+                    {todayMood && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        Tercatat ✨
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 truncate">
+                    {todayMood
+                      ? `Perasaan hari ini: ${todayMood.mood === 'VERY_HAPPY' ? 'Semangat 😊' : todayMood.mood === 'HAPPY' ? 'Baik 🙂' : todayMood.mood === 'NEUTRAL' ? 'Biasa 😐' : todayMood.mood === 'TIRED' ? 'Lelah 😟' : 'Stres 😫'}${todayMood.note ? ` (${todayMood.note})` : ''}`
+                      : 'Bagaimana perasaan & kondisi Anda pagi ini? Mari isi mood check-in!'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMoodModalOpen(true)}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer flex items-center gap-1.5"
+              >
+                <span>{todayMood ? '✏️ Ubah' : '✨ Isi Mood'}</span>
+              </button>
             </div>
 
             {/* 1. Top Profile Header Card */}
@@ -1608,6 +1657,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           </div>
         </Modal>
       )}
+
+      {/* Mood Check-in Modal */}
+      <MoodCheckinModal
+        isOpen={isMoodModalOpen}
+        onClose={() => setIsMoodModalOpen(false)}
+        onSaved={() => {
+          setIsMoodModalOpen(false);
+          const provider = ProviderFactory.getProvider();
+          const todayStr = getTodayDateInJakarta();
+          provider.getTodayTeacherMood(effectiveUser.id, todayStr, token || undefined).then((m) => setTodayMood(m));
+        }}
+      />
     </div>
   );
 };

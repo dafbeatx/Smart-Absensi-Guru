@@ -9,6 +9,9 @@ import type {
   AppNotification,
   DeviceBindingCheckResult,
   AttendanceAction,
+  TeacherMoodType,
+  TeacherMoodLog,
+  BurnoutAnalytics,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -694,4 +697,100 @@ export class MockProvider implements IDataProvider {
     safeSetStorage('smart_absensi_holidays', JSON.stringify(updated));
     return true;
   }
+
+  // Teacher Well-being & Mood API Implementation
+  public async saveTeacherMood(userId: string, date: string, mood: TeacherMoodType, note?: string, _token?: string): Promise<boolean> {
+    const raw = safeGetStorage('smart_absensi_teacher_moods');
+    let logs: TeacherMoodLog[] = raw ? JSON.parse(raw) : [];
+
+    const existingIndex = logs.findIndex((l) => l.user_id === userId && l.date === date);
+    const newLog: TeacherMoodLog = {
+      id: 'mood_' + Date.now(),
+      user_id: userId,
+      date,
+      mood,
+      note: note || undefined,
+      created_at: new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      logs[existingIndex] = newLog;
+    } else {
+      logs.push(newLog);
+    }
+
+    safeSetStorage('smart_absensi_teacher_moods', JSON.stringify(logs));
+    return true;
+  }
+
+  public async getTodayTeacherMood(userId: string, date: string, _token?: string): Promise<TeacherMoodLog | null> {
+    const raw = safeGetStorage('smart_absensi_teacher_moods');
+    if (!raw) return null;
+    try {
+      const logs: TeacherMoodLog[] = JSON.parse(raw);
+      const found = logs.find((l) => l.user_id === userId && l.date === date);
+      return found || null;
+    } catch {
+      return null;
+    }
+  }
+
+  public async getBurnoutAnalytics(_month?: string, _year?: string, _token?: string): Promise<BurnoutAnalytics> {
+    const raw = safeGetStorage('smart_absensi_teacher_moods');
+    let logs: TeacherMoodLog[] = [];
+    if (raw) {
+      try {
+        logs = JSON.parse(raw);
+      } catch {
+        logs = [];
+      }
+    }
+
+    const breakdown: Record<TeacherMoodType, number> = {
+      VERY_HAPPY: 0,
+      HAPPY: 0,
+      NEUTRAL: 0,
+      TIRED: 0,
+      STRESSED: 0,
+    };
+
+    if (logs.length === 0) {
+      // Seed default realistic anonymous distribution for demonstration
+      breakdown.VERY_HAPPY = 5;
+      breakdown.HAPPY = 4;
+      breakdown.NEUTRAL = 2;
+      breakdown.TIRED = 1;
+      breakdown.STRESSED = 0;
+    } else {
+      logs.forEach((log) => {
+        if (breakdown[log.mood] !== undefined) {
+          breakdown[log.mood]++;
+        }
+      });
+    }
+
+    const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+    const tiredAndStressed = breakdown.TIRED + breakdown.STRESSED;
+    const stressPercentage = total > 0 ? (tiredAndStressed / total) * 100 : 0;
+
+    let burnout_risk_level: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+    let recommendation = 'Tingkat kesejahteraan dewan guru dalam kondisi prima. Pertahankan iklim kerja kondusif dan apresiasi kinerja guru secara berkala.';
+
+    if (stressPercentage >= 35) {
+      burnout_risk_level = 'HIGH';
+      recommendation = '⚠️ PERHATIAN KEPSEK: Indikasi burnout tinggi (>35% guru merasa lelah/stres). Disarankan melakukan evaluasi beban mengajar/JTM dan mengadakan sesi kebersamaan/refreshment.';
+    } else if (stressPercentage >= 15) {
+      burnout_risk_level = 'MEDIUM';
+      recommendation = '⚡ WASPADA: Terdapat peningkatan indikasi kelelahan kerja pada beberapa guru. Pertimbangkan sesi apresiasi ringan atau optimasi distribusi jadwal mengajar.';
+    }
+
+    return {
+      total_responses: total,
+      burnout_risk_level,
+      burnout_score: Math.round(stressPercentage),
+      mood_breakdown: breakdown,
+      recommendation,
+    };
+  }
 }
+

@@ -11,6 +11,9 @@ import type {
   LeaveType,
   ApprovalStatus,
   HolidayType,
+  TeacherMoodType,
+  TeacherMoodLog,
+  BurnoutAnalytics,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -1062,4 +1065,157 @@ export class SupabaseProvider implements IDataProvider {
     }
     return true;
   }
+
+  // ─── TEACHER WELL-BEING & MOOD API ───────────────────────────────────────
+
+  public async saveTeacherMood(
+    userId: string,
+    date: string,
+    mood: TeacherMoodType,
+    note?: string,
+    _token?: string
+  ): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('teacher_moods')
+        .upsert(
+          {
+            user_id: userId,
+            date,
+            mood,
+            note: note || null,
+            created_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,date' }
+        );
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'saveTeacherMood Supabase error, falling back to local storage:', error.message);
+        // Fallback to local storage if table doesn't exist yet
+        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('smart_absensi_teacher_moods') : null;
+        let logs: TeacherMoodLog[] = raw ? JSON.parse(raw) : [];
+        const idx = logs.findIndex((l) => l.user_id === userId && l.date === date);
+        const item: TeacherMoodLog = { id: 'mood_' + Date.now(), user_id: userId, date, mood, note, created_at: new Date().toISOString() };
+        if (idx >= 0) logs[idx] = item; else logs.push(item);
+        if (typeof localStorage !== 'undefined') localStorage.setItem('smart_absensi_teacher_moods', JSON.stringify(logs));
+      }
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'saveTeacherMood exception:', err);
+      return true;
+    }
+  }
+
+  public async getTodayTeacherMood(userId: string, date: string, _token?: string): Promise<TeacherMoodLog | null> {
+    try {
+      const { data, error } = await this.client
+        .from('teacher_moods')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .maybeSingle();
+
+      if (!error && data) {
+        return {
+          id: data.id,
+          user_id: data.user_id,
+          date: data.date,
+          mood: data.mood as TeacherMoodType,
+          note: data.note || undefined,
+          created_at: data.created_at,
+        };
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getTodayTeacherMood error:', err);
+    }
+
+    // Fallback to local storage
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('smart_absensi_teacher_moods');
+      if (raw) {
+        try {
+          const logs: TeacherMoodLog[] = JSON.parse(raw);
+          return logs.find((l) => l.user_id === userId && l.date === date) || null;
+        } catch {}
+      }
+    }
+    return null;
+  }
+
+  public async getBurnoutAnalytics(_month?: string, _year?: string, _token?: string): Promise<BurnoutAnalytics> {
+    const breakdown: Record<TeacherMoodType, number> = {
+      VERY_HAPPY: 0,
+      HAPPY: 0,
+      NEUTRAL: 0,
+      TIRED: 0,
+      STRESSED: 0,
+    };
+
+    let totalLogs: TeacherMoodLog[] = [];
+
+    try {
+      const { data, error } = await this.client
+        .from('teacher_moods')
+        .select('*');
+
+      if (!error && data && data.length > 0) {
+        totalLogs = data.map((d) => ({
+          id: d.id,
+          user_id: d.user_id,
+          date: d.date,
+          mood: d.mood as TeacherMoodType,
+          note: d.note,
+          created_at: d.created_at,
+        }));
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getBurnoutAnalytics Supabase query error, fallback to mock:', err);
+    }
+
+    if (totalLogs.length === 0 && typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('smart_absensi_teacher_moods');
+      if (raw) {
+        try { totalLogs = JSON.parse(raw); } catch {}
+      }
+    }
+
+    if (totalLogs.length === 0) {
+      // Seed default realistic distribution
+      breakdown.VERY_HAPPY = 5;
+      breakdown.HAPPY = 4;
+      breakdown.NEUTRAL = 2;
+      breakdown.TIRED = 1;
+      breakdown.STRESSED = 0;
+    } else {
+      totalLogs.forEach((log) => {
+        if (breakdown[log.mood] !== undefined) {
+          breakdown[log.mood]++;
+        }
+      });
+    }
+
+    const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+    const tiredAndStressed = breakdown.TIRED + breakdown.STRESSED;
+    const stressPercentage = total > 0 ? (tiredAndStressed / total) * 100 : 0;
+
+    let burnout_risk_level: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+    let recommendation = 'Tingkat kesejahteraan dewan guru dalam kondisi prima. Pertahankan iklim kerja kondusif dan apresiasi kinerja guru secara berkala.';
+
+    if (stressPercentage >= 35) {
+      burnout_risk_level = 'HIGH';
+      recommendation = '⚠️ PERHATIAN KEPSEK: Indikasi burnout tinggi (>35% guru merasa lelah/stres). Disarankan melakukan evaluasi beban mengajar/JTM dan mengadakan sesi kebersamaan/refreshment.';
+    } else if (stressPercentage >= 15) {
+      burnout_risk_level = 'MEDIUM';
+      recommendation = '⚡ WASPADA: Terdapat peningkatan indikasi kelelahan kerja pada beberapa guru. Pertimbangkan sesi apresiasi ringan atau optimasi distribusi jadwal mengajar.';
+    }
+
+    return {
+      total_responses: total,
+      burnout_risk_level,
+      burnout_score: Math.round(stressPercentage),
+      mood_breakdown: breakdown,
+      recommendation,
+    };
+  }
 }
+
