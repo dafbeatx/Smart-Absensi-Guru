@@ -21,5 +21,18 @@
 - **Time Input Sanitizer**: Input HTML5 `type="time"` wajib diformat `HH:mm` menggunakan `formatTimeForInput` dari `src/utils/time.utils.ts`.
 - **Single Typography & Theme**: Wajib mengunci font family global menggunakan **Inter** dan menggunakan design tokens warna yang didefinisikan di `src/index.css`.
 
+### Mobile UI Layout & Element Sizing Standard
+| Elemen                |      Ukuran mobile |
+| --------------------- | -----------------: |
+| Padding halaman       |           **16px** |
+| Padding card          |           **16px** |
+| Jarak antar elemen    |        **12–16px** |
+| Judul utama           |        **24–28px** |
+| Subjudul              |        **18–20px** |
+| Teks biasa            |        **14–16px** |
+| Tombol                | tinggi **44–48px** |
+| Radius card           |        **12–16px** |
+| Lebar maksimal konten |          **480px** |
+
 ## Windows CLI Execution Protocol
 - Pada lingkungan Windows PowerShell di mana eksekusi script `.ps1` diblokir, selalu jalankan perintah build dan pengujian melalui shell `cmd /c "npm run build"`.
