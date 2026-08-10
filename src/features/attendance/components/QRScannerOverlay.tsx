@@ -556,158 +556,137 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         </div>
       </Modal>
 
-      {/* Auto-Submit Success Modal Overlay (2.2s Duration) */}
+      {/* Auto-Submit Success Modal Overlay */}
       <Modal isOpen={isSuccessModalOpen} onClose={() => {}}>
-        <div className="text-center space-y-4 py-2">
+        <div className="text-center space-y-3.5 py-1">
           
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto ring-8 animate-bounce ${
-            scanResult?.action === 'CHECK_OUT'
-              ? 'bg-blue-100 text-blue-600 ring-blue-50'
-              : scanResult?.rawStatus === 'TERLAMBAT'
-              ? 'bg-amber-100 text-amber-600 ring-amber-50'
-              : scanResult?.action === 'ALREADY_COMPLETED'
-              ? 'bg-amber-100 text-amber-600 ring-amber-50'
-              : 'bg-emerald-100 text-emerald-600 ring-emerald-50'
-          }`}>
-            {scanResult?.action === 'CHECK_OUT' ? '🌇' : scanResult?.rawStatus === 'TERLAMBAT' ? '⚠️' : scanResult?.action === 'ALREADY_COMPLETED' ? 'ℹ️' : '✓'}
+          {/* Animated Hero Icon */}
+          <div className="relative inline-flex items-center justify-center">
+            <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto shadow-md transition-transform duration-300 ring-4 ${
+              scanResult?.action === 'CHECK_OUT'
+                ? 'bg-blue-600 text-white ring-blue-100 shadow-blue-600/20'
+                : scanResult?.rawStatus === 'TERLAMBAT'
+                ? 'bg-amber-500 text-white ring-amber-100 shadow-amber-500/20'
+                : scanResult?.action === 'ALREADY_COMPLETED'
+                ? 'bg-amber-500 text-white ring-amber-100 shadow-amber-500/20'
+                : 'bg-emerald-600 text-white ring-emerald-100 shadow-emerald-600/20'
+            }`}>
+              {scanResult?.action === 'CHECK_OUT' ? '🌇' : scanResult?.rawStatus === 'TERLAMBAT' ? '⚠️' : scanResult?.action === 'ALREADY_COMPLETED' ? 'ℹ️' : '✓'}
+            </div>
           </div>
 
-          <div>
-            <h3 className="font-extrabold text-slate-900 text-xl">
+          {/* Title & Subtitle */}
+          <div className="space-y-1">
+            <h3 className="font-black text-slate-900 text-lg sm:text-xl tracking-tight">
               {scanResult?.action === 'CHECK_OUT'
-                ? 'ABSEN PULANG BERHASIL!'
+                ? 'Absen Pulang Berhasil!'
                 : scanResult?.rawStatus === 'TERLAMBAT'
-                ? 'ABSEN MASUK (TERLAMBAT)'
+                ? 'Absen Masuk (Terlambat)'
                 : scanResult?.action === 'ALREADY_COMPLETED'
-                ? 'PRESENSI HARI INI LENGKAP!'
-                : 'ABSEN MASUK BERHASIL!'}
+                ? 'Presensi Hari Ini Lengkap!'
+                : 'Absen Masuk Berhasil!'}
             </h3>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-slate-500 font-medium max-w-xs mx-auto">
               {scanResult?.action === 'CHECK_OUT'
-                ? 'Terima kasih atas pengabdian Anda hari ini!'
+                ? 'Terima kasih atas pengabdian Anda hari ini.'
                 : scanResult?.rawStatus === 'TERLAMBAT'
-                ? 'Presensi Anda tercatat, namun melewati batas jam masuk (07:30 WIB).'
+                ? 'Tercatat melewati batas jam masuk sekolah (07:30 WIB).'
                 : scanResult?.action === 'ALREADY_COMPLETED'
-                ? 'Anda sudah melakukan presensi masuk dan pulang hari ini.'
+                ? 'Anda sudah melakukan presensi masuk & pulang hari ini.'
                 : 'Selamat bertugas! Data presensi otomatis tersimpan.'}
             </p>
           </div>
 
-          {/* 🌟 SPESIAL GURU PIKET CARD BANNER */}
+          {/* Compact Guru Piket Badge (If Applicable) */}
           {scanResult?.isPiketGuru && (
-            <div className="bg-linear-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-4 rounded-2xl text-left shadow-lg border border-amber-300 relative overflow-hidden my-2">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shrink-0 shadow-inner">
-                  🛡️
-                </div>
-                <div className="space-y-1">
-                  <span className="bg-white/30 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                    GURU PIKET HARI INI
-                  </span>
-                  <h4 className="font-extrabold text-white text-sm">
-                    Selamat Bertugas Menjadi Guru Piket! 🌟
-                  </h4>
-                  <p className="text-[11px] text-amber-50 leading-relaxed font-medium">
-                    Semoga dedikasi dan pengabdian Anda hari ini mendatangkan keberkahan, kemudahan, serta kelancaran untuk seluruh kegiatan sekolah. Selamat mengabdi dengan penuh semangat!
-                  </p>
-                </div>
+            <div className="bg-linear-to-r from-amber-500 to-orange-600 text-white p-2.5 rounded-2xl text-left shadow-sm border border-amber-300 flex items-center gap-2.5">
+              <span className="text-xl shrink-0">🛡️</span>
+              <div className="min-w-0">
+                <span className="font-extrabold text-white text-xs block truncate">Guru Piket Hari Ini 🌟</span>
+                <p className="text-[10px] text-amber-50 font-medium truncate">Selamat bertugas &amp; jaga ketertiban sekolah!</p>
               </div>
             </div>
           )}
 
-          {scanResult?.isOffline ? (
-            <div className="bg-amber-50/90 border-2 border-amber-300 p-3.5 rounded-2xl text-left text-xs text-amber-950 space-y-1.5 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">📶</span>
-                <h4 className="font-extrabold text-amber-950 text-xs uppercase tracking-tight">
-                  PRESENSI TERSIMPAN LOKAL (SINYAL LEMAH / OFFLINE)
-                </h4>
-              </div>
-              <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
-                <strong>Jangan Khawatir!</strong> Jam <strong>{scanResult?.timestamp}</strong> &amp; lokasi GPS Anda sudah <strong>resmi dikunci &amp; tersimpan aman di HP</strong>. Anda <strong>TIDAK PERLU scan ulang!</strong>
-              </p>
-              <div className="text-[10px] text-amber-900 bg-white/80 p-2 rounded-xl border border-amber-200/80 font-medium">
-                ⚡ Data tersimpan di HP &amp; akan otomatis terunggah ke server begitu internet / Wi-Fi terhubung kembali.
-              </div>
-            </div>
-          ) : (
-            <div className="bg-emerald-50/90 border border-emerald-300 p-3.5 rounded-2xl text-left text-xs text-emerald-950 space-y-1 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🌐</span>
-                <h4 className="font-extrabold text-emerald-950 text-xs uppercase tracking-tight">
-                  TERHUBUNG REALTIME KE SERVER
-                </h4>
-              </div>
-              <p className="text-[11px] text-emerald-800 leading-relaxed font-medium">
-                Presensi Anda pada jam <strong>{scanResult?.timestamp}</strong> telah berhasil terunggah &amp; terverifikasi langsung ke server sekolah.
-              </p>
-            </div>
-          )}
-
-          <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-left text-xs text-slate-600 border border-slate-100">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Status Absen</span>
+          {/* Unified Compact Info Card */}
+          <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3.5 space-y-2 text-xs text-slate-700 text-left">
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200/60">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status Presensi</span>
               <Badge status={scanResult?.rawStatus === 'TERLAMBAT' ? 'TERLAMBAT' : 'HADIR'}>
                 {scanResult?.status || (scanResult?.rawStatus === 'TERLAMBAT' ? 'Terlambat' : 'Hadir Tepat Waktu')}
               </Badge>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Waktu Presensi</span>
-              <span className="font-bold text-emerald-600">{scanResult?.timestamp}</span>
+
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Waktu Presensi:</span>
+              <span className="font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 font-mono text-[11px]">
+                {scanResult?.timestamp}
+              </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Lokasi GPS Verified</span>
-              <span className="font-medium text-emerald-600">🟢 Area Sekolah ({scanResult?.distance}m)</span>
+
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Verifikasi GPS:</span>
+              <span className="font-semibold text-emerald-700 flex items-center gap-1 text-[11px]">
+                <span>🟢 Safe-Zone</span>
+                <span className="text-slate-400">({scanResult?.distance}m)</span>
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              <span className="text-slate-500 font-medium">Status Koneksi:</span>
+              <span className={`font-semibold text-[11px] flex items-center gap-1 ${
+                scanResult?.isOffline ? 'text-amber-700' : 'text-emerald-700'
+              }`}>
+                <span>{scanResult?.isOffline ? '⚡ Sync Offline (Tersimpan di HP)' : '🌐 Realtime Server'}</span>
+              </span>
             </div>
           </div>
 
+          {/* Lateness Note Input (Only if TERLAMBAT) */}
           {scanResult?.rawStatus === 'TERLAMBAT' && (
-            <div className="space-y-1.5 text-left bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200">
-              <label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                <span>📝</span>
-                <span>Catatan Alasan Terlambat (Dikirim ke Admin & Kepsek):</span>
+            <div className="space-y-1 text-left bg-amber-50/80 p-3 rounded-2xl border border-amber-200">
+              <label className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                <span>📝 Catatan Alasan Terlambat:</span>
               </label>
               <input
                 type="text"
                 value={latenessReason}
                 onChange={(e) => setLatenessReason(e.target.value)}
-                placeholder="Contoh: Hujan deras / Macet total di jalan utama / Kendala HP"
-                className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
+                placeholder="Contoh: Hujan deras / Macet di jalan utama"
+                className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
-              <p className="text-[10px] text-amber-700 font-medium">
-                💡 Catatan alasan ini akan langsung terlampir di laporan rekap absensi Admin & Kepsek.
-              </p>
             </div>
           )}
 
+          {/* Action Buttons */}
           <div className="pt-1 space-y-2">
             <button
               type="button"
               onClick={() => handleSaveReasonAndClose(true)}
-              className="w-full py-3 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5 border border-[#0D7A5F]"
+              className="w-full py-2.5 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5 border border-[#0D7A5F]"
             >
               <span>💚</span>
               <span>
                 {scanResult?.rawStatus === 'TERLAMBAT'
-                  ? '💾 SIMPAN ALASAN & ISI MOOD HARIAN ✨'
-                  : 'ISI MOOD HARIAN (WELL-BEING CHECK-IN) ✨'}
+                  ? 'Simpan Alasan & Isi Mood Harian ✨'
+                  : 'Isi Mood Harian (Check-in) ✨'}
               </span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSaveReasonAndClose(false)}
-              className="w-full py-2.5 bg-[#023246] hover:bg-[#022535] text-white font-semibold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-xs active:scale-98"
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-200 active:scale-98"
             >
               {scanResult?.rawStatus === 'TERLAMBAT'
-                ? '💾 SIMPAN ALASAN & TUTUP (TANPA MOOD)'
-                : '✓ SIAP, LEWATI MOOD & MASUK DASHBOARD'}
+                ? 'Simpan Alasan & Masuk Dashboard'
+                : 'Masuk Dashboard'}
             </button>
           </div>
 
           {scanResult?.rawStatus !== 'TERLAMBAT' && (
-            <p className="text-[10px] text-slate-400 animate-pulse font-medium">
-              Mengalihkan ke Dashboard dalam beberapa detik...
+            <p className="text-[10px] text-slate-400 font-medium">
+              Mengalihkan ke Dashboard secara otomatis...
             </p>
           )}
         </div>
