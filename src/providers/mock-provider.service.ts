@@ -619,6 +619,21 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
+  public async uploadAvatar(userId: string, file: File): Promise<string> {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+
+    const activeUser = useAuthStore.getState().user;
+    if (activeUser && activeUser.id === userId) {
+      useAuthStore.getState().updateUserProfile({ avatar_url: dataUrl });
+    }
+    return dataUrl;
+  }
+
   public async deleteUser(_userId: string, _token: string): Promise<boolean> {
     return true;
   }

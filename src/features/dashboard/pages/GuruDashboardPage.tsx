@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { Badge } from '../../../components/ui/Badge';
@@ -49,6 +49,39 @@ export interface GuruDashboardPageProps {
   isPreviewMode?: boolean;
 }
 
+// Robust Avatar Component with graceful image onError fallback for mobile devices
+const UserAvatar: React.FC<{
+  avatarUrl?: string | null;
+  name: string;
+  className?: string;
+  textClassName?: string;
+}> = ({ avatarUrl, name, className = 'w-12 h-12 rounded-2xl', textClassName = 'text-xl font-black' }) => {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [avatarUrl]);
+
+  const initial = name ? name.trim().charAt(0).toUpperCase() : 'G';
+
+  if (avatarUrl && !imgError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        onError={() => setImgError(true)}
+        className={`object-cover ${className}`}
+      />
+    );
+  }
+
+  return (
+    <div className={`bg-[#C8F2E0] text-[#0D7A5F] flex items-center justify-center font-black ${className} ${textClassName}`}>
+      {initial}
+    </div>
+  );
+};
+
 export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   onOpenScanner,
   onOpenLeaveForm,
@@ -80,6 +113,46 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
+
+  // Avatar Upload State & Ref
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('error', 'File Harus Gambar!', 'Pilih file foto dalam format JPG, PNG, atau WebP.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const provider = ProviderFactory.getProvider();
+      let uploadedUrl = '';
+
+      if ('uploadAvatar' in provider && typeof (provider as any).uploadAvatar === 'function') {
+        uploadedUrl = await (provider as any).uploadAvatar(effectiveUser.id, file);
+      } else {
+        uploadedUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
+        await provider.updateUser(effectiveUser.id, { avatar_url: uploadedUrl }, token || '');
+      }
+
+      useAuthStore.getState().updateUserProfile({ avatar_url: uploadedUrl });
+      showToast('success', 'Foto Profil Diperbarui ✨', 'Foto profil Anda berhasil diunggah dan disimpan.');
+    } catch (err) {
+      handleAppError(err, 'GuruDashboard.uploadAvatar', 'Gagal mengunggah foto profil');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (e.target) e.target.value = '';
+    }
+  };
 
   // Change PIN Form State
   const [newPin, setNewPin] = useState('');
@@ -759,12 +832,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               {/* Profile Greeting & Avatar Row */}
               <div className="flex items-center justify-between gap-3 relative z-10">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md p-0.5 border border-white/20 text-white font-black text-xl flex items-center justify-center shadow-inner overflow-hidden shrink-0 ring-2 ring-white/10">
-                    {effectiveUser.avatar_url ? (
-                      <img src={effectiveUser.avatar_url} alt={effectiveUser.full_name} className="w-full h-full object-cover rounded-xl" />
-                    ) : (
-                      effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'
-                    )}
+                  <div
+                    onClick={() => avatarFileInputRef.current?.click()}
+                    className="relative w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md p-0.5 border border-white/20 text-white font-black text-xl flex items-center justify-center shadow-inner overflow-hidden shrink-0 ring-2 ring-white/10 cursor-pointer group"
+                    title="Klik untuk ganti foto profil HP"
+                  >
+                    <UserAvatar
+                      avatarUrl={effectiveUser.avatar_url}
+                      name={effectiveUser.full_name}
+                      className="w-full h-full rounded-xl"
+                      textClassName="text-xl"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs text-white">
+                      📸
+                    </div>
                   </div>
                   <div className="space-y-0.5 min-w-0">
                     <span className="text-[10px] font-extrabold text-emerald-300 tracking-wider uppercase flex items-center gap-1">
@@ -1395,18 +1476,44 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {activeTab === 'PROFIL' && (
           <section className="space-y-3 sm:space-y-4">
             <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card space-y-4">
-              <div className="text-center space-y-1.5 pb-3 border-b border-slate-100">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-2xl sm:text-3xl flex items-center justify-center mx-auto shadow-inner border-2 border-[#0D7A5F]/20 overflow-hidden shrink-0">
-                  {effectiveUser.avatar_url ? (
-                    <img src={effectiveUser.avatar_url} alt={effectiveUser.full_name} className="w-full h-full object-cover" />
-                  ) : (
-                    effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'
-                  )}
+              <div className="text-center space-y-2 pb-3.5 border-b border-slate-100">
+                <input
+                  type="file"
+                  ref={avatarFileInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarFileChange}
+                />
+
+                <div
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-3xl flex items-center justify-center mx-auto shadow-inner border-2 border-[#0D7A5F]/20 overflow-hidden shrink-0 cursor-pointer group ring-4 ring-emerald-50"
+                  title="Klik untuk ganti foto profil HP"
+                >
+                  <UserAvatar
+                    avatarUrl={effectiveUser.avatar_url}
+                    name={effectiveUser.full_name}
+                    className="w-full h-full rounded-full"
+                    textClassName="text-3xl"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-lg text-white font-bold">
+                    📸
+                  </div>
                 </div>
+
                 <div>
                   <h2 className="font-black text-[#023246] text-base sm:text-lg">{effectiveUser.full_name}</h2>
                   <p className="text-[11px] sm:text-xs text-slate-500 font-semibold">{effectiveUser.position || 'Guru Pengajar'}</p>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#0D7A5F] text-xs font-extrabold rounded-xl border border-emerald-300 transition-all active:scale-95 cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                >
+                  <span>{isUploadingAvatar ? '⏳ Mengunggah...' : '📸 Unggah / Ganti Foto Profil HP'}</span>
+                </button>
               </div>
 
               {/* Device Binding Status Section */}
