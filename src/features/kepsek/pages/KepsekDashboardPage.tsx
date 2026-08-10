@@ -299,7 +299,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           <div className="relative -top-5 flex flex-col items-center">
             <button
               onClick={() => onOpenScanner && onOpenScanner()}
-              className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-[#023246] to-[#287094] text-white flex items-center justify-center text-xl shadow-lg shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
+              className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-tr from-[#023246] to-[#287094] text-white flex items-center justify-center text-xl shadow-lg shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
               title="Poster QR"
             >
               🔲
