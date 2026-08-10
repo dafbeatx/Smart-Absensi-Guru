@@ -806,16 +806,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       )}
 
       {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-3.5 sm:px-5 py-2.5 sm:py-3 bg-white border-b border-[#D4D4CE]/20 sticky top-0 z-30 shadow-2xs max-w-md mx-auto">
+      <header className="flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-[#DDD9D0] sticky top-0 z-30 shadow-2xs max-w-[480px] mx-auto">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white p-0.5 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-sm ring-2 ring-emerald-50">
+          <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-xs ring-2 ring-emerald-50">
             <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
           </div>
           <div className="min-w-0">
-            <h1 className="font-black text-[#023246] text-xs sm:text-sm tracking-tight leading-tight uppercase truncate">
+            <h1 className="font-extrabold text-[#023246] text-xs tracking-tight leading-tight uppercase truncate">
               Smart Absensi Guru
             </h1>
-            <p className="text-[9px] sm:text-[10px] font-semibold text-slate-500 mt-0.5 truncate max-w-50 sm:max-w-xs">
+            <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate max-w-[200px]">
               {settings.institution_name}
             </p>
           </div>
@@ -823,21 +823,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
         <button
           onClick={() => setActiveTab('NOTIFIKASI')}
-          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0"
+          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
           aria-label="Notifikasi"
         >
-          <span className={`text-base sm:text-lg transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>
+          <span className={`text-lg transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>
             🔔
           </span>
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.2 text-[9px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white shadow-xs shadow-red-500/50 animate-pulse">
+            <span className="absolute top-1 right-1 px-1.5 py-0.2 text-[9px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white shadow-2xs animate-pulse">
               {unreadCount}
             </span>
           )}
         </button>
       </header>
 
-      <main className="px-3 sm:px-4 pt-3 sm:pt-4 space-y-3 sm:space-y-4 max-w-md mx-auto">
+      <main className="px-4 pt-4 pb-28 space-y-4 max-w-[480px] mx-auto">
         <NotificationPermissionBanner />
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
@@ -1603,13 +1603,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         )}
       </main>
 
-      {/* ── MOBILE BOTTOM NAVIGATION DOCK ──────────────────────────────────── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-3 py-1.5 z-40 shadow-lg">
+      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Infinix Note 8 360px Width & 480px Max-Width) ── */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-2 z-40 shadow-2xl rounded-t-3xl ring-1 ring-black/5">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('BERANDA')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer ${
-              activeTab === 'BERANDA' ? 'text-[#0D7A5F] font-black scale-105' : 'text-slate-400 font-bold hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'BERANDA' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
             <span className="text-lg leading-none">🏠</span>
@@ -1618,8 +1618,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
           <button
             onClick={() => setActiveTab('RIWAYAT')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer ${
-              activeTab === 'RIWAYAT' ? 'text-[#0D7A5F] font-black scale-105' : 'text-slate-400 font-bold hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'RIWAYAT' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
             <span className="text-lg leading-none">📊</span>
@@ -1630,17 +1630,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <div className="relative -top-5 flex flex-col items-center">
             <button
               onClick={handleOpenScannerClick}
-              className="w-14 h-14 rounded-full bg-linear-to-tr from-[#0D7A5F] to-[#12A17E] text-white flex items-center justify-center shadow-lg shadow-[#0D7A5F]/35 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
+              className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-tr from-[#023246] to-[#0D7A5F] text-white flex items-center justify-center shadow-lg shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
               title="Pindai QR Code Absensi"
             >
-              <QrCodeScanIcon className="w-7 h-7 text-white" />
+              <QrCodeScanIcon className="w-6 h-6 text-white" />
             </button>
+            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Scan QR</span>
           </div>
 
           <button
             onClick={() => setActiveTab('NOTIFIKASI')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer relative ${
-              activeTab === 'NOTIFIKASI' ? 'text-[#0D7A5F] font-black scale-105' : 'text-slate-400 font-bold hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer relative active:scale-95 ${
+              activeTab === 'NOTIFIKASI' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
             {unreadCount > 0 && (
@@ -1654,8 +1655,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
           <button
             onClick={() => setActiveTab('PROFIL')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer ${
-              activeTab === 'PROFIL' ? 'text-[#0D7A5F] font-black scale-105' : 'text-slate-400 font-bold hover:text-slate-600'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'PROFIL' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
             <span className="text-lg leading-none">👤</span>
