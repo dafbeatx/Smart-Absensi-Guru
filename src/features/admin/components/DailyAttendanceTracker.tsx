@@ -49,6 +49,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           status: effectiveStatus,
           checkInTime: rec.check_in_time ? rec.check_in_time.substring(0, 5) : undefined,
           checkOutTime: rec.check_out_time ? rec.check_out_time.substring(0, 5) : undefined,
+          notes: rec.notes,
         });
       }
     }

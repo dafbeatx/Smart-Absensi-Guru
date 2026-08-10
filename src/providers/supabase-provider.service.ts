@@ -440,6 +440,7 @@ export class SupabaseProvider implements IDataProvider {
       verification_method: 'QR_GPS',
       attendance_source: 'QR',
       is_offline: false,
+      notes: row.notes || row.reason || null,
       created_at: row.created_at,
     }));
   }
@@ -458,6 +459,7 @@ export class SupabaseProvider implements IDataProvider {
         status: dto.status,
         check_in_time: dto.check_in_time && dto.check_in_time.trim().length > 0 ? (dto.check_in_time.length === 5 ? `${dto.check_in_time}:00` : dto.check_in_time) : (dto.status === 'HADIR' || dto.status === 'TERLAMBAT' ? '07:00:00' : null),
         check_out_time: dto.check_out_time ? (dto.check_out_time.length === 5 ? `${dto.check_out_time}:00` : dto.check_out_time) : null,
+        notes: dto.notes || dto.reason,
       },
       { onConflict: 'user_id,date' }
     );
@@ -486,8 +488,26 @@ export class SupabaseProvider implements IDataProvider {
       verification_method: 'QR_GPS',
       attendance_source: 'QR',
       is_offline: false,
+      notes: row.notes || row.reason || null,
       created_at: row.created_at,
     }));
+  }
+
+  public async updateAttendanceNote(userId: string, date: string, note: string, _token: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('attendance')
+        .update({ notes: note, reason: note })
+        .eq('user_id', userId)
+        .eq('date', date);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'updateAttendanceNote DB update warning:', error.message);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'updateAttendanceNote exception:', err);
+    }
+    return true;
   }
 
   // ─── LEAVE & APPROVAL API ─────────────────────────────────────────────────

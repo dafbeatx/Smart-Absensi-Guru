@@ -365,19 +365,14 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         const provider = ProviderFactory.getProvider();
         const todayStr = getTodayDateInJakarta();
         const token = useAuthStore.getState().token || '';
-        const recs = await provider.getDailyAttendance(todayStr, token);
-        const myRec = recs.find((r) => r.user_id === currentUser.id);
-        if (myRec && myRec.id) {
-          await provider.correctAttendance({
-            token,
-            target_user_id: currentUser.id,
-            date: todayStr,
-            status: myRec.status,
-            check_in_time: myRec.check_in_time || '07:30',
-            check_out_time: myRec.check_out_time || undefined,
-            reason: `[Alasan Terlambat]: ${latenessReason.trim()}`,
-            notes: `[Alasan Terlambat]: ${latenessReason.trim()}`,
-          });
+        const noteText = latenessReason.trim().startsWith('[Alasan Terlambat]')
+          ? latenessReason.trim()
+          : `[Alasan Terlambat]: ${latenessReason.trim()}`;
+
+        if ('updateAttendanceNote' in provider && typeof (provider as any).updateAttendanceNote === 'function') {
+          await (provider as any).updateAttendanceNote(currentUser.id, todayStr, noteText, token);
+        } else {
+          await provider.updateUser(currentUser.id, {}, token);
         }
       } catch (e) {
         console.warn('Error saving lateness reason note:', e);

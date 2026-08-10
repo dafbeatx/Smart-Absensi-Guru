@@ -402,6 +402,7 @@ export class MockProvider implements IDataProvider {
       check_in_lng: 106.8,
       check_in_distance_meters: 10,
       is_offline: false,
+      notes: dto.notes || dto.reason,
       created_at: new Date().toISOString(),
     };
 
@@ -430,6 +431,51 @@ export class MockProvider implements IDataProvider {
     }
 
     return true;
+  }
+
+  public async updateAttendanceNote(userId: string, date: string, note: string, _token: string): Promise<boolean> {
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    try {
+      const savedAll = safeGetStorage(ALL_KEY);
+      let allRecords: AttendanceRecord[] = savedAll ? JSON.parse(savedAll) : [];
+      if (!Array.isArray(allRecords)) allRecords = [];
+
+      const idx = allRecords.findIndex((r) => (r.user_id === userId || (Boolean(r.user_id) && r.user_id.includes(userId))) && r.date === date);
+      if (idx >= 0) {
+        allRecords[idx] = {
+          ...allRecords[idx],
+          notes: note,
+        };
+        safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
+      } else {
+        const newRecord: AttendanceRecord = {
+          id: `att_${userId}_${date}`,
+          user_id: userId,
+          date,
+          check_in_time: '07:35:00',
+          check_out_time: null,
+          status: 'TERLAMBAT',
+          verification_method: 'QR_GPS',
+          attendance_source: 'QR',
+          check_in_lat: -6.2,
+          check_in_lng: 106.8,
+          check_in_distance_meters: 15,
+          is_offline: false,
+          notes: note,
+          created_at: new Date().toISOString(),
+        };
+        allRecords.push(newRecord);
+        safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smart_absensi_records_updated'));
+      }
+      return true;
+    } catch (e) {
+      console.warn('Failed to update attendance note:', e);
+      return false;
+    }
   }
 
   public async getDailyAttendance(date: string, _token: string): Promise<AttendanceRecord[]> {
