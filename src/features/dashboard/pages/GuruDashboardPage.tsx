@@ -837,7 +837,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         </button>
       </header>
 
-      <main className="px-4 pt-4 pb-28 space-y-4 max-w-120 mx-auto">
+      <main className="px-4 pt-4 pb-20 space-y-4 max-w-120 mx-auto">
         <NotificationPermissionBanner />
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
@@ -1603,44 +1603,44 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         )}
       </main>
 
-      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Infinix Note 8 360px Width & 480px Max-Width) ── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-120 mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-2 z-40 shadow-2xl rounded-t-3xl ring-1 ring-black/5">
+      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Compact & Sleek) ── */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-120 mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-1 z-40 shadow-2xl rounded-t-2xl ring-1 ring-black/5">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('BERANDA')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-0.5 transition-all cursor-pointer active:scale-95 ${
               activeTab === 'BERANDA' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-lg leading-none">🏠</span>
+            <span className="text-base leading-none">🏠</span>
             <span>Beranda</span>
           </button>
 
           <button
             onClick={() => setActiveTab('RIWAYAT')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-0.5 transition-all cursor-pointer active:scale-95 ${
               activeTab === 'RIWAYAT' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-lg leading-none">📊</span>
+            <span className="text-base leading-none">📊</span>
             <span>Riwayat</span>
           </button>
 
-          {/* Center Elevated FAB Scanner Button */}
-          <div className="relative -top-5 flex flex-col items-center">
+          {/* Center Compact FAB Scanner Button */}
+          <div className="relative -top-3 flex flex-col items-center">
             <button
               onClick={handleOpenScannerClick}
-              className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-tr from-[#023246] to-[#0D7A5F] text-white flex items-center justify-center shadow-lg shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
+              className="w-12 h-12 rounded-xl bg-linear-to-tr from-[#023246] to-[#0D7A5F] text-white flex items-center justify-center shadow-md shadow-[#023246]/30 ring-3 ring-white active:scale-95 transition-transform cursor-pointer"
               title="Pindai QR Code Absensi"
             >
-              <QrCodeScanIcon className="w-6 h-6 text-white" />
+              <QrCodeScanIcon className="w-5.5 h-5.5 text-white" />
             </button>
             <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Scan QR</span>
           </div>
 
           <button
             onClick={() => setActiveTab('NOTIFIKASI')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer relative active:scale-95 ${
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-0.5 transition-all cursor-pointer relative active:scale-95 ${
               activeTab === 'NOTIFIKASI' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
@@ -1649,17 +1649,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 {unreadCount}
               </span>
             )}
-            <span className={`text-lg leading-none ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>🔔</span>
+            <span className={`text-base leading-none ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>🔔</span>
             <span>Notif</span>
           </button>
 
           <button
             onClick={() => setActiveTab('PROFIL')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-0.5 transition-all cursor-pointer active:scale-95 ${
               activeTab === 'PROFIL' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-lg leading-none">👤</span>
+            <span className="text-base leading-none">👤</span>
             <span>Profil</span>
           </button>
         </div>
