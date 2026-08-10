@@ -360,9 +360,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   return (
     <div className="space-y-6">
       {/* ── 1. WELCOME HEADER & QUICK ACTIONS BAR ───────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="space-y-1">
-          <h1 className="text-xl font-black text-slate-900">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="space-y-0.5">
+          <h1 className="text-lg sm:text-xl font-black text-slate-900">
             Selamat datang, {roleTitle} 👋
           </h1>
           <p className="text-xs text-slate-500 font-medium">
@@ -370,11 +370,11 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full">
           {onOpenQrGenerator && (
             <button
               onClick={onOpenQrGenerator}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
             >
               <span>🖨️</span> Poster QR
             </button>
@@ -382,7 +382,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           {onOpenCorrectionModal && (
             <button
               onClick={onOpenCorrectionModal}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
             >
               <span>✏️</span> Koreksi Manual
             </button>
@@ -390,7 +390,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           {onOpenTestRunner && (
             <button
               onClick={onOpenTestRunner}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
             >
               <span>🧪</span> Tests
             </button>
@@ -398,7 +398,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           {onSwitchToGuruView && (
             <button
               onClick={onSwitchToGuruView}
-              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl border border-emerald-700 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl border border-emerald-700 shadow-md transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
             >
               <span>👤</span> Mode Guru
             </button>
@@ -407,28 +407,28 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       </div>
 
       {/* ── 2. EXECUTIVE HIGH-IMPACT KPI HERO BANNER (Decision in 5 seconds) ── */}
-      <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
         <div className="space-y-1">
-          <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
+          <span className="text-[10px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
             Persentase Kehadiran Guru Hari Ini
           </span>
-          <div className="flex items-baseline gap-3">
-            <span className="text-5xl font-black text-white tracking-tight">{attendancePercentage}%</span>
+          <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
+            <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">{attendancePercentage}%</span>
             <span className="text-xs font-semibold text-slate-300">
               ({totalPresentCount} dari {totalGuruCount} Guru Hadir / Masuk)
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-6 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-6">
+        <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-6">
           <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Pending Approval</span>
-            <p className="text-2xl font-black text-amber-400">{pendingRequests.length} <span className="text-xs font-semibold text-amber-200/80">Pengajuan</span></p>
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase">Pending Approval</span>
+            <p className="text-xl sm:text-2xl font-black text-amber-400">{pendingRequests.length} <span className="text-xs font-semibold text-amber-200/80">Pengajuan</span></p>
           </div>
           <div className="h-8 w-px bg-slate-800" />
           <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Belum Hadir</span>
-            <p className="text-2xl font-black text-red-400">{belumAbsenCount} <span className="text-xs font-semibold text-red-200/80">Guru</span></p>
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase">Belum Hadir</span>
+            <p className="text-xl sm:text-2xl font-black text-red-400">{belumAbsenCount} <span className="text-xs font-semibold text-red-200/80">Guru</span></p>
           </div>
         </div>
       </div>

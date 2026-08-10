@@ -350,8 +350,99 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
         </div>
       </div>
 
-      {/* Data Table */}
-      <div className="overflow-x-auto">
+      {/* ── MOBILE CARD VIEW (<640px) for Infinix Note 8 & Smartphone Viewports ── */}
+      <div className="block sm:hidden space-y-3">
+        {filteredTeachers.length === 0 ? (
+          <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 font-bold">
+            Tidak ada pengguna terdaftar yang sesuai pencarian.
+          </div>
+        ) : (
+          filteredTeachers.map((t) => (
+            <div key={t.id} className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+              {/* Header: Avatar, Name, NPP & Active Badge */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
+                    {t.avatar_url ? (
+                      <img src={t.avatar_url} alt={t.full_name} className="w-full h-full object-cover" />
+                    ) : (
+                      t.full_name.charAt(0)
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-extrabold text-slate-900 text-xs sm:text-sm truncate">{t.full_name}</p>
+                    <p className="text-[10px] font-mono text-slate-500">NPP: {t.nip || '-'}</p>
+                  </div>
+                </div>
+
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black shrink-0 ${
+                  t.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {t.is_active ? 'Aktif' : 'Non-Aktif'}
+                </span>
+              </div>
+
+              {/* Body: Role & Position */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-100 text-xs">
+                <div className="space-y-0.5 min-w-0">
+                  <span className={`inline-block px-2 py-0.5 rounded-md text-[9px] font-black ${
+                    t.role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    {t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'ADMIN WEBSITE' : t.role}
+                  </span>
+                  <p className="text-[11px] font-semibold text-slate-600 truncate">{t.position || 'Tenaga Pendidik'}</p>
+                </div>
+                <span className="text-[11px] font-mono font-medium text-slate-500">💬 {t.phone_number || '-'}</span>
+              </div>
+
+              {/* Action Buttons Grid (Touch-friendly 44px min-target) */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                <button
+                  onClick={() => handleOpenEditModal(t)}
+                  className="py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold text-[10px] rounded-xl border border-emerald-200 transition-colors text-center active:scale-95"
+                >
+                  ✏️ Edit
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedTeacher(t);
+                    setIsResetPinOpen(true);
+                  }}
+                  className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold text-[10px] rounded-xl border border-amber-200 transition-colors text-center active:scale-95"
+                >
+                  🔑 Reset PIN
+                </button>
+                <button
+                  onClick={() => handleResetDevice(t)}
+                  className="py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold text-[10px] rounded-xl border border-blue-200 transition-colors text-center active:scale-95"
+                >
+                  📱 Device
+                </button>
+                <button
+                  onClick={() => handleToggleStatus(t)}
+                  className={`py-1.5 px-2 font-extrabold text-[10px] rounded-xl border transition-colors text-center active:scale-95 col-span-2 ${
+                    t.is_active ? 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  }`}
+                >
+                  {t.is_active ? '🔒 Nonaktifkan Akun' : '🔓 Aktifkan Akun'}
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedTeacher(t);
+                    setIsDeleteModalOpen(true);
+                  }}
+                  className="py-1.5 px-2 bg-red-50 hover:bg-red-100 text-red-700 font-extrabold text-[10px] rounded-xl border border-red-200 transition-colors text-center active:scale-95"
+                >
+                  🗑️ Hapus
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* ── DESKTOP DATA TABLE (>=640px) ────────────────────────────────── */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
             <tr>

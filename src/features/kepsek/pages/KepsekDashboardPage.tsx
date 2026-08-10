@@ -164,7 +164,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   ];
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] text-[#023246] flex flex-col lg:flex-row dashboard-density-scaled">
+    <div className="min-h-screen bg-[#F6F6F6] text-[#023246] flex flex-col lg:flex-row dashboard-density-scaled overflow-x-hidden">
       {/* ── LEFT SIDEBAR PANEL (DESKTOP & MOBILE) ────────────────────────── */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -190,7 +190,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         />
 
         {/* Main Content Viewport */}
-        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 p-3.5 sm:p-6 pb-28 sm:pb-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
           {(activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW') && (
             <ExecutiveDashboardOverview
@@ -211,7 +211,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           {/* TAB 3: APPROVALS */}
           {(activeTab === 'APPROVALS' || activeTab === 'APPROVAL') && (
-            <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
               <h3 className="font-extrabold text-[#023246] text-base">📝 Approval Pengajuan Izin / Cuti Guru</h3>
               <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
             </div>
@@ -219,7 +219,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           {/* TAB 4: UNABSENTED */}
           {activeTab === 'UNABSENTED' && (
-            <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
               <h3 className="font-extrabold text-[#023246] text-base flex items-center justify-between">
                 <span>⚠️ Daftar Guru & Staf Belum Absen</span>
                 <span className="text-xs font-semibold text-slate-500">{unabsentedTeachers.length} Orang</span>
@@ -243,17 +243,17 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               ) : (
                 <div className="space-y-2">
                   {unabsentedTeachers.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <div className="space-y-0.5">
-                        <p className="font-extrabold text-[#023246] text-sm">{t.full_name}</p>
-                        <p className="text-xs text-slate-500 font-medium">{t.position || 'Guru / Staf'} • {t.phone_number || '-'}</p>
+                    <div key={t.id} className="flex items-center justify-between p-3 sm:p-3.5 bg-slate-50 rounded-2xl border border-slate-200 gap-2">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <p className="font-extrabold text-[#023246] text-sm truncate">{t.full_name}</p>
+                        <p className="text-xs text-slate-500 font-medium truncate">{t.position || 'Guru / Staf'} • {t.phone_number || '-'}</p>
                       </div>
                       <FeatureGate flag="ENABLE_WHATSAPP">
                         <a
                           href={`https://wa.me/62${String(t.phone_number || '').replace(/^0/, '')}?text=Assalamu'alaikum%20Bapak/Ibu%20${encodeURIComponent(t.full_name)},%20mohon%20konfirmasi%20kehadiran%20hari%20ini.`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
+                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 active:scale-95"
                         >
                           💬 Hubungi WA
                         </a>
@@ -272,13 +272,13 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         </main>
       </div>
 
-      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Screen 1 Mockup) ────────────────── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-lg border-t border-[#D4D4CE]/30 px-3 py-1.5 z-40 shadow-xl lg:hidden">
+      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Infinix Note 8 360px Width Optimized) ── */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-xl border-t border-[#D4D4CE]/40 px-2 sm:px-4 py-2 z-40 shadow-2xl rounded-t-3xl lg:hidden ring-1 ring-black/5">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('DASHBOARD')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">🏠</span>
@@ -287,8 +287,8 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           <button
             onClick={() => setActiveTab('UNABSENTED')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'UNABSENTED' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'UNABSENTED' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">⬡</span>
@@ -299,24 +299,24 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           <div className="relative -top-5 flex flex-col items-center">
             <button
               onClick={() => onOpenScanner && onOpenScanner()}
-              className="w-14 h-14 rounded-full bg-[#023246] text-white flex items-center justify-center text-xl shadow-xl shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
+              className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-[#023246] to-[#287094] text-white flex items-center justify-center text-xl shadow-lg shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
               title="Poster QR"
             >
               🔲
             </button>
-            <span className="text-[10px] font-extrabold text-[#023246] mt-0.5">Poster QR</span>
+            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Poster QR</span>
           </div>
 
           <button
             onClick={() => setActiveTab('APPROVALS')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-colors cursor-pointer ${
-              activeTab === 'APPROVALS' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'APPROVALS' || activeTab === 'APPROVAL' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">☑️</span>
             <span>Approval</span>
             {pendingRequests.length > 0 ? (
-              <span className="absolute top-1 right-3.5 px-1 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-3 text-center animate-pulse">
+              <span className="absolute top-0.5 right-2 px-1.5 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-4 text-center animate-pulse shadow-2xs">
                 {pendingRequests.length}
               </span>
             ) : null}
@@ -324,7 +324,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 text-slate-400 font-semibold cursor-pointer"
+            className="flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 text-slate-400 font-semibold cursor-pointer active:scale-95 hover:text-[#023246]"
           >
             <span className="text-lg">🎛️</span>
             <span>Menu</span>

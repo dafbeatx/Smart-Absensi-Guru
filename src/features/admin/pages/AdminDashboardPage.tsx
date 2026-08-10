@@ -278,7 +278,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] text-[#023246] flex flex-col lg:flex-row dashboard-density-scaled">
+    <div className="min-h-screen bg-[#F6F6F6] text-[#023246] flex flex-col lg:flex-row dashboard-density-scaled overflow-x-hidden">
       {/* ── LEFT SIDEBAR PANEL (DESKTOP & MOBILE) ────────────────────────── */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -306,7 +306,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         />
 
         {/* Main Content Viewport */}
-        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 p-3.5 sm:p-6 pb-28 sm:pb-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
           <QueueMonitor />
 
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
@@ -521,13 +521,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         }}
       />
 
-      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Screen 1 Mockup) ────────────────── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-lg border-t border-[#D4D4CE]/30 px-3 py-1.5 z-40 shadow-xl lg:hidden">
+      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Infinix Note 8 360px Width Optimized) ── */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-xl border-t border-[#D4D4CE]/40 px-2 sm:px-4 py-2 z-40 shadow-2xl rounded-t-3xl lg:hidden ring-1 ring-black/5">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('DASHBOARD')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'DASHBOARD' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">🏠</span>
@@ -536,8 +536,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
           <button
             onClick={() => setActiveTab('ATTENDANCE_TRACKING')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'ATTENDANCE_TRACKING' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'ATTENDANCE_TRACKING' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">⬡</span>
@@ -548,24 +548,24 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           <div className="relative -top-5 flex flex-col items-center">
             <button
               onClick={() => setIsQrGeneratorOpen(true)}
-              className="w-14 h-14 rounded-full bg-[#023246] text-white flex items-center justify-center text-xl shadow-xl shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
+              className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-[#023246] to-[#287094] text-white flex items-center justify-center text-xl shadow-lg shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
               title="Cetak Poster QR"
             >
               🔲
             </button>
-            <span className="text-[10px] font-extrabold text-[#023246] mt-0.5">Poster QR</span>
+            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Poster QR</span>
           </div>
 
           <button
             onClick={() => setActiveTab('APPROVAL')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-colors cursor-pointer ${
-              activeTab === 'APPROVAL' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-all cursor-pointer active:scale-95 ${
+              activeTab === 'APPROVAL' || activeTab === 'APPROVALS' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
             }`}
           >
             <span className="text-lg">☑️</span>
             <span>Approval</span>
             {pendingRequests.length > 0 ? (
-              <span className="absolute top-1 right-3.5 px-1 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-3 text-center animate-pulse">
+              <span className="absolute top-0.5 right-2 px-1.5 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-4 text-center animate-pulse shadow-2xs">
                 {pendingRequests.length}
               </span>
             ) : null}
@@ -573,7 +573,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 text-slate-400 font-semibold cursor-pointer"
+            className="flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 text-slate-400 font-semibold cursor-pointer active:scale-95 hover:text-[#023246]"
           >
             <span className="text-lg">🎛️</span>
             <span>Menu</span>
