@@ -17,6 +17,7 @@
 - **Auto Coordinate Sanitization**: Koordinat GPS tanpa desimal (misal `-6613144`) wajib disanitasi secara otomatis menjadi desimal valid (`-6.613144`).
 
 ## Naming Standards & UI Design System Protocol
+- **Anti AI-Generic / Anti AI-Slop UI Protocol**: Setiap kali diminta membuat, memperbarui, atau memperbaiki antarmuka (UI/UX), WAJIB selalu merujuk dan mematuhi pedoman di [.ai/UI_DESIGN_SYSTEM_ANTI_AI_SLOP.md](file:///c:/Smart-Absensi-Guru/.ai/UI_DESIGN_SYSTEM_ANTI_AI_SLOP.md).
 - **NPP Naming Standard**: Seluruh penamaan ID pegawai di UI, modal, pencarian, dan laporan PDF/CSV wajib menggunakan istilah **NPP (Nomor Pokok Pegawai)**.
 - **Time Input Sanitizer**: Input HTML5 `type="time"` wajib diformat `HH:mm` menggunakan `formatTimeForInput` dari `src/utils/time.utils.ts`.
 - **Single Typography & Theme**: Wajib mengunci font family global menggunakan **Inter** dan menggunakan design tokens warna yang didefinisikan di `src/index.css`.
