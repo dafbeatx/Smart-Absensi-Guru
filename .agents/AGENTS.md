@@ -6,3 +6,20 @@
 ## Cross-Device Synchronization Protocol (Desktop / Laptop & Mobile HP)
 - **Status Notifikasi (Tandai Dibaca)**: Status read/unread notifikasi dan pengumuman wajib tersimpan secara persistent (`localStorage` + backend provider) dan harus **100% tersinkronisasi secara real-time** antara tampilan Laptop/Desktop dan Mobile HP, serta bertahan tanpa reset saat browser di-refresh.
 - **Foto Profil User**: Foto profil yang diset oleh Admin di HP/Desktop harus langsung tersinkronkan dan dapat dibaca secara seragam di seluruh perangkat tanpa perbedaan status.
+
+## Backend Architecture & Security Protocol (Supabase PostgreSQL Cloud)
+- **Provider Pattern Abstraction**: Seluruh pengambilan dan mutasi data WAJIB melalui `ProviderFactory.getProvider()` (`SupabaseProvider` untuk cloud mode, `MockProvider` untuk unit test/offline). Dilarang keras melakukan `fetch`, `axios`, atau query Supabase langsung dari komponen UI.
+- **PostgreSQL Row Level Security (RLS)**: Setiap pembuatan atau pembaruan tabel di Supabase wajib disertai script DDL SQL dan policy RLS yang ketat.
+
+## Attendance Safety Engine & Geofencing Protocol
+- **5-Step State Machine**: Alur absensi masuk dan pulang WAJIB melewati pipa state machine deterministik di `src/services/attendance-engine.service.ts`.
+- **Door Poster QR Mode**: Gunakan buffer radius 500m saat memindai QR Poster pintu sekolah agar absensi **langsung diterima**, sambil **tetap mencatat koordinat GPS fisik asli guru secara akurat ke database**.
+- **Auto Coordinate Sanitization**: Koordinat GPS tanpa desimal (misal `-6613144`) wajib disanitasi secara otomatis menjadi desimal valid (`-6.613144`).
+
+## Naming Standards & UI Design System Protocol
+- **NPP Naming Standard**: Seluruh penamaan ID pegawai di UI, modal, pencarian, dan laporan PDF/CSV wajib menggunakan istilah **NPP (Nomor Pokok Pegawai)**.
+- **Time Input Sanitizer**: Input HTML5 `type="time"` wajib diformat `HH:mm` menggunakan `formatTimeForInput` dari `src/utils/time.utils.ts`.
+- **Single Typography & Theme**: Wajib mengunci font family global menggunakan **Inter** dan menggunakan design tokens warna yang didefinisikan di `src/index.css`.
+
+## Windows CLI Execution Protocol
+- Pada lingkungan Windows PowerShell di mana eksekusi script `.ps1` diblokir, selalu jalankan perintah build dan pengujian melalui shell `cmd /c "npm run build"`.
