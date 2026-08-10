@@ -306,7 +306,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         />
 
         {/* Main Content Viewport */}
-        <main className="flex-1 p-3.5 sm:p-6 pb-28 sm:pb-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
+        <main className="flex-1 p-3.5 sm:p-6 pb-6 sm:pb-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
           <QueueMonitor />
 
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
@@ -520,66 +520,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           fetchPendingRequests();
         }}
       />
-
-      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Infinix Note 8 360px Width Optimized) ── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-xl border-t border-[#D4D4CE]/40 px-2 sm:px-4 py-2 z-40 shadow-2xl rounded-t-3xl lg:hidden ring-1 ring-black/5">
-        <div className="flex items-center justify-around relative">
-          <button
-            onClick={() => setActiveTab('DASHBOARD')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
-              activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
-            }`}
-          >
-            <span className="text-lg">🏠</span>
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('ATTENDANCE_TRACKING')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
-              activeTab === 'ATTENDANCE_TRACKING' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
-            }`}
-          >
-            <span className="text-lg">⬡</span>
-            <span>Live Tracking</span>
-          </button>
-
-          {/* Center FAB Poster QR Button */}
-          <div className="relative -top-5 flex flex-col items-center">
-            <button
-              onClick={() => setIsQrGeneratorOpen(true)}
-              className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-tr from-[#023246] to-[#287094] text-white flex items-center justify-center text-xl shadow-lg shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
-              title="Cetak Poster QR"
-            >
-              🔲
-            </button>
-            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Poster QR</span>
-          </div>
-
-          <button
-            onClick={() => setActiveTab('APPROVAL')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 relative transition-all cursor-pointer active:scale-95 ${
-              activeTab === 'APPROVAL' || activeTab === 'APPROVALS' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold'
-            }`}
-          >
-            <span className="text-lg">☑️</span>
-            <span>Approval</span>
-            {pendingRequests.length > 0 ? (
-              <span className="absolute top-0.5 right-2 px-1.5 py-0.2 text-[8px] font-black bg-red-500 text-white rounded-full min-w-4 text-center animate-pulse shadow-2xs">
-                {pendingRequests.length}
-              </span>
-            ) : null}
-          </button>
-
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 text-slate-400 font-semibold cursor-pointer active:scale-95 hover:text-[#023246]"
-          >
-            <span className="text-lg">🎛️</span>
-            <span>Menu</span>
-          </button>
-        </div>
-      </nav>
 
       {/* ── COMMAND PALETTE (CTRL + K) SEARCH & NAV MODAL ── */}
       <AdminCommandPaletteModal
