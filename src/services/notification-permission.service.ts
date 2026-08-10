@@ -129,6 +129,62 @@ class NotificationPermissionService {
   }
 
   /**
+   * Ambil Set ID notifikasi yang sudah dibaca oleh user tertentu dari LocalStorage
+   */
+  public getReadNotificationIds(userId?: string): Set<string> {
+    if (typeof window === 'undefined' || !userId) return new Set();
+    try {
+      const saved = localStorage.getItem(`smart_absensi_read_notifications_${userId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+    } catch (e) {
+      console.warn('Failed to parse read notification IDs:', e);
+    }
+    return new Set();
+  }
+
+  /**
+   * Tandai ID notifikasi tertentu sebagai sudah dibaca untuk user tertentu
+   */
+  public markIdAsRead(userId: string | undefined, notificationId: string) {
+    if (typeof window === 'undefined' || !userId) return;
+    try {
+      const readSet = this.getReadNotificationIds(userId);
+      readSet.add(notificationId);
+      localStorage.setItem(`smart_absensi_read_notifications_${userId}`, JSON.stringify(Array.from(readSet)));
+      this.markAllAsRead();
+    } catch (e) {
+      console.warn('Failed to mark notification ID read:', e);
+    }
+  }
+
+  /**
+   * Tandai seluruh daftar ID notifikasi sebagai sudah dibaca untuk user tertentu
+   */
+  public markAllIdsAsRead(userId: string | undefined, notificationIds: string[]) {
+    if (typeof window === 'undefined' || !userId) return;
+    try {
+      const readSet = this.getReadNotificationIds(userId);
+      notificationIds.forEach((id) => readSet.add(id));
+      localStorage.setItem(`smart_absensi_read_notifications_${userId}`, JSON.stringify(Array.from(readSet)));
+      this.markAllAsRead();
+    } catch (e) {
+      console.warn('Failed to mark all notification IDs read:', e);
+    }
+  }
+
+  /**
+   * Cek apakah notifikasi ID tertentu sudah dibaca
+   */
+  public isNotificationRead(userId: string | undefined, notificationId: string): boolean {
+    if (!userId) return false;
+    const readSet = this.getReadNotificationIds(userId);
+    return readSet.has(notificationId);
+  }
+
+  /**
    * Kirim Notifikasi Native Browser (OS Desktop / HP) + Suara Chime + Cache
    */
   public sendNativeNotification(payload: AttendanceNotificationPayload) {

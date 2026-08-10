@@ -88,32 +88,34 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       const provider = ProviderFactory.getProvider();
       const authToken = token || 'MOCK_TOKEN';
       const items: DynamicNotificationItem[] = [];
-
+      const readSet = loadReadIdsFromStorage(user.id);
       const todayIso = new Date().toISOString().substring(0, 10);
 
       // 1. STATUS ABSEN SAYA (ADMIN / GURU / KEPSEK)
       const myTodayAtt = await provider.getTodayAttendance(user.id, authToken).catch(() => null);
       if (!myTodayAtt) {
+        const notifId = 'notif_my_status_pending';
         items.push({
-          id: 'notif_my_status_pending',
+          id: notifId,
           category: 'MY_STATUS',
           title: '⚠️ Status Presensi Anda Hari Ini',
           message: `Halo ${user.full_name}, Anda BELUM melakukan presensi masuk hari ini. Batas waktu tepat waktu adalah pukul 07:30 WIB.`,
           time: 'Hari ini',
           badgeType: 'ALERT',
-          isRead: false,
+          isRead: readSet.has(notifId),
         });
       } else {
         const statusText = myTodayAtt.status === 'TERLAMBAT' ? 'Terlambat' : 'Tepat Waktu';
         const checkInTimeClean = myTodayAtt.check_in_time ? myTodayAtt.check_in_time.substring(0, 5) + ' WIB' : 'Tercatat';
+        const notifId = 'notif_my_status_success';
         items.push({
-          id: 'notif_my_status_success',
+          id: notifId,
           category: 'MY_STATUS',
           title: '✅ Status Presensi Anda Hari Ini',
           message: `Presensi Masuk Anda tercatat pada jam ${checkInTimeClean} (${statusText}).`,
           time: checkInTimeClean,
           badgeType: 'SUCCESS',
-          isRead: false,
+          isRead: readSet.has(notifId),
         });
       }
 
@@ -128,15 +130,16 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           const teacherName = teacher?.full_name || 'Guru Sekolah';
           const timeClean = att.check_in_time ? att.check_in_time.substring(0, 5) + ' WIB' : 'Baru Saja';
           const isLate = att.status === 'TERLAMBAT';
+          const attNotifId = `notif_att_${att.id}`;
 
           items.push({
-            id: `notif_att_${att.id}`,
+            id: attNotifId,
             category: 'TEACHER_SCAN',
             title: isLate ? '📷 Presensi Guru (Terlambat)' : '📷 Presensi Guru Masuk',
             message: `${teacherName} telah melakukan absen masuk jam ${timeClean} [${att.status}].`,
             time: timeClean,
             badgeType: isLate ? 'WARNING' : 'INFO',
-            isRead: false,
+            isRead: readSet.has(attNotifId),
           });
         });
 
@@ -150,14 +153,15 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           : allTeachers.filter((t) => t.role === 'GURU' && !absentedUserIds.has(t.id)).length;
 
         if (!offCheck.isOff && unabsentedCount > 0) {
+          const unabsentNotifId = 'notif_unabsented_summary';
           items.push({
-            id: 'notif_unabsented_summary',
+            id: unabsentNotifId,
             category: 'SYSTEM_ALERT',
             title: '🔔 Monitoring Presensi Guru Hari Ini',
             message: `Terdapat ${unabsentedCount} dari ${allTeachers.length} Guru/Staf yang belum melakukan absensi masuk hari ini.`,
             time: 'Monitoring Realtime',
             badgeType: 'WARNING',
-            isRead: false,
+            isRead: readSet.has(unabsentNotifId),
           });
         }
 
@@ -166,14 +170,15 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         const activePendingLeaves = pendingLeaves.filter((l) => l.approval_status === 'PENDING');
 
         if (activePendingLeaves.length > 0) {
+          const pendingNotifId = 'notif_pending_leaves';
           items.push({
-            id: 'notif_pending_leaves',
+            id: pendingNotifId,
             category: 'LEAVE_REQUEST',
             title: '📝 Permohonan Cuti / Izin Menunggu',
             message: `Terdapat ${activePendingLeaves.length} permohonan izin/cuti guru yang memerlukan persetujuan.`,
             time: 'Menunggu Review',
             badgeType: 'WARNING',
-            isRead: false,
+            isRead: readSet.has(pendingNotifId),
           });
         }
       }
@@ -181,14 +186,15 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       // 4. Real-time Cached Events & System Notifications
       const cachedNotifs = NotificationService.getCachedNotifications(user.id);
       cachedNotifs.forEach((cn) => {
+        const cnId = cn.id || `cn_${Date.now()}_${Math.random()}`;
         items.push({
-          id: cn.id || `cn_${Date.now()}_${Math.random()}`,
+          id: cnId,
           category: cn.type === 'EVENT' ? 'SYSTEM_ALERT' : cn.type === 'LEAVE_REQUEST' ? 'LEAVE_REQUEST' : cn.type === 'CHECK_IN' || cn.type === 'CHECK_OUT' ? 'TEACHER_SCAN' : 'MY_STATUS',
           title: cn.title,
           message: cn.body,
           time: cn.time || 'Realtime',
           badgeType: cn.type === 'CHECK_IN' || cn.type === 'CHECK_OUT' ? 'SUCCESS' : cn.type === 'LEAVE_REQUEST' ? 'WARNING' : 'INFO',
-          isRead: false,
+          isRead: Boolean(cn.isRead) || readSet.has(cnId),
         });
       });
 
@@ -210,7 +216,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
             message: dbItem.message || '',
             time: dbItem.created_at ? new Date(dbItem.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Sistem',
             badgeType: badgeMap[dbItem.type] || 'INFO',
-            isRead: Boolean(dbItem.is_read),
+            isRead: Boolean(dbItem.is_read) || readSet.has(dbItem.id),
           });
         });
       }
@@ -289,6 +295,12 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
     notifications.forEach((n) => updated.add(n.id));
     saveReadIds(updated);
 
+    if (user?.id) {
+      NotificationService.markAllIdsAsRead(user.id, notifications.map((n) => n.id));
+    } else {
+      NotificationService.markAllAsRead();
+    }
+
     const provider = ProviderFactory.getProvider();
     const authToken = token || 'MOCK_TOKEN';
     notifications.forEach((n) => {
@@ -301,6 +313,10 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       const updated = new Set(readIds);
       updated.add(id);
       saveReadIds(updated);
+
+      if (user?.id) {
+        NotificationService.markIdAsRead(user.id, id);
+      }
 
       const provider = ProviderFactory.getProvider();
       const authToken = token || 'MOCK_TOKEN';

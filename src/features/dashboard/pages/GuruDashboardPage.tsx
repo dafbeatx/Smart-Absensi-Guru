@@ -26,6 +26,7 @@ import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
 import { VoiceSettingsCard } from '../../../components/dashboard/VoiceSettingsCard';
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
+import { NotificationService } from '../../../services/notification-permission.service';
 import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
 import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
@@ -408,7 +409,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       // 5. Backend-Driven Notifications
       try {
         const notifs = await provider.getNotifications(effectiveUser.id, authToken);
-        setNotifications(notifs || []);
+        const readIds = NotificationService.getReadNotificationIds(effectiveUser.id);
+        const mappedNotifs = (notifs || []).map((n) => ({
+          ...n,
+          is_read: Boolean(n.is_read) || readIds.has(n.id),
+        }));
+        setNotifications(mappedNotifs);
       } catch (err) {
         handleAppError(err, 'GuruDashboard.loadNotifications', 'Gagal memuat notifikasi', false);
       }
@@ -454,10 +460,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             const dayNames = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
             const dayName = dayNames[todayDayOfWeek] || 'Hari Ini';
             const piketNotifId = `notif_piket_${effectiveUser.id}_${getTodayDateInJakarta()}`;
+            const isPiketRead = NotificationService.isNotificationRead(effectiveUser.id, piketNotifId);
 
             setNotifications((prev) => {
-              if (prev.some((n) => n.id === piketNotifId || n.title.includes('Jadwal Piket'))) {
-                return prev;
+              const existingIdx = prev.findIndex((n) => n.id === piketNotifId || n.title.includes('Jadwal Piket'));
+              if (existingIdx !== -1) {
+                return prev.map((n, idx) =>
+                  idx === existingIdx
+                    ? { ...n, is_read: Boolean(n.is_read) || isPiketRead }
+                    : n
+                );
               }
               const newNotif: AppNotification = {
                 id: piketNotifId,
@@ -467,7 +479,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   myPiket.notes ? `Tugas: ${myPiket.notes}` : 'Selamat bertugas dan jaga ketertiban sekolah!'
                 }`,
                 type: 'INFO',
-                is_read: false,
+                is_read: isPiketRead,
                 created_at: new Date().toISOString(),
               };
               return [newNotif, ...prev];
@@ -552,6 +564,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const handleMarkAllNotificationsRead = async () => {
     try {
+      if (effectiveUser) {
+        NotificationService.markAllIdsAsRead(effectiveUser.id, notifications.map((n) => n.id));
+      }
       const provider = ProviderFactory.getProvider();
       const authToken = token || '';
       for (const n of notifications) {
@@ -566,6 +581,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     } catch (err) {
       handleAppError(err, 'GuruDashboard.markRead', 'Gagal memperbarui notifikasi');
     }
+  };
+
+  const handleMarkSingleNotificationRead = (id: string) => {
+    if (effectiveUser) {
+      NotificationService.markIdAsRead(effectiveUser.id, id);
+    }
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+    );
+    const provider = ProviderFactory.getProvider();
+    const authToken = token || '';
+    provider.markNotificationAsRead(id, authToken).catch(() => {});
   };
 
   const handleChangePinSubmit = async (e: React.FormEvent) => {
@@ -1454,8 +1481,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border text-xs space-y-1 transition-all ${
-                        !n.is_read ? 'bg-[#C8F2E0]/20 border-[#0D7A5F]/30' : 'bg-slate-50 border-slate-200 opacity-80'
+                      onClick={() => handleMarkSingleNotificationRead(n.id)}
+                      className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border text-xs space-y-1 transition-all cursor-pointer ${
+                        !n.is_read ? 'bg-[#C8F2E0]/20 border-[#0D7A5F]/30 hover:border-[#0D7A5F]' : 'bg-slate-50 border-slate-200 opacity-80'
                       }`}
                     >
                       <div className="flex items-center justify-between">
