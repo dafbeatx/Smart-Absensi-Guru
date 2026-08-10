@@ -77,7 +77,7 @@ const UserAvatar: React.FC<{
   }
 
   return (
-    <div className={`bg-gradient-to-br from-[#0D7A5F] to-[#023246] text-white flex items-center justify-center font-black ${className} ${textClassName}`}>
+    <div className={`bg-linear-to-br from-[#0D7A5F] to-[#023246] text-white flex items-center justify-center font-black ${className} ${textClassName}`}>
       {initial}
     </div>
   );
