@@ -626,31 +626,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             const status = rec?.status;
 
             let tileClass = 'bg-white border-slate-200/80 hover:border-emerald-500 hover:bg-emerald-50/20';
-            let badgeClass = 'text-slate-400 bg-slate-100';
-            let labelText = '';
 
             if (rec) {
               if (status === 'HADIR') {
                 tileClass = 'bg-emerald-500/10 border-emerald-400/80 hover:bg-emerald-500/20 text-emerald-950 shadow-2xs';
-                badgeClass = 'bg-emerald-600 text-white font-black';
-                labelText = rec.check_in_time ? rec.check_in_time.substring(0, 5) : 'Hadir';
               } else if (status === 'TERLAMBAT') {
                 tileClass = 'bg-amber-500/10 border-amber-400/80 hover:bg-amber-500/20 text-amber-950 shadow-2xs';
-                badgeClass = 'bg-amber-600 text-white font-black';
-                labelText = rec.check_in_time ? rec.check_in_time.substring(0, 5) : 'Lambat';
               } else if (status === 'IZIN' || status === 'SAKIT' || status === 'DINAS_LUAR') {
                 tileClass = 'bg-blue-500/10 border-blue-400/80 hover:bg-blue-500/20 text-blue-950 shadow-2xs';
-                badgeClass = 'bg-blue-600 text-white font-black';
-                labelText = status === 'DINAS_LUAR' ? 'Dinas' : status;
               } else if (status === 'ALFA') {
                 tileClass = 'bg-red-500/10 border-red-400/80 hover:bg-red-500/20 text-red-950 shadow-2xs';
-                badgeClass = 'bg-red-600 text-white font-black';
-                labelText = 'Alfa';
               }
             } else if (cell.isHoliday) {
               tileClass = 'bg-slate-100 border-slate-200 text-slate-400';
-              badgeClass = 'bg-slate-200 text-slate-600 font-bold';
-              labelText = 'Libur';
             }
 
             return (
@@ -665,7 +653,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     holidayDesc: cell.holidayDesc,
                   })
                 }
-                className={`aspect-square p-1.5 rounded-2xl border flex flex-col justify-between items-start transition-all cursor-pointer relative group ${tileClass} ${
+                className={`aspect-square p-1.5 rounded-2xl border flex flex-col justify-between items-center transition-all cursor-pointer relative group ${tileClass} ${
                   cell.isToday ? 'ring-2 ring-emerald-500 ring-offset-1 font-black shadow-md' : ''
                 }`}
               >
@@ -678,14 +666,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   )}
                 </div>
 
-                <div className="w-full truncate text-left mt-auto">
-                  {labelText ? (
-                    <span className={`inline-block px-1 py-0.2 rounded text-[8px] sm:text-[9px] font-black truncate max-w-full ${badgeClass}`}>
-                      {labelText}
-                    </span>
+                <div className="w-full flex items-center justify-center mt-auto pb-0.5">
+                  {rec ? (
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full shadow-2xs ${
+                        status === 'HADIR'
+                          ? 'bg-emerald-500 ring-2 ring-emerald-200'
+                          : status === 'TERLAMBAT'
+                          ? 'bg-amber-500 ring-2 ring-amber-200'
+                          : status === 'ALFA'
+                          ? 'bg-red-500 ring-2 ring-red-200'
+                          : 'bg-blue-500 ring-2 ring-blue-200'
+                      }`}
+                      title={status}
+                    />
+                  ) : cell.isHoliday ? (
+                    <span className="w-2 h-2 rounded-full bg-slate-300" title="Libur" />
                   ) : (
                     <span className="text-[9px] text-slate-300 font-bold block truncate">
-                      {cell.isWeekend ? 'Akhir Pekan' : '-'}
+                      {cell.isWeekend ? '•' : '-'}
                     </span>
                   )}
                 </div>
@@ -752,199 +751,155 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
           <>
-            {/* 0. Live Digital Running Clock Widget */}
-            <div className="bg-linear-to-r from-[#023246] via-[#1E5670] to-[#0D7A5F] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-card border border-emerald-500/30 flex items-center justify-between gap-3 relative overflow-hidden">
-              <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none" />
-              
-              <div className="space-y-0.5 min-w-0 z-10">
-                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-emerald-300 uppercase tracking-wider">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-                  </span>
-                  <span>Waktu Perangkat (WIB)</span>
-                </div>
-                <p className="text-xs sm:text-sm font-semibold text-slate-200 truncate capitalize">
-                  📅 {formattedFullDateStr}
-                </p>
-              </div>
+            {/* 🌟 1. MASTER UNIFIED HERO HEADER CARD ──────────────────────────── */}
+            <div className="bg-linear-to-br from-[#023246] via-[#10485E] to-[#0D7A5F] text-white rounded-3xl p-4.5 sm:p-5 shadow-lg border border-emerald-500/20 relative overflow-hidden space-y-4">
+              <div className="absolute -right-8 -top-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -left-8 -bottom-8 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
 
-              <div className="bg-black/30 backdrop-blur-md px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl border border-white/10 shrink-0 text-right z-10 shadow-inner">
-                <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-white flex items-center justify-end gap-1">
-                  <span>{formattedTimeStr}</span>
-                  <span className="text-[10px] sm:text-xs font-bold text-emerald-300">WIB</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 🌟 0.1. JADWAL PIKET GURU ALERT BANNER (Jika Guru Bertugas Hari Ini) */}
-            {isDutyTeacherToday && (
-              <div className="bg-linear-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-2xl sm:rounded-3xl p-4 shadow-lg border border-amber-300/60 relative overflow-hidden animate-fade-in">
-                <div className="flex items-start gap-3.5 relative z-10">
-                  <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shrink-0 shadow-inner ring-2 ring-white/30">
-                    🛡️
-                  </div>
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-white/25 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Jadwal Piket Hari Ini
-                      </span>
-                    </div>
-                    <h3 className="font-extrabold text-white text-base leading-tight">
-                      Selamat Bertugas Menjadi Guru Piket! 🌟
-                    </h3>
-                    <p className="text-xs text-amber-50 leading-relaxed font-medium">
-                      {todayDutyDetails?.notes
-                        ? todayDutyDetails.notes
-                        : 'Hari ini Anda bertugas sebagai Guru Piket. Mari sambut siswa dengan senyuman dan bina ketertiban sekolah.'}
-                    </p>
-                    {fellowDutyTeachers.length > 0 && (
-                      <div className="pt-2 border-t border-white/20 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span className="font-semibold text-amber-100">Rekan Piket:</span>
-                        {fellowDutyTeachers.map((t) => (
-                          <span key={t.id} className="bg-white/20 px-2 py-0.5 rounded-md font-bold text-white">
-                            👤 {t.teacher_name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 0.5. Live Network Signal & Offline Mode Status Card */}
-            <div className={`p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all shadow-xs flex items-center justify-between gap-3 ${
-              isOnline
-                ? 'bg-emerald-50/80 border-emerald-200/80 text-emerald-950'
-                : 'bg-amber-50 border-amber-300 text-amber-950 shadow-md animate-pulse'
-            }`}>
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 border ${
-                  isOnline
-                    ? 'bg-emerald-100 border-emerald-300 text-emerald-700'
-                    : 'bg-amber-100 border-amber-400 text-amber-800'
-                }`}>
-                  {isOnline ? '📶' : '⚡'}
-                </div>
-                <div className="min-w-0 space-y-0.5">
-                  <div className="flex items-center gap-1.5 font-extrabold text-xs sm:text-sm">
-                    <span className={`w-2 h-2 rounded-full ${
-                      isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-ping'
-                    }`} />
-                    <span>{isOnline ? 'Sinyal Terhubung (Mode Online)' : 'Mode Offline (Sinyal Lemah / Putus)'}</span>
-                  </div>
-                  <p className="text-[10px] sm:text-xs font-medium opacity-85 truncate">
-                    {isOnline
-                      ? pendingItems.length > 0
-                        ? `${pendingItems.length} presensi offline mengantre untuk dikirim.`
-                        : 'Semua data presensi tersinkronisasi otomatis ke server.'
-                      : 'Absensi tetap aman disimpan di HP & dikirim saat sinyal pulih.'}
-                  </p>
-                </div>
-              </div>
-
-              {pendingItems.length > 0 && (
-                <button
-                  onClick={() => SyncEngine.processSyncQueue()}
-                  disabled={syncState === 'SYNCING'}
-                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all active:scale-95 disabled:opacity-50 shrink-0 cursor-pointer flex items-center gap-1"
-                >
-                  <span>{syncState === 'SYNCING' ? '⏳' : '🔄'}</span>
-                  <span>{syncState === 'SYNCING' ? 'Syncing...' : `Sync (${pendingItems.length})`}</span>
-                </button>
-              )}
-            </div>
-
-            {/* 0.6. Teacher Well-being & Mood Check-in Banner */}
-            <section className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-xs sm:shadow-card border border-[#D4D4CE]/30 flex items-center justify-between gap-3 transition-all hover:border-emerald-300">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-2xl shrink-0 shadow-2xs">
-                  {todayMood ? (
-                    todayMood.mood === 'VERY_HAPPY' ? '😊' :
-                    todayMood.mood === 'HAPPY' ? '🙂' :
-                    todayMood.mood === 'NEUTRAL' ? '😐' :
-                    todayMood.mood === 'TIRED' ? '😟' : '😫'
-                  ) : '💚'}
-                </div>
-                <div className="min-w-0 space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm sm:text-base font-black text-[#023246] tracking-tight">
-                      Mood Check-in Harian Guru
-                    </h3>
-                    {todayMood ? (
-                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
-                        ✓ Tercatat ✨
-                      </span>
+              {/* Profile Greeting & Avatar Row */}
+              <div className="flex items-center justify-between gap-3 relative z-10">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md p-0.5 border border-white/20 text-white font-black text-xl flex items-center justify-center shadow-inner overflow-hidden shrink-0 ring-2 ring-white/10">
+                    {effectiveUser.avatar_url ? (
+                      <img src={effectiveUser.avatar_url} alt={effectiveUser.full_name} className="w-full h-full object-cover rounded-xl" />
                     ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
-                        Belum Diisi
-                      </span>
+                      effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'
                     )}
                   </div>
-                  <p className="text-xs font-semibold text-slate-600 truncate">
-                    {todayMood
-                      ? `Status Mood: ${todayMood.mood === 'VERY_HAPPY' ? 'Semangat 😊' : todayMood.mood === 'HAPPY' ? 'Baik 🙂' : todayMood.mood === 'NEUTRAL' ? 'Biasa 😐' : todayMood.mood === 'TIRED' ? 'Lelah 😟' : 'Stres 😫'}${todayMood.note ? ` • ${todayMood.note}` : ''}`
-                      : 'Bagaimana kondisi & perasaan Bapak/Ibu Guru pagi ini? Mari isi mood check-in!'}
-                  </p>
+                  <div className="space-y-0.5 min-w-0">
+                    <span className="text-[10px] font-extrabold text-emerald-300 tracking-wider uppercase flex items-center gap-1">
+                      <span>{getTimeBasedGreeting()}</span>
+                    </span>
+                    <h2 className="text-sm sm:text-base font-black text-white leading-tight truncate">
+                      {effectiveUser.full_name}
+                    </h2>
+                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-200 truncate">
+                      {effectiveUser.nip ? `NPP/NIP. ${effectiveUser.nip}` : effectiveUser.position || 'Guru Pengajar'}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsMoodModalOpen(true)}
-                className="px-4 py-2 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs rounded-xl shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer flex items-center gap-1.5 border border-[#0D7A5F]"
-              >
-                <span>{todayMood ? '✏️ Ubah Mood' : '✨ Isi Mood'}</span>
-              </button>
-            </section>
 
-            {/* 1. Top Profile Header Card */}
-            <section className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-xs sm:shadow-card border border-[#D4D4CE]/30 flex items-center justify-between gap-3">
-              <div className="space-y-0.5 min-w-0">
-                <span className="text-[11px] sm:text-xs font-bold text-[#0D7A5F] flex items-center gap-1">
-                  <span>{getTimeBasedGreeting()}</span>
-                </span>
-                <h2 className="text-sm sm:text-base font-extrabold text-[#023246] leading-snug truncate">
-                  {effectiveUser.full_name}
-                </h2>
-                {effectiveUser.nip ? (
-                  <p className="text-[11px] sm:text-xs font-medium text-slate-500 truncate">
-                    NPP/NIP. {effectiveUser.nip}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col items-center gap-1 shrink-0">
-                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#C8F2E0] text-[#0D7A5F] font-black text-lg sm:text-xl flex items-center justify-center shadow-inner border border-[#0D7A5F]/20 overflow-hidden shrink-0">
-                  {effectiveUser.avatar_url ? (
-                    <img src={effectiveUser.avatar_url} alt={effectiveUser.full_name} className="w-full h-full object-cover" />
-                  ) : (
-                    effectiveUser.full_name ? effectiveUser.full_name.charAt(0) : 'G'
-                  )}
-                </div>
                 <button
+                  type="button"
                   onClick={() => setActiveTab('PROFIL')}
-                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-[#023246] text-[9px] sm:text-[10px] font-bold rounded-full border border-slate-200 transition-colors cursor-pointer"
+                  className="px-2.5 py-1 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-[10px] font-black rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer shrink-0"
                 >
                   Profil
                 </button>
               </div>
-            </section>
 
-            {/* 2. Today Attendance & Work Schedule Card */}
-            <section className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 shadow-xs sm:shadow-card border border-[#D4D4CE]/30 space-y-3 sm:space-y-3.5">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="text-[10px] font-extrabold text-[#0D7A5F] tracking-wider uppercase">
-                    Status Presensi Hari Ini
+              {/* Digital Clock & Date Row */}
+              <div className="bg-black/30 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 flex items-center justify-between gap-3 relative z-10 shadow-inner">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                    </span>
+                    <span>Waktu Perangkat</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-200 truncate capitalize">
+                    📅 {formattedFullDateStr}
+                  </p>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-white flex items-center justify-end gap-1">
+                    <span>{formattedTimeStr}</span>
+                    <span className="text-[10px] font-extrabold text-emerald-300">WIB</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Badges Row (Network Signal & Mood & Piket) */}
+              <div className="flex flex-wrap items-center gap-2 relative z-10 pt-0.5">
+                {/* Network Signal Badge */}
+                <div className={`px-2.5 py-1 rounded-xl border text-[10px] font-extrabold backdrop-blur-md flex items-center gap-1.5 ${
+                  isOnline
+                    ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-200'
+                    : 'bg-amber-500/30 border-amber-400/50 text-amber-200 animate-pulse'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
+                  <span>{isOnline ? 'Online' : 'Offline'}</span>
+                  {pendingItems.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        SyncEngine.processSyncQueue();
+                      }}
+                      disabled={syncState === 'SYNCING'}
+                      className="ml-1 px-1.5 py-0.2 bg-emerald-600 text-white rounded font-black cursor-pointer hover:bg-emerald-700"
+                    >
+                      {syncState === 'SYNCING' ? '⏳' : `Sync (${pendingItems.length})`}
+                    </button>
+                  )}
+                </div>
+
+                {/* Mood Check-in Pill */}
+                <button
+                  type="button"
+                  onClick={() => setIsMoodModalOpen(true)}
+                  className="px-2.5 py-1 rounded-xl border border-white/20 bg-white/15 hover:bg-white/25 text-white text-[10px] font-extrabold backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>
+                    {todayMood ? (
+                      todayMood.mood === 'VERY_HAPPY' ? '😊' :
+                      todayMood.mood === 'HAPPY' ? '🙂' :
+                      todayMood.mood === 'NEUTRAL' ? '😐' :
+                      todayMood.mood === 'TIRED' ? '😟' : '😫'
+                    ) : '💚'}
                   </span>
-                  <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">
-                    {new Date().toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                  <span>{todayMood ? `Mood: ${todayMood.mood === 'VERY_HAPPY' ? 'Semangat' : todayMood.mood === 'HAPPY' ? 'Baik' : todayMood.mood === 'NEUTRAL' ? 'Biasa' : todayMood.mood === 'TIRED' ? 'Lelah' : 'Stres'}` : 'Isi Mood'}</span>
+                  <span className="text-[9px] opacity-75">✏️</span>
+                </button>
+
+                {/* Duty Piket Pill if Active Today */}
+                {isDutyTeacherToday && (
+                  <div className="px-2.5 py-1 rounded-xl border border-amber-300/40 bg-amber-500/30 text-amber-100 text-[10px] font-black backdrop-blur-md flex items-center gap-1">
+                    <span>🛡️</span>
+                    <span>Guru Piket Hari Ini</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Piket Details Expand Banner if duty teacher */}
+            {isDutyTeacherToday && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-1.5 text-amber-950 shadow-2xs">
+                <div className="flex items-center gap-2 font-black text-xs text-amber-900">
+                  <span>🛡️ Selamat Bertugas Menjadi Guru Piket Hari Ini!</span>
+                </div>
+                <p className="text-[11px] text-amber-900 font-medium leading-relaxed">
+                  {todayDutyDetails?.notes || 'Mari sambut siswa dengan senyuman dan bina ketertiban sekolah.'}
+                </p>
+                {fellowDutyTeachers.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1 text-[10px] pt-1 border-t border-amber-200/60">
+                    <span className="font-bold text-amber-800">Rekan Piket:</span>
+                    {fellowDutyTeachers.map((t) => (
+                      <span key={t.id} className="bg-amber-100 px-1.5 py-0.2 rounded font-extrabold text-amber-900">
+                        👤 {t.teacher_name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 🌟 2. TODAY ATTENDANCE & WORK SCHEDULE HUB ────────────────────── */}
+            <section className="bg-white rounded-3xl p-4 sm:p-4.5 shadow-card border border-slate-200/80 space-y-4">
+              {/* Card Header & Status Badge */}
+              <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
+                <div>
+                  <h3 className="text-xs font-black text-[#023246] uppercase tracking-wider">
+                    Status Presensi Hari Ini
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                    {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                 </div>
 
                 {isTodayOff.isOff ? (
-                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 text-[10px] sm:text-xs font-black rounded-full border border-emerald-300 shrink-0 flex items-center gap-1">
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-black rounded-full border border-emerald-300 shrink-0 flex items-center gap-1 shadow-2xs">
                     <span>🌴</span>
                     <span>{isTodayOff.reason}</span>
                   </span>
@@ -959,13 +914,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       : todayAttendance.status}
                   </Badge>
                 ) : (
-                  <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] sm:text-xs font-bold rounded-full border border-amber-200 shrink-0">
+                  <span className="px-2.5 py-1 bg-amber-50 text-amber-800 text-xs font-black rounded-full border border-amber-300 shrink-0">
                     ⏳ Belum Presensi
                   </span>
                 )}
               </div>
 
-              {/* Dynamic Work Hours Display from Settings (Sync Friday Schedule) */}
+              {/* Work Hours Schedule Banner */}
               {(() => {
                 const isFriday = new Date().getDay() === 5;
                 const checkoutStart = isFriday
@@ -973,15 +928,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   : settings.work_checkout_start;
 
                 return (
-                  <div className="bg-[#F6F6F6] p-2.5 sm:p-3 rounded-xl sm:rounded-2xl flex items-center justify-between text-xs border border-slate-200/60">
+                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center justify-between text-xs border border-slate-200/80">
                     <div className="space-y-0.5">
-                      <span className="text-slate-500 font-bold block text-[9px] sm:text-[10px] uppercase">Batas Absen Masuk</span>
+                      <span className="text-slate-500 font-extrabold block text-[10px] uppercase tracking-wider">Batas Absen Masuk</span>
                       <span className="font-black text-[#023246] text-xs sm:text-sm">{settings.work_checkin_end} WIB</span>
                     </div>
-                    <div className="h-7 w-px bg-slate-300 mx-1" />
+                    <div className="h-7 w-px bg-slate-200 mx-2" />
                     <div className="space-y-0.5 text-right">
-                      <span className="text-slate-500 font-bold block text-[9px] sm:text-[10px] uppercase">
-                        Mulai Absen Pulang {isFriday ? '(Jumat)' : ''}
+                      <span className="text-slate-500 font-extrabold block text-[10px] uppercase tracking-wider">
+                        Absen Pulang {isFriday ? '(Jumat)' : ''}
                       </span>
                       <span className="font-black text-[#023246] text-xs sm:text-sm">{checkoutStart} WIB</span>
                     </div>
@@ -989,94 +944,80 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 );
               })()}
 
-              {/* Check-In / Check-Out Log Details */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs">
-                <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-emerald-50/60 border border-emerald-200/60 space-y-0.5">
-                  <span className="text-[9px] sm:text-[10px] font-extrabold text-emerald-800 uppercase block">Jam Masuk</span>
-                  <p className="font-black text-emerald-950 text-sm sm:text-base">
+              {/* Check-In / Check-Out Log Details Grid */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1 shadow-2xs">
+                  <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Jam Masuk</span>
+                  <p className="font-black text-emerald-950 text-base sm:text-lg">
                     {todayAttendance?.check_in_time ? todayAttendance.check_in_time.substring(0, 5) : '--:--'}
                   </p>
-                  <span className="text-[9px] sm:text-[10px] text-emerald-700 font-semibold block truncate">
-                    {todayAttendance?.check_in_time ? 'Terdaftar Valid' : isTodayOff.isOff ? 'Hari Libur' : 'Belum Absen'}
+                  <span className="text-[10px] text-emerald-700 font-bold block truncate">
+                    {todayAttendance?.check_in_time ? 'Tercatat Valid ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Belum Absen'}
                   </span>
                 </div>
 
-                <div className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-blue-50/60 border border-blue-200/60 space-y-0.5">
-                  <span className="text-[9px] sm:text-[10px] font-extrabold text-blue-800 uppercase block">Jam Pulang</span>
-                  <p className="font-black text-blue-950 text-sm sm:text-base">
+                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1 shadow-2xs">
+                  <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider block">Jam Pulang</span>
+                  <p className="font-black text-blue-950 text-base sm:text-lg">
                     {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
                   </p>
-                  <span className="text-[9px] sm:text-[10px] text-blue-700 font-semibold block truncate">
-                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai' : isTodayOff.isOff ? 'Hari Libur' : 'Belum Absen'}
+                  <span className="text-[10px] text-blue-700 font-bold block truncate">
+                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Belum Absen'}
                   </span>
                 </div>
               </div>
 
-              {/* Pre-Scan GPS Health Status Indicator & Camera Pre-Warm Handler */}
-              <div className="flex items-center justify-between bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/80 text-[11px] sm:text-xs">
-                <span className="font-semibold text-slate-600 flex items-center gap-1">
-                  <span>📍 GPS Readiness:</span>
-                </span>
-                <span className={`font-extrabold flex items-center gap-1.5 ${
-                  gpsHealth.status === 'READY' ? 'text-emerald-700' : 'text-amber-700 animate-pulse'
-                }`}>
-                  <span className={`w-2 h-2 rounded-full ${
-                    gpsHealth.status === 'READY' ? 'bg-emerald-500' : 'bg-amber-500 animate-ping'
-                  }`} />
-                  <span>{gpsHealth.text}</span>
-                </span>
-              </div>
-
-              {/* Live OpenStreetMap Preview Box under GPS Readiness */}
+              {/* GPS Readiness & Live Map Box */}
               {(() => {
                 const isOfflineMode = typeof navigator !== 'undefined' && !navigator.onLine;
                 const rawAllowed = getEffectiveAllowedRadius(settings.geofence_radius);
                 const effectiveAllowedRadius = isOfflineMode ? Math.max(rawAllowed, 500) : rawAllowed;
 
                 return (
-                  <div className="space-y-1 pt-0.5">
-                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-extrabold text-slate-700 px-0.5">
-                      <span className="flex items-center gap-1">
-                        <span>🗺️</span> Peta Lokasi Real-time Anda
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-0.5">
+                      <span className="flex items-center gap-1.5 font-black text-[#023246]">
+                        <span>🗺️ Lokasi Real-time Anda</span>
                       </span>
-                      {isOfflineMode ? (
-                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-extrabold rounded-md text-[9px] truncate max-w-xs">
-                          ⚡ Mode Offline: radius toleransi sementara 500m
-                        </span>
-                      ) : (
-                        <span className="text-[9px] text-slate-400 font-mono">
-                          {userCoords ? `±${Math.round(userCoords.accuracy)}m` : 'Mendeteksi...'}
-                        </span>
-                      )}
+                      <span className={`px-2 py-0.5 text-[10px] font-black rounded-lg border ${
+                        gpsHealth.status === 'READY'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : 'bg-amber-50 text-amber-800 border-amber-300'
+                      }`}>
+                        📍 {gpsHealth.text}
+                      </span>
                     </div>
-                    <LiveLocationMap
-                      userLat={userCoords?.latitude}
-                      userLng={userCoords?.longitude}
-                      schoolLat={settings.geofence_lat || CONSTANTS.DEFAULTS.GEOFENCE_LAT}
-                      schoolLng={settings.geofence_lng || CONSTANTS.DEFAULTS.GEOFENCE_LNG}
-                      allowedRadius={effectiveAllowedRadius}
-                      accuracy={userCoords?.accuracy}
-                      height="165px"
-                    />
+
+                    <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
+                      <LiveLocationMap
+                        userLat={userCoords?.latitude}
+                        userLng={userCoords?.longitude}
+                        schoolLat={settings.geofence_lat || CONSTANTS.DEFAULTS.GEOFENCE_LAT}
+                        schoolLng={settings.geofence_lng || CONSTANTS.DEFAULTS.GEOFENCE_LNG}
+                        allowedRadius={effectiveAllowedRadius}
+                        accuracy={userCoords?.accuracy}
+                        height="160px"
+                      />
+                    </div>
                   </div>
                 );
               })()}
 
               {/* Action Button or Off-Day Informative Banner */}
               {isTodayOff.isOff ? (
-                <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-emerald-900 flex items-center gap-3 shadow-2xs">
-                  <span className="text-2xl shrink-0">🌴</span>
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-center gap-3 shadow-2xs">
+                  <span className="text-3xl shrink-0">🌴</span>
                   <div className="space-y-0.5 text-xs">
-                    <p className="font-extrabold text-emerald-950">Hari Ini Libur ({isTodayOff.reason})</p>
+                    <p className="font-black text-emerald-950 text-sm">Hari Ini Libur ({isTodayOff.reason})</p>
                     <p className="text-[11px] text-emerald-800 font-medium leading-relaxed">
-                      Sesuai pengaturan jam kerja sekolah, tidak ada kewajiban presensi hari ini. Selamat beristirahat bersama keluarga!
+                      Sesuai jadwal sekolah, tidak ada kewajiban presensi hari ini. Selamat beristirahat!
                     </p>
                   </div>
                 </div>
               ) : (
                 <Button
                   variant="primary"
-                  leftIcon={<QrCodeScanIcon className="w-5 h-5 text-white shrink-0" />}
+                  leftIcon={<QrCodeScanIcon className="w-6 h-6 text-white shrink-0" />}
                   onClick={handleOpenScannerClick}
                   onMouseEnter={() => {
                     import('html5-qrcode').catch(() => {});
@@ -1084,51 +1025,51 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   onTouchStart={() => {
                     import('html5-qrcode').catch(() => {});
                   }}
-                  className="w-full py-3.5 text-xs sm:text-sm font-black tracking-tight shadow-md flex-row items-center justify-center gap-2.5 cursor-pointer rounded-2xl"
+                  className="w-full py-4 text-xs sm:text-sm font-black tracking-tight shadow-md shadow-emerald-700/20 flex-row items-center justify-center gap-2.5 cursor-pointer rounded-2xl bg-linear-to-r from-[#0D7A5F] to-[#095744] hover:from-[#095744] hover:to-[#023246] transition-all active:scale-[0.98]"
                 >
                   PINDAI QR CODE ABSENSI (SCANNER HP)
                 </Button>
               )}
             </section>
 
-            {/* 3. Quick Action Feature Grid */}
-            <section className="grid grid-cols-3 gap-2 sm:gap-3">
+            {/* 🌟 3. QUICK ACTION FEATURE CARDS ─────────────────────────────── */}
+            <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
               <button
                 onClick={handleOpenLeaveModal}
-                className="p-2.5 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-1.5 cursor-pointer group"
+                className="p-3 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
               >
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-base sm:text-xl font-bold group-hover:scale-105 transition-transform shrink-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-lg sm:text-xl font-bold group-hover:scale-110 transition-transform shrink-0 shadow-2xs">
                   📝
                 </div>
                 <div>
-                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight">Izin / Cuti</h3>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium hidden sm:block">Sakit & Cuti</p>
+                  <h3 className="font-black text-[#023246] text-xs leading-tight">Izin / Cuti</h3>
+                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Pengajuan</p>
                 </div>
               </button>
 
               <button
                 onClick={handleOpenCorrectionModal}
-                className="p-2.5 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-1.5 cursor-pointer group"
+                className="p-3 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
               >
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-base sm:text-xl font-bold group-hover:scale-105 transition-transform shrink-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-lg sm:text-xl font-bold group-hover:scale-110 transition-transform shrink-0 shadow-2xs">
                   ✏️
                 </div>
                 <div>
-                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight">Koreksi Absen</h3>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium hidden sm:block">Ke Admin</p>
+                  <h3 className="font-black text-[#023246] text-xs leading-tight">Koreksi Absen</h3>
+                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Ke Admin</p>
                 </div>
               </button>
 
               <button
                 onClick={() => setIsScheduleModalOpen(true)}
-                className="p-2.5 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-1.5 cursor-pointer group"
+                className="p-3 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
               >
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 text-[#0D7A5F] flex items-center justify-center text-base sm:text-xl font-bold group-hover:scale-105 transition-transform shrink-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-[#0D7A5F] border border-emerald-200 flex items-center justify-center text-lg sm:text-xl font-bold group-hover:scale-110 transition-transform shrink-0 shadow-2xs">
                   📅
                 </div>
                 <div>
-                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight">Jadwal Mengajar</h3>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium hidden sm:block">Jam Kelas</p>
+                  <h3 className="font-black text-[#023246] text-xs leading-tight">Jadwal Kelas</h3>
+                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Mengajar</p>
                 </div>
               </button>
             </section>
@@ -1568,61 +1509,61 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       </main>
 
       {/* ── MOBILE BOTTOM NAVIGATION DOCK ──────────────────────────────────── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-[#D4D4CE]/30 px-2 py-1 z-40 shadow-lg">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-3 py-1.5 z-40 shadow-lg">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('BERANDA')}
-            className={`flex flex-col items-center gap-0.5 text-[9px] sm:text-[10px] w-12 sm:w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'BERANDA' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer ${
+              activeTab === 'BERANDA' ? 'text-[#0D7A5F] font-black scale-105' : 'text-slate-400 font-bold hover:text-slate-600'
             }`}
           >
-            <span className="text-base sm:text-lg">🏠</span>
+            <span className="text-lg leading-none">🏠</span>
             <span>Beranda</span>
           </button>
 
           <button
             onClick={() => setActiveTab('RIWAYAT')}
-            className={`flex flex-col items-center gap-0.5 text-[9px] sm:text-[10px] w-12 sm:w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'RIWAYAT' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer ${
+              activeTab === 'RIWAYAT' ? 'text-[#0D7A5F] font-black scale-105' : 'text-slate-400 font-bold hover:text-slate-600'
             }`}
           >
-            <span className="text-base sm:text-lg">📊</span>
+            <span className="text-lg leading-none">📊</span>
             <span>Riwayat</span>
           </button>
 
-          {/* Center FAB Scanner Button */}
-          <div className="relative -top-4 sm:-top-5 flex flex-col items-center">
+          {/* Center Elevated FAB Scanner Button */}
+          <div className="relative -top-5 flex flex-col items-center">
             <button
               onClick={handleOpenScannerClick}
-              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#0D7A5F] text-white flex items-center justify-center shadow-lg shadow-[#0D7A5F]/30 ring-3 ring-white active:scale-95 transition-transform cursor-pointer"
-              title="Pindai QR Code (Icon by ChilliColor - Flaticon)"
+              className="w-14 h-14 rounded-full bg-linear-to-tr from-[#0D7A5F] to-[#12A17E] text-white flex items-center justify-center shadow-lg shadow-[#0D7A5F]/35 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
+              title="Pindai QR Code Absensi"
             >
-              <QrCodeScanIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              <QrCodeScanIcon className="w-7 h-7 text-white" />
             </button>
           </div>
 
           <button
             onClick={() => setActiveTab('NOTIFIKASI')}
-            className={`flex flex-col items-center gap-0.5 text-[9px] sm:text-[10px] w-12 sm:w-14 py-1 transition-colors cursor-pointer relative ${
-              activeTab === 'NOTIFIKASI' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer relative ${
+              activeTab === 'NOTIFIKASI' ? 'text-[#0D7A5F] font-black scale-105' : 'text-slate-400 font-bold hover:text-slate-600'
             }`}
           >
             {unreadCount > 0 && (
-              <span className="absolute -top-1 right-2 px-1 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-3.5 text-center ring-1.5 ring-white animate-pulse">
+              <span className="absolute -top-1 right-2 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white animate-pulse">
                 {unreadCount}
               </span>
             )}
-            <span className={`text-base sm:text-lg ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>🔔</span>
+            <span className={`text-lg leading-none ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>🔔</span>
             <span>Notif</span>
           </button>
 
           <button
             onClick={() => setActiveTab('PROFIL')}
-            className={`flex flex-col items-center gap-0.5 text-[9px] sm:text-[10px] w-12 sm:w-14 py-1 transition-colors cursor-pointer ${
-              activeTab === 'PROFIL' ? 'text-[#0D7A5F] font-black' : 'text-slate-400 font-semibold'
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer ${
+              activeTab === 'PROFIL' ? 'text-[#0D7A5F] font-black scale-105' : 'text-slate-400 font-bold hover:text-slate-600'
             }`}
           >
-            <span className="text-base sm:text-lg">👤</span>
+            <span className="text-lg leading-none">👤</span>
             <span>Profil</span>
           </button>
         </div>
