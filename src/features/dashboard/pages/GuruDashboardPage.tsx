@@ -483,7 +483,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       const authToken = token || '';
       for (const n of notifications) {
         if (!n.is_read) {
-          await provider.markNotificationAsRead(n.id, authToken);
+          await provider.markNotificationAsRead(n.id, authToken).catch((err) => {
+            logger.warn('GuruDashboardPage', 'markNotificationAsRead error for item:', err);
+          });
         }
       }
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));

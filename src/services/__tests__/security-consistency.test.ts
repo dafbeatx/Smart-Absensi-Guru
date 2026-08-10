@@ -244,6 +244,11 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Teacher Sync - markNotificationAsRead persists status', markRes === true);
   }
 
+  // Test Non-UUID Synthetic Notification (e.g. Piket schedule notification)
+  const piketNotifId = 'notif_piket_usr_admin_001_2026-08-10';
+  const syntheticMarkRes = await mockProvider.markNotificationAsRead(piketNotifId, 'MOCK_TOKEN');
+  assert('Teacher Sync - markNotificationAsRead handles synthetic non-UUID ID gracefully', syntheticMarkRes === true);
+
   // Test Device Binding Check Response
   const bindingCheck = await mockProvider.checkDeviceBinding(mockGuruUser.id, 'DEV_TEST_UUID', 'MOCK_TOKEN');
   assert('Teacher Sync - checkDeviceBinding returns valid status', ['ACTIVE', 'UNBOUND', 'DIFFERENT_DEVICE', 'NEEDS_ADMIN_RESET', 'UNAVAILABLE'].includes(bindingCheck.status));

@@ -1055,6 +1055,12 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async markNotificationAsRead(notificationId: string, _token: string): Promise<boolean> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notificationId);
+    if (!isUuid) {
+      logger.info('SupabaseProvider', 'Skipping DB update for synthetic/local notification ID:', notificationId);
+      return true;
+    }
+
     const { error } = await this.client
       .from('notifications')
       .update({ is_read: true })
