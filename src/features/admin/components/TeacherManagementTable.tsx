@@ -82,6 +82,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     } catch (e) {
       console.warn('Failed to cache teachers to localStorage:', e);
     }
+    window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
 
     await AuditLogger.log({
       actorId: user?.id || 'op_1',
@@ -188,6 +189,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     } catch (e) {
       console.warn('Failed to cache teachers to localStorage:', e);
     }
+    window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
 
     if (user && selectedTeacher && (user.id === selectedTeacher.id || (Boolean(user.nip) && user.nip === selectedTeacher.nip))) {
       useAuthStore.getState().updateUserProfile(updates);

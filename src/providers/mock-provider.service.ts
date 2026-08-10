@@ -598,24 +598,81 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getAllUsers(_token: string): Promise<UserProfile[]> {
-    return [];
+    const saved = safeGetStorage('smart_absensi_teachers');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.warn('Failed to parse cached teachers:', e);
+      }
+    }
+    const defaultUsers: UserProfile[] = [
+      {
+        id: 'usr_admin_1001',
+        nip: '199501012020011001',
+        full_name: 'Rina Fitriani, S.Kom.',
+        phone_number: '0895351251395',
+        role: 'ADMIN',
+        position: 'Admin Website & IT Sekolah',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'usr_kepsek_1001',
+        nip: '197504122003121001',
+        full_name: 'Drs. H. M. Yusuf, M.Pd.',
+        phone_number: '081234567891',
+        role: 'KEPSEK',
+        position: 'Kepala Sekolah Utama',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'usr_guru_1001',
+        nip: '198905202014021003',
+        full_name: 'Guru Pengajar, S.Pd',
+        phone_number: '081234567890',
+        role: 'GURU',
+        position: 'Guru Utama / Pendidik',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+    ];
+    safeSetStorage('smart_absensi_teachers', JSON.stringify(defaultUsers));
+    return defaultUsers;
   }
 
   public async createUser(user: Partial<UserProfile>, _token: string): Promise<UserProfile> {
-    return {
-      id: 'usr_mock_' + Date.now(),
+    const newUser: UserProfile = {
+      id: user.id || 'usr_mock_' + Date.now(),
       nip: user.nip || '',
       full_name: user.full_name || '',
       phone_number: user.phone_number || '',
       role: user.role || 'GURU',
       position: user.position || '',
-      avatar_url: null,
-      is_active: true,
+      avatar_url: user.avatar_url || null,
+      is_active: user.is_active !== undefined ? user.is_active : true,
       created_at: new Date().toISOString(),
     };
+    const allUsers = await this.getAllUsers(_token);
+    const updated = [...allUsers.filter((u) => u.id !== newUser.id), newUser];
+    safeSetStorage('smart_absensi_teachers', JSON.stringify(updated));
+    return newUser;
   }
 
-  public async updateUser(_userId: string, _updates: Partial<UserProfile>, _token: string): Promise<boolean> {
+  public async updateUser(userId: string, updates: Partial<UserProfile>, _token: string): Promise<boolean> {
+    const allUsers = await this.getAllUsers(_token);
+    const updated = allUsers.map((u) => (u.id === userId || (u.nip && u.nip === userId) ? { ...u, ...updates } : u));
+    safeSetStorage('smart_absensi_teachers', JSON.stringify(updated));
+
+    const activeUser = useAuthStore.getState().user;
+    if (activeUser && (activeUser.id === userId || (activeUser.nip && activeUser.nip === userId))) {
+      useAuthStore.getState().updateUserProfile(updates);
+    }
     return true;
   }
 
@@ -627,10 +684,7 @@ export class MockProvider implements IDataProvider {
       reader.readAsDataURL(file);
     });
 
-    const activeUser = useAuthStore.getState().user;
-    if (activeUser && activeUser.id === userId) {
-      useAuthStore.getState().updateUserProfile({ avatar_url: dataUrl });
-    }
+    await this.updateUser(userId, { avatar_url: dataUrl }, '');
     return dataUrl;
   }
 

@@ -798,6 +798,11 @@ export class SupabaseProvider implements IDataProvider {
 
     const { error } = await this.client.from('users').update(payload).eq('id', userId);
     if (error) throw new Error('Gagal memperbarui data pengguna: ' + error.message);
+
+    const activeUser = useAuthStore.getState().user;
+    if (activeUser && (activeUser.id === userId || (activeUser.nip && activeUser.nip === userId))) {
+      useAuthStore.getState().updateUserProfile(updates);
+    }
     return true;
   }
 

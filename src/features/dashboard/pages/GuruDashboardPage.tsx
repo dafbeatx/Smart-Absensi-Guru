@@ -368,6 +368,26 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       const provider = ProviderFactory.getProvider();
       const authToken = token || '';
 
+      // 0. Sync Profile Avatar & Details from LocalStorage smart_absensi_teachers & DB
+      try {
+        const savedTeachersStr = typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_teachers') : null;
+        let teacherList: UserProfile[] = savedTeachersStr ? JSON.parse(savedTeachersStr) : [];
+        if (!Array.isArray(teacherList) || teacherList.length === 0) {
+          teacherList = await provider.getAllUsers(authToken).catch(() => []);
+        }
+        const matched = teacherList.find(
+          (t) =>
+            t.id === effectiveUser.id ||
+            (Boolean(t.nip) && t.nip === effectiveUser.nip) ||
+            (Boolean(t.full_name) && t.full_name.toLowerCase() === effectiveUser.full_name.toLowerCase())
+        );
+        if (matched && matched.avatar_url && matched.avatar_url !== effectiveUser.avatar_url) {
+          useAuthStore.getState().updateUserProfile({ avatar_url: matched.avatar_url });
+        }
+      } catch (e) {
+        // ignore profile sync warning
+      }
+
       // 1. Settings
       try {
         const sysSettings = await provider.getSettings();
@@ -515,10 +535,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
+    window.addEventListener('smart_absensi_teachers_updated', handleScannedEvent);
+    window.addEventListener('storage', handleScannedEvent);
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
+      window.removeEventListener('smart_absensi_teachers_updated', handleScannedEvent);
+      window.removeEventListener('storage', handleScannedEvent);
     };
   }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);
 
