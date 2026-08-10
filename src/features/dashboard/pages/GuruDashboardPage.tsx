@@ -806,7 +806,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       )}
 
       {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-[#DDD9D0] sticky top-0 z-30 shadow-2xs max-w-[480px] mx-auto">
+      <header className="flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-[#DDD9D0] sticky top-0 z-30 shadow-2xs max-w-120 mx-auto">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-xs ring-2 ring-emerald-50">
             <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
@@ -815,7 +815,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             <h1 className="font-extrabold text-[#023246] text-xs tracking-tight leading-tight uppercase truncate">
               Smart Absensi Guru
             </h1>
-            <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate max-w-[200px]">
+            <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate max-w-50">
               {settings.institution_name}
             </p>
           </div>
@@ -823,7 +823,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
         <button
           onClick={() => setActiveTab('NOTIFIKASI')}
-          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 min-h-11 min-w-11 flex items-center justify-center active:scale-95"
           aria-label="Notifikasi"
         >
           <span className={`text-lg transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>
@@ -837,7 +837,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         </button>
       </header>
 
-      <main className="px-4 pt-4 pb-28 space-y-4 max-w-[480px] mx-auto">
+      <main className="px-4 pt-4 pb-28 space-y-4 max-w-120 mx-auto">
         <NotificationPermissionBanner />
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
@@ -1604,7 +1604,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       </main>
 
       {/* ── MOBILE BOTTOM NAVIGATION DOCK (Infinix Note 8 360px Width & 480px Max-Width) ── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-2 z-40 shadow-2xl rounded-t-3xl ring-1 ring-black/5">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-120 mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-2 z-40 shadow-2xl rounded-t-3xl ring-1 ring-black/5">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('BERANDA')}
