@@ -23,6 +23,7 @@ import type {
   CorrectAttendanceDTO,
 } from '../repositories/AttendanceRepository';
 import { timeToMinutes, getTodayDateInJakarta, getCurrentTimeInJakarta } from '../utils/time.utils';
+import { NotificationService } from '../services/notification-permission.service';
 import { hashPin } from '../utils/hash.utils';
 import { useAuthStore } from '../store/useAuthStore';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
@@ -1041,13 +1042,14 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       if (data && data.length > 0) {
+        const readIds = NotificationService.getReadNotificationIds(userId);
         return data.map((n) => ({
           id: n.id,
           user_id: n.user_id,
           title: n.title,
           message: n.message,
           type: n.type || 'INFO',
-          is_read: n.is_read || false,
+          is_read: Boolean(n.is_read) || readIds.has(n.id),
           created_at: n.created_at,
         }));
       }

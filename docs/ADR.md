@@ -52,3 +52,13 @@
 * **Consequences:**
   * (+) Fleksibilitas penuh untuk demonstrasi dan penanganan bug secara instan.
   * (+) Dasar pengembangan aplikasi SaaS Multi-Tenant White-Label.
+
+---
+
+## ADR-006: Sinkronisasi Status Notifikasi & Profil Lintas Perangkat (Desktop/Laptop & Mobile HP)
+* **Status:** Accepted
+* **Context:** Pengguna yang membaca/menandai dibaca notifikasi di Laptop/Desktop atau HP mengharapkan status notifikasi tetap bertanda dibaca meskipun halaman di-refresh.
+* **Decision:** Menggabungkan penyimpanan ID notifikasi terbaca di `NotificationPermissionService` (User-bound + Global cache), Provider State Sync, serta pemicu Custom Event (`smart_absensi_notifications_read_updated`).
+* **Consequences:**
+  * (+) Status notifikasi yang sudah ditandai dibaca 100% konsisten antara layar Laptop/Desktop dan Mobile HP.
+  * (+) Notifikasi sintetis maupun DB tidak pernah muncul kembali sebagai belum dibaca setelah browser di-refresh.

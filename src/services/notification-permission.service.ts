@@ -129,47 +129,73 @@ class NotificationPermissionService {
   }
 
   /**
-   * Ambil Set ID notifikasi yang sudah dibaca oleh user tertentu dari LocalStorage
+   * Ambil Set ID notifikasi yang sudah dibaca oleh user tertentu / global dari LocalStorage
    */
   public getReadNotificationIds(userId?: string): Set<string> {
-    if (typeof window === 'undefined' || !userId) return new Set();
-    try {
-      const saved = localStorage.getItem(`smart_absensi_read_notifications_${userId}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return new Set(parsed);
+    if (typeof window === 'undefined') return new Set();
+    const readSet = new Set<string>();
+
+    const readKeys = [
+      userId ? `smart_absensi_read_notifications_${userId}` : null,
+      'smart_absensi_read_notifications_global',
+      'smart_absensi_read_notifications_all',
+    ].filter(Boolean) as string[];
+
+    for (const key of readKeys) {
+      try {
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((id) => readSet.add(id));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse read notification IDs:', e);
       }
-    } catch (e) {
-      console.warn('Failed to parse read notification IDs:', e);
     }
-    return new Set();
+    return readSet;
   }
 
   /**
-   * Tandai ID notifikasi tertentu sebagai sudah dibaca untuk user tertentu
+   * Tandai ID notifikasi tertentu sebagai sudah dibaca untuk user tertentu & global
    */
   public markIdAsRead(userId: string | undefined, notificationId: string) {
-    if (typeof window === 'undefined' || !userId) return;
+    if (typeof window === 'undefined') return;
     try {
       const readSet = this.getReadNotificationIds(userId);
       readSet.add(notificationId);
-      localStorage.setItem(`smart_absensi_read_notifications_${userId}`, JSON.stringify(Array.from(readSet)));
+      const arr = Array.from(readSet);
+
+      if (userId) {
+        localStorage.setItem(`smart_absensi_read_notifications_${userId}`, JSON.stringify(arr));
+      }
+      localStorage.setItem('smart_absensi_read_notifications_global', JSON.stringify(arr));
       this.markAllAsRead();
+
+      window.dispatchEvent(new CustomEvent('smart_absensi_notifications_read_updated', { detail: { notificationId } }));
     } catch (e) {
       console.warn('Failed to mark notification ID read:', e);
     }
   }
 
   /**
-   * Tandai seluruh daftar ID notifikasi sebagai sudah dibaca untuk user tertentu
+   * Tandai seluruh daftar ID notifikasi sebagai sudah dibaca untuk user tertentu & global
    */
   public markAllIdsAsRead(userId: string | undefined, notificationIds: string[]) {
-    if (typeof window === 'undefined' || !userId) return;
+    if (typeof window === 'undefined') return;
     try {
       const readSet = this.getReadNotificationIds(userId);
       notificationIds.forEach((id) => readSet.add(id));
-      localStorage.setItem(`smart_absensi_read_notifications_${userId}`, JSON.stringify(Array.from(readSet)));
+      const arr = Array.from(readSet);
+
+      if (userId) {
+        localStorage.setItem(`smart_absensi_read_notifications_${userId}`, JSON.stringify(arr));
+      }
+      localStorage.setItem('smart_absensi_read_notifications_global', JSON.stringify(arr));
       this.markAllAsRead();
+
+      window.dispatchEvent(new CustomEvent('smart_absensi_notifications_read_updated'));
     } catch (e) {
       console.warn('Failed to mark all notification IDs read:', e);
     }
@@ -179,7 +205,6 @@ class NotificationPermissionService {
    * Cek apakah notifikasi ID tertentu sudah dibaca
    */
   public isNotificationRead(userId: string | undefined, notificationId: string): boolean {
-    if (!userId) return false;
     const readSet = this.getReadNotificationIds(userId);
     return readSet.has(notificationId);
   }

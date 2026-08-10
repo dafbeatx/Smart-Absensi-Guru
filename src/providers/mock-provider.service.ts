@@ -19,6 +19,7 @@ import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } f
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
+import { NotificationService } from '../services/notification-permission.service';
 import { getTodayDateInJakarta, getCurrentTimeInJakarta, timeToMinutes } from '../utils/time.utils';
 
 const memoryStore = new Map<string, string>();
@@ -516,51 +517,61 @@ export class MockProvider implements IDataProvider {
   public async getNotifications(userId: string, _token: string): Promise<AppNotification[]> {
     const key = `smart_absensi_notifications_${userId}`;
     const saved = safeGetStorage(key);
+    let items: AppNotification[] = [];
+
     if (saved) {
       try {
-        return JSON.parse(saved);
+        items = JSON.parse(saved);
       } catch (e) {
         console.error('Failed to parse notifications:', e);
       }
     }
 
-    const defaults: AppNotification[] = [
-      {
-        id: 'n1',
-        user_id: userId,
-        title: '☀️ Selalu Absen Masuk Tepat Waktu',
-        message: 'Batas toleransi absen masuk adalah sesuai jam operasional sekolah. Gunakan QR Code resmi di sekolah.',
-        type: 'INFO',
-        is_read: false,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 'n2',
-        user_id: userId,
-        title: '🔒 Keamanan Perangkat (Device Binding)',
-        message: 'Akun Anda terikat pada HP aktif. Pembatasan 1 akun 1 HP aktif.',
-        type: 'SUCCESS',
-        is_read: false,
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 'n3',
-        user_id: userId,
-        title: '🔑 Pengingat PIN Kemanan',
-        message: 'Apabila Anda masih menggunakan PIN default 123456, segera ubah PIN melalui tab Profil.',
-        type: 'WARNING',
-        is_read: true,
-        created_at: new Date().toISOString(),
-      },
-    ];
+    if (!items || items.length === 0) {
+      items = [
+        {
+          id: 'n1',
+          user_id: userId,
+          title: '☀️ Selalu Absen Masuk Tepat Waktu',
+          message: 'Batas toleransi absen masuk adalah sesuai jam operasional sekolah. Gunakan QR Code resmi di sekolah.',
+          type: 'INFO',
+          is_read: false,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'n2',
+          user_id: userId,
+          title: '🔒 Keamanan Perangkat (Device Binding)',
+          message: 'Akun Anda terikat pada HP aktif. Pembatasan 1 akun 1 HP aktif.',
+          type: 'SUCCESS',
+          is_read: false,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'n3',
+          user_id: userId,
+          title: '🔑 Pengingat PIN Kemanan',
+          message: 'Apabila Anda masih menggunakan PIN default 123456, segera ubah PIN melalui tab Profil.',
+          type: 'WARNING',
+          is_read: true,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      safeSetStorage(key, JSON.stringify(items));
+    }
 
-    safeSetStorage(key, JSON.stringify(defaults));
-    return defaults;
+    const readIds = NotificationService.getReadNotificationIds(userId);
+    return items.map((n) => ({
+      ...n,
+      is_read: Boolean(n.is_read) || readIds.has(n.id),
+    }));
   }
 
   public async markNotificationAsRead(notificationId: string, token: string): Promise<boolean> {
     const sessionUser = useAuthStore.getState().user;
     const userId = sessionUser?.id || 'usr_uuid_1001';
+    NotificationService.markIdAsRead(userId, notificationId);
+
     const key = `smart_absensi_notifications_${userId}`;
     const notifications = await this.getNotifications(userId, token);
     const updated = notifications.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n));

@@ -496,12 +496,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
     window.addEventListener('smart_absensi_teachers_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
     window.addEventListener('storage', handleScannedEvent);
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
       window.removeEventListener('smart_absensi_teachers_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
       window.removeEventListener('storage', handleScannedEvent);
     };
   }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);

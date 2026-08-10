@@ -48,11 +48,20 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
 
   const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIdsFromStorage(user?.id));
 
-  // Sync readIds when user changes or on storage change
+  // Sync readIds when user changes or on storage/notification events
   useEffect(() => {
-    if (user?.id) {
-      setReadIds(loadReadIdsFromStorage(user.id));
-    }
+    const syncReadIds = () => {
+      setReadIds(NotificationService.getReadNotificationIds(user?.id));
+    };
+
+    syncReadIds();
+
+    window.addEventListener('smart_absensi_notifications_read_updated', syncReadIds);
+    window.addEventListener('storage', syncReadIds);
+    return () => {
+      window.removeEventListener('smart_absensi_notifications_read_updated', syncReadIds);
+      window.removeEventListener('storage', syncReadIds);
+    };
   }, [user?.id]);
 
   const saveReadIds = (newSet: Set<string>) => {
