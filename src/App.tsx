@@ -143,6 +143,7 @@ export const App: React.FC = () => {
             isPreviewMode={false}
             previewUser={{
               ...user,
+              avatar_url: user.avatar_url || null,
               role: 'GURU',
               position: user.position || 'Pendidik / Tenaga Kependidikan',
             }}

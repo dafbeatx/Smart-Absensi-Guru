@@ -77,7 +77,7 @@ const UserAvatar: React.FC<{
   }
 
   return (
-    <div className={`bg-[#C8F2E0] text-[#0D7A5F] flex items-center justify-center font-black ${className} ${textClassName}`}>
+    <div className={`bg-gradient-to-br from-[#0D7A5F] to-[#023246] text-white flex items-center justify-center font-black ${className} ${textClassName}`}>
       {initial}
     </div>
   );
@@ -105,8 +105,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     created_at: new Date().toISOString(),
   };
 
-  // Effective user: previewUser when in Preview Mode, otherwise authUser
-  const effectiveUser: UserProfile = previewUser || authUser || fallbackUser;
+  // Effective user: merge previewUser with authUser (prioritize authUser.avatar_url if present)
+  const effectiveUser: UserProfile = previewUser
+    ? {
+        ...previewUser,
+        avatar_url: authUser?.avatar_url || previewUser.avatar_url || null,
+      }
+    : (authUser || fallbackUser);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
