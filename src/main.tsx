@@ -5,8 +5,13 @@ import App from './App.tsx';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { logger } from './utils/logger.utils';
 
+import { AutoUpdateService } from './services/auto-update.service';
+
 // Global Unhandled Error & Promise Rejection Handlers
 if (typeof window !== 'undefined') {
+  // Initialize Auto-Update & Version Monitoring Engine for HP Mobile & Desktop
+  AutoUpdateService.initAutoUpdateEngine();
+
   window.addEventListener('unhandledrejection', (event) => {
     logger.error('GlobalWindow', 'Unhandled Promise Rejection:', event.reason);
   });

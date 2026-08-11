@@ -100,6 +100,11 @@ export class SupabaseProvider implements IDataProvider {
     };
   }
 
+  private isUuid(str?: string | null): boolean {
+    if (!str) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  }
+
   public async verifySession(token: string): Promise<UserProfile> {
     const activeUser = useAuthStore.getState().user;
     const parts = token.split('_');
@@ -107,24 +112,37 @@ export class SupabaseProvider implements IDataProvider {
     const searchId = activeUser?.id || userIdFromToken;
 
     if (searchId) {
-      const { data: user } = await this.client
-        .from('users')
-        .select('*')
-        .or(`id.eq.${searchId},nip.eq.${activeUser?.nip || searchId},phone_number.eq.${activeUser?.phone_number || searchId}`)
-        .maybeSingle();
+      const filters: string[] = [];
+      if (this.isUuid(searchId)) {
+        filters.push(`id.eq.${searchId}`);
+      }
+      if (activeUser?.nip || (!this.isUuid(searchId) && searchId)) {
+        filters.push(`nip.eq.${activeUser?.nip || searchId}`);
+      }
+      if (activeUser?.phone_number) {
+        filters.push(`phone_number.eq.${activeUser.phone_number}`);
+      }
 
-      if (user) {
-        return {
-          id: user.id,
-          nip: user.nip,
-          full_name: user.full_name,
-          phone_number: user.phone_number,
-          role: user.role,
-          position: user.position,
-          avatar_url: user.avatar_url || null,
-          is_active: user.account_status === 'ACTIVE',
-          created_at: user.created_at,
-        };
+      if (filters.length > 0) {
+        const { data: user } = await this.client
+          .from('users')
+          .select('*')
+          .or(filters.join(','))
+          .maybeSingle();
+
+        if (user) {
+          return {
+            id: user.id,
+            nip: user.nip,
+            full_name: user.full_name,
+            phone_number: user.phone_number,
+            role: user.role,
+            position: user.position,
+            avatar_url: user.avatar_url || null,
+            is_active: user.account_status === 'ACTIVE',
+            created_at: user.created_at,
+          };
+        }
       }
     }
 
@@ -231,11 +249,29 @@ export class SupabaseProvider implements IDataProvider {
 
     // Verifikasi user exist di public.users sebelum insert
     // (mencegah FK violation jika user preview / token kadaluarsa / akun dibuat di local store)
-    let { data: userExists, error: userCheckError } = await this.client
-      .from('users')
-      .select('id, nip, full_name')
-      .or(`id.eq.${userId},nip.eq.${sessionUser?.nip || userId}`)
-      .maybeSingle();
+    const scanUserFilters: string[] = [];
+    if (this.isUuid(userId)) {
+      scanUserFilters.push(`id.eq.${userId}`);
+    }
+    if (sessionUser?.nip || (!this.isUuid(userId) && userId)) {
+      scanUserFilters.push(`nip.eq.${sessionUser?.nip || userId}`);
+    }
+    if (sessionUser?.phone_number) {
+      scanUserFilters.push(`phone_number.eq.${sessionUser.phone_number}`);
+    }
+
+    let userExists: { id: string; nip: string; full_name: string } | null = null;
+    let userCheckError: { message: string } | null = null;
+
+    if (scanUserFilters.length > 0) {
+      const res = await this.client
+        .from('users')
+        .select('id, nip, full_name')
+        .or(scanUserFilters.join(','))
+        .maybeSingle();
+      userExists = res.data;
+      userCheckError = res.error;
+    }
 
     if (userCheckError) {
       logger.warn('SupabaseProvider', 'User existence check error:', userCheckError.message);
