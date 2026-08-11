@@ -35,7 +35,7 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
 
   const mockAttendance: AttendanceRecord[] = [
     { id: 'att_1', user_id: 'usr_1', date: '2026-07-30', check_in_time: '06:55', check_out_time: null, status: 'HADIR', check_in_lat: -6.2, check_in_lng: 106.8, check_in_distance_meters: 12, verification_method: 'QR_GPS', attendance_source: 'QR', is_offline: false, created_at: '' },
-    { id: 'att_2', user_id: 'usr_2', date: '2026-07-30', check_in_time: '07:25', check_out_time: null, status: 'TERLAMBAT', check_in_lat: -6.2, check_in_lng: 106.8, check_in_distance_meters: 15, verification_method: 'QR_GPS', attendance_source: 'QR', is_offline: false, created_at: '' },
+    { id: 'att_2', user_id: 'usr_2', date: '2026-07-30', check_in_time: '07:45', check_out_time: null, status: 'TERLAMBAT', check_in_lat: -6.2, check_in_lng: 106.8, check_in_distance_meters: 15, verification_method: 'QR_GPS', attendance_source: 'QR', is_offline: false, created_at: '' },
   ];
 
   const mockLeave: LeaveRequest[] = [];

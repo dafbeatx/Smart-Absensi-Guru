@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { logger } from '../utils/logger.utils';
 import { indexedDBService } from '../services/indexed-db.service';
 import { useSyncQueueStore } from '../store/useSyncQueueStore';
+import { CONSTANTS } from '../config/constants';
 
 export interface ScanAttendanceDTO {
   token: string;
@@ -186,7 +187,7 @@ export class AttendanceRepository {
     // Auto-evaluate HADIR vs TERLAMBAT cutoff based on settings.work_checkin_end
     let finalStatus = dto.status;
     if (dto.status === 'HADIR' && dto.check_in_time) {
-      let checkinEnd = '07:15';
+      let checkinEnd: string = CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
       try {
         const sysSettings = await ProviderFactory.getProvider().getSettings();
         if (sysSettings?.work_checkin_end) {

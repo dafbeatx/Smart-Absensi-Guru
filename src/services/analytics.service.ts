@@ -1,5 +1,6 @@
 import type { AttendanceRecord, HolidayRecord, LeaveRequest, SystemSettings, UserProfile } from '../types/database.types';
 import { evaluateAttendanceStatus, isDateOffDay } from '../utils/time.utils';
+import { CONSTANTS } from '../config/constants';
 
 export interface DailyAttendanceSummary {
   date: string;
@@ -56,8 +57,10 @@ export class AnalyticsService {
       }
     }
 
+    const checkinEnd = systemSettings?.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+
     userAttendanceMap.forEach((rec) => {
-      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, checkinEnd, rec.status);
       if (effectiveStatus === 'HADIR') totalPresent++;
       else if (effectiveStatus === 'TERLAMBAT') totalLate++;
       else if (effectiveStatus === 'IZIN') totalLeave++;
@@ -122,10 +125,11 @@ export class AnalyticsService {
     }
 
     const activeUserIds = new Set<string>();
+    const checkinEnd = systemSettings?.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
     for (const rec of attendanceRecords) {
       if (rec.date === dateStr) {
-        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, checkinEnd, rec.status);
         if (rec.check_in_time || effectiveStatus === 'HADIR' || effectiveStatus === 'TERLAMBAT' || effectiveStatus === 'IZIN' || effectiveStatus === 'SAKIT' || effectiveStatus === 'DINAS_LUAR') {
           activeUserIds.add(rec.user_id);
         }

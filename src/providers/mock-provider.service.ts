@@ -374,7 +374,7 @@ export class MockProvider implements IDataProvider {
 
     let finalStatus = (dto.status || 'HADIR') as AttendanceStatus;
     if (dto.status === 'HADIR' && dto.check_in_time) {
-      let checkinEnd = '07:15';
+      let checkinEnd: string = CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
       try {
         const settings = await this.getSettings();
         if (settings?.work_checkin_end) {

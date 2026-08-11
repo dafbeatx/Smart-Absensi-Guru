@@ -1,7 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AlertTriangle, Clock, Send, CheckCircle2, UserX, PenSquare } from 'lucide-react';
 import type { UserProfile, AttendanceRecord } from '../../types/database.types';
 import { useToastStore } from '../../store/useToastStore';
+import { evaluateAttendanceStatus } from '../../utils/time.utils';
+import { CONSTANTS } from '../../config/constants';
+import { ProviderFactory } from '../../providers/provider-factory';
 
 export interface EarlyWarningSystemWidgetProps {
   teachers: UserProfile[];
@@ -24,6 +27,21 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
   onOpenCorrectionModal,
 }) => {
   const { showToast } = useToastStore();
+  const [checkinEnd, setCheckinEnd] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_END);
+
+  useEffect(() => {
+    const loadSettings = () => {
+      ProviderFactory.getProvider()
+        .getSettings()
+        .then((st) => {
+          if (st?.work_checkin_end) setCheckinEnd(st.work_checkin_end.slice(0, 5));
+        })
+        .catch(() => {});
+    };
+    loadSettings();
+    window.addEventListener('smart_absensi_settings_updated', loadSettings);
+    return () => window.removeEventListener('smart_absensi_settings_updated', loadSettings);
+  }, []);
 
   const flaggedTeachers = useMemo(() => {
     const now = new Date();
@@ -43,7 +61,8 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
 
     monthRecs.forEach((r) => {
       const existing = teacherStatsMap.get(r.user_id) || { lateCount: 0, unexcusedCount: 0 };
-      if (r.status === 'TERLAMBAT' || (r.check_in_time && r.check_in_time > '07:15')) {
+      const effectiveStatus = evaluateAttendanceStatus(r.check_in_time, checkinEnd, r.status);
+      if (effectiveStatus === 'TERLAMBAT') {
         existing.lateCount += 1;
         existing.lastLateDate = r.date;
       } else if (r.status === 'ALFA' || (!r.check_in_time && r.status === 'BELUM_ABSEN')) {
@@ -78,12 +97,12 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
       if (a.riskLevel !== 'HIGH' && b.riskLevel === 'HIGH') return 1;
       return b.totalAbsences - a.totalAbsences;
     });
-  }, [teachers, attendanceRecords]);
+  }, [teachers, attendanceRecords, checkinEnd]);
 
   const handleSendWaReminder = (teacher: UserProfile, lateCount: number) => {
     const phone = teacher.phone_number ? teacher.phone_number.replace(/^0/, '62') : '';
     const msg = encodeURIComponent(
-      `Assalamu'alaikum wr. wb. Yth. Bapak/Ibu ${teacher.full_name}, semoga senantiasa diberikan kesehatan & kelancaran. Salam hormat, berikut pengingat pembinaan kedisiplinan presensi sekolah. Bulan ini terdata ${lateCount}x keterlambatan. Mohon berkenan Bapak/Ibu dapat hadir lebih awal sebelum pukul 07.15 WIB. Terima kasih atas dedikasi & kerja samanya.`
+      `Assalamu'alaikum wr. wb. Yth. Bapak/Ibu ${teacher.full_name}, semoga senantiasa diberikan kesehatan & kelancaran. Salam hormat, berikut pengingat pembinaan kedisiplinan presensi sekolah. Bulan ini terdata ${lateCount}x keterlambatan. Mohon berkenan Bapak/Ibu dapat hadir lebih awal sebelum pukul ${checkinEnd} WIB. Terima kasih atas dedikasi & kerja samanya.`
     );
 
     if (phone) {

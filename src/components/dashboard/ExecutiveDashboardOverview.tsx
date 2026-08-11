@@ -1,10 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../types/database.types';
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 import { EarlyWarningSystemWidget } from './EarlyWarningSystemWidget';
 import { BurnoutEarlyWarningWidget } from '../../features/kepsek/components/BurnoutEarlyWarningWidget';
 import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay } from '../../utils/time.utils';
+import { CONSTANTS } from '../../config/constants';
+import { ProviderFactory } from '../../providers/provider-factory';
 
 export interface ExecutiveDashboardOverviewProps {
   roleTitle: 'Admin Website' | 'Kepala Sekolah';
@@ -30,8 +32,24 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   onOpenTestRunner,
   onNavigateTab,
 }) => {
-  const todayStr = getTodayDateInJakarta();
-  const totalGuruCount = teachers.length > 0 ? teachers.length : 12;
+  const todayStr = useMemo(() => getTodayDateInJakarta(), []);
+  const [checkinEnd, setCheckinEnd] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_END);
+
+  useEffect(() => {
+    const loadSettings = () => {
+      ProviderFactory.getProvider()
+        .getSettings()
+        .then((st) => {
+          if (st?.work_checkin_end) setCheckinEnd(st.work_checkin_end.slice(0, 5));
+        })
+        .catch(() => {});
+    };
+    loadSettings();
+    window.addEventListener('smart_absensi_settings_updated', loadSettings);
+    return () => window.removeEventListener('smart_absensi_settings_updated', loadSettings);
+  }, []);
+
+  const totalGuruCount = useMemo(() => (teachers || []).filter((t) => t.is_active !== false).length, [teachers]);
 
   const [lastUpdatedTime, setLastUpdatedTime] = React.useState<string>(() => {
     return new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
@@ -73,7 +91,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
     }
 
     todayUserMap.forEach((rec) => {
-      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, checkinEnd, rec.status);
       if (effectiveStatus === 'HADIR') hadir++;
       else if (effectiveStatus === 'TERLAMBAT') terlambat++;
       else if (effectiveStatus === 'IZIN' || effectiveStatus === 'SAKIT' || effectiveStatus === 'DINAS_LUAR') izin++;
@@ -344,7 +362,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         created_at: new Date().toISOString(),
       };
 
-      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, checkinEnd, rec.status);
       scanned.push({
         teacher: teacherObj,
         record: rec,

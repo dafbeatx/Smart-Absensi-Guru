@@ -208,7 +208,7 @@ export class SupabaseProvider implements IDataProvider {
       ? new Date(dto.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'
       : getCurrentTimeInJakarta();
 
-    const checkinEnd = settings.work_checkin_end || '07:15';
+    const checkinEnd = settings.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
     const currentMin = timeToMinutes(timeStr);
     const cutoffMin = timeToMinutes(checkinEnd);
 

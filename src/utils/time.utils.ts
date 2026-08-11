@@ -1,3 +1,5 @@
+import { CONSTANTS } from '../config/constants';
+
 /**
  * Helper utility for formatting and sanitizing time values for HTML5 <input type="time">
  * and intelligent attendance status evaluation (HADIR vs TERLAMBAT).
@@ -23,11 +25,11 @@ export function timeToMinutes(timeStr: unknown): number {
 
 /**
  * Intelligently evaluates whether a check-in time is HADIR (On Time) or TERLAMBAT (Late).
- * If check-in time is strictly greater than checkinEnd (default 07:15), returns 'TERLAMBAT'.
+ * If check-in time is strictly greater than checkinEnd (default from system settings / 07:30), returns 'TERLAMBAT'.
  */
 export function evaluateAttendanceStatus(
   checkInTime: string | null | undefined,
-  checkinEnd: string = '07:15',
+  checkinEnd: string = CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
   currentStatus?: string
 ): 'HADIR' | 'TERLAMBAT' | 'IZIN' | 'SAKIT' | 'DINAS_LUAR' | 'ALFA' {
   if (currentStatus && currentStatus !== 'HADIR' && currentStatus !== 'TERLAMBAT' && currentStatus !== 'BELUM_ABSEN') {

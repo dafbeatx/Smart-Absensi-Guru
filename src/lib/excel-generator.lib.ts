@@ -456,7 +456,7 @@ export class ExcelReportGenerator {
         const timeStr = r.check_in_time.slice(0, 5);
         if (timeStr < '06:45') bin1Count++;
         else if (timeStr <= '07:00') bin2Count++;
-        else if (timeStr <= '07:15') bin3Count++;
+        else if (timeStr <= CONSTANTS.DEFAULTS.WORK_CHECKIN_END) bin3Count++;
         else bin4Count++;
       }
     });

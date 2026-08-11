@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
-import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus } from '../../../types/database.types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus, SystemSettings } from '../../../types/database.types';
 import { AnalyticsService } from '../../../services/analytics.service';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
 import { evaluateAttendanceStatus, isDateOffDay } from '../../../utils/time.utils';
+import { CONSTANTS } from '../../../config/constants';
+import { ProviderFactory } from '../../../providers/provider-factory';
 
 export interface DailyAttendanceTrackerProps {
   teachers: UserProfile[];
@@ -23,11 +25,28 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+
+  useEffect(() => {
+    const fetchSettings = () => {
+      ProviderFactory.getProvider()
+        .getSettings()
+        .then((st) => {
+          if (st) setSystemSettings(st);
+        })
+        .catch(() => {});
+    };
+    fetchSettings();
+    window.addEventListener('smart_absensi_settings_updated', fetchSettings);
+    return () => window.removeEventListener('smart_absensi_settings_updated', fetchSettings);
+  }, []);
+
+  const checkinEnd = systemSettings?.work_checkin_end ? systemSettings.work_checkin_end.slice(0, 5) : CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
   // 1. Calculate Daily Analytics Stats
   const summary = useMemo(() => {
-    return AnalyticsService.calculateDailySummary(selectedDate, teachers, attendanceRecords, leaveRequests);
-  }, [selectedDate, teachers, attendanceRecords, leaveRequests]);
+    return AnalyticsService.calculateDailySummary(selectedDate, teachers, attendanceRecords, leaveRequests, systemSettings);
+  }, [selectedDate, teachers, attendanceRecords, leaveRequests, systemSettings]);
 
   // 2. Identify attendance state map for each teacher for selectedDate
   const teacherAttendanceMap = useMemo(() => {
@@ -43,7 +62,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     // Map attendance records
     for (const rec of attendanceRecords) {
       if (rec.date === selectedDate) {
-        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, '07:15', rec.status);
+        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, checkinEnd, rec.status);
         map.set(rec.user_id, {
           record: rec,
           status: effectiveStatus,
