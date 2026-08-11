@@ -7,6 +7,7 @@ import { GroqAIService } from '../../../services/groq-ai.service';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { logger } from '../../../utils/logger.utils';
+import type { AttendanceRecord } from '../../../types/database.types';
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
 
@@ -17,6 +18,8 @@ export interface GuruCorrectionRequestModalProps {
   onClose: () => void;
   onSuccess?: () => void;
 }
+
+export type CorrectionScope = 'MASUK' | 'PULANG' | 'KEDUANYA';
 
 export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProps> = ({
   isOpen,
@@ -31,6 +34,9 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
   const [checkInTime, setCheckInTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
   const [checkOutTime, setCheckOutTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
   const [targetStatus, setTargetStatus] = useState<'HADIR' | 'IZIN' | 'SAKIT'>('HADIR');
+  const [correctionScope, setCorrectionScope] = useState<CorrectionScope>('MASUK');
+  const [existingRecord, setExistingRecord] = useState<AttendanceRecord | null>(null);
+
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAiPolishing, setIsAiPolishing] = useState(false);
@@ -44,6 +50,28 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
       }).catch(() => {});
     }
   }, [isOpen]);
+
+  // Fetch existing attendance data for current teacher on selected date
+  React.useEffect(() => {
+    if (isOpen && user?.id && date) {
+      const userToken = token || 'MOCK_TOKEN';
+      ProviderFactory.getProvider()
+        .getDailyAttendance(date, userToken)
+        .then((records) => {
+          const rec = records.find((r) => r.user_id === user.id);
+          if (rec) {
+            setExistingRecord(rec);
+            if (rec.check_in_time) setCheckInTime(rec.check_in_time.slice(0, 5));
+            if (rec.check_out_time) setCheckOutTime(rec.check_out_time.slice(0, 5));
+          } else {
+            setExistingRecord(null);
+          }
+        })
+        .catch(() => {
+          setExistingRecord(null);
+        });
+    }
+  }, [isOpen, user?.id, date, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,8 +90,18 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
     setIsLoading(true);
 
     try {
-      const timeInfo = targetStatus === 'HADIR' ? ` (Masuk: ${checkInTime}, Pulang: ${checkOutTime})` : '';
-      const fullReason = `[Pengajuan Koreksi Absen ${date}${timeInfo} menjadi ${targetStatus}]: ${reason.trim()}`;
+      let scopeText = '';
+      if (targetStatus === 'HADIR') {
+        if (correctionScope === 'MASUK') {
+          scopeText = ` [Target Koreksi: Jam Masuk (${checkInTime} WIB)]`;
+        } else if (correctionScope === 'PULANG') {
+          scopeText = ` [Target Koreksi: Jam Pulang (${checkOutTime} WIB)]`;
+        } else {
+          scopeText = ` [Target Koreksi: Masuk (${checkInTime} WIB) & Pulang (${checkOutTime} WIB)]`;
+        }
+      }
+
+      const fullReason = `[Pengajuan Koreksi Absen ${date}${scopeText} menjadi ${targetStatus}]: ${reason.trim()}`;
 
       await LeaveRepository.submitLeave({
         token: token || 'MOCK_TOKEN',
@@ -121,10 +159,109 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
         </div>
 
         {targetStatus === 'HADIR' ? (
-          <div className="grid grid-cols-3 gap-3">
-            <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
-            <Input label="Jam Masuk" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
-            <Input label="Jam Pulang" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Pilih Target Koreksi Presensi</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCorrectionScope('MASUK')}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                    correctionScope === 'MASUK'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>🌅</span> Koreksi Jam Masuk
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCorrectionScope('PULANG')}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                    correctionScope === 'PULANG'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>🌆</span> Koreksi Jam Pulang
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCorrectionScope('KEDUANYA')}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5 ${
+                    correctionScope === 'KEDUANYA'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>🌓</span> Masuk & Pulang
+                </button>
+              </div>
+            </div>
+
+            {correctionScope === 'MASUK' && (
+              <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                    <span>🌅</span> Form Khusus Koreksi Presensi Masuk
+                  </span>
+                  {existingRecord?.check_out_time && (
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-lg">
+                      Pulang: {existingRecord.check_out_time.slice(0, 5)} WIB
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
+                  <Input label="Jam Masuk Baru" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
+                </div>
+                <div className="text-[11px] text-emerald-800 font-medium leading-tight">
+                  ℹ️ Pengajuan ini <strong>hanya mengoreksi Jam Masuk</strong>. Jam Pulang Anda tidak diubah.
+                </div>
+              </div>
+            )}
+
+            {correctionScope === 'PULANG' && (
+              <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                    <span>🌆</span> Form Khusus Koreksi Presensi Pulang
+                  </span>
+                  {existingRecord?.check_in_time && (
+                    <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-lg">
+                      Masuk: {existingRecord.check_in_time.slice(0, 5)} WIB
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
+                  <Input label="Jam Pulang Baru" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
+                </div>
+                <div className="text-[11px] text-indigo-800 font-medium leading-tight">
+                  ℹ️ Pengajuan ini <strong>hanya mengoreksi Jam Pulang</strong>. Jam Masuk Anda tidak diubah.
+                </div>
+              </div>
+            )}
+
+            {correctionScope === 'KEDUANYA' && (
+              <div className="space-y-3">
+                <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-2">
+                    <label className="block text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <span>🌅</span> Sesi Presensi Masuk
+                    </label>
+                    <Input label="Jam Masuk Baru" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
+                  </div>
+                  <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-2xl space-y-2">
+                    <label className="block text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                      <span>🌆</span> Sesi Presensi Pulang
+                    </label>
+                    <Input label="Jam Pulang Baru" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
@@ -171,7 +308,7 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
         </div>
 
         <div className="pt-2 flex justify-end gap-2">
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={isLoading}>
             Batal
           </Button>
           <Button variant="primary" type="submit" isLoading={isLoading}>
@@ -182,3 +319,4 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
     </Modal>
   );
 };
+
