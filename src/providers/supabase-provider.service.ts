@@ -451,18 +451,31 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error('Akses Ditolak! Role GURU tidak diizinkan mengubah absensi secara langsung. Silakan gunakan menu Ajukan Koreksi Absen.');
     }
 
-    const { error } = await this.client.from('attendance').upsert(
+    const basePayload = {
+      id: `att_${dto.target_user_id}_${dto.date}`,
+      user_id: dto.target_user_id,
+      date: dto.date,
+      status: dto.status,
+      check_in_time: dto.check_in_time && dto.check_in_time.trim().length > 0 ? (dto.check_in_time.length === 5 ? `${dto.check_in_time}:00` : dto.check_in_time) : (dto.status === 'HADIR' || dto.status === 'TERLAMBAT' ? '07:00:00' : null),
+      check_out_time: dto.check_out_time ? (dto.check_out_time.length === 5 ? `${dto.check_out_time}:00` : dto.check_out_time) : null,
+    };
+
+    let { error } = await this.client.from('attendance').upsert(
       {
-        id: `att_${dto.target_user_id}_${dto.date}`,
-        user_id: dto.target_user_id,
-        date: dto.date,
-        status: dto.status,
-        check_in_time: dto.check_in_time && dto.check_in_time.trim().length > 0 ? (dto.check_in_time.length === 5 ? `${dto.check_in_time}:00` : dto.check_in_time) : (dto.status === 'HADIR' || dto.status === 'TERLAMBAT' ? '07:00:00' : null),
-        check_out_time: dto.check_out_time ? (dto.check_out_time.length === 5 ? `${dto.check_out_time}:00` : dto.check_out_time) : null,
+        ...basePayload,
         notes: dto.notes || dto.reason,
       },
       { onConflict: 'user_id,date' }
     );
+
+    if (error && (error.message.includes("'notes'") || error.message.includes('"notes"'))) {
+      // Fallback: retry upsert without the optional 'notes' column if it does not exist in schema
+      const retryRes = await this.client.from('attendance').upsert(
+        basePayload,
+        { onConflict: 'user_id,date' }
+      );
+      error = retryRes.error;
+    }
 
     if (error) throw new Error('Gagal koreksi absensi: ' + error.message);
     return true;
