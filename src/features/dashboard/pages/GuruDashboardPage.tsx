@@ -866,7 +866,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       {effectiveUser.full_name}
                     </h2>
                     <p className="text-[10px] sm:text-[11px] font-semibold text-slate-200 truncate">
-                      {effectiveUser.nip ? `NPP/NIP. ${effectiveUser.nip}` : effectiveUser.position || 'Guru Pengajar'}
+                      {effectiveUser.nip ? `NPP: ${effectiveUser.nip}` : effectiveUser.position || 'Guru Pengajar'}
                     </p>
                   </div>
                 </div>
@@ -874,9 +874,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('PROFIL')}
-                  className="px-2.5 py-1 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-[10px] font-black rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer shrink-0"
+                  className="px-3 py-1.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-xs font-bold rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1"
                 >
-                  Profil
+                  <span>👤 Profil</span>
                 </button>
               </div>
 
@@ -1124,44 +1124,44 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               )}
             </section>
 
-            {/* 🌟 3. QUICK ACTION FEATURE CARDS ─────────────────────────────── */}
+            {/* 🌟 3. QUICK ACTION FEATURE CARDS (INTUITIVE & MINIMALIST) ─────────── */}
             <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
               <button
                 onClick={handleOpenLeaveModal}
-                className="p-3 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
               >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-lg sm:text-xl font-bold group-hover:scale-110 transition-transform shrink-0 shadow-2xs">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
                   📝
                 </div>
                 <div>
-                  <h3 className="font-black text-[#023246] text-xs leading-tight">Izin / Cuti</h3>
-                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Pengajuan</p>
+                  <h3 className="font-black text-[#023246] text-xs leading-tight">Ajukan Izin</h3>
+                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Sakit / Cuti</p>
                 </div>
               </button>
 
               <button
                 onClick={handleOpenCorrectionModal}
-                className="p-3 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
               >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-lg sm:text-xl font-bold group-hover:scale-110 transition-transform shrink-0 shadow-2xs">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
                   ✏️
                 </div>
                 <div>
                   <h3 className="font-black text-[#023246] text-xs leading-tight">Koreksi Absen</h3>
-                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Ke Admin</p>
+                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Lapor Admin</p>
                 </div>
               </button>
 
               <button
                 onClick={() => setIsScheduleModalOpen(true)}
-                className="p-3 sm:p-4 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs sm:shadow-card transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
               >
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-[#0D7A5F] border border-emerald-200 flex items-center justify-center text-lg sm:text-xl font-bold group-hover:scale-110 transition-transform shrink-0 shadow-2xs">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#0D7A5F] border border-emerald-200 flex items-center justify-center text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
                   📅
                 </div>
                 <div>
                   <h3 className="font-black text-[#023246] text-xs leading-tight">Jadwal Kelas</h3>
-                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Mengajar</p>
+                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Jam Mengajar</p>
                 </div>
               </button>
             </section>
