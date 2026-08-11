@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GroqAIService } from '../../services/groq-ai.service';
 import { isFeatureEnabled } from '../../config/feature-flags.config';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -25,14 +25,46 @@ export const AIAssistantDrawer: React.FC = () => {
   ]);
 
   const user = useAuthStore((state) => state.user);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(scrollToBottom, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [messages, isOpen, isLoading]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 150);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+
+      const isAltA = e.altKey && e.key.toLowerCase() === 'a';
+      const isCtrlI = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i';
+
+      if (isAltA || isCtrlI) {
+        const activeEl = document.activeElement;
+        const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+
+        if (!isTyping || isAltA) {
+          e.preventDefault();
+          setIsOpen((prev) => !prev);
+        }
+      }
     };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-    }
+    window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
@@ -86,7 +118,8 @@ export const AIAssistantDrawer: React.FC = () => {
           <button
             onClick={() => setIsOpen(true)}
             className="flex items-center gap-2 text-white font-bold text-xs cursor-pointer py-1.5 pr-1.5"
-            aria-label="Buka Smart AI Assistant"
+            aria-label="Buka Smart AI Assistant (Alt + A)"
+            title="Buka Smart AI Assistant (Alt + A / Ctrl + I)"
           >
             <span className="text-lg animate-bounce">✨</span>
             <span className="font-semibold text-xs whitespace-nowrap">Tanya AI</span>
@@ -198,17 +231,20 @@ export const AIAssistantDrawer: React.FC = () => {
                   </div>
                 </div>
               )}
+              {/* Messages End Anchor */}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Footer Input Box & Mobile Exit Button */}
             <div className="p-3 bg-white border-t border-slate-200 space-y-2">
               <div className="flex gap-2 items-center">
                 <input
+                  ref={inputRef}
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Tulis pertanyaan seputar absensi..."
+                  placeholder="Tulis pertanyaan seputar absensi... (Alt + A / Ctrl + I)"
                   className="flex-1 bg-slate-100 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
                 />
                 <button
