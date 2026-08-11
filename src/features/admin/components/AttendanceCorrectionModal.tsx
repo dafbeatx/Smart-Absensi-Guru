@@ -291,13 +291,13 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
                 <Input label="Tanggal Absensi" type="date" value={date} max={todayStr} onChange={(e) => setDate(e.target.value)} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-2">
-                    <label className="block text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
                       <span>🌅</span> Sesi Presensi Masuk
                     </label>
                     <Input label="Jam Masuk Baru" type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} />
                   </div>
                   <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-2xl space-y-2">
-                    <label className="block text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-indigo-900">
                       <span>🌆</span> Sesi Presensi Pulang
                     </label>
                     <Input label="Jam Pulang Baru" type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} />
