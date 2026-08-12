@@ -32,6 +32,16 @@ export interface ExecutiveDashboardAnalytics {
 
 export class AnalyticsService {
   /**
+   * Helper to filter active teachers expected to take daily attendance
+   * (is_active !== false && (role === 'GURU' || !role))
+   */
+  private static filterActiveGuruTeachers(allTeachers: UserProfile[]): UserProfile[] {
+    return allTeachers.filter(
+      (t) => t.is_active !== false && (t.role === 'GURU' || (!t.role as boolean))
+    );
+  }
+
+  /**
    * Calculates real-time daily attendance metrics and statistics
    */
   public static calculateDailySummary(
@@ -42,7 +52,8 @@ export class AnalyticsService {
     systemSettings?: SystemSettings | null,
     holidays?: HolidayRecord[] | null
   ): DailyAttendanceSummary {
-    const totalTeachers = allTeachers.length;
+    const activeTeachers = this.filterActiveGuruTeachers(allTeachers);
+    const totalTeachers = activeTeachers.length;
     let totalPresent = 0;
     let totalLate = 0;
     let totalLeave = 0;
@@ -147,6 +158,7 @@ export class AnalyticsService {
       }
     }
 
-    return allTeachers.filter((t) => t.is_active && !activeUserIds.has(t.id));
+    const activeTeachers = this.filterActiveGuruTeachers(allTeachers);
+    return activeTeachers.filter((t) => !activeUserIds.has(t.id));
   }
 }

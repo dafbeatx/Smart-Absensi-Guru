@@ -157,9 +157,10 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         const offCheck = isDateOffDay(new Date(), sysSettings);
 
         const absentedUserIds = new Set(todayAttendanceList.map((a) => a.user_id));
+        const activeGuruTeachers = allTeachers.filter((t) => t.is_active !== false && (t.role === 'GURU' || (!t.role as boolean)));
         const unabsentedCount = offCheck.isOff
           ? 0
-          : allTeachers.filter((t) => t.role === 'GURU' && !absentedUserIds.has(t.id)).length;
+          : activeGuruTeachers.filter((t) => !absentedUserIds.has(t.id)).length;
 
         if (!offCheck.isOff && unabsentedCount > 0) {
           const unabsentNotifId = 'notif_unabsented_summary';
@@ -167,7 +168,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
             id: unabsentNotifId,
             category: 'SYSTEM_ALERT',
             title: '🔔 Monitoring Presensi Guru Hari Ini',
-            message: `Terdapat ${unabsentedCount} dari ${allTeachers.length} Guru/Staf yang belum melakukan absensi masuk hari ini.`,
+            message: `Terdapat ${unabsentedCount} dari ${activeGuruTeachers.length} Guru/Staf yang belum melakukan absensi masuk hari ini.`,
             time: 'Monitoring Realtime',
             badgeType: 'WARNING',
             isRead: readSet.has(unabsentNotifId),

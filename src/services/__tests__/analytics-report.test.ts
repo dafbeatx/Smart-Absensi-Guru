@@ -55,6 +55,19 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     unabsented.length === 1 && unabsented[0].id === 'usr_3'
   );
 
+  // Test 2b: Exclude Inactive Teachers and Non-Guru Roles from Unabsented Calculation
+  const mixedTeachers: UserProfile[] = [
+    ...mockTeachers,
+    { id: 'usr_inactive', nip: '198504', full_name: 'Guru Nonaktif', phone_number: '084', role: 'GURU', position: 'IPS', avatar_url: null, is_active: false, created_at: '' },
+    { id: 'usr_admin', nip: '198505', full_name: 'Admin Web', phone_number: '085', role: 'ADMIN', position: 'IT Admin', avatar_url: null, is_active: true, created_at: '' },
+    { id: 'usr_kepsek', nip: '198506', full_name: 'Kepala Sekolah', phone_number: '086', role: 'KEPSEK', position: 'Headmaster', avatar_url: null, is_active: true, created_at: '' },
+  ];
+  const unabsentedMixed = AnalyticsService.getUnabsentedTeachers('2026-07-30', mixedTeachers, mockAttendance, mockLeave);
+  assert(
+    'Analytics - Excludes Inactive & Non-Guru Users from Unabsented List',
+    unabsentedMixed.length === 1 && unabsentedMixed[0].id === 'usr_3'
+  );
+
   // Test 3: 5-Sheet Excel Data Generation & Signatory Official Sync
   const reportPayload: MultiSheetReportPayload = {
     month: 'Juli',

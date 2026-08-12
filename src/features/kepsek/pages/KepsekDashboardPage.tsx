@@ -12,6 +12,7 @@ import { ExecutiveDashboardOverview } from '../../../components/dashboard/Execut
 import { DevTestPage } from '../../admin/pages/DevTestPage';
 import { getTodayDateInJakarta, isDateOffDay } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
+import { AnalyticsService } from '../../../services/analytics.service';
 import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
 
 export interface KepsekDashboardPageProps {
@@ -153,17 +154,14 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   }, []);
 
   const todayStr = getTodayDateInJakarta();
-  const offCheck = isDateOffDay(todayStr);
 
-  // Dynamic calculation of teachers who haven't absented today (Returns [] on Weekends / Holidays)
-  const unabsentedTeachers = offCheck.isOff
-    ? []
-    : teachers.filter((t) => {
-        const hasAttended = attendanceRecords.some(
-          (r) => r.user_id === t.id && (r.status === 'HADIR' || r.status === 'TERLAMBAT' || r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR')
-        );
-        return !hasAttended;
-      });
+  // Dynamic calculation of active GURU teachers who haven't absented today (Returns [] on Weekends / Holidays)
+  const unabsentedTeachers = AnalyticsService.getUnabsentedTeachers(
+    todayStr,
+    teachers,
+    attendanceRecords,
+    allLeaves
+  );
 
   const sidebarItems: SidebarItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
