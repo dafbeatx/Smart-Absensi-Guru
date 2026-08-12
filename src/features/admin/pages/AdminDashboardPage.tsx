@@ -317,6 +317,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               roleTitle="Admin Website"
               teachers={teachers}
               pendingRequests={pendingRequests}
+              allLeaves={allLeaves}
               attendanceRecords={attendanceRecords}
               onOpenScanner={onOpenScanner}
               onSwitchToGuruView={onSwitchToGuruView}

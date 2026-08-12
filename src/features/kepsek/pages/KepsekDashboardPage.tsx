@@ -207,6 +207,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               roleTitle="Kepala Sekolah"
               teachers={teachers}
               pendingRequests={pendingRequests}
+              allLeaves={allLeaves}
               attendanceRecords={attendanceRecords}
               onOpenScanner={onOpenScanner}
               onSwitchToGuruView={onSwitchToGuruView}

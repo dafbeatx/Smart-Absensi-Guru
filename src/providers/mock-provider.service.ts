@@ -552,8 +552,58 @@ export class MockProvider implements IDataProvider {
       safeSetStorage('smart_absensi_leaves', JSON.stringify(leaves));
     }
 
-    // Trigger Push Notification for Guru
+    // Trigger Push Notification for Guru & Sync Attendance Record
     if (targetLeave) {
+      if (decision === 'APPROVED') {
+        const leaveStatus: AttendanceStatus =
+          targetLeave.leave_type === 'SAKIT' ? 'SAKIT' : targetLeave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+
+        const startDate = new Date(targetLeave.start_date);
+        const endDate = new Date(targetLeave.end_date);
+        const curr = new Date(startDate);
+
+        const allRecordsStr = safeGetStorage('smart_absensi_daily_attendance') || '[]';
+        let allRecords: AttendanceRecord[] = [];
+        try {
+          allRecords = JSON.parse(allRecordsStr);
+        } catch (e) {
+          allRecords = [];
+        }
+
+        while (curr <= endDate) {
+          const dateStr = curr.toISOString().substring(0, 10);
+          const existingIdx = allRecords.findIndex((r) => r.user_id === targetLeave!.user_id && r.date === dateStr);
+
+          const newRec: AttendanceRecord = {
+            id: existingIdx !== -1 ? allRecords[existingIdx].id : 'att_leave_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+            user_id: targetLeave.user_id,
+            date: dateStr,
+            check_in_time: null,
+            check_out_time: null,
+            status: leaveStatus,
+            check_in_lat: null,
+            check_in_lng: null,
+            check_in_distance_meters: null,
+            verification_method: 'MANUAL_OPERATOR',
+            attendance_source: 'MANUAL',
+            is_offline: false,
+            notes: `Izin Disetujui Kepsek: ${notes || targetLeave.reason}`,
+            created_at: new Date().toISOString(),
+          };
+
+          if (existingIdx !== -1) {
+            allRecords[existingIdx] = newRec;
+          } else {
+            allRecords.push(newRec);
+          }
+
+          safeSetStorage(`smart_absensi_daily_attendance_${dateStr}`, JSON.stringify([newRec]));
+          curr.setDate(curr.getDate() + 1);
+        }
+
+        safeSetStorage('smart_absensi_daily_attendance', JSON.stringify(allRecords));
+      }
+
       const notifKey = `smart_absensi_notifications_${targetLeave.user_id}`;
       const savedNotifs = safeGetStorage(notifKey);
       let notifs: AppNotification[] = [];

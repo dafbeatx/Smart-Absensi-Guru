@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../types/database.types';
+import type { UserProfile, LeaveRequest, AttendanceRecord, AttendanceStatus } from '../../types/database.types';
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 import { EarlyWarningSystemWidget } from './EarlyWarningSystemWidget';
@@ -12,6 +12,7 @@ export interface ExecutiveDashboardOverviewProps {
   roleTitle: 'Admin Website' | 'Kepala Sekolah';
   teachers: UserProfile[];
   pendingRequests?: LeaveRequest[];
+  allLeaves?: LeaveRequest[];
   attendanceRecords?: AttendanceRecord[];
   onOpenScanner?: () => void;
   onSwitchToGuruView?: () => void;
@@ -25,6 +26,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   roleTitle,
   teachers,
   pendingRequests = [],
+  allLeaves = [],
   attendanceRecords = [],
   onSwitchToGuruView,
   onOpenQrGenerator,
@@ -90,6 +92,45 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       }
     }
 
+    // Merge approved leaves for today into todayUserMap if teacher has no explicit attendance record yet
+    const leavesToEvaluate: LeaveRequest[] = [...allLeaves, ...pendingRequests];
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_leaves');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) leavesToEvaluate.push(...parsed);
+        }
+      } catch (e) {}
+    }
+
+    for (const leave of leavesToEvaluate) {
+      if (leave.approval_status === 'APPROVED') {
+        if (leave.start_date <= todayStr && leave.end_date >= todayStr) {
+          if (!todayUserMap.has(leave.user_id)) {
+            const leaveStatus: AttendanceStatus =
+              leave.leave_type === 'SAKIT' ? 'SAKIT' : leave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+            todayUserMap.set(leave.user_id, {
+              id: 'rec_leave_' + leave.id,
+              user_id: leave.user_id,
+              date: todayStr,
+              check_in_time: null,
+              check_out_time: null,
+              status: leaveStatus,
+              check_in_lat: null,
+              check_in_lng: null,
+              check_in_distance_meters: null,
+              verification_method: 'MANUAL_OPERATOR',
+              attendance_source: 'MANUAL',
+              is_offline: false,
+              notes: leave.reason,
+              created_at: leave.created_at,
+            });
+          }
+        }
+      }
+    }
+
     todayUserMap.forEach((rec) => {
       const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, checkinEnd, rec.status);
       if (effectiveStatus === 'HADIR') hadir++;
@@ -117,7 +158,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       completeCheckOutCount: completeCheckOut,
       pendingCheckOutCount: pendingCheckOut,
     };
-  }, [attendanceRecords, totalGuruCount, todayStr]);
+  }, [attendanceRecords, allLeaves, pendingRequests, totalGuruCount, todayStr, checkinEnd]);
 
   // Full 100% requires both check-in AND check-out. Check-in only gets 50% weight.
   const weightedScore = (completeCheckOutCount + izinCount) + (pendingCheckOutCount * 0.5);
