@@ -1173,7 +1173,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               ) : (
                 <Button
                   variant="primary"
-                  leftIcon={<QrCodeScanIcon className="w-6 h-6 text-white shrink-0" />}
+                  leftIcon={<QrCodeScanIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white shrink-0" />}
                   onClick={handleOpenScannerClick}
                   onMouseEnter={() => {
                     import('html5-qrcode').catch(() => {});
@@ -1181,9 +1181,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   onTouchStart={() => {
                     import('html5-qrcode').catch(() => {});
                   }}
-                  className="w-full py-4 text-xs sm:text-sm font-black tracking-tight shadow-md shadow-emerald-700/20 flex-row items-center justify-center gap-2.5 cursor-pointer rounded-2xl bg-linear-to-r from-[#0D7A5F] to-[#095744] hover:from-[#095744] hover:to-[#023246] transition-all active:scale-[0.98]"
+                  className="w-full py-3.5 sm:py-4 text-xs sm:text-sm font-black tracking-tight shadow-md shadow-emerald-700/20 flex-row items-center justify-center gap-2 sm:gap-2.5 cursor-pointer rounded-2xl bg-linear-to-r from-[#0D7A5F] to-[#095744] hover:from-[#095744] hover:to-[#023246] transition-all active:scale-[0.98] whitespace-normal leading-tight text-center"
                 >
-                  PINDAI QR CODE ABSENSI (SCANNER HP)
+                  PINDAI QR CODE ABSENSI
                 </Button>
               )}
             </section>
