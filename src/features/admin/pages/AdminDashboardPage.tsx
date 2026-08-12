@@ -281,7 +281,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const sidebarItems: SidebarItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
     { id: 'ATTENDANCE_TRACKING', label: 'Live Tracking', icon: '👁️' },
-    { id: 'TEACHERS', label: 'Account Applications', icon: '👥' },
+    { id: 'TEACHERS', label: 'Manajemen Guru & Staf', icon: '👥' },
     { id: 'SCHEDULE', label: 'Jadwal Mengajar', icon: '🗓️' },
     { id: 'DUTY_SCHEDULE', label: 'Jadwal Piket Guru', icon: '🛡️' },
     { id: 'CALENDAR', label: 'Kalender', icon: '📅' },

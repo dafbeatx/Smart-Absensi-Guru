@@ -675,6 +675,13 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     const helperFiltered = AnalyticsService.getAttendanceEligibleUsers(rawAllUsers as any);
     assert('Shared Helper getAttendanceEligibleUsers - Returns identical 2 active GURU users', helperFiltered.length === 2);
     assert('Shared Helper getAttendanceEligibleUsers - Excludes inactive & non-GURU users', helperFiltered.every((u) => u.is_active !== false && (u.role === 'GURU' || !u.role)));
+
+    // Test W: Sidebar Navigation Label Consistency Contract
+    const adminSidebarItem = { id: 'TEACHERS', label: 'Manajemen Guru & Staf' };
+    const kepsekSidebarItem = { id: 'ACCOUNT_APPLICATIONS', label: 'Manajemen Guru & Staf' };
+
+    assert('Sidebar Item Label - Admin teachers tab uses Indonesian title "Manajemen Guru & Staf"', adminSidebarItem.label === 'Manajemen Guru & Staf');
+    assert('Sidebar Item Label - Kepsek teachers tab uses Indonesian title "Manajemen Guru & Staf"', kepsekSidebarItem.label === 'Manajemen Guru & Staf');
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
