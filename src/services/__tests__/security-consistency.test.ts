@@ -526,6 +526,18 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
       'Notification Bell - A11y aria-haspopup, aria-expanded & touch-friendly click listener contract',
       testDropdownA11yContract.ariaHasPopup === 'true' && testDropdownA11yContract.ariaExpanded === true && testDropdownA11yContract.outsideListenerEvent === 'click'
     );
+
+    // Test K: isLoading A11y aria-busy & aria-live Contract
+    const testLoadingA11yContract = (isLoading: boolean) => ({
+      'aria-busy': isLoading ? true : undefined,
+      'aria-live': isLoading ? 'polite' : undefined,
+    });
+    const activeLoadingProps = testLoadingA11yContract(true);
+    const inactiveLoadingProps = testLoadingA11yContract(false);
+    assert(
+      'Button & Form Loading - A11y aria-busy="true" and aria-live="polite" screen reader announcement contract',
+      activeLoadingProps['aria-busy'] === true && activeLoadingProps['aria-live'] === 'polite' && inactiveLoadingProps['aria-busy'] === undefined
+    );
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

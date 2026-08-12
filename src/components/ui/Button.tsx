@@ -39,10 +39,15 @@ export const Button: React.FC<ButtonProps> = ({
     <button
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled || isLoading}
+      aria-busy={isLoading ? true : undefined}
+      aria-live={isLoading ? 'polite' : undefined}
       {...props}
     >
       {isLoading ? (
-        <span className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-1" />
+        <>
+          <span className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-1" aria-hidden="true" />
+          <span className="sr-only">Proses memuat data...</span>
+        </>
       ) : (
         leftIcon
       )}

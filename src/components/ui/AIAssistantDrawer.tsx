@@ -210,9 +210,9 @@ export const AIAssistantDrawer: React.FC = () => {
                 </div>
               ))}
               {isLoading && (
-                <div className="flex justify-start">
+                <div className="flex justify-start" aria-live="polite" aria-busy="true">
                   <div className="bg-white text-slate-500 border border-slate-200 rounded-2xl rounded-bl-none px-4 py-2.5 text-xs flex items-center gap-2">
-                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" aria-hidden="true" />
                     <span>AI sedang berpikir...</span>
                   </div>
                 </div>
@@ -241,9 +241,19 @@ export const AIAssistantDrawer: React.FC = () => {
                   onClick={() => handleSendMessage()}
                   disabled={isLoading || !inputText.trim()}
                   aria-label="Kirim Pesan ke Smart AI Assistant"
-                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer"
+                  aria-busy={isLoading ? true : undefined}
+                  aria-live={isLoading ? 'polite' : undefined}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  Kirim
+                  {isLoading ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                      <span className="sr-only">Sedang mengirim...</span>
+                      <span>Kirim</span>
+                    </>
+                  ) : (
+                    <span>Kirim</span>
+                  )}
                 </button>
               </div>
               <div className="flex justify-between items-center text-[11px] text-slate-400 px-1 pt-0.5">
