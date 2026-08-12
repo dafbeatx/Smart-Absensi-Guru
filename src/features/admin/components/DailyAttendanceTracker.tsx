@@ -43,10 +43,17 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
   const checkinEnd = systemSettings?.work_checkin_end ? systemSettings.work_checkin_end.slice(0, 5) : CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
+  // Filter active guru teachers expected to take daily attendance
+  const activeGuruTeachers = useMemo(() => {
+    return teachers.filter(
+      (t) => t.is_active !== false && (t.role === 'GURU' || (!t.role as boolean))
+    );
+  }, [teachers]);
+
   // 1. Calculate Daily Analytics Stats
   const summary = useMemo(() => {
-    return AnalyticsService.calculateDailySummary(selectedDate, teachers, attendanceRecords, leaveRequests, systemSettings);
-  }, [selectedDate, teachers, attendanceRecords, leaveRequests, systemSettings]);
+    return AnalyticsService.calculateDailySummary(selectedDate, activeGuruTeachers, attendanceRecords, leaveRequests, systemSettings);
+  }, [selectedDate, activeGuruTeachers, attendanceRecords, leaveRequests, systemSettings]);
 
   // 2. Identify attendance state map for each teacher for selectedDate
   const teacherAttendanceMap = useMemo(() => {
@@ -86,7 +93,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       return false;
     };
 
-    for (const teacher of teachers) {
+    for (const teacher of activeGuruTeachers) {
       // 1. Check if teacher has explicit attendance record for selectedDate
       const record = attendanceRecords.find(
         (r) => r.date === selectedDate && isTeacherRecordMatch(teacher, r)
@@ -129,11 +136,11 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     }
 
     return map;
-  }, [selectedDate, teachers, attendanceRecords, leaveRequests, checkinEnd]);
+  }, [selectedDate, activeGuruTeachers, attendanceRecords, leaveRequests, checkinEnd]);
 
   // 3. Filtered list of teachers based on search query and status filter
   const filteredTeachers = useMemo(() => {
-    return teachers.filter((teacher) => {
+    return activeGuruTeachers.filter((teacher) => {
       // Search query filter (Name, NIP, Position)
       const query = searchQuery.trim().toLowerCase();
       const matchesSearch =
@@ -156,7 +163,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
       return true;
     });
-  }, [teachers, teacherAttendanceMap, searchQuery, statusFilter]);
+  }, [activeGuruTeachers, teacherAttendanceMap, searchQuery, statusFilter]);
 
   const isOffDayCheck = useMemo(() => isDateOffDay(selectedDate), [selectedDate]);
 

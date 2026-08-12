@@ -651,6 +651,24 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Attendance Sync Safety - Uses fresh targetTeachers list when provided', resolveListToFetch(freshFetchedTeachers).length === 3);
     assert('Attendance Sync Safety - Fresh list first item matches fetched backend user ID', resolveListToFetch(freshFetchedTeachers)[0].id === 'usr_fresh_1');
     assert('Attendance Sync Safety - Falls back to state teachers if no parameter provided', resolveListToFetch().length === 2);
+
+    // Test U: DailyAttendanceTracker Active Guru Filtering Contract
+    const rawAllUsers = [
+      { id: 'usr_g1', role: 'GURU', is_active: true },
+      { id: 'usr_g2', role: 'GURU', is_active: true },
+      { id: 'usr_g3_inactive', role: 'GURU', is_active: false },
+      { id: 'usr_admin', role: 'ADMIN', is_active: true },
+      { id: 'usr_kepsek', role: 'KEPSEK', is_active: true },
+    ];
+
+    const filterTrackerTeachers = (users: typeof rawAllUsers) =>
+      users.filter((t) => t.is_active !== false && (t.role === 'GURU' || (!t.role as boolean)));
+
+    const activeGuruList = filterTrackerTeachers(rawAllUsers);
+
+    assert('DailyAttendanceTracker Filtering - Excludes non-GURU roles and inactive teachers', activeGuruList.length === 2);
+    assert('DailyAttendanceTracker Filtering - First item is active GURU 1', activeGuruList[0].id === 'usr_g1');
+    assert('DailyAttendanceTracker Filtering - Second item is active GURU 2', activeGuruList[1].id === 'usr_g2');
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
