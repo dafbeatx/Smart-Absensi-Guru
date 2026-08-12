@@ -32,12 +32,14 @@ export interface ExecutiveDashboardAnalytics {
 
 export class AnalyticsService {
   /**
-   * Helper to filter active teachers expected to take daily attendance
-   * (is_active !== false && (role === 'GURU' || !role))
+   * Helper to filter active users expected to take daily attendance
+   * (is_active !== false && (role === 'GURU' || role === 'KEPSEK' || role === 'ADMIN' || !role))
    */
   public static getAttendanceEligibleUsers(allTeachers: UserProfile[]): UserProfile[] {
     return (allTeachers || []).filter(
-      (t) => t.is_active !== false && (t.role === 'GURU' || (!t.role as boolean))
+      (t) =>
+        t.is_active !== false &&
+        (t.role === 'GURU' || t.role === 'KEPSEK' || t.role === 'ADMIN' || (!t.role as boolean))
     );
   }
 

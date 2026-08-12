@@ -653,28 +653,30 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Attendance Sync Safety - Fresh list first item matches fetched backend user ID', resolveListToFetch(freshFetchedTeachers)[0].id === 'usr_fresh_1');
     assert('Attendance Sync Safety - Falls back to state teachers if no parameter provided', resolveListToFetch().length === 2);
 
-    // Test U: DailyAttendanceTracker Active Guru Filtering Contract
+    // Test U: DailyAttendanceTracker Active Personnel Filtering Contract
     const rawAllUsers = [
       { id: 'usr_g1', role: 'GURU', is_active: true },
       { id: 'usr_g2', role: 'GURU', is_active: true },
       { id: 'usr_g3_inactive', role: 'GURU', is_active: false },
       { id: 'usr_admin', role: 'ADMIN', is_active: true },
       { id: 'usr_kepsek', role: 'KEPSEK', is_active: true },
+      { id: 'usr_operator', role: 'OPERATOR', is_active: true },
     ];
 
     const filterTrackerTeachers = (users: typeof rawAllUsers) =>
-      users.filter((t) => t.is_active !== false && (t.role === 'GURU' || (!t.role as boolean)));
+      users.filter((t) => t.is_active !== false && (t.role === 'GURU' || t.role === 'KEPSEK' || t.role === 'ADMIN' || (!t.role as boolean)));
 
-    const activeGuruList = filterTrackerTeachers(rawAllUsers);
+    const activeEligibleList = filterTrackerTeachers(rawAllUsers);
 
-    assert('DailyAttendanceTracker Filtering - Excludes non-GURU roles and inactive teachers', activeGuruList.length === 2);
-    assert('DailyAttendanceTracker Filtering - First item is active GURU 1', activeGuruList[0].id === 'usr_g1');
-    assert('DailyAttendanceTracker Filtering - Second item is active GURU 2', activeGuruList[1].id === 'usr_g2');
+    assert('DailyAttendanceTracker Filtering - Includes active GURU, KEPSEK, ADMIN and excludes inactive/OPERATOR', activeEligibleList.length === 4);
+    assert('DailyAttendanceTracker Filtering - Includes active GURU 1', activeEligibleList.some((u) => u.id === 'usr_g1'));
+    assert('DailyAttendanceTracker Filtering - Includes active ADMIN', activeEligibleList.some((u) => u.id === 'usr_admin'));
+    assert('DailyAttendanceTracker Filtering - Includes active KEPSEK', activeEligibleList.some((u) => u.id === 'usr_kepsek'));
 
     // Test V: AnalyticsService.getAttendanceEligibleUsers Shared Helper Contract
     const helperFiltered = AnalyticsService.getAttendanceEligibleUsers(rawAllUsers as any);
-    assert('Shared Helper getAttendanceEligibleUsers - Returns identical 2 active GURU users', helperFiltered.length === 2);
-    assert('Shared Helper getAttendanceEligibleUsers - Excludes inactive & non-GURU users', helperFiltered.every((u) => u.is_active !== false && (u.role === 'GURU' || !u.role)));
+    assert('Shared Helper getAttendanceEligibleUsers - Returns identical 4 active personnel', helperFiltered.length === 4);
+    assert('Shared Helper getAttendanceEligibleUsers - Excludes inactive & non-attendance roles', helperFiltered.every((u) => u.is_active !== false && (u.role === 'GURU' || u.role === 'KEPSEK' || u.role === 'ADMIN' || !u.role)));
 
     // Test W: Sidebar Navigation Label Consistency Contract
     const adminSidebarItem = { id: 'TEACHERS', label: 'Manajemen Guru & Staf' };
