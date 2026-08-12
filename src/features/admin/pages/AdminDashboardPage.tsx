@@ -334,6 +334,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               <DailyAttendanceTracker
                 teachers={teachers}
                 attendanceRecords={attendanceRecords}
+                leaveRequests={allLeaves.length > 0 ? allLeaves : pendingRequests}
                 onOpenCorrectionModal={(teacher) => {
                   setSelectedCorrectionTeacher(teacher);
                   setIsCorrectionModalOpen(true);
