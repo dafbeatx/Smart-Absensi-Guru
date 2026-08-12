@@ -414,7 +414,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
     }
 
     return scanned;
-  }, [attendanceRecords, teachers, todayStr]);
+  }, [attendanceRecords, teachers, todayStr, checkinEnd]);
 
   return (
     <div className="space-y-6">

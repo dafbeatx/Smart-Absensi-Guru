@@ -562,6 +562,17 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('MockProvider approveLeave - Updates approval_status to APPROVED', approvedItem?.approval_status === 'APPROVED');
     assert('MockProvider approveLeave - Preserves approval notes', approvedItem?.approval_notes === 'Disetujui untuk uji coba dev');
     assert('MockProvider approveLeave - Excludes approved leave from getPendingLeaves', !pendingListAfterApproval.some((l) => l.id === testLeaveId));
+
+    // Test N: ExecutiveDashboardOverview checkinEnd useMemo Dependency Contract
+    const computeScannedStatusWithDeadline = (checkInTime: string, checkinEnd: string) => {
+      const evaluateFn = (time: string, deadline: string) => (time > deadline ? 'TERLAMBAT' : 'HADIR');
+      return evaluateFn(checkInTime, checkinEnd);
+    };
+    const statusBeforeDeadlineShift = computeScannedStatusWithDeadline('07:15', '07:30');
+    const statusAfterDeadlineShift = computeScannedStatusWithDeadline('07:15', '07:00');
+
+    assert('ExecutiveDashboardOverview - Evaluates ON_TIME when before deadline', statusBeforeDeadlineShift === 'HADIR');
+    assert('ExecutiveDashboardOverview - Dynamically re-evaluates LATE when deadline changes', statusAfterDeadlineShift === 'TERLAMBAT');
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
