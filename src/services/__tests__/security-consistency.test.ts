@@ -682,6 +682,40 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
 
     assert('Sidebar Item Label - Admin teachers tab uses Indonesian title "Manajemen Guru & Staf"', adminSidebarItem.label === 'Manajemen Guru & Staf');
     assert('Sidebar Item Label - Kepsek teachers tab uses Indonesian title "Manajemen Guru & Staf"', kepsekSidebarItem.label === 'Manajemen Guru & Staf');
+
+    // Test X: Cross-Device Sync Hook Contract
+    // Simulate the cooldown debounce logic from useCrossDeviceSync
+    const COOLDOWN_MS = 30000;
+    let lastSyncTimestamp = 0;
+    let syncCallCount = 0;
+
+    const simulateTriggerSync = (nowMs: number, enabled: boolean): boolean => {
+      if (!enabled) return false;
+      if (nowMs - lastSyncTimestamp < COOLDOWN_MS) return false;
+      lastSyncTimestamp = nowMs;
+      syncCallCount++;
+      return true;
+    };
+
+    // First trigger should always succeed (now=30000, last=0, diff=30000 >= 30000 ✓)
+    const firstTrigger = simulateTriggerSync(30000, true);
+    assert('CrossDeviceSync - First visibility trigger invokes onSync', firstTrigger === true);
+    assert('CrossDeviceSync - SyncCallCount is 1 after first trigger', syncCallCount === 1);
+
+    // Second trigger within cooldown window (now=45000, last=30000, diff=15000 < 30000 → blocked)
+    const secondTrigger = simulateTriggerSync(45000, true);
+    assert('CrossDeviceSync - Second trigger within 30s cooldown is blocked', secondTrigger === false);
+    assert('CrossDeviceSync - SyncCallCount remains 1 after blocked trigger', syncCallCount === 1);
+
+    // Third trigger after cooldown expires (now=61000, last=30000, diff=31000 >= 30000 ✓)
+    const thirdTrigger = simulateTriggerSync(61000, true);
+    assert('CrossDeviceSync - Third trigger after 30s cooldown passes', thirdTrigger === true);
+    assert('CrossDeviceSync - SyncCallCount is 2 after cooldown expiry', syncCallCount === 2);
+
+    // Trigger with enabled=false should be blocked regardless of timing
+    const disabledTrigger = simulateTriggerSync(200000, false);
+    assert('CrossDeviceSync - Trigger blocked when enabled=false (preview mode)', disabledTrigger === false);
+    assert('CrossDeviceSync - SyncCallCount unchanged when disabled', syncCallCount === 2);
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

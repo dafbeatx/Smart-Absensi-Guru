@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { Badge } from '../../../components/ui/Badge';
@@ -30,6 +30,7 @@ import { NotificationService } from '../../../services/notification-permission.s
 import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
 import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
+import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -321,6 +322,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
   }, [effectiveUser?.id]);
 
+  // Ref to hold the latest loadAllData function for cross-device sync hook
+  const loadAllDataRef = useRef<(() => void) | null>(null);
+
   // Load Settings, Today Attendance, Holidays, Monthly History, Notifications, & Device Binding
   useEffect(() => {
     const loadAllData = async () => {
@@ -493,6 +497,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
 
     loadAllData();
+    loadAllDataRef.current = loadAllData;
 
     const handleScannedEvent = () => loadAllData();
     const handleNotificationPushed = () => {
@@ -515,6 +520,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       window.removeEventListener('storage', handleScannedEvent);
     };
   }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);
+
+  // Cross-device sync: auto-refresh data when user returns to the app from another device/tab
+  const handleCrossDeviceSync = useCallback(() => {
+    if (loadAllDataRef.current) {
+      loadAllDataRef.current();
+    }
+  }, []);
+
+  useCrossDeviceSync({
+    onSync: handleCrossDeviceSync,
+    cooldownMs: 30000,
+    enabled: !isPreviewMode && !!effectiveUser?.id,
+  });
 
   // Dynamic monthly attendance statistics calculation
   const totalDays = attendanceHistory.length;

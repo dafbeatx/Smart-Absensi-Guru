@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
@@ -27,6 +27,7 @@ import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { isDateOffDay } from '../../../utils/time.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
+import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -165,6 +166,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     }
   };
 
+  // Ref to hold the latest backend sync function for cross-device sync hook
+  const syncBackendRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     // 1. Instantly populate from local storage cache for instant UI rendering
     let activeTeachersCache = teachers;
@@ -228,6 +232,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     };
 
     syncBackendDataSequentially();
+    syncBackendRef.current = syncBackendDataSequentially;
 
     const handleScannedEvent = () => {
       fetchAttendanceRecords();
@@ -267,6 +272,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
   }, [user?.id, teachers.length]);
+
+  // Cross-device sync: auto-refresh data when Admin returns to the app
+  const handleCrossDeviceSync = useCallback(() => {
+    if (syncBackendRef.current) {
+      syncBackendRef.current();
+    }
+  }, []);
+
+  useCrossDeviceSync({
+    onSync: handleCrossDeviceSync,
+    cooldownMs: 30000,
+    enabled: !!user?.id,
+  });
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 

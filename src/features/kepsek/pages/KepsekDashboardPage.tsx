@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
@@ -15,6 +15,7 @@ import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { AnalyticsService } from '../../../services/analytics.service';
 import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
+import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -159,11 +160,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     }
   };
 
-  const handleManualRefresh = () => {
+  const handleManualRefresh = useCallback(() => {
     fetchUsersFromBackend();
     fetchPendingRequests();
     fetchAttendanceRecords();
-  };
+  }, []);
 
   useEffect(() => {
     const handleSyncTeachers = () => {
@@ -206,6 +207,13 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       window.removeEventListener('storage', handleLeaveUpdated);
     };
   }, []);
+
+  // Cross-device sync: auto-refresh data when Kepsek returns to the app
+  useCrossDeviceSync({
+    onSync: handleManualRefresh,
+    cooldownMs: 30000,
+    enabled: !!user?.id,
+  });
 
   const todayStr = getTodayDateInJakarta();
 
