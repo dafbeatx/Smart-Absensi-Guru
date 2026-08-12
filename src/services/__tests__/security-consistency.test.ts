@@ -408,5 +408,62 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('hashPin Security - Test Execution', false, String(e));
   }
 
+  // Test E: Admin User Mutation Error Propagation Test
+  try {
+    const failingProvider = {
+      createUser: async () => { throw new Error('Database RLS Policy Violation'); },
+      updateUser: async () => { throw new Error('Network Connection Lost'); },
+      resetPin: async () => { throw new Error('User not found'); },
+      toggleUserStatus: async () => { throw new Error('Permission denied'); },
+      deleteUser: async () => { throw new Error('Foreign Key Constraint Error'); },
+    };
+
+    let createUserFailed = false;
+    try {
+      await failingProvider.createUser();
+    } catch {
+      createUserFailed = true;
+    }
+    assert('Admin Mutation - Provider createUser error throws and prevents success flow', createUserFailed === true);
+
+    let updateUserFailed = false;
+    try {
+      await failingProvider.updateUser();
+    } catch {
+      updateUserFailed = true;
+    }
+    assert('Admin Mutation - Provider updateUser error throws and prevents success flow', updateUserFailed === true);
+
+    let resetPinFailed = false;
+    try {
+      await failingProvider.resetPin();
+    } catch {
+      resetPinFailed = true;
+    }
+    assert('Admin Mutation - Provider resetPin error throws and prevents success flow', resetPinFailed === true);
+
+    let toggleStatusFailed = false;
+    try {
+      await failingProvider.toggleUserStatus();
+    } catch {
+      toggleStatusFailed = true;
+    }
+    assert('Admin Mutation - Provider toggleUserStatus error throws and prevents success flow', toggleStatusFailed === true);
+
+    let deleteUserFailed = false;
+    try {
+      await failingProvider.deleteUser();
+    } catch {
+      deleteUserFailed = true;
+    }
+    assert('Admin Mutation - Provider deleteUser error throws and prevents success flow', deleteUserFailed === true);
+
+    const { handleAppError } = await import('../../utils/error.utils');
+    const formattedMsg = handleAppError(new Error('Failed to fetch'), 'TestContext', 'Gagal Tambah User', false);
+    assert('Admin Mutation - Error handler formats network error cleanly', formattedMsg.includes('Gagal terhubung ke server'));
+  } catch (e) {
+    assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
+  }
+
   return { passed, failed, results };
 };

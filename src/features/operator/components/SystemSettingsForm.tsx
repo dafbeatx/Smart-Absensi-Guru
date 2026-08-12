@@ -10,6 +10,7 @@ import type { SystemSettings } from '../../../types/database.types';
 import { formatTimeForInput } from '../../../utils/time.utils';
 import { GPSService } from '../../../services/gps.service';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
+import { handleAppError } from '../../../utils/error.utils';
 
 export const SystemSettingsForm: React.FC = () => {
   const { user } = useAuthStore();
@@ -154,30 +155,32 @@ export const SystemSettingsForm: React.FC = () => {
       geofence_radius: finalRadius,
     };
 
-    // 1. Persist to localStorage
-    localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updatedSettings));
-
-    // 2. Persist to backend / Google Sheets
     try {
+      // 1. Persist to backend / Google Sheets first
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
       await provider.updateSettings(updatedSettings, token);
-    } catch (err) {
-      console.warn('Failed to sync settings to backend:', err);
+
+      // 2. Persist to localStorage & dispatch event ONLY after backend succeeds
+      localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updatedSettings));
+      window.dispatchEvent(new Event('smart_absensi_settings_updated'));
+
+      // 3. Log Audit Trail
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'OPERATOR',
+        actionType: 'UPDATE_SETTINGS',
+        targetEntity: 'System_Settings',
+        newValue: JSON.stringify(updatedSettings),
+        reason: 'Pembaruan Konfigurasi Jam Kerja & Geofence Sekolah oleh Operator Website',
+      });
+
+      setIsLoading(false);
+      showToast('success', 'Pengaturan Tersimpan Permanen!', 'Konfigurasi jam kerja & geofence telah diperbarui dan disimpan.');
+    } catch (err: unknown) {
+      setIsLoading(false);
+      handleAppError(err, 'OperatorSystemSettingsForm.handleSave', 'Gagal Menyimpan Pengaturan Sistem');
     }
-
-    // 3. Log Audit Trail
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'OPERATOR',
-      actionType: 'UPDATE_SETTINGS',
-      targetEntity: 'System_Settings',
-      newValue: JSON.stringify(updatedSettings),
-      reason: 'Pembaruan Konfigurasi Jam Kerja & Geofence Sekolah oleh Operator Website',
-    });
-
-    setIsLoading(false);
-    showToast('success', 'Pengaturan Tersimpan Permanen!', 'Konfigurasi jam kerja & geofence telah diperbarui dan disimpan.');
   };
 
   return (

@@ -8,6 +8,7 @@ import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { UserProfile, RoleCode } from '../../../types/database.types';
 import { convertToWebP } from '../../../utils/image.utils';
+import { handleAppError } from '../../../utils/error.utils';
 
 export interface TeacherManagementTableProps {
   teachers: UserProfile[];
@@ -70,40 +71,41 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
-      await provider.createUser(newTeacher, token);
-    } catch (err) {
-      console.warn('Backend GAS create user notify:', err);
+      const createdUser = await provider.createUser(newTeacher, token);
+      const savedUser = createdUser || newTeacher;
+
+      const updated = [...teachers, savedUser];
+      onTeachersChange(updated);
+      try {
+        localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to cache teachers to localStorage:', e);
+      }
+      window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'ADD_USER',
+        targetEntity: 'Users',
+        newValue: JSON.stringify(savedUser),
+        reason: `Pendaftaran akun ${role} baru oleh Admin Website: ${fullName}`,
+      });
+
+      showToast(
+        'success',
+        'Pengguna Berhasil Ditambahkan!',
+        `${fullName} (${role}) telah terdaftar dengan PIN awal default: 123456.`
+      );
+      setIsAddModalOpen(false);
+      setFullName('');
+      setNip('');
+      setPhone('');
+      setPosition('');
+      setAvatarUrl(null);
+    } catch (err: unknown) {
+      handleAppError(err, 'TeacherManagementTable.handleAddTeacher', 'Gagal Menambahkan Pengguna Baru');
     }
-
-    const updated = [...teachers, newTeacher];
-    onTeachersChange(updated);
-    try {
-      localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
-    } catch (e) {
-      console.warn('Failed to cache teachers to localStorage:', e);
-    }
-    window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
-
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'ADMIN',
-      actionType: 'ADD_USER',
-      targetEntity: 'Users',
-      newValue: JSON.stringify(newTeacher),
-      reason: `Pendaftaran akun ${role} baru oleh Admin Website: ${fullName}`,
-    });
-
-    showToast(
-      'success',
-      'Pengguna Berhasil Ditambahkan!',
-      `${fullName} (${role}) telah terdaftar dengan PIN awal default: 123456.`
-    );
-    setIsAddModalOpen(false);
-    setFullName('');
-    setNip('');
-    setPhone('');
-    setPosition('');
-    setAvatarUrl(null);
   };
 
   const handleOpenEditModal = (t: UserProfile) => {
@@ -176,139 +178,161 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
       await provider.updateUser(selectedTeacher.id, updates, token);
-    } catch (err) {
-      console.warn('Backend update user warning:', err);
+
+      const updated = teachers.map((t) =>
+        t.id === selectedTeacher.id ? { ...t, ...updates } : t
+      );
+      onTeachersChange(updated);
+      try {
+        localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to cache teachers to localStorage:', e);
+      }
+      window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
+
+      if (user && selectedTeacher && (user.id === selectedTeacher.id || (Boolean(user.nip) && user.nip === selectedTeacher.nip))) {
+        useAuthStore.getState().updateUserProfile(updates);
+      }
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'EDIT_USER',
+        targetEntity: 'Users',
+        newValue: JSON.stringify(updates),
+        reason: `Pembaruan data akun ${fullName} (${role}) oleh Admin Website`,
+      });
+
+      showToast('success', 'Data Pengguna Berhasil Diperbarui!', `Profil ${fullName} telah diperbarui di database & frontend.`);
+      setIsEditModalOpen(false);
+    } catch (err: unknown) {
+      handleAppError(err, 'TeacherManagementTable.handleEditTeacherSubmit', 'Gagal Memperbarui Data Pengguna');
     }
-
-    const updated = teachers.map((t) =>
-      t.id === selectedTeacher.id ? { ...t, ...updates } : t
-    );
-    onTeachersChange(updated);
-    try {
-      localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
-    } catch (e) {
-      console.warn('Failed to cache teachers to localStorage:', e);
-    }
-    window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
-
-    if (user && selectedTeacher && (user.id === selectedTeacher.id || (Boolean(user.nip) && user.nip === selectedTeacher.nip))) {
-      useAuthStore.getState().updateUserProfile(updates);
-    }
-
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'ADMIN',
-      actionType: 'EDIT_USER',
-      targetEntity: 'Users',
-      newValue: JSON.stringify(updates),
-      reason: `Pembaruan data akun ${fullName} (${role}) oleh Admin Website`,
-    });
-
-    showToast('success', 'Data Pengguna Berhasil Diperbarui!', `Profil ${fullName} telah diperbarui di database & frontend.`);
-    setIsEditModalOpen(false);
   };
 
   const handleResetPin = async () => {
     if (!selectedTeacher || newPin.length !== 6) return;
 
     try {
-      await ProviderFactory.getProvider().resetPin(selectedTeacher.id, newPin, useAuthStore.getState().token || '');
-    } catch (e) {
-      console.warn('API resetPin warning:', e);
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      await provider.resetPin(selectedTeacher.id, newPin, token);
+
+      const updated = teachers.map((t) =>
+        t.id === selectedTeacher.id ? { ...t, must_change_pin: true } : t
+      );
+      onTeachersChange(updated);
+      try {
+        localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to cache teachers to localStorage:', e);
+      }
+      window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'RESET_PIN',
+        targetEntity: 'Users',
+        newValue: JSON.stringify({ pin_reset: true, must_change_pin: true }),
+        reason: `Reset PIN 6-digit oleh Admin Website untuk ${selectedTeacher.full_name}`,
+      });
+
+      showToast('success', 'Reset PIN Berhasil!', `PIN sementara untuk ${selectedTeacher.full_name} adalah ${newPin} (Wajib reset di login berikutnya).`);
+      setIsResetPinOpen(false);
+      setSelectedTeacher(null);
+      setNewPin('');
+    } catch (err: unknown) {
+      handleAppError(err, 'TeacherManagementTable.handleResetPin', 'Gagal Melakukan Reset PIN');
     }
-
-    const updated = teachers.map((t) =>
-      t.id === selectedTeacher.id ? { ...t, must_change_pin: true } : t
-    );
-    onTeachersChange(updated);
-
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'ADMIN',
-      actionType: 'RESET_PIN',
-      targetEntity: 'Users',
-      newValue: JSON.stringify({ pin_reset: true, must_change_pin: true }),
-      reason: `Reset PIN 6-digit oleh Admin Website untuk ${selectedTeacher.full_name}`,
-    });
-
-    showToast('success', 'Reset PIN Berhasil!', `PIN sementara untuk ${selectedTeacher.full_name} adalah ${newPin} (Wajib reset di login berikutnya).`);
-    setIsResetPinOpen(false);
-    setSelectedTeacher(null);
-    setNewPin('');
   };
 
   const handleResetDevice = async (teacher: UserProfile) => {
     try {
-      await ProviderFactory.getProvider().resetDevice(teacher.id, useAuthStore.getState().token || '');
-    } catch (e) {
-      console.warn('API resetDevice warning:', e);
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      await provider.resetDevice(teacher.id, token);
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'RESET_DEVICE',
+        targetEntity: 'Device_Binding',
+        newValue: JSON.stringify({ device_unbound: true }),
+        reason: `Reset ikatan HP oleh Admin Website untuk ${teacher.full_name}`,
+      });
+
+      showToast('success', 'Reset Perangkat Berhasil!', `Ikatan HP untuk ${teacher.full_name} telah dilepas.`);
+    } catch (err: unknown) {
+      handleAppError(err, 'TeacherManagementTable.handleResetDevice', 'Gagal Melepas Ikatan Perangkat');
     }
-
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'ADMIN',
-      actionType: 'RESET_DEVICE',
-      targetEntity: 'Device_Binding',
-      newValue: JSON.stringify({ device_unbound: true }),
-      reason: `Reset ikatan HP oleh Admin Website untuk ${teacher.full_name}`,
-    });
-
-    showToast('success', 'Reset Perangkat Berhasil!', `Ikatan HP untuk ${teacher.full_name} telah dilepas.`);
   };
 
   const handleToggleStatus = async (teacher: UserProfile) => {
-    const updated = teachers.map((t) =>
-      t.id === teacher.id ? { ...t, is_active: !t.is_active } : t
-    );
-    onTeachersChange(updated);
-
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
       await provider.toggleUserStatus(teacher.id, token);
-    } catch (err) {
-      console.warn('Failed to sync toggleUserStatus to backend:', err);
+
+      const updated = teachers.map((t) =>
+        t.id === teacher.id ? { ...t, is_active: !t.is_active } : t
+      );
+      onTeachersChange(updated);
+      try {
+        localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to cache teachers to localStorage:', e);
+      }
+      window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'TOGGLE_USER_STATUS',
+        targetEntity: 'Users',
+        oldValue: JSON.stringify({ is_active: teacher.is_active }),
+        newValue: JSON.stringify({ is_active: !teacher.is_active }),
+        reason: `Mengubah status keaktifan akun ${teacher.full_name}`,
+      });
+
+      showToast('info', 'Status Akun Diperbarui', `${teacher.full_name} kini ${!teacher.is_active ? 'Aktif' : 'Non-Aktif'}.`);
+    } catch (err: unknown) {
+      handleAppError(err, 'TeacherManagementTable.handleToggleStatus', 'Gagal Mengubah Status Keaktifan Akun');
     }
-
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'ADMIN',
-      actionType: 'TOGGLE_USER_STATUS',
-      targetEntity: 'Users',
-      oldValue: JSON.stringify({ is_active: teacher.is_active }),
-      newValue: JSON.stringify({ is_active: !teacher.is_active }),
-      reason: `Mengubah status keaktifan akun ${teacher.full_name}`,
-    });
-
-    showToast('info', 'Status Akun Diperbarui', `${teacher.full_name} kini ${!teacher.is_active ? 'Aktif' : 'Non-Aktif'}.`);
   };
 
   const handleDeleteTeacher = async () => {
     if (!selectedTeacher) return;
 
-    const updated = teachers.filter((t) => t.id !== selectedTeacher.id);
-    onTeachersChange(updated);
-
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
       await provider.deleteUser(selectedTeacher.id, token);
-    } catch (e) {
-      console.warn('Backend GAS delete notify:', e);
+
+      const updated = teachers.filter((t) => t.id !== selectedTeacher.id);
+      onTeachersChange(updated);
+      try {
+        localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to cache teachers to localStorage:', e);
+      }
+      window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'DELETE_USER',
+        targetEntity: 'Users',
+        oldValue: JSON.stringify(selectedTeacher),
+        reason: `Penghapusan akun ${selectedTeacher.role} oleh Admin Website: ${selectedTeacher.full_name}`,
+      });
+
+      showToast('success', 'Pengguna Berhasil Dihapus!', `Akun ${selectedTeacher.full_name} telah dihapus.`);
+      setIsDeleteModalOpen(false);
+      setSelectedTeacher(null);
+    } catch (err: unknown) {
+      handleAppError(err, 'TeacherManagementTable.handleDeleteTeacher', 'Gagal Menghapus Pengguna');
     }
-
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'ADMIN',
-      actionType: 'DELETE_USER',
-      targetEntity: 'Users',
-      oldValue: JSON.stringify(selectedTeacher),
-      reason: `Penghapusan akun ${selectedTeacher.role} oleh Admin Website: ${selectedTeacher.full_name}`,
-    });
-
-    showToast('success', 'Pengguna Berhasil Dihapus!', `Akun ${selectedTeacher.full_name} telah dihapus.`);
-    setIsDeleteModalOpen(false);
-    setSelectedTeacher(null);
   };
 
   return (

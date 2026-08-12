@@ -10,6 +10,7 @@ import type { SystemSettings } from '../../../types/database.types';
 import { formatTimeForInput } from '../../../utils/time.utils';
 import { GPSService } from '../../../services/gps.service';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
+import { handleAppError } from '../../../utils/error.utils';
 
 export const SystemSettingsForm: React.FC = () => {
   const { user } = useAuthStore();
@@ -153,11 +154,6 @@ export const SystemSettingsForm: React.FC = () => {
     const finalLng = parseCoord(geofenceLng, false);
     const finalRadius = parseInt(geofenceRadius, 10) || CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS;
 
-    // Update state to formatted values
-    setGeofenceLat(String(finalLat));
-    setGeofenceLng(String(finalLng));
-    setGeofenceRadius(String(finalRadius));
-
     const updatedSettings: SystemSettings = {
       app_name: appName,
       institution_name: institution,
@@ -172,31 +168,37 @@ export const SystemSettingsForm: React.FC = () => {
       geofence_radius: finalRadius,
     };
 
-    // 1. Persist to localStorage
-    localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updatedSettings));
-    window.dispatchEvent(new Event('smart_absensi_settings_updated'));
-
-    // 2. Persist to backend / Google Sheets
     try {
+      // 1. Persist to backend / Google Sheets first
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
       await provider.updateSettings(updatedSettings, token);
-    } catch (err) {
-      console.warn('Failed to sync settings to backend:', err);
+
+      // 2. Persist to localStorage
+      localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updatedSettings));
+      window.dispatchEvent(new Event('smart_absensi_settings_updated'));
+
+      // Update state to formatted values
+      setGeofenceLat(String(finalLat));
+      setGeofenceLng(String(finalLng));
+      setGeofenceRadius(String(finalRadius));
+
+      // 3. Log Audit Trail
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'UPDATE_SETTINGS',
+        targetEntity: 'System_Settings',
+        newValue: JSON.stringify(updatedSettings),
+        reason: 'Pembaruan Detail Jam Kerja Hari Jumat & Geofence Sekolah oleh Admin Website',
+      });
+
+      setIsLoading(false);
+      showToast('success', 'Pengaturan Tersimpan Permanen!', 'Pengaturan jam kerja per hari (Jumat 11:00, Sabtu-Minggu Libur) & geofence berhasil disimpan.');
+    } catch (err: unknown) {
+      setIsLoading(false);
+      handleAppError(err, 'SystemSettingsForm.handleSave', 'Gagal Menyimpan Pengaturan Sistem');
     }
-
-    // 3. Log Audit Trail
-    await AuditLogger.log({
-      actorId: user?.id || 'op_1',
-      actorRole: user?.role || 'ADMIN',
-      actionType: 'UPDATE_SETTINGS',
-      targetEntity: 'System_Settings',
-      newValue: JSON.stringify(updatedSettings),
-      reason: 'Pembaruan Detail Jam Kerja Hari Jumat & Geofence Sekolah oleh Admin Website',
-    });
-
-    setIsLoading(false);
-    showToast('success', 'Pengaturan Tersimpan Permanen!', 'Pengaturan jam kerja per hari (Jumat 11:00, Sabtu-Minggu Libur) & geofence berhasil disimpan.');
   };
 
   return (
