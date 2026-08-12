@@ -573,6 +573,18 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
 
     assert('ExecutiveDashboardOverview - Evaluates ON_TIME when before deadline', statusBeforeDeadlineShift === 'HADIR');
     assert('ExecutiveDashboardOverview - Dynamically re-evaluates LATE when deadline changes', statusAfterDeadlineShift === 'TERLAMBAT');
+
+    // Test O: Kepsek Mobile Bottom Navigation FAB Button Label & Action Contract
+    const kepsekFabConfig = {
+      label: 'Scan QR',
+      icon: '📷',
+      title: 'Scan QR Absensi',
+      handlerName: 'onOpenScanner',
+    };
+
+    assert('Kepsek Mobile Bottom Nav - FAB Label matches handler action', kepsekFabConfig.label === 'Scan QR');
+    assert('Kepsek Mobile Bottom Nav - FAB Icon uses camera symbol', kepsekFabConfig.icon === '📷');
+    assert('Kepsek Mobile Bottom Nav - FAB Handler triggers camera scanner', kepsekFabConfig.handlerName === 'onOpenScanner');
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

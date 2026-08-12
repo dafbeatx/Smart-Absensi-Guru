@@ -3,15 +3,15 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
-import { FeatureGate } from '../../../components/ui/FeatureGate';
 import { Sidebar } from '../../../components/ui/Sidebar';
 import type { SidebarItem } from '../../../components/ui/Sidebar';
 import { TeacherManagementTable } from '../../admin/components/TeacherManagementTable';
+import { QRCodeGeneratorModal } from '../../admin/components/QRCodeGeneratorModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
 import { DevTestPage } from '../../admin/pages/DevTestPage';
-import { getTodayDateInJakarta, isDateOffDay } from '../../../utils/time.utils';
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { AnalyticsService } from '../../../services/analytics.service';
 import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
@@ -26,6 +26,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const { showToast } = useToastStore();
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
 
@@ -323,6 +324,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               allLeaves={allLeaves}
               attendanceRecords={attendanceRecords}
               onOpenScanner={onOpenScanner}
+              onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
               onSwitchToGuruView={onSwitchToGuruView}
               onNavigateTab={(tab: string) => setActiveTab(tab)}
             />
@@ -344,51 +346,33 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           {/* TAB 4: UNABSENTED */}
           {activeTab === 'UNABSENTED' && (
             <div className="bg-white p-4 sm:p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
-              <h3 className="font-extrabold text-[#023246] text-base flex items-center justify-between">
-                <span>⚠️ Daftar Guru & Staf Belum Absen</span>
-                <span className="text-xs font-semibold text-slate-500">{unabsentedTeachers.length} Orang</span>
-              </h3>
-
-              {attendanceSyncStatus === 'ERROR' && (
-                <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-red-900 text-xs font-semibold flex items-center gap-2">
-                  <span className="text-base">⚠️</span>
-                  <span>PERHATIAN: Data presensi gagal diperbarui dari server. Daftar guru belum absen di bawah ini mungkin tidak mencerminkan kondisi terbaru.</span>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-extrabold text-[#023246] text-base">⚠️ Daftar Guru Belum Absen Masuk Hari Ini</h3>
+                  <p className="text-xs text-slate-500 font-medium">Monitoring kehadiran guru secara real-time</p>
                 </div>
-              )}
-
-              {isDateOffDay(getTodayDateInJakarta()).isOff && (
-                <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl text-sky-900 text-xs space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold text-sm">
-                    <span>🏖️</span> Hari Ini Libur Sekolah ({isDateOffDay(getTodayDateInJakarta()).reason})
-                  </div>
-                  <p className="text-[11px] text-sky-700 font-medium">Tidak ada jadwal / kewajiban presensi bagi guru dan staf hari ini.</p>
-                </div>
-              )}
+                <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-bold text-xs">
+                  {unabsentedTeachers.length} Guru
+                </span>
+              </div>
 
               {unabsentedTeachers.length === 0 ? (
-                <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 font-medium space-y-1">
-                  <span className="text-xl block">✅</span>
-                  <p className="font-bold text-[#023246]">Semua Guru & Staf Telah Absen Hari Ini</p>
-                  <p className="text-[11px] text-slate-400">Seluruh personil sekolah yang terdaftar telah memiliki catatan absensi.</p>
+                <div className="p-8 text-center bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-2">
+                  <span className="text-3xl">🎉</span>
+                  <p className="font-bold text-emerald-900 text-sm">Semua Guru Sudah Melakukan Absensi</p>
+                  <p className="text-xs text-emerald-700">Seluruh staf pengajar yang aktif telah terdata masuk atau izin hari ini.</p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {unabsentedTeachers.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between p-3 sm:p-3.5 bg-slate-50 rounded-2xl border border-slate-200 gap-2">
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <p className="font-extrabold text-[#023246] text-sm truncate">{t.full_name}</p>
-                        <p className="text-xs text-slate-500 font-medium truncate">{t.position || 'Guru / Staf'} • {t.phone_number || '-'}</p>
+                    <div key={t.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-2xs">
+                        {t.full_name.charAt(0)}
                       </div>
-                      <FeatureGate flag="ENABLE_WHATSAPP">
-                        <a
-                          href={`https://wa.me/62${String(t.phone_number || '').replace(/^0/, '')}?text=Assalamu'alaikum%20Bapak/Ibu%20${encodeURIComponent(t.full_name)},%20mohon%20konfirmasi%20kehadiran%20hari%20ini.`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 active:scale-95"
-                        >
-                          💬 Hubungi WA
-                        </a>
-                      </FeatureGate>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-slate-900 text-xs truncate">{t.full_name}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{t.position || 'Guru Pengajar'}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -396,16 +380,14 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             </div>
           )}
 
-          {/* TAB 5: DEVELOPER TEST MODE */}
-          {activeTab === 'DEV_TEST' && (
-            <DevTestPage onBackToDashboard={() => setActiveTab('DASHBOARD')} />
-          )}
+          {/* TAB 5: DEV TEST MODE */}
+          {activeTab === 'DEV_TEST' && <DevTestPage onBackToDashboard={() => setActiveTab('DASHBOARD')} />}
         </main>
       </div>
 
-      {/* ── MOBILE BOTTOM NAVIGATION DOCK (Infinix Note 8 360px Width Optimized) ── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-xl border-t border-[#D4D4CE]/40 px-2 sm:px-4 py-2 z-40 shadow-2xl rounded-t-3xl lg:hidden ring-1 ring-black/5">
-        <div className="flex items-center justify-around relative">
+      {/* ── MOBILE BOTTOM NAVIGATION BAR ───────────────────────────────────── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-40 px-3 py-1 shadow-lg">
+        <div className="flex items-center justify-around max-w-md mx-auto relative">
           <button
             onClick={() => setActiveTab('DASHBOARD')}
             className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-1 transition-all cursor-pointer active:scale-95 ${
@@ -413,7 +395,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             }`}
           >
             <span className="text-lg">🏠</span>
-            <span>Dashboard</span>
+            <span>Beranda</span>
           </button>
 
           <button
@@ -426,16 +408,16 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             <span>Live Tracking</span>
           </button>
 
-          {/* Center FAB Poster QR Button */}
+          {/* Center FAB Scan QR Button */}
           <div className="relative -top-5 flex flex-col items-center">
             <button
               onClick={() => onOpenScanner && onOpenScanner()}
               className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-tr from-[#023246] to-[#287094] text-white flex items-center justify-center text-xl shadow-lg shadow-[#023246]/30 ring-4 ring-white active:scale-95 transition-transform cursor-pointer"
-              title="Poster QR"
+              title="Scan QR Absensi"
             >
-              🔲
+              📷
             </button>
-            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Poster QR</span>
+            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Scan QR</span>
           </div>
 
           <button
@@ -462,6 +444,12 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           </button>
         </div>
       </nav>
+
+      {/* Official QR Code Poster Generator Modal */}
+      <QRCodeGeneratorModal
+        isOpen={isQrGeneratorOpen}
+        onClose={() => setIsQrGeneratorOpen(false)}
+      />
     </div>
   );
 };
