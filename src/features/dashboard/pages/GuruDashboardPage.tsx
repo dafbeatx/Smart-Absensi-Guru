@@ -1189,43 +1189,43 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             </section>
 
             {/* 🌟 3. QUICK ACTION FEATURE CARDS (INTUITIVE & MINIMALIST) ─────────── */}
-            <section className="grid grid-cols-3 gap-2.5 sm:gap-3">
+            <section className="grid grid-cols-3 gap-2 sm:gap-3">
               <button
                 onClick={handleOpenLeaveModal}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
+                className="p-2.5 sm:p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-1.5 sm:space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full"
               >
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-base sm:text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
                   📝
                 </div>
-                <div>
-                  <h3 className="font-black text-[#023246] text-xs leading-tight">Ajukan Izin</h3>
-                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Sakit / Cuti</p>
+                <div className="min-w-0 w-full">
+                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Ajukan Izin</h3>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Sakit / Cuti</p>
                 </div>
               </button>
 
               <button
                 onClick={handleOpenCorrectionModal}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
+                className="p-2.5 sm:p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-1.5 sm:space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full"
               >
-                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-base sm:text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
                   ✏️
                 </div>
-                <div>
-                  <h3 className="font-black text-[#023246] text-xs leading-tight">Koreksi Absen</h3>
-                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Lapor Admin</p>
+                <div className="min-w-0 w-full">
+                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Koreksi Absen</h3>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Lapor Admin</p>
                 </div>
               </button>
 
               <button
                 onClick={() => setIsScheduleModalOpen(true)}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95"
+                className="p-2.5 sm:p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-1.5 sm:space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full"
               >
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#0D7A5F] border border-emerald-200 flex items-center justify-center text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-50 text-[#0D7A5F] border border-emerald-200 flex items-center justify-center text-base sm:text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
                   📅
                 </div>
-                <div>
-                  <h3 className="font-black text-[#023246] text-xs leading-tight">Jadwal Kelas</h3>
-                  <p className="text-[10px] text-slate-500 font-semibold truncate mt-0.5">Jam Mengajar</p>
+                <div className="min-w-0 w-full">
+                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Jadwal Kelas</h3>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Jam Mengajar</p>
                 </div>
               </button>
             </section>
