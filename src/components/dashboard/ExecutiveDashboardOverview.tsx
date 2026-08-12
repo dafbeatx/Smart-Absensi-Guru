@@ -786,7 +786,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
 
           {/* Dynamic Pending Approvals or Clean Empty State */}
           {pendingRequests && pendingRequests.length > 0 ? (
-            <PendingApprovalWidget requests={pendingRequests} />
+            <PendingApprovalWidget requests={pendingRequests} teachers={teachers} />
           ) : (
             <div className="p-6 text-center bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 font-medium space-y-1">
               <span className="text-xl block">✅</span>

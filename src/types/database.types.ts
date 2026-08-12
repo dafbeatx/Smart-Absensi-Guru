@@ -86,6 +86,8 @@ export interface AttendanceRecord {
 export interface LeaveRequest {
   id: string;
   user_id: string;
+  user_name?: string | null;
+  teacher_name?: string | null;
   leave_type: LeaveType;
   start_date: string;
   end_date: string;
