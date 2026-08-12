@@ -825,6 +825,8 @@ export class SupabaseProvider implements IDataProvider {
 
   public async updateSettings(settings: SystemSettings, _token: string): Promise<boolean> {
     const updates = [
+      { key: 'app_name', value: settings.app_name || 'Smart Absensi Guru' },
+      { key: 'institution_name', value: settings.institution_name || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam' },
       { key: 'geofence_lat', value: String(settings.geofence_lat) },
       { key: 'geofence_lng', value: String(settings.geofence_lng) },
       { key: 'geofence_radius', value: String(settings.geofence_radius) },

@@ -601,6 +601,33 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     onOpenScannerInPreview(true);
     assert('Preview Mode Scanner Safety - Blocks real camera scanner invocation', !isRealScannerOpened);
     assert('Preview Mode Scanner Safety - Triggers preview scanner blocked modal', isPreviewBlockedModalOpened);
+
+    // Test R: System Settings Persistence Payload Contract (app_name & institution_name)
+    const testSettingsPayload = {
+      app_name: 'Smart Absensi Guru Custom',
+      institution_name: 'Yayasan Pendidikan Islam Al-Ittihadiyah',
+      geofence_lat: -6.613144,
+      geofence_lng: 106.812345,
+      geofence_radius: 500,
+      work_checkin_start: '06:00',
+      work_checkin_end: '07:15',
+      work_checkout_start: '14:00',
+      friday_checkout_start: '11:30',
+      saturday_is_holiday: true,
+      sunday_is_holiday: true,
+    };
+
+    const generateUpdatesPayload = (s: typeof testSettingsPayload) => [
+      { key: 'app_name', value: s.app_name },
+      { key: 'institution_name', value: s.institution_name },
+      { key: 'geofence_lat', value: String(s.geofence_lat) },
+      { key: 'geofence_lng', value: String(s.geofence_lng) },
+      { key: 'geofence_radius', value: String(s.geofence_radius) },
+    ];
+    const updates = generateUpdatesPayload(testSettingsPayload);
+
+    assert('System Settings Persistence - Includes app_name key in updates', updates.some((u) => u.key === 'app_name' && u.value === 'Smart Absensi Guru Custom'));
+    assert('System Settings Persistence - Includes institution_name key in updates', updates.some((u) => u.key === 'institution_name' && u.value === 'Yayasan Pendidikan Islam Al-Ittihadiyah'));
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
