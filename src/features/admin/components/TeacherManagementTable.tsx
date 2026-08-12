@@ -14,12 +14,14 @@ export interface TeacherManagementTableProps {
   teachers: UserProfile[];
   onTeachersChange: (updatedTeachers: UserProfile[]) => void;
   isReadOnly?: boolean;
+  syncStatus?: 'LIVE_SERVER' | 'OFFLINE_CACHE' | 'ERROR_FALLBACK';
 }
 
 export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   teachers,
   onTeachersChange,
   isReadOnly = false,
+  syncStatus = 'LIVE_SERVER',
 }) => {
   const { user } = useAuthStore();
   const { showToast } = useToastStore();
@@ -358,6 +360,37 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
   return (
     <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-card space-y-4">
+      {/* Data Sync Status Badge & Warning Banner */}
+      {syncStatus === 'ERROR_FALLBACK' && (
+        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center justify-between text-xs text-red-800 font-bold">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping shrink-0" />
+            <span>⚠️ <strong>ERROR_FALLBACK</strong>: Gagal terhubung ke database Supabase Cloud. Menampilkan data simulasi lokal (offline fallback).</span>
+          </div>
+          <span className="px-2 py-0.5 bg-red-200/80 text-red-900 rounded-full font-mono text-[10px] shrink-0">DATA_DUMMY_FALLBACK</span>
+        </div>
+      )}
+
+      {syncStatus === 'OFFLINE_CACHE' && (
+        <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs text-amber-900 font-bold">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+            <span>📦 <strong>OFFLINE_CACHE</strong>: Menampilkan data pengguna dari cache lokal browser (localStorage). Menyambungkan ke Supabase...</span>
+          </div>
+          <span className="px-2 py-0.5 bg-amber-200/80 text-amber-950 rounded-full font-mono text-[10px] shrink-0">OFFLINE_CACHE</span>
+        </div>
+      )}
+
+      {syncStatus === 'LIVE_SERVER' && (
+        <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between text-xs text-emerald-900 font-bold">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+            <span>🟢 <strong>LIVE_SERVER</strong>: Data pengguna tersinkronisasi 100% secara real-time dari Supabase Cloud PostgreSQL.</span>
+          </div>
+          <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-950 rounded-full font-mono text-[10px] shrink-0">ONLINE_CLOUD</span>
+        </div>
+      )}
+
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>

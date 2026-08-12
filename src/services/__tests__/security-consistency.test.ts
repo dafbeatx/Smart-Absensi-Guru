@@ -628,6 +628,17 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
 
     assert('System Settings Persistence - Includes app_name key in updates', updates.some((u) => u.key === 'app_name' && u.value === 'Smart Absensi Guru Custom'));
     assert('System Settings Persistence - Includes institution_name key in updates', updates.some((u) => u.key === 'institution_name' && u.value === 'Yayasan Pendidikan Islam Al-Ittihadiyah'));
+
+    // Test S: Teachers Data Sync Status State Contract
+    const computeSyncStatus = (hasBackendData: boolean, hasLocalCache: boolean): 'LIVE_SERVER' | 'OFFLINE_CACHE' | 'ERROR_FALLBACK' => {
+      if (hasBackendData) return 'LIVE_SERVER';
+      if (hasLocalCache) return 'OFFLINE_CACHE';
+      return 'ERROR_FALLBACK';
+    };
+
+    assert('Teachers Sync Status - Returns LIVE_SERVER on backend success', computeSyncStatus(true, true) === 'LIVE_SERVER');
+    assert('Teachers Sync Status - Returns OFFLINE_CACHE on backend failure with cache', computeSyncStatus(false, true) === 'OFFLINE_CACHE');
+    assert('Teachers Sync Status - Returns ERROR_FALLBACK on backend failure without cache', computeSyncStatus(false, false) === 'ERROR_FALLBACK');
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

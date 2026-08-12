@@ -100,6 +100,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     ];
   });
 
+  const [teachersSyncStatus, setTeachersSyncStatus] = useState<'LIVE_SERVER' | 'OFFLINE_CACHE' | 'ERROR_FALLBACK'>(() => {
+    const saved = localStorage.getItem('smart_absensi_teachers');
+    return saved ? 'OFFLINE_CACHE' : 'ERROR_FALLBACK';
+  });
+
   const handleTeachersChange = (updated: UserProfile[]) => {
     setTeachers(updated);
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
@@ -184,9 +189,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           if (fetched && fetched.length > 0) {
             setTeachers(fetched);
             localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
+            setTeachersSyncStatus('LIVE_SERVER');
+          } else {
+            const hasCache = !!localStorage.getItem('smart_absensi_teachers');
+            setTeachersSyncStatus(hasCache ? 'OFFLINE_CACHE' : 'ERROR_FALLBACK');
           }
         } catch (err) {
           console.warn('Backend fetch users fallback:', err);
+          const hasCache = !!localStorage.getItem('smart_absensi_teachers');
+          setTeachersSyncStatus(hasCache ? 'OFFLINE_CACHE' : 'ERROR_FALLBACK');
         }
 
         await new Promise((r) => setTimeout(r, 300));
@@ -355,7 +366,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
           {/* TAB 3: ACCOUNT APPLICATIONS / TEACHERS */}
           {(activeTab === 'TEACHERS' || activeTab === 'ACCOUNT_APPLICATIONS') && (
-            <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
+            <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} syncStatus={teachersSyncStatus} />
           )}
 
           {/* TAB 4: ACADEMIC CALENDAR */}
