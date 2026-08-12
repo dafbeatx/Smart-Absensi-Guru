@@ -13,14 +13,18 @@ import { handleAppError } from '../../../utils/error.utils';
 export interface TeacherManagementTableProps {
   teachers: UserProfile[];
   onTeachersChange: (updatedTeachers: UserProfile[]) => void;
+  isReadOnly?: boolean;
 }
 
 export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   teachers,
   onTeachersChange,
+  isReadOnly = false,
 }) => {
   const { user } = useAuthStore();
   const { showToast } = useToastStore();
+
+  const effectiveReadOnly = isReadOnly || user?.role === 'KEPSEK';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<'ALL' | RoleCode>('ALL');
@@ -48,6 +52,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   });
 
   const handleAddTeacher = async () => {
+    if (effectiveReadOnly) {
+      showToast('warning', 'Akses Ditolak', 'Peran Kepala Sekolah / Mode Lihat Saja tidak dapat menambah akun guru.');
+      return;
+    }
     if (!fullName || !phone) return;
 
     const newTeacher: UserProfile = {
@@ -98,6 +106,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   };
 
   const handleOpenEditModal = (t: UserProfile) => {
+    if (effectiveReadOnly) {
+      showToast('warning', 'Akses Ditolak', 'Peran Kepala Sekolah / Mode Lihat Saja tidak dapat mengubah data akun guru.');
+      return;
+    }
     setSelectedTeacher(t);
     setFullName(t.full_name);
     setNip(t.nip || '');
@@ -109,7 +121,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
   const handleEditTeacherSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTeacher) return;
+    if (effectiveReadOnly || !selectedTeacher) return;
 
     const updates: Partial<UserProfile> = {
       full_name: fullName,
@@ -156,7 +168,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   };
 
   const handleResetPin = async () => {
-    if (!selectedTeacher || newPin.length !== 6) return;
+    if (effectiveReadOnly || !selectedTeacher || newPin.length !== 6) return;
 
     try {
       const provider = ProviderFactory.getProvider();
@@ -193,6 +205,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   };
 
   const handleResetDevice = async (teacher: UserProfile) => {
+    if (effectiveReadOnly) {
+      showToast('warning', 'Akses Ditolak', 'Mode Lihat Saja (Read-Only) tidak dapat melepaskan ikatan HP.');
+      return;
+    }
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
@@ -214,6 +230,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   };
 
   const handleToggleStatus = async (teacher: UserProfile) => {
+    if (effectiveReadOnly) {
+      showToast('warning', 'Akses Ditolak', 'Mode Lihat Saja (Read-Only) tidak dapat menguji/mengubah status akun.');
+      return;
+    }
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
@@ -251,13 +271,22 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h3 className="font-bold text-slate-900 text-sm">Manajemen Master Data Pengguna & Guru</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-slate-900 text-sm">Direktori Master Data Pengguna & Guru</h3>
+            {effectiveReadOnly && (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
+                👁️ Mode Lihat (Kepala Sekolah)
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500">{filteredTeachers.length} pengguna terdaftar</p>
         </div>
 
-        <Button variant="primary" onClick={() => setIsAddModalOpen(true)}>
-          + Tambah Pengguna Baru
-        </Button>
+        {!effectiveReadOnly && (
+          <Button variant="primary" onClick={() => setIsAddModalOpen(true)}>
+            + Tambah Pengguna Baru
+          </Button>
+        )}
       </div>
 
       {/* Filter & Search Bar */}
@@ -294,7 +323,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               <th className="p-3">Role & Jabatan</th>
               <th className="p-3">Kontak WA</th>
               <th className="p-3">Status</th>
-              <th className="p-3 text-right">Aksi Admin Website</th>
+              <th className="p-3 text-right">{effectiveReadOnly ? 'Akses' : 'Aksi Admin Website'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -320,36 +349,44 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                     {t.is_active ? 'Aktif' : 'Non-Aktif'}
                   </span>
                 </td>
-                <td className="p-3 text-right space-x-1.5">
-                  <button
-                    onClick={() => handleOpenEditModal(t)}
-                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-lg transition-colors"
-                  >
-                    ✏️ Edit
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedTeacher(t);
-                      setIsResetPinOpen(true);
-                    }}
-                    className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg transition-colors"
-                  >
-                    🔑 PIN
-                  </button>
-                  <button
-                    onClick={() => handleResetDevice(t)}
-                    className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-lg transition-colors"
-                  >
-                    📱 Device
-                  </button>
-                  <button
-                    onClick={() => handleToggleStatus(t)}
-                    className={`px-2.5 py-1 font-bold rounded-lg transition-colors ${
-                      t.is_active ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    }`}
-                  >
-                    {t.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-                  </button>
+                <td className="p-3 text-right">
+                  {!effectiveReadOnly ? (
+                    <div className="space-x-1.5 inline-block">
+                      <button
+                        onClick={() => handleOpenEditModal(t)}
+                        className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-lg transition-colors"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedTeacher(t);
+                          setIsResetPinOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg transition-colors"
+                      >
+                        🔑 PIN
+                      </button>
+                      <button
+                        onClick={() => handleResetDevice(t)}
+                        className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-lg transition-colors"
+                      >
+                        📱 Device
+                      </button>
+                      <button
+                        onClick={() => handleToggleStatus(t)}
+                        className={`px-2.5 py-1 font-bold rounded-lg transition-colors ${
+                          t.is_active ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {t.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                      👁️ Read-Only
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}

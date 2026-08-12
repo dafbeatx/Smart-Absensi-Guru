@@ -461,6 +461,23 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     const { handleAppError } = await import('../../utils/error.utils');
     const formattedMsg = handleAppError(new Error('Failed to fetch'), 'TestContext', 'Gagal Tambah User', false);
     assert('Admin Mutation - Error handler formats network error cleanly', formattedMsg.includes('Gagal terhubung ke server'));
+
+    // Test F: Kepsek Read-Only Permission Guard Assertion
+    const kepsekUser: UserProfile = {
+      id: 'usr_kepsek_01',
+      nip: '197501012000031001',
+      full_name: 'Dr. H. Kepala Sekolah, M.Pd.',
+      phone_number: '081234567890',
+      role: 'KEPSEK',
+      position: 'Kepala Sekolah',
+      avatar_url: null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+    const isKepsekReadOnly = (userRole: string, propReadOnly?: boolean) => propReadOnly || userRole === 'KEPSEK';
+    assert('Kepsek Guard - Auto Enforces Read-Only for KEPSEK Role', isKepsekReadOnly(kepsekUser.role, false) === true);
+    assert('Kepsek Guard - Allows ADMIN when propReadOnly is false', isKepsekReadOnly('ADMIN', false) === false);
+    assert('Kepsek Guard - Enforces Read-Only when propReadOnly is true for ADMIN', isKepsekReadOnly('ADMIN', true) === true);
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

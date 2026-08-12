@@ -217,7 +217,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           {/* TAB 2: ACCOUNT APPLICATIONS */}
           {(activeTab === 'ACCOUNT_APPLICATIONS' || activeTab === 'TEACHERS') && (
-            <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} />
+            <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} isReadOnly={true} />
           )}
 
           {/* TAB 3: APPROVALS */}
