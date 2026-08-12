@@ -208,13 +208,13 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     switch (role) {
       case 'KEPSEK':
         return (
-          <span className="px-2.5 py-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[10px] rounded-full shadow-xs flex items-center gap-1 border border-amber-400/50">
+          <span className="px-2.5 py-0.5 bg-linear-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[10px] rounded-full shadow-xs flex items-center gap-1 border border-amber-400/50">
             👑 Kepala Sekolah
           </span>
         );
       case 'ADMIN':
         return (
-          <span className="px-2.5 py-0.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold text-[10px] rounded-full shadow-xs flex items-center gap-1 border border-indigo-400/50">
+          <span className="px-2.5 py-0.5 bg-linear-to-r from-indigo-600 to-violet-600 text-white font-extrabold text-[10px] rounded-full shadow-xs flex items-center gap-1 border border-indigo-400/50">
             🛡️ Administrator
           </span>
         );
@@ -245,8 +245,8 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   };
 
   const getAvatarBg = (role?: RoleCode) => {
-    if (role === 'KEPSEK') return 'bg-gradient-to-br from-amber-500 to-amber-700 text-white ring-2 ring-amber-400/50 shadow-xs';
-    if (role === 'ADMIN') return 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white ring-2 ring-indigo-400/50 shadow-xs';
+    if (role === 'KEPSEK') return 'bg-linear-to-br from-amber-500 to-amber-700 text-white ring-2 ring-amber-400/50 shadow-xs';
+    if (role === 'ADMIN') return 'bg-linear-to-br from-indigo-600 to-violet-700 text-white ring-2 ring-indigo-400/50 shadow-xs';
     return 'bg-slate-900 text-white';
   };
 
