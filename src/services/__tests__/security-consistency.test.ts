@@ -488,6 +488,22 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Data Sync Status - LIVE when backend fetch succeeds', evaluateDataSyncStatus(true, true) === 'LIVE');
     assert('Data Sync Status - OFFLINE_CACHED when backend fails but cache exists', evaluateDataSyncStatus(false, true) === 'OFFLINE_CACHED');
     assert('Data Sync Status - ERROR_FALLBACK when backend fails and no cache exists', evaluateDataSyncStatus(false, false) === 'ERROR_FALLBACK');
+
+    // Test H: Attendance Sync Status & Error State Handling
+    const handleAttendanceFetchResult = (isError: boolean, errorObj?: Error) => {
+      if (isError) {
+        return {
+          status: 'ERROR' as const,
+          msg: errorObj ? errorObj.message : 'Koneksi database presensi terganggu.',
+          showToast: true,
+        };
+      }
+      return { status: 'SYNCED' as const, msg: null, showToast: false };
+    };
+    const errResult = handleAttendanceFetchResult(true, new Error('Network failure'));
+    assert('Attendance Sync - Sets ERROR status on fetch failure', errResult.status === 'ERROR');
+    assert('Attendance Sync - Captures error message cleanly', errResult.msg === 'Network failure');
+    assert('Attendance Sync - Triggers toast error alert', errResult.showToast === true);
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

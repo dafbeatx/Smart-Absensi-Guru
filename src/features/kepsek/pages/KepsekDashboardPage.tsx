@@ -37,6 +37,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Attendance Records Sync Status States
+  const [attendanceSyncStatus, setAttendanceSyncStatus] = useState<'SYNCED' | 'ERROR' | 'SYNCING'>('SYNCED');
+  const [attendanceErrorMsg, setAttendanceErrorMsg] = useState<string | null>(null);
+  const [attendanceLastSynced, setAttendanceLastSynced] = useState<string | null>(null);
+
   const [teachers, setTeachers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('smart_absensi_teachers');
     if (saved) {
@@ -95,6 +100,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   };
 
   const fetchAttendanceRecords = async () => {
+    setAttendanceSyncStatus('SYNCING');
     try {
       const provider = ProviderFactory.getProvider();
       const tkn = useAuthStore.getState().token || '';
@@ -102,9 +108,20 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         const todayStr = getTodayDateInJakarta();
         const records = await provider.getDailyAttendance(todayStr, tkn);
         setAttendanceRecords(records || []);
+        setAttendanceSyncStatus('SYNCED');
+        setAttendanceErrorMsg(null);
+        setAttendanceLastSynced(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn('Kepsek fetch attendance records error:', err);
+      setAttendanceSyncStatus('ERROR');
+      const friendlyMsg = err instanceof Error ? err.message : 'Koneksi database presensi terganggu.';
+      setAttendanceErrorMsg(friendlyMsg);
+      showToast(
+        'error',
+        'Gagal Memuat Presensi Hari Ini',
+        'Data presensi harian gagal diperbarui dari server database.'
+      );
     }
   };
 
@@ -260,13 +277,39 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
             <button
               onClick={handleManualRefresh}
-              disabled={isSyncing}
+              disabled={isSyncing || attendanceSyncStatus === 'SYNCING'}
               className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 disabled:opacity-50"
             >
-              <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
-              {isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data Server'}
+              <span className={isSyncing || attendanceSyncStatus === 'SYNCING' ? 'animate-spin' : ''}>🔄</span>
+              {isSyncing || attendanceSyncStatus === 'SYNCING' ? 'Menyinkronkan...' : 'Sinkronkan Data Server'}
             </button>
           </div>
+
+          {/* ATTENDANCE FETCH ERROR BANNER */}
+          {attendanceSyncStatus === 'ERROR' && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-900 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center text-lg shrink-0">
+                  ⚠️
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-red-950">Gagal Memuat Data Presensi Server</h4>
+                  <p className="text-xs text-red-700 font-medium mt-0.5">
+                    {attendanceErrorMsg || 'Koneksi ke database presensi terganggu. Data presensi yang ditampilkan mungkin tidak terbaru.'}
+                    {attendanceLastSynced && ` (Pembaruan terakhir: ${attendanceLastSynced} WIB)`}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleManualRefresh}
+                disabled={isSyncing}
+                className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold transition-all shrink-0"
+              >
+                🔄 Muat Ulang Presensi
+              </button>
+            </div>
+          )}
+
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
           {(activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW') && (
             <ExecutiveDashboardOverview
@@ -301,6 +344,13 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                 <span>⚠️ Daftar Guru & Staf Belum Absen</span>
                 <span className="text-xs font-semibold text-slate-500">{unabsentedTeachers.length} Orang</span>
               </h3>
+
+              {attendanceSyncStatus === 'ERROR' && (
+                <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-red-900 text-xs font-semibold flex items-center gap-2">
+                  <span className="text-base">⚠️</span>
+                  <span>PERHATIAN: Data presensi gagal diperbarui dari server. Daftar guru belum absen di bawah ini mungkin tidak mencerminkan kondisi terbaru.</span>
+                </div>
+              )}
 
               {isDateOffDay(getTodayDateInJakarta()).isOff && (
                 <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl text-sky-900 text-xs space-y-1">
