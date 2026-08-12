@@ -378,7 +378,9 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
               return (
                 <div
                   key={req.id}
-                  className={`p-4 rounded-2xl border ${cardBg} flex flex-col md:flex-row md:items-center justify-between gap-3.5 transition-all shadow-2xs`}
+                  onClick={() => setSelectedRequest(req)}
+                  className={`p-4 rounded-2xl border ${cardBg} flex flex-col md:flex-row md:items-center justify-between gap-3.5 transition-all cursor-pointer hover:shadow-md hover:border-blue-400 active:scale-[0.99]`}
+                  title="Klik untuk meninjau detail / membuat keputusan persetujuan"
                 >
                   <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -421,7 +423,8 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
                           href={req.attachment_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-emerald-700 font-bold hover:underline flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-emerald-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
                         >
                           📎 Lampiran Dokumen
                         </a>
@@ -455,14 +458,20 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
                       <>
                         <button
                           type="button"
-                          onClick={() => handleOpenAction(req, 'APPROVE')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenAction(req, 'APPROVE');
+                          }}
                           className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1"
                         >
                           <span>✓</span> Setujui
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleOpenAction(req, 'REJECT')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenAction(req, 'REJECT');
+                          }}
                           className="px-4 py-2 bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200 rounded-xl text-xs font-bold active:scale-95 transition-all cursor-pointer flex items-center gap-1"
                         >
                           <span>✕</span> Tolak
@@ -471,7 +480,10 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
                     ) : (
                       <button
                         type="button"
-                        onClick={() => handleOpenAction(req, isApproved ? 'REJECT' : 'APPROVE')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAction(req, isApproved ? 'REJECT' : 'APPROVE');
+                        }}
                         className="px-3 py-1.5 bg-slate-200/80 hover:bg-slate-300/80 text-slate-700 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
                         title="Ubah Keputusan"
                       >

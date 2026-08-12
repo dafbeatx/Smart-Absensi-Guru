@@ -307,33 +307,63 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           </div>
         </div>
 
-        {/* Quick Stat Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
-          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-0.5">
+        {/* Quick Stat Cards (Fully Clickable to Filter) */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('ALL')}
+            className={`p-3 rounded-2xl bg-slate-50 border text-center space-y-0.5 transition-all cursor-pointer active:scale-95 ${
+              statusFilter === 'ALL' ? 'border-slate-800 ring-2 ring-slate-400/30 shadow-xs' : 'border-slate-200 hover:border-slate-400 hover:shadow-xs'
+            }`}
+          >
             <span className="text-xl font-black text-slate-800">{summary.totalTeachers}</span>
             <p className="text-[10px] font-bold text-slate-500">Total Personel</p>
-          </div>
-          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-center space-y-0.5">
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('HADIR')}
+            className={`p-3 rounded-2xl bg-emerald-50 border text-center space-y-0.5 transition-all cursor-pointer active:scale-95 ${
+              statusFilter === 'HADIR' ? 'border-emerald-600 ring-2 ring-emerald-400/40 shadow-xs' : 'border-emerald-200 hover:border-emerald-400 hover:shadow-xs'
+            }`}
+          >
             <span className="text-xl font-black text-emerald-700">{summary.totalPresent}</span>
             <p className="text-[10px] font-bold text-emerald-800">Hadir Tepat</p>
-          </div>
-          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-100 text-center space-y-0.5">
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('TERLAMBAT')}
+            className={`p-3 rounded-2xl bg-amber-50 border text-center space-y-0.5 transition-all cursor-pointer active:scale-95 ${
+              statusFilter === 'TERLAMBAT' ? 'border-amber-600 ring-2 ring-amber-400/40 shadow-xs' : 'border-amber-200 hover:border-amber-400 hover:shadow-xs'
+            }`}
+          >
             <span className="text-xl font-black text-amber-700">{summary.totalLate}</span>
             <p className="text-[10px] font-bold text-amber-800">Terlambat</p>
-          </div>
-          <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100 text-center space-y-0.5">
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('IZIN_SAKIT')}
+            className={`p-3 rounded-2xl bg-blue-50 border text-center space-y-0.5 transition-all cursor-pointer active:scale-95 ${
+              statusFilter === 'IZIN_SAKIT' ? 'border-blue-600 ring-2 ring-blue-400/40 shadow-xs' : 'border-blue-200 hover:border-blue-400 hover:shadow-xs'
+            }`}
+          >
             <span className="text-xl font-black text-blue-700">{summary.totalSick + summary.totalLeave + summary.totalOfficialDuty}</span>
             <p className="text-[10px] font-bold text-blue-800">Izin / Sakit</p>
-          </div>
-          <div className="p-3 rounded-2xl bg-red-50 border border-red-100 text-center space-y-0.5 col-span-2 sm:col-span-1">
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('BELUM_ABSEN')}
+            className={`p-3 rounded-2xl bg-red-50 border text-center space-y-0.5 col-span-2 sm:col-span-1 transition-all cursor-pointer active:scale-95 ${
+              statusFilter === 'BELUM_ABSEN' ? 'border-red-600 ring-2 ring-red-400/40 shadow-xs' : 'border-red-200 hover:border-red-400 hover:shadow-xs'
+            }`}
+          >
             <span className="text-xl font-black text-red-700">{summary.totalUnabsented}</span>
             <p className="text-[10px] font-bold text-red-800">Belum Absen</p>
-          </div>
+          </button>
         </div>
       </div>
 
       {/* Interactive Controls & Filters */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-card space-y-4">
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-card space-y-4">
         <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
           {/* Search Box */}
           <div className="relative flex-1">
@@ -364,7 +394,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               <button
                 key={rf.id}
                 onClick={() => setRoleFilter(rf.id as RoleFilter)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                   roleFilter === rf.id
                     ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
                     : 'text-slate-500 hover:text-slate-800'
@@ -388,7 +418,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             <button
               key={filter.id}
               onClick={() => setStatusFilter(filter.id as StatusFilter)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                 statusFilter === filter.id
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -415,7 +445,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               return (
                 <div
                   key={teacher.id}
-                  className={`p-4 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${getCardStyle(teacher.role)}`}
+                  onClick={() => onOpenCorrectionModal && onOpenCorrectionModal(teacher)}
+                  className={`p-4 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer active:scale-[0.99] ${getCardStyle(teacher.role)}`}
+                  title="Klik untuk melihat / mengoreksi absensi personel ini"
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 overflow-hidden ${getAvatarBg(teacher.role)}`}>
@@ -473,7 +505,8 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                             href={`https://wa.me/62${String(teacher.phone_number || '').replace(/^0/, '')}?text=Assalamu'alaikum%20Bapak/Ibu%20${encodeURIComponent(teacher.full_name)},%20mohon%20konfirmasi%20kehadiran%20hari%20ini.`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1 cursor-pointer active:scale-95"
                             title="Kirim Pesan Pengingat Absen via WhatsApp"
                           >
                             <span>💬</span> Remind WA
@@ -484,8 +517,11 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                       {/* Manual Correction Shortcut for Admin */}
                       {onOpenCorrectionModal && (
                         <button
-                          onClick={() => onOpenCorrectionModal(teacher)}
-                          className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenCorrectionModal(teacher);
+                          }}
+                          className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl transition-colors cursor-pointer active:scale-95"
                           title="Koreksi Manual Absensi Personel Ini"
                         >
                           ✏️ Koreksi

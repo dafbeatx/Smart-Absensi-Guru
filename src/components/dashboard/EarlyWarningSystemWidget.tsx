@@ -154,11 +154,13 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
           {flaggedTeachers.map(({ teacher, lateCount, unexcusedCount, riskLevel, lastLateDate }) => (
             <div
               key={teacher.id}
-              className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+              onClick={() => onOpenCorrectionModal && onOpenCorrectionModal()}
+              className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 cursor-pointer hover:shadow-md active:scale-[0.99] ${
                 riskLevel === 'HIGH'
-                  ? 'bg-rose-50/60 border-rose-200/90 shadow-2xs'
-                  : 'bg-amber-50/60 border-amber-200/90 shadow-2xs'
+                  ? 'bg-rose-50/60 border-rose-200/90 hover:border-rose-400'
+                  : 'bg-amber-50/60 border-amber-200/90 hover:border-amber-400'
               }`}
+              title="Klik untuk membuka Koreksi Presensi Guru ini"
             >
               {/* Teacher Info Row */}
               <div className="flex items-start gap-3 min-w-0">
@@ -214,7 +216,10 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
               <div className="pt-2 border-t border-slate-200/40 flex items-center justify-end">
                 <button
                   type="button"
-                  onClick={() => handleSendWaReminder(teacher, lateCount)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendWaReminder(teacher, lateCount);
+                  }}
                   className="w-full sm:w-auto px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 min-h-11"
                 >
                   <Send className="w-3.5 h-3.5 text-white shrink-0" />

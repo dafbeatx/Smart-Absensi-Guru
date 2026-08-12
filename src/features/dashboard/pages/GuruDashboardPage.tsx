@@ -1118,27 +1118,37 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 );
               })()}
 
-              {/* Check-In / Check-Out Log Details Grid */}
+              {/* Check-In / Check-Out Log Details Grid (Interactive Clickable Cards) */}
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1 shadow-2xs">
-                  <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Jam Masuk</span>
+                <button
+                  type="button"
+                  onClick={onOpenScanner}
+                  className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1 shadow-2xs text-left cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95 transition-all"
+                  title="Klik untuk membuka Kamera Scanner QR Presensi Masuk"
+                >
+                  <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Jam Masuk (Klik Absen)</span>
                   <p className="font-black text-emerald-950 text-base sm:text-lg">
                     {todayAttendance?.check_in_time ? todayAttendance.check_in_time.substring(0, 5) : '--:--'}
                   </p>
                   <span className="text-[10px] text-emerald-700 font-bold block truncate">
-                    {todayAttendance?.check_in_time ? 'Tercatat Valid ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Belum Absen'}
+                    {todayAttendance?.check_in_time ? 'Tercatat Valid ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Scan Sekarang →'}
                   </span>
-                </div>
+                </button>
 
-                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1 shadow-2xs">
-                  <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider block">Jam Pulang</span>
+                <button
+                  type="button"
+                  onClick={onOpenScanner}
+                  className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1 shadow-2xs text-left cursor-pointer hover:border-blue-400 hover:shadow-md active:scale-95 transition-all"
+                  title="Klik untuk membuka Kamera Scanner QR Presensi Pulang"
+                >
+                  <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider block">Jam Pulang (Klik Absen)</span>
                   <p className="font-black text-blue-950 text-base sm:text-lg">
                     {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
                   </p>
                   <span className="text-[10px] text-blue-700 font-bold block truncate">
-                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Belum Absen'}
+                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Scan Sekarang →'}
                   </span>
-                </div>
+                </button>
               </div>
 
               {/* GPS Readiness & Live Map Box */}

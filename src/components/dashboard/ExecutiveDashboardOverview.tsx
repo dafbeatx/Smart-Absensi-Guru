@@ -466,10 +466,15 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       </div>
 
       {/* ── 2. EXECUTIVE HIGH-IMPACT KPI HERO BANNER (Decision in 5 seconds) ── */}
-      <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
+      <button
+        type="button"
+        onClick={() => onNavigateTab && onNavigateTab('ATTENDANCE_TRACKING')}
+        className="w-full bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 text-left cursor-pointer hover:border-slate-700 active:scale-[0.99] transition-all"
+        title="Klik untuk membuka Live Attendance Tracking Detail"
+      >
         <div className="space-y-1">
           <span className="text-[10px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
-            Persentase Kehadiran Guru Hari Ini
+            Persentase Kehadiran Guru Hari Ini (Klik Detail)
           </span>
           <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
             <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">{attendancePercentage}%</span>
@@ -490,7 +495,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             <p className="text-xl sm:text-2xl font-black text-red-400">{belumAbsenCount} <span className="text-xs font-semibold text-red-200/80">Guru</span></p>
           </div>
         </div>
-      </div>
+      </button>
 
       {/* Real-time Web Push Notification Permission Banner for Admin & Kepsek */}
       <NotificationPermissionBanner />
@@ -502,10 +507,14 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         onOpenCorrectionModal={onOpenCorrectionModal}
       />
 
-      {/* ── 2. SUMMARY STAT CARDS GRID (5 CARDS IN A ROW) ──────────────────── */}
+      {/* ── 2. SUMMARY STAT CARDS GRID (5 CARDS IN A ROW - FULLY CLICKABLE) ──────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {/* Card 1: Total Guru */}
-        <div className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3">
+        <button
+          type="button"
+          onClick={() => onNavigateTab && onNavigateTab('ATTENDANCE_TRACKING')}
+          className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3 text-left cursor-pointer hover:border-blue-400 hover:shadow-md active:scale-95 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center text-lg shrink-0">
               👥
@@ -516,10 +525,14 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             </div>
           </div>
           <p className="text-[10px] text-slate-400 font-semibold">100% dari total</p>
-        </div>
+        </button>
 
         {/* Card 2: Hadir Tepat */}
-        <div className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3">
+        <button
+          type="button"
+          onClick={() => onNavigateTab && onNavigateTab('ATTENDANCE_TRACKING')}
+          className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3 text-left cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center text-lg shrink-0">
               ✓
@@ -530,10 +543,14 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             </div>
           </div>
           <p className="text-[10px] text-slate-400 font-semibold">{hadirPercentage}% dari total</p>
-        </div>
+        </button>
 
         {/* Card 3: Terlambat */}
-        <div className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3">
+        <button
+          type="button"
+          onClick={() => onNavigateTab && onNavigateTab('ATTENDANCE_TRACKING')}
+          className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3 text-left cursor-pointer hover:border-amber-400 hover:shadow-md active:scale-95 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-lg shrink-0">
               🕒
@@ -544,10 +561,14 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             </div>
           </div>
           <p className="text-[10px] text-slate-400 font-semibold">{terlambatPercentage}% dari total</p>
-        </div>
+        </button>
 
         {/* Card 4: Izin / Sakit */}
-        <div className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3">
+        <button
+          type="button"
+          onClick={() => onNavigateTab && onNavigateTab('ATTENDANCE_TRACKING')}
+          className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3 text-left cursor-pointer hover:border-blue-400 hover:shadow-md active:scale-95 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-[#287094] flex items-center justify-center text-lg shrink-0">
               💼
@@ -558,10 +579,14 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             </div>
           </div>
           <p className="text-[10px] text-slate-400 font-semibold">{izinPercentage}% dari total</p>
-        </div>
+        </button>
 
         {/* Card 5: Belum Absen */}
-        <div className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3 col-span-2 sm:col-span-1">
+        <button
+          type="button"
+          onClick={() => onNavigateTab && onNavigateTab('ATTENDANCE_TRACKING')}
+          className="bg-white p-4 rounded-2xl border border-[#D4D4CE]/40 shadow-card space-y-3 col-span-2 sm:col-span-1 text-left cursor-pointer hover:border-red-400 hover:shadow-md active:scale-95 transition-all"
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center text-lg shrink-0">
               👤
@@ -572,7 +597,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             </div>
           </div>
           <p className="text-[10px] text-slate-400 font-semibold">{belumPercentage}% dari total</p>
-        </div>
+        </button>
       </div>
 
       {/* ── 3. VISUAL ANALYTICS ROW (3 COLUMNS) ───────────────────────────── */}
