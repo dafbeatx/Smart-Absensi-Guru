@@ -70,7 +70,32 @@ export class LeaveRepository {
   }
 
   public static async getPendingLeaves(token: string): Promise<LeaveRequest[]> {
-    return ProviderFactory.getProvider().getPendingLeaves(token);
+    try {
+      const leaves = await ProviderFactory.getProvider().getPendingLeaves(token);
+      if (Array.isArray(leaves)) {
+        return leaves
+          .filter((l) => l.approval_status === 'PENDING' || l.approval_status === 'SUBMITTED' || l.approval_status === 'UNDER_REVIEW' || !l.approval_status)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      }
+    } catch (err) {
+      logger.warn('LeaveRepository', 'Provider getPendingLeaves failed, falling back to local cache:', err);
+    }
+
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('smart_absensi_leaves');
+      if (saved) {
+        const list: LeaveRequest[] = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          return list
+            .filter((l) => l.approval_status === 'PENDING' || l.approval_status === 'SUBMITTED' || l.approval_status === 'UNDER_REVIEW' || !l.approval_status)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
+      }
+    } catch (e) {
+      logger.warn('LeaveRepository', 'Failed to parse pending leaves:', e);
+    }
+    return [];
   }
 
   public static async getAllLeaves(token: string): Promise<LeaveRequest[]> {

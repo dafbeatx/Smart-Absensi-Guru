@@ -92,7 +92,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       if (tkn) {
         const fetched = await LeaveRepository.getAllLeaves(tkn);
         setAllLeaves(fetched || []);
-        setPendingRequests((fetched || []).filter((r) => r.approval_status === 'PENDING'));
+        setPendingRequests(
+          (fetched || []).filter(
+            (r) => r.approval_status === 'PENDING' || r.approval_status === 'SUBMITTED' || r.approval_status === 'UNDER_REVIEW' || !r.approval_status
+          )
+        );
       }
     } catch (err) {
       console.warn('Gagal memuat pengajuan izin:', err);

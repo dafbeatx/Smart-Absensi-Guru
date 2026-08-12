@@ -135,19 +135,24 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
     return localRequests;
   }, [localRequests]);
 
+  const isPendingStatus = (status?: string) =>
+    status === 'PENDING' || status === 'SUBMITTED' || status === 'UNDER_REVIEW' || !status;
+  const isApprovedStatus = (status?: string) => status === 'APPROVED';
+  const isRejectedStatus = (status?: string) => status === 'REJECTED';
+
   // Counts for tabs
-  const pendingCount = validRequests.filter((r) => r.approval_status === 'PENDING').length;
-  const approvedCount = validRequests.filter((r) => r.approval_status === 'APPROVED').length;
-  const rejectedCount = validRequests.filter((r) => r.approval_status === 'REJECTED').length;
+  const pendingCount = validRequests.filter((r) => isPendingStatus(r.approval_status)).length;
+  const approvedCount = validRequests.filter((r) => isApprovedStatus(r.approval_status)).length;
+  const rejectedCount = validRequests.filter((r) => isRejectedStatus(r.approval_status)).length;
   const totalCount = validRequests.length;
 
   // Filter requests based on tab and search
   const filteredRequests = useMemo(() => {
     return validRequests.filter((req) => {
       // Tab filter
-      if (activeTab === 'PENDING' && req.approval_status !== 'PENDING') return false;
-      if (activeTab === 'APPROVED' && req.approval_status !== 'APPROVED') return false;
-      if (activeTab === 'REJECTED' && req.approval_status !== 'REJECTED') return false;
+      if (activeTab === 'PENDING' && !isPendingStatus(req.approval_status)) return false;
+      if (activeTab === 'APPROVED' && !isApprovedStatus(req.approval_status)) return false;
+      if (activeTab === 'REJECTED' && !isRejectedStatus(req.approval_status)) return false;
 
       // Search query filter
       if (searchQuery.trim()) {

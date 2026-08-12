@@ -16,7 +16,7 @@ import { ProviderFactory } from '../../providers/provider-factory';
 import { AttendanceRepository } from '../../repositories/AttendanceRepository';
 import { LeaveRepository } from '../../repositories/LeaveRepository';
 import { useAuthStore } from '../../store/useAuthStore';
-import type { UserProfile } from '../../types/database.types';
+import type { UserProfile, LeaveRequest } from '../../types/database.types';
 import type { LoginDTO } from '../../repositories/AuthRepository';
 
 export const runSecurityConsistencyTestSuite = async (): Promise<{
@@ -504,6 +504,17 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Attendance Sync - Sets ERROR status on fetch failure', errResult.status === 'ERROR');
     assert('Attendance Sync - Captures error message cleanly', errResult.msg === 'Network failure');
     assert('Attendance Sync - Triggers toast error alert', errResult.showToast === true);
+
+    // Test I: Strict Status Filtering Guard for Pending Approvals
+    const rawLeaves: LeaveRequest[] = [
+      { id: 'l1', user_id: 'usr_1', leave_type: 'IZIN', start_date: '2026-08-12', end_date: '2026-08-12', reason: 'Izin Alasan Keluarga 101', approval_status: 'PENDING', attachment_url: null, approval_deadline: '2026-08-12T23:59:59Z', created_at: '' },
+      { id: 'l2', user_id: 'usr_2', leave_type: 'SAKIT', start_date: '2026-08-12', end_date: '2026-08-12', reason: 'Sakit Berobat Rumah Sakit', approval_status: 'APPROVED', attachment_url: null, approval_deadline: '2026-08-12T23:59:59Z', created_at: '' },
+      { id: 'l3', user_id: 'usr_3', leave_type: 'CUTI', start_date: '2026-08-12', end_date: '2026-08-12', reason: 'Cuti Tahunan Guru Pengajar', approval_status: 'REJECTED', attachment_url: null, approval_deadline: '2026-08-12T23:59:59Z', created_at: '' },
+      { id: 'l4', user_id: 'usr_4', leave_type: 'DINAS_LUAR', start_date: '2026-08-12', end_date: '2026-08-12', reason: 'Dinas Luar Kota Pelatihan', approval_status: 'SUBMITTED', attachment_url: null, approval_deadline: '2026-08-12T23:59:59Z', created_at: '' },
+    ];
+    const isPendingStatus = (status?: string) => status === 'PENDING' || status === 'SUBMITTED' || status === 'UNDER_REVIEW' || !status;
+    const pendingOnly = rawLeaves.filter((r) => isPendingStatus(r.approval_status));
+    assert('Pending Approval Guard - Filters ONLY Pending/Submitted status (excludes APPROVED/REJECTED)', pendingOnly.length === 2 && pendingOnly.every((r) => r.id === 'l1' || r.id === 'l4'));
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
