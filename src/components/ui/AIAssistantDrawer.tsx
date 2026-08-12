@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GroqAIService } from '../../services/groq-ai.service';
 import { isFeatureEnabled } from '../../config/feature-flags.config';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -25,6 +25,12 @@ export const AIAssistantDrawer: React.FC = () => {
   ]);
 
   const user = useAuthStore((state) => state.user);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -32,9 +38,22 @@ export const AIAssistantDrawer: React.FC = () => {
     };
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);
+      // Auto-focus input when AI drawer opens
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        clearTimeout(timer);
+      };
     }
-    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+    }
+  }, [messages, isLoading, isOpen]);
 
   if (!isFeatureEnabled('ENABLE_AI_ASSISTANT')) {
     return null;
@@ -98,7 +117,7 @@ export const AIAssistantDrawer: React.FC = () => {
             }}
             className="w-6 h-6 rounded-full bg-slate-900/40 hover:bg-slate-900 text-white text-xs font-bold flex items-center justify-center transition-colors cursor-pointer border border-white/20 shrink-0"
             title="Sembunyikan Tombol Tanya AI"
-            aria-label="Sembunyikan Tombol"
+            aria-label="Sembunyikan Tombol Tanya AI"
           >
             ✕
           </button>
@@ -198,22 +217,30 @@ export const AIAssistantDrawer: React.FC = () => {
                   </div>
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Footer Input Box & Mobile Exit Button */}
             <div className="p-3 bg-white border-t border-slate-200 space-y-2">
               <div className="flex gap-2 items-center">
+                <label htmlFor="ai-assistant-input-field" className="sr-only">
+                  Tulis pertanyaan atau pesan untuk Smart AI Assistant
+                </label>
                 <input
+                  id="ai-assistant-input-field"
+                  ref={inputRef}
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                   placeholder="Tulis pertanyaan seputar absensi..."
+                  aria-label="Tulis pertanyaan atau pesan untuk Smart AI Assistant"
                   className="flex-1 bg-slate-100 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
                 />
                 <button
                   onClick={() => handleSendMessage()}
                   disabled={isLoading || !inputText.trim()}
+                  aria-label="Kirim Pesan ke Smart AI Assistant"
                   className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer"
                 >
                   Kirim

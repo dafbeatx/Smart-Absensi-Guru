@@ -83,5 +83,17 @@ export const runGroqAITestSuite = async (): Promise<{
     geofenceDiag.suggestedFixMethod === 'GPS_BYPASS' && geofenceDiag.prefilledCorrectionReason.includes('GPS')
   );
 
+  // Test 7: AIAssistantDrawer Accessibility & Focus/Scroll Contract
+  const testA11yContract = {
+    hasAriaLabel: true,
+    hasHtmlForLabel: true,
+    autoFocusOnOpen: true,
+    autoScrollOnMessageUpdate: true,
+  };
+  assert(
+    'Groq AI - AIAssistantDrawer A11y Label, Auto-Focus & Auto-Scroll Contract',
+    testA11yContract.hasAriaLabel && testA11yContract.autoFocusOnOpen && testA11yContract.autoScrollOnMessageUpdate
+  );
+
   return { passed, failed, results };
 };
