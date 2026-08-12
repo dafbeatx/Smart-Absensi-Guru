@@ -1405,23 +1405,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                   {/* Leaves Overview Badges Summary */}
                   <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center text-xs">
-                    <div className="p-2 bg-amber-50 rounded-xl border border-amber-200">
-                      <span className="text-[9px] font-bold text-amber-800 uppercase block">Menunggu</span>
-                      <p className="text-sm sm:text-base font-black text-amber-950">
+                    <div className="p-1.5 sm:p-2.5 bg-amber-50 rounded-xl border border-amber-200 min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold text-amber-800 uppercase block truncate">Menunggu</span>
+                      <p className="text-xs sm:text-base font-black text-amber-950 mt-0.5">
                         {userLeaves.filter((l) => l.approval_status === 'PENDING').length}
                       </p>
                     </div>
 
-                    <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-200">
-                      <span className="text-[9px] font-bold text-emerald-800 uppercase block">Disetujui</span>
-                      <p className="text-sm sm:text-base font-black text-emerald-950">
+                    <div className="p-1.5 sm:p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold text-emerald-800 uppercase block truncate">Disetujui</span>
+                      <p className="text-xs sm:text-base font-black text-emerald-950 mt-0.5">
                         {userLeaves.filter((l) => l.approval_status === 'APPROVED').length}
                       </p>
                     </div>
 
-                    <div className="p-2 bg-red-50 rounded-xl border border-red-200">
-                      <span className="text-[9px] font-bold text-red-800 uppercase block">Ditolak</span>
-                      <p className="text-sm sm:text-base font-black text-red-950">
+                    <div className="p-1.5 sm:p-2.5 bg-red-50 rounded-xl border border-red-200 min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold text-red-800 uppercase block truncate">Ditolak</span>
+                      <p className="text-xs sm:text-base font-black text-red-950 mt-0.5">
                         {userLeaves.filter((l) => l.approval_status === 'REJECTED').length}
                       </p>
                     </div>
