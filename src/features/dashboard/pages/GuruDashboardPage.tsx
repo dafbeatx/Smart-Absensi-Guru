@@ -701,22 +701,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     return (
       <div className="space-y-3 pt-1">
         {/* Days of Week Header */}
-        <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider bg-slate-100/90 p-2 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="grid grid-cols-7 gap-1 text-center font-extrabold text-[9px] sm:text-xs text-slate-500 uppercase tracking-wider bg-slate-100/90 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs">
           {daysOfWeek.map((d, i) => (
-            <div key={d} className={i >= 5 ? 'text-red-500 font-black' : ''}>
+            <div key={d} className={`min-w-0 truncate ${i >= 5 ? 'text-red-500 font-black' : ''}`}>
               {d}
             </div>
           ))}
         </div>
 
         {/* Calendar Day Tiles Grid */}
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {cells.map((cell) => {
             if (cell.isPadding) {
               return (
                 <div
                   key={cell.key}
-                  className="aspect-square rounded-2xl bg-slate-50/40 border border-dashed border-slate-200/50 opacity-30 pointer-events-none"
+                  className="aspect-square rounded-xl sm:rounded-2xl bg-slate-50/40 border border-dashed border-slate-200/50 opacity-30 pointer-events-none"
                 />
               );
             }
@@ -752,23 +752,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     holidayDesc: cell.holidayDesc,
                   })
                 }
-                className={`aspect-square p-1.5 rounded-2xl border flex flex-col justify-between items-center transition-all cursor-pointer relative group ${tileClass} ${
+                className={`aspect-square p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border flex flex-col justify-between items-center transition-all cursor-pointer relative group ${tileClass} ${
                   cell.isToday ? 'ring-2 ring-emerald-500 ring-offset-1 font-black shadow-md' : ''
                 }`}
               >
-                <div className="flex items-center justify-between w-full">
-                  <span className={`text-xs font-black leading-none ${cell.isToday ? 'text-emerald-700' : cell.isWeekend ? 'text-red-500' : 'text-slate-800'}`}>
+                <div className="flex items-center justify-between w-full min-w-0">
+                  <span className={`text-[10px] sm:text-xs font-black leading-none ${cell.isToday ? 'text-emerald-700' : cell.isWeekend ? 'text-red-500' : 'text-slate-800'}`}>
                     {cell.dayNumber}
                   </span>
                   {cell.isToday && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
                   )}
                 </div>
 
-                <div className="w-full flex items-center justify-center mt-auto pb-0.5">
+                <div className="w-full flex items-center justify-center mt-auto pb-0.5 min-w-0">
                   {rec ? (
                     <span
-                      className={`w-2.5 h-2.5 rounded-full shadow-2xs ${
+                      className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shadow-2xs shrink-0 ${
                         status === 'HADIR'
                           ? 'bg-emerald-500 ring-2 ring-emerald-200'
                           : status === 'TERLAMBAT'
@@ -780,9 +780,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       title={status}
                     />
                   ) : cell.isHoliday ? (
-                    <span className="w-2 h-2 rounded-full bg-slate-300" title="Libur" />
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-slate-300 shrink-0" title="Libur" />
                   ) : (
-                    <span className="text-[9px] text-slate-300 font-bold block truncate">
+                    <span className="text-[8px] sm:text-[9px] text-slate-300 font-bold block truncate leading-none">
                       {cell.isWeekend ? '•' : '-'}
                     </span>
                   )}
