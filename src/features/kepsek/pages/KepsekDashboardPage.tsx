@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useToastStore } from '../../../store/useToastStore';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
@@ -22,10 +23,19 @@ export interface KepsekDashboardPageProps {
 
 export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpenScanner, onSwitchToGuruView }) => {
   const { user, logout } = useAuthStore();
+  const { showToast } = useToastStore();
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
+
+  // Data Source Sync Status States
+  const [dataSyncStatus, setDataSyncStatus] = useState<'LIVE' | 'OFFLINE_CACHED' | 'ERROR_FALLBACK'>(() => {
+    const saved = localStorage.getItem('smart_absensi_teachers');
+    return saved ? 'OFFLINE_CACHED' : 'ERROR_FALLBACK';
+  });
+  const [lastSyncedTime, setLastSyncedTime] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [teachers, setTeachers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('smart_absensi_teachers');
@@ -98,20 +108,42 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     }
   };
 
-  useEffect(() => {
-    const fetchUsersFromBackend = async () => {
-      try {
-        const provider = ProviderFactory.getProvider();
-        const tkn = useAuthStore.getState().token || '';
-        const fetched = await provider.getAllUsers(tkn);
-        if (fetched && fetched.length > 0) {
-          setTeachers(fetched);
-          localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
-        }
-      } catch (err) {
-        console.warn('Backend fetch users fallback:', err);
+  const fetchUsersFromBackend = async () => {
+    setIsSyncing(true);
+    try {
+      const provider = ProviderFactory.getProvider();
+      const tkn = useAuthStore.getState().token || '';
+      const fetched = await provider.getAllUsers(tkn);
+      if (fetched && fetched.length > 0) {
+        setTeachers(fetched);
+        localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
+        setDataSyncStatus('LIVE');
+        setLastSyncedTime(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
+      } else {
+        const saved = localStorage.getItem('smart_absensi_teachers');
+        setDataSyncStatus(saved ? 'OFFLINE_CACHED' : 'ERROR_FALLBACK');
       }
-    };
+    } catch (err: unknown) {
+      console.warn('Backend fetch users fallback:', err);
+      const saved = localStorage.getItem('smart_absensi_teachers');
+      setDataSyncStatus(saved ? 'OFFLINE_CACHED' : 'ERROR_FALLBACK');
+      showToast(
+        'warning',
+        'Gagal Memuat Data Server Terupdate',
+        'Sistem beralih ke data offline/cache lokal. Data mungkin tidak 100% realtime.'
+      );
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleManualRefresh = () => {
+    fetchUsersFromBackend();
+    fetchPendingRequests();
+    fetchAttendanceRecords();
+  };
+
+  useEffect(() => {
     const handleSyncTeachers = () => {
       const saved = localStorage.getItem('smart_absensi_teachers');
       if (saved) {
@@ -199,6 +231,42 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
         {/* Main Content Viewport */}
         <main className="flex-1 p-3.5 sm:p-6 pb-28 sm:pb-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
+          {/* Data Source Sync Status Indicator Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-xs font-bold text-slate-700">Sumber Data:</span>
+              {dataSyncStatus === 'LIVE' && (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Live dari Server Database
+                </span>
+              )}
+              {dataSyncStatus === 'OFFLINE_CACHED' && (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-extrabold text-[11px]">
+                  <span>⚠️</span> Mode Offline / Cache Lokal
+                </span>
+              )}
+              {dataSyncStatus === 'ERROR_FALLBACK' && (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-800 border border-red-200 font-extrabold text-[11px]">
+                  <span>🚫</span> Gagal Terhubung Server (Data Stub)
+                </span>
+              )}
+              {lastSyncedTime && (
+                <span className="text-[11px] text-slate-500 font-mono font-medium">
+                  Terakhir diperbarui: {lastSyncedTime} WIB
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={handleManualRefresh}
+              disabled={isSyncing}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
+              {isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data Server'}
+            </button>
+          </div>
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
           {(activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW') && (
             <ExecutiveDashboardOverview

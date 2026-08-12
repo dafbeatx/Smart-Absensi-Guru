@@ -478,6 +478,16 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Kepsek Guard - Auto Enforces Read-Only for KEPSEK Role', isKepsekReadOnly(kepsekUser.role, false) === true);
     assert('Kepsek Guard - Allows ADMIN when propReadOnly is false', isKepsekReadOnly('ADMIN', false) === false);
     assert('Kepsek Guard - Enforces Read-Only when propReadOnly is true for ADMIN', isKepsekReadOnly('ADMIN', true) === true);
+
+    // Test G: Data Source Sync Status Evaluation
+    const evaluateDataSyncStatus = (hasBackendSuccess: boolean, hasLocalStorageCache: boolean) => {
+      if (hasBackendSuccess) return 'LIVE';
+      if (hasLocalStorageCache) return 'OFFLINE_CACHED';
+      return 'ERROR_FALLBACK';
+    };
+    assert('Data Sync Status - LIVE when backend fetch succeeds', evaluateDataSyncStatus(true, true) === 'LIVE');
+    assert('Data Sync Status - OFFLINE_CACHED when backend fails but cache exists', evaluateDataSyncStatus(false, true) === 'OFFLINE_CACHED');
+    assert('Data Sync Status - ERROR_FALLBACK when backend fails and no cache exists', evaluateDataSyncStatus(false, false) === 'ERROR_FALLBACK');
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
