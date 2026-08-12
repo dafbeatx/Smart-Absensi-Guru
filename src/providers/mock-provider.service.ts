@@ -526,20 +526,55 @@ export class MockProvider implements IDataProvider {
     return leaveRecord;
   }
 
-  public async approveLeave(leaveId: string, decision: 'APPROVED' | 'REJECTED', notes: string, _token: string): Promise<boolean> {
+  private getInitialMockLeaves(): LeaveRequest[] {
     const saved = safeGetStorage('smart_absensi_leaves');
-    let leaves: LeaveRequest[] = [];
     if (saved) {
       try {
-        leaves = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
       } catch (e) {
-        leaves = [];
+        console.warn('Failed to parse saved leaves in MockProvider:', e);
       }
     }
 
+    const defaultLeaves: LeaveRequest[] = [
+      {
+        id: 'leave_demo_01',
+        user_id: 'usr_guru_01',
+        leave_type: 'CUTI',
+        start_date: new Date().toISOString().substring(0, 10),
+        end_date: new Date().toISOString().substring(0, 10),
+        reason: 'Permohonan Cuti Tahunan untuk Keperluan Keluarga',
+        approval_status: 'PENDING',
+        attachment_url: null,
+        approval_deadline: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'leave_demo_02',
+        user_id: 'usr_guru_02',
+        leave_type: 'SAKIT',
+        start_date: new Date().toISOString().substring(0, 10),
+        end_date: new Date().toISOString().substring(0, 10),
+        reason: 'Pemeriksaan Kesehatan dan Rawat Jalan di Rumah Sakit',
+        approval_status: 'PENDING',
+        attachment_url: null,
+        approval_deadline: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+      },
+    ];
+
+    safeSetStorage('smart_absensi_leaves', JSON.stringify(defaultLeaves));
+    return defaultLeaves;
+  }
+
+  public async approveLeave(leaveId: string, decision: 'APPROVED' | 'REJECTED', notes: string, _token: string): Promise<boolean> {
+    const leaves = this.getInitialMockLeaves();
     const activeUser = useAuthStore.getState().user;
-    const targetIdx = leaves.findIndex((l) => l.id === leaveId);
-    let targetLeave: LeaveRequest | undefined;
+    let targetIdx = leaves.findIndex((l) => l.id === leaveId);
+    let targetLeave: LeaveRequest;
 
     if (targetIdx !== -1) {
       leaves[targetIdx] = {
@@ -549,85 +584,101 @@ export class MockProvider implements IDataProvider {
         approved_by: activeUser?.full_name || 'Kepala Sekolah',
       };
       targetLeave = leaves[targetIdx];
-      safeSetStorage('smart_absensi_leaves', JSON.stringify(leaves));
-    }
-
-    // Trigger Push Notification for Guru & Sync Attendance Record
-    if (targetLeave) {
-      if (decision === 'APPROVED') {
-        const leaveStatus: AttendanceStatus =
-          targetLeave.leave_type === 'SAKIT' ? 'SAKIT' : targetLeave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
-
-        const startDate = new Date(targetLeave.start_date);
-        const endDate = new Date(targetLeave.end_date);
-        const curr = new Date(startDate);
-
-        const allRecordsStr = safeGetStorage('smart_absensi_daily_attendance') || '[]';
-        let allRecords: AttendanceRecord[] = [];
-        try {
-          allRecords = JSON.parse(allRecordsStr);
-        } catch (e) {
-          allRecords = [];
-        }
-
-        while (curr <= endDate) {
-          const dateStr = curr.toISOString().substring(0, 10);
-          const existingIdx = allRecords.findIndex((r) => r.user_id === targetLeave!.user_id && r.date === dateStr);
-
-          const newRec: AttendanceRecord = {
-            id: existingIdx !== -1 ? allRecords[existingIdx].id : 'att_leave_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-            user_id: targetLeave.user_id,
-            date: dateStr,
-            check_in_time: null,
-            check_out_time: null,
-            status: leaveStatus,
-            check_in_lat: null,
-            check_in_lng: null,
-            check_in_distance_meters: null,
-            verification_method: 'MANUAL_OPERATOR',
-            attendance_source: 'MANUAL',
-            is_offline: false,
-            notes: `Izin Disetujui Kepsek: ${notes || targetLeave.reason}`,
-            created_at: new Date().toISOString(),
-          };
-
-          if (existingIdx !== -1) {
-            allRecords[existingIdx] = newRec;
-          } else {
-            allRecords.push(newRec);
-          }
-
-          safeSetStorage(`smart_absensi_daily_attendance_${dateStr}`, JSON.stringify([newRec]));
-          curr.setDate(curr.getDate() + 1);
-        }
-
-        safeSetStorage('smart_absensi_daily_attendance', JSON.stringify(allRecords));
-      }
-
-      const notifKey = `smart_absensi_notifications_${targetLeave.user_id}`;
-      const savedNotifs = safeGetStorage(notifKey);
-      let notifs: AppNotification[] = [];
-      if (savedNotifs) {
-        try {
-          notifs = JSON.parse(savedNotifs);
-        } catch (e) {
-          notifs = [];
-        }
-      }
-      const newNotif: AppNotification = {
-        id: 'notif_leave_' + Date.now(),
-        user_id: targetLeave.user_id,
-        title: decision === 'APPROVED' ? '✅ Pengajuan Izin Disetujui' : '❌ Pengajuan Izin Ditolak',
-        message: decision === 'APPROVED'
-          ? `Pengajuan ${targetLeave.leave_type} Anda (${targetLeave.start_date}) telah DISETUJUI oleh Kepala Sekolah.`
-          : `Pengajuan ${targetLeave.leave_type} Anda (${targetLeave.start_date}) DITOLAK oleh Kepala Sekolah.${notes ? ` Alasan: ${notes}` : ''}`,
-        type: decision === 'APPROVED' ? 'SUCCESS' : 'WARNING',
-        is_read: false,
+    } else {
+      // If leave record was not in mock storage yet, append updated synthetic record
+      targetLeave = {
+        id: leaveId,
+        user_id: 'usr_guru',
+        leave_type: 'IZIN',
+        start_date: new Date().toISOString().substring(0, 10),
+        end_date: new Date().toISOString().substring(0, 10),
+        reason: 'Pengajuan Izin Presensi Guru',
+        approval_status: decision,
+        approval_notes: notes,
+        approved_by: activeUser?.full_name || 'Kepala Sekolah',
+        attachment_url: null,
+        approval_deadline: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
         created_at: new Date().toISOString(),
       };
-      notifs.unshift(newNotif);
-      safeSetStorage(notifKey, JSON.stringify(notifs));
+      leaves.push(targetLeave);
     }
+
+    safeSetStorage('smart_absensi_leaves', JSON.stringify(leaves));
+
+    // Trigger Push Notification for Guru & Sync Attendance Record
+    if (decision === 'APPROVED') {
+      const leaveStatus: AttendanceStatus =
+        targetLeave.leave_type === 'SAKIT' ? 'SAKIT' : targetLeave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+
+      const startDate = new Date(targetLeave.start_date);
+      const endDate = new Date(targetLeave.end_date);
+      const curr = new Date(startDate);
+
+      const allRecordsStr = safeGetStorage('smart_absensi_daily_attendance') || '[]';
+      let allRecords: AttendanceRecord[] = [];
+      try {
+        allRecords = JSON.parse(allRecordsStr);
+      } catch (e) {
+        allRecords = [];
+      }
+
+      while (curr <= endDate) {
+        const dateStr = curr.toISOString().substring(0, 10);
+        const existingIdx = allRecords.findIndex((r) => r.user_id === targetLeave.user_id && r.date === dateStr);
+
+        const newRec: AttendanceRecord = {
+          id: existingIdx !== -1 ? allRecords[existingIdx].id : 'att_leave_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          user_id: targetLeave.user_id,
+          date: dateStr,
+          check_in_time: null,
+          check_out_time: null,
+          status: leaveStatus,
+          check_in_lat: null,
+          check_in_lng: null,
+          check_in_distance_meters: null,
+          verification_method: 'MANUAL_OPERATOR',
+          attendance_source: 'MANUAL',
+          is_offline: false,
+          notes: `Izin Disetujui Kepsek: ${notes || targetLeave.reason}`,
+          created_at: new Date().toISOString(),
+        };
+
+        if (existingIdx !== -1) {
+          allRecords[existingIdx] = newRec;
+        } else {
+          allRecords.push(newRec);
+        }
+
+        safeSetStorage(`smart_absensi_daily_attendance_${dateStr}`, JSON.stringify([newRec]));
+        curr.setDate(curr.getDate() + 1);
+      }
+
+      safeSetStorage('smart_absensi_daily_attendance', JSON.stringify(allRecords));
+    }
+
+    const notifKey = `smart_absensi_notifications_${targetLeave.user_id}`;
+    const savedNotifs = safeGetStorage(notifKey);
+    let notifs: AppNotification[] = [];
+    if (savedNotifs) {
+      try {
+        notifs = JSON.parse(savedNotifs);
+      } catch (e) {
+        notifs = [];
+      }
+    }
+    const newNotif: AppNotification = {
+      id: 'notif_leave_' + Date.now(),
+      user_id: targetLeave.user_id,
+      title: decision === 'APPROVED' ? '✅ Pengajuan Izin Disetujui' : '❌ Pengajuan Izin Ditolak',
+      message: decision === 'APPROVED'
+        ? `Pengajuan ${targetLeave.leave_type} Anda (${targetLeave.start_date}) telah DISETUJUI oleh Kepala Sekolah.`
+        : `Pengajuan ${targetLeave.leave_type} Anda (${targetLeave.start_date}) DITOLAK oleh Kepala Sekolah.${notes ? ` Alasan: ${notes}` : ''}`,
+      type: decision === 'APPROVED' ? 'SUCCESS' : 'WARNING',
+      is_read: false,
+      created_at: new Date().toISOString(),
+    };
+    notifs.unshift(newNotif);
+    safeSetStorage(notifKey, JSON.stringify(notifs));
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smart_absensi_leave_updated'));
@@ -639,52 +690,22 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getPendingLeaves(_token: string): Promise<LeaveRequest[]> {
-    const saved = safeGetStorage('smart_absensi_leaves');
-    if (saved) {
-      try {
-        const list: LeaveRequest[] = JSON.parse(saved);
-        if (Array.isArray(list)) {
-          return list
-            .filter((l) => l.approval_status === 'PENDING')
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        }
-      } catch (e) {
-        console.error('Failed to parse leaves:', e);
-      }
-    }
-    return [];
+    const list = this.getInitialMockLeaves();
+    return list
+      .filter((l) => l.approval_status === 'PENDING' || l.approval_status === 'SUBMITTED' || l.approval_status === 'UNDER_REVIEW' || !l.approval_status)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   public async getAllLeaves(_token: string): Promise<LeaveRequest[]> {
-    const saved = safeGetStorage('smart_absensi_leaves');
-    if (saved) {
-      try {
-        const list: LeaveRequest[] = JSON.parse(saved);
-        if (Array.isArray(list)) {
-          return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        }
-      } catch (e) {
-        console.error('Failed to parse leaves:', e);
-      }
-    }
-    return [];
+    const list = this.getInitialMockLeaves();
+    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   public async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
-    const saved = safeGetStorage('smart_absensi_leaves');
-    if (saved) {
-      try {
-        const list: LeaveRequest[] = JSON.parse(saved);
-        if (Array.isArray(list)) {
-          return list
-            .filter((l) => l.user_id === userId || !l.user_id)
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        }
-      } catch (e) {
-        console.error('Failed to parse user leaves:', e);
-      }
-    }
-    return [];
+    const list = this.getInitialMockLeaves();
+    return list
+      .filter((l) => l.user_id === userId || !l.user_id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   public async getNotifications(userId: string, _token: string): Promise<AppNotification[]> {

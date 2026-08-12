@@ -550,6 +550,18 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Input Component - Explicit ID takes priority', explicitId === 'usr_npp');
     assert('Input Component - Label string formatted cleanly', labelId === 'nomor-pokok-pegawai');
     assert('Input Component - Fallback ID is NEVER undefined', fallbackId === 'input-:r0:' && typeof fallbackId === 'string' && fallbackId.length > 0);
+
+    // Test M: MockProvider approveLeave State Mutation & Pending Sync Contract
+    const mockProvider = ProviderFactory.getProvider();
+    const testLeaveId = 'leave_test_mock_101';
+    await mockProvider.approveLeave(testLeaveId, 'APPROVED', 'Disetujui untuk uji coba dev', 'MOCK_TOKEN');
+    const pendingListAfterApproval = await mockProvider.getPendingLeaves('MOCK_TOKEN');
+    const allListAfterApproval = await mockProvider.getAllLeaves('MOCK_TOKEN');
+    const approvedItem = allListAfterApproval.find((l) => l.id === testLeaveId);
+
+    assert('MockProvider approveLeave - Updates approval_status to APPROVED', approvedItem?.approval_status === 'APPROVED');
+    assert('MockProvider approveLeave - Preserves approval notes', approvedItem?.approval_notes === 'Disetujui untuk uji coba dev');
+    assert('MockProvider approveLeave - Excludes approved leave from getPendingLeaves', !pendingListAfterApproval.some((l) => l.id === testLeaveId));
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
