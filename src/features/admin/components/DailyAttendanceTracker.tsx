@@ -43,11 +43,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
   const checkinEnd = systemSettings?.work_checkin_end ? systemSettings.work_checkin_end.slice(0, 5) : CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
-  // Filter active guru teachers expected to take daily attendance
+  // Filter active guru teachers expected to take daily attendance using shared AnalyticsService helper
   const activeGuruTeachers = useMemo(() => {
-    return teachers.filter(
-      (t) => t.is_active !== false && (t.role === 'GURU' || (!t.role as boolean))
-    );
+    return AnalyticsService.getAttendanceEligibleUsers(teachers);
   }, [teachers]);
 
   // 1. Calculate Daily Analytics Stats

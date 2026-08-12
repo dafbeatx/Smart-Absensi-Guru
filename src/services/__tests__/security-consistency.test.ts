@@ -18,6 +18,7 @@ import { LeaveRepository } from '../../repositories/LeaveRepository';
 import { useAuthStore } from '../../store/useAuthStore';
 import type { UserProfile, LeaveRequest } from '../../types/database.types';
 import type { LoginDTO } from '../../repositories/AuthRepository';
+import { AnalyticsService } from '../analytics.service';
 
 export const runSecurityConsistencyTestSuite = async (): Promise<{
   passed: number;
@@ -669,6 +670,11 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('DailyAttendanceTracker Filtering - Excludes non-GURU roles and inactive teachers', activeGuruList.length === 2);
     assert('DailyAttendanceTracker Filtering - First item is active GURU 1', activeGuruList[0].id === 'usr_g1');
     assert('DailyAttendanceTracker Filtering - Second item is active GURU 2', activeGuruList[1].id === 'usr_g2');
+
+    // Test V: AnalyticsService.getAttendanceEligibleUsers Shared Helper Contract
+    const helperFiltered = AnalyticsService.getAttendanceEligibleUsers(rawAllUsers as any);
+    assert('Shared Helper getAttendanceEligibleUsers - Returns identical 2 active GURU users', helperFiltered.length === 2);
+    assert('Shared Helper getAttendanceEligibleUsers - Excludes inactive & non-GURU users', helperFiltered.every((u) => u.is_active !== false && (u.role === 'GURU' || !u.role)));
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

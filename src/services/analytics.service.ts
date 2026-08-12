@@ -35,8 +35,8 @@ export class AnalyticsService {
    * Helper to filter active teachers expected to take daily attendance
    * (is_active !== false && (role === 'GURU' || !role))
    */
-  private static filterActiveGuruTeachers(allTeachers: UserProfile[]): UserProfile[] {
-    return allTeachers.filter(
+  public static getAttendanceEligibleUsers(allTeachers: UserProfile[]): UserProfile[] {
+    return (allTeachers || []).filter(
       (t) => t.is_active !== false && (t.role === 'GURU' || (!t.role as boolean))
     );
   }
@@ -52,7 +52,7 @@ export class AnalyticsService {
     systemSettings?: SystemSettings | null,
     holidays?: HolidayRecord[] | null
   ): DailyAttendanceSummary {
-    const activeTeachers = this.filterActiveGuruTeachers(allTeachers);
+    const activeTeachers = this.getAttendanceEligibleUsers(allTeachers);
     const totalTeachers = activeTeachers.length;
     let totalPresent = 0;
     let totalLate = 0;
@@ -158,7 +158,7 @@ export class AnalyticsService {
       }
     }
 
-    const activeTeachers = this.filterActiveGuruTeachers(allTeachers);
+    const activeTeachers = this.getAttendanceEligibleUsers(allTeachers);
     return activeTeachers.filter((t) => !activeUserIds.has(t.id));
   }
 }
