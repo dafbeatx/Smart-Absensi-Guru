@@ -857,40 +857,40 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-center space-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
+            <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-center space-y-1 min-w-0">
               <span className="text-lg block">☁️</span>
-              <p className="text-[10px] font-extrabold text-slate-800">Backend Core</p>
-              <p className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Online (20ms)</span>
+              <p className="text-[10px] sm:text-xs font-extrabold text-slate-800 truncate">Backend Core</p>
+              <p className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1 min-w-0 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="truncate">Online (20ms)</span>
               </p>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-center space-y-1">
+            <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-center space-y-1 min-w-0">
               <span className="text-lg block">📍</span>
-              <p className="text-[10px] font-extrabold text-slate-800">GPS Geofence</p>
-              <p className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Radius 50m</span>
+              <p className="text-[10px] sm:text-xs font-extrabold text-slate-800 truncate">GPS Geofence</p>
+              <p className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1 min-w-0 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="truncate">Radius 50m</span>
               </p>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-center space-y-1">
+            <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-center space-y-1 min-w-0">
               <span className="text-lg block">🛡️</span>
-              <p className="text-[10px] font-extrabold text-slate-800">Keamanan QR</p>
-              <p className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Seed Enkripsi</span>
+              <p className="text-[10px] sm:text-xs font-extrabold text-slate-800 truncate">Keamanan QR</p>
+              <p className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1 min-w-0 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="truncate">Seed Enkripsi</span>
               </p>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-center space-y-1">
+            <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-center space-y-1 min-w-0">
               <span className="text-lg block">📡</span>
-              <p className="text-[10px] font-extrabold text-slate-800">Sinkronisasi</p>
-              <p className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Real-time DB</span>
+              <p className="text-[10px] sm:text-xs font-extrabold text-slate-800 truncate">Sinkronisasi</p>
+              <p className="text-[10px] font-bold text-emerald-600 flex items-center justify-center gap-1 min-w-0 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="truncate">Real-time DB</span>
               </p>
             </div>
           </div>
