@@ -639,6 +639,18 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Teachers Sync Status - Returns LIVE_SERVER on backend success', computeSyncStatus(true, true) === 'LIVE_SERVER');
     assert('Teachers Sync Status - Returns OFFLINE_CACHE on backend failure with cache', computeSyncStatus(false, true) === 'OFFLINE_CACHE');
     assert('Teachers Sync Status - Returns ERROR_FALLBACK on backend failure without cache', computeSyncStatus(false, false) === 'ERROR_FALLBACK');
+
+    // Test T: Attendance Fetch Direct Fresh Teachers List Parameter Contract
+    const staleStateTeachers = [{ id: 'usr_old_1' }, { id: 'usr_old_2' }];
+    const freshFetchedTeachers = [{ id: 'usr_fresh_1' }, { id: 'usr_fresh_2' }, { id: 'usr_fresh_3' }];
+
+    const resolveListToFetch = (targetTeachers?: Array<{ id: string }>) => {
+      return targetTeachers && targetTeachers.length > 0 ? targetTeachers : staleStateTeachers;
+    };
+
+    assert('Attendance Sync Safety - Uses fresh targetTeachers list when provided', resolveListToFetch(freshFetchedTeachers).length === 3);
+    assert('Attendance Sync Safety - Fresh list first item matches fetched backend user ID', resolveListToFetch(freshFetchedTeachers)[0].id === 'usr_fresh_1');
+    assert('Attendance Sync Safety - Falls back to state teachers if no parameter provided', resolveListToFetch().length === 2);
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

@@ -109,6 +109,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     setTeachers(updated);
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
     window.dispatchEvent(new Event('smart_absensi_teachers_updated'));
+    fetchAttendanceRecords(updated);
   };
 
   const fetchPendingRequests = async () => {
@@ -128,7 +129,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     }
   };
 
-  const fetchAttendanceRecords = async () => {
+  const fetchAttendanceRecords = async (targetTeachers?: UserProfile[]) => {
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
@@ -136,7 +137,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
       const allRecs: AttendanceRecord[] = [];
 
-      for (const t of teachers) {
+      const listToFetch = targetTeachers && targetTeachers.length > 0 ? targetTeachers : teachers;
+
+      for (const t of listToFetch) {
         const recs = await provider.getMonthlyAttendance(t.id, monthStr, yearStr, token);
         allRecs.push(...recs);
       }
@@ -164,11 +167,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   useEffect(() => {
     // 1. Instantly populate from local storage cache for instant UI rendering
+    let activeTeachersCache = teachers;
     const cachedTeachers = localStorage.getItem('smart_absensi_teachers');
     if (cachedTeachers) {
       try {
         const parsed = JSON.parse(cachedTeachers);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          activeTeachersCache = parsed;
           setTeachers(parsed);
         }
       } catch (e) {
@@ -183,10 +188,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         const token = useAuthStore.getState().token || '';
         if (!token) return;
 
+        let currentUsersList = activeTeachersCache;
+
         // Step 1: Sync Users List
         try {
           const fetched = await provider.getAllUsers(token);
           if (fetched && fetched.length > 0) {
+            currentUsersList = fetched;
             setTeachers(fetched);
             localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
             setTeachersSyncStatus('LIVE_SERVER');
@@ -207,8 +215,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
         await new Promise((r) => setTimeout(r, 300));
 
-        // Step 3: Sync Daily Attendance Records
-        await fetchAttendanceRecords();
+        // Step 3: Sync Daily Attendance Records with FRESH currentUsersList
+        await fetchAttendanceRecords(currentUsersList);
 
         await new Promise((r) => setTimeout(r, 300));
 
@@ -226,8 +234,23 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       fetchMyAttendance();
     };
 
+    const handleTeachersUpdatedEvent = () => {
+      const saved = localStorage.getItem('smart_absensi_teachers');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            fetchAttendanceRecords(parsed);
+          }
+        } catch (e) {
+          console.warn('Failed to parse updated teachers cache:', e);
+        }
+      }
+    };
+
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
