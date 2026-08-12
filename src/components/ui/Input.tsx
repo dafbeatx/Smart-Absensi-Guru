@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { formatTimeForInput } from '../../utils/time.utils';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -17,7 +17,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   id,
   ...props
 }, ref) => {
-  const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  const generatedId = useId();
+  const inputId = id || (label ? label.toLowerCase().replace(/[^a-z0-9]/gi, '-') : `input-${generatedId}`);
+  const errorId = error ? `${inputId}-error` : undefined;
 
   const finalProps = { ...props };
   if (props.type === 'time' && props.value !== undefined) {
@@ -40,6 +42,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
         <input
           ref={ref}
           id={inputId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={errorId}
           className={`w-full bg-white rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 transition-all ${
             leftIcon ? 'pl-10' : ''
           } ${rightIcon ? 'pr-10' : ''} ${
@@ -56,7 +60,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({
         )}
       </div>
       {error && (
-        <p className="text-xs font-medium text-red-600 flex items-center gap-1 mt-1">
+        <p id={errorId} role="alert" className="text-xs font-medium text-red-600 flex items-center gap-1 mt-1">
           <span>⚠️</span> {error}
         </p>
       )}

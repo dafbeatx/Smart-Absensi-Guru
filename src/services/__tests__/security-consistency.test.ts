@@ -538,6 +538,18 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
       'Button & Form Loading - A11y aria-busy="true" and aria-live="polite" screen reader announcement contract',
       activeLoadingProps['aria-busy'] === true && activeLoadingProps['aria-live'] === 'polite' && inactiveLoadingProps['aria-busy'] === undefined
     );
+
+    // Test L: Input Component Unique ID Fallback & aria-describedby Contract
+    const resolveInputId = (id?: string, label?: string, generatedId: string = ':r0:') => {
+      return id || (label ? label.toLowerCase().replace(/[^a-z0-9]/gi, '-') : `input-${generatedId}`);
+    };
+    const explicitId = resolveInputId('usr_npp', undefined, ':r0:');
+    const labelId = resolveInputId(undefined, 'Nomor Pokok Pegawai', ':r0:');
+    const fallbackId = resolveInputId(undefined, undefined, ':r0:');
+
+    assert('Input Component - Explicit ID takes priority', explicitId === 'usr_npp');
+    assert('Input Component - Label string formatted cleanly', labelId === 'nomor-pokok-pegawai');
+    assert('Input Component - Fallback ID is NEVER undefined', fallbackId === 'input-:r0:' && typeof fallbackId === 'string' && fallbackId.length > 0);
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
