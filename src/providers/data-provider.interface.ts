@@ -36,6 +36,7 @@ export interface IDataProvider {
   submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest>;
   approveLeave(leaveId: string, decision: 'APPROVED' | 'REJECTED', notes: string, token: string): Promise<boolean>;
   getPendingLeaves(token: string): Promise<LeaveRequest[]>;
+  getAllLeaves(token: string): Promise<LeaveRequest[]>;
   getUserLeaves(userId: string, token: string): Promise<LeaveRequest[]>;
 
   // Notification API

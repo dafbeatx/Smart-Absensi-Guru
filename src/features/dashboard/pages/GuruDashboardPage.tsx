@@ -977,6 +977,62 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
             )}
 
+            {/* Active Leave Request Status Alert Banner */}
+            {userLeaves.length > 0 && (() => {
+              const latestLeave = userLeaves[0];
+              const isApproved = latestLeave.approval_status === 'APPROVED';
+              const isRejected = latestLeave.approval_status === 'REJECTED';
+
+              let bannerStyle = 'bg-amber-500/10 border-amber-400/80 text-amber-950';
+              if (isApproved) bannerStyle = 'bg-emerald-500/10 border-emerald-400/80 text-emerald-950';
+              if (isRejected) bannerStyle = 'bg-rose-500/10 border-rose-400/80 text-rose-950';
+
+              return (
+                <div className={`p-4 rounded-3xl border shadow-card transition-all space-y-2 ${bannerStyle}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">
+                        {isApproved ? '🟢' : isRejected ? '🔴' : '🟡'}
+                      </span>
+                      <span className="font-extrabold text-xs tracking-tight">
+                        Status Izin ({latestLeave.leave_type}): {isApproved ? 'DISETUJUI KEPSEK' : isRejected ? 'DITOLAK KEPSEK' : 'MENUNGGU PERSETUJUAN KEPSEK'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('RIWAYAT');
+                        setHistorySubTab('LEAVES');
+                      }}
+                      className="text-[10px] font-extrabold px-2.5 py-1 bg-white/80 border border-slate-200 rounded-xl hover:bg-white cursor-pointer shrink-0 shadow-2xs"
+                    >
+                      Detail →
+                    </button>
+                  </div>
+
+                  <div className="text-[11px] font-medium leading-relaxed bg-white/90 p-2.5 rounded-2xl border border-slate-200/60 space-y-1">
+                    <p className="font-bold text-slate-800">
+                      📅 Periode: {latestLeave.start_date} {latestLeave.end_date !== latestLeave.start_date ? `s/d ${latestLeave.end_date}` : ''}
+                    </p>
+                    <p className="text-slate-600 italic">"{latestLeave.reason}"</p>
+                    {latestLeave.approval_notes && (
+                      <div className={`pt-1.5 mt-1 border-t text-[11px] font-semibold ${
+                        isApproved ? 'border-emerald-200 text-emerald-900' : 'border-rose-200 text-rose-900'
+                      }`}>
+                        💬 <strong className="uppercase font-bold text-[10px]">{isApproved ? 'Catatan Kepala Sekolah:' : 'Alasan Penolakan:'}</strong>{' '}
+                        <span>{latestLeave.approval_notes}</span>
+                        {latestLeave.approved_by && (
+                          <span className="block text-[9px] text-slate-400 font-normal mt-0.5">
+                            Oleh: {latestLeave.approved_by}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* 🌟 2. TODAY ATTENDANCE & WORK SCHEDULE HUB ────────────────────── */}
             <section className="bg-white rounded-3xl p-4 sm:p-4.5 shadow-card border border-slate-200/80 space-y-4">
               {/* Card Header & Status Badge */}

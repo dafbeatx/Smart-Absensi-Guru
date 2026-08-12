@@ -24,6 +24,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
 
   const [teachers, setTeachers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('smart_absensi_teachers');
@@ -73,8 +74,9 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     try {
       const tkn = useAuthStore.getState().token || '';
       if (tkn) {
-        const fetched = await LeaveRepository.getPendingLeaves(tkn);
-        setPendingRequests(fetched || []);
+        const fetched = await LeaveRepository.getAllLeaves(tkn);
+        setAllLeaves(fetched || []);
+        setPendingRequests((fetched || []).filter((r) => r.approval_status === 'PENDING'));
       }
     } catch (err) {
       console.warn('Gagal memuat pengajuan izin:', err);
@@ -123,6 +125,10 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       }
     };
 
+    const handleLeaveUpdated = () => {
+      fetchPendingRequests();
+    };
+
     fetchUsersFromBackend();
     fetchPendingRequests();
     fetchAttendanceRecords();
@@ -132,13 +138,17 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     };
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
+    window.addEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
     window.addEventListener('smart_absensi_teachers_updated', handleSyncTeachers);
     window.addEventListener('storage', handleSyncTeachers);
+    window.addEventListener('storage', handleLeaveUpdated);
 
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
+      window.removeEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
       window.removeEventListener('smart_absensi_teachers_updated', handleSyncTeachers);
       window.removeEventListener('storage', handleSyncTeachers);
+      window.removeEventListener('storage', handleLeaveUpdated);
     };
   }, []);
 
@@ -213,7 +223,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           {(activeTab === 'APPROVALS' || activeTab === 'APPROVAL') && (
             <div className="bg-white p-4 sm:p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
               <h3 className="font-extrabold text-[#023246] text-base">📝 Approval Pengajuan Izin / Cuti Guru</h3>
-              <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
+              <PendingApprovalWidget requests={allLeaves.length > 0 ? allLeaves : pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
             </div>
           )}
 

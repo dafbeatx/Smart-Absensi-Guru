@@ -665,20 +665,58 @@ export class SupabaseProvider implements IDataProvider {
     notes: string,
     _token: string
   ): Promise<boolean> {
+    const activeUser = useAuthStore.getState().user;
     const { error } = await this.client
       .from('leaves')
       .update({
         status: decision,
+        approval_status: decision,
         rejection_notes: notes,
+        approval_notes: notes,
         approved_at: new Date().toISOString(),
+        approved_by: activeUser?.full_name || activeUser?.id || 'Kepala Sekolah',
       })
       .eq('id', leaveId);
 
-    if (error) throw new Error('Gagal memproses persetujuan izin: ' + error.message);
+    if (error) {
+      const { error: error2 } = await this.client
+        .from('leaves')
+        .update({
+          status: decision,
+          rejection_notes: notes,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', leaveId);
+
+      if (error2) throw new Error('Gagal memproses persetujuan izin: ' + error2.message);
+    }
     return true;
   }
 
   public async getPendingLeaves(_token: string): Promise<LeaveRequest[]> {
+    const { data } = await this.client
+      .from('leaves')
+      .select('*')
+      .or('status.eq.PENDING,approval_status.eq.PENDING')
+      .order('created_at', { ascending: false });
+
+    return (data || []).map((row) => ({
+      id: row.id,
+      user_id: row.user_id,
+      leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
+      start_date: row.start_date,
+      end_date: row.end_date,
+      reason: row.reason,
+      attachment_url: row.attachment_url || null,
+      approval_status: (row.status || row.approval_status || 'PENDING') as ApprovalStatus,
+      approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
+      approved_by: row.approved_by || null,
+      approval_notes: row.rejection_notes || row.approval_notes || null,
+      created_at: row.created_at,
+    }));
+  }
+
+  public async getAllLeaves(_token: string): Promise<LeaveRequest[]> {
     const { data } = await this.client
       .from('leaves')
       .select('*')
@@ -687,15 +725,15 @@ export class SupabaseProvider implements IDataProvider {
     return (data || []).map((row) => ({
       id: row.id,
       user_id: row.user_id,
-      leave_type: (row.type || 'IZIN') as LeaveType,
+      leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
       start_date: row.start_date,
       end_date: row.end_date,
       reason: row.reason,
       attachment_url: row.attachment_url || null,
-      approval_status: (row.status || 'PENDING') as ApprovalStatus,
-      approval_deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+      approval_status: (row.status || row.approval_status || 'PENDING') as ApprovalStatus,
+      approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
       approved_by: row.approved_by || null,
-      approval_notes: row.rejection_notes || null,
+      approval_notes: row.rejection_notes || row.approval_notes || null,
       created_at: row.created_at,
     }));
   }

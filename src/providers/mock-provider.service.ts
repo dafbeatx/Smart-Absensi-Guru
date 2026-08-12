@@ -526,7 +526,65 @@ export class MockProvider implements IDataProvider {
     return leaveRecord;
   }
 
-  public async approveLeave(_leaveId: string, _decision: 'APPROVED' | 'REJECTED', _notes: string, _token: string): Promise<boolean> {
+  public async approveLeave(leaveId: string, decision: 'APPROVED' | 'REJECTED', notes: string, _token: string): Promise<boolean> {
+    const saved = safeGetStorage('smart_absensi_leaves');
+    let leaves: LeaveRequest[] = [];
+    if (saved) {
+      try {
+        leaves = JSON.parse(saved);
+      } catch (e) {
+        leaves = [];
+      }
+    }
+
+    const activeUser = useAuthStore.getState().user;
+    const targetIdx = leaves.findIndex((l) => l.id === leaveId);
+    let targetLeave: LeaveRequest | undefined;
+
+    if (targetIdx !== -1) {
+      leaves[targetIdx] = {
+        ...leaves[targetIdx],
+        approval_status: decision,
+        approval_notes: notes,
+        approved_by: activeUser?.full_name || 'Kepala Sekolah',
+      };
+      targetLeave = leaves[targetIdx];
+      safeSetStorage('smart_absensi_leaves', JSON.stringify(leaves));
+    }
+
+    // Trigger Push Notification for Guru
+    if (targetLeave) {
+      const notifKey = `smart_absensi_notifications_${targetLeave.user_id}`;
+      const savedNotifs = safeGetStorage(notifKey);
+      let notifs: AppNotification[] = [];
+      if (savedNotifs) {
+        try {
+          notifs = JSON.parse(savedNotifs);
+        } catch (e) {
+          notifs = [];
+        }
+      }
+      const newNotif: AppNotification = {
+        id: 'notif_leave_' + Date.now(),
+        user_id: targetLeave.user_id,
+        title: decision === 'APPROVED' ? '✅ Pengajuan Izin Disetujui' : '❌ Pengajuan Izin Ditolak',
+        message: decision === 'APPROVED'
+          ? `Pengajuan ${targetLeave.leave_type} Anda (${targetLeave.start_date}) telah DISETUJUI oleh Kepala Sekolah.`
+          : `Pengajuan ${targetLeave.leave_type} Anda (${targetLeave.start_date}) DITOLAK oleh Kepala Sekolah.${notes ? ` Alasan: ${notes}` : ''}`,
+        type: decision === 'APPROVED' ? 'SUCCESS' : 'WARNING',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+      notifs.unshift(newNotif);
+      safeSetStorage(notifKey, JSON.stringify(notifs));
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smart_absensi_leave_updated'));
+      window.dispatchEvent(new CustomEvent('smart_absensi_records_updated'));
+      window.dispatchEvent(new CustomEvent('smart_absensi_notification_pushed'));
+    }
+
     return true;
   }
 
@@ -535,7 +593,26 @@ export class MockProvider implements IDataProvider {
     if (saved) {
       try {
         const list: LeaveRequest[] = JSON.parse(saved);
-        return list.filter((l) => l.approval_status === 'PENDING');
+        if (Array.isArray(list)) {
+          return list
+            .filter((l) => l.approval_status === 'PENDING')
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
+      } catch (e) {
+        console.error('Failed to parse leaves:', e);
+      }
+    }
+    return [];
+  }
+
+  public async getAllLeaves(_token: string): Promise<LeaveRequest[]> {
+    const saved = safeGetStorage('smart_absensi_leaves');
+    if (saved) {
+      try {
+        const list: LeaveRequest[] = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
       } catch (e) {
         console.error('Failed to parse leaves:', e);
       }

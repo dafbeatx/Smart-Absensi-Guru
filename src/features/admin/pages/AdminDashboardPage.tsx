@@ -50,6 +50,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isLoadingMyAttendance, setIsLoadingMyAttendance] = useState(false);
 
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
+  const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
 
   const [teachers, setTeachers] = useState<UserProfile[]>(() => {
@@ -109,8 +110,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     try {
       const token = useAuthStore.getState().token || '';
       if (token) {
-        const fetched = await LeaveRepository.getPendingLeaves(token);
-        setPendingRequests(fetched || []);
+        const fetched = await LeaveRepository.getAllLeaves(token);
+        setAllLeaves(fetched || []);
+        setPendingRequests((fetched || []).filter((r) => r.approval_status === 'PENDING'));
       }
     } catch (err) {
       console.warn('Gagal memuat pengajuan izin:', err);
@@ -340,7 +342,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 <h3 className="font-extrabold text-[#023246] text-sm flex items-center gap-2">
                   <span>📝 Persetujuan Pengajuan Izin / Sakit Guru</span>
                 </h3>
-                <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
+                <PendingApprovalWidget requests={allLeaves.length > 0 ? allLeaves : pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
               </div>
             </div>
           )}
@@ -443,7 +445,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           {(activeTab === 'APPROVAL' || activeTab === 'APPROVALS') && (
             <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
               <h3 className="font-extrabold text-[#023246] text-base">📝 Approval Pengajuan Izin / Sakit</h3>
-              <PendingApprovalWidget requests={pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
+              <PendingApprovalWidget requests={allLeaves.length > 0 ? allLeaves : pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
             </div>
           )}
 
