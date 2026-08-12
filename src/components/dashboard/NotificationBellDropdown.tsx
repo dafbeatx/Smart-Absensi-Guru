@@ -75,7 +75,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
     }
   };
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (using 'click' event to prevent accidental closure during mobile touch scrolling)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -84,9 +84,15 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      // Use 'click' instead of 'mousedown' so touch scrolling gestures on mobile do not trigger accidental dropdown closure
+      const timer = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('click', handleClickOutside);
+      };
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
   const loadNotifications = async () => {
@@ -351,6 +357,8 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         }}
         className="relative p-2 text-slate-600 hover:text-[#023246] hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
         aria-label="Pusat Notifikasi Presensi"
+        aria-haspopup="true"
+        aria-expanded={isOpen}
         title="Pusat Notifikasi Presensi"
       >
         <span className={`text-lg transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>

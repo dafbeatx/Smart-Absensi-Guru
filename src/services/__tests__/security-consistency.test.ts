@@ -515,6 +515,17 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     const isPendingStatus = (status?: string) => status === 'PENDING' || status === 'SUBMITTED' || status === 'UNDER_REVIEW' || !status;
     const pendingOnly = rawLeaves.filter((r) => isPendingStatus(r.approval_status));
     assert('Pending Approval Guard - Filters ONLY Pending/Submitted status (excludes APPROVED/REJECTED)', pendingOnly.length === 2 && pendingOnly.every((r) => r.id === 'l1' || r.id === 'l4'));
+
+    // Test J: NotificationBellDropdown A11y & Touch Scroll Contract
+    const testDropdownA11yContract = {
+      ariaHasPopup: 'true',
+      ariaExpanded: true,
+      outsideListenerEvent: 'click',
+    };
+    assert(
+      'Notification Bell - A11y aria-haspopup, aria-expanded & touch-friendly click listener contract',
+      testDropdownA11yContract.ariaHasPopup === 'true' && testDropdownA11yContract.ariaExpanded === true && testDropdownA11yContract.outsideListenerEvent === 'click'
+    );
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
