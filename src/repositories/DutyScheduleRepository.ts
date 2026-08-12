@@ -47,8 +47,10 @@ export class DutyScheduleRepository {
     const cleanQuery = teacherIdOrName.trim().toLowerCase();
 
     return todaySchedules.some((s) => {
+      if (!s) return false;
       const matchId = s.teacher_id === teacherIdOrName;
-      const matchName = s.teacher_name.toLowerCase().includes(cleanQuery) || cleanQuery.includes(s.teacher_name.toLowerCase());
+      const teacherNameLower = s.teacher_name ? s.teacher_name.toLowerCase() : '';
+      const matchName = teacherNameLower ? (teacherNameLower.includes(cleanQuery) || cleanQuery.includes(teacherNameLower)) : false;
       return matchId || matchName;
     });
   }

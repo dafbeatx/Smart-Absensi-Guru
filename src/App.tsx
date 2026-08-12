@@ -140,7 +140,7 @@ export const App: React.FC = () => {
           </div>
           <GuruDashboardPage
             onOpenScanner={() => setIsScannerOpen(true)}
-            isPreviewMode={false}
+            isPreviewMode={true}
             previewUser={{
               ...user,
               avatar_url: user.avatar_url || null,

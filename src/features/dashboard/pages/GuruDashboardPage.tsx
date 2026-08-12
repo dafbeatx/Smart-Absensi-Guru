@@ -337,9 +337,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }
         const matched = teacherList.find(
           (t) =>
-            t.id === effectiveUser.id ||
-            (Boolean(t.nip) && t.nip === effectiveUser.nip) ||
-            (Boolean(t.full_name) && t.full_name.toLowerCase() === effectiveUser.full_name.toLowerCase())
+            t &&
+            (t.id === effectiveUser.id ||
+              (Boolean(t.nip) && Boolean(effectiveUser.nip) && t.nip === effectiveUser.nip) ||
+              (Boolean(t.full_name) &&
+                Boolean(effectiveUser.full_name) &&
+                t.full_name.toLowerCase() === effectiveUser.full_name.toLowerCase()))
         );
         if (matched && matched.avatar_url && matched.avatar_url !== effectiveUser.avatar_url) {
           useAuthStore.getState().updateUserProfile({ avatar_url: matched.avatar_url });
@@ -428,12 +431,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
         const todayDayOfWeek = new Date().getDay(); // 1 = Senin, ..., 5 = Jumat
         if (todayDayOfWeek >= 1 && todayDayOfWeek <= 5) {
-          const todayPikets = (fetchedDuty || []).filter((s) => s.day_of_week === todayDayOfWeek);
+          const todayPikets = (fetchedDuty || []).filter((s) => s && s.day_of_week === todayDayOfWeek);
           const myPiket = todayPikets.find(
             (s) =>
-              s.teacher_id === effectiveUser.id ||
-              s.teacher_name.toLowerCase().includes(effectiveUser.full_name.toLowerCase()) ||
-              effectiveUser.full_name.toLowerCase().includes(s.teacher_name.toLowerCase())
+              s &&
+              (s.teacher_id === effectiveUser.id ||
+                (Boolean(s.teacher_name) &&
+                  Boolean(effectiveUser.full_name) &&
+                  s.teacher_name.toLowerCase().includes(effectiveUser.full_name.toLowerCase())) ||
+                (Boolean(effectiveUser.full_name) &&
+                  Boolean(s.teacher_name) &&
+                  effectiveUser.full_name.toLowerCase().includes(s.teacher_name.toLowerCase())))
           );
 
           if (myPiket) {
@@ -1565,7 +1573,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="flex items-center justify-between text-xs gap-2">
                   <span className="font-bold text-slate-700 text-xs">📱 Keamanan Perangkat Presensi (1 Akun = 1 HP)</span>
                   <span className={`px-2 py-0.5 text-[9px] sm:text-[10px] font-black rounded-full border shrink-0 ${
-                    effectiveUser.full_name.toLowerCase().includes('dafa maulana')
+                    Boolean(effectiveUser?.full_name) && effectiveUser.full_name.toLowerCase().includes('dafa maulana')
                       ? 'bg-sky-100 text-sky-800 border-sky-300'
                       : deviceBindingStatus.status === 'ACTIVE'
                       ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
@@ -1575,7 +1583,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       ? 'bg-orange-100 text-orange-800 border-orange-300'
                       : 'bg-amber-100 text-amber-800 border-amber-300'
                   }`}>
-                    {effectiveUser.full_name.toLowerCase().includes('dafa maulana')
+                    {Boolean(effectiveUser?.full_name) && effectiveUser.full_name.toLowerCase().includes('dafa maulana')
                       ? '🚀 BYPASS MULTI-DEVICE'
                       : deviceBindingStatus.status === 'ACTIVE'
                       ? '🔒 TERIKAT AKTIF (1 HP)'
