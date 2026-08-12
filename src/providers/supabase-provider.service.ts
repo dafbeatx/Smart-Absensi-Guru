@@ -260,7 +260,7 @@ export class SupabaseProvider implements IDataProvider {
       scanUserFilters.push(`phone_number.eq.${sessionUser.phone_number}`);
     }
 
-    let userExists: { id: string; nip: string; full_name: string } | null = null;
+    let userExists: { id: string; nip: string | null; full_name: string } | null = null;
     let userCheckError: { message: string } | null = null;
 
     if (scanUserFilters.length > 0) {
@@ -289,7 +289,7 @@ export class SupabaseProvider implements IDataProvider {
       const defaultPinHash = await hashPin('123456');
       const newUserRecord = {
         id: sessionUser.id || userId,
-        nip: sessionUser.nip || `NIP_${Date.now()}`,
+        nip: sessionUser.nip || null,
         full_name: sessionUser.full_name || 'Guru Active',
         phone_number: sessionUser.phone_number || '080000000000',
         pin_hash: defaultPinHash,
@@ -871,7 +871,7 @@ export class SupabaseProvider implements IDataProvider {
 
     const newUser = {
       id: newId,
-      nip: user.nip || `NIP_${Date.now()}`,
+      nip: user.nip ? user.nip.trim() : null,
       full_name: user.full_name || 'Guru Baru',
       phone_number: user.phone_number || '080000000000',
       pin_hash: hashedPin,

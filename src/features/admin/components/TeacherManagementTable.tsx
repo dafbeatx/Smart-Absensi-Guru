@@ -67,7 +67,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     }
     const newTeacher: UserProfile = {
       id: 'usr_' + Date.now(),
-      nip: nip || '',
+      nip: nip.trim() ? nip.trim() : null,
       full_name: fullName,
       phone_number: phone,
       role,
@@ -125,7 +125,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     }
     setSelectedTeacher(t);
     setFullName(t.full_name);
-    setNip(t.nip || '');
+    setNip(t.nip && !t.nip.startsWith('NIP_') ? t.nip : '');
     setPhone(t.phone_number || '');
     setPosition(t.position || '');
     setRole(t.role);
@@ -182,7 +182,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
     const updates: Partial<UserProfile> = {
       full_name: fullName,
-      nip: nip,
+      nip: nip.trim() ? nip.trim() : null,
       phone_number: phone,
       position: position,
       role: role,
@@ -770,7 +770,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               <p className="font-bold text-sm">Apakah Anda yakin ingin menghapus akun ini?</p>
               <div className="text-xs space-y-1 bg-white p-3 rounded-xl border border-red-100 font-medium text-slate-700">
                 <p><span className="font-bold">Nama:</span> {selectedTeacher.full_name}</p>
-                <p><span className="font-bold">NPP:</span> {selectedTeacher.nip || '-'}</p>
+                <p><span className="font-bold">NPP:</span> {selectedTeacher.nip && !selectedTeacher.nip.startsWith('NIP_') ? selectedTeacher.nip : '-'}</p>
                 <p><span className="font-bold">Role:</span> {selectedTeacher.role === 'ADMIN' ? 'ADMIN WEBSITE' : selectedTeacher.role}</p>
                 <p><span className="font-bold">Jabatan:</span> {selectedTeacher.position}</p>
               </div>

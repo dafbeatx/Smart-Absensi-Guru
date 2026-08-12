@@ -57,7 +57,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     return [
       {
         id: 'usr_1001',
-        nip: '198507122010011008',
+        nip: null,
         full_name: 'Ahmad Hidayat, S.Pd.',
         phone_number: '081234567890',
         role: 'GURU',
@@ -68,7 +68,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       },
       {
         id: 'usr_1002',
-        nip: '199002142018021002',
+        nip: null,
         full_name: 'Budi Santoso, M.Pd.',
         phone_number: '081398765432',
         role: 'GURU',

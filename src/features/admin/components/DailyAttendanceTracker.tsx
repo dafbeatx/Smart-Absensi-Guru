@@ -472,7 +472,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                         )}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        NPP: {teacher.nip || '-'} • {teacher.position || (teacher.role === 'KEPSEK' ? 'Kepala Sekolah' : teacher.role === 'ADMIN' ? 'Administrator Sekolah' : 'Tenaga Pendidik')}
+                        NPP: {teacher.nip && !teacher.nip.startsWith('NIP_') ? teacher.nip : '-'} • {teacher.position || (teacher.role === 'KEPSEK' ? 'Kepala Sekolah' : teacher.role === 'ADMIN' ? 'Administrator Sekolah' : 'Tenaga Pendidik')}
                       </p>
                     </div>
                   </div>

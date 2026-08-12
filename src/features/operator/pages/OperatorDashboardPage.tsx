@@ -21,7 +21,7 @@ export const OperatorDashboardPage: React.FC = () => {
   const [teachers, setTeachers] = useState<UserProfile[]>([
     {
       id: 'usr_1001',
-      nip: '198507122010011008',
+      nip: null,
       full_name: 'Ahmad Hidayat, S.Pd.',
       phone_number: '081234567890',
       role: 'GURU',
@@ -32,7 +32,7 @@ export const OperatorDashboardPage: React.FC = () => {
     },
     {
       id: 'usr_1002',
-      nip: '199002142018021002',
+      nip: null,
       full_name: 'Budi Santoso, M.Pd.',
       phone_number: '081398765432',
       role: 'GURU',
@@ -43,7 +43,7 @@ export const OperatorDashboardPage: React.FC = () => {
     },
     {
       id: 'usr_1003',
-      nip: '197504122003121001',
+      nip: null,
       full_name: 'Farhan Sopian Sahid, S.Pd.I',
       phone_number: '081298765432',
       role: 'KEPSEK',

@@ -58,13 +58,13 @@ export class MockProvider implements IDataProvider {
     let role: 'GURU' | 'KEPSEK' | 'ADMIN' = 'GURU';
     let name = 'Guru Pengajar, S.Pd';
     let position = 'Guru Utama / Pendidik';
-    let nip: string | null = '198905202014021003';
+    let nip: string | null = null;
 
     if (dto.identity.toUpperCase().includes('KEPSEK') || dto.identity.startsWith('1975')) {
       role = 'KEPSEK';
       name = 'Drs. H. M. Yusuf, M.Pd.';
       position = 'Kepala Sekolah Utama';
-      nip = '197504122003121001';
+      nip = null;
     } else if (
       dto.identity.toUpperCase().includes('ADMIN') ||
       dto.identity.toUpperCase().includes('OPERATOR') ||
@@ -74,7 +74,7 @@ export class MockProvider implements IDataProvider {
       role = 'ADMIN';
       name = 'Rina Fitriani, S.Kom.';
       position = 'Admin Website & IT Sekolah';
-      nip = '199501012020011001';
+      nip = null;
     }
 
     const mockUser: UserProfile = {
@@ -100,7 +100,7 @@ export class MockProvider implements IDataProvider {
     if (token && token.includes('ADMIN')) {
       return {
         id: 'usr_admin_1001',
-        nip: '199501012020011001',
+        nip: null,
         full_name: 'Rina Fitriani, S.Kom.',
         phone_number: '0895351251395',
         role: 'ADMIN',
@@ -113,7 +113,7 @@ export class MockProvider implements IDataProvider {
     if (token && token.includes('KEPSEK')) {
       return {
         id: 'usr_kepsek_1001',
-        nip: '197504122003121001',
+        nip: null,
         full_name: 'Drs. H. M. Yusuf, M.Pd.',
         phone_number: '081234567891',
         role: 'KEPSEK',
@@ -125,7 +125,7 @@ export class MockProvider implements IDataProvider {
     }
     return {
       id: 'usr_guru_1001',
-      nip: '198905202014021003',
+      nip: null,
       full_name: 'Guru Pengajar, S.Pd',
       phone_number: '081234567890',
       role: 'GURU',
@@ -815,7 +815,7 @@ export class MockProvider implements IDataProvider {
     const defaultUsers: UserProfile[] = [
       {
         id: 'usr_admin_1001',
-        nip: '199501012020011001',
+        nip: null,
         full_name: 'Rina Fitriani, S.Kom.',
         phone_number: '0895351251395',
         role: 'ADMIN',
@@ -826,7 +826,7 @@ export class MockProvider implements IDataProvider {
       },
       {
         id: 'usr_kepsek_1001',
-        nip: '197504122003121001',
+        nip: null,
         full_name: 'Drs. H. M. Yusuf, M.Pd.',
         phone_number: '081234567891',
         role: 'KEPSEK',
@@ -837,7 +837,7 @@ export class MockProvider implements IDataProvider {
       },
       {
         id: 'usr_guru_1001',
-        nip: '198905202014021003',
+        nip: null,
         full_name: 'Guru Pengajar, S.Pd',
         phone_number: '081234567890',
         role: 'GURU',
@@ -854,7 +854,7 @@ export class MockProvider implements IDataProvider {
   public async createUser(user: Partial<UserProfile>, _token: string): Promise<UserProfile> {
     const newUser: UserProfile = {
       id: user.id || 'usr_mock_' + Date.now(),
-      nip: user.nip || '',
+      nip: user.nip ? user.nip.trim() : null,
       full_name: user.full_name || '',
       phone_number: user.phone_number || '',
       role: user.role || 'GURU',

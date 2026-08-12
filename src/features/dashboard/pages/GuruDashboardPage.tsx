@@ -96,7 +96,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const fallbackUser: UserProfile = {
     id: 'usr_guru_sample',
-    nip: '198905202014021003',
+    nip: null,
     full_name: 'Guru Utama',
     phone_number: '081234567890',
     role: 'GURU',
