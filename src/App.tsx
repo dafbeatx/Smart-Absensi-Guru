@@ -138,8 +138,17 @@ export const App: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Banner Peringatan Mode Preview */}
+          <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-amber-900 text-xs font-bold flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span>⚠️</span>
+              <span>Mode Preview Aktif — Pemindaian QR absensi dinonaktifkan untuk simulasi tampilan {user.role === 'ADMIN' ? 'Admin' : 'Kepsek'}.</span>
+            </div>
+          </div>
+
           <GuruDashboardPage
-            onOpenScanner={() => setIsScannerOpen(true)}
+            onOpenScanner={() => setIsPreviewScannerBlocked(true)}
             isPreviewMode={true}
             previewUser={{
               ...user,

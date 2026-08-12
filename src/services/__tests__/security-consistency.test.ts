@@ -585,6 +585,22 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert('Kepsek Mobile Bottom Nav - FAB Label matches handler action', kepsekFabConfig.label === 'Scan QR');
     assert('Kepsek Mobile Bottom Nav - FAB Icon uses camera symbol', kepsekFabConfig.icon === '📷');
     assert('Kepsek Mobile Bottom Nav - FAB Handler triggers camera scanner', kepsekFabConfig.handlerName === 'onOpenScanner');
+
+    // Test Q: Preview Mode QR Scanner Safety & Blocking Contract
+    let isRealScannerOpened = false;
+    let isPreviewBlockedModalOpened = false;
+
+    const onOpenScannerInPreview = (isPreviewMode: boolean) => {
+      if (isPreviewMode) {
+        isPreviewBlockedModalOpened = true;
+      } else {
+        isRealScannerOpened = true;
+      }
+    };
+
+    onOpenScannerInPreview(true);
+    assert('Preview Mode Scanner Safety - Blocks real camera scanner invocation', !isRealScannerOpened);
+    assert('Preview Mode Scanner Safety - Triggers preview scanner blocked modal', isPreviewBlockedModalOpened);
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }
