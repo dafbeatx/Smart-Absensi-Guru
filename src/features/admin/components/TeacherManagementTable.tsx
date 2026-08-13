@@ -34,6 +34,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isResetPinOpen, setIsResetPinOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<UserProfile | null>(null);
 
   // Form states
@@ -131,6 +132,59 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setRole(t.role);
     setAvatarUrl(t.avatar_url || null);
     setIsEditModalOpen(true);
+  };
+
+  const handleOpenPhotoModal = (t: UserProfile) => {
+    if (effectiveReadOnly) {
+      showToast('warning', 'Akses Ditolak', 'Peran Kepala Sekolah / Mode Lihat Saja tidak dapat mengubah foto profil.');
+      return;
+    }
+    setSelectedTeacher(t);
+    setAvatarUrl(t.avatar_url || null);
+    setIsPhotoModalOpen(true);
+  };
+
+  const handleSavePhotoDirectly = async () => {
+    if (effectiveReadOnly || !selectedTeacher) return;
+
+    const updates: Partial<UserProfile> = {
+      avatar_url: avatarUrl,
+    };
+
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      await provider.updateUser(selectedTeacher.id, updates, token);
+
+      const updated = teachers.map((t) =>
+        t.id === selectedTeacher.id ? { ...t, avatar_url: avatarUrl } : t
+      );
+      onTeachersChange(updated);
+      try {
+        localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to cache teachers to localStorage:', e);
+      }
+      window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
+
+      if (user && selectedTeacher && (user.id === selectedTeacher.id || user.nip === selectedTeacher.nip)) {
+        useAuthStore.getState().updateUserProfile(updates);
+      }
+
+      await AuditLogger.log({
+        actorId: user?.id || 'op_1',
+        actorRole: user?.role || 'ADMIN',
+        actionType: 'EDIT_USER_PHOTO',
+        targetEntity: 'Users',
+        newValue: JSON.stringify({ user_id: selectedTeacher.id, avatar_url: avatarUrl }),
+        reason: `Pembaruan foto profil guru ${selectedTeacher.full_name} oleh Admin Website`,
+      });
+
+      showToast('success', 'Foto Profil Berhasil Disimpan!', `Foto profil ${selectedTeacher.full_name} telah tersinkronisasi ke seluruh perangkat.`);
+      setIsPhotoModalOpen(false);
+    } catch (err: unknown) {
+      handleAppError(err, 'TeacherManagementTable.handleSavePhotoDirectly', 'Gagal Menyimpan Foto Profil');
+    }
   };
 
   const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -484,12 +538,18 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
               {/* Action Buttons Grid (Touch-friendly 44px min-target) */}
               {!effectiveReadOnly ? (
-                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                <div className="grid grid-cols-4 gap-1.5 pt-1">
                   <button
                     onClick={() => handleOpenEditModal(t)}
                     className="py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold text-[10px] rounded-xl border border-emerald-200 transition-colors text-center active:scale-95"
                   >
                     ✏️ Edit
+                  </button>
+                  <button
+                    onClick={() => handleOpenPhotoModal(t)}
+                    className="py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold text-[10px] rounded-xl border border-purple-200 transition-colors text-center active:scale-95"
+                  >
+                    📷 Foto
                   </button>
                   <button
                     onClick={() => {
@@ -498,7 +558,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                     }}
                     className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold text-[10px] rounded-xl border border-amber-200 transition-colors text-center active:scale-95"
                   >
-                    🔑 Reset PIN
+                    🔑 PIN
                   </button>
                   <button
                     onClick={() => handleResetDevice(t)}
@@ -508,7 +568,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                   </button>
                   <button
                     onClick={() => handleToggleStatus(t)}
-                    className={`py-1.5 px-2 font-extrabold text-[10px] rounded-xl border transition-colors text-center active:scale-95 col-span-2 ${
+                    className={`py-1.5 px-2 font-extrabold text-[10px] rounded-xl border transition-colors text-center active:scale-95 col-span-3 ${
                       t.is_active ? 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-800 border-emerald-300'
                     }`}
                   >
@@ -592,6 +652,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                         ✏️ Edit
                       </button>
                       <button
+                        onClick={() => handleOpenPhotoModal(t)}
+                        className="px-2.5 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold rounded-lg transition-colors"
+                      >
+                        📷 Foto
+                      </button>
+                      <button
                         onClick={() => {
                           setSelectedTeacher(t);
                           setIsResetPinOpen(true);
@@ -646,6 +712,43 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
             <p className="text-[11px] text-blue-700">
               Pengguna baru akan secara otomatis diminta membuat PIN 6-digit rahasia mereka sendiri saat pertama kali login.
             </p>
+          </div>
+
+          {/* Avatar Upload Section for New User */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-sm shrink-0 overflow-hidden border-2 border-emerald-500 shadow-xs">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Foto Profil Guru" className="w-full h-full object-cover" />
+                ) : (
+                  fullName.charAt(0) || '📷'
+                )}
+              </div>
+              <div>
+                <p className="font-bold text-xs text-slate-900">Foto Profil Guru (Opsional)</p>
+                <p className="text-[10px] text-slate-500">Auto Crop 1:1 WebP (Max 10MB)</p>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl(null)}
+                    className="text-[10px] text-red-600 hover:underline font-bold mt-0.5 cursor-pointer"
+                  >
+                    Hapus Foto
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <label className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-2xs shrink-0">
+              {isUploadingAvatar ? 'Memproses...' : '📷 Unggah Foto'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFileChange}
+                className="hidden"
+                disabled={isUploadingAvatar}
+              />
+            </label>
           </div>
 
           <Input label="Nama Lengkap & Gelar" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
@@ -785,6 +888,79 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               </Button>
               <Button variant="danger" className="w-1/2" onClick={handleDeleteTeacher}>
                 Ya, Hapus Pengguna
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Quick Teacher Photo Management Modal */}
+      <Modal isOpen={isPhotoModalOpen} onClose={() => setIsPhotoModalOpen(false)} title="📷 Kelola Foto Profil Guru">
+        {selectedTeacher && (
+          <div className="space-y-4 text-xs text-slate-700">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <div className="w-24 h-24 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-2xl shrink-0 overflow-hidden border-4 border-emerald-500 shadow-md">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={selectedTeacher.full_name} className="w-full h-full object-cover" />
+                ) : (
+                  selectedTeacher.full_name.charAt(0) || '👤'
+                )}
+              </div>
+
+              <div className="space-y-1 min-w-0 flex-1">
+                <h4 className="font-extrabold text-slate-900 text-sm truncate">{selectedTeacher.full_name}</h4>
+                <p className="text-[11px] font-mono text-slate-500">NPP: {selectedTeacher.nip || '-'}</p>
+                <p className="text-[11px] font-semibold text-slate-600">{selectedTeacher.position || 'Tenaga Pendidik'}</p>
+
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 pt-1">
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md">
+                    ✨ WebP 1:1 Auto-Crop (400x400)
+                  </span>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-md">
+                    ⚡ Auto Sync All Devices
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1 text-blue-900">
+              <p className="font-bold flex items-center gap-1">
+                <span>💡</span> Pengubahan Foto Profil Real-Time:
+              </p>
+              <p className="text-[11px] leading-relaxed text-blue-800">
+                Foto profil yang diunggah akan otomatis dikompresi menjadi format WebP hemat kuota (~20-30KB) dan langsung tersinkronisasi di tampilan HP Guru, Dashboard Kepsek, dan Laporan PDF.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <label className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-extrabold text-xs rounded-xl cursor-pointer transition-all shadow-2xs text-center flex items-center justify-center gap-1.5">
+                <span>{isUploadingAvatar ? '⏳ Memproses...' : '📷 Pilih & Kompresi Foto'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarFileChange}
+                  className="hidden"
+                  disabled={isUploadingAvatar}
+                />
+              </label>
+
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => setAvatarUrl(null)}
+                  className="py-2.5 px-3 bg-red-50 hover:bg-red-100 text-red-700 font-extrabold text-xs rounded-xl border border-red-200 transition-all text-center active:scale-95"
+                >
+                  🗑️ Hapus Foto
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100">
+              <Button variant="secondary" className="w-1/2" onClick={() => setIsPhotoModalOpen(false)}>
+                Batal
+              </Button>
+              <Button variant="primary" className="w-1/2 bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={handleSavePhotoDirectly}>
+                💾 Simpan Foto Profil
               </Button>
             </div>
           </div>
