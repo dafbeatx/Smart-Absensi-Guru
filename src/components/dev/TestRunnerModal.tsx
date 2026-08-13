@@ -32,7 +32,10 @@ export const TestRunnerModal: React.FC<TestRunnerModalProps> = ({ isOpen, onClos
           <div>
             <h4 className="font-bold text-sm text-emerald-400">Unit Test Suite Validator</h4>
             <p className="text-[11px] text-slate-300">
-              Menjalankan 5 modul pengujian otomatis (Attendance, Leave, Analytics, Audit/WA, Feature Flags).
+              Menjalankan {summary ? summary.totalSuites : 9} modul pengujian otomatis dalam sandbox terisolasi.
+            </p>
+            <p className="text-[10px] text-amber-300 font-semibold mt-0.5">
+              🔒 Sesi login Anda tetap aman — test berjalan di sandbox MockProvider.
             </p>
           </div>
           <Button

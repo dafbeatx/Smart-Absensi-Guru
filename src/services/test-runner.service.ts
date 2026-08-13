@@ -39,7 +39,15 @@ import { MockProvider } from '../providers/mock-provider.service';
 
 export class MasterTestRunner {
   public static async runAll(): Promise<MasterTestSummary> {
-    ProviderFactory.setProvider(new MockProvider());
+    // ⚠️ CRITICAL: Save the original live provider BEFORE switching to MockProvider.
+    // Without this, the MockProvider permanently overwrites the SupabaseProvider singleton,
+    // causing the logged-in admin session to be replaced by mock user data (e.g. "Rina Fitriani").
+    const originalProvider = ProviderFactory.getProvider();
+
+    // Switch to isolated MockProvider for test execution only
+    const testMockProvider = new MockProvider();
+    ProviderFactory.setProvider(testMockProvider);
+
     const startTime = Date.now();
     const suites: TestSuiteResult[] = [];
 
@@ -58,27 +66,33 @@ export class MasterTestRunner {
     let totalPassed = 0;
     let totalFailed = 0;
 
-    for (const suite of suitesToRun) {
-      try {
-        const res = await suite.fn();
-        totalPassed += res.passed;
-        totalFailed += res.failed;
-        suites.push({
-          suiteName: suite.name,
-          passed: res.passed,
-          failed: res.failed,
-          results: res.results,
-        });
-      } catch (err: unknown) {
-        totalFailed += 1;
-        const errMsg = err instanceof Error ? err.message : String(err);
-        suites.push({
-          suiteName: suite.name,
-          passed: 0,
-          failed: 1,
-          results: [{ testName: `${suite.name} (Crash Error)`, status: 'FAIL', details: errMsg }],
-        });
+    try {
+      for (const suite of suitesToRun) {
+        try {
+          const res = await suite.fn();
+          totalPassed += res.passed;
+          totalFailed += res.failed;
+          suites.push({
+            suiteName: suite.name,
+            passed: res.passed,
+            failed: res.failed,
+            results: res.results,
+          });
+        } catch (err: unknown) {
+          totalFailed += 1;
+          const errMsg = err instanceof Error ? err.message : String(err);
+          suites.push({
+            suiteName: suite.name,
+            passed: 0,
+            failed: 1,
+            results: [{ testName: `${suite.name} (Crash Error)`, status: 'FAIL', details: errMsg }],
+          });
+        }
       }
+    } finally {
+      // ✅ CRITICAL: ALWAYS restore the original provider after test run completes.
+      // This ensures the live Supabase session and admin login are never corrupted.
+      ProviderFactory.setProvider(originalProvider);
     }
 
     const durationMs = Date.now() - startTime;
