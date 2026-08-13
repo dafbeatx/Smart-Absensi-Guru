@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "tsx scripts/run-tests.ts",
+    "test:e2e": "npm test",
     "preview": "vite preview"
   },
   "dependencies": {

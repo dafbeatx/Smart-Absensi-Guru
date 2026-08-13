@@ -11,6 +11,7 @@ import { runFeatureFlagsTestSuite } from '../config/__tests__/feature-flags.test
 import { runSecurityConsistencyTestSuite } from './__tests__/security-consistency.test';
 import { runGroqAITestSuite } from './__tests__/groq-ai.test';
 import { runPWAGeofenceTestSuite } from './__tests__/pwa-geofence.test';
+import { runMobileUIE2ETestSuite } from './__tests__/mobile-ui-e2e.test';
 
 export interface TestResultItem {
   testName: string;
@@ -51,6 +52,7 @@ export class MasterTestRunner {
       { name: 'Groq AI Engine & Smart Assistant', fn: runGroqAITestSuite },
       { name: 'Security & Consistency Engine', fn: runSecurityConsistencyTestSuite },
       { name: 'PWA & Interactive Geofence Map', fn: runPWAGeofenceTestSuite },
+      { name: 'Automated End-to-End (E2E) Mobile UI & QA', fn: runMobileUIE2ETestSuite },
     ];
 
     let totalPassed = 0;
