@@ -157,7 +157,7 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
                 key={option.type}
                 type="button"
                 onClick={() => setSelectedMood(option.type)}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-200 cursor-pointer text-center relative min-h-[64px] ${
+                className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-200 cursor-pointer text-center relative min-h-16 ${
                   isSelected
                     ? option.selectedClass
                     : 'bg-slate-50 border-slate-200/90 text-slate-800 hover:bg-slate-100 hover:border-slate-300'
@@ -194,7 +194,7 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
                   key={tag}
                   type="button"
                   onClick={() => setSelectedTag(isTagSelected ? '' : tag)}
-                  className={`px-3 py-1.5 text-xs rounded-xl border transition-all cursor-pointer min-h-[36px] ${
+                  className={`px-3 py-1.5 text-xs rounded-xl border transition-all cursor-pointer min-h-9 ${
                     isTagSelected
                       ? 'bg-[#0D7A5F] text-white border-[#0D7A5F] font-extrabold shadow-2xs'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200/90 font-semibold'
@@ -213,7 +213,7 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer min-h-[44px]"
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer min-h-11"
           >
             Nanti Saja
           </button>
@@ -221,7 +221,7 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
             type="button"
             onClick={handleSaveMood}
             disabled={isSubmitting}
-            className="px-5 py-2.5 bg-[#0D7A5F] hover:bg-[#095744] text-white font-black text-xs rounded-xl border border-[#0D7A5F] shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 min-h-[44px]"
+            className="px-5 py-2.5 bg-[#0D7A5F] hover:bg-[#095744] text-white font-black text-xs rounded-xl border border-[#0D7A5F] shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 min-h-11"
           >
             <span>Simpan Mood</span>
           </button>

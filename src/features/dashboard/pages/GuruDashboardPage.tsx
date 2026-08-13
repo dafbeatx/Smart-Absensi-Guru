@@ -888,7 +888,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       )}
 
       {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-[#DDD9D0] sticky top-0 z-30 shadow-2xs w-full max-w-[480px] mx-auto">
+      <header className="flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-[#DDD9D0] sticky top-0 z-30 shadow-2xs w-full max-w-120 mx-auto">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-xs ring-2 ring-emerald-50">
             <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
@@ -897,7 +897,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             <h1 className="font-extrabold text-[#023246] text-xs tracking-tight leading-tight uppercase truncate">
               Smart Absensi Guru
             </h1>
-            <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate max-w-[200px]">
+            <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate max-w-50">
               {settings.institution_name}
             </p>
           </div>
@@ -905,7 +905,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
         <button
           onClick={() => setActiveTab('NOTIFIKASI')}
-          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
+          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 min-h-11 min-w-11 flex items-center justify-center active:scale-95"
           aria-label="Notifikasi"
         >
           <BellIcon className={`w-5 h-5 transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : 'text-slate-600'}`} />
@@ -917,7 +917,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         </button>
       </header>
 
-      <main className="px-4 pt-4 pb-20 space-y-4 w-full max-w-[480px] mx-auto">
+      <main className="px-4 pt-4 pb-20 space-y-4 w-full max-w-120 mx-auto">
         <NotificationPermissionBanner />
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
@@ -951,7 +951,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('PROFIL')}
-                  className="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5 min-h-[44px]"
+                  className="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5 min-h-11"
                 >
                   <UserIcon className="w-4 h-4 text-emerald-300" />
                   <span>Profil</span>
@@ -1009,7 +1009,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsMoodModalOpen(true)}
-                  className="px-2.5 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 text-white text-[10px] font-extrabold transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 min-h-[36px]"
+                  className="px-2.5 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 text-white text-[10px] font-extrabold transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 min-h-9"
                 >
                   <span>
                     {todayMood ? (
@@ -1270,7 +1270,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             <section className="grid grid-cols-3 gap-2 sm:gap-3">
               <button
                 onClick={handleOpenLeaveModal}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-[84px]"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-21"
               >
                 <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
                   <DocumentTextIcon className="w-5 h-5 text-blue-600" />
@@ -1283,7 +1283,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
               <button
                 onClick={handleOpenCorrectionModal}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-[84px]"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-21"
               >
                 <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
                   <PencilSquareIcon className="w-5 h-5 text-amber-600" />
@@ -1296,7 +1296,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
               <button
                 onClick={() => setIsScheduleModalOpen(true)}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-[84px]"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-21"
               >
                 <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
                   <CalendarDaysIcon className="w-5 h-5 text-emerald-700" />
@@ -1728,7 +1728,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   variant="secondary"
                   onClick={() => setIsChangePinOpen(true)}
                   leftIcon={<KeyIcon className="w-4 h-4 text-slate-700" />}
-                  className="w-full text-xs font-extrabold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-[44px]"
+                  className="w-full text-xs font-extrabold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-11"
                 >
                   UBAH PIN KEAMANAN 6-DIGIT
                 </Button>
@@ -1737,7 +1737,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   variant="danger"
                   onClick={logout}
                   leftIcon={<LogOutIcon className="w-4 h-4 text-white" />}
-                  className="w-full text-xs font-extrabold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-[44px]"
+                  className="w-full text-xs font-extrabold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-11"
                 >
                   KELUAR DARI AKUN (LOGOUT)
                 </Button>
@@ -1748,11 +1748,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       </main>
 
       {/* ── MOBILE BOTTOM NAVIGATION DOCK (Compact & Sleek) ── */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-[480px] mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-1.5 z-40 shadow-xl rounded-t-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-120 mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-1.5 z-40 shadow-xl rounded-t-2xl">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('BERANDA')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-[44px] justify-center active:scale-95 ${
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-11 justify-center active:scale-95 ${
               activeTab === 'BERANDA' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
@@ -1762,7 +1762,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
           <button
             onClick={() => setActiveTab('RIWAYAT')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-[44px] justify-center active:scale-95 ${
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-11 justify-center active:scale-95 ${
               activeTab === 'RIWAYAT' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
@@ -1774,7 +1774,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <div className="relative -top-3 flex flex-col items-center">
             <button
               onClick={handleOpenScannerClick}
-              className="w-12 h-12 rounded-2xl bg-[#023246] hover:bg-[#0D7A5F] text-white flex items-center justify-center shadow-md ring-4 ring-white active:scale-95 transition-all cursor-pointer min-h-[48px] min-w-[48px]"
+              className="w-12 h-12 rounded-2xl bg-[#023246] hover:bg-[#0D7A5F] text-white flex items-center justify-center shadow-md ring-4 ring-white active:scale-95 transition-all cursor-pointer min-h-12 min-w-12"
               title="Pindai QR Code Absensi"
             >
               <QrCodeScanIcon className="w-6 h-6 text-white" />
@@ -1784,7 +1784,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
           <button
             onClick={() => setActiveTab('NOTIFIKASI')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer relative min-h-[44px] justify-center active:scale-95 ${
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer relative min-h-11 justify-center active:scale-95 ${
               activeTab === 'NOTIFIKASI' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
@@ -1799,7 +1799,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
           <button
             onClick={() => setActiveTab('PROFIL')}
-            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-[44px] justify-center active:scale-95 ${
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-11 justify-center active:scale-95 ${
               activeTab === 'PROFIL' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
