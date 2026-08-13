@@ -178,5 +178,29 @@ export interface TeacherDutySchedule {
   created_at: string;
 }
 
+export interface TeacherBadge {
+  id: string;
+  title: string;
+  category: 'DISCIPLINE' | 'DUTY' | 'RESILIENCE' | 'PERFECT_MONTH';
+  icon: string;
+  description: string;
+  isUnlocked: boolean;
+  progressPercent: number;
+  unlockedAt?: string;
+}
+
+export interface TeacherAppreciationScore {
+  totalPoints: number;
+  level: string; // e.g. "Pendidik Teladan Platinum", "Pendidik Disiplin Emas"
+  nextLevelPoints: number;
+  levelProgressPercent: number;
+  hadirTepatWaktuCount: number;
+  terlambatCount: number;
+  piketCount: number;
+  moodCheckinCount: number;
+  badges: TeacherBadge[];
+}
+
+
 
 

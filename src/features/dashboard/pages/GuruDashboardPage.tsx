@@ -31,6 +31,7 @@ import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
 import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
+import { calculateTeacherAppreciationScore } from '../../../utils/teacher-appreciation.utils';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -601,6 +602,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const terlambatPercent = totalDays > 0 ? (terlambatCount / totalDays) * 100 : 0;
 
+  // Teacher Appreciation & Gamification Score Calculation
+  const appreciationScore = calculateTeacherAppreciationScore(
+    attendanceHistory,
+    _dutySchedules,
+    todayMood,
+    effectiveUser?.id
+  );
+
   const monthNamesIndonesian = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -1028,6 +1037,59 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <span>Guru Piket Hari Ini</span>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* 🌟 1.5 TEACHER APPRECIATION & GAMIFICATION WIDGET ─────────── */}
+            <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-lg font-bold shrink-0 shadow-2xs">
+                    🏆
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider block truncate">Apresiasi & Disiplin Guru</span>
+                    <h3 className="text-xs font-black text-[#023246] truncate">{appreciationScore.level}</h3>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-base font-black text-amber-600 font-mono leading-none block">{appreciationScore.totalPoints}</span>
+                  <span className="text-[9px] font-bold text-slate-500 block">Poin Kehadiran</span>
+                </div>
+              </div>
+
+              {/* Level Progress Bar */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] font-bold text-slate-600">
+                  <span>Kemajuan Level</span>
+                  <span>{appreciationScore.levelProgressPercent}% (Target: {appreciationScore.nextLevelPoints} Pts)</span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/60">
+                  <div
+                    className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${appreciationScore.levelProgressPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Badges Carousel / Grid */}
+              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                {appreciationScore.badges.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setActiveTab('PROFIL')}
+                    title={`${b.title}: ${b.description}`}
+                    className={`p-2 rounded-2xl border text-center flex flex-col items-center justify-center transition-all cursor-pointer ${
+                      b.isUnlocked
+                        ? 'bg-amber-50/80 border-amber-200 text-amber-950 shadow-2xs hover:scale-105'
+                        : 'bg-slate-50 border-slate-200/80 text-slate-400 opacity-60 hover:opacity-80'
+                    }`}
+                  >
+                    <span className="text-xl mb-0.5 leading-none">{b.icon}</span>
+                    <span className="text-[9px] font-extrabold leading-tight truncate w-full">{b.title.split(' ')[0]}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1693,6 +1755,52 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   >
                     <span>🔄 Re-Sync HP</span>
                   </button>
+                </div>
+              </div>
+
+              {/* Teacher Appreciation Badge Showcase Section */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-[#FFFDF7] border border-amber-200/90 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🎖️</span>
+                    <div>
+                      <h3 className="font-extrabold text-xs text-[#023246]">Lencana Penghargaan & Apresiasi Kepsek</h3>
+                      <p className="text-[10px] text-slate-500 font-medium">Monitoring performa disiplin internal sekolah</p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl shadow-2xs">
+                    {appreciationScore.totalPoints} PTS
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {appreciationScore.badges.map((badge) => (
+                    <div
+                      key={badge.id}
+                      className={`p-3 rounded-2xl border space-y-1 transition-all ${
+                        badge.isUnlocked
+                          ? 'bg-amber-50/60 border-amber-200/90 shadow-2xs text-slate-900'
+                          : 'bg-slate-50/80 border-slate-200 text-slate-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">{badge.icon}</span>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg border ${
+                          badge.isUnlocked
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                          {badge.isUnlocked ? 'TERBUKA ✨' : `${badge.progressPercent}%`}
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-[11px] text-slate-900 leading-tight pt-1">{badge.title}</h4>
+                      <p className="text-[9px] text-slate-500 leading-relaxed font-medium">{badge.description}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-2.5 bg-amber-50/40 rounded-xl border border-amber-200/60 text-[10px] text-slate-600 font-medium leading-relaxed">
+                  💡 <b>Catatan Kepala Sekolah:</b> Poin dan lencana kehadiran ini dihitung otomatis untuk pertimbangan apresiasi dan reward periodik guru teladan sekolah.
                 </div>
               </div>
 
