@@ -29,6 +29,7 @@ export interface IDataProvider {
   getTodayAttendance(userId: string, token: string): Promise<AttendanceRecord | null>;
   getMonthlyAttendance(userId: string, month: string, year: string, token: string): Promise<AttendanceRecord[]>;
   correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean>;
+  resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, token: string): Promise<boolean>;
   getDailyAttendance(date: string, token: string): Promise<AttendanceRecord[]>;
   updateAttendanceNote(userId: string, date: string, note: string, token: string): Promise<boolean>;
 

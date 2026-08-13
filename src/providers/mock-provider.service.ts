@@ -433,6 +433,62 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
+  public async resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, _token: string): Promise<boolean> {
+    await new Promise((r) => setTimeout(r, 200));
+
+    // 1. Fetch system settings to verify Admin Reset Password
+    const settings = await this.getSettings();
+    if (!settings.admin_reset_password || settings.admin_reset_password.trim() === '') {
+      throw new Error(
+        'Password Reset Absensi belum diatur oleh Admin. Silakan buat/atur password reset terlebih dahulu di menu Pengaturan Sistem (Sandi Keamanan Reset Absensi Admin)!'
+      );
+    }
+
+    if (!adminPasswordInput || adminPasswordInput.trim() !== settings.admin_reset_password.trim()) {
+      throw new Error('Password Reset Absensi Admin Salah! Silakan periksa kembali password reset yang Anda masukkan.');
+    }
+
+    // 2. Remove record from global history storage
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    try {
+      const savedAll = safeGetStorage(ALL_KEY);
+      let allRecords: AttendanceRecord[] = savedAll ? JSON.parse(savedAll) : [];
+      if (Array.isArray(allRecords)) {
+        allRecords = allRecords.filter((r) => !(r.user_id === targetUserId && r.date === date));
+        safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
+      }
+    } catch (e) {
+      console.error('Failed to reset attendance from all history:', e);
+    }
+
+    // 3. Clean local storage for target user's today attendance if date matches today
+    const todayStr = getTodayDateInJakarta();
+    if (date === todayStr) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`smart_absensi_today_attendance_${targetUserId}_${todayStr}`);
+
+        // Also check if global smart_absensi_today_attendance matches this user
+        const globalSaved = safeGetStorage('smart_absensi_today_attendance');
+        if (globalSaved) {
+          try {
+            const parsed: AttendanceRecord = JSON.parse(globalSaved);
+            if (parsed.user_id === targetUserId && parsed.date === todayStr) {
+              localStorage.removeItem('smart_absensi_today_attendance');
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    // 4. Trigger real-time UI refresh events
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    }
+
+    return true;
+  }
+
   public async updateAttendanceNote(userId: string, date: string, note: string, _token: string): Promise<boolean> {
     const ALL_KEY = 'smart_absensi_all_attendance_history';
     try {

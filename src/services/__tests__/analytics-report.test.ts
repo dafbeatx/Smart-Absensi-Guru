@@ -55,14 +55,18 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     unabsented.length === 1 && unabsented[0].id === 'usr_3'
   );
 
-  // Test 2b: Exclude Inactive Teachers and Non-Guru Roles from Unabsented Calculation
+  // Test 2b: Exclude Inactive Teachers and Non-Attendance Roles (OPERATOR) from Unabsented Calculation
   const mixedTeachers: UserProfile[] = [
     ...mockTeachers,
     { id: 'usr_inactive', nip: '198504', full_name: 'Guru Nonaktif', phone_number: '084', role: 'GURU', position: 'IPS', avatar_url: null, is_active: false, created_at: '' },
-    { id: 'usr_admin', nip: '198505', full_name: 'Admin Web', phone_number: '085', role: 'ADMIN', position: 'IT Admin', avatar_url: null, is_active: true, created_at: '' },
-    { id: 'usr_kepsek', nip: '198506', full_name: 'Kepala Sekolah', phone_number: '086', role: 'KEPSEK', position: 'Headmaster', avatar_url: null, is_active: true, created_at: '' },
+    { id: 'usr_operator', nip: '198505', full_name: 'Operator System', phone_number: '085', role: 'OPERATOR', position: 'IT Operator', avatar_url: null, is_active: true, created_at: '' },
+    { id: 'usr_admin', nip: '198506', full_name: 'Admin Web', phone_number: '086', role: 'ADMIN', position: 'IT Admin', avatar_url: null, is_active: true, created_at: '' },
   ];
-  const unabsentedMixed = AnalyticsService.getUnabsentedTeachers('2026-07-30', mixedTeachers, mockAttendance, mockLeave);
+  const mockAttendanceWithAdmin: AttendanceRecord[] = [
+    ...mockAttendance,
+    { id: 'att_admin', user_id: 'usr_admin', date: '2026-07-30', check_in_time: '07:15:00', check_out_time: null, status: 'HADIR', check_in_lat: -6.2, check_in_lng: 106.8, check_in_distance_meters: 10, verification_method: 'QR_GPS', attendance_source: 'QR', is_offline: false, created_at: '' },
+  ];
+  const unabsentedMixed = AnalyticsService.getUnabsentedTeachers('2026-07-30', mixedTeachers, mockAttendanceWithAdmin, mockLeave);
   assert(
     'Analytics - Excludes Inactive & Non-Guru Users from Unabsented List',
     unabsentedMixed.length === 1 && unabsentedMixed[0].id === 'usr_3'

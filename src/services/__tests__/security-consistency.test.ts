@@ -718,6 +718,24 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     const disabledTrigger = simulateTriggerSync(200000, false);
     assert('CrossDeviceSync - Trigger blocked when enabled=false (preview mode)', disabledTrigger === false);
     assert('CrossDeviceSync - SyncCallCount unchanged when disabled', syncCallCount === 2);
+
+    // Test G: Reset Attendance Feature & Custom Admin Password Security Verification
+    const provider = ProviderFactory.getProvider();
+    await provider.updateSettings({
+      ...(await provider.getSettings()),
+      admin_reset_password: 'AdminSecretPassword2026!',
+    }, 'MOCK_TOKEN');
+
+    let invalidResetCaught = false;
+    try {
+      await provider.resetAttendance('usr_guru_01', '2026-08-13', 'WrongPassword', 'MOCK_TOKEN');
+    } catch {
+      invalidResetCaught = true;
+    }
+    assert('Reset Attendance Security - Rejects Incorrect Admin Reset Password', invalidResetCaught === true);
+
+    const resetSuccess = await provider.resetAttendance('usr_guru_01', '2026-08-13', 'AdminSecretPassword2026!', 'MOCK_TOKEN');
+    assert('Reset Attendance Security - Accepts Correct Admin Reset Password', resetSuccess === true);
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

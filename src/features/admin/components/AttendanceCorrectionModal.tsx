@@ -9,7 +9,7 @@ import { useToastStore } from '../../../store/useToastStore';
 import type { AttendanceRecord, AttendanceStatus, UserProfile } from '../../../types/database.types';
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
-
+import { AttendanceResetModal } from './AttendanceResetModal';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 
 export interface AttendanceCorrectionModalProps {
@@ -81,6 +81,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
   const [reason, setReason] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,11 +332,29 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
           />
         </div>
 
-        <div className="pt-2 flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>Batal</Button>
-          <Button type="submit" variant="primary" isLoading={isLoading}>Simpan Koreksi</Button>
+        <div className="pt-2 flex justify-between items-center gap-2">
+          <Button type="button" variant="danger" onClick={() => setIsResetOpen(true)} disabled={isLoading}>
+            🔄 Reset Absensi
+          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>Batal</Button>
+            <Button type="submit" variant="primary" isLoading={isLoading}>Simpan Koreksi</Button>
+          </div>
         </div>
       </form>
+
+      {/* Embedded Reset Modal Trigger */}
+      <AttendanceResetModal
+        isOpen={isResetOpen}
+        onClose={() => setIsResetOpen(false)}
+        teachers={teachers}
+        selectedTeacherId={selectedUserId}
+        selectedDate={date}
+        onSuccess={() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }}
+      />
     </Modal>
   );
 };

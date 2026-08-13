@@ -127,6 +127,7 @@ export interface SystemSettings {
   geofence_lat: number;
   geofence_lng: number;
   geofence_radius: number;
+  admin_reset_password?: string; // Password keamanan khusus buatan Admin untuk reset absensi harian
 }
 
 export type HolidayType = 'NATIONAL_HOLIDAY' | 'SCHOOL_HOLIDAY' | 'CUTI_BERSAMA' | 'OTHER';

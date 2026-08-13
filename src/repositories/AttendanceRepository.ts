@@ -41,6 +41,14 @@ export interface CorrectAttendanceDTO {
   notes?: string;
 }
 
+export interface ResetAttendanceDTO {
+  token: string;
+  target_user_id: string;
+  date: string;
+  admin_password?: string;
+  reason: string;
+}
+
 export function isNetworkOrTimeoutError(err: unknown): boolean {
   if (!err) return false;
   const msg = typeof err === 'object' && err !== null && 'message' in err
@@ -223,6 +231,45 @@ export class AttendanceRepository {
       return result;
     } catch (err) {
       logger.error('AttendanceRepository', 'correctAttendance failed:', err);
+      throw err;
+    }
+  }
+
+  public static async resetAttendance(dto: ResetAttendanceDTO): Promise<boolean> {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'OPERATOR')) {
+      logger.warn('AttendanceRepository', 'Unauthorized resetAttendance attempt by role:', currentUser?.role);
+      throw new Error('Akses Ditolak! Hanya Administrator/Operator yang diizinkan melakukan reset absensi.');
+    }
+
+    if (!dto.admin_password || dto.admin_password.trim() === '') {
+      throw new Error('Password Reset Admin wajib diisi untuk verifikasi keamanan!');
+    }
+
+    if (!dto.reason || dto.reason.trim().length < 5) {
+      throw new Error('Alasan reset presensi wajib diisi minimal 5 karakter.');
+    }
+
+    logger.info('AttendanceRepository', 'Executing resetAttendance via active provider', {
+      target_user_id: dto.target_user_id,
+      date: dto.date,
+    });
+
+    try {
+      const result = await ProviderFactory.getProvider().resetAttendance(
+        dto.target_user_id,
+        dto.date,
+        dto.admin_password,
+        dto.token
+      );
+      logger.info('AttendanceRepository', 'resetAttendance success');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('smart_absensi_scanned'));
+        window.dispatchEvent(new Event('smart_absensi_records_updated'));
+      }
+      return result;
+    } catch (err) {
+      logger.error('AttendanceRepository', 'resetAttendance failed:', err);
       throw err;
     }
   }

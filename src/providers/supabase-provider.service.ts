@@ -517,6 +517,60 @@ export class SupabaseProvider implements IDataProvider {
     return true;
   }
 
+  public async resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, _token: string): Promise<boolean> {
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'OPERATOR')) {
+      throw new Error('Akses Ditolak! Hanya Administrator/Operator yang berhak melakukan reset presensi.');
+    }
+
+    // 1. Check Admin Reset Password in settings
+    const settings = await this.getSettings();
+    if (!settings.admin_reset_password || settings.admin_reset_password.trim() === '') {
+      throw new Error(
+        'Password Reset Absensi belum diatur oleh Admin. Silakan buat/atur password reset terlebih dahulu di menu Pengaturan Sistem (Sandi Keamanan Reset Absensi Admin)!'
+      );
+    }
+
+    if (!adminPasswordInput || adminPasswordInput.trim() !== settings.admin_reset_password.trim()) {
+      throw new Error('Password Reset Absensi Admin Salah! Silakan periksa kembali password reset yang Anda masukkan.');
+    }
+
+    // 2. Delete attendance record from Supabase table
+    const { error } = await this.client
+      .from('attendance')
+      .delete()
+      .eq('user_id', targetUserId)
+      .eq('date', date);
+
+    if (error) {
+      logger.error('SupabaseProvider', 'resetAttendance failed:', error.message);
+      throw new Error('Gagal menghapus presensi di database: ' + error.message);
+    }
+
+    // 3. Clear local storage cache if resetting today's attendance
+    const todayStr = getTodayDateInJakarta();
+    if (date === todayStr && typeof window !== 'undefined') {
+      localStorage.removeItem(`smart_absensi_today_attendance_${targetUserId}_${todayStr}`);
+      const globalSaved = localStorage.getItem('smart_absensi_today_attendance');
+      if (globalSaved) {
+        try {
+          const parsed = JSON.parse(globalSaved);
+          if (parsed.user_id === targetUserId && parsed.date === todayStr) {
+            localStorage.removeItem('smart_absensi_today_attendance');
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 4. Trigger real-time UI refresh events
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    }
+
+    return true;
+  }
+
   public async getDailyAttendance(date: string, _token: string): Promise<AttendanceRecord[]> {
     const targetDate = date || getTodayDateInJakarta();
     const { data } = await this.client
@@ -820,6 +874,7 @@ export class SupabaseProvider implements IDataProvider {
       geofence_lat: map.geofence_lat ? parseFloat(map.geofence_lat) : CONSTANTS.DEFAULTS.GEOFENCE_LAT,
       geofence_lng: map.geofence_lng ? parseFloat(map.geofence_lng) : CONSTANTS.DEFAULTS.GEOFENCE_LNG,
       geofence_radius: map.geofence_radius ? parseInt(map.geofence_radius, 10) : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+      admin_reset_password: map.admin_reset_password || undefined,
     };
   }
 
@@ -837,6 +892,10 @@ export class SupabaseProvider implements IDataProvider {
       { key: 'saturday_is_holiday', value: String(settings.saturday_is_holiday) },
       { key: 'sunday_is_holiday', value: String(settings.sunday_is_holiday) },
     ];
+
+    if (settings.admin_reset_password !== undefined) {
+      updates.push({ key: 'admin_reset_password', value: settings.admin_reset_password });
+    }
 
     const { error } = await this.client.from('system_settings').upsert(updates, { onConflict: 'key' });
     if (error) throw new Error('Gagal menyimpan pengaturan di Supabase: ' + error.message);

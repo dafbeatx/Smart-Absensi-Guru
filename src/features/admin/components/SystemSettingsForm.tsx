@@ -29,6 +29,10 @@ export const SystemSettingsForm: React.FC = () => {
   const [geofenceLat, setGeofenceLat] = useState(String(CONSTANTS.DEFAULTS.GEOFENCE_LAT));
   const [geofenceLng, setGeofenceLng] = useState(String(CONSTANTS.DEFAULTS.GEOFENCE_LNG));
   const [geofenceRadius, setGeofenceRadius] = useState(String(CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS));
+
+  const [adminResetPassword, setAdminResetPassword] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isGettingGps, setIsGettingGps] = useState(false);
@@ -73,6 +77,10 @@ export const SystemSettingsForm: React.FC = () => {
           if (parsed.geofence_lat !== undefined) setGeofenceLat(sanitizeCoord(parsed.geofence_lat, true));
           if (parsed.geofence_lng !== undefined) setGeofenceLng(sanitizeCoord(parsed.geofence_lng, false));
           if (parsed.geofence_radius !== undefined) setGeofenceRadius(String(parsed.geofence_radius));
+          if (parsed.admin_reset_password) {
+            setAdminResetPassword(parsed.admin_reset_password);
+            setConfirmResetPassword(parsed.admin_reset_password);
+          }
         } catch (e) {
           console.error('Failed to parse local settings:', e);
         }
@@ -94,6 +102,10 @@ export const SystemSettingsForm: React.FC = () => {
           if (fetched.geofence_lat !== undefined) setGeofenceLat(sanitizeCoord(fetched.geofence_lat, true));
           if (fetched.geofence_lng !== undefined) setGeofenceLng(sanitizeCoord(fetched.geofence_lng, false));
           if (fetched.geofence_radius !== undefined) setGeofenceRadius(String(fetched.geofence_radius));
+          if (fetched.admin_reset_password) {
+            setAdminResetPassword(fetched.admin_reset_password);
+            setConfirmResetPassword(fetched.admin_reset_password);
+          }
 
           localStorage.setItem('smart_absensi_system_settings', JSON.stringify({
             ...fetched,
@@ -130,6 +142,12 @@ export const SystemSettingsForm: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (adminResetPassword && adminResetPassword !== confirmResetPassword) {
+      showToast('error', 'Password Reset Tidak Cocok', 'Konfirmasi password reset absensi tidak cocok dengan password yang Anda masukkan.');
+      return;
+    }
+
     setIsLoading(true);
 
     const parseCoord = (val: string, isLat: boolean): number => {
@@ -166,6 +184,7 @@ export const SystemSettingsForm: React.FC = () => {
       geofence_lat: finalLat,
       geofence_lng: finalLng,
       geofence_radius: finalRadius,
+      admin_reset_password: adminResetPassword,
     };
 
     try {
@@ -350,6 +369,54 @@ export const SystemSettingsForm: React.FC = () => {
         <p className="text-[11px] text-slate-500">
           Guru dapat melakukan absensi jika posisi GPS berada dalam radius <strong>{geofenceRadius} meter</strong> dari koordinat di atas.
         </p>
+      </div>
+
+      {/* Section 4: Password Keamanan Reset Absensi Admin */}
+      <div className="space-y-3 pt-3 border-t border-slate-100">
+        <div className="flex items-center justify-between">
+          <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">🔐 Password Keamanan Reset Absensi Admin</h4>
+          <span className="px-2.5 py-0.5 bg-red-100 text-red-800 text-[10px] font-extrabold rounded-full border border-red-200">
+            Strict Security Admin
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+          Password ini dibuat khusus oleh Anda (Admin) untuk mengamankan fitur <strong>Reset Presensi Harian</strong> (menghapus status presensi per-hari personel bilamana terjadi kekeliruan).
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-700">Password Reset Absensi Baru</label>
+            <div className="relative">
+              <input
+                type={showResetPassword ? 'text' : 'password'}
+                value={adminResetPassword}
+                onChange={(e) => setAdminResetPassword(e.target.value)}
+                placeholder="Buat password khusus reset..."
+                className="w-full bg-white border border-slate-200 rounded-xl p-2.5 pr-10 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowResetPassword(!showResetPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+              >
+                {showResetPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-700">Konfirmasi Password Reset</label>
+            <div className="relative">
+              <input
+                type={showResetPassword ? 'text' : 'password'}
+                value={confirmResetPassword}
+                onChange={(e) => setConfirmResetPassword(e.target.value)}
+                placeholder="Ulangi password reset..."
+                className="w-full bg-white border border-slate-200 rounded-xl p-2.5 pr-10 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="pt-2 flex justify-end">

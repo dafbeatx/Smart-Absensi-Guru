@@ -5,6 +5,7 @@ import { FeatureGate } from '../../../components/ui/FeatureGate';
 import { evaluateAttendanceStatus, isDateOffDay } from '../../../utils/time.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { AttendanceResetModal } from './AttendanceResetModal';
 
 export interface DailyAttendanceTrackerProps {
   teachers: UserProfile[];
@@ -28,6 +29,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+
+  const [resetModalTeacher, setResetModalTeacher] = useState<UserProfile | null>(null);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchSettings = () => {
@@ -527,6 +531,19 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                           ✏️ Koreksi
                         </button>
                       )}
+
+                      {/* Reset Presensi Shortcut for Admin */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResetModalTeacher(teacher);
+                          setIsResetModalOpen(true);
+                        }}
+                        className="px-2.5 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 text-xs font-bold rounded-xl transition-colors cursor-pointer active:scale-95 flex items-center gap-1"
+                        title="Reset Harian Absensi Personel Ini (Diperlukan Password Admin)"
+                      >
+                        <span>🔄</span> Reset
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -535,6 +552,20 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           )}
         </div>
       </div>
+
+      {/* Modal Reset Presensi Harian dengan Password Admin */}
+      <AttendanceResetModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        teachers={teachers}
+        selectedTeacherId={resetModalTeacher?.id}
+        selectedDate={selectedDate}
+        onSuccess={() => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('smart_absensi_records_updated'));
+          }
+        }}
+      />
     </div>
   );
 };
