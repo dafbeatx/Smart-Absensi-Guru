@@ -32,6 +32,7 @@ import { SyncEngine } from '../../../services/sync-engine.service';
 import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import { calculateTeacherAppreciationScore } from '../../../utils/teacher-appreciation.utils';
+import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -42,6 +43,7 @@ import type {
   LeaveRequest,
   TeacherMoodLog,
   TeacherDutySchedule,
+  TeachingSlot,
 } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
@@ -220,6 +222,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [allHolidays, setAllHolidays] = useState<HolidayRecord[]>([]);
   const [userLeaves, setUserLeaves] = useState<LeaveRequest[]>([]);
   const [isLoadingLeaves, setIsLoadingLeaves] = useState(false);
+  const [teachingSlots, setTeachingSlots] = useState<TeachingSlot[]>([]);
+  const lastChimedSlotKeyRef = useRef<string | null>(null);
 
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -485,6 +489,30 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         console.warn('Failed to load today mood:', err);
       }
 
+      // 7.5 Load Real Teaching Slots for Logged-In Teacher (No Fake AI Data!)
+      try {
+        const savedSchedules = localStorage.getItem('smart_absensi_teaching_schedules');
+        if (savedSchedules) {
+          const parsed = JSON.parse(savedSchedules);
+          if (Array.isArray(parsed)) {
+            const userSlots = parsed.filter(
+              (s: any) =>
+                s &&
+                (s.user_id === effectiveUser.id ||
+                  (effectiveUser.full_name && s.teacher_name === effectiveUser.full_name))
+            );
+            setTeachingSlots(userSlots);
+          } else {
+            setTeachingSlots([]);
+          }
+        } else {
+          setTeachingSlots([]);
+        }
+      } catch (err) {
+        console.warn('Failed to parse cached teaching schedules:', err);
+        setTeachingSlots([]);
+      }
+
       // 8. Teacher Duty Schedule Check (Jadwal Piket Guru Senin - Jumat)
       try {
         const fetchedDuty = await DutyScheduleRepository.getDutySchedules(authToken);
@@ -609,6 +637,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     todayMood,
     effectiveUser?.id
   );
+
+  // Smart Class & Duty Alarm Evaluation (No AI Fake Data!)
+  const smartAlarmStatus = evaluateSmartClassAlarm(
+    teachingSlots,
+    todayDutyDetails,
+    currentTime
+  );
+
+  // Trigger audio chime & speech announcement when entering 10-minute upcoming KBM window
+  useEffect(() => {
+    if (
+      smartAlarmStatus.type === 'UPCOMING_10MIN' &&
+      smartAlarmStatus.upcomingSlot &&
+      smartAlarmStatus.minutesUntilNext !== undefined &&
+      smartAlarmStatus.minutesUntilNext <= 10
+    ) {
+      const slotKey = `${smartAlarmStatus.upcomingSlot.id}-${smartAlarmStatus.upcomingSlot.day}-${smartAlarmStatus.minutesUntilNext}`;
+      if (lastChimedSlotKeyRef.current !== slotKey) {
+        lastChimedSlotKeyRef.current = slotKey;
+        SoundService.playNotificationChime();
+        if (smartAlarmStatus.speechText) {
+          SpeechService.speak(smartAlarmStatus.speechText);
+        }
+      }
+    }
+  }, [smartAlarmStatus]);
 
   const monthNamesIndonesian = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -1327,6 +1381,63 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </Button>
               )}
             </section>
+
+            {/* 🌟 2.5 SMART CLASS ALARM BANNER (PENGINGAT KBM & PIKET) ─────────── */}
+            <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xl shrink-0">
+                    {smartAlarmStatus.type === 'UPCOMING_10MIN' ? '⏰' :
+                     smartAlarmStatus.type === 'CURRENTLY_TEACHING' ? '📚' :
+                     smartAlarmStatus.type === 'DUTY_TODAY' ? '🛡️' : '📅'}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-xs font-black text-[#023246] tracking-tight uppercase truncate">
+                      Pengingat Smart KBM & Piket
+                    </h3>
+                    <p className="text-[10px] text-slate-500 font-semibold truncate">Alarm Persiapan Kelas Hari Ini</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    SoundService.playNotificationChime();
+                    if (smartAlarmStatus.speechText) {
+                      SpeechService.speak(smartAlarmStatus.speechText);
+                    }
+                    showToast('info', 'Tes Suara Alarm KBM', 'Suara chime dan pengingat audio berfungsi normal.');
+                  }}
+                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all active:scale-95 flex items-center gap-1 shadow-2xs shrink-0"
+                >
+                  <span>🔊 Tes Alarm</span>
+                </button>
+              </div>
+
+              <div className={`p-3 rounded-2xl border text-xs leading-relaxed space-y-1 ${
+                smartAlarmStatus.type === 'UPCOMING_10MIN'
+                  ? 'bg-amber-500/10 border-amber-400 text-amber-950 font-semibold animate-pulse'
+                  : smartAlarmStatus.type === 'CURRENTLY_TEACHING'
+                  ? 'bg-emerald-500/10 border-emerald-400 text-emerald-950 font-semibold'
+                  : smartAlarmStatus.type === 'DUTY_TODAY'
+                  ? 'bg-blue-500/10 border-blue-400 text-blue-950 font-semibold'
+                  : 'bg-slate-50 border-slate-200 text-slate-600 font-medium'
+              }`}>
+                <p className="font-extrabold text-[11px] leading-tight">{smartAlarmStatus.message}</p>
+                {smartAlarmStatus.type === 'NO_SCHEDULE' && (
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 mt-1">
+                    <span className="text-[10px] text-slate-500 italic">Jadwal resmi dikelola oleh Kurikulum / Operator.</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsScheduleModalOpen(true)}
+                      className="text-[10px] font-black text-[#0D7A5F] underline cursor-pointer"
+                    >
+                      Lihat Jadwal →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* 🌟 3. QUICK ACTION FEATURE CARDS (INTUITIVE & MINIMALIST) ─────────── */}
             <section className="grid grid-cols-3 gap-2 sm:gap-3">
