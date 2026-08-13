@@ -105,9 +105,12 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
       const map = L.map(containerRef.current, {
         center: [initialLat, initialLng],
         zoom: 17,
-        zoomControl: true,
+        zoomControl: false,
         attributionControl: false,
       });
+
+      // Add Zoom Control at top-right corner to prevent overlapping top-left legend overlay
+      L.control.zoom({ position: 'topright' }).addTo(map);
 
       // OpenStreetMap Tile Layer
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -249,7 +252,7 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
       </button>
 
       {/* Legend & Distance Header Overlay */}
-      <div className="absolute top-3 left-3 z-10 px-3 py-1.5 bg-white/95 backdrop-blur-md text-[11px] font-bold rounded-xl shadow-xs border border-[#DDD9D0] flex flex-wrap items-center gap-2 text-slate-700">
+      <div className="absolute top-3 left-3 z-10 max-w-[calc(100%-85px)] px-3 py-1.5 bg-white/95 backdrop-blur-md text-[11px] font-bold rounded-xl shadow-xs border border-[#DDD9D0] flex flex-wrap items-center gap-2 text-slate-700">
         <span className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded-full bg-[#023246]" /> Sekolah
         </span>
