@@ -1562,7 +1562,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="w-full py-2.5 px-3 bg-gradient-to-r from-[#0D7A5F] to-[#095744] hover:from-[#095744] hover:to-[#023246] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-98 cursor-pointer"
+                    className="w-full py-2.5 px-3 bg-linear-to-r from-[#0D7A5F] to-[#095744] hover:from-[#095744] hover:to-[#023246] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-98 cursor-pointer"
                   >
                     <span>🖨️</span> CETAK LAPORAN PRESENSI SAYA (PDF / EXCEL BER-QR CODE)
                   </button>

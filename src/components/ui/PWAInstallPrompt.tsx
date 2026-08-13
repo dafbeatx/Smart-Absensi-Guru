@@ -58,7 +58,7 @@ export const PWAInstallPrompt: React.FC = () => {
   return (
     <>
       {/* Sleek Floating Install Banner for Mobile & Desktop */}
-      <div className="bg-gradient-to-r from-[#023246] to-[#0d5c75] text-white p-3.5 rounded-2xl shadow-xl border border-teal-500/30 flex items-center justify-between gap-3 mb-4 animate-fade-in">
+      <div className="bg-linear-to-r from-[#023246] to-[#0d5c75] text-white p-3.5 rounded-2xl shadow-xl border border-teal-500/30 flex items-center justify-between gap-3 mb-4 animate-fade-in">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
             📱
