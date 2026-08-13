@@ -12,6 +12,7 @@ import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrection
 import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
+import { TeacherLocationCard } from '../../guru/components/TeacherLocationCard';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
@@ -1097,6 +1098,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 )}
               </div>
             </div>
+
+            {/* 📍 REAL-TIME GEOFENCE LOCATION CARD WIDGET ──────────────────── */}
+            <TeacherLocationCard onOpenScanner={handleOpenScannerClick} />
 
             {/* 🌟 1.5 TEACHER APPRECIATION & GAMIFICATION WIDGET ─────────── */}
             <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-3">

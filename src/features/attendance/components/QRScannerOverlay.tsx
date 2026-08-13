@@ -472,18 +472,18 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             </div>
           ) : gpsCoords ? (
             <div className="space-y-2">
-              <div className={`border text-xs px-4 py-2 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-bold ${
+              <div className={`border text-xs px-3.5 py-1.5 rounded-full inline-flex items-center gap-2 backdrop-blur-md font-extrabold ${
                 isWithinRadius
-                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                  : 'bg-red-500/20 border-red-500/40 text-red-300 animate-pulse'
+                  ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                  : 'bg-red-500/20 border-red-400/40 text-red-300 animate-pulse'
               }`}>
-                <span className={`w-2.5 h-2.5 rounded-full ${
-                  isWithinRadius ? 'bg-emerald-400 animate-ping' : 'bg-red-500'
+                <span className={`w-2 h-2 rounded-full ${
+                  isWithinRadius ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'
                 }`} />
                 <span>
                   {isWithinRadius
-                    ? `🟢 GPS OK: ${gpsCoords.distanceMeters}m dari Sekolah`
-                    : `🔴 Di Luar Radius: ${gpsCoords.distanceMeters}m (maks. ${allowedRadius}m)`}
+                    ? `GPS Safe: ${gpsCoords.distanceMeters}m dari Sekolah`
+                    : `Di Luar Radius: ${gpsCoords.distanceMeters}m (maks. ${allowedRadius}m)`}
                 </span>
               </div>
               
@@ -491,45 +491,57 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowLiveMap(true)}
-                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold rounded-xl backdrop-blur-md transition-all cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-xs font-bold rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>🗺️ Peta Live GPS</span>
+                  <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  <span>Peta Live</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsManualModalOpen(true)}
-                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl backdrop-blur-md transition-all cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>⌨️ Manual</span>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>Manual</span>
                 </button>
                 <button
                   type="button"
                   onClick={fetchGPSLocation}
-                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold rounded-xl backdrop-blur-md transition-all cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-xs font-bold rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>🔄 Ukur GPS</span>
+                  <svg className="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Ukur GPS</span>
                 </button>
               </div>
             </div>
           ) : null}
-          <p className="text-[11px] text-slate-400">Arahkan kamera HP Anda ke QR Code yang dipajang di sekolah</p>
+          <p className="text-[11px] text-slate-400 font-medium">Arahkan kamera HP Anda ke QR Code resmi di pintu sekolah</p>
         </div>
 
       </div>
 
       {/* Live Location OpenStreetMap Modal */}
-      <Modal isOpen={showLiveMap} onClose={() => setShowLiveMap(false)} title="🗺️ Live Map Posisi Real-time (OpenStreetMap)">
+      <Modal isOpen={showLiveMap} onClose={() => setShowLiveMap(false)} title="📍 Peta Geofence Presensi Real-Time">
         <div className="space-y-3">
           {isOfflineMode && (
-            <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">
-              ⚡ Mode Offline: radius toleransi sementara {allowedRadius}m
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">
+              ⚡ Mode Offline: Radius toleransi sementara {allowedRadius}m
             </div>
           )}
 
-          <div className="flex items-center justify-between text-xs font-medium text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-            <span>
-              Status: <b className={isWithinRadius ? 'text-emerald-600' : 'text-red-600'}>{isWithinRadius ? '🟢 Dalam Radius Safe-Zone' : '🔴 Di Luar Radius Sekolah'}</b>
-            </span>
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-[#DDD9D0]">
+            <div>
+              <span>Status: </span>
+              <strong className={isWithinRadius ? 'text-emerald-700' : 'text-red-700'}>
+                {isWithinRadius ? '🟢 Dalam Radius Safe-Zone' : '🔴 Di Luar Radius Sekolah'}
+              </strong>
+            </div>
             <span className="font-mono text-[11px] text-slate-500">
               Akurasi: ±{gpsCoords?.accuracy ? Math.round(gpsCoords.accuracy) : 0}m
             </span>
@@ -545,8 +557,8 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             height="320px"
           />
 
-          <p className="text-[11px] text-slate-500 text-center">
-            Peta berbasis <b>OpenStreetMap & Leaflet.js</b> (100% Bebas Kuota API & Gratis). Pin biru menandakan posisi HP Anda secara realtime.
+          <p className="text-[11px] text-slate-500 text-center font-medium">
+            Peta presensi berbasis OpenStreetMap &amp; Leaflet (Bebas kuota API). Pin hijau menandakan posisi fisik HP Anda.
           </p>
         </div>
       </Modal>

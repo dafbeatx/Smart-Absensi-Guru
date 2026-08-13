@@ -15,6 +15,26 @@ export interface LiveLocationMapProps {
   className?: string;
 }
 
+// Calculate Haversine distance in meters
+function calculateHaversineDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371000; // Earth radius in meters
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
 export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
   userLat,
   userLng,
@@ -34,13 +54,15 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
   const schoolMarkerRef = useRef<L.Marker | null>(null);
   const geofenceCircleRef = useRef<L.Circle | null>(null);
 
-  // Custom DivIcon definitions for crisp UI without broken asset links
+  // Custom DivIcon with SVG icons for ultra-crisp UI
   const createSchoolIcon = () =>
     L.divIcon({
       className: 'custom-school-icon',
       html: `
-        <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-[#023246] text-white shadow-xl ring-4 ring-white border border-slate-300 transform -translate-x-1/2 -translate-y-1/2">
-          <span class="text-xl">🏫</span>
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-[#023246] text-white shadow-lg ring-4 ring-white border border-[#DDD9D0] transform -translate-x-1/2 -translate-y-1/2">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11m0 0h4m-4 0H9m4 0V7m0 0h4m-4 0H9" />
+          </svg>
         </div>
       `,
       iconSize: [40, 40],
@@ -52,15 +74,18 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
       className: 'custom-user-icon',
       html: `
         <div class="relative flex items-center justify-center w-9 h-9 rounded-full ${
-          isInside ? 'bg-emerald-500' : 'bg-red-500'
-        } text-white shadow-2xl ring-4 ring-white border border-slate-200 transform -translate-x-1/2 -translate-y-1/2 animate-bounce">
-          <span class="text-lg">📍</span>
+          isInside ? 'bg-[#287A52]' : 'bg-[#B64040]'
+        } text-white shadow-xl ring-4 ring-white border border-[#DDD9D0] transform -translate-x-1/2 -translate-y-1/2">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
           <span class="absolute -top-1 -right-1 flex h-3 w-3">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full ${
               isInside ? 'bg-emerald-400' : 'bg-red-400'
             } opacity-75"></span>
             <span class="relative inline-flex rounded-full h-3 w-3 ${
-              isInside ? 'bg-emerald-600' : 'bg-red-600'
+              isInside ? 'bg-[#287A52]' : 'bg-[#B64040]'
             }"></span>
           </span>
         </div>
@@ -113,7 +138,7 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
       schoolMarkerRef.current.setLatLng([schoolLat, schoolLng]);
     } else {
       const schoolMarker = L.marker([schoolLat, schoolLng], { icon: createSchoolIcon() }).addTo(map);
-      schoolMarker.bindPopup('<b>🏫 Lokasi Utama Sekolah</b><br/>Pusat Geofence Presensi');
+      schoolMarker.bindPopup('<b>🏫 Pintu Utama Sekolah</b><br/>Pusat Geofence Presensi');
       schoolMarkerRef.current = schoolMarker;
     }
 
@@ -128,18 +153,18 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
       geofenceCircleRef.current.setLatLng([schoolLat, schoolLng]);
       geofenceCircleRef.current.setRadius(allowedRadius);
       geofenceCircleRef.current.setStyle({
-        color: isInside ? '#10B981' : '#EF4444',
-        fillColor: isInside ? '#10B981' : '#EF4444',
-        fillOpacity: 0.15,
+        color: isInside ? '#287A52' : '#B64040',
+        fillColor: isInside ? '#287A52' : '#B64040',
+        fillOpacity: 0.12,
         weight: 2,
         dashArray: '6, 6',
       });
     } else {
       const circle = L.circle([schoolLat, schoolLng], {
         radius: allowedRadius,
-        color: isInside ? '#10B981' : '#EF4444',
-        fillColor: isInside ? '#10B981' : '#EF4444',
-        fillOpacity: 0.15,
+        color: isInside ? '#287A52' : '#B64040',
+        fillColor: isInside ? '#287A52' : '#B64040',
+        fillOpacity: 0.12,
         weight: 2,
         dashArray: '6, 6',
       }).addTo(map);
@@ -153,7 +178,7 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
         userMarkerRef.current.setIcon(createUserIcon(isInside));
       } else {
         const userMarker = L.marker([userLat, userLng], { icon: createUserIcon(isInside) }).addTo(map);
-        userMarker.bindPopup('<b>📍 Lokasi Saya (Real-time)</b>');
+        userMarker.bindPopup('<b>📍 Lokasi Saya (Real-Time)</b>');
         userMarkerRef.current = userMarker;
       }
 
@@ -164,9 +189,9 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
         } else {
           const accCircle = L.circle([userLat, userLng], {
             radius: accuracy,
-            color: '#3B82F6',
-            fillColor: '#3B82F6',
-            fillOpacity: 0.1,
+            color: '#2457A6',
+            fillColor: '#2457A6',
+            fillOpacity: 0.08,
             weight: 1,
           }).addTo(map);
           accuracyCircleRef.current = accCircle;
@@ -201,65 +226,47 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
     }
   };
 
+  const calculatedDistance = userLat && userLng
+    ? calculateHaversineDistance(userLat, userLng, schoolLat, schoolLng)
+    : null;
+  const isInsideSafeZone = calculatedDistance !== null ? calculatedDistance <= allowedRadius : true;
+
   return (
-    <div className={`relative rounded-2xl overflow-hidden border border-slate-200 shadow-md ${className}`}>
+    <div className={`relative rounded-2xl overflow-hidden border border-[#DDD9D0] shadow-xs ${className}`}>
       <div ref={containerRef} style={{ height, width: '100%' }} className="z-0 bg-slate-100" />
 
       {/* Recenter Quick Action Floating Button */}
       <button
         type="button"
         onClick={handleRecenter}
-        className="absolute bottom-3 right-3 z-10 px-3 py-1.5 bg-white/90 backdrop-blur-md hover:bg-white text-slate-800 text-xs font-bold rounded-xl shadow-lg border border-slate-200 flex items-center gap-1.5 transition-all cursor-pointer"
+        className="absolute bottom-3 right-3 z-10 px-3 py-1.5 bg-white/95 backdrop-blur-md hover:bg-white text-slate-800 text-xs font-bold rounded-xl shadow-sm border border-[#DDD9D0] flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
         title="Pusatkan Peta ke Lokasi Saya"
       >
-        <span>🎯</span> Recenter
+        <svg className="w-4 h-4 text-[#023246]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8 4c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8 8 3.58 8 8z" />
+        </svg>
+        <span>Recenter</span>
       </button>
 
-      {/* Legend & Distance Badge */}
-      <div className="absolute top-3 left-3 z-10 px-3 py-1.5 bg-white/95 backdrop-blur-md text-[11px] font-bold rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center gap-2 text-slate-700">
+      {/* Legend & Distance Header Overlay */}
+      <div className="absolute top-3 left-3 z-10 px-3 py-1.5 bg-white/95 backdrop-blur-md text-[11px] font-bold rounded-xl shadow-xs border border-[#DDD9D0] flex flex-wrap items-center gap-2 text-slate-700">
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#023246]"></span> Sekolah
+          <span className="w-2.5 h-2.5 rounded-full bg-[#023246]" /> Sekolah
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Anda
+          <span className="w-2.5 h-2.5 rounded-full bg-[#287A52]" /> Anda
         </span>
-        <span className="text-slate-400">|</span>
+        <span className="text-slate-300">|</span>
         <span className="text-slate-600 font-mono">
           ⭕ {allowedRadius}m
         </span>
-        {userLat && userLng && (
+        {calculatedDistance !== null && (
           <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
-            (() => {
-              const R = 6371000;
-              const dLat = ((userLat - schoolLat) * Math.PI) / 180;
-              const dLng = ((userLng - schoolLng) * Math.PI) / 180;
-              const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos((schoolLat * Math.PI) / 180) *
-                  Math.cos((userLat * Math.PI) / 180) *
-                  Math.sin(dLng / 2) *
-                  Math.sin(dLng / 2);
-              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-              const dist = Math.round(R * c);
-              return dist <= allowedRadius
-                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                : 'bg-red-100 text-red-800 border border-red-300';
-            })()
+            isInsideSafeZone
+              ? 'bg-emerald-50 text-[#287A52] border border-emerald-200'
+              : 'bg-red-50 text-[#B64040] border border-red-200'
           }`}>
-            {(() => {
-              const R = 6371000;
-              const dLat = ((userLat - schoolLat) * Math.PI) / 180;
-              const dLng = ((userLng - schoolLng) * Math.PI) / 180;
-              const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos((schoolLat * Math.PI) / 180) *
-                  Math.cos((userLat * Math.PI) / 180) *
-                  Math.sin(dLng / 2) *
-                  Math.sin(dLng / 2);
-              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-              const dist = Math.round(R * c);
-              return dist <= allowedRadius ? `🟢 Safe (${dist}m)` : `🔴 Out (${dist}m)`;
-            })()}
+            {isInsideSafeZone ? `🟢 Safe (${calculatedDistance}m)` : `🔴 Out (${calculatedDistance}m)`}
           </span>
         )}
       </div>
