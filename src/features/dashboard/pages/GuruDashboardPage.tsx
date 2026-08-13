@@ -78,11 +78,67 @@ const UserAvatar: React.FC<{
   }
 
   return (
-    <div className={`bg-linear-to-br from-[#0D7A5F] to-[#023246] text-white flex items-center justify-center font-black ${className} ${textClassName}`}>
+    <div className={`bg-slate-800 text-white flex items-center justify-center font-black ${className} ${textClassName}`}>
       {initial}
     </div>
   );
 };
+
+// Clean UI Icons (Anti AI-Slop standard)
+const HomeIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 00-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+  </svg>
+);
+
+const ChartIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+  </svg>
+);
+
+const BellIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+  </svg>
+);
+
+const UserIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
+const DocumentTextIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const PencilSquareIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
+
+const CalendarDaysIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const KeyIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+  </svg>
+);
+
+const LogOutIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+  </svg>
+);
+
 
 export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   onOpenScanner,
@@ -553,10 +609,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const getTimeBasedGreeting = (): string => {
     const hour = new Date().getHours();
-    if (hour < 11) return '☀️ Selamat Pagi';
-    if (hour < 15) return '🌤️ Selamat Siang';
-    if (hour < 18) return '🌆 Selamat Sore';
-    return '🌙 Selamat Malam';
+    if (hour < 11) return 'Selamat Pagi';
+    if (hour < 15) return 'Selamat Siang';
+    if (hour < 18) return 'Selamat Sore';
+    return 'Selamat Malam';
   };
 
   const handleOpenScannerClick = () => {
@@ -832,7 +888,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       )}
 
       {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-[#DDD9D0] sticky top-0 z-30 shadow-2xs max-w-120 mx-auto">
+      <header className="flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-[#DDD9D0] sticky top-0 z-30 shadow-2xs w-full max-w-[480px] mx-auto">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-xs ring-2 ring-emerald-50">
             <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
@@ -841,7 +897,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             <h1 className="font-extrabold text-[#023246] text-xs tracking-tight leading-tight uppercase truncate">
               Smart Absensi Guru
             </h1>
-            <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate max-w-50">
+            <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate max-w-[200px]">
               {settings.institution_name}
             </p>
           </div>
@@ -849,12 +905,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
         <button
           onClick={() => setActiveTab('NOTIFIKASI')}
-          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 min-h-11 min-w-11 flex items-center justify-center active:scale-95"
+          className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
           aria-label="Notifikasi"
         >
-          <span className={`text-lg transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>
-            🔔
-          </span>
+          <BellIcon className={`w-5 h-5 transition-transform ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : 'text-slate-600'}`} />
           {unreadCount > 0 && (
             <span className="absolute top-1 right-1 px-1.5 py-0.2 text-[9px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white shadow-2xs animate-pulse">
               {unreadCount}
@@ -863,20 +917,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         </button>
       </header>
 
-      <main className="px-4 pt-4 pb-20 space-y-4 max-w-120 mx-auto">
+      <main className="px-4 pt-4 pb-20 space-y-4 w-full max-w-[480px] mx-auto">
         <NotificationPermissionBanner />
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
           <>
             {/* 🌟 1. MASTER UNIFIED HERO HEADER CARD ──────────────────────────── */}
-            <div className="bg-linear-to-br from-[#023246] via-[#10485E] to-[#0D7A5F] text-white rounded-3xl p-4.5 sm:p-5 shadow-lg border border-emerald-500/20 relative overflow-hidden space-y-4">
-              <div className="absolute -right-8 -top-8 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
-              <div className="absolute -left-8 -bottom-8 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-
+            <div className="bg-[#023246] text-white rounded-3xl p-4.5 sm:p-5 shadow-sm border border-slate-700/60 relative overflow-hidden space-y-4">
               {/* Profile Greeting & Avatar Row */}
               <div className="flex items-center justify-between gap-3 relative z-10">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md p-0.5 border border-white/20 text-white font-black text-xl flex items-center justify-center shadow-inner overflow-hidden shrink-0 ring-2 ring-white/10">
+                  <div className="w-12 h-12 rounded-2xl bg-white/10 p-0.5 border border-white/20 text-white font-black text-xl flex items-center justify-center overflow-hidden shrink-0 ring-2 ring-white/10">
                     <UserAvatar
                       avatarUrl={effectiveUser.avatar_url}
                       name={effectiveUser.full_name}
@@ -885,13 +936,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     />
                   </div>
                   <div className="space-y-0.5 min-w-0">
-                    <span className="text-[10px] font-extrabold text-emerald-300 tracking-wider uppercase flex items-center gap-1">
+                    <span className="text-[10px] font-extrabold text-emerald-400 tracking-wider uppercase flex items-center gap-1">
                       <span>{getTimeBasedGreeting()}</span>
                     </span>
                     <h2 className="text-sm sm:text-base font-black text-white leading-tight truncate">
                       {effectiveUser.full_name}
                     </h2>
-                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-200 truncate">
+                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-300 truncate">
                       {effectiveUser.nip ? `NPP: ${effectiveUser.nip}` : effectiveUser.position || 'Guru Pengajar'}
                     </p>
                   </div>
@@ -900,16 +951,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('PROFIL')}
-                  className="px-3 py-1.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-xs font-bold rounded-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1"
+                  className="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5 min-h-[44px]"
                 >
-                  <span>👤 Profil</span>
+                  <UserIcon className="w-4 h-4 text-emerald-300" />
+                  <span>Profil</span>
                 </button>
               </div>
 
               {/* Digital Clock & Date Row */}
-              <div className="bg-black/30 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 flex items-center justify-between gap-3 relative z-10 shadow-inner">
+              <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-white/10 flex items-center justify-between gap-3 relative z-10">
                 <div className="space-y-0.5 min-w-0">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
@@ -917,14 +969,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <span>Waktu Perangkat</span>
                   </div>
                   <p className="text-xs font-semibold text-slate-200 truncate capitalize">
-                    📅 {formattedFullDateStr}
+                    {formattedFullDateStr}
                   </p>
                 </div>
 
                 <div className="text-right shrink-0">
                   <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-white flex items-center justify-end gap-1">
                     <span>{formattedTimeStr}</span>
-                    <span className="text-[10px] font-extrabold text-emerald-300">WIB</span>
+                    <span className="text-[10px] font-extrabold text-emerald-400">WIB</span>
                   </div>
                 </div>
               </div>
@@ -932,7 +984,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               {/* Status Badges Row (Network Signal & Mood & Piket) */}
               <div className="flex flex-wrap items-center gap-2 relative z-10 pt-0.5">
                 {/* Network Signal Badge */}
-                <div className={`px-2.5 py-1 rounded-xl border text-[10px] font-extrabold backdrop-blur-md flex items-center gap-1.5 ${
+                <div className={`px-2.5 py-1 rounded-xl border text-[10px] font-extrabold flex items-center gap-1.5 ${
                   isOnline
                     ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-200'
                     : 'bg-amber-500/30 border-amber-400/50 text-amber-200 animate-pulse'
@@ -957,7 +1009,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsMoodModalOpen(true)}
-                  className="px-2.5 py-1 rounded-xl border border-white/20 bg-white/15 hover:bg-white/25 text-white text-[10px] font-extrabold backdrop-blur-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  className="px-2.5 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 text-white text-[10px] font-extrabold transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 min-h-[36px]"
                 >
                   <span>
                     {todayMood ? (
@@ -965,16 +1017,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       todayMood.mood === 'HAPPY' ? '🙂' :
                       todayMood.mood === 'NEUTRAL' ? '😐' :
                       todayMood.mood === 'TIRED' ? '😟' : '😫'
-                    ) : '💚'}
+                    ) : '💙'}
                   </span>
                   <span>{todayMood ? `Mood: ${todayMood.mood === 'VERY_HAPPY' ? 'Semangat' : todayMood.mood === 'HAPPY' ? 'Baik' : todayMood.mood === 'NEUTRAL' ? 'Biasa' : todayMood.mood === 'TIRED' ? 'Lelah' : 'Stres'}` : 'Isi Mood'}</span>
-                  <span className="text-[9px] opacity-75">✏️</span>
                 </button>
 
                 {/* Duty Piket Pill if Active Today */}
                 {isDutyTeacherToday && (
-                  <div className="px-2.5 py-1 rounded-xl border border-amber-300/40 bg-amber-500/30 text-amber-100 text-[10px] font-black backdrop-blur-md flex items-center gap-1">
-                    <span>🛡️</span>
+                  <div className="px-2.5 py-1 rounded-xl border border-amber-300/40 bg-amber-500/30 text-amber-100 text-[10px] font-black flex items-center gap-1">
                     <span>Guru Piket Hari Ini</span>
                   </div>
                 )}
@@ -1220,39 +1270,39 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             <section className="grid grid-cols-3 gap-2 sm:gap-3">
               <button
                 onClick={handleOpenLeaveModal}
-                className="p-2.5 sm:p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-1.5 sm:space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-[84px]"
               >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center text-base sm:text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
-                  📝
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                  <DocumentTextIcon className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="min-w-0 w-full">
-                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Ajukan Izin</h3>
+                  <h3 className="font-extrabold text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Ajukan Izin</h3>
                   <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Sakit / Cuti</p>
                 </div>
               </button>
 
               <button
                 onClick={handleOpenCorrectionModal}
-                className="p-2.5 sm:p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-1.5 sm:space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-[84px]"
               >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-base sm:text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
-                  ✏️
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                  <PencilSquareIcon className="w-5 h-5 text-amber-600" />
                 </div>
                 <div className="min-w-0 w-full">
-                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Koreksi Absen</h3>
+                  <h3 className="font-extrabold text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Koreksi Absen</h3>
                   <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Lapor Admin</p>
                 </div>
               </button>
 
               <button
                 onClick={() => setIsScheduleModalOpen(true)}
-                className="p-2.5 sm:p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs transition-all text-left flex flex-col items-start justify-between space-y-1.5 sm:space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full"
+                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-[84px]"
               >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-50 text-[#0D7A5F] border border-emerald-200 flex items-center justify-center text-base sm:text-lg font-bold group-hover:scale-105 transition-transform shrink-0 shadow-2xs">
-                  📅
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                  <CalendarDaysIcon className="w-5 h-5 text-emerald-700" />
                 </div>
                 <div className="min-w-0 w-full">
-                  <h3 className="font-black text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Jadwal Kelas</h3>
+                  <h3 className="font-extrabold text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Jadwal Kelas</h3>
                   <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Jam Mengajar</p>
                 </div>
               </button>
@@ -1677,17 +1727,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <Button
                   variant="secondary"
                   onClick={() => setIsChangePinOpen(true)}
-                  className="w-full text-xs font-extrabold py-2.5 flex items-center justify-center gap-2 cursor-pointer rounded-xl"
+                  leftIcon={<KeyIcon className="w-4 h-4 text-slate-700" />}
+                  className="w-full text-xs font-extrabold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-[44px]"
                 >
-                  <span>🔑</span> UBAH PIN KEAMANAN 6-DIGIT
+                  UBAH PIN KEAMANAN 6-DIGIT
                 </Button>
 
                 <Button
                   variant="danger"
                   onClick={logout}
-                  className="w-full text-xs font-extrabold py-2.5 flex items-center justify-center gap-2 cursor-pointer rounded-xl"
+                  leftIcon={<LogOutIcon className="w-4 h-4 text-white" />}
+                  className="w-full text-xs font-extrabold py-3 flex items-center justify-center gap-2 cursor-pointer rounded-xl min-h-[44px]"
                 >
-                  <span>🚪</span> KELUAR DARI AKUN (LOGOUT)
+                  KELUAR DARI AKUN (LOGOUT)
                 </Button>
               </div>
             </div>
@@ -1696,25 +1748,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       </main>
 
       {/* ── MOBILE BOTTOM NAVIGATION DOCK (Compact & Sleek) ── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-120 mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-1 z-40 shadow-2xl rounded-t-2xl ring-1 ring-black/5">
+      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-[480px] mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-1.5 z-40 shadow-xl rounded-t-2xl">
         <div className="flex items-center justify-around relative">
           <button
             onClick={() => setActiveTab('BERANDA')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-0.5 transition-all cursor-pointer active:scale-95 ${
-              activeTab === 'BERANDA' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-[44px] justify-center active:scale-95 ${
+              activeTab === 'BERANDA' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-base leading-none">🏠</span>
+            <HomeIcon className={`w-5 h-5 ${activeTab === 'BERANDA' ? 'text-[#023246]' : 'text-slate-400'}`} />
             <span>Beranda</span>
           </button>
 
           <button
             onClick={() => setActiveTab('RIWAYAT')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-0.5 transition-all cursor-pointer active:scale-95 ${
-              activeTab === 'RIWAYAT' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-[44px] justify-center active:scale-95 ${
+              activeTab === 'RIWAYAT' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-base leading-none">📊</span>
+            <ChartIcon className={`w-5 h-5 ${activeTab === 'RIWAYAT' ? 'text-[#023246]' : 'text-slate-400'}`} />
             <span>Riwayat</span>
           </button>
 
@@ -1722,36 +1774,36 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <div className="relative -top-3 flex flex-col items-center">
             <button
               onClick={handleOpenScannerClick}
-              className="w-12 h-12 rounded-xl bg-linear-to-tr from-[#023246] to-[#0D7A5F] text-white flex items-center justify-center shadow-md shadow-[#023246]/30 ring-3 ring-white active:scale-95 transition-transform cursor-pointer"
+              className="w-12 h-12 rounded-2xl bg-[#023246] hover:bg-[#0D7A5F] text-white flex items-center justify-center shadow-md ring-4 ring-white active:scale-95 transition-all cursor-pointer min-h-[48px] min-w-[48px]"
               title="Pindai QR Code Absensi"
             >
-              <QrCodeScanIcon className="w-5.5 h-5.5 text-white" />
+              <QrCodeScanIcon className="w-6 h-6 text-white" />
             </button>
             <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Scan QR</span>
           </div>
 
           <button
             onClick={() => setActiveTab('NOTIFIKASI')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-0.5 transition-all cursor-pointer relative active:scale-95 ${
-              activeTab === 'NOTIFIKASI' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer relative min-h-[44px] justify-center active:scale-95 ${
+              activeTab === 'NOTIFIKASI' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
             {unreadCount > 0 && (
-              <span className="absolute -top-1 right-2 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white animate-pulse">
+              <span className="absolute top-0.5 right-2 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white animate-pulse">
                 {unreadCount}
               </span>
             )}
-            <span className={`text-base leading-none ${unreadCount > 0 ? 'animate-bell-ring text-amber-500' : ''}`}>🔔</span>
+            <BellIcon className={`w-5 h-5 ${activeTab === 'NOTIFIKASI' ? 'text-[#023246]' : unreadCount > 0 ? 'text-amber-500 animate-bell-ring' : 'text-slate-400'}`} />
             <span>Notif</span>
           </button>
 
           <button
             onClick={() => setActiveTab('PROFIL')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] w-14 py-0.5 transition-all cursor-pointer active:scale-95 ${
-              activeTab === 'PROFIL' ? 'text-[#023246] font-black scale-105' : 'text-slate-400 font-semibold hover:text-slate-600'
+            className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-[44px] justify-center active:scale-95 ${
+              activeTab === 'PROFIL' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
           >
-            <span className="text-base leading-none">👤</span>
+            <UserIcon className={`w-5 h-5 ${activeTab === 'PROFIL' ? 'text-[#023246]' : 'text-slate-400'}`} />
             <span>Profil</span>
           </button>
         </div>
