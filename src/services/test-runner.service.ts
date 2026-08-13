@@ -10,6 +10,7 @@ import { runAuditWhatsAppTestSuite } from './__tests__/audit-whatsapp.test';
 import { runFeatureFlagsTestSuite } from '../config/__tests__/feature-flags.test';
 import { runSecurityConsistencyTestSuite } from './__tests__/security-consistency.test';
 import { runGroqAITestSuite } from './__tests__/groq-ai.test';
+import { runPWAGeofenceTestSuite } from './__tests__/pwa-geofence.test';
 
 export interface TestResultItem {
   testName: string;
@@ -49,6 +50,7 @@ export class MasterTestRunner {
       { name: 'Feature Flag System', fn: runFeatureFlagsTestSuite },
       { name: 'Groq AI Engine & Smart Assistant', fn: runGroqAITestSuite },
       { name: 'Security & Consistency Engine', fn: runSecurityConsistencyTestSuite },
+      { name: 'PWA & Interactive Geofence Map', fn: runPWAGeofenceTestSuite },
     ];
 
     let totalPassed = 0;

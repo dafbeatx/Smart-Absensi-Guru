@@ -27,6 +27,7 @@ import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
 import { VoiceSettingsCard } from '../../../components/dashboard/VoiceSettingsCard';
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
+import { PWAInstallPrompt } from '../../../components/ui/PWAInstallPrompt';
 import { NotificationService } from '../../../services/notification-permission.service';
 import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
@@ -984,6 +985,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
       <main className="px-4 pt-4 pb-20 space-y-4 w-full max-w-120 mx-auto">
         <NotificationPermissionBanner />
+        <PWAInstallPrompt />
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
           <>
