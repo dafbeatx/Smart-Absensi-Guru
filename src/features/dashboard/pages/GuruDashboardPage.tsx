@@ -12,6 +12,7 @@ import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrection
 import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
+import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { GPSService } from '../../../services/gps.service';
@@ -179,6 +180,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Change PIN Form State
   const [newPin, setNewPin] = useState('');
@@ -1554,6 +1556,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                   </div>
 
+                  {/* Cetak Rekap Mandiri PDF/Excel Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsExportModalOpen(true)}
+                    className="w-full py-2.5 px-3 bg-gradient-to-r from-[#0D7A5F] to-[#095744] hover:from-[#095744] hover:to-[#023246] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-98 cursor-pointer"
+                  >
+                    <span>🖨️</span> CETAK LAPORAN PRESENSI SAYA (PDF / EXCEL BER-QR CODE)
+                  </button>
+
                   {/* View Mode Toggle Switcher: CALENDAR vs LIST */}
                   <div className="flex items-center justify-between gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/80">
                     <span className="text-[11px] font-extrabold text-slate-700 pl-1">
@@ -2176,6 +2187,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           const todayStr = getTodayDateInJakarta();
           provider.getTodayTeacherMood(effectiveUser.id, todayStr, token || undefined).then((m) => setTodayMood(m));
         }}
+      />
+
+      {/* Export Report Modal for Self PDF/Excel Download */}
+      <ExportReportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        teachers={[effectiveUser]}
+        attendanceRecords={attendanceHistory}
+        leaveRequests={userLeaves}
+        defaultTeacherId={effectiveUser.id}
       />
     </div>
   );
