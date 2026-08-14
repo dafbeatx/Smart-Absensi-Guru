@@ -59,12 +59,36 @@ export class MockProvider implements IDataProvider {
     let name = 'Guru Pengajar, S.Pd';
     let position = 'Guru Utama / Pendidik';
     let nip: string | null = null;
+    let userId = 'usr_' + role.toLowerCase() + '_1001';
 
-    if (dto.identity.toUpperCase().includes('KEPSEK') || dto.identity.startsWith('1975')) {
+    // Official 11 Users Lookup Table (from SEED_USERS.sql)
+    const officialTeachers: Record<string, { id: string; name: string; role: 'GURU' | 'KEPSEK' | 'ADMIN'; position: string }> = {
+      '081947674030': { id: 'usr_guru_002', name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', role: 'GURU', position: 'Wakasek Sarana dan Prasarana' },
+      '085716117717': { id: 'usr_kepsek_002', name: 'Farhan Sopian Sahid, S.Pd.I', role: 'KEPSEK', position: 'Kepala Sekolah' },
+      '081213134916': { id: 'usr_guru_003', name: 'Adi Prasetyo, S.Pd., G.r', role: 'GURU', position: 'Guru Mapel Bahasa Inggris' },
+      '081802107009': { id: 'usr_op_002', name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', role: 'ADMIN', position: 'Operator Sekolah' },
+      '08159185700':  { id: 'usr_guru_004', name: 'Mira Nurdianti, S.Pd', role: 'GURU', position: 'Tata Usaha (TU)' },
+      '0881024136818':{ id: 'usr_guru_005', name: 'Fitri Ani Rahayu', role: 'GURU', position: 'Guru Mapel Matematika' },
+      '089611651623': { id: 'usr_guru_006', name: 'Nurul Fahriya, S.Pd., G.r', role: 'GURU', position: 'Wakasek Kurikulum' },
+      '08989462357':  { id: 'usr_guru_007', name: 'Septi Nur Aeni, S.E', role: 'GURU', position: 'Guru Mapel B. Indonesia' },
+      '081646035486': { id: 'usr_guru_008', name: 'Windiani, S.E., G.r', role: 'GURU', position: 'Bendahara Sekolah' },
+      '085885460842': { id: 'usr_guru_009', name: 'Widianingsih, S.Si., G.r', role: 'GURU', position: 'Guru Mapel IPA' },
+      '085122948690': { id: 'usr_guru_010', name: 'Mawar Andinia, S.Pd., G.r', role: 'GURU', position: 'Bimbingan Konseling (BK)' },
+    };
+
+    const foundOfficial = officialTeachers[dto.identity.trim()];
+
+    if (foundOfficial) {
+      role = foundOfficial.role;
+      name = foundOfficial.name;
+      position = foundOfficial.position;
+      userId = foundOfficial.id;
+    } else if (dto.identity.toUpperCase().includes('KEPSEK') || dto.identity.startsWith('1975')) {
       role = 'KEPSEK';
       name = 'Drs. H. M. Yusuf, M.Pd.';
       position = 'Kepala Sekolah Utama';
       nip = null;
+      userId = 'usr_kepsek_1001';
     } else if (
       dto.identity.toUpperCase().includes('ADMIN') ||
       dto.identity.toUpperCase().includes('OPERATOR') ||
@@ -75,10 +99,11 @@ export class MockProvider implements IDataProvider {
       name = 'Rina Fitriani, S.Kom.';
       position = 'Admin Website & IT Sekolah';
       nip = null;
+      userId = 'usr_admin_1001';
     }
 
     const mockUser: UserProfile = {
-      id: 'usr_' + role.toLowerCase() + '_1001',
+      id: userId,
       nip: nip,
       full_name: name,
       phone_number: dto.identity,

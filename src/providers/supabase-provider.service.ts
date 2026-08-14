@@ -8,6 +8,7 @@ import type {
   SystemSettings,
   HolidayRecord,
   AttendanceStatus,
+  AttendanceAction,
   LeaveType,
   ApprovalStatus,
   HolidayType,
@@ -100,11 +101,6 @@ export class SupabaseProvider implements IDataProvider {
     };
   }
 
-  private isUuid(str?: string | null): boolean {
-    if (!str) return false;
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-  }
-
   public async verifySession(token: string): Promise<UserProfile> {
     const activeUser = useAuthStore.getState().user;
     const parts = token.split('_');
@@ -113,11 +109,10 @@ export class SupabaseProvider implements IDataProvider {
 
     if (searchId) {
       const filters: string[] = [];
-      if (this.isUuid(searchId)) {
-        filters.push(`id.eq.${searchId}`);
-      }
-      if (activeUser?.nip || (!this.isUuid(searchId) && searchId)) {
-        filters.push(`nip.eq.${activeUser?.nip || searchId}`);
+      // Support both UUIDs and custom string IDs (e.g., usr_guru_007)
+      filters.push(`id.eq.${searchId}`);
+      if (activeUser?.nip && activeUser.nip !== searchId) {
+        filters.push(`nip.eq.${activeUser.nip}`);
       }
       if (activeUser?.phone_number) {
         filters.push(`phone_number.eq.${activeUser.phone_number}`);
@@ -250,11 +245,11 @@ export class SupabaseProvider implements IDataProvider {
     // Verifikasi user exist di public.users sebelum insert
     // (mencegah FK violation jika user preview / token kadaluarsa / akun dibuat di local store)
     const scanUserFilters: string[] = [];
-    if (this.isUuid(userId)) {
+    if (userId) {
       scanUserFilters.push(`id.eq.${userId}`);
     }
-    if (sessionUser?.nip || (!this.isUuid(userId) && userId)) {
-      scanUserFilters.push(`nip.eq.${sessionUser?.nip || userId}`);
+    if (sessionUser?.nip && sessionUser.nip !== userId) {
+      scanUserFilters.push(`nip.eq.${sessionUser.nip}`);
     }
     if (sessionUser?.phone_number) {
       scanUserFilters.push(`phone_number.eq.${sessionUser.phone_number}`);
@@ -319,6 +314,15 @@ export class SupabaseProvider implements IDataProvider {
 
     const attId = `att_${userId}_${todayStr}`;
 
+    // Determine check-out open time based on day of week (Friday vs Monday-Thursday)
+    const dayOfWeek = new Date().getDay(); // 5 = Friday
+    const targetCheckoutStart = dayOfWeek === 5
+      ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
+      : (settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
+
+    const checkoutStartMin = timeToMinutes(targetCheckoutStart);
+    const isCheckoutWindow = currentMin >= checkoutStartMin;
+
     // Check if user has already checked in today
     const { data: existing } = await this.client
       .from('attendance')
@@ -341,13 +345,6 @@ export class SupabaseProvider implements IDataProvider {
           };
         }
 
-        // Determine check-out open time based on day of week (Friday vs Monday-Thursday)
-        const dayOfWeek = new Date().getDay(); // 5 = Friday
-        const targetCheckoutStart = dayOfWeek === 5
-          ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
-          : (settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
-
-        const checkoutStartMin = timeToMinutes(targetCheckoutStart);
         const isEarlyCheckout = currentMin < checkoutStartMin;
         const checkoutLabel = isEarlyCheckout
           ? `${timeStr} WIB (Pulang Awal < ${targetCheckoutStart})`
@@ -391,13 +388,13 @@ export class SupabaseProvider implements IDataProvider {
     );
 
     if (error) {
-      throw new Error('Gagal menyimpan absensi ke Supabase: ' + error.message);
+      throw new Error('Gagal menyimpan data absensi ke Supabase: ' + error.message);
     }
 
     return {
       attendance_id: attId,
       status: status,
-      timestamp: `${timeStr} WIB`,
+      timestamp: `${timeStr} WIB (Absen Masuk)`,
       distance_meters: distanceMeters,
       geofence_verified: true,
       attendance_action: 'CHECK_IN',
