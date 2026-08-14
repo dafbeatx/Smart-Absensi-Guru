@@ -108,7 +108,7 @@ class PWAService {
   /**
    * Schedule local attendance push reminder via Service Worker
    */
-  public scheduleAttendanceReminder(title: string, body: string, delayMs: number) {
+  public scheduleAttendanceReminder(title: string, body: string, delayMs: number, tag?: string) {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
     if (navigator.serviceWorker.controller) {
@@ -117,6 +117,7 @@ class PWAService {
         title,
         body,
         delayMs,
+        tag: tag || 'checkout-reminder',
       });
     }
   }

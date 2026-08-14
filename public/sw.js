@@ -149,14 +149,19 @@ self.addEventListener('notificationclick', (event) => {
 // Message Event from Client (Scheduled Attendance Alarm Trigger)
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SCHEDULE_ATTENDANCE_REMINDER') {
-    const { title, body, delayMs } = event.data;
+    const { title, body, delayMs, tag } = event.data;
     setTimeout(() => {
-      self.registration.showNotification(title || '🔔 Pengingat Presensi Sekolah', {
-        body: body || 'Jangan lupa melakukan presensi masuk/pulang hari ini.',
+      self.registration.showNotification(title || '🔔 Waktu Pulang Sekolah Tiba!', {
+        body: body || 'Jangan lupa scan QR / Absen Pulang sebelum meninggalkan area sekolah.',
         icon: '/pwa-192x192.png',
         badge: '/pwa-192x192.png',
-        vibrate: [200, 100, 200],
-        tag: 'attendance-reminder',
+        vibrate: [200, 100, 200, 100, 200],
+        tag: tag || 'checkout-reminder',
+        requireInteraction: true,
+        actions: [
+          { action: 'open_app', title: '📱 Absen Pulang Sekarang' },
+          { action: 'close', title: 'Tutup' },
+        ],
       });
     }, delayMs || 0);
   }

@@ -1,4 +1,5 @@
 import { pwaService } from '../pwa.service';
+import { NotificationService } from '../notification-permission.service';
 import { getEffectiveAllowedRadius, calculateDistanceMeters } from '../../utils/geofence.utils';
 import type { TestSuiteResult } from '../test-runner.service';
 
@@ -50,6 +51,26 @@ export async function runPWAGeofenceTestSuite(): Promise<TestSuiteResult> {
     scheduleSafe = false;
   }
   assert('PWA Service - scheduleAttendanceReminder executes without error in non-browser env', scheduleSafe);
+
+  // 7. Day-of-Week Checkout Target Schedule Rule (Senin-Kamis 13.00 vs Jumat 11.00)
+  const mondayThursdayDate = new Date('2026-08-13T08:00:00'); // Thursday (day 4)
+  const fridayDate = new Date('2026-08-14T08:00:00'); // Friday (day 5)
+
+  const monThuTarget = NotificationService.getCheckoutTargetTimeForDate(mondayThursdayDate);
+  const friTarget = NotificationService.getCheckoutTargetTimeForDate(fridayDate);
+
+  assert('Checkout Schedule - Monday-Thursday target time is 13:00', monThuTarget.hours === 13 && monThuTarget.minutes === 0);
+  assert('Checkout Schedule - Friday target time is 11:00', friTarget.hours === 11 && friTarget.minutes === 0);
+
+  // 8. NotificationService Schedule & Cancel Checkout Reminder Safety
+  let notifScheduleSafe = true;
+  try {
+    NotificationService.scheduleCheckoutReminder('Guru Test', 'user-123');
+    NotificationService.cancelScheduledCheckoutReminder();
+  } catch (e) {
+    notifScheduleSafe = false;
+  }
+  assert('NotificationService - scheduleCheckoutReminder and cancel execute safely', notifScheduleSafe);
 
   return {
     suiteName: 'PWA & Interactive Geofence Map',

@@ -8,7 +8,6 @@ import type {
   SystemSettings,
   HolidayRecord,
   AttendanceStatus,
-  AttendanceAction,
   LeaveType,
   ApprovalStatus,
   HolidayType,
@@ -345,7 +344,7 @@ export class SupabaseProvider implements IDataProvider {
           };
         }
 
-        const isEarlyCheckout = currentMin < checkoutStartMin;
+        const isEarlyCheckout = !isCheckoutWindow;
         const checkoutLabel = isEarlyCheckout
           ? `${timeStr} WIB (Pulang Awal < ${targetCheckoutStart})`
           : `${timeStr} WIB (Absen Pulang)`;

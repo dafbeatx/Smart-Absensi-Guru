@@ -4,6 +4,7 @@
  */
 
 import { SoundService } from './audio.service';
+import { pwaService } from './pwa.service';
 
 export interface AttendanceNotificationPayload {
   id?: string;
@@ -303,6 +304,95 @@ class NotificationPermissionService {
       teacherName,
       roleTarget: 'ADMIN',
     });
+  }
+
+  private activeCheckoutTimer: any = null;
+
+  /**
+   * Dapatkan Jam Target Pulang berdasarkan hari (Senin-Kamis 13.00, Jumat 11.00)
+   */
+  public getCheckoutTargetTimeForDate(date: Date = new Date()): { hours: number; minutes: number; label: string } {
+    const dayOfWeek = date.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+    if (dayOfWeek === 5) {
+      return { hours: 11, minutes: 0, label: '11.00 WIB (Jumat)' };
+    }
+    return { hours: 13, minutes: 0, label: '13.00 WIB (Senin - Kamis)' };
+  }
+
+  /**
+   * Menjadwalkan Automatic Local Push Notification & PWA Alarm Presensi Pulang
+   * Dipanggil secara otomatis saat Guru berhasil melakukan Absen Masuk
+   */
+  public scheduleCheckoutReminder(teacherName: string, userId?: string) {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const targetInfo = this.getCheckoutTargetTimeForDate(now);
+
+    const targetTime = new Date();
+    targetTime.setHours(targetInfo.hours, targetInfo.minutes, 0, 0);
+
+    const delayMs = Math.max(0, targetTime.getTime() - now.getTime());
+    const notifTitle = '🔔 Waktu Pulang Sekolah Tiba!';
+    const notifBody = `Waktu Pulang Sekolah Tiba! Bapak/Ibu ${teacherName}, jangan lupa scan QR / Absen Pulang sebelum meninggalkan area sekolah.`;
+
+    // 1. Send schedule message to PWA Service Worker
+    pwaService.scheduleAttendanceReminder(notifTitle, notifBody, delayMs, 'checkout-reminder');
+
+    // 2. Clear previous active window timer & setup new one
+    if (this.activeCheckoutTimer) {
+      clearTimeout(this.activeCheckoutTimer);
+      this.activeCheckoutTimer = null;
+    }
+
+    const fireReminder = () => {
+      this.sendNativeNotification({
+        title: notifTitle,
+        body: notifBody,
+        type: 'CHECK_OUT',
+        teacherName,
+        userId,
+        roleTarget: 'GURU',
+      });
+      this.saveCheckoutReminderState({ teacherName, userId, dateStr: todayStr, isFired: true });
+    };
+
+    if (delayMs <= 0) {
+      fireReminder();
+    } else {
+      this.activeCheckoutTimer = setTimeout(fireReminder, delayMs);
+      this.saveCheckoutReminderState({
+        teacherName,
+        userId,
+        dateStr: todayStr,
+        isFired: false,
+        targetTimeIso: targetTime.toISOString(),
+      });
+    }
+  }
+
+  /**
+   * Membatalkan Alarm / Pengingat Pulang setelah Guru berhasil melakukan Absen Pulang
+   */
+  public cancelScheduledCheckoutReminder() {
+    if (this.activeCheckoutTimer) {
+      clearTimeout(this.activeCheckoutTimer);
+      this.activeCheckoutTimer = null;
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('smart_absensi_scheduled_checkout_reminder');
+    }
+  }
+
+  /**
+   * Helper internal menyimpan state reminder ke localStorage
+   */
+  private saveCheckoutReminderState(data: { teacherName: string; userId?: string; dateStr: string; isFired: boolean; targetTimeIso?: string }) {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('smart_absensi_scheduled_checkout_reminder', JSON.stringify(data));
+    } catch (e) {
+      console.warn('Failed to save checkout reminder state:', e);
+    }
   }
 
   /**

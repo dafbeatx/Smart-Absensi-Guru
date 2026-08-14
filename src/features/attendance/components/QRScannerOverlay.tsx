@@ -323,8 +323,10 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
     if (returnedAction === 'CHECK_OUT') {
       NotificationService.notifyTeacherCheckOut(teacherName, timestampStr, userId);
+      NotificationService.cancelScheduledCheckoutReminder();
     } else {
       NotificationService.notifyTeacherCheckIn(teacherName, timestampStr, userId);
+      NotificationService.scheduleCheckoutReminder(teacherName, userId);
     }
 
     const isLate = returnedStatus === 'TERLAMBAT';
