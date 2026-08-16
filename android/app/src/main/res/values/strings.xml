@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Smart Absensi Guru</string>
+    <string name="title_activity_main">Smart Absensi Guru</string>
+    <string name="package_name">com.smartabsensi.guru</string>
+    <string name="custom_url_scheme">com.smartabsensi.guru</string>
+</resources>
