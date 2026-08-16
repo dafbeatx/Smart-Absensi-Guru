@@ -76,6 +76,19 @@ export const App: React.FC = () => {
   const userRole = user?.role;
 
   useEffect(() => {
+    // Android Hardware Back Button Listener (Capacitor Native)
+    import('@capacitor/app')
+      .then(({ App: CapApp }) => {
+        CapApp.addListener('backButton', ({ canGoBack }) => {
+          if (!canGoBack) {
+            CapApp.exitApp();
+          } else {
+            window.history.back();
+          }
+        }).catch(console.warn);
+      })
+      .catch(() => {});
+
     if (isAuthenticated && token) {
       AuthRepository.verifySession(token)
         .then((latestUser) => {
