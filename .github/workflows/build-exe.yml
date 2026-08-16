@@ -1,0 +1,37 @@
+name: Build Windows Desktop App (EXE)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-windows-exe:
+    name: Build Windows EXE Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: 📦 Install Node Dependencies
+        run: npm ci
+
+      - name: 🏗️ Build Web Assets
+        run: npm run build
+
+      - name: 💻 Compile Windows Executable (.exe)
+        run: npx --yes electron-builder --win --config electron-builder.json
+
+      - name: 📤 Upload Windows EXE Installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: Smart-Absensi-Guru-Windows-EXE
+          path: release/*.exe

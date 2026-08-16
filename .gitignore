@@ -11,6 +11,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+release
+dist-electron
 
 # Environment Variables (Secrets - DO NOT COMMIT TO GIT)
 .env
