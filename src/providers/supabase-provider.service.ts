@@ -39,12 +39,13 @@ export class SupabaseProvider implements IDataProvider {
     const url =
       (typeof import.meta !== 'undefined' && import.meta.env
         ? (import.meta.env.VITE_SUPABASE_URL as string)
-        : '') || 'https://YOUR_SUPABASE_PROJECT_ID.supabase.co';
+        : '') || 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
 
     const key =
       (typeof import.meta !== 'undefined' && import.meta.env
         ? (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
-        : '') || 'YOUR_SUPABASE_ANON_KEY';
+        : '') ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
 
     this.client = createClient(url, key);
   }

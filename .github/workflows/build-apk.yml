@@ -39,6 +39,10 @@ jobs:
         run: npm install
 
       - name: Build Web Assets
+        env:
+          VITE_PROVIDER: "supabase"
+          VITE_SUPABASE_URL: "https://fwhdjqvtjzesbdcqorsn.supabase.co"
+          VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY"
         run: npm run build
 
       - name: Sync Capacitor Android
