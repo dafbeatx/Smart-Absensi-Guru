@@ -1,0 +1,5 @@
+# Salin file ini menjadi key.properties di folder android/app/ untuk membuat APK Release bertanda tangan sah
+storePassword=password_keystore_anda
+keyPassword=password_alias_anda
+keyAlias=smartabsensi
+storeFile=release-key.keystore
