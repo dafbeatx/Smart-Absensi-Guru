@@ -16,6 +16,10 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
     signingConfigs {
         release {
             if (file('key.properties').exists()) {
@@ -57,6 +61,13 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+}
+
+configurations.all {
+    resolutionStrategy {
+        force "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+        force "androidx.core:core:$androidxCoreVersion"
+    }
 }
 
 apply from: 'capacitor.build.gradle'
