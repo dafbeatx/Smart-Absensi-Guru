@@ -30,15 +30,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install Android SDK Components
+      - name: Accept Licenses & Install Android 35 SDK
         run: |
-          sdkmanager --list | grep "platforms;android-" | head -20
-          sdkmanager --list | grep "build-tools;" | head -20
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools" || true
-          sdkmanager "platforms;android-36" || true
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
       - name: Install Node Dependencies
         run: npm ci
@@ -54,7 +49,7 @@ jobs:
 
       - name: Build Debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --stacktrace 2>&1 | tail -100
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         if: success()
