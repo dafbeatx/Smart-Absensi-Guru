@@ -33,9 +33,12 @@ jobs:
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Install Android SDK Build Tools and Platforms
+      - name: Install Android SDK Components
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager --list | grep "platforms;android-" | head -20
+          sdkmanager --list | grep "build-tools;" | head -20
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools" || true
+          sdkmanager "platforms;android-36" || true
 
       - name: Install Node Dependencies
         run: npm ci
@@ -51,9 +54,10 @@ jobs:
 
       - name: Build Debug APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace 2>&1 | tail -100
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Smart-Absensi-Guru-APK
