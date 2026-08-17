@@ -116,20 +116,30 @@ export class GPSService {
           const accuracyBuffer = Math.min(Math.round(accuracy / 2), 30);
           const effectiveDistance = Math.max(0, rawDistance - accuracyBuffer);
 
-          this.cachedFix = {
-            coords: {
-              latitude: lat,
-              longitude: lng,
-              accuracy,
-              distanceMeters: effectiveDistance,
-              isMock: mockCheck.isMock,
-              mockReason: mockCheck.reason,
-              speed: position.coords.speed,
-              altitude: position.coords.altitude,
-              heading: position.coords.heading,
-            },
-            timestamp: Date.now(),
+          const newCoords: GPSCoordinates = {
+            latitude: lat,
+            longitude: lng,
+            accuracy,
+            distanceMeters: effectiveDistance,
+            isMock: mockCheck.isMock,
+            mockReason: mockCheck.reason,
+            speed: position.coords.speed,
+            altitude: position.coords.altitude,
+            heading: position.coords.heading,
           };
+
+          // Progressive settling: prefer higher accuracy fixes over coarse fixes
+          if (
+            !this.cachedFix ||
+            accuracy <= this.cachedFix.coords.accuracy ||
+            accuracy <= CONSTANTS.DEFAULTS.GPS_MAX_ALLOWED_ACCURACY_METERS ||
+            Date.now() - this.cachedFix.timestamp > 15000
+          ) {
+            this.cachedFix = {
+              coords: newCoords,
+              timestamp: Date.now(),
+            };
+          }
           logger.info('GPSService', 'Background GPS warm-up fix updated:', this.cachedFix.coords);
         },
         (err) => {
@@ -137,8 +147,8 @@ export class GPSService {
         },
         {
           enableHighAccuracy: true,
-          maximumAge: 10000,
-          timeout: 10000,
+          maximumAge: 0, // Force fresh satellite/device reading, avoid stale iOS cellular cache
+          timeout: 15000,
         }
       );
     } catch (e) {
@@ -198,6 +208,8 @@ export class GPSService {
         return { status: 'READY', text: `🟢 GPS Siap (${acc}m)`, accuracy: acc };
       } else if (acc <= maxAcc) {
         return { status: 'READY', text: `🟡 Sinyal Cukup (${acc}m)`, accuracy: acc };
+      } else if (acc > 500) {
+        return { status: 'REFINING', text: `🔴 Lokasi Kasar (${acc}m) - Cek "Lokasi Tepat"`, accuracy: acc };
       }
       return { status: 'REFINING', text: `🔴 Akurasi Lemah (${acc}m > ${maxAcc}m)...`, accuracy: acc };
     }
@@ -262,15 +274,15 @@ export class GPSService {
   }
 
   /**
-   * Takes a single raw geolocation sample and wraps it as a Promise.
+   * Takes a single raw geolocation sample with hardware GPS priority and wraps it as a Promise.
    */
   private static takeSingleSample(
     schoolLat: number,
     schoolLng: number,
-    timeoutMs: number
+    timeoutMs = 8000
   ): Promise<GPSCoordinates> {
     return new Promise((resolve, reject) => {
-      // Stage 1: High Accuracy (Hardware Satellite GPS)
+      // Stage 1: High Accuracy (Hardware Satellite GNSS GPS) with maximumAge = 0 to prevent stale cellular cache on iOS
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const mockCheck = GPSService.detectMockLocation(position, this.cachedFix);
@@ -295,15 +307,15 @@ export class GPSService {
           });
         },
         (primaryErr) => {
-          logger.warn('GPSService', 'High-accuracy GPS sample failed/timed out, trying standard accuracy fallback:', primaryErr?.message || primaryErr);
+          logger.warn('GPSService', 'High-accuracy GPS sample attempt failed/timed out:', primaryErr?.message || primaryErr);
           
-          // Stage 2: Fallback Standard Accuracy (WiFi / Cell Triangulation for Android / MIUI compatibility)
+          // Re-attempt once with high accuracy if primary timed out (do not fallback to low-accuracy coarse cell-tower)
           navigator.geolocation.getCurrentPosition(
-            (fallbackPos) => {
-              const mockCheck = GPSService.detectMockLocation(fallbackPos, this.cachedFix);
-              const lat = fallbackPos.coords.latitude;
-              const lng = fallbackPos.coords.longitude;
-              const accuracy = fallbackPos.coords.accuracy || 0;
+            (retryPos) => {
+              const mockCheck = GPSService.detectMockLocation(retryPos, this.cachedFix);
+              const lat = retryPos.coords.latitude;
+              const lng = retryPos.coords.longitude;
+              const accuracy = retryPos.coords.accuracy || 0;
 
               const rawDistance = calculateDistanceMeters(lat, lng, schoolLat, schoolLng);
               const accuracyBuffer = Math.min(Math.round(accuracy / 2), 30);
@@ -316,25 +328,25 @@ export class GPSService {
                 distanceMeters: effectiveDistance,
                 isMock: mockCheck.isMock,
                 mockReason: mockCheck.reason,
-                speed: fallbackPos.coords.speed,
-                altitude: fallbackPos.coords.altitude,
-                heading: fallbackPos.coords.heading,
+                speed: retryPos.coords.speed,
+                altitude: retryPos.coords.altitude,
+                heading: retryPos.coords.heading,
               });
             },
-            (fallbackErr) => {
-              reject(fallbackErr || primaryErr);
+            (retryErr) => {
+              reject(retryErr || primaryErr);
             },
             {
-              enableHighAccuracy: false,
+              enableHighAccuracy: true,
               timeout: timeoutMs + 2000,
-              maximumAge: 15000,
+              maximumAge: 0,
             }
           );
         },
         {
           enableHighAccuracy: true,
           timeout: timeoutMs,
-          maximumAge: 10000,
+          maximumAge: 0, // Never return stale cached BTS/Cell Tower coordinate
         }
       );
     });
@@ -342,16 +354,16 @@ export class GPSService {
 
   /**
    * Reads browser location using parallel warm-cache + fast sample strategy:
-   * - First checks warm cached GPS fix (< 15s age) for instant response (< 5ms)
-   * - If not ready, takes fast single/double sample spaced ~800ms apart
+   * - First checks warm cached GPS fix (< 15s age, <= 40m accuracy) for instant response (< 5ms)
+   * - If not ready or accuracy needs settling, takes progressive high-accuracy sample
    */
   public static async getCurrentPosition(
     targetLat?: number,
     targetLng?: number
   ): Promise<GPSCoordinates> {
-    // 1. Instant check: Use pre-heated warm cached fix if available
+    // 1. Instant check: Use pre-heated warm cached fix if available with good accuracy
     const warmFix = this.getWarmCachedFix();
-    if (warmFix) {
+    if (warmFix && warmFix.accuracy <= CONSTANTS.DEFAULTS.GPS_CACHE_MIN_ACCURACY_METERS) {
       return warmFix;
     }
 
@@ -360,10 +372,10 @@ export class GPSService {
     const schoolLng = targetLng !== undefined ? targetLng : settings.lng;
 
     const SAMPLE_COUNT = 2;
-    const SAMPLE_TIMEOUT_MS = 4000; // per sample
-    const INTERVAL_MS = 800;        // delay between samples
+    const SAMPLE_TIMEOUT_MS = 8000; // per sample (sufficient for iOS GNSS satellite lock)
+    const INTERVAL_MS = 600;        // delay between samples for progressive satellite convergence
 
-    logger.info('GPSService', `Requesting fast GPS location (${SAMPLE_COUNT} samples)...`);
+    logger.info('GPSService', `Requesting high-accuracy GPS location (${SAMPLE_COUNT} samples)...`);
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       logger.error('GPSService', 'Geolocation API is not supported by browser');
@@ -383,12 +395,14 @@ export class GPSService {
           isMock: sample.isMock,
         });
 
-        // Update cached fix
-        this.cachedFix = { coords: sample, timestamp: Date.now() };
+        // Update cached fix if this sample is better or first
+        if (!this.cachedFix || sample.accuracy <= this.cachedFix.coords.accuracy) {
+          this.cachedFix = { coords: sample, timestamp: Date.now() };
+        }
 
-        // Stop early if good accuracy and not mock
+        // Stop early if high-accuracy (< 25m) satellite lock obtained
         if (sample.accuracy <= 25 && !sample.isMock) {
-          logger.info('GPSService', 'High-accuracy sample obtained early, stopping collection.');
+          logger.info('GPSService', 'High-accuracy satellite lock obtained early, stopping collection.');
           break;
         }
 

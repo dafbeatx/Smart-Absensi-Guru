@@ -50,7 +50,7 @@ export const ERROR_CODES: Record<string, ErrorDefinition> = {
   GPS_004: {
     code: 'GPS_004',
     message: 'Akurasi sinyal GPS HP Anda terlalu rendah (> 50 meter).',
-    solution: 'Pastikan Anda berada di area terbuka (outdoor) atau nyalakan Wi-Fi untuk meningkatkan presisi lokasi.',
+    solution: 'Pastikan berada di area terbuka dan nyalakan Wi-Fi. Untuk pengguna iPhone: pastikan opsi "Lokasi Tepat" aktif di Pengaturan > Privasi > Layanan Lokasi > Safari.',
   },
 
   // Attendance & QR Errors (ATT_xxx / QR_xxx)
