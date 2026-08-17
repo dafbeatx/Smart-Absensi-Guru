@@ -20,7 +20,7 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
-import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta, getMonthWorkingDays } from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
@@ -623,16 +623,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     enabled: !isPreviewMode && !!effectiveUser?.id,
   });
 
-  // Dynamic monthly attendance statistics calculation
-  const totalDays = attendanceHistory.length;
+  // Dynamic monthly attendance statistics calculation against working days
+  const currentMonthInfo = getMonthWorkingDays(
+    new Date().getMonth() + 1,
+    new Date().getFullYear(),
+    true,
+    settings
+  );
+  const effectiveWorkingDays = Math.max(1, currentMonthInfo.effectiveWorkingDays);
   const hadirCount = attendanceHistory.filter((h) => h.status === 'HADIR').length;
   const terlambatCount = attendanceHistory.filter((h) => h.status === 'TERLAMBAT').length;
+  const totalMasukCount = hadirCount + terlambatCount;
 
-  const attendancePercentage = totalDays > 0
-    ? (Math.round(((hadirCount + terlambatCount) / totalDays) * 1000) / 10).toFixed(1)
+  const attendancePercentage = effectiveWorkingDays > 0
+    ? (Math.min(100, Math.round((totalMasukCount / effectiveWorkingDays) * 1000) / 10)).toFixed(1)
     : '0.0';
 
-  const terlambatPercent = totalDays > 0 ? (terlambatCount / totalDays) * 100 : 0;
+  const terlambatPercent = totalMasukCount > 0 ? (terlambatCount / totalMasukCount) * 100 : 0;
 
   // Teacher Appreciation & Gamification Score Calculation
   const appreciationScore = calculateTeacherAppreciationScore(
@@ -1607,7 +1614,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <div className="p-3 bg-[#C8F2E0]/40 rounded-xl sm:rounded-2xl border border-[#0D7A5F]/20 space-y-0.5">
                       <span className="text-[9px] sm:text-[10px] font-bold text-[#0D7A5F] block uppercase truncate">Kehadiran {activeMonthName}</span>
                       <p className="text-lg sm:text-xl font-black text-[#023246]">{attendancePercentage}%</p>
-                      <span className="text-[9px] sm:text-[10px] text-slate-500 font-semibold block truncate">{hadirCount + terlambatCount} dari {totalDays} Hari</span>
+                      <span className="text-[9px] sm:text-[10px] text-slate-500 font-semibold block truncate">{hadirCount + terlambatCount} dari {effectiveWorkingDays} Hari Kerja</span>
                     </div>
 
                     <div className="p-3 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-200 space-y-0.5">

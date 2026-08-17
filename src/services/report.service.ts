@@ -2,7 +2,7 @@ import { ExcelReportGenerator } from '../lib/excel-generator.lib';
 import type { MultiSheetReportPayload } from '../lib/excel-generator.lib';
 import { AnalyticsService } from './analytics.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../types/database.types';
-import { getTodayDateInJakarta } from '../utils/time.utils';
+import { getTodayDateInJakarta, getMonthWorkingDays, parseIndonesianMonth } from '../utils/time.utils';
 
 export class ReportService {
   public static preparePayload(
@@ -13,13 +13,52 @@ export class ReportService {
     leaveRequests: LeaveRequest[],
     auditLogs: AuditLog[]
   ): MultiSheetReportPayload {
-    const todayStr = getTodayDateInJakarta();
-    const summary = AnalyticsService.calculateDailySummary(
-      todayStr,
-      teachers,
-      attendanceRecords,
-      leaveRequests
+    const workingDaysInfo = getMonthWorkingDays(month, year, true);
+    const monthNumber = parseIndonesianMonth(month);
+    const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
+
+    const activeTeachers = AnalyticsService.getAttendanceEligibleUsers(teachers);
+    const totalTeachers = activeTeachers.length;
+    const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
+    const totalExpectedCapacity = totalTeachers * effectiveDays;
+
+    const monthlyAttendance = attendanceRecords.filter(
+      (r) => r.date && r.date.startsWith(monthPrefix)
     );
+
+    let totalPresent = 0;
+    let totalLate = 0;
+    let totalLeave = 0;
+    let totalSick = 0;
+    let totalOfficialDuty = 0;
+
+    for (const rec of monthlyAttendance) {
+      if (rec.status === 'HADIR') totalPresent++;
+      else if (rec.status === 'TERLAMBAT') totalLate++;
+      else if (rec.status === 'IZIN') totalLeave++;
+      else if (rec.status === 'SAKIT') totalSick++;
+      else if (rec.status === 'DINAS_LUAR') totalOfficialDuty++;
+    }
+
+    const totalActualMasuk = totalPresent + totalLate;
+    const totalAccounted = totalActualMasuk + totalLeave + totalSick + totalOfficialDuty;
+    const totalUnabsented = Math.max(0, totalExpectedCapacity - totalAccounted);
+    const attendancePercentage =
+      totalExpectedCapacity > 0
+        ? Math.min(100, Math.round((totalActualMasuk / totalExpectedCapacity) * 1000) / 10)
+        : 0;
+
+    const summary = {
+      date: getTodayDateInJakarta(),
+      totalTeachers,
+      totalPresent,
+      totalLate,
+      totalLeave,
+      totalSick,
+      totalOfficialDuty,
+      totalUnabsented,
+      attendancePercentage,
+    };
 
     return {
       month,
@@ -29,6 +68,7 @@ export class ReportService {
       attendanceRecords,
       leaveRequests,
       auditLogs,
+      workingDaysInfo,
     };
   }
 

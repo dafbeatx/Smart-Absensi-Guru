@@ -160,4 +160,120 @@ export function isDateOffDay(
   return { isOff: false, reason: '' };
 }
 
+export const INDONESIAN_MONTHS = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+
+export interface MonthWorkingDaysInfo {
+  monthName: string;
+  monthNumber: number; // 1 - 12
+  year: number;
+  totalDaysInMonth: number;
+  totalMonthWorkingDays: number;
+  elapsedWorkingDays: number;
+  effectiveWorkingDays: number;
+  isCurrentMonth: boolean;
+  isPastMonth: boolean;
+  isFutureMonth: boolean;
+  workingDates: string[];
+}
+
+export function parseIndonesianMonth(monthInput: string | number): number {
+  if (typeof monthInput === 'number') {
+    return Math.min(12, Math.max(1, Math.floor(monthInput)));
+  }
+  const str = String(monthInput).trim().toLowerCase();
+  const foundIdx = INDONESIAN_MONTHS.findIndex((m) => m.toLowerCase() === str);
+  if (foundIdx !== -1) {
+    return foundIdx + 1;
+  }
+  const parsedNum = parseInt(str, 10);
+  if (!isNaN(parsedNum) && parsedNum >= 1 && parsedNum <= 12) {
+    return parsedNum;
+  }
+  return new Date().getMonth() + 1;
+}
+
+/**
+ * Calculates accurate working days in a specific month & year.
+ * Distinguishes between completed months and ongoing/current months (up to today),
+ * properly excluding weekend holidays and custom school holidays.
+ */
+export function getMonthWorkingDays(
+  monthInput: string | number,
+  yearInput: string | number,
+  upToTodayIfCurrentMonth: boolean = true,
+  settings?: { saturday_is_holiday?: boolean; sunday_is_holiday?: boolean } | null,
+  holidays?: Array<{ date: string; name: string }> | null
+): MonthWorkingDaysInfo {
+  const monthNumber = parseIndonesianMonth(monthInput);
+  const year = typeof yearInput === 'number' ? yearInput : parseInt(String(yearInput), 10) || new Date().getFullYear();
+  const monthName = INDONESIAN_MONTHS[monthNumber - 1] || 'Januari';
+
+  const todayStr = getTodayDateInJakarta();
+  const todayDate = new Date(todayStr);
+  const currentYear = todayDate.getFullYear();
+  const currentMonthNumber = todayDate.getMonth() + 1;
+  const currentDay = todayDate.getDate();
+
+  const isCurrentMonth = year === currentYear && monthNumber === currentMonthNumber;
+  const isPastMonth = year < currentYear || (year === currentYear && monthNumber < currentMonthNumber);
+  const isFutureMonth = year > currentYear || (year === currentYear && monthNumber > currentMonthNumber);
+
+  const totalDaysInMonth = new Date(year, monthNumber, 0).getDate();
+  let totalMonthWorkingDays = 0;
+  let elapsedWorkingDays = 0;
+  const workingDates: string[] = [];
+
+  for (let day = 1; day <= totalDaysInMonth; day++) {
+    const dayStr = `${year}-${String(monthNumber).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const offCheck = isDateOffDay(dayStr, settings, holidays);
+
+    if (!offCheck.isOff) {
+      totalMonthWorkingDays++;
+      workingDates.push(dayStr);
+
+      if (isCurrentMonth) {
+        if (day <= currentDay) {
+          elapsedWorkingDays++;
+        }
+      } else if (isPastMonth) {
+        elapsedWorkingDays++;
+      }
+    }
+  }
+
+  let effectiveWorkingDays = totalMonthWorkingDays;
+  if (isCurrentMonth && upToTodayIfCurrentMonth) {
+    effectiveWorkingDays = elapsedWorkingDays;
+  } else if (isFutureMonth) {
+    effectiveWorkingDays = totalMonthWorkingDays;
+  }
+
+  return {
+    monthName,
+    monthNumber,
+    year,
+    totalDaysInMonth,
+    totalMonthWorkingDays,
+    elapsedWorkingDays,
+    effectiveWorkingDays,
+    isCurrentMonth,
+    isPastMonth,
+    isFutureMonth,
+    workingDates,
+  };
+}
+
 

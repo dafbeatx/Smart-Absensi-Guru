@@ -111,5 +111,32 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     summaryCorrected.totalLeave === 1 && summaryCorrected.totalUnabsented === 0 && unabsentedCorrected.length === 0
   );
 
+  // Test 6: Working Days Calculation for Completed & Ongoing Months
+  const { getMonthWorkingDays } = await import('../../utils/time.utils');
+  const julyWorkingDays = getMonthWorkingDays('Juli', '2026', false);
+  assert(
+    'Time Utils - Accurate Working Days Calculation',
+    julyWorkingDays.totalDaysInMonth === 31 &&
+    julyWorkingDays.totalMonthWorkingDays === 23 &&
+    julyWorkingDays.workingDates.length === 23
+  );
+
+  // Test 7: Master PDF HTML Visual Attendance Non-100% Calculation
+  const pdfHTML = ExcelReportGenerator.getPrintablePDFHTML(reportPayload);
+  assert(
+    'Report Engine - Visual Attendance Progress Bar Calculation',
+    pdfHTML.includes('Visual Kehadiran') &&
+    pdfHTML.includes('progress-bar-fill') &&
+    pdfHTML.includes('Hari Kerja')
+  );
+
+  // Test 8: Individual Teacher PDF & Excel Accurate Working Days
+  const indPDF = ExcelReportGenerator.getIndividualTeacherPDFHTML(mockTeachers[0], 'Juli', '2026', mockAttendance);
+  assert(
+    'Report Engine - Individual Teacher PDF Attendance Ratio',
+    indPDF.includes('Tingkat Kehadiran') &&
+    indPDF.includes('Ahmad Hidayat')
+  );
+
   return { passed, failed, results };
 };

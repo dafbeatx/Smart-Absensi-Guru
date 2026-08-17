@@ -3,6 +3,8 @@ import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../t
 import type { DailyAttendanceSummary } from '../services/analytics.service';
 import { APP_CONFIG } from '../config/app.config';
 import { CONSTANTS } from '../config/constants';
+import { getMonthWorkingDays, parseIndonesianMonth } from '../utils/time.utils';
+import type { MonthWorkingDaysInfo } from '../utils/time.utils';
 
 export const SIGNATORY_OFFICIALS = {
   KEPSEK_NAME: 'Farhan Sopian Sahid, S.Pd.I',
@@ -19,6 +21,7 @@ export interface MultiSheetReportPayload {
   attendanceRecords: AttendanceRecord[];
   leaveRequests: LeaveRequest[];
   auditLogs: AuditLog[];
+  workingDaysInfo?: MonthWorkingDaysInfo;
 }
 
 export class ExcelReportGenerator {
@@ -51,6 +54,10 @@ export class ExcelReportGenerator {
    */
   public static generateMultiSheetXLSX(payload: MultiSheetReportPayload): void {
     const wb = XLSX.utils.book_new();
+    const workingDaysInfo = payload.workingDaysInfo || getMonthWorkingDays(payload.month, payload.year, true);
+    const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
+    const monthNumber = parseIndonesianMonth(payload.month);
+    const monthPrefix = `${payload.year}-${String(monthNumber).padStart(2, '0')}`;
 
     // ── SHEET 1: DASHBOARD RINGKASAN ──────────────────────────────────────────
     const summaryData = [
@@ -58,6 +65,8 @@ export class ExcelReportGenerator {
       ['Institusi', APP_CONFIG.INSTITUTION_NAME],
       ['Aplikasi', APP_CONFIG.APP_NAME],
       ['Periode Laporan', `${payload.month} ${payload.year}`],
+      ['Status Periode', workingDaysInfo.isCurrentMonth ? `Bulan Berjalan (${workingDaysInfo.effectiveWorkingDays} Hari Kerja Terlewati)` : `Bulan Selesai (${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)`],
+      ['Target Hari Kerja Efektif', `${workingDaysInfo.effectiveWorkingDays} Hari`],
       ['Tanggal Cetak', new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })],
       [],
       ['METRIK EKSEKUTIF KESELURUHAN', 'JUMLAH / PERSENTASE'],
@@ -81,20 +90,23 @@ export class ExcelReportGenerator {
 
     // ── SHEET 2: REKAP KEHADIRAN GURU ─────────────────────────────────────────
     const teacherData = payload.teachers.map((t, index) => {
-      const tRecords = payload.attendanceRecords.filter((r) => r.user_id === t.id);
+      const tRecords = payload.attendanceRecords.filter((r) => r.user_id === t.id && (!r.date || r.date.startsWith(monthPrefix)));
       const tPresent = tRecords.filter((r) => r.status === 'HADIR').length;
       const tLate = tRecords.filter((r) => r.status === 'TERLAMBAT').length;
       const tTotalMasuk = tPresent + tLate;
       const tTotalIzin = tRecords.filter((r) => r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR').length;
+      const attendancePct = Math.min(100, Math.round((tTotalMasuk / effectiveDays) * 100));
 
       return {
         No: index + 1,
-        NIP: t.nip || '-',
+        NPP: t.nip || '-',
         'Nama Lengkap & Gelar': t.full_name,
         Role: t.role,
         'Jabatan / Bidang Studi': t.position,
         'Jumlah Masuk (Hari)': tTotalMasuk,
         'Jumlah Izin / Sakit (Hari)': tTotalIzin,
+        'Target Hari Kerja': effectiveDays,
+        'Persentase Kehadiran': `${attendancePct}%`,
         'No. WhatsApp': t.phone_number,
         Status: t.is_active ? 'Aktif' : 'Non-Aktif',
       };
@@ -109,6 +121,8 @@ export class ExcelReportGenerator {
       { wch: 28 },
       { wch: 18 },
       { wch: 22 },
+      { wch: 18 },
+      { wch: 20 },
       { wch: 18 },
       { wch: 12 },
     ];
@@ -231,10 +245,16 @@ export class ExcelReportGenerator {
    * Generates the raw HTML content string for the Master PDF Report
    */
   public static getPrintablePDFHTML(payload: MultiSheetReportPayload): string {
+    const workingDaysInfo = payload.workingDaysInfo || getMonthWorkingDays(payload.month, payload.year, true);
+    const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
+    const monthNumber = parseIndonesianMonth(payload.month);
+    const monthPrefix = `${payload.year}-${String(monthNumber).padStart(2, '0')}`;
+
     const totalTeachers = payload.summary.totalTeachers || 1;
-    const presentPct = Math.min(100, Math.round((payload.summary.totalPresent / totalTeachers) * 100)) || 0;
-    const latePct = Math.min(100 - presentPct, Math.round((payload.summary.totalLate / totalTeachers) * 100)) || 0;
-    const leavePct = Math.min(100 - presentPct - latePct, Math.round(((payload.summary.totalSick + payload.summary.totalLeave) / totalTeachers) * 100)) || 0;
+    const totalExpectedCapacity = totalTeachers * effectiveDays;
+    const presentPct = totalExpectedCapacity > 0 ? Math.min(100, Math.round((payload.summary.totalPresent / totalExpectedCapacity) * 100)) : 0;
+    const latePct = totalExpectedCapacity > 0 ? Math.min(100 - presentPct, Math.round((payload.summary.totalLate / totalExpectedCapacity) * 100)) : 0;
+    const leavePct = totalExpectedCapacity > 0 ? Math.min(100 - presentPct - latePct, Math.round(((payload.summary.totalSick + payload.summary.totalLeave + payload.summary.totalOfficialDuty) / totalExpectedCapacity) * 100)) : 0;
     const unabsentPct = Math.max(0, 100 - presentPct - latePct - leavePct);
 
     return `
@@ -309,7 +329,7 @@ export class ExcelReportGenerator {
         </div>
 
         <div class="meta-grid">
-          <div><strong>Periode Laporan:</strong> ${payload.month} ${payload.year}</div>
+          <div><strong>Periode Laporan:</strong> ${payload.month} ${payload.year} ${workingDaysInfo.isCurrentMonth ? `<span style="color:#0284c7;font-weight:700;">(${workingDaysInfo.effectiveWorkingDays} Hari Kerja Berjalan)</span>` : `<span style="color:#64748b;">(${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)</span>`}</div>
           <div><strong>Total Guru Terdaftar:</strong> ${payload.teachers.length} Orang</div>
           <div><strong>Tingkat Kehadiran:</strong> ${payload.summary.attendancePercentage}%</div>
           <div><strong>Tanggal Cetak:</strong> ${new Date().toLocaleDateString('id-ID', { dateStyle: 'long' })}</div>
@@ -318,8 +338,8 @@ export class ExcelReportGenerator {
         <div class="kpi-container">
           <div class="kpi-card"><div class="val" style="color: #16a34a;">${payload.summary.totalPresent}</div><div class="lbl">Hadir Tepat Waktu</div></div>
           <div class="kpi-card"><div class="val" style="color: #d97706;">${payload.summary.totalLate}</div><div class="lbl">Terlambat</div></div>
-          <div class="kpi-card"><div class="val" style="color: #0284c7;">${payload.summary.totalSick + payload.summary.totalLeave}</div><div class="lbl">Izin / Sakit</div></div>
-          <div class="kpi-card"><div class="val" style="color: #dc2626;">${payload.summary.totalUnabsented}</div><div class="lbl">Belum Absen</div></div>
+          <div class="kpi-card"><div class="val" style="color: #0284c7;">${payload.summary.totalSick + payload.summary.totalLeave + payload.summary.totalOfficialDuty}</div><div class="lbl">Izin / Sakit</div></div>
+          <div class="kpi-card"><div class="val" style="color: #dc2626;">${payload.summary.totalUnabsented}</div><div class="lbl">Belum Absen / Alfa</div></div>
         </div>
 
         <!-- GRAFIK KESELURUHAN SEKOLAH -->
@@ -334,7 +354,7 @@ export class ExcelReportGenerator {
           <div class="chart-legend">
             <div class="legend-item"><span class="legend-dot" style="background-color:#16a34a !important; background:#16a34a !important;"></span> Hadir Tepat Waktu (${payload.summary.totalPresent})</div>
             <div class="legend-item"><span class="legend-dot" style="background-color:#d97706 !important; background:#d97706 !important;"></span> Terlambat (${payload.summary.totalLate})</div>
-            <div class="legend-item"><span class="legend-dot" style="background-color:#0284c7 !important; background:#0284c7 !important;"></span> Izin/Sakit (${payload.summary.totalSick + payload.summary.totalLeave})</div>
+            <div class="legend-item"><span class="legend-dot" style="background-color:#0284c7 !important; background:#0284c7 !important;"></span> Izin/Sakit (${payload.summary.totalSick + payload.summary.totalLeave + payload.summary.totalOfficialDuty})</div>
             <div class="legend-item"><span class="legend-dot" style="background-color:#dc2626 !important; background:#dc2626 !important;"></span> Belum Absen (${payload.summary.totalUnabsented})</div>
           </div>
         </div>
@@ -347,19 +367,32 @@ export class ExcelReportGenerator {
               <th>NPP</th>
               <th>Nama Lengkap & Gelar</th>
               <th>Jabatan / Mapel</th>
-              <th style="width: 90px; text-align: center;">Jumlah Masuk</th>
-              <th style="width: 90px; text-align: center;">Jumlah Izin</th>
-              <th style="width: 125px;">Visual Kehadiran</th>
+              <th style="width: 85px; text-align: center;">Jumlah Masuk</th>
+              <th style="width: 85px; text-align: center;">Jumlah Izin</th>
+              <th style="width: 140px;">Visual Kehadiran (${effectiveDays} Hari Kerja)</th>
             </tr>
           </thead>
           <tbody>
             ${payload.teachers.map((t, index) => {
-              const tRecords = payload.attendanceRecords.filter((r) => r.user_id === t.id);
+              const tRecords = payload.attendanceRecords.filter((r) => r.user_id === t.id && (!r.date || r.date.startsWith(monthPrefix)));
               const tPresent = tRecords.filter((r) => r.status === 'HADIR').length;
               const tLate = tRecords.filter((r) => r.status === 'TERLAMBAT').length;
               const tTotalMasuk = tPresent + tLate;
               const tTotalIzin = tRecords.filter((r) => r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR').length;
-              const ratioPct = tRecords.length > 0 ? Math.round((tTotalMasuk / tRecords.length) * 100) : 100;
+              const ratioPct = Math.min(100, Math.round((tTotalMasuk / effectiveDays) * 100));
+
+              let barColor = '#16a34a';
+              let textColor = '#15803d';
+              if (ratioPct < 50) {
+                barColor = '#dc2626';
+                textColor = '#b91c1c';
+              } else if (ratioPct < 75) {
+                barColor = '#d97706';
+                textColor = '#b45309';
+              } else if (ratioPct < 90) {
+                barColor = '#0284c7';
+                textColor = '#0369a1';
+              }
 
               return `
                 <tr>
@@ -372,9 +405,9 @@ export class ExcelReportGenerator {
                   <td>
                     <div style="display: flex; align-items: center; gap: 6px;">
                       <div class="progress-bar-bg" style="flex: 1; background-color: #e2e8f0 !important; background: #e2e8f0 !important; border-radius: 6px; height: 10px; overflow: hidden; border: 1px solid #cbd5e1;">
-                        <div class="progress-bar-fill" style="width: ${ratioPct}%; background-color: #16a34a !important; background: #16a34a !important; height: 100%; border-radius: 6px;"></div>
+                        <div class="progress-bar-fill" style="width: ${ratioPct}%; background-color: ${barColor} !important; background: ${barColor} !important; height: 100%; border-radius: 6px;"></div>
                       </div>
-                      <span style="font-size: 10px; font-weight: 800; color: #15803d; width: 32px; text-align: right;">${ratioPct}%</span>
+                      <span style="font-size: 10px; font-weight: 800; color: ${textColor}; width: 62px; text-align: right;">${ratioPct}% <span style="font-size:8px;color:#64748b;font-weight:600;">(${tTotalMasuk}/${effectiveDays})</span></span>
                     </div>
                   </td>
                 </tr>
@@ -430,11 +463,17 @@ export class ExcelReportGenerator {
     year: string,
     records: AttendanceRecord[]
   ): string {
-    const teacherRecords = records.filter((r) => r.user_id === teacher.id);
+    const workingDaysInfo = getMonthWorkingDays(month, year, true);
+    const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
+    const monthNumber = parseIndonesianMonth(month);
+    const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
+
+    const teacherRecords = records.filter((r) => r.user_id === teacher.id && (!r.date || r.date.startsWith(monthPrefix)));
     let totalPresent = 0;
     let totalLate = 0;
     let totalLeave = 0;
     let totalSick = 0;
+    let totalOfficialDuty = 0;
 
     // Histogram Bins for Check-in Times:
     // Bin 1: < 06:45 (Sangat Awal)
@@ -451,6 +490,7 @@ export class ExcelReportGenerator {
       else if (r.status === 'TERLAMBAT') totalLate++;
       else if (r.status === 'IZIN') totalLeave++;
       else if (r.status === 'SAKIT') totalSick++;
+      else if (r.status === 'DINAS_LUAR') totalOfficialDuty++;
 
       if (r.check_in_time) {
         const timeStr = r.check_in_time.slice(0, 5);
@@ -460,6 +500,10 @@ export class ExcelReportGenerator {
         else bin4Count++;
       }
     });
+
+    const totalMasuk = totalPresent + totalLate;
+    const totalIzin = totalLeave + totalSick + totalOfficialDuty;
+    const attendancePct = Math.min(100, Math.round((totalMasuk / effectiveDays) * 100));
 
     const maxBinValue = Math.max(bin1Count, bin2Count, bin3Count, bin4Count, 1);
     const getBarHeightPercent = (val: number) => Math.max(12, Math.round((val / maxBinValue) * 100));
@@ -535,8 +579,8 @@ export class ExcelReportGenerator {
 
         <div class="profile-box">
           <div><strong>Nama Lengkap:</strong> ${teacher.full_name}</div>
-          <div><strong>Periode Absensi:</strong> ${month} ${year}</div>
-          <div><strong>NPP / NIP:</strong> ${teacher.nip || '-'}</div>
+          <div><strong>Periode Absensi:</strong> ${month} ${year} ${workingDaysInfo.isCurrentMonth ? `<span style="color:#0284c7;font-weight:700;">(${workingDaysInfo.effectiveWorkingDays} Hari Kerja Berjalan)</span>` : `<span style="color:#64748b;">(${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)</span>`}</div>
+          <div><strong>NPP:</strong> ${teacher.nip || '-'}</div>
           <div><strong>Jabatan / Tugas:</strong> ${teacher.position || 'Guru Pengajar'}</div>
           <div><strong>No. WhatsApp:</strong> ${teacher.phone_number || '-'}</div>
           <div><strong>Tanggal Cetak:</strong> ${new Date().toLocaleDateString('id-ID', { dateStyle: 'long' })}</div>
@@ -545,8 +589,8 @@ export class ExcelReportGenerator {
         <div class="kpi-container">
           <div class="kpi-card"><div class="val" style="color: #16a34a;">${totalPresent}</div><div class="lbl">Hadir Tepat Waktu</div></div>
           <div class="kpi-card"><div class="val" style="color: #d97706;">${totalLate}</div><div class="lbl">Terlambat</div></div>
-          <div class="kpi-card"><div class="val" style="color: #0284c7;">${totalLeave + totalSick}</div><div class="lbl">Izin / Sakit</div></div>
-          <div class="kpi-card"><div class="val" style="color: #0f172a;">${totalPresent + totalLate} Hari</div><div class="lbl">Total Masuk</div></div>
+          <div class="kpi-card"><div class="val" style="color: #0284c7;">${totalIzin}</div><div class="lbl">Izin / Sakit</div></div>
+          <div class="kpi-card"><div class="val" style="color: #0f172a;">${attendancePct}%</div><div class="lbl">Tingkat Kehadiran (${totalMasuk}/${effectiveDays} Hari)</div></div>
         </div>
 
         <!-- GRAFIK HISTOGRAM WAKTU MASUK INDIVIDU -->
@@ -668,19 +712,27 @@ export class ExcelReportGenerator {
     records: AttendanceRecord[]
   ): void {
     const wb = XLSX.utils.book_new();
-    const teacherRecords = records.filter((r) => r.user_id === teacher.id);
+    const workingDaysInfo = getMonthWorkingDays(month, year, true);
+    const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
+    const monthNumber = parseIndonesianMonth(month);
+    const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
+
+    const teacherRecords = records.filter((r) => r.user_id === teacher.id && (!r.date || r.date.startsWith(monthPrefix)));
     const tPresent = teacherRecords.filter((r) => r.status === 'HADIR').length;
     const tLate = teacherRecords.filter((r) => r.status === 'TERLAMBAT').length;
     const tTotalMasuk = tPresent + tLate;
     const tTotalIzin = teacherRecords.filter((r) => r.status === 'IZIN' || r.status === 'SAKIT' || r.status === 'DINAS_LUAR').length;
+    const attendancePct = Math.min(100, Math.round((tTotalMasuk / effectiveDays) * 100));
 
     const summaryData = [
       ['LAPORAN PRESENSI INDIVIDU GURU & STAF'],
       ['Institusi', APP_CONFIG.INSTITUTION_NAME],
       ['Nama Guru', teacher.full_name],
-      ['NIP / NPP', teacher.nip || '-'],
+      ['NPP', teacher.nip || '-'],
       ['Jabatan / Tugas', teacher.position],
       ['Periode Laporan', `${month} ${year}`],
+      ['Status Periode', workingDaysInfo.isCurrentMonth ? `Bulan Berjalan (${workingDaysInfo.effectiveWorkingDays} Hari Kerja Terlewati)` : `Bulan Selesai (${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)`],
+      ['Target Hari Kerja Efektif', `${effectiveDays} Hari`],
       ['Tanggal Cetak', new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })],
       [],
       ['RINGKASAN TOTAL INDIVIDU'],
@@ -688,6 +740,7 @@ export class ExcelReportGenerator {
       ['Total Terlambat', tLate],
       ['Jumlah Masuk (Hari)', tTotalMasuk],
       ['Jumlah Izin / Sakit (Hari)', tTotalIzin],
+      ['Tingkat Kehadiran', `${attendancePct}%`],
       [],
       ['PENANDATANGAN RESMI'],
       ['TU (Tata Usaha)', SIGNATORY_OFFICIALS.TU_NAME],
