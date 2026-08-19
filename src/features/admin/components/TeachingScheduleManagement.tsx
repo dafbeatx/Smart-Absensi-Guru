@@ -458,7 +458,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
               value={formSubject}
               onChange={(e) => setFormSubject(e.target.value)}
               required
-              className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2.5 outline-none cursor-pointer focus:ring-2 focus:ring-[#0D7A5F]/20 focus:border-[#0D7A5F]"
+              className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2.5 outline-none cursor-pointer focus:ring-2 focus:ring-[#0D7A5F]/20"
             >
               <option value="" disabled>
                 -- Pilih Mata Pelajaran --
