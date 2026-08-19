@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { UserProfile, TeachingSlot } from '../../../types/database.types';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
+import { SearchableSelect, type SelectOption } from '../../../components/ui/SearchableSelect';
 import { useToastStore } from '../../../store/useToastStore';
 import {
   SubjectManagementModal,
@@ -21,10 +22,21 @@ export interface TeachingScheduleManagementProps {
 }
 
 const STORAGE_KEY = 'smart_absensi_teaching_schedules';
+const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+const FILTER_DAYS = ['Semua', ...DAYS];
+
+const TIME_PRESETS = [
+  { label: 'Jam 1-2 (07:30 - 08:50)', start: '07:30', end: '08:50' },
+  { label: 'Jam 3-4 (08:50 - 10:10)', start: '08:50', end: '10:10' },
+  { label: 'Jam 5-6 (10:30 - 11:50)', start: '10:30', end: '11:50' },
+  { label: 'Jam 7-8 (12:30 - 13:50)', start: '12:30', end: '13:50' },
+];
+
+const CLASS_PRESETS = ['Kelas VII-A', 'Kelas VII-B', 'Kelas VIII-A', 'Kelas VIII-B', 'Kelas IX-A', 'Kelas IX-B'];
+const ROOM_PRESETS = ['Ruang Teori 7A', 'Ruang Teori 8A', 'Ruang Teori 9A', 'Lab Komputer', 'Lab IPA', 'Lapangan'];
 
 export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProps> = ({ teachers }) => {
   const { showToast } = useToastStore();
-  const days = ['Semua', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
   const [schedules, setSchedules] = useState<ExtendedTeachingSlot[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -201,6 +213,60 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     }
   };
 
+  // Helper to extract initials
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase();
+  };
+
+  // Teacher Options for SearchableSelect
+  const teacherOptions: SelectOption[] = useMemo(() => {
+    return teachers.map((t) => ({
+      value: t.id,
+      label: t.full_name,
+      subtitle: t.position || 'Guru Pengajar',
+      avatarText: getInitials(t.full_name),
+      avatarUrl: t.avatar_url || undefined,
+      badge: t.role === 'KEPSEK' ? 'Kepsek' : t.role === 'ADMIN' ? 'Admin' : undefined,
+      badgeClass: t.role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700',
+    }));
+  }, [teachers]);
+
+  // Subject Options for SearchableSelect
+  const subjectOptions: SelectOption[] = useMemo(() => {
+    const list: SelectOption[] = subjects.map((s) => ({
+      value: s.name,
+      label: s.name,
+      badge: s.category,
+      badgeClass:
+        s.category === 'Keagamaan'
+          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+          : s.category === 'Muatan Lokal'
+          ? 'bg-purple-50 text-purple-800 border border-purple-200'
+          : s.category === 'Peminatan / Kejuruan'
+          ? 'bg-blue-50 text-blue-800 border border-blue-200'
+          : 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+      subtitle: s.code ? `Kode: ${s.code}` : undefined,
+    }));
+
+    // If editing a slot with custom subject not in standard list
+    if (formSubject && !subjects.some((s) => s.name.toLowerCase() === formSubject.toLowerCase())) {
+      list.unshift({
+        value: formSubject,
+        label: `${formSubject} (Kustom)`,
+        badge: 'Kustom',
+        badgeClass: 'bg-slate-100 text-slate-700',
+      });
+    }
+
+    return list;
+  }, [subjects, formSubject]);
+
   // Filtered List
   const filteredSchedules = schedules.filter((s) => {
     const matchTeacher = selectedTeacherId === 'ALL' || s.user_id === selectedTeacherId;
@@ -287,7 +353,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
             Filter Hari:
           </label>
           <div className="flex gap-1 overflow-x-auto no-scrollbar">
-            {days.map((d) => (
+            {FILTER_DAYS.map((d) => (
               <button
                 key={d}
                 type="button"
@@ -368,134 +434,209 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
         )}
       </div>
 
-      {/* Add / Edit Schedule Modal */}
+      {/* Modern Add / Edit Schedule Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingId ? 'Edit Jadwal Mengajar' : 'Tambah Jadwal Mengajar Guru'}
+        maxWidth="lg"
       >
-        <form onSubmit={handleSaveSchedule} className="space-y-4">
-          <div className="space-y-1">
-            <label className="block text-xs font-bold text-slate-700">Pilih Guru *</label>
-            <select
-              value={formTeacherId}
-              onChange={(e) => setFormTeacherId(e.target.value)}
-              required
-              className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none cursor-pointer"
+        <div className="space-y-4">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#023246] text-white flex items-center justify-center text-lg shadow-xs">
+                🗓️
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-[#023246]">
+                  {editingId ? 'Edit Jadwal Mengajar' : 'Tambah Jadwal Mengajar Guru'}
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Atur alokasi pengajar, mata pelajaran, waktu, dan ruang kelas
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold transition-colors cursor-pointer text-sm"
             >
-              <option value="" disabled>
-                -- Pilih Guru Pengajar --
-              </option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.full_name} ({t.position || 'Guru'})
-                </option>
-              ))}
-            </select>
+              ✕
+            </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">Hari *</label>
-              <select
-                value={formDay}
-                onChange={(e) => setFormDay(e.target.value)}
-                className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none cursor-pointer"
-              >
-                <option value="Senin">Senin</option>
-                <option value="Selasa">Selasa</option>
-                <option value="Rabu">Rabu</option>
-                <option value="Kamis">Kamis</option>
-                <option value="Jumat">Jumat</option>
-              </select>
-            </div>
+          <form onSubmit={handleSaveSchedule} className="space-y-4 max-h-[72vh] overflow-y-auto pr-1">
+            {/* Section 1: Guru Pengajar & Mata Pelajaran */}
+            <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                1. Pengajar & Mata Pelajaran
+              </span>
 
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">Kelas *</label>
-              <Input
-                value={formClassName}
-                onChange={(e) => setFormClassName(e.target.value)}
-                placeholder="Contoh: Kelas VII-A"
+              {/* Custom Searchable Teacher Selector */}
+              <SearchableSelect
+                label="Pilih Guru Pengajar"
+                placeholder="-- Pilih Guru Pengajar --"
+                options={teacherOptions}
+                value={formTeacherId}
+                onChange={setFormTeacherId}
                 required
+                emptyText="Nama guru tidak ditemukan"
+              />
+
+              {/* Custom Searchable Subject Selector */}
+              <SearchableSelect
+                label="Mata Pelajaran"
+                placeholder="-- Pilih Mata Pelajaran --"
+                options={subjectOptions}
+                value={formSubject}
+                onChange={setFormSubject}
+                required
+                actionButton={{
+                  label: '➕ Kelola Mapel',
+                  onClick: () => setIsSubjectModalOpen(true),
+                }}
+                emptyText="Mata pelajaran tidak ditemukan"
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">Jam Mulai *</label>
-              <Input
-                type="time"
-                value={formTimeStart}
-                onChange={(e) => setFormTimeStart(e.target.value)}
-                required
-              />
+            {/* Section 2: Waktu & Alokasi Hari */}
+            <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                2. Hari & Jam Mengajar
+              </span>
+
+              {/* Day Segmented Selector */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700">Hari Mengajar *</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {DAYS.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setFormDay(d)}
+                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+                        formDay === d
+                          ? 'bg-[#023246] text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Time Pickers */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Jam Mulai *</label>
+                  <Input
+                    type="time"
+                    value={formTimeStart}
+                    onChange={(e) => setFormTimeStart(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Jam Selesai *</label>
+                  <Input
+                    type="time"
+                    value={formTimeEnd}
+                    onChange={(e) => setFormTimeEnd(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Time Presets */}
+              <div className="flex gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[10px] font-bold text-slate-400 self-center">Preset:</span>
+                {TIME_PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => {
+                      setFormTimeStart(p.start);
+                      setFormTimeEnd(p.end);
+                    }}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      formTimeStart === p.start && formTimeEnd === p.end
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {p.start} - {p.end}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">Jam Selesai *</label>
-              <Input
-                type="time"
-                value={formTimeEnd}
-                onChange={(e) => setFormTimeEnd(e.target.value)}
-                required
-              />
+
+            {/* Section 3: Kelas & Ruangan */}
+            <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                3. Ruang & Alokasi Kelas
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Kelas *</label>
+                  <Input
+                    value={formClassName}
+                    onChange={(e) => setFormClassName(e.target.value)}
+                    placeholder="Contoh: Kelas VII-A"
+                    required
+                  />
+                  {/* Quick Class Chips */}
+                  <div className="flex gap-1 overflow-x-auto no-scrollbar pt-1">
+                    {CLASS_PRESETS.slice(0, 4).map((cls) => (
+                      <button
+                        key={cls}
+                        type="button"
+                        onClick={() => setFormClassName(cls)}
+                        className="px-1.5 py-0.5 text-[9px] font-bold bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-100 cursor-pointer shrink-0"
+                      >
+                        {cls.replace('Kelas ', '')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">Ruangan / Lab</label>
+                  <Input
+                    value={formRoom}
+                    onChange={(e) => setFormRoom(e.target.value)}
+                    placeholder="Contoh: Ruang Teori 7A"
+                  />
+                  {/* Quick Room Chips */}
+                  <div className="flex gap-1 overflow-x-auto no-scrollbar pt-1">
+                    {ROOM_PRESETS.slice(0, 3).map((rm) => (
+                      <button
+                        key={rm}
+                        type="button"
+                        onClick={() => setFormRoom(rm)}
+                        className="px-1.5 py-0.5 text-[9px] font-bold bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-100 cursor-pointer shrink-0"
+                      >
+                        {rm}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Mata Pelajaran Dropdown */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-700">Mata Pelajaran *</label>
-              <button
-                type="button"
-                onClick={() => setIsSubjectModalOpen(true)}
-                className="text-[11px] font-bold text-[#0D7A5F] hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <span>➕</span> Tambah Mapel Baru
-              </button>
+            {/* Modal Actions */}
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>
+                Batal
+              </Button>
+              <Button variant="primary" type="submit" className="px-5">
+                {editingId ? '💾 Simpan Perubahan' : '➕ Tambah Jadwal'}
+              </Button>
             </div>
-            <select
-              value={formSubject}
-              onChange={(e) => setFormSubject(e.target.value)}
-              required
-              className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2.5 outline-none cursor-pointer focus:ring-2 focus:ring-[#0D7A5F]/20"
-            >
-              <option value="" disabled>
-                -- Pilih Mata Pelajaran --
-              </option>
-              {/* If existing slot has a custom subject not in the active subjects list, display it */}
-              {formSubject &&
-                !subjects.some((s) => s.name.toLowerCase() === formSubject.toLowerCase()) && (
-                  <option value={formSubject}>
-                    {formSubject} (Kustom)
-                  </option>
-                )}
-              {subjects.map((s) => (
-                <option key={s.id} value={s.name}>
-                  {s.name} {s.category ? `• [${s.category}]` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-bold text-slate-700">Ruangan / Lab</label>
-            <Input
-              value={formRoom}
-              onChange={(e) => setFormRoom(e.target.value)}
-              placeholder="Contoh: Ruang Teori 7A / Lab Komputer A"
-            />
-          </div>
-
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-            <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>
-              Batal
-            </Button>
-            <Button variant="primary" type="submit">
-              {editingId ? 'Simpan Perubahan' : 'Tambah Jadwal'}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </div>
       </Modal>
 
       {/* Subject Management Modal */}
