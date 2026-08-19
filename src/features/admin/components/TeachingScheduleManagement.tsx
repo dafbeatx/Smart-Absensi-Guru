@@ -4,6 +4,12 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
 import { useToastStore } from '../../../store/useToastStore';
+import {
+  SubjectManagementModal,
+  DEFAULT_SUBJECTS,
+  SUBJECTS_STORAGE_KEY,
+} from './SubjectManagementModal';
+import type { SubjectItem } from './SubjectManagementModal';
 
 export interface ExtendedTeachingSlot extends TeachingSlot {
   user_id?: string; // Associated teacher user ID or NIP
@@ -33,12 +39,30 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     return [];
   });
 
+  // Master Data: Subjects List
+  const [subjects, setSubjects] = useState<SubjectItem[]>(() => {
+    const saved = localStorage.getItem(SUBJECTS_STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.warn('Failed to parse cached subjects:', e);
+      }
+    }
+    return DEFAULT_SUBJECTS;
+  });
+
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('ALL');
   const [selectedDay, setSelectedDay] = useState<string>('Semua');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
 
   // Modal State for Add / Edit Schedule
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Modal State for Subject Management
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
 
   // Form Fields
   const [formTeacherId, setFormTeacherId] = useState<string>('');
@@ -49,10 +73,39 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   const [formSubject, setFormSubject] = useState<string>('');
   const [formRoom, setFormRoom] = useState<string>('');
 
+  // Persist schedules
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(schedules));
     window.dispatchEvent(new CustomEvent('smart_absensi_schedules_updated', { detail: schedules }));
   }, [schedules]);
+
+  // Handle subjects update
+  const handleUpdateSubjects = (newSubjects: SubjectItem[]) => {
+    setSubjects(newSubjects);
+    localStorage.setItem(SUBJECTS_STORAGE_KEY, JSON.stringify(newSubjects));
+    window.dispatchEvent(new CustomEvent('smart_absensi_subjects_updated', { detail: newSubjects }));
+  };
+
+  // Sync subjects across tabs / events
+  useEffect(() => {
+    const onSubjectsUpdated = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setSubjects(e.detail);
+      } else {
+        const saved = localStorage.getItem(SUBJECTS_STORAGE_KEY);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) setSubjects(parsed);
+          } catch (err) {
+            console.warn('Failed to re-sync subjects:', err);
+          }
+        }
+      }
+    };
+    window.addEventListener('smart_absensi_subjects_updated', onSubjectsUpdated);
+    return () => window.removeEventListener('smart_absensi_subjects_updated', onSubjectsUpdated);
+  }, []);
 
   const handleOpenAddModal = () => {
     setEditingId(null);
@@ -61,7 +114,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     setFormTimeStart('07:30');
     setFormTimeEnd('08:50');
     setFormClassName('Kelas VII-A');
-    setFormSubject('');
+    setFormSubject(subjects[0]?.name || '');
     setFormRoom('Ruang Teori 7A');
     setIsModalOpen(true);
   };
@@ -94,7 +147,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
       return;
     }
     if (!formSubject.trim()) {
-      showToast('error', 'Mata Pelajaran Wajib', 'Masukkan nama mata pelajaran.');
+      showToast('error', 'Mata Pelajaran Wajib', 'Pilih mata pelajaran yang diajarkan.');
       return;
     }
     if (!formClassName.trim()) {
@@ -152,32 +205,46 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   const filteredSchedules = schedules.filter((s) => {
     const matchTeacher = selectedTeacherId === 'ALL' || s.user_id === selectedTeacherId;
     const matchDay = selectedDay === 'Semua' || s.day === selectedDay;
-    return matchTeacher && matchDay;
+    const matchSubject = selectedSubjectFilter === 'ALL' || s.subject === selectedSubjectFilter;
+    return matchTeacher && matchDay && matchSubject;
   });
 
   return (
     <div className="space-y-5 bg-white p-5 rounded-3xl border border-[#D4D4CE]/40 shadow-card">
-      {/* Header & Quick Action */}
+      {/* Header & Quick Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
         <div>
           <h2 className="text-lg font-black text-[#023246]">🗓️ Kelola Jadwal Mengajar Guru</h2>
           <p className="text-xs text-slate-500 font-medium">
-            Input & atur jadwal mata pelajaran, kelas, dan jam mengajar guru
+            Input & atur alokasi mata pelajaran, kelas, dan jam mengajar guru
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          onClick={handleOpenAddModal}
-          className="px-4 py-2.5 text-xs font-extrabold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-        >
-          <span>➕</span> Tambah Jadwal Mengajar
-        </Button>
+        {/* Action Buttons: Kelola Mapel & Tambah Jadwal */}
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsSubjectModalOpen(true)}
+            className="px-3.5 py-2.5 text-xs font-extrabold text-[#023246] bg-slate-100 hover:bg-slate-200 border border-slate-300/80 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+            title="Kelola master daftar mata pelajaran sekolah"
+          >
+            <span>📚</span> Kelola Mata Pelajaran
+          </button>
+
+          <Button
+            variant="primary"
+            onClick={handleOpenAddModal}
+            className="px-4 py-2.5 text-xs font-extrabold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <span>➕</span> Tambah Jadwal Mengajar
+          </Button>
+        </div>
       </div>
 
       {/* Filter Control Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
-        <div className="flex-1 space-y-1">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+        {/* Teacher Filter */}
+        <div className="space-y-1">
           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
             Filter Guru:
           </label>
@@ -195,7 +262,27 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
           </select>
         </div>
 
-        <div className="flex-1 space-y-1">
+        {/* Subject Filter */}
+        <div className="space-y-1">
+          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+            Filter Mata Pelajaran:
+          </label>
+          <select
+            value={selectedSubjectFilter}
+            onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+            className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none cursor-pointer"
+          >
+            <option value="ALL">📚 Semua Mata Pelajaran</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Day Filter */}
+        <div className="space-y-1">
           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
             Filter Hari:
           </label>
@@ -203,8 +290,9 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
             {days.map((d) => (
               <button
                 key={d}
+                type="button"
                 onClick={() => setSelectedDay(d)}
-                className={`py-1.5 px-3 rounded-xl text-[10px] font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                className={`py-2 px-2.5 rounded-xl text-[10px] font-extrabold transition-all cursor-pointer whitespace-nowrap flex-1 text-center ${
                   selectedDay === d
                     ? 'bg-[#023246] text-white shadow-xs'
                     : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
@@ -354,14 +442,40 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
             </div>
           </div>
 
+          {/* Mata Pelajaran Dropdown */}
           <div className="space-y-1">
-            <label className="block text-xs font-bold text-slate-700">Mata Pelajaran *</label>
-            <Input
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-700">Mata Pelajaran *</label>
+              <button
+                type="button"
+                onClick={() => setIsSubjectModalOpen(true)}
+                className="text-[11px] font-bold text-[#0D7A5F] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>➕</span> Tambah Mapel Baru
+              </button>
+            </div>
+            <select
               value={formSubject}
               onChange={(e) => setFormSubject(e.target.value)}
-              placeholder="Contoh: Matematika Terpadu / IPA"
               required
-            />
+              className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2.5 outline-none cursor-pointer focus:ring-2 focus:ring-[#0D7A5F]/20 focus:border-[#0D7A5F]"
+            >
+              <option value="" disabled>
+                -- Pilih Mata Pelajaran --
+              </option>
+              {/* If existing slot has a custom subject not in the active subjects list, display it */}
+              {formSubject &&
+                !subjects.some((s) => s.name.toLowerCase() === formSubject.toLowerCase()) && (
+                  <option value={formSubject}>
+                    {formSubject} (Kustom)
+                  </option>
+                )}
+              {subjects.map((s) => (
+                <option key={s.id} value={s.name}>
+                  {s.name} {s.category ? `• [${s.category}]` : ''}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-1">
@@ -383,6 +497,15 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
           </div>
         </form>
       </Modal>
+
+      {/* Subject Management Modal */}
+      <SubjectManagementModal
+        isOpen={isSubjectModalOpen}
+        onClose={() => setIsSubjectModalOpen(false)}
+        subjects={subjects}
+        onUpdateSubjects={handleUpdateSubjects}
+        schedules={schedules}
+      />
     </div>
   );
 };
