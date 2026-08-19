@@ -337,7 +337,7 @@ export const SubjectManagementModal: React.FC<SubjectManagementModalProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="🔍 Cari mata pelajaran..."
-              className="w-full text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pr-8 outline-none focus:bg-white focus:border-slate-400 transition-all"
+              className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-2 pr-8 outline-none focus:ring-2 focus:ring-slate-200 transition-all"
             />
             {searchQuery && (
               <button
