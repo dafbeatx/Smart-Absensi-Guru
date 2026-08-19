@@ -174,7 +174,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="🔍 Ketik untuk mencari..."
-                className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-1.5 pr-7 outline-none focus:border-[#023246] transition-all"
+                className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-1.5 pr-7 outline-none focus:ring-2 focus:ring-slate-200 transition-all"
               />
               {search && (
                 <button
