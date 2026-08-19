@@ -39,6 +39,14 @@ export const DEFAULT_SUBJECTS: SubjectItem[] = [
 
 export const SUBJECTS_STORAGE_KEY = 'smart_absensi_subjects';
 
+const CATEGORIES: SubjectItem['category'][] = [
+  'Umum / Wajib',
+  'Keagamaan',
+  'Muatan Lokal',
+  'Peminatan / Kejuruan',
+  'Lainnya',
+];
+
 interface SubjectManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -58,14 +66,15 @@ export const SubjectManagementModal: React.FC<SubjectManagementModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
 
-  // Form add / edit state
+  // Form toggle & state
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [categoryInput, setCategoryInput] = useState<SubjectItem['category']>('Umum / Wajib');
   const [codeInput, setCodeInput] = useState('');
 
-  // Reset form
   const resetForm = () => {
+    setIsFormOpen(false);
     setEditingSubjectId(null);
     setNameInput('');
     setCategoryInput('Umum / Wajib');
@@ -76,6 +85,7 @@ export const SubjectManagementModal: React.FC<SubjectManagementModalProps> = ({
     if (!isOpen) {
       resetForm();
       setSearchQuery('');
+      setSelectedCategoryFilter('ALL');
     }
   }, [isOpen]);
 
@@ -91,11 +101,17 @@ export const SubjectManagementModal: React.FC<SubjectManagementModalProps> = ({
     return map;
   }, [schedules]);
 
+  const handleStartAdd = () => {
+    resetForm();
+    setIsFormOpen(true);
+  };
+
   const handleStartEdit = (sub: SubjectItem) => {
     setEditingSubjectId(sub.id);
     setNameInput(sub.name);
     setCategoryInput(sub.category);
     setCodeInput(sub.code || '');
+    setIsFormOpen(true);
   };
 
   const handleSaveSubject = (e: React.FormEvent) => {
@@ -186,205 +202,292 @@ export const SubjectManagementModal: React.FC<SubjectManagementModalProps> = ({
     });
   }, [subjects, searchQuery, selectedCategoryFilter]);
 
-  const categories: SubjectItem['category'][] = [
-    'Umum / Wajib',
-    'Peminatan / Kejuruan',
-    'Muatan Lokal',
-    'Keagamaan',
-    'Lainnya',
-  ];
+  const getCategoryBadgeClass = (category: SubjectItem['category']) => {
+    switch (category) {
+      case 'Keagamaan':
+        return 'bg-amber-50 text-amber-800 border-amber-200';
+      case 'Muatan Lokal':
+        return 'bg-purple-50 text-purple-800 border-purple-200';
+      case 'Peminatan / Kejuruan':
+        return 'bg-blue-50 text-blue-800 border-blue-200';
+      case 'Umum / Wajib':
+      default:
+        return 'bg-emerald-50 text-emerald-800 border-emerald-200';
+    }
+  };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="📚 Kelola Master Mata Pelajaran">
-      <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
-        {/* Form Add / Edit */}
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-black text-[#023246] flex items-center gap-1.5">
-              <span>{editingSubjectId ? '✏️ Edit Mata Pelajaran' : '➕ Tambah Mata Pelajaran Baru'}</span>
-            </h4>
-            {editingSubjectId && (
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="lg">
+      <div className="space-y-4 max-h-[80vh] flex flex-col">
+        {/* Header Section */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-lg shrink-0">
+              📚
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-[#023246]">Kelola Mata Pelajaran</h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                {subjects.length} mata pelajaran terdaftar
+              </p>
+            </div>
+          </div>
+
+          {!isFormOpen && (
+            <button
+              type="button"
+              onClick={handleStartAdd}
+              className="px-3 py-1.5 text-xs font-extrabold bg-[#023246] hover:bg-[#287094] text-white rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <span>➕</span> Tambah Mapel
+            </button>
+          )}
+        </div>
+
+        {/* Collapsible Add / Edit Form */}
+        {isFormOpen && (
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-[#023246] flex items-center gap-1.5">
+                {editingSubjectId ? '✏️ Edit Mata Pelajaran' : '➕ Tambah Mata Pelajaran Baru'}
+              </span>
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-[11px] font-bold text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                className="text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
               >
-                Batal Edit
+                Batal
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSubject} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                    Nama Mata Pelajaran *
+                  </label>
+                  <Input
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Contoh: Matematika Terpadu"
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                    Kode Singkat
+                  </label>
+                  <Input
+                    value={codeInput}
+                    onChange={(e) => setCodeInput(e.target.value)}
+                    placeholder="Contoh: MTK"
+                    maxLength={8}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-2.5 pt-1">
+                <div className="flex-1 space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                    Kategori
+                  </label>
+                  <select
+                    value={categoryInput}
+                    onChange={(e) => setCategoryInput(e.target.value as SubjectItem['category'])}
+                    className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none cursor-pointer"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={resetForm}
+                    className="px-3 py-2 text-xs font-bold"
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    className="px-4 py-2 text-xs font-extrabold shadow-xs"
+                  >
+                    {editingSubjectId ? 'Simpan' : 'Tambahkan'}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Search & Filter Category Pills */}
+        <div className="space-y-2">
+          {/* Search Box */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Cari mata pelajaran..."
+              className="w-full text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pr-8 outline-none focus:bg-white focus:border-slate-400 transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                ✕
               </button>
             )}
           </div>
 
-          <form onSubmit={handleSaveSubject} className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div className="sm:col-span-2 space-y-1">
-                <label className="block text-[11px] font-bold text-slate-700">Nama Mata Pelajaran *</label>
-                <Input
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Contoh: Matematika Terpadu / Robotika"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold text-slate-700">Kode Mapel (Opsional)</label>
-                <Input
-                  value={codeInput}
-                  onChange={(e) => setCodeInput(e.target.value)}
-                  placeholder="Contoh: MTK"
-                  maxLength={8}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-2.5 pt-1">
-              <div className="flex-1 space-y-1">
-                <label className="block text-[11px] font-bold text-slate-700">Kategori Mapel</label>
-                <select
-                  value={categoryInput}
-                  onChange={(e) => setCategoryInput(e.target.value as SubjectItem['category'])}
-                  className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none cursor-pointer"
-                >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <Button
-                type="submit"
-                variant="primary"
-                className="px-4 py-2 text-xs font-extrabold rounded-xl shadow-xs shrink-0 flex items-center justify-center gap-1.5"
-              >
-                {editingSubjectId ? '💾 Simpan Perubahan' : '➕ Tambah Mapel'}
-              </Button>
-            </div>
-          </form>
-        </div>
-
-        {/* Filter & Search Bar */}
-        <div className="space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span className="text-xs font-extrabold text-[#023246]">
-              Daftar Mata Pelajaran ({filteredSubjects.length} dari {subjects.length})
-            </span>
+          {/* Category Filter Pills */}
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
             <button
               type="button"
-              onClick={handleResetToDefault}
-              className="text-[11px] font-bold text-slate-500 hover:text-slate-800 hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+              onClick={() => setSelectedCategoryFilter('ALL')}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold whitespace-nowrap transition-all cursor-pointer ${
+                selectedCategoryFilter === 'ALL'
+                  ? 'bg-[#023246] text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
             >
-              🔄 Reset ke Kurikulum Standar
+              Semua ({subjects.length})
             </button>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="flex-1">
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="🔍 Cari nama atau kode mapel..."
-              />
-            </div>
-            <select
-              value={selectedCategoryFilter}
-              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-              className="text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none cursor-pointer shrink-0"
-            >
-              <option value="ALL">Semua Kategori</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            {CATEGORIES.map((cat) => {
+              const count = subjects.filter((s) => s.category === cat).length;
+              if (count === 0 && selectedCategoryFilter !== cat) return null;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter(cat)}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold whitespace-nowrap transition-all cursor-pointer ${
+                    selectedCategoryFilter === cat
+                      ? 'bg-[#023246] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {cat} ({count})
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Subjects List */}
-        <div className="space-y-2">
+        {/* Subjects List (Clean & Compact Table/Rows) */}
+        <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5 max-h-[42vh] divide-y divide-slate-100">
           {filteredSubjects.length === 0 ? (
-            <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 font-medium">
-              Tidak ada mata pelajaran yang cocok dengan pencarian "{searchQuery}".
+            <div className="text-center py-10 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 font-medium space-y-2">
+              <span className="text-2xl block">🔍</span>
+              <p className="font-bold text-slate-700">Mata Pelajaran Tidak Ditemukan</p>
+              <p className="text-[11px] text-slate-400">
+                {searchQuery
+                  ? `Tidak ada mapel dengan kata kunci "${searchQuery}"`
+                  : 'Belum ada mata pelajaran dalam kategori ini.'}
+              </p>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                >
+                  Reset Pencarian
+                </button>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {filteredSubjects.map((sub) => {
-                const count = usageCountMap[sub.name.trim().toLowerCase()] || 0;
-                const isSelectedForEdit = editingSubjectId === sub.id;
+            filteredSubjects.map((sub) => {
+              const count = usageCountMap[sub.name.trim().toLowerCase()] || 0;
+              const isSelected = editingSubjectId === sub.id;
 
-                return (
-                  <div
-                    key={sub.id}
-                    className={`p-3 rounded-2xl border transition-all flex flex-col justify-between gap-2 ${
-                      isSelectedForEdit
-                        ? 'bg-emerald-50/50 border-emerald-400 ring-2 ring-emerald-200'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {sub.code && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-mono font-black uppercase bg-slate-100 text-slate-700 rounded-md border border-slate-200 shrink-0">
-                              {sub.code}
-                            </span>
-                          )}
-                          <span
-                            className={`px-2 py-0.5 text-[9px] font-bold rounded-md shrink-0 ${
-                              sub.category === 'Keagamaan'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : sub.category === 'Muatan Lokal'
-                                ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                : sub.category === 'Peminatan / Kejuruan'
-                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            }`}
-                          >
-                            {sub.category}
-                          </span>
-                        </div>
-                        <p className="text-xs font-black text-[#023246] truncate">{sub.name}</p>
-                      </div>
+              return (
+                <div
+                  key={sub.id}
+                  className={`py-2 px-3 rounded-xl transition-colors flex items-center justify-between gap-3 ${
+                    isSelected
+                      ? 'bg-emerald-50/70 border border-emerald-300'
+                      : 'hover:bg-slate-50'
+                  }`}
+                >
+                  {/* Left: Code, Name, Category */}
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {sub.code && (
+                      <span className="px-1.5 py-0.5 text-[9px] font-mono font-black uppercase bg-slate-100 text-slate-700 rounded-md shrink-0">
+                        {sub.code}
+                      </span>
+                    )}
+                    <span className="text-xs font-bold text-slate-800 truncate" title={sub.name}>
+                      {sub.name}
+                    </span>
+                    <span
+                      className={`hidden sm:inline-block px-2 py-0.5 text-[9px] font-bold rounded-md border shrink-0 ${getCategoryBadgeClass(
+                        sub.category
+                      )}`}
+                    >
+                      {sub.category}
+                    </span>
+                  </div>
 
-                      {count > 0 && (
-                        <span
-                          title={`${count} jadwal mengajar menggunakan mapel ini`}
-                          className="px-2 py-0.5 text-[10px] font-extrabold bg-[#023246]/5 text-[#023246] rounded-full shrink-0"
-                        >
-                          {count} jadwal
-                        </span>
-                      )}
-                    </div>
+                  {/* Right: Usage & Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {count > 0 && (
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {count} jadwal
+                      </span>
+                    )}
 
-                    <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-slate-100">
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => handleStartEdit(sub)}
-                        className="px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                        title="Edit Mapel"
+                        className="w-7 h-7 flex items-center justify-center text-xs text-amber-700 hover:bg-amber-100 rounded-lg transition-colors cursor-pointer"
                       >
-                        ✏️ Edit
+                        ✏️
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteSubject(sub)}
-                        className="px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Hapus Mapel"
+                        className="w-7 h-7 flex items-center justify-center text-xs text-rose-600 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer"
                       >
-                        🗑️ Hapus
+                        🗑️
                       </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })
           )}
         </div>
 
-        {/* Modal Footer */}
-        <div className="pt-3 flex items-center justify-end border-t border-slate-100">
-          <Button variant="secondary" type="button" onClick={onClose} className="px-5 py-2 text-xs font-extrabold">
-            Tutup
+        {/* Footer Actions */}
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={handleResetToDefault}
+            className="text-[11px] font-bold text-slate-500 hover:text-slate-800 hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            🔄 Reset Standar Kurikulum
+          </button>
+
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-extrabold"
+          >
+            Selesai
           </Button>
         </div>
       </div>
