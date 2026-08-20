@@ -1339,7 +1339,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <div className="space-y-1">
                 <div className="flex justify-between text-[10px] font-bold text-slate-600">
                   <span>Kemajuan Level</span>
-                  <span>{appreciationScore.levelProgressPercent}% (Target: {appreciationScore.nextLevelPoints} Pts)</span>
+                  <span>{appreciationScore.levelProgressPercent}% (Target: {appreciationScore.nextLevelPoints} Poin)</span>
                 </div>
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/60">
                   <div
@@ -2137,7 +2137,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                   </div>
                   <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl shadow-2xs">
-                    {appreciationScore.totalPoints} PTS
+                    {appreciationScore.totalPoints} Poin
                   </span>
                 </div>
 
