@@ -57,13 +57,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const sidebarContent = (
     <aside
-      className={`bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col border-r border-[#D4D4CE]/20 h-full w-56 ${
-        isDesktopFixed ? 'hidden lg:flex fixed top-0 left-0 bottom-0' : 'w-56'
+      className={`bg-[#023246] text-[#F6F6F6] z-50 shadow-2xl flex flex-col border-r border-[#D4D4CE]/20 h-full w-60 ${
+        isDesktopFixed ? 'hidden lg:flex fixed top-0 left-0 bottom-0' : 'w-60'
       }`}
       aria-label="Navigation Sidebar"
     >
       {/* Brand Logo Header (Delta Symbol + SMART ABSENSI GURU) */}
-      <div className="p-5 border-b border-[#D4D4CE]/15 flex items-center gap-3 bg-[#012332]">
+      <div className="p-4 border-b border-[#D4D4CE]/15 flex items-center gap-3 bg-[#012332]">
         <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-white/30 flex items-center justify-center shrink-0 shadow-md">
           <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
         </div>
@@ -74,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation Items List */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-1 custom-scrollbar">
         {items.map((item) => {
           const isActive = activeTab === item.id;
           const hasBadge = item.badge !== undefined && item.badge !== null && item.badge !== 0 && item.badge !== '0';
@@ -85,35 +85,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onSelectTab(item.id);
                 onClose();
               }}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all relative ${
                 isActive
-                  ? 'bg-[#287094] text-white font-extrabold shadow-md shadow-[#287094]/40 border border-[#D4D4CE]/30'
-                  : 'text-[#D4D4CE] hover:bg-[#0c4156] hover:text-white border border-transparent'
+                  ? 'bg-[#287094] text-white font-bold shadow-xs'
+                  : 'text-[#D4D4CE] hover:bg-[#0c4156] hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-sm">{item.icon}</span>
+              <div className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+                <span className="text-sm shrink-0">{item.icon}</span>
                 <span className="truncate">{item.label}</span>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 {hasBadge && (
                   <span
-                    className={`px-2 py-0.5 text-[10px] font-black rounded-full shadow-xs flex items-center justify-center min-w-5 h-4.5 ${
+                    className={`px-1.5 py-0.2 text-[10px] font-extrabold rounded-full tabular-nums shrink-0 leading-tight flex items-center justify-center min-w-5 h-4.5 transition-colors ${
                       item.badgeVariant === 'EMERALD'
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
                         : item.badgeVariant === 'AMBER'
-                        ? 'bg-amber-500 text-white'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
                         : item.badgeVariant === 'BLUE'
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-sky-500/20 text-sky-300 border border-sky-400/30'
                         : item.badgeVariant === 'NEUTRAL'
-                        ? 'bg-slate-700 text-slate-200 border border-slate-600'
-                        : 'bg-red-600 text-white ring-1 ring-white/30 shadow-red-500/50'
+                        ? 'bg-white/10 text-slate-300 border border-white/10'
+                        : 'bg-rose-500 text-white shadow-2xs'
                     }`}
                   >
                     {item.badge}
                   </span>
                 )}
-                {item.hasDropdown && <span className="text-[10px] text-[#D4D4CE]/60">▼</span>}
+                {item.hasDropdown && <span className="text-[9px] text-[#D4D4CE]/60 ml-0.5">▼</span>}
               </div>
             </button>
           );
@@ -236,35 +236,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onSelectTab(item.id);
                         onClose();
                       }}
-                      className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                         isActive
                           ? 'bg-slate-100 text-[#023246] font-black border border-slate-200/80 shadow-2xs'
                           : 'text-slate-700 hover:bg-slate-50 font-medium'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-base">{item.icon}</span>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+                        <span className="text-base shrink-0">{item.icon}</span>
                         <span className="truncate">{item.label}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         {item.badge !== undefined && item.badge !== null && item.badge !== 0 && item.badge !== '0' && (
                           <span
-                            className={`px-2 py-0.5 text-[10px] font-black rounded-full shadow-xs flex items-center justify-center min-w-5 h-4.5 ${
+                            className={`px-1.5 py-0.2 text-[10px] font-extrabold rounded-full tabular-nums shrink-0 leading-tight flex items-center justify-center min-w-5 h-4.5 ${
                               item.badgeVariant === 'EMERALD'
-                                ? 'bg-emerald-600 text-white'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 : item.badgeVariant === 'AMBER'
-                                ? 'bg-amber-500 text-white'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
                                 : item.badgeVariant === 'BLUE'
-                                ? 'bg-blue-600 text-white'
+                                ? 'bg-sky-100 text-sky-800 border border-sky-300'
                                 : item.badgeVariant === 'NEUTRAL'
-                                ? 'bg-slate-200 text-slate-800'
-                                : 'bg-red-600 text-white ring-1 ring-red-300 shadow-xs'
+                                ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                                : 'bg-rose-500 text-white shadow-2xs'
                             }`}
                           >
                             {item.badge}
                           </span>
                         )}
-                        {item.hasDropdown && <span className="text-[10px] text-slate-400">▼</span>}
+                        {item.hasDropdown && <span className="text-[9px] text-slate-400 ml-0.5">▼</span>}
                       </div>
                     </button>
                   );

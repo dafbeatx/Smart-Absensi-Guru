@@ -301,22 +301,16 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     historicalUnabsented,
   ]);
 
-  const totalKepsekAlerts = (unabsentedTeachers.length > 0 ? unabsentedTeachers.length : 0) + pendingRequests.length + pendingComplaintsCount;
-
   const sidebarItems: SidebarItem[] = [
     {
       id: 'DASHBOARD',
       label: 'Dashboard',
       icon: '🏠',
-      badge: totalKepsekAlerts > 0 ? totalKepsekAlerts : undefined,
-      badgeVariant: 'RED',
     },
     {
       id: 'ACCOUNT_APPLICATIONS',
       label: 'Manajemen Guru & Staf',
       icon: '👥',
-      badge: teachers.length > 0 ? teachers.length : undefined,
-      badgeVariant: 'NEUTRAL',
     },
     {
       id: 'COMPLAINTS',
@@ -362,7 +356,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       />
 
       {/* ── RIGHT MAIN CONTAINER ────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-56">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-60">
         {/* Top Header Navbar */}
         <TopDashboardNavbar
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}

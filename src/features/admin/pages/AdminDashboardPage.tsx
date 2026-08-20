@@ -25,8 +25,6 @@ import { ExecutiveDashboardOverview } from '../../../components/dashboard/Execut
 import { AdminCommandPaletteModal } from '../../../components/dashboard/AdminCommandPaletteModal';
 import { AnonymousComplaintManagement } from '../components/AnonymousComplaintManagement';
 import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
-import { TeachingScheduleRepository, TEACHING_SCHEDULES_UPDATED_EVENT } from '../../../repositories/TeachingScheduleRepository';
-import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
 import { AnalyticsService } from '../../../services/analytics.service';
 import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
@@ -359,59 +357,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     );
   }, [attendanceRecords, user, todayStr]);
 
-  // 3. Teaching schedules count today
-  const [todaySchedulesCount, setTodaySchedulesCount] = useState<number>(0);
-  const fetchSchedulesCount = useCallback(async () => {
-    try {
-      const allSlots = await TeachingScheduleRepository.getSchedules();
-      const dayNamesEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const dayNamesId = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-      const todayDayIdx = new Date().getDay();
-      const currentDayEn = dayNamesEn[todayDayIdx];
-      const currentDayId = dayNamesId[todayDayIdx];
-
-      const todaySlots = allSlots.filter(
-        (s) => s.day === currentDayEn || s.day === currentDayId
-      );
-      setTodaySchedulesCount(todaySlots.length);
-    } catch {
-      setTodaySchedulesCount(0);
-    }
-  }, []);
-
-  // 4. Duty teachers count today
-  const [todayDutyCount, setTodayDutyCount] = useState<number>(0);
-  const fetchDutyCount = useCallback(async () => {
-    try {
-      const dayOfWeek = new Date().getDay(); // 1 = Senin..5 = Jumat
-      const list = await DutyScheduleRepository.getDutyTeachersForDay(dayOfWeek);
-      setTodayDutyCount(list.length);
-    } catch {
-      setTodayDutyCount(0);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSchedulesCount();
-    fetchDutyCount();
-    window.addEventListener(TEACHING_SCHEDULES_UPDATED_EVENT, fetchSchedulesCount);
-    window.addEventListener('smart_absensi_duty_schedules_updated', fetchDutyCount);
-    return () => {
-      window.removeEventListener(TEACHING_SCHEDULES_UPDATED_EVENT, fetchSchedulesCount);
-      window.removeEventListener('smart_absensi_duty_schedules_updated', fetchDutyCount);
-    };
-  }, [fetchSchedulesCount, fetchDutyCount]);
-
-  // Total critical alerts for Dashboard main badge
-  const totalDashboardAlerts = (unabsentedCount > 0 ? unabsentedCount : 0) + pendingRequests.length + pendingComplaintsCount;
-
   const sidebarItems: SidebarItem[] = [
     {
       id: 'DASHBOARD',
       label: 'Dashboard',
       icon: '🏠',
-      badge: totalDashboardAlerts > 0 ? totalDashboardAlerts : undefined,
-      badgeVariant: 'RED',
     },
     {
       id: 'ATTENDANCE_TRACKING',
@@ -424,8 +374,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       id: 'TEACHERS',
       label: 'Manajemen Guru & Staf',
       icon: '👥',
-      badge: teachers.length > 0 ? teachers.length : undefined,
-      badgeVariant: 'NEUTRAL',
     },
     {
       id: 'COMPLAINTS',
@@ -438,15 +386,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       id: 'SCHEDULE',
       label: 'Jadwal Mengajar',
       icon: '🗓️',
-      badge: todaySchedulesCount > 0 ? todaySchedulesCount : undefined,
-      badgeVariant: 'BLUE',
     },
     {
       id: 'DUTY_SCHEDULE',
       label: 'Jadwal Piket Guru',
       icon: '🛡️',
-      badge: todayDutyCount > 0 ? todayDutyCount : undefined,
-      badgeVariant: 'BLUE',
     },
     { id: 'CALENDAR', label: 'Kalender', icon: '📅' },
     {
@@ -513,7 +457,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       />
 
       {/* ── RIGHT MAIN CONTAINER ────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-56">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-60">
         {/* Top Header Navbar */}
         <TopDashboardNavbar
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
