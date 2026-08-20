@@ -271,7 +271,9 @@ class NotificationPermissionService {
    * Helper: Trigger Notifikasi Guru Absen Masuk (Check-In)
    */
   public notifyTeacherCheckIn(teacherName: string, timeStr: string, userId?: string) {
+    const todayIso = new Date().toISOString().substring(0, 10);
     this.sendNativeNotification({
+      id: `notif_in_${userId || teacherName.replace(/\s+/g, '_')}_${todayIso}_${timeStr.replace(':', '')}`,
       title: `🟢 Presensi Masuk: ${teacherName}`,
       body: `Bapak/Ibu ${teacherName} telah melakukan presensi masuk pada pukul ${timeStr} WIB.`,
       type: 'CHECK_IN',
@@ -286,7 +288,9 @@ class NotificationPermissionService {
    * Helper: Trigger Notifikasi Guru Absen Keluar (Check-Out)
    */
   public notifyTeacherCheckOut(teacherName: string, timeStr: string, userId?: string) {
+    const todayIso = new Date().toISOString().substring(0, 10);
     this.sendNativeNotification({
+      id: `notif_out_${userId || teacherName.replace(/\s+/g, '_')}_${todayIso}_${timeStr.replace(':', '')}`,
       title: `🔵 Presensi Pulang: ${teacherName}`,
       body: `Bapak/Ibu ${teacherName} telah melakukan presensi pulang pada pukul ${timeStr} WIB.`,
       type: 'CHECK_OUT',
@@ -302,6 +306,7 @@ class NotificationPermissionService {
    */
   public notifySchoolEvent(eventTitle: string, eventDate: string, description?: string) {
     this.sendNativeNotification({
+      id: `notif_event_${eventDate}_${eventTitle.replace(/\s+/g, '_').substring(0, 20)}`,
       title: `📅 Agenda Sekolah: ${eventTitle}`,
       body: `${eventTitle} (${eventDate})${description ? ' - ' + description : ''}.`,
       type: 'EVENT',
@@ -313,7 +318,9 @@ class NotificationPermissionService {
    * Helper: Trigger Notifikasi Pengajuan Izin Baru untuk Admin / Kepsek
    */
   public notifyTeacherLeaveRequest(teacherName: string, leaveType: string, reason: string) {
+    const todayIso = new Date().toISOString().substring(0, 10);
     this.sendNativeNotification({
+      id: `notif_leave_req_${teacherName.replace(/\s+/g, '_')}_${todayIso}_${leaveType}`,
       title: `📝 Pengajuan Izin Baru: ${teacherName}`,
       body: `${teacherName} mengajukan ${leaveType} (${reason}). Perlu persetujuan Kepala Sekolah/Admin.`,
       type: 'LEAVE_REQUEST',
