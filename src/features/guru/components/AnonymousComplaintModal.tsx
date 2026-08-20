@@ -195,7 +195,7 @@ export const AnonymousComplaintModal: React.FC<AnonymousComplaintModalProps> = (
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Tuliskan kendala sarana, fasilitas kelas, sistem absensi, atau aspirasi Anda secara rinci..."
-            className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] transition-all resize-none shadow-2xs leading-relaxed"
+            className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] transition-all resize-none shadow-2xs leading-relaxed"
           />
         </div>
 

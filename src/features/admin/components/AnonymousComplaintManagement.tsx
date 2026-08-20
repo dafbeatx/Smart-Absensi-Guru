@@ -290,7 +290,7 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari kata kunci isi keluhan..."
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] shadow-2xs"
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] shadow-2xs"
           />
         </div>
       </div>
@@ -500,7 +500,7 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
                 value={responseText}
                 onChange={(e) => setResponseText(e.target.value)}
                 placeholder="Contoh: Terima kasih atas laporannya. Tim sarpras telah memperbaiki proyektor tersebut hari ini..."
-                className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] transition-all resize-none shadow-2xs leading-relaxed"
+                className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] transition-all resize-none shadow-2xs leading-relaxed"
               />
             </div>
 
