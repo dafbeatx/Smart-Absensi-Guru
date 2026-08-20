@@ -6,6 +6,7 @@ export interface SidebarItem {
   label: string;
   icon: string;
   badge?: number | string;
+  badgeVariant?: 'RED' | 'AMBER' | 'EMERALD' | 'BLUE' | 'NEUTRAL';
   color?: string;
   hasDropdown?: boolean;
 }
@@ -76,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
         {items.map((item) => {
           const isActive = activeTab === item.id;
+          const hasBadge = item.badge !== undefined && item.badge !== null && item.badge !== 0 && item.badge !== '0';
           return (
             <button
               key={item.id}
@@ -94,12 +96,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="truncate">{item.label}</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                {item.badge !== undefined && item.badge !== null && (
+                {hasBadge && (
                   <span
-                    className={`px-2 py-0.5 text-[10px] font-black rounded-full ${
-                      isActive
-                        ? 'bg-[#F6F6F6] text-[#023246]'
-                        : 'bg-[#287094]/40 text-[#F6F6F6] border border-[#D4D4CE]/30'
+                    className={`px-2 py-0.5 text-[10px] font-black rounded-full shadow-xs flex items-center justify-center min-w-5 h-4.5 ${
+                      item.badgeVariant === 'EMERALD'
+                        ? 'bg-emerald-600 text-white'
+                        : item.badgeVariant === 'AMBER'
+                        ? 'bg-amber-500 text-white'
+                        : item.badgeVariant === 'BLUE'
+                        ? 'bg-blue-600 text-white'
+                        : item.badgeVariant === 'NEUTRAL'
+                        ? 'bg-slate-700 text-slate-200 border border-slate-600'
+                        : 'bg-red-600 text-white ring-1 ring-white/30 shadow-red-500/50'
                     }`}
                   >
                     {item.badge}
@@ -239,8 +247,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span className="truncate">{item.label}</span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {item.badge !== undefined && item.badge !== null && (
-                          <span className="px-2 py-0.5 text-[10px] font-black rounded-full bg-slate-200 text-[#023246]">
+                        {item.badge !== undefined && item.badge !== null && item.badge !== 0 && item.badge !== '0' && (
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-black rounded-full shadow-xs flex items-center justify-center min-w-5 h-4.5 ${
+                              item.badgeVariant === 'EMERALD'
+                                ? 'bg-emerald-600 text-white'
+                                : item.badgeVariant === 'AMBER'
+                                ? 'bg-amber-500 text-white'
+                                : item.badgeVariant === 'BLUE'
+                                ? 'bg-blue-600 text-white'
+                                : item.badgeVariant === 'NEUTRAL'
+                                ? 'bg-slate-200 text-slate-800'
+                                : 'bg-red-600 text-white ring-1 ring-red-300 shadow-xs'
+                            }`}
+                          >
                             {item.badge}
                           </span>
                         )}

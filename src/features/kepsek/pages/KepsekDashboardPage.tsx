@@ -301,12 +301,45 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     historicalUnabsented,
   ]);
 
+  const totalKepsekAlerts = (unabsentedTeachers.length > 0 ? unabsentedTeachers.length : 0) + pendingRequests.length + pendingComplaintsCount;
+
   const sidebarItems: SidebarItem[] = [
-    { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
-    { id: 'ACCOUNT_APPLICATIONS', label: 'Manajemen Guru & Staf', icon: '👥' },
-    { id: 'COMPLAINTS', label: 'Kotak Aspirasi Guru', icon: '💬', badge: pendingComplaintsCount },
-    { id: 'APPROVALS', label: 'Persetujuan Izin/Cuti', icon: '📝', badge: pendingRequests.length, hasDropdown: true },
-    { id: 'UNABSENTED', label: 'Daftar Belum Absen', icon: '⚠️', badge: unabsentedTeachers.length },
+    {
+      id: 'DASHBOARD',
+      label: 'Dashboard',
+      icon: '🏠',
+      badge: totalKepsekAlerts > 0 ? totalKepsekAlerts : undefined,
+      badgeVariant: 'RED',
+    },
+    {
+      id: 'ACCOUNT_APPLICATIONS',
+      label: 'Manajemen Guru & Staf',
+      icon: '👥',
+      badge: teachers.length > 0 ? teachers.length : undefined,
+      badgeVariant: 'NEUTRAL',
+    },
+    {
+      id: 'COMPLAINTS',
+      label: 'Kotak Aspirasi Guru',
+      icon: '💬',
+      badge: pendingComplaintsCount > 0 ? pendingComplaintsCount : undefined,
+      badgeVariant: 'RED',
+    },
+    {
+      id: 'APPROVALS',
+      label: 'Persetujuan Izin/Cuti',
+      icon: '📝',
+      badge: pendingRequests.length > 0 ? pendingRequests.length : undefined,
+      badgeVariant: 'RED',
+      hasDropdown: true,
+    },
+    {
+      id: 'UNABSENTED',
+      label: 'Daftar Belum Absen',
+      icon: '⚠️',
+      badge: unabsentedTeachers.length > 0 ? unabsentedTeachers.length : undefined,
+      badgeVariant: 'RED',
+    },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 

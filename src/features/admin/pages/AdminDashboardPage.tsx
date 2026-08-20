@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
@@ -25,9 +25,12 @@ import { ExecutiveDashboardOverview } from '../../../components/dashboard/Execut
 import { AdminCommandPaletteModal } from '../../../components/dashboard/AdminCommandPaletteModal';
 import { AnonymousComplaintManagement } from '../components/AnonymousComplaintManagement';
 import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
+import { TeachingScheduleRepository, TEACHING_SCHEDULES_UPDATED_EVENT } from '../../../repositories/TeachingScheduleRepository';
+import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
+import { AnalyticsService } from '../../../services/analytics.service';
 import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
-import { isDateOffDay } from '../../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 
@@ -333,17 +336,135 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     setIsExportModalOpen(true);
   };
 
+  const todayStr = getTodayDateInJakarta();
+  const isOffDay = useMemo(() => isDateOffDay(todayStr).isOff, [todayStr]);
+
+  // 1. Unabsented teachers count today
+  const unabsentedCount = useMemo(() => {
+    return AnalyticsService.getUnabsentedTeachers(
+      todayStr,
+      teachers,
+      attendanceRecords,
+      allLeaves
+    ).length;
+  }, [todayStr, teachers, attendanceRecords, allLeaves]);
+
+  // 2. Admin's own attendance check today
+  const hasAdminCheckedIn = useMemo(() => {
+    return attendanceRecords.some(
+      (r) =>
+        (r.user_id === user?.id || (user?.nip && r.user_id === user.nip) || r.user_id === user?.full_name) &&
+        r.date === todayStr &&
+        r.check_in_time
+    );
+  }, [attendanceRecords, user, todayStr]);
+
+  // 3. Teaching schedules count today
+  const [todaySchedulesCount, setTodaySchedulesCount] = useState<number>(0);
+  const fetchSchedulesCount = useCallback(async () => {
+    try {
+      const allSlots = await TeachingScheduleRepository.getSchedules();
+      const dayNamesEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayNamesId = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const todayDayIdx = new Date().getDay();
+      const currentDayEn = dayNamesEn[todayDayIdx];
+      const currentDayId = dayNamesId[todayDayIdx];
+
+      const todaySlots = allSlots.filter(
+        (s) => s.day === currentDayEn || s.day === currentDayId
+      );
+      setTodaySchedulesCount(todaySlots.length);
+    } catch {
+      setTodaySchedulesCount(0);
+    }
+  }, []);
+
+  // 4. Duty teachers count today
+  const [todayDutyCount, setTodayDutyCount] = useState<number>(0);
+  const fetchDutyCount = useCallback(async () => {
+    try {
+      const dayOfWeek = new Date().getDay(); // 1 = Senin..5 = Jumat
+      const list = await DutyScheduleRepository.getDutyTeachersForDay(dayOfWeek);
+      setTodayDutyCount(list.length);
+    } catch {
+      setTodayDutyCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSchedulesCount();
+    fetchDutyCount();
+    window.addEventListener(TEACHING_SCHEDULES_UPDATED_EVENT, fetchSchedulesCount);
+    window.addEventListener('smart_absensi_duty_schedules_updated', fetchDutyCount);
+    return () => {
+      window.removeEventListener(TEACHING_SCHEDULES_UPDATED_EVENT, fetchSchedulesCount);
+      window.removeEventListener('smart_absensi_duty_schedules_updated', fetchDutyCount);
+    };
+  }, [fetchSchedulesCount, fetchDutyCount]);
+
+  // Total critical alerts for Dashboard main badge
+  const totalDashboardAlerts = (unabsentedCount > 0 ? unabsentedCount : 0) + pendingRequests.length + pendingComplaintsCount;
+
   const sidebarItems: SidebarItem[] = [
-    { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
-    { id: 'ATTENDANCE_TRACKING', label: 'Live Tracking', icon: '👁️' },
-    { id: 'TEACHERS', label: 'Manajemen Guru & Staf', icon: '👥' },
-    { id: 'COMPLAINTS', label: 'Kotak Aspirasi Guru', icon: '💬', badge: pendingComplaintsCount },
-    { id: 'SCHEDULE', label: 'Jadwal Mengajar', icon: '🗓️' },
-    { id: 'DUTY_SCHEDULE', label: 'Jadwal Piket Guru', icon: '🛡️' },
+    {
+      id: 'DASHBOARD',
+      label: 'Dashboard',
+      icon: '🏠',
+      badge: totalDashboardAlerts > 0 ? totalDashboardAlerts : undefined,
+      badgeVariant: 'RED',
+    },
+    {
+      id: 'ATTENDANCE_TRACKING',
+      label: 'Live Tracking',
+      icon: '👁️',
+      badge: unabsentedCount > 0 ? unabsentedCount : undefined,
+      badgeVariant: 'RED',
+    },
+    {
+      id: 'TEACHERS',
+      label: 'Manajemen Guru & Staf',
+      icon: '👥',
+      badge: teachers.length > 0 ? teachers.length : undefined,
+      badgeVariant: 'NEUTRAL',
+    },
+    {
+      id: 'COMPLAINTS',
+      label: 'Kotak Aspirasi Guru',
+      icon: '💬',
+      badge: pendingComplaintsCount > 0 ? pendingComplaintsCount : undefined,
+      badgeVariant: 'RED',
+    },
+    {
+      id: 'SCHEDULE',
+      label: 'Jadwal Mengajar',
+      icon: '🗓️',
+      badge: todaySchedulesCount > 0 ? todaySchedulesCount : undefined,
+      badgeVariant: 'BLUE',
+    },
+    {
+      id: 'DUTY_SCHEDULE',
+      label: 'Jadwal Piket Guru',
+      icon: '🛡️',
+      badge: todayDutyCount > 0 ? todayDutyCount : undefined,
+      badgeVariant: 'BLUE',
+    },
     { id: 'CALENDAR', label: 'Kalender', icon: '📅' },
-    { id: 'MY_ATTENDANCE', label: 'Absensi Saya', icon: '📷' },
+    {
+      id: 'MY_ATTENDANCE',
+      label: 'Absensi Saya',
+      icon: '📷',
+      badge: !hasAdminCheckedIn && !isOffDay ? 1 : undefined,
+      badgeVariant: 'RED',
+    },
     { id: 'APPLY_LEAVE', label: 'Pengajuan Izin / Cuti', icon: '📄' },
-    { id: 'APPROVAL', label: 'Approval Cuti Guru', icon: '📝', hasDropdown: true },
+    {
+      id: 'APPROVAL',
+      label: 'Approval Cuti Guru',
+      icon: '📝',
+      badge: pendingRequests.length > 0 ? pendingRequests.length : undefined,
+      badgeVariant: 'RED',
+      hasDropdown: true,
+    },
     { id: 'CORRECTION', label: 'Koreksi Manual', icon: '✏️' },
     { id: 'EXPORT', label: 'Laporan', icon: '📊', hasDropdown: true },
     { id: 'SETTINGS', label: 'Pengaturan', icon: '⚙️', hasDropdown: true },
