@@ -16,6 +16,7 @@ import type {
   TeacherComplaint,
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
+  TeachingSlot,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -1340,6 +1341,26 @@ export class MockProvider implements IDataProvider {
     };
 
     safeSetStorage('smart_absensi_teacher_complaints', JSON.stringify(list));
+    return true;
+  }
+
+  // ── TEACHING SCHEDULES API ────────────────────────────────────────────────
+  public async getTeachingSchedules(_token?: string): Promise<TeachingSlot[]> {
+    const raw = safeGetStorage('smart_absensi_teaching_schedules');
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public async saveTeachingSchedules(
+    schedules: TeachingSlot[],
+    _token?: string
+  ): Promise<boolean> {
+    safeSetStorage('smart_absensi_teaching_schedules', JSON.stringify(schedules));
     return true;
   }
 }

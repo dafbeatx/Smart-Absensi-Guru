@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { TeachingSlot } from '../../../types/database.types';
 import { useAuthStore } from '../../../store/useAuthStore';
+import {
+  TeachingScheduleRepository,
+  TEACHING_SCHEDULES_UPDATED_EVENT,
+} from '../../../repositories/TeachingScheduleRepository';
 
 interface TeachingScheduleModalProps {
   isOpen: boolean;
@@ -20,44 +24,34 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
   const [selectedDay, setSelectedDay] = useState('Semua');
   const [activeSchedules, setActiveSchedules] = useState<TeachingSlot[]>([]);
 
+  const loadSchedules = useCallback(async () => {
+    if (schedule && schedule.length > 0) {
+      setActiveSchedules(schedule);
+      return;
+    }
+
+    if (!user) {
+      setActiveSchedules([]);
+      return;
+    }
+
+    const userSlots = await TeachingScheduleRepository.getTeacherSchedules(
+      user.id,
+      user.full_name || undefined
+    );
+    setActiveSchedules(userSlots);
+  }, [schedule, user]);
+
   useEffect(() => {
     if (!isOpen) return;
 
-    const loadSchedules = () => {
-      if (schedule && schedule.length > 0) {
-        setActiveSchedules(schedule);
-        return;
-      }
-
-      const saved = localStorage.getItem('smart_absensi_teaching_schedules');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            // Filter slots assigned to this logged-in teacher
-            const userSlots = parsed.filter(
-              (s: any) =>
-                s.user_id === user?.id ||
-                (user?.full_name && s.teacher_name === user.full_name)
-            );
-            setActiveSchedules(userSlots);
-            return;
-          }
-        } catch (e) {
-          console.warn('Failed to parse cached teaching schedules:', e);
-        }
-      }
-
-      setActiveSchedules([]);
-    };
-
     loadSchedules();
 
-    window.addEventListener('smart_absensi_schedules_updated', loadSchedules);
+    window.addEventListener(TEACHING_SCHEDULES_UPDATED_EVENT, loadSchedules);
     return () => {
-      window.removeEventListener('smart_absensi_schedules_updated', loadSchedules);
+      window.removeEventListener(TEACHING_SCHEDULES_UPDATED_EVENT, loadSchedules);
     };
-  }, [isOpen, schedule, user?.id, user?.full_name]);
+  }, [isOpen, loadSchedules]);
 
   if (!isOpen) return null;
 

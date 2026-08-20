@@ -5,6 +5,7 @@ import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
 import { SearchableSelect, type SelectOption } from '../../../components/ui/SearchableSelect';
 import { useToastStore } from '../../../store/useToastStore';
+import { TeachingScheduleRepository } from '../../../repositories/TeachingScheduleRepository';
 import {
   SubjectManagementModal,
   DEFAULT_SUBJECTS,
@@ -85,10 +86,18 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   const [formSubject, setFormSubject] = useState<string>('');
   const [formRoom, setFormRoom] = useState<string>('');
 
-  // Persist schedules
+  // Initial load from cloud provider repository with cache fallback
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(schedules));
-    window.dispatchEvent(new CustomEvent('smart_absensi_schedules_updated', { detail: schedules }));
+    TeachingScheduleRepository.getSchedules().then((fetched) => {
+      if (Array.isArray(fetched) && fetched.length > 0) {
+        setSchedules(fetched);
+      }
+    });
+  }, []);
+
+  // Persist schedules to cloud provider & local cache
+  useEffect(() => {
+    TeachingScheduleRepository.saveSchedules(schedules);
   }, [schedules]);
 
   // Handle subjects update

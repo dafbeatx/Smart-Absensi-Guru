@@ -13,6 +13,7 @@ import type {
   TeacherComplaint,
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
+  TeachingSlot,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -78,6 +79,10 @@ export interface IDataProvider {
   getUserComplaints(userId: string, token?: string): Promise<TeacherComplaint[]>;
   getAllComplaints(token?: string): Promise<TeacherComplaint[]>;
   updateComplaintStatus(dto: UpdateComplaintStatusDTO, token?: string): Promise<boolean>;
+
+  // Teaching Schedules API (Jadwal Mengajar Guru)
+  getTeachingSchedules(token?: string): Promise<TeachingSlot[]>;
+  saveTeachingSchedules(schedules: TeachingSlot[], token?: string): Promise<boolean>;
 }
 
 

@@ -35,6 +35,10 @@ import { NotificationService } from '../../../services/notification-permission.s
 import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
 import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
+import {
+  TeachingScheduleRepository,
+  TEACHING_SCHEDULES_UPDATED_EVENT,
+} from '../../../repositories/TeachingScheduleRepository';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import { calculateTeacherAppreciationScore } from '../../../utils/teacher-appreciation.utils';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
@@ -91,6 +95,30 @@ const UserAvatar: React.FC<{
       {initial}
     </div>
   );
+};
+
+// Helper: Real-time Live Status for Teaching Slot
+const getSlotLiveStatus = (
+  timeStr: string,
+  now: Date
+): 'CURRENT' | 'NEXT' | 'FINISHED' | 'UPCOMING' => {
+  try {
+    const parts = timeStr.split('-').map((p) => p.trim());
+    if (parts.length < 2) return 'UPCOMING';
+    const [startStr, endStr] = parts;
+    const [sh, sm] = startStr.split(':').map((n) => parseInt(n, 10));
+    const [eh, em] = endStr.split(':').map((n) => parseInt(n, 10));
+    if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 'UPCOMING';
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    if (currentMin >= startMin && currentMin < endMin) return 'CURRENT';
+    if (currentMin >= endMin) return 'FINISHED';
+    if (startMin > currentMin && startMin - currentMin <= 30) return 'NEXT';
+    return 'UPCOMING';
+  } catch {
+    return 'UPCOMING';
+  }
 };
 
 // Clean UI Icons (Anti AI-Slop standard)
@@ -605,27 +633,53 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         console.warn('Failed to load today mood:', err);
       }
 
-      // 7.5 Load Real Teaching Slots for Logged-In Teacher (No Fake AI Data!)
+      // 7.5 Load Real Teaching Slots for Logged-In Teacher (Cloud + Local Cache Sync)
       try {
-        const savedSchedules = localStorage.getItem('smart_absensi_teaching_schedules');
-        if (savedSchedules) {
-          const parsed = JSON.parse(savedSchedules);
-          if (Array.isArray(parsed)) {
-            const userSlots = parsed.filter(
-              (s: any) =>
-                s &&
-                (s.user_id === effectiveUser.id ||
-                  (effectiveUser.full_name && s.teacher_name === effectiveUser.full_name))
+        const userSlots = await TeachingScheduleRepository.getTeacherSchedules(
+          effectiveUser.id,
+          effectiveUser.full_name || undefined,
+          authToken
+        );
+        setTeachingSlots(userSlots);
+
+        // Automated In-App Notification Push for Today's Teaching Schedule (e.g. Senin / today)
+        const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const todayDayName = dayNames[new Date().getDay()];
+        const todaySlots = userSlots.filter((s) => s && s.day === todayDayName);
+
+        if (todaySlots.length > 0) {
+          const schedNotifId = `notif_teaching_sched_${effectiveUser.id}_${getTodayDateInJakarta()}`;
+          const isSchedRead = NotificationService.isNotificationRead(effectiveUser.id, schedNotifId);
+
+          const slotSummary = todaySlots
+            .map((s) => `${s.subject} (${s.className}, ${s.time.split('-')[0]?.trim()} WIB)`)
+            .join(' • ');
+
+          setNotifications((prev) => {
+            const existingIdx = prev.findIndex(
+              (n) => n.id === schedNotifId || (n.title.includes('Jadwal Mengajar') && n.title.includes(todayDayName))
             );
-            setTeachingSlots(userSlots);
-          } else {
-            setTeachingSlots([]);
-          }
-        } else {
-          setTeachingSlots([]);
+            if (existingIdx !== -1) {
+              return prev.map((n, idx) =>
+                idx === existingIdx
+                  ? { ...n, is_read: Boolean(n.is_read) || isSchedRead }
+                  : n
+              );
+            }
+            const newNotif: AppNotification = {
+              id: schedNotifId,
+              user_id: effectiveUser.id,
+              title: `📅 Jadwal Mengajar Hari Ini (${todayDayName})`,
+              message: `Anda memiliki ${todaySlots.length} jadwal KBM hari ini: ${slotSummary}. Silakan bersiap-siap tepat waktu.`,
+              type: 'INFO',
+              is_read: isSchedRead,
+              created_at: new Date().toISOString(),
+            };
+            return [newNotif, ...prev];
+          });
         }
       } catch (err) {
-        console.warn('Failed to parse cached teaching schedules:', err);
+        console.warn('Failed to load teaching schedules:', err);
         setTeachingSlots([]);
       }
 
@@ -815,6 +869,28 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       loadAllDataRef.current();
     }
   }, []);
+
+  // Listen for real-time teaching schedule updates across windows/tabs
+  useEffect(() => {
+    const handleSchedulesUpdated = async () => {
+      if (!effectiveUser?.id) return;
+      try {
+        const userSlots = await TeachingScheduleRepository.getTeacherSchedules(
+          effectiveUser.id,
+          effectiveUser.full_name || undefined,
+          token || undefined
+        );
+        setTeachingSlots(userSlots);
+      } catch (err) {
+        console.warn('Failed to refresh teaching slots on event:', err);
+      }
+    };
+
+    window.addEventListener(TEACHING_SCHEDULES_UPDATED_EVENT, handleSchedulesUpdated);
+    return () => {
+      window.removeEventListener(TEACHING_SCHEDULES_UPDATED_EVENT, handleSchedulesUpdated);
+    };
+  }, [effectiveUser?.id, effectiveUser?.full_name, token]);
 
   useCrossDeviceSync({
     onSync: handleCrossDeviceSync,
@@ -1688,7 +1764,132 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               )}
             </section>
 
-            {/* 🌟 2.5 SMART CLASS ALARM BANNER (PENGINGAT KBM & PIKET) ─────────── */}
+            {/* 🌟 2.5 JADWAL MENGAJAR HARI INI (REAL-TIME KBM TIMETABLE HUB) ───── */}
+            {(() => {
+              const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+              const todayDayName = dayNames[new Date().getDay()];
+              const todaySlots = teachingSlots.filter((s) => s && s.day === todayDayName);
+
+              return (
+                <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-card space-y-3.5 relative overflow-hidden">
+                  {/* Header */}
+                  <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#023246] to-[#0D7A5F] text-white flex items-center justify-center text-lg shrink-0 shadow-xs ring-4 ring-[#023246]/5">
+                        📖
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-xs sm:text-sm font-black text-[#023246] tracking-tight uppercase">
+                            Jadwal Mengajar Hari Ini
+                          </h3>
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-black rounded-full">
+                            {todayDayName}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-semibold truncate mt-0.5">
+                          {todaySlots.length > 0
+                            ? `${todaySlots.length} Mata Pelajaran Terjadwal`
+                            : 'Tidak ada jam mengajar tatap muka hari ini'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsScheduleModalOpen(true)}
+                      className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-extrabold cursor-pointer transition-all active:scale-95 flex items-center gap-1 shadow-2xs shrink-0"
+                    >
+                      <span>📅 Semua Jadwal</span>
+                    </button>
+                  </div>
+
+                  {/* Schedule Slots List */}
+                  {todaySlots.length === 0 ? (
+                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-xl shrink-0">☕</span>
+                        <p className="text-[11px] font-medium leading-tight">
+                          Tidak ada jam mengajar tatap muka di kelas untuk hari <strong>{todayDayName}</strong>.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsScheduleModalOpen(true)}
+                        className="text-[11px] font-black text-[#0D7A5F] hover:underline shrink-0 cursor-pointer"
+                      >
+                        Lihat Mingguan →
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {todaySlots.map((slot) => {
+                        const status = getSlotLiveStatus(slot.time, currentTime);
+                        const isOngoing = status === 'CURRENT';
+                        const isNext = status === 'NEXT';
+                        const isDone = status === 'FINISHED';
+
+                        return (
+                          <div
+                            key={slot.id}
+                            className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                              isOngoing
+                                ? 'bg-emerald-50/90 border-emerald-400 shadow-xs ring-2 ring-emerald-300/40'
+                                : isNext
+                                ? 'bg-amber-50/80 border-amber-300 shadow-2xs'
+                                : isDone
+                                ? 'bg-slate-50/60 border-slate-200 opacity-75'
+                                : 'bg-white border-slate-200/90 shadow-2xs'
+                            }`}
+                          >
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs sm:text-sm font-black text-[#023246] truncate">
+                                  {slot.subject}
+                                </span>
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-black rounded-lg">
+                                  {slot.className}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium">
+                                <span className="flex items-center gap-1 font-mono font-bold text-slate-700">
+                                  ⏱️ {slot.time} WIB
+                                </span>
+                                <span>📍 {slot.room}</span>
+                              </div>
+                            </div>
+
+                            {/* Real-time Status Badge */}
+                            <div className="shrink-0 text-right">
+                              {isOngoing ? (
+                                <span className="px-2.5 py-1 bg-emerald-600 text-white text-[10px] font-black rounded-xl flex items-center gap-1 shadow-xs animate-pulse">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                  <span>BERLANGSUNG</span>
+                                </span>
+                              ) : isNext ? (
+                                <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl flex items-center gap-1 shadow-xs">
+                                  <span>SELANJUTNYA</span>
+                                </span>
+                              ) : isDone ? (
+                                <span className="px-2 py-0.5 bg-slate-200 text-slate-600 text-[10px] font-bold rounded-lg">
+                                  ✓ Selesai
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold rounded-lg">
+                                  Menunggu
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              );
+            })()}
+
+            {/* 🌟 2.6 SMART CLASS ALARM BANNER (PENGINGAT KBM & PIKET) ─────────── */}
             <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">

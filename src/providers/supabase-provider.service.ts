@@ -18,6 +18,7 @@ import type {
   TeacherComplaint,
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
+  TeachingSlot,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -1694,5 +1695,75 @@ export class SupabaseProvider implements IDataProvider {
     // Always update local cache
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.updateComplaintStatus(dto);
+  }
+
+  // ── TEACHING SCHEDULES API ────────────────────────────────────────────────
+  public async getTeachingSchedules(_token?: string): Promise<TeachingSlot[]> {
+    try {
+      const { data, error } = await this.client
+        .from('teaching_schedules')
+        .select('*')
+        .order('day', { ascending: true });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getTeachingSchedules Supabase query error, fallback to local storage:', error.message);
+      } else if (data && data.length > 0) {
+        return (data as any[]).map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          teacher_name: row.teacher_name,
+          day: row.day,
+          time: row.time,
+          className: row.class_name,
+          subject: row.subject,
+          room: row.room,
+          created_at: row.created_at,
+        }));
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getTeachingSchedules DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getTeachingSchedules();
+  }
+
+  public async saveTeachingSchedules(
+    schedules: TeachingSlot[],
+    _token?: string
+  ): Promise<boolean> {
+    try {
+      const dbRows = schedules.map((s) => ({
+        user_id: s.user_id || 'UNKNOWN',
+        teacher_name: s.teacher_name || 'Guru',
+        day: s.day,
+        time: s.time,
+        class_name: s.className,
+        subject: s.subject,
+        room: s.room,
+      }));
+
+      // Clear existing records and insert current schedules
+      await this.client
+        .from('teaching_schedules')
+        .delete()
+        .neq('day', '__CLEAR_ALL_RECORDS__');
+
+      if (dbRows.length > 0) {
+        const { error: insertErr } = await this.client
+          .from('teaching_schedules')
+          .insert(dbRows);
+
+        if (insertErr) {
+          logger.warn('SupabaseProvider', 'saveTeachingSchedules insert error:', insertErr.message);
+        }
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'saveTeachingSchedules DB exception:', err);
+    }
+
+    // Always update local cache
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.saveTeachingSchedules(schedules);
   }
 }

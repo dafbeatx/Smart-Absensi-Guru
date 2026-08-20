@@ -146,11 +146,14 @@ export interface HolidayRecord {
 
 export interface TeachingSlot {
   id: string;
+  user_id?: string;
+  teacher_name?: string;
   day: string;
   time: string;
   className: string;
   subject: string;
   room: string;
+  created_at?: string;
 }
 
 export type TeacherMoodType = 'VERY_HAPPY' | 'HAPPY' | 'NEUTRAL' | 'TIRED' | 'STRESSED';
