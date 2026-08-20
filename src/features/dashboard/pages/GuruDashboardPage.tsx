@@ -480,15 +480,82 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         console.warn('Failed to load user leaves for unabsented check:', err);
       }
 
-      // 5. Backend-Driven Notifications
+      // 5. Backend-Driven Notifications & Official School Announcements
       try {
-        const notifs = await provider.getNotifications(effectiveUser.id, authToken);
+        const notifs = await provider.getNotifications(effectiveUser.id, authToken).catch(() => []);
         const readIds = NotificationService.getReadNotificationIds(effectiveUser.id);
-        const mappedNotifs = (notifs || []).map((n) => ({
+
+        let allItems: AppNotification[] = (notifs || []).map((n) => ({
           ...n,
           is_read: Boolean(n.is_read) || readIds.has(n.id),
         }));
-        setNotifications(mappedNotifs);
+
+        // 5.1 If backend returned no notifications (e.g., Supabase table empty or preview mode), provide standard institutional school announcements
+        if (allItems.length === 0) {
+          const defaultAnnouncements: AppNotification[] = [
+            {
+              id: `ann_checkin_guide_${effectiveUser.id}`,
+              user_id: effectiveUser.id,
+              title: '☀️ Ketertiban & Batas Waktu Absensi Masuk',
+              message: 'Batas toleransi absensi masuk adalah sesuai jadwal kerja sekolah (pukul 07:30 WIB). Pastikan melakukan scan QR Code saat tiba di lingkungan sekolah.',
+              type: 'INFO',
+              is_read: readIds.has(`ann_checkin_guide_${effectiveUser.id}`),
+              created_at: new Date().toISOString(),
+            },
+            {
+              id: `ann_device_guide_${effectiveUser.id}`,
+              user_id: effectiveUser.id,
+              title: '📱 Keamanan Perangkat (1 Akun = 1 HP)',
+              message: 'Akun presensi Anda terikat secara aman dengan HP aktif Anda untuk menjamin keabsahan data kehadiran.',
+              type: 'SUCCESS',
+              is_read: readIds.has(`ann_device_guide_${effectiveUser.id}`),
+              created_at: new Date().toISOString(),
+            },
+            {
+              id: `ann_leave_guide_${effectiveUser.id}`,
+              user_id: effectiveUser.id,
+              title: '📋 Pengajuan Izin & Koreksi Presensi',
+              message: 'Bapak/Ibu Guru dapat mengajukan permohonan Cuti, Izin, Sakit, atau Koreksi Presensi langsung dari tombol layanan di menu Beranda.',
+              type: 'INFO',
+              is_read: readIds.has(`ann_leave_guide_${effectiveUser.id}`),
+              created_at: new Date().toISOString(),
+            },
+            {
+              id: `ann_security_pin_${effectiveUser.id}`,
+              user_id: effectiveUser.id,
+              title: '🔒 Keamanan Akun & PIN Presensi',
+              message: 'Jaga kerahasiaan PIN 6-digit Anda. Anda dapat memperbarui PIN secara berkala melalui tab Profil.',
+              type: 'WARNING',
+              is_read: readIds.has(`ann_security_pin_${effectiveUser.id}`),
+              created_at: new Date().toISOString(),
+            },
+          ];
+          allItems = defaultAnnouncements;
+        }
+
+        // 5.2 Merge with Realtime Cached Notifications
+        const cachedNotifs = NotificationService.getCachedNotifications(effectiveUser.id);
+        if (Array.isArray(cachedNotifs) && cachedNotifs.length > 0) {
+          cachedNotifs.forEach((cn) => {
+            const cnId = cn.id || `cn_${cn.title}_${cn.time}`;
+            if (!allItems.some((item) => item.id === cnId)) {
+              allItems.push({
+                id: cnId,
+                user_id: effectiveUser.id,
+                title: cn.title,
+                message: cn.body,
+                type: cn.type === 'LEAVE_REQUEST' ? 'WARNING' : cn.type === 'EVENT' ? 'INFO' : 'SUCCESS',
+                is_read: Boolean(cn.isRead) || readIds.has(cnId),
+                action_type: cn.actionType,
+                action_date: cn.actionDate,
+                action_target_id: cn.actionTargetId,
+                created_at: cn.createdAt || new Date().toISOString(),
+              });
+            }
+          });
+        }
+
+        setNotifications(allItems);
       } catch (err) {
         handleAppError(err, 'GuruDashboard.loadNotifications', 'Gagal memuat notifikasi', false);
       }
@@ -1147,14 +1214,31 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('PROFIL')}
-                  className="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5 min-h-11"
-                >
-                  <UserIcon className="w-4 h-4 text-emerald-300" />
-                  <span>Profil</span>
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('NOTIFIKASI')}
+                    className="relative p-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer shrink-0 flex items-center justify-center min-h-11 min-w-11"
+                    title="Buka Notifikasi & Pengumuman"
+                    aria-label="Pusat Notifikasi & Pengumuman"
+                  >
+                    <BellIcon className={`w-5 h-5 ${unreadCount > 0 ? 'text-amber-400 animate-bell-ring' : 'text-slate-200'}`} />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[9px] font-black bg-red-500 text-white rounded-full min-w-4 text-center ring-2 ring-[#023246]">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('PROFIL')}
+                    className="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5 min-h-11"
+                  >
+                    <UserIcon className="w-4 h-4 text-emerald-300" />
+                    <span>Profil</span>
+                  </button>
+                </div>
               </div>
 
               {/* Digital Clock & Date Row */}

@@ -1267,7 +1267,7 @@ export class SupabaseProvider implements IDataProvider {
       const { data, error } = await this.client
         .from('notifications')
         .select('*')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},user_id.is.null`)
         .order('created_at', { ascending: false });
 
       if (error) {
