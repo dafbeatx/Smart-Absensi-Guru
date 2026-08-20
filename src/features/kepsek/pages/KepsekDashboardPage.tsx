@@ -198,6 +198,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
     const handleLeaveUpdated = () => {
       fetchPendingRequests();
+      fetchAttendanceRecords();
     };
 
     const handleComplaintsUpdated = () => {

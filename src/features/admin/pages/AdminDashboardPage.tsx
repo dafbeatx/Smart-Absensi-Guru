@@ -258,6 +258,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       fetchComplaintsCount();
     };
 
+    const handleLeaveUpdated = () => {
+      fetchPendingRequests();
+      fetchAttendanceRecords();
+    };
+
     const handleComplaintsUpdated = () => {
       fetchComplaintsCount();
     };
@@ -278,9 +283,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
     window.addEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
     window.addEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
     window.addEventListener('storage', handleComplaintsUpdated);
+    window.addEventListener('storage', handleLeaveUpdated);
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -294,9 +301,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
       window.removeEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
       window.removeEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
       window.removeEventListener('storage', handleComplaintsUpdated);
+      window.removeEventListener('storage', handleLeaveUpdated);
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
   }, [user?.id, teachers.length]);

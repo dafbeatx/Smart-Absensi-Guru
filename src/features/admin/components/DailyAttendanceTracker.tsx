@@ -98,38 +98,34 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     };
 
     for (const teacher of activeEligiblePersonnel) {
-      // 1. Check if personnel has explicit attendance record for selectedDate
+      // 1. Check if personnel has an APPROVED leave for selectedDate (High Priority)
+      const approvedLeave = allLeavesToEvaluate.find((l) => {
+        const isApproved =
+          l.approval_status === 'APPROVED' || (l as any).status === 'APPROVED';
+        if (!isApproved) return false;
+        if (!isTeacherLeaveMatch(teacher, l)) return false;
+        const startStr = (l.start_date || '').substring(0, 10);
+        const endStr = (l.end_date || '').substring(0, 10);
+        return startStr <= selectedDate && selectedDate <= endStr;
+      });
+
+      // 2. Check if personnel has explicit attendance record for selectedDate
       const record = attendanceRecords.find(
         (r) => r.date === selectedDate && isTeacherRecordMatch(teacher, r)
       );
 
-      if (record) {
-        const effectiveStatus = evaluateAttendanceStatus(record.check_in_time, checkinEnd, record.status);
-        map.set(teacher.id, {
-          record,
-          status: effectiveStatus,
-          checkInTime: record.check_in_time ? record.check_in_time.substring(0, 5) : undefined,
-          checkOutTime: record.check_out_time ? record.check_out_time.substring(0, 5) : undefined,
-          notes: record.notes,
-        });
-        continue;
-      }
-
-      // 2. Check if personnel has an APPROVED leave for selectedDate
-      const leave = allLeavesToEvaluate.find((l) => {
-        if (l.approval_status !== 'APPROVED') return false;
-        if (!isTeacherLeaveMatch(teacher, l)) return false;
-        return l.start_date <= selectedDate && selectedDate <= l.end_date;
-      });
-
-      if (leave) {
+      if (approvedLeave) {
         let status: AttendanceStatus = 'IZIN';
         let checkInTime: string | undefined = undefined;
         let checkOutTime: string | undefined = undefined;
 
-        if (leave.leave_type === 'KOREKSI_ABSEN') {
-          const reasonText = leave.reason || '';
-          if (reasonText.includes('menjadi HADIR') || reasonText.includes('Target Koreksi') || !reasonText.includes('menjadi ')) {
+        if (approvedLeave.leave_type === 'KOREKSI_ABSEN') {
+          const reasonText = approvedLeave.reason || '';
+          if (
+            reasonText.includes('menjadi HADIR') ||
+            reasonText.includes('Target Koreksi') ||
+            !reasonText.includes('menjadi ')
+          ) {
             status = 'HADIR';
           } else if (reasonText.includes('menjadi SAKIT')) {
             status = 'SAKIT';
@@ -144,15 +140,39 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           if (outMatch) checkOutTime = outMatch[1];
         } else {
           status =
-            leave.leave_type === 'SAKIT' ? 'SAKIT' : leave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+            approvedLeave.leave_type === 'SAKIT'
+              ? 'SAKIT'
+              : approvedLeave.leave_type === 'DINAS_LUAR'
+              ? 'DINAS_LUAR'
+              : 'IZIN';
         }
 
         map.set(teacher.id, {
-          leave,
+          record,
+          leave: approvedLeave,
           status,
-          checkInTime,
-          checkOutTime,
-          notes: leave.leave_type === 'KOREKSI_ABSEN' ? `Koreksi Disetujui: ${leave.reason}` : `Izin Disetujui Kepsek: ${leave.reason}`,
+          checkInTime: record?.check_in_time ? record.check_in_time.substring(0, 5) : checkInTime,
+          checkOutTime: record?.check_out_time ? record.check_out_time.substring(0, 5) : checkOutTime,
+          notes:
+            approvedLeave.leave_type === 'KOREKSI_ABSEN'
+              ? `Koreksi Disetujui: ${approvedLeave.reason}`
+              : `Izin Disetujui: ${approvedLeave.reason}`,
+        });
+        continue;
+      }
+
+      if (record) {
+        const effectiveStatus = evaluateAttendanceStatus(
+          record.check_in_time,
+          checkinEnd,
+          record.status
+        );
+        map.set(teacher.id, {
+          record,
+          status: effectiveStatus,
+          checkInTime: record.check_in_time ? record.check_in_time.substring(0, 5) : undefined,
+          checkOutTime: record.check_out_time ? record.check_out_time.substring(0, 5) : undefined,
+          notes: record.notes,
         });
         continue;
       }

@@ -788,25 +788,54 @@ export class SupabaseProvider implements IDataProvider {
             status = lType === 'SAKIT' ? 'SAKIT' : lType === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
           }
 
-          const startDate = new Date(leaveRow.start_date);
-          const endDate = new Date(leaveRow.end_date);
-          const curr = new Date(startDate);
+          const startStr = (leaveRow.start_date || '').substring(0, 10);
+          const endStr = (leaveRow.end_date || '').substring(0, 10);
 
-          while (curr <= endDate) {
-            const dateStr = curr.toISOString().substring(0, 10);
-            await this.client.from('attendance').upsert(
-              {
+          if (startStr && endStr) {
+            const currDate = new Date(`${startStr}T12:00:00Z`);
+            const endDateObj = new Date(`${endStr}T12:00:00Z`);
+
+            while (currDate <= endDateObj) {
+              const dateStr = currDate.toISOString().substring(0, 10);
+              const attendancePayload = {
                 id: `att_${leaveRow.user_id}_${dateStr}`,
                 user_id: leaveRow.user_id,
                 date: dateStr,
                 status: status,
                 check_in_time: checkInTime,
                 check_out_time: checkOutTime,
-                notes: lType === 'KOREKSI_ABSEN' ? `Koreksi Disetujui: ${notes || leaveRow.reason}` : `Izin Disetujui: ${notes || leaveRow.reason}`,
-              },
-              { onConflict: 'user_id,date' }
-            );
-            curr.setDate(curr.getDate() + 1);
+                notes:
+                  lType === 'KOREKSI_ABSEN'
+                    ? `Koreksi Disetujui: ${notes || leaveRow.reason}`
+                    : `Izin Disetujui: ${notes || leaveRow.reason}`,
+              };
+
+              // Try upsert first
+              const { error: upsertErr } = await this.client
+                .from('attendance')
+                .upsert(attendancePayload, { onConflict: 'user_id,date' });
+
+              if (upsertErr) {
+                // Fallback: Check if record exists, then update or insert
+                const { data: existing } = await this.client
+                  .from('attendance')
+                  .select('id')
+                  .eq('user_id', leaveRow.user_id)
+                  .eq('date', dateStr)
+                  .maybeSingle();
+
+                if (existing) {
+                  await this.client
+                    .from('attendance')
+                    .update(attendancePayload)
+                    .eq('id', existing.id);
+                } else {
+                  await this.client.from('attendance').insert(attendancePayload);
+                }
+              }
+
+              currDate.setUTCDate(currDate.getUTCDate() + 1);
+            }
           }
         }
       } catch (upsertErr) {

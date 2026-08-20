@@ -63,47 +63,89 @@ export class AnalyticsService {
     let totalOfficialDuty = 0;
 
     const userAttendanceMap = new Map<string, AttendanceRecord>();
-
     for (const rec of attendanceRecords) {
       if (rec.date === dateStr) {
         userAttendanceMap.set(rec.user_id, rec);
       }
     }
 
-    const checkinEnd = systemSettings?.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+    const accountedUserIds = new Set<string>();
 
-    userAttendanceMap.forEach((rec) => {
-      const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, checkinEnd, rec.status);
-      if (effectiveStatus === 'HADIR') totalPresent++;
-      else if (effectiveStatus === 'TERLAMBAT') totalLate++;
-      else if (effectiveStatus === 'IZIN') totalLeave++;
-      else if (effectiveStatus === 'SAKIT') totalSick++;
-      else if (effectiveStatus === 'DINAS_LUAR') totalOfficialDuty++;
-    });
-
+    // 1. Process Approved Leaves FIRST (Highest Priority for accounting)
     for (const leave of leaveRequests) {
-      if (leave.approval_status === 'APPROVED' && !userAttendanceMap.has(leave.user_id)) {
-        const start = new Date(leave.start_date);
-        const end = new Date(leave.end_date);
-        const target = new Date(dateStr);
+      const isApproved =
+        leave.approval_status === 'APPROVED' || (leave as any).status === 'APPROVED';
+      if (isApproved) {
+        const startStr = (leave.start_date || '').substring(0, 10);
+        const endStr = (leave.end_date || '').substring(0, 10);
 
-        if (target >= start && target <= end) {
-          if (leave.leave_type === 'SAKIT') totalSick++;
-          else if (leave.leave_type === 'IZIN') totalLeave++;
-          else if (leave.leave_type === 'DINAS_LUAR') totalOfficialDuty++;
+        if (startStr <= dateStr && dateStr <= endStr) {
+          accountedUserIds.add(leave.user_id);
+          if (leave.leave_type === 'SAKIT') {
+            totalSick++;
+          } else if (leave.leave_type === 'DINAS_LUAR') {
+            totalOfficialDuty++;
+          } else if (leave.leave_type === 'KOREKSI_ABSEN') {
+            const reasonText = leave.reason || '';
+            if (reasonText.includes('menjadi SAKIT')) {
+              totalSick++;
+            } else if (reasonText.includes('menjadi DINAS_LUAR')) {
+              totalOfficialDuty++;
+            } else if (reasonText.includes('menjadi IZIN')) {
+              totalLeave++;
+            } else {
+              totalPresent++;
+            }
+          } else {
+            totalLeave++;
+          }
         }
       }
     }
 
-    const totalAccountedFor = totalPresent + totalLate + totalSick + totalLeave + totalOfficialDuty;
-    const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
-    
-    // On Weekend / Holiday, unabsented is 0 because there is no expectation of attendance
-    const totalUnabsented = offCheck.isOff ? 0 : Math.max(0, totalTeachers - totalAccountedFor);
+    // 2. Process remaining attendance records for personnel without approved leaves
+    const checkinEnd =
+      systemSettings?.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
-    const rawPercentage = totalTeachers > 0
-      ? Math.round(((totalPresent + totalLate) / totalTeachers) * 1000) / 10
-      : 0;
+    userAttendanceMap.forEach((rec, uId) => {
+      if (accountedUserIds.has(uId)) return;
+
+      const effectiveStatus = evaluateAttendanceStatus(
+        rec.check_in_time,
+        checkinEnd,
+        rec.status
+      );
+
+      if (effectiveStatus === 'HADIR') {
+        totalPresent++;
+        accountedUserIds.add(uId);
+      } else if (effectiveStatus === 'TERLAMBAT') {
+        totalLate++;
+        accountedUserIds.add(uId);
+      } else if (effectiveStatus === 'IZIN') {
+        totalLeave++;
+        accountedUserIds.add(uId);
+      } else if (effectiveStatus === 'SAKIT') {
+        totalSick++;
+        accountedUserIds.add(uId);
+      } else if (effectiveStatus === 'DINAS_LUAR') {
+        totalOfficialDuty++;
+        accountedUserIds.add(uId);
+      }
+    });
+
+    const totalAccountedFor = accountedUserIds.size;
+    const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
+
+    // On Weekend / Holiday, unabsented is 0 because there is no expectation of attendance
+    const totalUnabsented = offCheck.isOff
+      ? 0
+      : Math.max(0, totalTeachers - totalAccountedFor);
+
+    const rawPercentage =
+      totalTeachers > 0
+        ? Math.round(((totalPresent + totalLate) / totalTeachers) * 1000) / 10
+        : 0;
 
     const attendancePercentage = Math.min(100, Math.max(0, rawPercentage));
 
@@ -138,24 +180,40 @@ export class AnalyticsService {
     }
 
     const activeUserIds = new Set<string>();
-    const checkinEnd = systemSettings?.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
-    for (const rec of attendanceRecords) {
-      if (rec.date === dateStr) {
-        const effectiveStatus = evaluateAttendanceStatus(rec.check_in_time, checkinEnd, rec.status);
-        if (rec.check_in_time || effectiveStatus === 'HADIR' || effectiveStatus === 'TERLAMBAT' || effectiveStatus === 'IZIN' || effectiveStatus === 'SAKIT' || effectiveStatus === 'DINAS_LUAR') {
-          activeUserIds.add(rec.user_id);
+    // 1. Account for Approved Leaves (Guru yang izin/sakit/dinasnya disetujui BUKAN belum absen!)
+    for (const leave of leaveRequests) {
+      const isApproved =
+        leave.approval_status === 'APPROVED' || (leave as any).status === 'APPROVED';
+      if (isApproved) {
+        const startStr = (leave.start_date || '').substring(0, 10);
+        const endStr = (leave.end_date || '').substring(0, 10);
+        if (startStr <= dateStr && dateStr <= endStr) {
+          activeUserIds.add(leave.user_id);
         }
       }
     }
 
-    for (const leave of leaveRequests) {
-      if (leave.approval_status === 'APPROVED') {
-        const start = new Date(leave.start_date);
-        const end = new Date(leave.end_date);
-        const target = new Date(dateStr);
-        if (target >= start && target <= end) {
-          activeUserIds.add(leave.user_id);
+    // 2. Account for Scanned Attendance Records
+    const checkinEnd =
+      systemSettings?.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+
+    for (const rec of attendanceRecords) {
+      if (rec.date === dateStr) {
+        const effectiveStatus = evaluateAttendanceStatus(
+          rec.check_in_time,
+          checkinEnd,
+          rec.status
+        );
+        if (
+          rec.check_in_time ||
+          effectiveStatus === 'HADIR' ||
+          effectiveStatus === 'TERLAMBAT' ||
+          effectiveStatus === 'IZIN' ||
+          effectiveStatus === 'SAKIT' ||
+          effectiveStatus === 'DINAS_LUAR'
+        ) {
+          activeUserIds.add(rec.user_id);
         }
       }
     }
