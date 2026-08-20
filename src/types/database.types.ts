@@ -40,6 +40,9 @@ export interface AppNotification {
   message: string;
   type: NotificationType;
   is_read: boolean;
+  action_type?: 'CORRECTION' | 'NAVIGATE_TAB' | 'INFO';
+  action_date?: string;
+  action_target_id?: string;
   created_at: string;
 }
 

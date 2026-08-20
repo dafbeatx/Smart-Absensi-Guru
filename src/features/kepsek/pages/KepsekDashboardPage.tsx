@@ -256,6 +256,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         {/* Top Header Navbar */}
         <TopDashboardNavbar
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          onNavigateTab={(tab) => setActiveTab(tab as any)}
           onLogout={logout}
         />
 

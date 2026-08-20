@@ -361,6 +361,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenCorrectionModal={(teacher, date) => {
+            if (teacher) setSelectedCorrectionTeacher(teacher);
+            if (date) setSelectedCorrectionDate(date);
+            setIsCorrectionModalOpen(true);
+          }}
+          onNavigateTab={(tab) => setActiveTab(tab as any)}
           onLogout={logout}
         />
 

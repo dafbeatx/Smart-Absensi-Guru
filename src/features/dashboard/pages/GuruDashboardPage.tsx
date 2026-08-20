@@ -20,7 +20,7 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
-import { isDateOffDay, getTodayDateInJakarta, getMonthWorkingDays } from '../../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays } from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
@@ -422,9 +422,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }
 
       // 1. Settings
+      let loadedSettings: SystemSettings | null = null;
       try {
         const sysSettings = await provider.getSettings();
-        if (sysSettings) setSettings(sysSettings);
+        if (sysSettings) {
+          setSettings(sysSettings);
+          loadedSettings = sysSettings;
+        }
       } catch (err) {
         handleAppError(err, 'GuruDashboard.loadSettings', 'Gagal memuat pengaturan jam kerja', false);
       }
@@ -438,17 +442,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }
 
       // 3. Holidays
+      let loadedHolidays: HolidayRecord[] = [];
       try {
         const holidays = await provider.getHolidays(authToken);
-        setAllHolidays(holidays || []);
+        loadedHolidays = holidays || [];
+        setAllHolidays(loadedHolidays);
         const todayIso = new Date().toISOString().substring(0, 10);
-        const holidayToday = (holidays || []).find((h) => h.date === todayIso);
+        const holidayToday = loadedHolidays.find((h) => h.date === todayIso);
         setTodayHoliday(holidayToday || null);
       } catch (err) {
         handleAppError(err, 'GuruDashboard.loadHolidays', 'Gagal memuat data hari libur', false);
       }
 
       // 4. Monthly Attendance History
+      let loadedHistory: AttendanceRecord[] = [];
       setIsLoadingHistory(true);
       try {
         const history = await provider.getMonthlyAttendance(
@@ -457,11 +464,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           String(selectedYear),
           authToken
         );
-        setAttendanceHistory(history || []);
+        loadedHistory = history || [];
+        setAttendanceHistory(loadedHistory);
       } catch (err) {
         handleAppError(err, 'GuruDashboard.loadMonthlyAttendance', 'Gagal memuat riwayat bulanan', false);
       } finally {
         setIsLoadingHistory(false);
+      }
+
+      // 4.5. User Approved Leaves for Period
+      let loadedLeaves: LeaveRequest[] = [];
+      try {
+        loadedLeaves = await provider.getUserLeaves(effectiveUser.id, authToken).catch(() => []);
+      } catch (err) {
+        console.warn('Failed to load user leaves for unabsented check:', err);
       }
 
       // 5. Backend-Driven Notifications
@@ -583,6 +599,93 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }
       } catch (err) {
         console.warn('Failed to check teacher duty schedule:', err);
+      }
+
+      // 9. Automated Unabsented Working Days Detection & Direct Notification Push
+      try {
+        const todayStr = getTodayDateInJakarta();
+        const currentTime = getCurrentTimeInJakarta();
+        const checkinEnd = loadedSettings?.work_checkin_end
+          ? loadedSettings.work_checkin_end.slice(0, 5)
+          : CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
+        const currentYear = parseInt(todayStr.substring(0, 4), 10);
+        const currentMonth = parseInt(todayStr.substring(5, 7), 10);
+        const currentDay = parseInt(todayStr.substring(8, 10), 10);
+
+        const maxDayToCheck =
+          selectedYear === currentYear && selectedMonth === currentMonth
+            ? currentDay
+            : new Date(selectedYear, selectedMonth, 0).getDate();
+
+        const missingAttNotifs: AppNotification[] = [];
+
+        for (let d = 1; d <= maxDayToCheck; d++) {
+          const dayPad = String(d).padStart(2, '0');
+          const monthPad = String(selectedMonth).padStart(2, '0');
+          const dateStr = `${selectedYear}-${monthPad}-${dayPad}`;
+
+          // If date is today, only trigger if time has passed check-in deadline
+          if (dateStr === todayStr && currentTime < checkinEnd) {
+            continue;
+          }
+
+          // Check if off day (weekend / holiday)
+          const offCheck = isDateOffDay(dateStr, loadedSettings || undefined, loadedHolidays);
+          if (offCheck.isOff) {
+            continue;
+          }
+
+          // Check if teacher has physical attendance record
+          const hasAttendance = loadedHistory.some(
+            (r) => r.date === dateStr && r.status && r.status !== 'BELUM_ABSEN'
+          );
+          if (hasAttendance) continue;
+
+          // Check if teacher has approved leave
+          const hasLeave = loadedLeaves.some(
+            (l) => l.approval_status === 'APPROVED' && l.start_date <= dateStr && dateStr <= l.end_date
+          );
+          if (hasLeave) continue;
+
+          // Missing attendance identified!
+          const notifId = `notif_missing_att_${effectiveUser.id}_${dateStr}`;
+          const isRead = NotificationService.isNotificationRead(effectiveUser.id, notifId);
+
+          const missingItem: AppNotification = {
+            id: notifId,
+            user_id: effectiveUser.id,
+            title: `⚠️ Presensi Belum Tercatat: ${dateStr}`,
+            message: `Anda belum tercatat presensi pada ${dateStr}. Ketuk di sini untuk langsung mengajukan Koreksi Absen.`,
+            type: 'WARNING',
+            is_read: isRead,
+            action_type: 'CORRECTION',
+            action_date: dateStr,
+            created_at: `${dateStr}T12:00:00.000Z`,
+          };
+
+          missingAttNotifs.push(missingItem);
+
+          if (!isRead) {
+            NotificationService.notifyTeacherMissingAttendance(effectiveUser.full_name, dateStr, effectiveUser.id);
+          }
+        }
+
+        if (missingAttNotifs.length > 0) {
+          setNotifications((prev) => {
+            const combined = [...prev];
+            missingAttNotifs.forEach((newN) => {
+              const idx = combined.findIndex((n) => n.id === newN.id);
+              if (idx !== -1) {
+                combined[idx] = { ...newN, is_read: Boolean(combined[idx].is_read) || newN.is_read };
+              } else {
+                combined.unshift(newN);
+              }
+            });
+            return combined;
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to detect unabsented working days for guru:', err);
       }
     };
 
@@ -732,7 +835,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
   };
 
-  const handleMarkSingleNotificationRead = (id: string) => {
+  const handleMarkSingleNotificationRead = (notifItem: AppNotification | string) => {
+    const id = typeof notifItem === 'string' ? notifItem : notifItem.id;
+    const notifObj = typeof notifItem === 'string' ? notifications.find((n) => n.id === id) : notifItem;
+
     if (effectiveUser) {
       NotificationService.markIdAsRead(effectiveUser.id, id);
     }
@@ -742,6 +848,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     const provider = ProviderFactory.getProvider();
     const authToken = token || '';
     provider.markNotificationAsRead(id, authToken).catch(() => {});
+
+    // Auto-open attendance correction modal if this notification is for missing attendance
+    if (notifObj) {
+      if (
+        notifObj.action_type === 'CORRECTION' ||
+        notifObj.title.includes('Presensi Belum') ||
+        notifObj.title.includes('Koreksi Absen')
+      ) {
+        let targetDate = notifObj.action_date;
+        if (!targetDate) {
+          const match = notifObj.title.match(/(\d{4}-\d{2}-\d{2})/) || notifObj.message.match(/(\d{4}-\d{2}-\d{2})/);
+          if (match) targetDate = match[1];
+        }
+        handleOpenCorrectionModal(targetDate);
+      }
+    }
   };
 
   const handleChangePinSubmit = async (e: React.FormEvent) => {
@@ -1806,17 +1928,42 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      onClick={() => handleMarkSingleNotificationRead(n.id)}
-                      className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border text-xs space-y-1 transition-all cursor-pointer ${
-                        !n.is_read ? 'bg-[#C8F2E0]/20 border-[#0D7A5F]/30 hover:border-[#0D7A5F]' : 'bg-slate-50 border-slate-200 opacity-80'
+                      onClick={() => handleMarkSingleNotificationRead(n)}
+                      className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border text-xs space-y-1.5 transition-all cursor-pointer ${
+                        !n.is_read
+                          ? n.action_type === 'CORRECTION'
+                            ? 'bg-amber-50/70 border-amber-300/80 hover:border-amber-500 shadow-xs'
+                            : 'bg-[#C8F2E0]/20 border-[#0D7A5F]/30 hover:border-[#0D7A5F]'
+                          : 'bg-slate-50 border-slate-200 opacity-80'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <h3 className="font-extrabold text-[#023246] text-xs">{n.title}</h3>
-                        {!n.is_read && <span className="w-2 h-2 rounded-full bg-[#0D7A5F]" />}
+                        <h3 className="font-extrabold text-[#023246] text-xs flex items-center gap-1.5">
+                          {n.action_type === 'CORRECTION' && <span>✏️</span>}
+                          <span>{n.title}</span>
+                        </h3>
+                        {!n.is_read && (
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              n.action_type === 'CORRECTION' ? 'bg-amber-500 animate-pulse' : 'bg-[#0D7A5F]'
+                            }`}
+                          />
+                        )}
                       </div>
-                      <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed">{n.message}</p>
-                      <span className="text-[9px] text-slate-400 font-mono block pt-0.5">{n.created_at ? new Date(n.created_at).toLocaleDateString('id-ID') : 'Hari ini'}</span>
+                      <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed">
+                        {n.message}
+                      </p>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[9px] text-slate-400 font-mono block">
+                          {n.created_at ? new Date(n.created_at).toLocaleDateString('id-ID') : 'Hari ini'}
+                        </span>
+                        {n.action_type === 'CORRECTION' && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-900 bg-amber-100/90 hover:bg-amber-200 px-2 py-0.5 rounded-lg border border-amber-300/80 transition-colors">
+                            <span>✏️ Ajukan Koreksi</span>
+                            <span>➔</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}

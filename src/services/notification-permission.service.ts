@@ -15,9 +15,14 @@ export interface AttendanceNotificationPayload {
   time?: string;
   userId?: string;
   roleTarget?: 'ALL' | 'ADMIN' | 'GURU' | 'KEPSEK';
+  actionType?: 'CORRECTION' | 'NAVIGATE_TAB' | 'INFO';
+  actionDate?: string;
+  actionTargetId?: string;
   createdAt?: string;
   isRead?: boolean;
 }
+
+const memoryNotificationCache: AttendanceNotificationPayload[] = [];
 
 class NotificationPermissionService {
   constructor() {
@@ -72,28 +77,36 @@ class NotificationPermissionService {
    * Simpan notifikasi ke local storage cache untuk ditampilkan di in-app notification bell
    */
   private saveToCache(payload: AttendanceNotificationPayload) {
-    if (typeof window === 'undefined') return;
-    try {
-      const saved = localStorage.getItem('smart_absensi_notifications_cache');
-      const existing: AttendanceNotificationPayload[] = saved ? JSON.parse(saved) : [];
-      const newNotif: AttendanceNotificationPayload = {
-        id: payload.id || `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        title: payload.title,
-        body: payload.body,
-        type: payload.type,
-        teacherName: payload.teacherName,
-        time: payload.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-        userId: payload.userId,
-        roleTarget: payload.roleTarget || 'ALL',
-        createdAt: payload.createdAt || new Date().toISOString(),
-        isRead: false,
-      };
+    const newNotif: AttendanceNotificationPayload = {
+      id: payload.id || `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title: payload.title,
+      body: payload.body,
+      type: payload.type,
+      teacherName: payload.teacherName,
+      time: payload.time || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      userId: payload.userId,
+      roleTarget: payload.roleTarget || 'ALL',
+      actionType: payload.actionType,
+      actionDate: payload.actionDate,
+      actionTargetId: payload.actionTargetId,
+      createdAt: payload.createdAt || new Date().toISOString(),
+      isRead: false,
+    };
 
-      // Keep up to 50 latest notifications
-      const updated = [newNotif, ...existing].slice(0, 50);
-      localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(updated));
-    } catch (e) {
-      console.warn('Failed to save notification to cache:', e);
+    memoryNotificationCache.unshift(newNotif);
+    if (memoryNotificationCache.length > 50) {
+      memoryNotificationCache.length = 50;
+    }
+
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_notifications_cache');
+        const existing: AttendanceNotificationPayload[] = saved ? JSON.parse(saved) : [];
+        const updated = [newNotif, ...existing].slice(0, 50);
+        localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save notification to cache:', e);
+      }
     }
   }
 
@@ -101,16 +114,19 @@ class NotificationPermissionService {
    * Ambill daftar notifikasi tersimpan dari local cache
    */
   public getCachedNotifications(userId?: string): AttendanceNotificationPayload[] {
-    if (typeof window === 'undefined') return [];
-    try {
-      const saved = localStorage.getItem('smart_absensi_notifications_cache');
-      if (!saved) return [];
-      const parsed: AttendanceNotificationPayload[] = JSON.parse(saved);
-      if (!userId) return parsed;
-      return parsed.filter((n) => !n.userId || n.userId === userId || n.roleTarget === 'ALL');
-    } catch (e) {
-      return [];
+    let list = [...memoryNotificationCache];
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_notifications_cache');
+        if (saved) {
+          list = JSON.parse(saved);
+        }
+      } catch (e) {
+        // use memory list
+      }
     }
+    if (!userId) return list;
+    return list.filter((n) => !n.userId || n.userId === userId || n.roleTarget === 'ALL');
   }
 
   /**
@@ -303,6 +319,39 @@ class NotificationPermissionService {
       type: 'LEAVE_REQUEST',
       teacherName,
       roleTarget: 'ADMIN',
+    });
+  }
+
+  /**
+   * Helper: Trigger Notifikasi Hari Belum Absen untuk Guru
+   */
+  public notifyTeacherMissingAttendance(teacherName: string, dateStr: string, userId?: string) {
+    this.sendNativeNotification({
+      id: `notif_missing_att_${userId || 'guru'}_${dateStr}`,
+      title: `⚠️ Presensi Belum Tercatat: ${dateStr}`,
+      body: `Bapak/Ibu ${teacherName}, Anda belum tercatat presensi pada tanggal ${dateStr}. Ketuk untuk langsung mengajukan Koreksi Absen.`,
+      type: 'SYSTEM',
+      teacherName,
+      userId,
+      roleTarget: 'GURU',
+      actionType: 'CORRECTION',
+      actionDate: dateStr,
+      actionTargetId: userId,
+    });
+  }
+
+  /**
+   * Helper: Trigger Notifikasi Ringkasan Guru Belum Absen untuk Admin / Kepsek
+   */
+  public notifyAdminMissingAttendanceSummary(unabsentedCount: number, dateStr: string) {
+    this.sendNativeNotification({
+      id: `notif_unabsented_summary_${dateStr}`,
+      title: `⚠️ ${unabsentedCount} Guru Belum Presensi: ${dateStr}`,
+      body: `Terdapat ${unabsentedCount} guru yang belum tercatat presensi pada ${dateStr}. Ketuk untuk memeriksa dan melakukan koreksi manual.`,
+      type: 'SYSTEM',
+      roleTarget: 'ADMIN',
+      actionType: 'NAVIGATE_TAB',
+      actionDate: dateStr,
     });
   }
 

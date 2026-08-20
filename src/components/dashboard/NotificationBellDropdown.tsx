@@ -14,13 +14,22 @@ export interface DynamicNotificationItem {
   time: string;
   badgeType: 'ALERT' | 'SUCCESS' | 'INFO' | 'WARNING';
   isRead: boolean;
+  actionType?: 'CORRECTION' | 'NAVIGATE_TAB' | 'INFO';
+  actionDate?: string;
+  actionTeacherId?: string;
 }
 
 export interface NotificationBellDropdownProps {
   className?: string;
+  onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
+  onNavigateTab?: (tabId: string) => void;
 }
 
-export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> = ({ className = '' }) => {
+export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> = ({
+  className = '',
+  onOpenCorrectionModal,
+  onNavigateTab,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'MY_STATUS' | 'TEACHER_SCAN' | 'LEAVES'>('ALL');
   const [notifications, setNotifications] = useState<DynamicNotificationItem[]>([]);
@@ -118,6 +127,8 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           time: 'Hari ini',
           badgeType: 'ALERT',
           isRead: readSet.has(notifId),
+          actionType: 'CORRECTION',
+          actionDate: todayIso,
         });
       } else {
         const statusText = myTodayAtt.status === 'TERLAMBAT' ? 'Terlambat' : 'Tepat Waktu';
@@ -178,6 +189,8 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
             time: 'Monitoring Realtime',
             badgeType: 'WARNING',
             isRead: readSet.has(unabsentNotifId),
+            actionType: 'NAVIGATE_TAB',
+            actionDate: todayIso,
           });
         }
 
@@ -195,6 +208,8 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
             time: 'Menunggu Review',
             badgeType: 'WARNING',
             isRead: readSet.has(pendingNotifId),
+            actionType: 'NAVIGATE_TAB',
+            actionDate: todayIso,
           });
         }
       }
@@ -211,6 +226,9 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           time: cn.time || 'Realtime',
           badgeType: cn.type === 'CHECK_IN' || cn.type === 'CHECK_OUT' ? 'SUCCESS' : cn.type === 'LEAVE_REQUEST' ? 'WARNING' : 'INFO',
           isRead: Boolean(cn.isRead) || readSet.has(cnId),
+          actionType: cn.actionType,
+          actionDate: cn.actionDate,
+          actionTeacherId: cn.actionTargetId,
         });
       });
 
@@ -233,6 +251,9 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
             time: dbItem.created_at ? new Date(dbItem.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : 'Sistem',
             badgeType: badgeMap[dbItem.type] || 'INFO',
             isRead: Boolean(dbItem.is_read) || readSet.has(dbItem.id),
+            actionType: dbItem.action_type,
+            actionDate: dbItem.action_date,
+            actionTeacherId: dbItem.action_target_id,
           });
         });
       }
@@ -337,6 +358,32 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       const provider = ProviderFactory.getProvider();
       const authToken = token || 'MOCK_TOKEN';
       provider.markNotificationAsRead(id, authToken).catch(() => {});
+    }
+  };
+
+  const handleNotificationClick = (item: DynamicNotificationItem) => {
+    markItemAsRead(item.id);
+
+    // Direct redirection based on notification payload
+    if (item.actionType === 'CORRECTION' && onOpenCorrectionModal) {
+      onOpenCorrectionModal(undefined, item.actionDate);
+      setIsOpen(false);
+    } else if (item.actionType === 'NAVIGATE_TAB' && onNavigateTab) {
+      if (item.category === 'LEAVE_REQUEST') {
+        onNavigateTab('LEAVES');
+      } else if (item.category === 'SYSTEM_ALERT' || item.title.includes('Monitoring') || item.title.includes('Belum Presensi')) {
+        onNavigateTab(user?.role === 'KEPSEK' ? 'UNABSENTED' : 'ATTENDANCE_TRACKING');
+      }
+      setIsOpen(false);
+    } else if (
+      (item.title.includes('Belum Melakukan') ||
+        item.title.includes('Belum Presensi') ||
+        item.title.includes('Belum Tercatat') ||
+        item.title.includes('Status Presensi Anda')) &&
+      onOpenCorrectionModal
+    ) {
+      onOpenCorrectionModal(undefined, item.actionDate);
+      setIsOpen(false);
     }
   };
 
@@ -459,7 +506,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
                 return (
                   <div
                     key={n.id}
-                    onClick={() => markItemAsRead(n.id)}
+                    onClick={() => handleNotificationClick(n)}
                     className={`p-3 rounded-2xl transition-all cursor-pointer flex gap-3 text-xs ${
                       isRead ? 'bg-white opacity-70 hover:opacity-100' : 'bg-emerald-50/50 hover:bg-emerald-50 border-l-4 border-emerald-500'
                     }`}
@@ -499,6 +546,14 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
                       <p className="text-[11px] text-slate-600 leading-relaxed font-normal">
                         {n.message}
                       </p>
+                      {(n.actionType === 'CORRECTION' || (n.actionType === 'NAVIGATE_TAB' && n.category === 'SYSTEM_ALERT')) && (
+                        <div className="pt-1 flex items-center justify-end">
+                          <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-lg border border-emerald-300/80">
+                            <span>{n.actionType === 'CORRECTION' ? '✏️ Koreksi Presensi' : '📋 Tinjau Belum Absen'}</span>
+                            <span>➔</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

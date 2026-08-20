@@ -19,6 +19,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import type { UserProfile, LeaveRequest } from '../../types/database.types';
 import type { LoginDTO } from '../../repositories/AuthRepository';
 import { AnalyticsService } from '../analytics.service';
+import { NotificationService } from '../notification-permission.service';
 
 export const runSecurityConsistencyTestSuite = async (): Promise<{
   passed: number;
@@ -736,6 +737,36 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
 
     const resetSuccess = await provider.resetAttendance('usr_guru_01', '2026-08-13', 'AdminSecretPassword2026!', 'MOCK_TOKEN');
     assert('Reset Attendance Security - Accepts Correct Admin Reset Password', resetSuccess === true);
+
+    // Test H: Missing Attendance Notification & Direct Correction Redirection Contract
+    NotificationService.notifyTeacherMissingAttendance('Mira Nurdianti, S.Pd', '2026-08-19', 'usr_mira');
+    const cachedGuruNotifs = NotificationService.getCachedNotifications('usr_mira');
+    const guruNotif = cachedGuruNotifs.find((n) => n.id?.includes('2026-08-19') && n.userId === 'usr_mira');
+
+    assert(
+      'Missing Attendance Notification - Guru payload contains CORRECTION action & target date',
+      Boolean(
+        guruNotif &&
+        guruNotif.actionType === 'CORRECTION' &&
+        guruNotif.actionDate === '2026-08-19' &&
+        guruNotif.userId === 'usr_mira' &&
+        guruNotif.title.includes('Presensi Belum Tercatat')
+      )
+    );
+
+    NotificationService.notifyAdminMissingAttendanceSummary(3, '2026-08-19');
+    const cachedAdminNotifs = NotificationService.getCachedNotifications();
+    const adminNotif = cachedAdminNotifs.find((n) => n.id?.includes('notif_unabsented_summary_2026-08-19'));
+
+    assert(
+      'Missing Attendance Notification - Admin summary payload contains NAVIGATE_TAB action',
+      Boolean(
+        adminNotif &&
+        adminNotif.actionType === 'NAVIGATE_TAB' &&
+        adminNotif.actionDate === '2026-08-19' &&
+        adminNotif.title.includes('3 Guru Belum Presensi')
+      )
+    );
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
   }

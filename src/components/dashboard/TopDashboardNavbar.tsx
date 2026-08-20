@@ -1,9 +1,12 @@
+import type { UserProfile } from '../../types/database.types';
 import { NotificationBellDropdown } from './NotificationBellDropdown';
 
 export interface TopDashboardNavbarProps {
   onToggleSidebar: () => void;
   onOpenQrGenerator?: () => void;
   onOpenCommandPalette?: () => void;
+  onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
+  onNavigateTab?: (tabId: string) => void;
   onLogout: () => void;
 }
 
@@ -11,6 +14,8 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
   onToggleSidebar,
   onOpenQrGenerator,
   onOpenCommandPalette,
+  onOpenCorrectionModal,
+  onNavigateTab,
   onLogout,
 }) => {
   return (
@@ -86,7 +91,10 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
           )}
 
           {/* Dynamic Realtime Notification Bell Dropdown */}
-          <NotificationBellDropdown />
+          <NotificationBellDropdown
+            onOpenCorrectionModal={onOpenCorrectionModal}
+            onNavigateTab={onNavigateTab}
+          />
 
           {/* Logout button on desktop */}
           <button
