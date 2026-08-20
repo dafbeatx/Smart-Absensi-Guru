@@ -10,6 +10,9 @@ import type {
   TeacherMoodLog,
   BurnoutAnalytics,
   TeacherDutySchedule,
+  TeacherComplaint,
+  SubmitComplaintDTO,
+  UpdateComplaintStatusDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -69,6 +72,12 @@ export interface IDataProvider {
   // Teacher Duty Schedule API (Jadwal Piket Guru Senin - Jumat)
   getDutySchedules(token?: string): Promise<TeacherDutySchedule[]>;
   saveDutySchedules(schedules: Omit<TeacherDutySchedule, 'id' | 'created_at'>[], token?: string): Promise<boolean>;
+
+  // Anonymous Teacher Complaints & Aspirations API (Kotak Suara / Keluhan Guru Anonim)
+  submitComplaint(userId: string, dto: SubmitComplaintDTO, token?: string): Promise<TeacherComplaint>;
+  getUserComplaints(userId: string, token?: string): Promise<TeacherComplaint[]>;
+  getAllComplaints(token?: string): Promise<TeacherComplaint[]>;
+  updateComplaintStatus(dto: UpdateComplaintStatusDTO, token?: string): Promise<boolean>;
 }
 
 

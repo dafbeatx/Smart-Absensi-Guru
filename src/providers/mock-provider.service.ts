@@ -13,6 +13,9 @@ import type {
   TeacherMoodLog,
   BurnoutAnalytics,
   TeacherDutySchedule,
+  TeacherComplaint,
+  SubmitComplaintDTO,
+  UpdateComplaintStatusDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -1254,7 +1257,119 @@ export class MockProvider implements IDataProvider {
     safeSetStorage('smart_absensi_duty_schedules', JSON.stringify(formatted));
     return true;
   }
+
+  // ─── ANONYMOUS TEACHER COMPLAINTS & FEEDBACK API ──────────────────────────
+
+  private getInitialComplaintsSeed(): TeacherComplaint[] {
+    const today = getTodayDateInJakarta();
+    return [
+      {
+        id: 'comp_sample_01',
+        user_id: 'usr_sample_1',
+        date: today,
+        category: 'SARANA_PRASARANA',
+        content: 'Proyektor di Lab Komputer 2 terkadang flickering/mati sesaat saat dipakai presentasi pembelajaran. Mohon bantuan tim sarpras untuk cek kabel atau port VGA-nya.',
+        status: 'IN_REVIEW',
+        admin_response: 'Terima kasih atas laporannya. Tim sarpras telah menjadwalkan pengecekan teknis dan kabel cadangan telah disiapkan.',
+        responded_at: new Date().toISOString(),
+        responded_by_role: 'ADMIN',
+        is_anonymous: true,
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      },
+      {
+        id: 'comp_sample_02',
+        user_id: 'usr_sample_2',
+        date: today,
+        category: 'SISTEM_APLIKASI',
+        content: 'Aplikasi absensi QR sangat cepat dan praktis! Radius 500m di pintu gerbang utama bekerja dengan sangat mulus.',
+        status: 'RESOLVED',
+        admin_response: 'Terima kasih atas apresiasinya. Kami terus memantau performa sistem agar tetap handal.',
+        responded_at: new Date().toISOString(),
+        responded_by_role: 'KEPSEK',
+        is_anonymous: true,
+        created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+      },
+      {
+        id: 'comp_sample_03',
+        user_id: 'usr_sample_3',
+        date: today,
+        category: 'KEBIJAKAN_MANAJEMEN',
+        content: 'Usulan agar sesi rapat koordinasi hari Jumat dimulai tepat pukul 13.30 WIB agar persiapan materi mengajar tidak tergesa-gesa.',
+        status: 'SUBMITTED',
+        admin_response: null,
+        responded_at: null,
+        responded_by_role: null,
+        is_anonymous: true,
+        created_at: new Date(Date.now() - 3600000 * 8).toISOString(),
+      },
+    ];
+  }
+
+  public async submitComplaint(
+    userId: string,
+    dto: SubmitComplaintDTO,
+    _token?: string
+  ): Promise<TeacherComplaint> {
+    const raw = safeGetStorage('smart_absensi_teacher_complaints');
+    let list: TeacherComplaint[] = raw ? JSON.parse(raw) : this.getInitialComplaintsSeed();
+
+    const todayStr = getTodayDateInJakarta();
+    const newComplaint: TeacherComplaint = {
+      id: 'comp_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substring(2, 6)),
+      user_id: userId,
+      date: todayStr,
+      category: dto.category,
+      content: dto.content.trim(),
+      status: 'SUBMITTED',
+      admin_response: null,
+      responded_at: null,
+      responded_by_role: null,
+      is_anonymous: dto.is_anonymous ?? true,
+      created_at: new Date().toISOString(),
+    };
+
+    list.unshift(newComplaint);
+    safeSetStorage('smart_absensi_teacher_complaints', JSON.stringify(list));
+
+    return newComplaint;
+  }
+
+  public async getUserComplaints(userId: string, _token?: string): Promise<TeacherComplaint[]> {
+    const raw = safeGetStorage('smart_absensi_teacher_complaints');
+    const list: TeacherComplaint[] = raw ? JSON.parse(raw) : this.getInitialComplaintsSeed();
+    return list.filter((c) => c.user_id === userId);
+  }
+
+  public async getAllComplaints(_token?: string): Promise<TeacherComplaint[]> {
+    const raw = safeGetStorage('smart_absensi_teacher_complaints');
+    const list: TeacherComplaint[] = raw ? JSON.parse(raw) : this.getInitialComplaintsSeed();
+    
+    // Strict Anonymity: Mask user_id to 'ANONYMOUS' so neither Admin nor Kepsek can trace the author
+    return list.map((c) => ({
+      ...c,
+      user_id: 'ANONYMOUS',
+    }));
+  }
+
+  public async updateComplaintStatus(
+    dto: UpdateComplaintStatusDTO,
+    _token?: string
+  ): Promise<boolean> {
+    const raw = safeGetStorage('smart_absensi_teacher_complaints');
+    let list: TeacherComplaint[] = raw ? JSON.parse(raw) : this.getInitialComplaintsSeed();
+
+    const index = list.findIndex((c) => c.id === dto.complaintId);
+    if (index === -1) return false;
+
+    list[index] = {
+      ...list[index],
+      status: dto.status,
+      admin_response: dto.adminResponse !== undefined ? dto.adminResponse.trim() : list[index].admin_response,
+      responded_at: dto.adminResponse !== undefined ? new Date().toISOString() : list[index].responded_at,
+      responded_by_role: dto.respondedByRole || list[index].responded_by_role || 'ADMIN',
+    };
+
+    safeSetStorage('smart_absensi_teacher_complaints', JSON.stringify(list));
+    return true;
+  }
 }
-
-
-

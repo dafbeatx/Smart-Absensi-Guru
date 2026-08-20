@@ -15,6 +15,9 @@ import type {
   TeacherMoodLog,
   BurnoutAnalytics,
   TeacherDutySchedule,
+  TeacherComplaint,
+  SubmitComplaintDTO,
+  UpdateComplaintStatusDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -1544,6 +1547,120 @@ export class SupabaseProvider implements IDataProvider {
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.saveDutySchedules(schedules);
   }
+
+  // ─── ANONYMOUS TEACHER COMPLAINTS & FEEDBACK API ──────────────────────────
+
+  public async submitComplaint(
+    userId: string,
+    dto: SubmitComplaintDTO,
+    _token?: string
+  ): Promise<TeacherComplaint> {
+    try {
+      const todayStr = getTodayDateInJakarta();
+      const { data, error } = await this.client
+        .from('teacher_complaints')
+        .insert({
+          user_id: userId,
+          date: todayStr,
+          category: dto.category,
+          content: dto.content.trim(),
+          status: 'SUBMITTED',
+          is_anonymous: dto.is_anonymous ?? true,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'submitComplaint Supabase error, falling back to local storage:', error.message);
+      } else if (data) {
+        // Also update local cache
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        await mockProv.submitComplaint(userId, dto);
+        return data as TeacherComplaint;
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'submitComplaint DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.submitComplaint(userId, dto);
+  }
+
+  public async getUserComplaints(userId: string, _token?: string): Promise<TeacherComplaint[]> {
+    try {
+      const { data, error } = await this.client
+        .from('teacher_complaints')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getUserComplaints Supabase error, fallback to local storage:', error.message);
+      } else if (data && data.length > 0) {
+        return data as TeacherComplaint[];
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getUserComplaints DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getUserComplaints(userId);
+  }
+
+  public async getAllComplaints(_token?: string): Promise<TeacherComplaint[]> {
+    try {
+      const { data, error } = await this.client
+        .from('teacher_complaints')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getAllComplaints Supabase error, fallback to local storage:', error.message);
+      } else if (data && data.length > 0) {
+        // Mask user_id for strict anonymity
+        return (data as TeacherComplaint[]).map((c) => ({
+          ...c,
+          user_id: 'ANONYMOUS',
+        }));
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getAllComplaints DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getAllComplaints();
+  }
+
+  public async updateComplaintStatus(
+    dto: UpdateComplaintStatusDTO,
+    _token?: string
+  ): Promise<boolean> {
+    try {
+      const updatePayload: Record<string, any> = {
+        status: dto.status,
+      };
+
+      if (dto.adminResponse !== undefined) {
+        updatePayload.admin_response = dto.adminResponse.trim();
+        updatePayload.responded_at = new Date().toISOString();
+        updatePayload.responded_by_role = dto.respondedByRole || 'ADMIN';
+      }
+
+      const { error } = await this.client
+        .from('teacher_complaints')
+        .update(updatePayload)
+        .eq('id', dto.complaintId);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'updateComplaintStatus Supabase error:', error.message);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'updateComplaintStatus DB exception:', err);
+    }
+
+    // Always update local cache
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.updateComplaintStatus(dto);
+  }
 }
-
-

@@ -23,6 +23,8 @@ import { TestRunnerModal } from '../../../components/dev/TestRunnerModal';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
 import { AdminCommandPaletteModal } from '../../../components/dashboard/AdminCommandPaletteModal';
+import { AnonymousComplaintManagement } from '../components/AnonymousComplaintManagement';
+import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
 import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { isDateOffDay } from '../../../utils/time.utils';
@@ -54,6 +56,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [pendingComplaintsCount, setPendingComplaintsCount] = useState<number>(0);
+
+  const fetchComplaintsCount = async () => {
+    try {
+      const tkn = useAuthStore.getState().token;
+      const list = await ComplaintRepository.getAllComplaints(tkn || undefined);
+      const unhandled = list.filter((c) => c.status === 'SUBMITTED' || c.status === 'IN_REVIEW');
+      setPendingComplaintsCount(unhandled.length);
+    } catch (err) {
+      console.warn('Gagal memuat count keluhan:', err);
+    }
+  };
 
   const [teachers, setTeachers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('smart_absensi_teachers');
@@ -227,6 +241,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
         // Step 4: Sync Admin's Own Today Attendance
         await fetchMyAttendance();
+
+        // Step 5: Sync Anonymous Complaints
+        await fetchComplaintsCount();
       } catch (err) {
         console.warn('Backend sync sequence error:', err);
       }
@@ -238,6 +255,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     const handleScannedEvent = () => {
       fetchAttendanceRecords();
       fetchMyAttendance();
+      fetchComplaintsCount();
+    };
+
+    const handleComplaintsUpdated = () => {
+      fetchComplaintsCount();
     };
 
     const handleTeachersUpdatedEvent = () => {
@@ -257,6 +279,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
+    window.addEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
+    window.addEventListener('storage', handleComplaintsUpdated);
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -270,6 +294,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
+      window.removeEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
+      window.removeEventListener('storage', handleComplaintsUpdated);
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
   }, [user?.id, teachers.length]);
@@ -301,6 +328,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
     { id: 'ATTENDANCE_TRACKING', label: 'Live Tracking', icon: '👁️' },
     { id: 'TEACHERS', label: 'Manajemen Guru & Staf', icon: '👥' },
+    { id: 'COMPLAINTS', label: 'Kotak Aspirasi Guru', icon: '💬', badge: pendingComplaintsCount },
     { id: 'SCHEDULE', label: 'Jadwal Mengajar', icon: '🗓️' },
     { id: 'DUTY_SCHEDULE', label: 'Jadwal Piket Guru', icon: '🛡️' },
     { id: 'CALENDAR', label: 'Kalender', icon: '📅' },
@@ -514,6 +542,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               <PendingApprovalWidget requests={allLeaves.length > 0 ? allLeaves : pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
             </div>
           )}
+
+          {/* TAB: COMPLAINTS (KOTAK ASPIRASI GURU ANONIM) */}
+          {activeTab === 'COMPLAINTS' && <AnonymousComplaintManagement role="ADMIN" />}
 
           {/* TAB 7: SETTINGS */}
           {activeTab === 'SETTINGS' && <SystemSettingsForm />}

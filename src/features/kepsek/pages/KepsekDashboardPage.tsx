@@ -10,6 +10,8 @@ import { QRCodeGeneratorModal } from '../../admin/components/QRCodeGeneratorModa
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TopDashboardNavbar } from '../../../components/dashboard/TopDashboardNavbar';
 import { ExecutiveDashboardOverview } from '../../../components/dashboard/ExecutiveDashboardOverview';
+import { AnonymousComplaintManagement } from '../../admin/components/AnonymousComplaintManagement';
+import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
 import { DevTestPage } from '../../admin/pages/DevTestPage';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
@@ -30,6 +32,18 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
+  const [pendingComplaintsCount, setPendingComplaintsCount] = useState<number>(0);
+
+  const fetchComplaintsCount = async () => {
+    try {
+      const tkn = useAuthStore.getState().token;
+      const list = await ComplaintRepository.getAllComplaints(tkn || undefined);
+      const unhandled = list.filter((c) => c.status === 'SUBMITTED' || c.status === 'IN_REVIEW');
+      setPendingComplaintsCount(unhandled.length);
+    } catch (err) {
+      console.warn('Gagal memuat count keluhan kepsek:', err);
+    }
+  };
 
   // Data Source Sync Status States
   const [dataSyncStatus, setDataSyncStatus] = useState<'LIVE' | 'OFFLINE_CACHED' | 'ERROR_FALLBACK'>(() => {
@@ -164,6 +178,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     fetchUsersFromBackend();
     fetchPendingRequests();
     fetchAttendanceRecords();
+    fetchComplaintsCount();
   }, []);
 
   useEffect(() => {
@@ -185,26 +200,36 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       fetchPendingRequests();
     };
 
+    const handleComplaintsUpdated = () => {
+      fetchComplaintsCount();
+    };
+
     fetchUsersFromBackend();
     fetchPendingRequests();
     fetchAttendanceRecords();
+    fetchComplaintsCount();
 
     const handleScannedEvent = () => {
       fetchAttendanceRecords();
+      fetchComplaintsCount();
     };
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
     window.addEventListener('smart_absensi_teachers_updated', handleSyncTeachers);
+    window.addEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
     window.addEventListener('storage', handleSyncTeachers);
     window.addEventListener('storage', handleLeaveUpdated);
+    window.addEventListener('storage', handleComplaintsUpdated);
 
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
       window.removeEventListener('smart_absensi_teachers_updated', handleSyncTeachers);
+      window.removeEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
       window.removeEventListener('storage', handleSyncTeachers);
       window.removeEventListener('storage', handleLeaveUpdated);
+      window.removeEventListener('storage', handleComplaintsUpdated);
     };
   }, []);
 
@@ -228,6 +253,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const sidebarItems: SidebarItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
     { id: 'ACCOUNT_APPLICATIONS', label: 'Manajemen Guru & Staf', icon: '👥' },
+    { id: 'COMPLAINTS', label: 'Kotak Aspirasi Guru', icon: '💬', badge: pendingComplaintsCount },
     { id: 'APPROVALS', label: 'Persetujuan Izin/Cuti', icon: '📝', badge: pendingRequests.length, hasDropdown: true },
     { id: 'UNABSENTED', label: 'Daftar Belum Absen', icon: '⚠️', badge: unabsentedTeachers.length },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
@@ -343,6 +369,9 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           {(activeTab === 'ACCOUNT_APPLICATIONS' || activeTab === 'TEACHERS') && (
             <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} isReadOnly={true} />
           )}
+
+          {/* TAB: COMPLAINTS (KOTAK ASPIRASI GURU) */}
+          {activeTab === 'COMPLAINTS' && <AnonymousComplaintManagement role="KEPSEK" />}
 
           {/* TAB 3: APPROVALS */}
           {(activeTab === 'APPROVALS' || activeTab === 'APPROVAL') && (

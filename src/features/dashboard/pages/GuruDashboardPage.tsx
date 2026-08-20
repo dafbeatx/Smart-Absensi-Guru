@@ -12,10 +12,12 @@ import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrection
 import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
+import { AnonymousComplaintModal } from '../../guru/components/AnonymousComplaintModal';
 import { TeacherLocationCard } from '../../guru/components/TeacherLocationCard';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
+import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
@@ -47,6 +49,7 @@ import type {
   TeacherMoodLog,
   TeacherDutySchedule,
   TeachingSlot,
+  TeacherComplaint,
 } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
@@ -216,7 +219,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
 
   // Leave & Calendar History State
-  const [historySubTab, setHistorySubTab] = useState<'ATTENDANCE' | 'LEAVES'>('ATTENDANCE');
+  const [historySubTab, setHistorySubTab] = useState<'ATTENDANCE' | 'LEAVES' | 'COMPLAINTS'>('ATTENDANCE');
   const [historyViewMode, setHistoryViewMode] = useState<'CALENDAR' | 'LIST'>('CALENDAR');
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<{
     dateStr: string;
@@ -227,6 +230,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [allHolidays, setAllHolidays] = useState<HolidayRecord[]>([]);
   const [userLeaves, setUserLeaves] = useState<LeaveRequest[]>([]);
   const [isLoadingLeaves, setIsLoadingLeaves] = useState(false);
+  const [userComplaints, setUserComplaints] = useState<TeacherComplaint[]>([]);
+  const [isLoadingComplaints, setIsLoadingComplaints] = useState(false);
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
   const [teachingSlots, setTeachingSlots] = useState<TeachingSlot[]>([]);
   const lastChimedSlotKeyRef = useRef<string | null>(null);
 
@@ -344,6 +350,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
   };
 
+  const loadUserComplaints = async () => {
+    if (!effectiveUser) return;
+    setIsLoadingComplaints(true);
+    try {
+      const complaints = await ComplaintRepository.getUserComplaints(effectiveUser.id, token || undefined);
+      setUserComplaints(complaints);
+    } catch (err) {
+      console.warn('Failed to load user complaints:', err);
+    } finally {
+      setIsLoadingComplaints(false);
+    }
+  };
+
   const checkDeviceStatus = async () => {
     if (!effectiveUser) return;
     try {
@@ -361,10 +380,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   useEffect(() => {
     loadUserLeaves();
+    loadUserComplaints();
     checkDeviceStatus();
 
     const handleLeaveUpdate = () => {
       loadUserLeaves();
+    };
+
+    const handleComplaintUpdate = () => {
+      loadUserComplaints();
     };
 
     const handleDeviceReset = (e: Event) => {
@@ -376,14 +400,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
 
     window.addEventListener('smart_absensi_leave_updated', handleLeaveUpdate);
+    window.addEventListener('smart_absensi_complaints_updated', handleComplaintUpdate);
     window.addEventListener('smart_absensi_device_reset', handleDeviceReset);
     window.addEventListener('storage', handleLeaveUpdate);
+    window.addEventListener('storage', handleComplaintUpdate);
     window.addEventListener('storage', checkDeviceStatus);
 
     return () => {
       window.removeEventListener('smart_absensi_leave_updated', handleLeaveUpdate);
+      window.removeEventListener('smart_absensi_complaints_updated', handleComplaintUpdate);
       window.removeEventListener('smart_absensi_device_reset', handleDeviceReset);
       window.removeEventListener('storage', handleLeaveUpdate);
+      window.removeEventListener('storage', handleComplaintUpdate);
       window.removeEventListener('storage', checkDeviceStatus);
     };
   }, [effectiveUser?.id]);
@@ -1448,6 +1476,48 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               );
             })()}
 
+            {/* 💬 Quick Kotak Aspirasi & Keluhan Anonim Banner */}
+            <div className="p-3.5 sm:p-4 rounded-3xl bg-linear-to-r from-amber-500/10 via-teal-500/10 to-emerald-500/10 border border-amber-300/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-900 border border-amber-300 flex items-center justify-center text-xl shrink-0">
+                  💬
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="font-black text-[#023246] text-xs sm:text-sm truncate">
+                      Kotak Aspirasi &amp; Keluhan Guru
+                    </h4>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[9px] font-black rounded-full">
+                      🔒 100% Anonim
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium truncate mt-0.5">
+                    Laporkan kendala sarana, fasilitas, atau usulan sekolah dengan aman.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('RIWAYAT');
+                    setHistorySubTab('COMPLAINTS');
+                  }}
+                  className="flex-1 sm:flex-none px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-extrabold rounded-xl border border-slate-200 transition-all cursor-pointer shadow-2xs text-center"
+                >
+                  Riwayat ({userComplaints.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsComplaintModalOpen(true)}
+                  className="flex-1 sm:flex-none px-3.5 py-2 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-black rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer text-center"
+                >
+                  + Tulis Catatan
+                </button>
+              </div>
+            </div>
+
             {/* 🌟 2. TODAY ATTENDANCE & WORK SCHEDULE HUB ────────────────────── */}
             <section className="bg-white rounded-3xl p-4 sm:p-4.5 shadow-card border border-slate-200/80 space-y-4">
               {/* Card Header & Status Badge */}
@@ -1721,7 +1791,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <span>📅 Presensi Harian</span>
+                  <span>📅 Presensi</span>
                   <span className="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full text-[9px] sm:text-[10px]">
                     {attendanceHistory.length}
                   </span>
@@ -1736,9 +1806,24 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <span>📝 Riwayat Izin</span>
+                  <span>📝 Izin / Cuti</span>
                   <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[9px] sm:text-[10px]">
                     {userLeaves.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setHistorySubTab('COMPLAINTS')}
+                  className={`flex-1 py-1.5 sm:py-2 text-[11px] sm:text-xs font-extrabold rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 ${
+                    historySubTab === 'COMPLAINTS'
+                      ? 'bg-white text-[#023246] shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <span>💬 Aspirasi</span>
+                  <span className="px-1.5 py-0.2 bg-amber-100 text-amber-900 font-bold rounded-full text-[9px] sm:text-[10px]">
+                    {userComplaints.length}
                   </span>
                 </button>
               </div>
@@ -1975,6 +2060,135 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                             <span className="text-[9px] text-slate-400 font-mono block pt-0.5">
                               Diajukan pada: {new Date(leave.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SUB-TAB 3: ASPIRASI & KELUHAN ANONIM */}
+              {historySubTab === 'COMPLAINTS' && (
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                    <div>
+                      <h2 className="font-black text-[#023246] text-xs sm:text-base flex items-center gap-1.5">
+                        <span>💬</span>
+                        <span>Aspirasi &amp; Keluhan Saya</span>
+                      </h2>
+                      <p className="text-[10px] sm:text-xs text-slate-400 font-semibold">
+                        Daftar catatan anonim yang Anda kirimkan ke pihak sekolah
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsComplaintModalOpen(true)}
+                      className="px-3 py-1.5 bg-[#0D7A5F] hover:bg-[#095744] text-white text-[11px] sm:text-xs font-extrabold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1 active:scale-95"
+                    >
+                      <span>+</span>
+                      <span>Tulis Keluhan Baru</span>
+                    </button>
+                  </div>
+
+                  {/* Anonymity Guarantee Reassurance Card */}
+                  <div className="bg-emerald-50/80 border border-emerald-200/80 p-3 rounded-2xl flex items-start gap-2.5 shadow-2xs">
+                    <span className="text-base shrink-0">🔒</span>
+                    <p className="text-[11px] text-emerald-950 font-medium leading-relaxed">
+                      <strong>Privasi Anda 100% Terjamin:</strong> Pihak Admin &amp; Kepala Sekolah membaca masukan ini sebagai <em>"Pendidik Anonim"</em> tanpa pernah mengetahui nama atau identitas Anda.
+                    </p>
+                  </div>
+
+                  {/* Complaints List or Empty State */}
+                  <div className="space-y-3">
+                    {isLoadingComplaints ? (
+                      <SkeletonList count={3} />
+                    ) : userComplaints.length === 0 ? (
+                      <EmptyState
+                        icon="💬"
+                        title="Belum Ada Catatan / Keluhan"
+                        description="Anda belum pernah mengirimkan catatan atau keluhan anonim. Tekan tombol '+ Tulis Keluhan Baru' jika ada kendala fasilitas, sistem, atau masukan untuk sekolah."
+                        actionLabel="+ Tulis Aspirasi Pertama"
+                        onAction={() => setIsComplaintModalOpen(true)}
+                      />
+                    ) : (
+                      userComplaints.map((item) => {
+                        const catMeta = ComplaintRepository.CATEGORY_META[item.category] || {
+                          label: item.category,
+                          emoji: '💡',
+                          colorClass: 'text-slate-800',
+                          bgClass: 'bg-slate-100',
+                          borderClass: 'border-slate-200',
+                        };
+                        const statusMeta = ComplaintRepository.STATUS_META[item.status] || {
+                          label: item.status,
+                          colorClass: 'text-slate-700',
+                          bgClass: 'bg-slate-100',
+                          borderClass: 'border-slate-200',
+                          badgeStatus: 'DEFAULT' as const,
+                        };
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50/80 border border-slate-200/90 text-xs space-y-2.5 transition-all shadow-2xs"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border flex items-center gap-1 ${catMeta.bgClass} ${catMeta.colorClass} ${catMeta.borderClass}`}>
+                                  <span>{catMeta.emoji}</span>
+                                  <span>{catMeta.label}</span>
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {new Date(item.created_at).toLocaleDateString('id-ID', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </div>
+
+                              <span className={`px-2 py-0.5 text-[10px] font-black rounded-lg border shrink-0 ${statusMeta.bgClass} ${statusMeta.colorClass} ${statusMeta.borderClass}`}>
+                                {statusMeta.label}
+                              </span>
+                            </div>
+
+                            <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/70 text-xs text-slate-800 font-medium leading-relaxed">
+                              "{item.content}"
+                            </div>
+
+                            {/* Official School Management Response */}
+                            {item.admin_response ? (
+                              <div className="bg-emerald-50/90 border border-emerald-300/80 p-3 rounded-xl space-y-1">
+                                <div className="flex items-center justify-between text-[11px] font-extrabold text-emerald-900">
+                                  <span className="flex items-center gap-1.5">
+                                    <span>💬</span>
+                                    <span>Tanggapan Resmi ({item.responded_by_role === 'KEPSEK' ? 'Kepala Sekolah' : 'Admin'}):</span>
+                                  </span>
+                                  {item.responded_at && (
+                                    <span className="font-mono text-[10px] text-emerald-700 font-semibold">
+                                      {new Date(item.responded_at).toLocaleDateString('id-ID', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-800 font-semibold leading-relaxed">
+                                  {item.admin_response}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-amber-700 bg-amber-50/70 px-2.5 py-1.5 rounded-lg border border-amber-200/60 flex items-center gap-1.5 font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                <span>Catatan telah diterima server &amp; menunggu peninjauan pihak sekolah.</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })
@@ -2438,6 +2652,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         attendanceRecords={attendanceHistory}
         leaveRequests={userLeaves}
         defaultTeacherId={effectiveUser.id}
+      />
+
+      {/* Anonymous Teacher Complaint & Feedback Modal */}
+      <AnonymousComplaintModal
+        isOpen={isComplaintModalOpen}
+        onClose={() => setIsComplaintModalOpen(false)}
+        onSuccess={() => {
+          loadUserComplaints();
+        }}
       />
     </div>
   );

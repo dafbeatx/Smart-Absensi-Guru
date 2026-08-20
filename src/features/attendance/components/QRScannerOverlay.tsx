@@ -15,6 +15,7 @@ import type { ScanRejectionDiagnosisResult } from '../../../services/groq-ai.ser
 import { ManualQRCodeModal } from './ManualQRCodeModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
+import { AnonymousComplaintModal } from '../../guru/components/AnonymousComplaintModal';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -49,6 +50,8 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [scanResult, setScanResult] = useState<{
     timestamp: string;
@@ -350,17 +353,24 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     setLatenessReason('');
     setIsSuccessModalOpen(true);
 
-    // Auto-Close 3.5s Timer ONLY for Hadir Tepat Waktu. For TERLAMBAT, popup remains OPEN until teacher manually saves reason!
+    // Auto-Close 4.5s Timer ONLY for Hadir Tepat Waktu. For TERLAMBAT, popup remains OPEN until teacher manually saves reason!
     if (!isLate) {
-      setTimeout(() => {
+      if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = setTimeout(() => {
         setIsSuccessModalOpen(false);
         onSuccess(result);
         onClose();
-      }, 3500);
+      }, 4500);
     }
   };
 
-  const handleSaveReasonAndClose = async (openMood: boolean = false) => {
+  const handleSaveReasonAndClose = async (openTarget: 'NONE' | 'MOOD' | 'COMPLAINT' = 'NONE') => {
+    // Clear auto-close timer if user interacted
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+
     const currentUser = useAuthStore.getState().user;
     if (latenessReason.trim() && currentUser) {
       try {
@@ -381,8 +391,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       }
     }
     setIsSuccessModalOpen(false);
-    if (openMood) {
+
+    if (openTarget === 'MOOD') {
       setIsMoodModalOpen(true);
+    } else if (openTarget === 'COMPLAINT') {
+      setIsComplaintModalOpen(true);
     } else {
       if (scanResult) onSuccess(scanResult);
       onClose();
@@ -671,7 +684,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           <div className="pt-1 space-y-2">
             <button
               type="button"
-              onClick={() => handleSaveReasonAndClose(true)}
+              onClick={() => handleSaveReasonAndClose('MOOD')}
               className="w-full py-2.5 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5 border border-[#0D7A5F]"
             >
               <span>💚</span>
@@ -684,7 +697,16 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
             <button
               type="button"
-              onClick={() => handleSaveReasonAndClose(false)}
+              onClick={() => handleSaveReasonAndClose('COMPLAINT')}
+              className="w-full py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 border border-amber-300 font-extrabold text-xs rounded-xl transition-all cursor-pointer active:scale-98 flex items-center justify-center gap-1.5 shadow-2xs"
+            >
+              <span>💬</span>
+              <span>Tulis Catatan / Keluhan Anonim 🔒</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSaveReasonAndClose('NONE')}
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-200 active:scale-98"
             >
               {scanResult?.rawStatus === 'TERLAMBAT'
@@ -830,6 +852,21 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         }}
         onSaved={() => {
           setIsMoodModalOpen(false);
+          if (scanResult) onSuccess(scanResult);
+          onClose();
+        }}
+      />
+
+      {/* Anonymous Teacher Complaint & Feedback Modal */}
+      <AnonymousComplaintModal
+        isOpen={isComplaintModalOpen}
+        onClose={() => {
+          setIsComplaintModalOpen(false);
+          if (scanResult) onSuccess(scanResult);
+          onClose();
+        }}
+        onSuccess={() => {
+          setIsComplaintModalOpen(false);
           if (scanResult) onSuccess(scanResult);
           onClose();
         }}

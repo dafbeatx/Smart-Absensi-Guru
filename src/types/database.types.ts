@@ -204,6 +204,42 @@ export interface TeacherAppreciationScore {
   badges: TeacherBadge[];
 }
 
+export type ComplaintCategory =
+  | 'SARANA_PRASARANA' // Fasilitas, AC, Proyektor, Kebersihan, Internet
+  | 'SISTEM_APLIKASI' // Kendala Absensi, GPS, Barcode, Error
+  | 'KEBIJAKAN_MANAJEMEN' // Jadwal Mengajar, Beban Kerja, Koordinasi
+  | 'KESEJAHTERAAN' // Kenyamanan Kerja, Lingkungan Sekolah
+  | 'LAINNYA'; // Aspirasi & Saran Umum
 
+export type ComplaintStatus =
+  | 'SUBMITTED' // Terkirim (Menunggu Tinjauan)
+  | 'IN_REVIEW' // Sedang Ditinjau Admin / Kepsek
+  | 'RESOLVED' // Selesai / Ditindaklanjuti
+  | 'ARCHIVED'; // Diarsipkan
 
+export interface TeacherComplaint {
+  id: string;
+  user_id: string; // ID Pengirim (Hanya dapat diakses oleh guru pengirim, disamarkan menjadi 'ANONYMOUS' untuk admin/kepsek)
+  date: string; // YYYY-MM-DD
+  category: ComplaintCategory;
+  content: string; // Isi keluhan / catatan
+  status: ComplaintStatus;
+  admin_response?: string | null; // Tanggapan / Solusi resmi dari Kepsek atau Admin
+  responded_at?: string | null;
+  responded_by_role?: 'ADMIN' | 'KEPSEK' | null;
+  is_anonymous: boolean;
+  created_at: string;
+}
 
+export interface SubmitComplaintDTO {
+  category: ComplaintCategory;
+  content: string;
+  is_anonymous?: boolean;
+}
+
+export interface UpdateComplaintStatusDTO {
+  complaintId: string;
+  status: ComplaintStatus;
+  adminResponse?: string;
+  respondedByRole?: 'ADMIN' | 'KEPSEK';
+}
