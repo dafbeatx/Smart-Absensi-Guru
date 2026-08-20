@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
@@ -16,6 +16,7 @@ import { DevTestPage } from '../../admin/pages/DevTestPage';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { AnalyticsService } from '../../../services/analytics.service';
+import type { HistoricalUnabsentedRecord } from '../../../services/analytics.service';
 import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 
@@ -242,6 +243,9 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   });
 
   const todayStr = getTodayDateInJakarta();
+  const [unabsentedFilterScope, setUnabsentedFilterScope] = useState<
+    'TODAY' | 'PAST_DAYS' | 'ALFA' | 'ALL_7_DAYS'
+  >('TODAY');
 
   // Dynamic calculation of active GURU teachers who haven't absented today (Returns [] on Weekends / Holidays)
   const unabsentedTeachers = AnalyticsService.getUnabsentedTeachers(
@@ -250,6 +254,52 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     attendanceRecords,
     allLeaves
   );
+
+  // Dynamic calculation of historical unabsented & ALFA teachers (Last 7 school days)
+  const historicalUnabsented: HistoricalUnabsentedRecord[] = useMemo(() => {
+    return AnalyticsService.getHistoricalUnabsentedTeachers(
+      teachers,
+      attendanceRecords,
+      allLeaves,
+      null,
+      null,
+      7
+    );
+  }, [teachers, attendanceRecords, allLeaves]);
+
+  const historicalPastOnly: HistoricalUnabsentedRecord[] = useMemo(() => {
+    return historicalUnabsented.filter((h: HistoricalUnabsentedRecord) => h.date !== todayStr);
+  }, [historicalUnabsented, todayStr]);
+
+  const historicalAlfaOnly: HistoricalUnabsentedRecord[] = useMemo(() => {
+    return historicalUnabsented.filter((h: HistoricalUnabsentedRecord) => h.status === 'ALFA');
+  }, [historicalUnabsented]);
+
+  const displayedUnabsentedList: HistoricalUnabsentedRecord[] = useMemo(() => {
+    if (unabsentedFilterScope === 'TODAY') {
+      return unabsentedTeachers.map((t) => ({
+        date: todayStr,
+        dayName: 'Hari Ini',
+        dateFormatted: `Hari Ini (${todayStr})`,
+        teacher: t,
+        status: 'BELUM_ABSEN' as const,
+      }));
+    }
+    if (unabsentedFilterScope === 'PAST_DAYS') {
+      return historicalPastOnly;
+    }
+    if (unabsentedFilterScope === 'ALFA') {
+      return historicalAlfaOnly;
+    }
+    return historicalUnabsented;
+  }, [
+    unabsentedFilterScope,
+    unabsentedTeachers,
+    todayStr,
+    historicalPastOnly,
+    historicalAlfaOnly,
+    historicalUnabsented,
+  ]);
 
   const sidebarItems: SidebarItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: '🏠' },
@@ -382,35 +432,102 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             </div>
           )}
 
-          {/* TAB 4: UNABSENTED */}
+          {/* TAB 4: UNABSENTED (HARI INI & HARI-HARI KEMARIN) */}
           {activeTab === 'UNABSENTED' && (
-            <div className="bg-white p-4 sm:p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="bg-white p-4 sm:p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                 <div>
-                  <h3 className="font-extrabold text-[#023246] text-base">⚠️ Daftar Guru Belum Absen Masuk Hari Ini</h3>
-                  <p className="text-xs text-slate-500 font-medium">Monitoring kehadiran guru secara real-time</p>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 font-extrabold text-[11px] rounded-full">
+                      ⚠️ Monitoring Presensi
+                    </span>
+                    <span className="text-xs text-slate-400 font-medium">Real-time &amp; Audit Riwayat</span>
+                  </div>
+                  <h3 className="font-extrabold text-[#023246] text-base mt-1">
+                    Daftar Guru Belum Absen &amp; Tanpa Keterangan
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Memantau guru yang belum melakukan presensi atau berstatus tanpa keterangan (hari ini &amp; hari-hari kemarin).
+                  </p>
                 </div>
-                <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-bold text-xs">
-                  {unabsentedTeachers.length} Guru
-                </span>
+                <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                  <span className="px-3 py-1 bg-red-50 text-red-700 border border-red-200 rounded-full font-extrabold text-xs">
+                    {unabsentedTeachers.length} Belum Absen Hari Ini
+                  </span>
+                </div>
               </div>
 
-              {unabsentedTeachers.length === 0 ? (
+              {/* Scope Sub-Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+                {[
+                  { id: 'TODAY', label: `Hari Ini (${unabsentedTeachers.length})` },
+                  { id: 'PAST_DAYS', label: `Hari-Hari Kemarin (${historicalPastOnly.length})` },
+                  { id: 'ALFA', label: `Tanpa Keterangan (${historicalAlfaOnly.length})` },
+                  { id: 'ALL_7_DAYS', label: `Semua 7 Hari Terakhir (${historicalUnabsented.length})` },
+                ].map((st) => (
+                  <button
+                    key={st.id}
+                    onClick={() => setUnabsentedFilterScope(st.id as any)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap cursor-pointer ${
+                      unabsentedFilterScope === st.id
+                        ? 'bg-[#023246] text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* UNABSENTED LIST RENDERING */}
+              {displayedUnabsentedList.length === 0 ? (
                 <div className="p-8 text-center bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-2">
-                  <span className="text-3xl">🎉</span>
-                  <p className="font-bold text-emerald-900 text-sm">Semua Guru Sudah Melakukan Absensi</p>
-                  <p className="text-xs text-emerald-700">Seluruh staf pengajar yang aktif telah terdata masuk atau izin hari ini.</p>
+                  <span className="text-3xl block">🎉</span>
+                  <p className="font-bold text-emerald-900 text-sm">Semua Presensi Tertib &amp; Lengkap</p>
+                  <p className="text-xs text-emerald-700">
+                    Tidak ada guru yang tercatat belum absen atau berstatus tanpa keterangan pada kategori ini.
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {unabsentedTeachers.map((t) => (
-                    <div key={t.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-2xs">
-                        {t.full_name.charAt(0)}
+                  {displayedUnabsentedList.map((item, idx) => (
+                    <div
+                      key={`${item.teacher.id}_${item.date}_${idx}`}
+                      className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2.5 transition-all ${
+                        item.status === 'ALFA'
+                          ? 'bg-rose-50/40 border-rose-200/80'
+                          : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-2xs">
+                            {item.teacher.full_name.charAt(0)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-slate-900 text-xs truncate">{item.teacher.full_name}</p>
+                            <p className="text-[10px] text-slate-500 truncate">
+                              NPP: {item.teacher.nip && !item.teacher.nip.startsWith('NIP_') ? item.teacher.nip : '-'} • {item.teacher.position || 'Guru Pengajar'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-full font-bold text-[10px] shrink-0 border ${
+                            item.status === 'ALFA'
+                              ? 'bg-rose-100 text-rose-800 border-rose-300'
+                              : 'bg-red-100 text-red-700 border-red-200'
+                          }`}
+                        >
+                          {item.status === 'ALFA' ? '🚫 Tanpa Keterangan' : '⏳ Belum Absen'}
+                        </span>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-slate-900 text-xs truncate">{t.full_name}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{t.position || 'Guru Pengajar'}</p>
+
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-600 font-bold">
+                        <span>📅 {item.dateFormatted}</span>
+                        <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[10px]">
+                          {item.dayName}
+                        </span>
                       </div>
                     </div>
                   ))}

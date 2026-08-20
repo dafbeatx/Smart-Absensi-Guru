@@ -14,7 +14,7 @@ export interface DailyAttendanceTrackerProps {
   onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
 }
 
-type StatusFilter = 'ALL' | 'HADIR' | 'TERLAMBAT' | 'IZIN_SAKIT' | 'BELUM_ABSEN';
+type StatusFilter = 'ALL' | 'HADIR' | 'TERLAMBAT' | 'IZIN_SAKIT' | 'ALFA' | 'BELUM_ABSEN';
 type RoleFilter = 'ALL' | 'GURU' | 'PIMPINAN_ADMIN';
 
 export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
@@ -54,10 +54,37 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     return AnalyticsService.getAttendanceEligibleUsers(teachers);
   }, [teachers]);
 
+  // Gather all leave requests from props & localStorage
+  const allLeavesToEvaluate = useMemo(() => {
+    const list = [...leaveRequests];
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_leaves');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) list.push(...parsed);
+        }
+      } catch (e) {}
+    }
+    return list;
+  }, [leaveRequests]);
+
   // 1. Calculate Daily Analytics Stats
   const summary = useMemo(() => {
-    return AnalyticsService.calculateDailySummary(selectedDate, activeEligiblePersonnel, attendanceRecords, leaveRequests, systemSettings);
-  }, [selectedDate, activeEligiblePersonnel, attendanceRecords, leaveRequests, systemSettings]);
+    return AnalyticsService.calculateDailySummary(selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, systemSettings);
+  }, [selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, systemSettings]);
+
+  // Historical Unabsented & ALFA records (Past 7 workdays)
+  const historicalUnabsented = useMemo(() => {
+    return AnalyticsService.getHistoricalUnabsentedTeachers(
+      teachers,
+      attendanceRecords,
+      allLeavesToEvaluate,
+      systemSettings,
+      null,
+      7
+    );
+  }, [teachers, attendanceRecords, allLeavesToEvaluate, systemSettings]);
 
   // 2. Identify attendance state map for each personnel for selectedDate
   const teacherAttendanceMap = useMemo(() => {
@@ -69,18 +96,6 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       checkOutTime?: string;
       notes?: string;
     }>();
-
-    // Gather all leave requests from props & localStorage
-    const allLeavesToEvaluate: LeaveRequest[] = [...leaveRequests];
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('smart_absensi_leaves');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) allLeavesToEvaluate.push(...parsed);
-        }
-      } catch (e) {}
-    }
 
     // Helper to match personnel with leave request
     const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest) => {
@@ -184,7 +199,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     }
 
     return map;
-  }, [selectedDate, activeEligiblePersonnel, attendanceRecords, leaveRequests, checkinEnd]);
+  }, [selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, checkinEnd]);
 
   // 3. Filtered & Priority-Sorted list of personnel based on search, status filter, and role filter
   const filteredTeachers = useMemo(() => {
@@ -211,6 +226,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       if (statusFilter === 'HADIR') return status === 'HADIR';
       if (statusFilter === 'TERLAMBAT') return status === 'TERLAMBAT';
       if (statusFilter === 'IZIN_SAKIT') return status === 'IZIN' || status === 'SAKIT' || status === 'DINAS_LUAR';
+      if (statusFilter === 'ALFA') return status === 'ALFA';
       if (statusFilter === 'BELUM_ABSEN') return status === 'BELUM_ABSEN';
 
       return true;
@@ -218,15 +234,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
     // Pinned Priority Sorting: KEPSEK (1) -> ADMIN (2) -> GURU/Others (3), then alphabetically by name
     return list.sort((a, b) => {
-      const getRoleRank = (r?: RoleCode) => {
-        if (r === 'KEPSEK') return 1;
-        if (r === 'ADMIN') return 2;
+      const getPriority = (role?: RoleCode) => {
+        if (role === 'KEPSEK') return 1;
+        if (role === 'ADMIN') return 2;
         return 3;
       };
-      const rankA = getRoleRank(a.role);
-      const rankB = getRoleRank(b.role);
-      if (rankA !== rankB) return rankA - rankB;
-      return a.full_name.localeCompare(b.full_name);
+      const priorityDiff = getPriority(a.role) - getPriority(b.role);
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.full_name.localeCompare(b.full_name, 'id');
     });
   }, [activeEligiblePersonnel, teacherAttendanceMap, searchQuery, statusFilter, roleFilter]);
 
@@ -242,6 +257,8 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       case 'SAKIT':
       case 'DINAS_LUAR':
         return <span className="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full border border-blue-200">📝 {status}</span>;
+      case 'ALFA':
+        return <span className="px-2.5 py-1 bg-rose-100 text-rose-800 text-xs font-bold rounded-full border border-rose-300">🚫 Tanpa Keterangan (Alfa)</span>;
       case 'BELUM_ABSEN':
       default:
         return isOffDayCheck.isOff ? (
@@ -328,7 +345,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         {/* Attendance Rate & Progress Bar */}
         <div className="space-y-2">
           <div className="flex justify-between items-center text-xs">
-            <span className="font-bold text-slate-700">Persentase Kehadiran Hari Ini</span>
+            <span className="font-bold text-slate-700">Persentase Kehadiran ({selectedDate})</span>
             <span className="font-black text-lg text-emerald-600">{summary.attendancePercentage}%</span>
           </div>
           <div className="w-full h-3.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
@@ -348,6 +365,11 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               title={`Izin / Sakit / Dinas: ${summary.totalLeave + summary.totalSick + summary.totalOfficialDuty}`}
             />
             <div
+              style={{ width: `${summary.totalTeachers > 0 ? (summary.totalAlfa / summary.totalTeachers) * 100 : 0}%` }}
+              className="bg-rose-500 transition-all duration-500"
+              title={`Tanpa Keterangan (Alfa): ${summary.totalAlfa}`}
+            />
+            <div
               style={{ width: `${summary.totalTeachers > 0 ? (summary.totalUnabsented / summary.totalTeachers) * 100 : 0}%` }}
               className="bg-red-400 transition-all duration-500"
               title={`Belum Absen: ${summary.totalUnabsented}`}
@@ -356,7 +378,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         </div>
 
         {/* Quick Stat Cards (Fully Clickable to Filter) */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 pt-1">
           <button
             type="button"
             onClick={() => setStatusFilter('ALL')}
@@ -399,8 +421,18 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           </button>
           <button
             type="button"
+            onClick={() => setStatusFilter('ALFA')}
+            className={`p-3 rounded-2xl bg-rose-50 border text-center space-y-0.5 transition-all cursor-pointer active:scale-95 ${
+              statusFilter === 'ALFA' ? 'border-rose-600 ring-2 ring-rose-400/40 shadow-xs' : 'border-rose-200 hover:border-rose-400 hover:shadow-xs'
+            }`}
+          >
+            <span className="text-xl font-black text-rose-700">{summary.totalAlfa}</span>
+            <p className="text-[10px] font-bold text-rose-800">Tanpa Keterangan</p>
+          </button>
+          <button
+            type="button"
             onClick={() => setStatusFilter('BELUM_ABSEN')}
-            className={`p-3 rounded-2xl bg-red-50 border text-center space-y-0.5 col-span-2 sm:col-span-1 transition-all cursor-pointer active:scale-95 ${
+            className={`p-3 rounded-2xl bg-red-50 border text-center space-y-0.5 transition-all cursor-pointer active:scale-95 ${
               statusFilter === 'BELUM_ABSEN' ? 'border-red-600 ring-2 ring-red-400/40 shadow-xs' : 'border-red-200 hover:border-red-400 hover:shadow-xs'
             }`}
           >
@@ -454,34 +486,37 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           </div>
         </div>
 
-        {/* Status Filter Buttons */}
-        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100">
+        {/* Status Filter Tab Buttons */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
           {[
-            { id: 'ALL', label: `Semua Status (${activeEligiblePersonnel.length})` },
-            { id: 'HADIR', label: `Hadir (${summary.totalPresent})` },
+            { id: 'ALL', label: `Semua (${activeEligiblePersonnel.length})` },
+            { id: 'HADIR', label: `Hadir Tepat (${summary.totalPresent})` },
             { id: 'TERLAMBAT', label: `Terlambat (${summary.totalLate})` },
-            { id: 'IZIN_SAKIT', label: `Izin/Sakit (${summary.totalSick + summary.totalLeave + summary.totalOfficialDuty})` },
+            { id: 'IZIN_SAKIT', label: `Izin / Sakit (${summary.totalSick + summary.totalLeave + summary.totalOfficialDuty})` },
+            { id: 'ALFA', label: `Tanpa Keterangan (${summary.totalAlfa})` },
             { id: 'BELUM_ABSEN', label: `Belum Absen (${summary.totalUnabsented})` },
-          ].map((filter) => (
+          ].map((tab) => (
             <button
-              key={filter.id}
-              onClick={() => setStatusFilter(filter.id as StatusFilter)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
-                statusFilter === filter.id
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id as StatusFilter)}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap cursor-pointer ${
+                statusFilter === tab.id
+                  ? 'bg-[#023246] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {filter.label}
+              {tab.label}
             </button>
           ))}
         </div>
 
-        {/* Attendance Records List */}
-        <div className="space-y-3 pt-2">
+        {/* Personnel Attendance List */}
+        <div className="divide-y divide-slate-100">
           {filteredTeachers.length === 0 ? (
-            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 text-xs font-bold">
-              Tidak ada data personel yang sesuai dengan kriteria pencarian / filter.
+            <div className="p-8 text-center text-slate-400 space-y-1">
+              <span className="text-3xl block">🔍</span>
+              <p className="font-bold text-slate-600 text-xs">Tidak ada data personel yang cocok dengan filter</p>
+              <p className="text-[11px]">Coba ubah tanggal, peran, atau kata kunci pencarian.</p>
             </div>
           ) : (
             filteredTeachers.map((teacher) => {
@@ -494,7 +529,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                 <div
                   key={teacher.id}
                   onClick={() => onOpenCorrectionModal && onOpenCorrectionModal(teacher, selectedDate)}
-                  className={`p-4 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer active:scale-[0.99] ${getCardStyle(teacher.role)}`}
+                  className={`p-3.5 sm:p-4 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 my-1.5 cursor-pointer active:scale-[0.99] ${getCardStyle(teacher.role)}`}
                   title="Klik untuk melihat / mengoreksi absensi personel ini"
                 >
                   <div className="flex items-center gap-3">
@@ -595,6 +630,91 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             })
           )}
         </div>
+      </div>
+
+      {/* ── REKAP GURU BELUM ABSEN & ALFA HARI-HARI KEMARIN ─────────────────── */}
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 font-extrabold text-[11px] rounded-full">
+                ⚠️ Audit Riwayat Hari-Hari Kemarin
+              </span>
+              <span className="text-xs text-slate-400 font-medium">7 Hari Sekolah Terakhir</span>
+            </div>
+            <h3 className="font-extrabold text-slate-900 text-sm sm:text-base mt-1">
+              Rekap Personel Belum Absen &amp; Tanpa Keterangan (Kemarin &amp; Hari Sebelumnya)
+            </h3>
+            <p className="text-xs text-slate-500">
+              Daftar guru/staf yang belum melakukan absensi atau dialfakan pada hari kerja sebelumnya agar dapat ditindaklanjuti.
+            </p>
+          </div>
+          <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-extrabold text-xs shrink-0 self-start sm:self-auto">
+            Total {historicalUnabsented.length} Catatan
+          </span>
+        </div>
+
+        {historicalUnabsented.length === 0 ? (
+          <div className="p-8 text-center bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-2">
+            <span className="text-3xl block">🎉</span>
+            <p className="font-bold text-emerald-900 text-sm">Semua Kehadiran Hari-Hari Kemarin Tertib</p>
+            <p className="text-xs text-emerald-700">
+              Tidak ada guru yang terlewat absen tanpa keterangan pada 7 hari sekolah terakhir.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {historicalUnabsented.map((item, idx) => (
+              <div
+                key={`${item.teacher.id}_${item.date}_${idx}`}
+                className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-2 transition-all ${
+                  item.status === 'ALFA'
+                    ? 'bg-rose-50/40 border-rose-200/80 hover:border-rose-300'
+                    : 'bg-amber-50/30 border-amber-200/80 hover:border-amber-300'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
+                      {item.teacher.full_name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 text-xs truncate">{item.teacher.full_name}</p>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        NPP: {item.teacher.nip && !item.teacher.nip.startsWith('NIP_') ? item.teacher.nip : '-'} • {item.teacher.position || 'Guru Pengajar'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`px-2 py-0.5 rounded-full font-bold text-[10px] shrink-0 border ${
+                      item.status === 'ALFA'
+                        ? 'bg-rose-100 text-rose-800 border-rose-300'
+                        : 'bg-red-100 text-red-700 border-red-200'
+                    }`}
+                  >
+                    {item.status === 'ALFA' ? '🚫 Tanpa Keterangan' : '⏳ Belum Absen'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
+                  <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                    <span>📅</span> {item.dateFormatted} ({item.dayName})
+                  </span>
+
+                  {onOpenCorrectionModal && (
+                    <button
+                      onClick={() => onOpenCorrectionModal(item.teacher, item.date)}
+                      className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-[10px] rounded-lg transition-all cursor-pointer active:scale-95 border border-amber-300"
+                    >
+                      ✏️ Koreksi / Isi Alasan
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Modal Reset Presensi Harian dengan Password Admin */}

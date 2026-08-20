@@ -10,6 +10,7 @@ export interface DailyAttendanceSummary {
   totalLeave: number;
   totalSick: number;
   totalOfficialDuty: number;
+  totalAlfa: number;
   totalUnabsented: number;
   attendancePercentage: number;
 }
@@ -28,6 +29,16 @@ export interface ExecutiveDashboardAnalytics {
   monthlyPercentage: number;
   pendingApprovalsCount: number;
   unabsentedTeachers: UserProfile[];
+}
+
+export interface HistoricalUnabsentedRecord {
+  date: string;
+  dayName: string;
+  dateFormatted: string;
+  teacher: UserProfile;
+  status: 'BELUM_ABSEN' | 'ALFA';
+  notes?: string;
+  record?: AttendanceRecord;
 }
 
 export class AnalyticsService {
@@ -61,6 +72,7 @@ export class AnalyticsService {
     let totalLeave = 0;
     let totalSick = 0;
     let totalOfficialDuty = 0;
+    let totalAlfa = 0;
 
     const userAttendanceMap = new Map<string, AttendanceRecord>();
     for (const rec of attendanceRecords) {
@@ -93,6 +105,8 @@ export class AnalyticsService {
               totalOfficialDuty++;
             } else if (reasonText.includes('menjadi IZIN')) {
               totalLeave++;
+            } else if (reasonText.includes('menjadi ALFA')) {
+              totalAlfa++;
             } else {
               totalPresent++;
             }
@@ -131,6 +145,9 @@ export class AnalyticsService {
       } else if (effectiveStatus === 'DINAS_LUAR') {
         totalOfficialDuty++;
         accountedUserIds.add(uId);
+      } else if (effectiveStatus === 'ALFA') {
+        totalAlfa++;
+        accountedUserIds.add(uId);
       }
     });
 
@@ -157,6 +174,7 @@ export class AnalyticsService {
       totalLeave,
       totalSick,
       totalOfficialDuty,
+      totalAlfa,
       totalUnabsented,
       attendancePercentage,
     };
@@ -194,7 +212,7 @@ export class AnalyticsService {
       }
     }
 
-    // 2. Account for Scanned Attendance Records
+    // 2. Account for Scanned or Corrected Attendance Records
     const checkinEnd =
       systemSettings?.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
@@ -205,13 +223,16 @@ export class AnalyticsService {
           checkinEnd,
           rec.status
         );
+        // Include any recorded status (including ALFA so ALFA is not treated as unabsented)
         if (
           rec.check_in_time ||
           effectiveStatus === 'HADIR' ||
           effectiveStatus === 'TERLAMBAT' ||
           effectiveStatus === 'IZIN' ||
           effectiveStatus === 'SAKIT' ||
-          effectiveStatus === 'DINAS_LUAR'
+          effectiveStatus === 'DINAS_LUAR' ||
+          effectiveStatus === 'ALFA' ||
+          rec.status === 'ALFA'
         ) {
           activeUserIds.add(rec.user_id);
         }
@@ -220,5 +241,84 @@ export class AnalyticsService {
 
     const activeTeachers = this.getAttendanceEligibleUsers(allTeachers);
     return activeTeachers.filter((t) => !activeUserIds.has(t.id));
+  }
+
+  /**
+   * Retrieves historical unabsented & ALFA personnel records across past school workdays
+   * (e.g. yesterday and up to lookbackDays prior workdays).
+   */
+  public static getHistoricalUnabsentedTeachers(
+    allTeachers: UserProfile[],
+    attendanceRecords: AttendanceRecord[],
+    leaveRequests: LeaveRequest[],
+    systemSettings?: SystemSettings | null,
+    holidays?: HolidayRecord[] | null,
+    lookbackDays: number = 7
+  ): HistoricalUnabsentedRecord[] {
+    const results: HistoricalUnabsentedRecord[] = [];
+    const activeTeachers = this.getAttendanceEligibleUsers(allTeachers);
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    const today = new Date();
+
+    // Iterate backwards from today to lookbackDays ago
+    for (let i = 0; i <= lookbackDays; i++) {
+      const targetDate = new Date();
+      targetDate.setDate(today.getDate() - i);
+      const dateStr = targetDate.toISOString().substring(0, 10);
+
+      // Check if it's weekend or official school holiday
+      const offCheck = isDateOffDay(dateStr, systemSettings, holidays);
+      if (offCheck.isOff) continue;
+
+      const dayName = dayNames[targetDate.getDay()];
+      const dayNum = targetDate.getDate();
+      const monthName = monthNames[targetDate.getMonth()];
+      const dateFormatted = `${dayName}, ${dayNum} ${monthName} ${targetDate.getFullYear()}`;
+
+      // 1. Identify unabsented teachers for this date
+      const unabsentedForDate = this.getUnabsentedTeachers(
+        dateStr,
+        activeTeachers,
+        attendanceRecords,
+        leaveRequests,
+        systemSettings,
+        holidays
+      );
+
+      unabsentedForDate.forEach((t) => {
+        results.push({
+          date: dateStr,
+          dayName: i === 0 ? 'Hari Ini' : i === 1 ? 'Kemarin' : dayName,
+          dateFormatted,
+          teacher: t,
+          status: 'BELUM_ABSEN',
+        });
+      });
+
+      // 2. Identify recorded ALFA teachers for this date
+      attendanceRecords.forEach((rec) => {
+        if (rec.date === dateStr && rec.status === 'ALFA') {
+          const teacher = activeTeachers.find((t) => t.id === rec.user_id);
+          if (teacher) {
+            results.push({
+              date: dateStr,
+              dayName: i === 0 ? 'Hari Ini' : i === 1 ? 'Kemarin' : dayName,
+              dateFormatted,
+              teacher,
+              status: 'ALFA',
+              notes: rec.notes || 'Tanpa Keterangan (Alpha)',
+              record: rec,
+            });
+          }
+        }
+      });
+    }
+
+    return results;
   }
 }
