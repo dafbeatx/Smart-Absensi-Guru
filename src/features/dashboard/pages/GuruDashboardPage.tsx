@@ -1512,7 +1512,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     setActiveTab('RIWAYAT');
                     setHistorySubTab('COMPLAINTS');
                   }}
-                  className="min-h-[44px] px-3 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black rounded-2xl border border-slate-200/90 transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                  className="min-h-11 px-3 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black rounded-2xl border border-slate-200/90 transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.98]"
                 >
                   <span>📋 Riwayat Saya</span>
                   <span className="px-1.5 py-0.2 bg-slate-200 text-slate-800 font-mono text-[10px] rounded-full font-bold">
@@ -1523,7 +1523,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsComplaintModalOpen(true)}
-                  className="min-h-[44px] px-3 py-2.5 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-black rounded-2xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
+                  className="min-h-11 px-3 py-2.5 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-black rounded-2xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
                 >
                   <span>+</span>
                   <span>Tulis Catatan</span>
@@ -2099,7 +2099,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsComplaintModalOpen(true)}
-                      className="min-h-[42px] sm:min-h-9 px-4 py-2 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-black rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 self-start sm:self-auto w-full sm:w-auto"
+                      className="min-h-11 sm:min-h-9 px-4 py-2 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-black rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 self-start sm:self-auto w-full sm:w-auto"
                     >
                       <span>+</span>
                       <span>Tulis Catatan Baru</span>

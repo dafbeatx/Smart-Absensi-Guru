@@ -275,7 +275,7 @@ export const AnonymousComplaintModal: React.FC<AnonymousComplaintModalProps> = (
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Tuliskan kendala sarana, fasilitas kelas, sistem absensi, atau aspirasi Anda secara rinci..."
-              className="w-full p-3.5 bg-slate-50/70 border border-slate-300 rounded-2xl text-xs sm:text-sm text-slate-900 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] focus:border-transparent transition-all resize-none shadow-2xs leading-relaxed min-h-[110px]"
+              className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] transition-all resize-none shadow-2xs leading-relaxed min-h-28"
             />
 
             {/* Character Progress Bar */}
@@ -290,14 +290,14 @@ export const AnonymousComplaintModal: React.FC<AnonymousComplaintModalProps> = (
           </div>
         </div>
 
-        {/* Bottom Action Button Bar (Full Mobile Touch Targets min 46px) */}
+        {/* Bottom Action Button Bar (Full Mobile Touch Targets min 44-48px) */}
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
           <Button
             type="button"
             variant="secondary"
             onClick={handleClose}
             disabled={isSubmitting}
-            className="min-h-[46px] sm:min-h-11 px-4 text-xs font-bold rounded-2xl w-full sm:w-auto"
+            className="min-h-12 sm:min-h-11 px-4 text-xs font-bold rounded-2xl w-full sm:w-auto"
           >
             Batal
           </Button>
@@ -306,7 +306,7 @@ export const AnonymousComplaintModal: React.FC<AnonymousComplaintModalProps> = (
             type="submit"
             variant="primary"
             disabled={isSubmitting || !content.trim()}
-            className="min-h-[46px] sm:min-h-11 px-6 bg-[#0D7A5F] hover:bg-[#095744] text-white font-black text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md active:scale-98 cursor-pointer w-full sm:w-auto"
+            className="min-h-12 sm:min-h-11 px-6 bg-[#0D7A5F] hover:bg-[#095744] text-white font-black text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 shadow-md active:scale-98 cursor-pointer w-full sm:w-auto"
           >
             <span>{isSubmitting ? 'Mengirim Catatan...' : '🔒 Kirim Secara Anonim'}</span>
           </Button>
