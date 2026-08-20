@@ -817,26 +817,58 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getPendingLeaves(_token: string): Promise<LeaveRequest[]> {
-    const { data } = await this.client
-      .from('leaves')
-      .select('*')
-      .or('status.eq.PENDING,approval_status.eq.PENDING')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await this.client
+        .from('leaves')
+        .select('*')
+        .in('status', ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'])
+        .order('created_at', { ascending: false });
 
-    return (data || []).map((row) => ({
-      id: row.id,
-      user_id: row.user_id,
-      leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
-      start_date: row.start_date,
-      end_date: row.end_date,
-      reason: row.reason,
-      attachment_url: row.attachment_url || null,
-      approval_status: (row.status || row.approval_status || 'PENDING') as ApprovalStatus,
-      approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
-      approved_by: row.approved_by || null,
-      approval_notes: row.rejection_notes || row.approval_notes || null,
-      created_at: row.created_at,
-    }));
+      if (error) {
+        logger.warn('SupabaseProvider', 'getPendingLeaves query error:', error.message);
+        // Fallback: try without filter (get all and filter client-side)
+        const { data: allData } = await this.client
+          .from('leaves')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        const filtered = (allData || []).filter(
+          (row) => row.status === 'PENDING' || row.status === 'SUBMITTED' || row.status === 'UNDER_REVIEW'
+        );
+        return filtered.map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
+          start_date: row.start_date,
+          end_date: row.end_date,
+          reason: row.reason,
+          attachment_url: row.attachment_url || null,
+          approval_status: (row.status || 'PENDING') as ApprovalStatus,
+          approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
+          approved_by: row.approved_by || null,
+          approval_notes: row.rejection_notes || row.approval_notes || null,
+          created_at: row.created_at,
+        }));
+      }
+
+      return (data || []).map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
+        start_date: row.start_date,
+        end_date: row.end_date,
+        reason: row.reason,
+        attachment_url: row.attachment_url || null,
+        approval_status: (row.status || 'PENDING') as ApprovalStatus,
+        approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
+        approved_by: row.approved_by || null,
+        approval_notes: row.rejection_notes || row.approval_notes || null,
+        created_at: row.created_at,
+      }));
+    } catch (err) {
+      logger.error('SupabaseProvider', 'getPendingLeaves exception:', err);
+      return [];
+    }
   }
 
   public async getAllLeaves(_token: string): Promise<LeaveRequest[]> {
