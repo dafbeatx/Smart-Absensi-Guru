@@ -1260,49 +1260,23 @@ export class MockProvider implements IDataProvider {
 
   // ─── ANONYMOUS TEACHER COMPLAINTS & FEEDBACK API ──────────────────────────
 
-  private getInitialComplaintsSeed(): TeacherComplaint[] {
-    const today = getTodayDateInJakarta();
-    return [
-      {
-        id: 'comp_sample_01',
-        user_id: 'usr_sample_1',
-        date: today,
-        category: 'SARANA_PRASARANA',
-        content: 'Proyektor di Lab Komputer 2 terkadang flickering/mati sesaat saat dipakai presentasi pembelajaran. Mohon bantuan tim sarpras untuk cek kabel atau port VGA-nya.',
-        status: 'IN_REVIEW',
-        admin_response: 'Terima kasih atas laporannya. Tim sarpras telah menjadwalkan pengecekan teknis dan kabel cadangan telah disiapkan.',
-        responded_at: new Date().toISOString(),
-        responded_by_role: 'ADMIN',
-        is_anonymous: true,
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      },
-      {
-        id: 'comp_sample_02',
-        user_id: 'usr_sample_2',
-        date: today,
-        category: 'SISTEM_APLIKASI',
-        content: 'Aplikasi absensi QR sangat cepat dan praktis! Radius 500m di pintu gerbang utama bekerja dengan sangat mulus.',
-        status: 'RESOLVED',
-        admin_response: 'Terima kasih atas apresiasinya. Kami terus memantau performa sistem agar tetap handal.',
-        responded_at: new Date().toISOString(),
-        responded_by_role: 'KEPSEK',
-        is_anonymous: true,
-        created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-      },
-      {
-        id: 'comp_sample_03',
-        user_id: 'usr_sample_3',
-        date: today,
-        category: 'KEBIJAKAN_MANAJEMEN',
-        content: 'Usulan agar sesi rapat koordinasi hari Jumat dimulai tepat pukul 13.30 WIB agar persiapan materi mengajar tidak tergesa-gesa.',
-        status: 'SUBMITTED',
-        admin_response: null,
-        responded_at: null,
-        responded_by_role: null,
-        is_anonymous: true,
-        created_at: new Date(Date.now() - 3600000 * 8).toISOString(),
-      },
-    ];
+  private getStorageComplaints(): TeacherComplaint[] {
+    const raw = safeGetStorage('smart_absensi_teacher_complaints');
+    if (!raw) return [];
+    try {
+      const list: TeacherComplaint[] = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        // Purge any legacy sample seed dummy items
+        const cleanList = list.filter((c) => !c.id.startsWith('comp_sample_'));
+        if (cleanList.length !== list.length) {
+          safeSetStorage('smart_absensi_teacher_complaints', JSON.stringify(cleanList));
+        }
+        return cleanList;
+      }
+    } catch {
+      // ignore parse error
+    }
+    return [];
   }
 
   public async submitComplaint(
@@ -1310,8 +1284,7 @@ export class MockProvider implements IDataProvider {
     dto: SubmitComplaintDTO,
     _token?: string
   ): Promise<TeacherComplaint> {
-    const raw = safeGetStorage('smart_absensi_teacher_complaints');
-    let list: TeacherComplaint[] = raw ? JSON.parse(raw) : this.getInitialComplaintsSeed();
+    const list = this.getStorageComplaints();
 
     const todayStr = getTodayDateInJakarta();
     const newComplaint: TeacherComplaint = {
@@ -1335,14 +1308,12 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getUserComplaints(userId: string, _token?: string): Promise<TeacherComplaint[]> {
-    const raw = safeGetStorage('smart_absensi_teacher_complaints');
-    const list: TeacherComplaint[] = raw ? JSON.parse(raw) : this.getInitialComplaintsSeed();
+    const list = this.getStorageComplaints();
     return list.filter((c) => c.user_id === userId);
   }
 
   public async getAllComplaints(_token?: string): Promise<TeacherComplaint[]> {
-    const raw = safeGetStorage('smart_absensi_teacher_complaints');
-    const list: TeacherComplaint[] = raw ? JSON.parse(raw) : this.getInitialComplaintsSeed();
+    const list = this.getStorageComplaints();
     
     // Strict Anonymity: Mask user_id to 'ANONYMOUS' so neither Admin nor Kepsek can trace the author
     return list.map((c) => ({
@@ -1355,8 +1326,7 @@ export class MockProvider implements IDataProvider {
     dto: UpdateComplaintStatusDTO,
     _token?: string
   ): Promise<boolean> {
-    const raw = safeGetStorage('smart_absensi_teacher_complaints');
-    let list: TeacherComplaint[] = raw ? JSON.parse(raw) : this.getInitialComplaintsSeed();
+    const list = this.getStorageComplaints();
 
     const index = list.findIndex((c) => c.id === dto.complaintId);
     if (index === -1) return false;

@@ -1597,7 +1597,7 @@ export class SupabaseProvider implements IDataProvider {
 
       if (error) {
         logger.warn('SupabaseProvider', 'getUserComplaints Supabase error, fallback to local storage:', error.message);
-      } else if (data && data.length > 0) {
+      } else if (data) {
         return data as TeacherComplaint[];
       }
     } catch (err) {
@@ -1617,7 +1617,7 @@ export class SupabaseProvider implements IDataProvider {
 
       if (error) {
         logger.warn('SupabaseProvider', 'getAllComplaints Supabase error, fallback to local storage:', error.message);
-      } else if (data && data.length > 0) {
+      } else if (data) {
         // Mask user_id for strict anonymity
         return (data as TeacherComplaint[]).map((c) => ({
           ...c,
