@@ -13,7 +13,7 @@ export class TeachingScheduleRepository {
     try {
       const provider = ProviderFactory.getProvider();
       const schedules = await provider.getTeachingSchedules(token);
-      if (Array.isArray(schedules) && schedules.length > 0) {
+      if (Array.isArray(schedules)) {
         try {
           localStorage.setItem(TEACHING_SCHEDULES_STORAGE_KEY, JSON.stringify(schedules));
         } catch {

@@ -89,16 +89,11 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   // Initial load from cloud provider repository with cache fallback
   useEffect(() => {
     TeachingScheduleRepository.getSchedules().then((fetched) => {
-      if (Array.isArray(fetched) && fetched.length > 0) {
+      if (Array.isArray(fetched)) {
         setSchedules(fetched);
       }
     });
   }, []);
-
-  // Persist schedules to cloud provider & local cache
-  useEffect(() => {
-    TeachingScheduleRepository.saveSchedules(schedules);
-  }, [schedules]);
 
   // Handle subjects update
   const handleUpdateSubjects = (newSubjects: SubjectItem[]) => {
@@ -179,22 +174,22 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     const selectedTeacher = teachers.find((t) => t.id === formTeacherId);
     const timeFormatted = `${formTimeStart} - ${formTimeEnd} WIB`;
 
+    let updatedSchedules: ExtendedTeachingSlot[];
+
     if (editingId) {
-      setSchedules((prev) =>
-        prev.map((item) =>
-          item.id === editingId
-            ? {
-                ...item,
-                user_id: formTeacherId,
-                teacher_name: selectedTeacher?.full_name || 'Guru',
-                day: formDay,
-                time: timeFormatted,
-                className: formClassName,
-                subject: formSubject,
-                room: formRoom || 'Ruang Kelas',
-              }
-            : item
-        )
+      updatedSchedules = schedules.map((item) =>
+        item.id === editingId
+          ? {
+              ...item,
+              user_id: formTeacherId,
+              teacher_name: selectedTeacher?.full_name || 'Guru',
+              day: formDay,
+              time: timeFormatted,
+              className: formClassName,
+              subject: formSubject,
+              room: formRoom || 'Ruang Kelas',
+            }
+          : item
       );
       showToast('success', 'Jadwal Diperbarui', 'Jadwal mengajar berhasil diperbarui.');
     } else {
@@ -208,16 +203,20 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
         subject: formSubject,
         room: formRoom || 'Ruang Kelas',
       };
-      setSchedules((prev) => [...prev, newSlot]);
+      updatedSchedules = [...schedules, newSlot];
       showToast('success', 'Jadwal Ditambahkan', 'Jadwal mengajar baru berhasil disimpan.');
     }
 
+    setSchedules(updatedSchedules);
+    TeachingScheduleRepository.saveSchedules(updatedSchedules);
     setIsModalOpen(false);
   };
 
   const handleDeleteSchedule = (id: string) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus jam mengajar ini?')) {
-      setSchedules((prev) => prev.filter((s) => s.id !== id));
+      const updatedSchedules = schedules.filter((s) => s.id !== id);
+      setSchedules(updatedSchedules);
+      TeachingScheduleRepository.saveSchedules(updatedSchedules);
       showToast('success', 'Jadwal Dihapus', 'Jam mengajar berhasil dihapus.');
     }
   };
