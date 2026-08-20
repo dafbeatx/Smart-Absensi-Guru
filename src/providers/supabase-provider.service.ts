@@ -1390,7 +1390,11 @@ export class SupabaseProvider implements IDataProvider {
     return null;
   }
 
-  public async getBurnoutAnalytics(_month?: string, _year?: string, _token?: string): Promise<BurnoutAnalytics> {
+  public async getBurnoutAnalytics(month?: string, year?: string, _token?: string): Promise<BurnoutAnalytics> {
+    const today = getTodayDateInJakarta();
+    const targetYear = year || today.substring(0, 4);
+    const targetMonth = month !== undefined ? month : String(parseInt(today.substring(5, 7), 10));
+
     const breakdown: Record<TeacherMoodType, number> = {
       VERY_HAPPY: 0,
       HAPPY: 0,
@@ -1402,9 +1406,18 @@ export class SupabaseProvider implements IDataProvider {
     let totalLogs: TeacherMoodLog[] = [];
 
     try {
-      const { data, error } = await this.client
-        .from('teacher_moods')
-        .select('*');
+      let query = this.client.from('teacher_moods').select('*');
+
+      if (targetMonth === 'ALL') {
+        query = query.gte('date', `${targetYear}-01-01`).lte('date', `${targetYear}-12-31`);
+      } else {
+        const monthNum = parseInt(targetMonth, 10);
+        const monthPad = String(targetMonth).padStart(2, '0');
+        const lastDay = new Date(parseInt(targetYear, 10), monthNum, 0).getDate();
+        query = query.gte('date', `${targetYear}-${monthPad}-01`).lte('date', `${targetYear}-${monthPad}-${String(lastDay).padStart(2, '0')}`);
+      }
+
+      const { data, error } = await query;
 
       if (!error && data && data.length > 0) {
         totalLogs = data.map((d) => ({
@@ -1423,7 +1436,17 @@ export class SupabaseProvider implements IDataProvider {
     if (totalLogs.length === 0 && typeof localStorage !== 'undefined') {
       const raw = localStorage.getItem('smart_absensi_teacher_moods');
       if (raw) {
-        try { totalLogs = JSON.parse(raw); } catch {}
+        try {
+          const parsed: TeacherMoodLog[] = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            if (targetMonth === 'ALL') {
+              totalLogs = parsed.filter((log) => log.date && log.date.startsWith(`${targetYear}-`));
+            } else {
+              const monthPad = String(targetMonth).padStart(2, '0');
+              totalLogs = parsed.filter((log) => log.date && log.date.startsWith(`${targetYear}-${monthPad}`));
+            }
+          }
+        } catch {}
       }
     }
 
@@ -1441,7 +1464,7 @@ export class SupabaseProvider implements IDataProvider {
 
     let burnout_risk_level: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
     let recommendation = total === 0
-      ? 'Belum ada data mood guru yang tercatat. Grafik dan rekomendasi akan muncul secara realtime begitu dewan guru mengisi mood check-in harian.'
+      ? 'Belum ada data mood guru yang tercatat pada periode ini. Grafik dan rekomendasi akan muncul secara realtime begitu dewan guru mengisi mood check-in harian.'
       : 'Tingkat kesejahteraan dewan guru dalam kondisi prima. Pertahankan iklim kerja kondusif dan apresiasi kinerja guru secara berkala.';
 
     if (stressPercentage >= 35) {

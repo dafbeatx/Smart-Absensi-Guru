@@ -138,5 +138,30 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     indPDF.includes('Ahmad Hidayat')
   );
 
+  // Test 9: Burnout Analytics - Monthly isolation resets to 0 on empty month
+  const { MockProvider } = await import('../../providers/mock-provider.service');
+  const testProvider = new MockProvider();
+  await testProvider.saveTeacherMood('usr_1', '2026-08-01', 'VERY_HAPPY');
+  await testProvider.saveTeacherMood('usr_2', '2026-08-02', 'STRESSED');
+  await testProvider.saveTeacherMood('usr_3', '2026-07-15', 'TIRED');
+
+  const augAnalytics = await testProvider.getBurnoutAnalytics('8', '2026');
+  assert(
+    'Burnout Analytics - August monthly filter returns only August records',
+    augAnalytics.total_responses === 2 && augAnalytics.mood_breakdown.VERY_HAPPY === 1 && augAnalytics.mood_breakdown.STRESSED === 1
+  );
+
+  const sepAnalytics = await testProvider.getBurnoutAnalytics('9', '2026');
+  assert(
+    'Burnout Analytics - New month with no entries resets to 0',
+    sepAnalytics.total_responses === 0 && sepAnalytics.burnout_score === 0
+  );
+
+  const yearAnalytics = await testProvider.getBurnoutAnalytics('ALL', '2026');
+  assert(
+    'Burnout Analytics - Yearly recap aggregates all months in year',
+    yearAnalytics.total_responses === 3
+  );
+
   return { passed, failed, results };
 };

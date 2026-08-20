@@ -1155,15 +1155,30 @@ export class MockProvider implements IDataProvider {
     }
   }
 
-  public async getBurnoutAnalytics(_month?: string, _year?: string, _token?: string): Promise<BurnoutAnalytics> {
+  public async getBurnoutAnalytics(month?: string, year?: string, _token?: string): Promise<BurnoutAnalytics> {
+    const today = getTodayDateInJakarta();
+    const targetYear = year || today.substring(0, 4);
+    const targetMonth = month !== undefined ? month : String(parseInt(today.substring(5, 7), 10));
+
     const raw = safeGetStorage('smart_absensi_teacher_moods');
-    let logs: TeacherMoodLog[] = [];
+    let allLogs: TeacherMoodLog[] = [];
     if (raw) {
       try {
-        logs = JSON.parse(raw);
+        allLogs = JSON.parse(raw);
       } catch {
-        logs = [];
+        allLogs = [];
       }
+    }
+
+    // Filter by period:
+    let logs: TeacherMoodLog[] = [];
+    if (targetMonth === 'ALL') {
+      // Yearly recap: filter by year
+      logs = allLogs.filter((log) => log.date && log.date.startsWith(`${targetYear}-`));
+    } else {
+      // Monthly recap: filter by year and month
+      const monthPad = String(targetMonth).padStart(2, '0');
+      logs = allLogs.filter((log) => log.date && log.date.startsWith(`${targetYear}-${monthPad}`));
     }
 
     const breakdown: Record<TeacherMoodType, number> = {
@@ -1188,7 +1203,7 @@ export class MockProvider implements IDataProvider {
 
     let burnout_risk_level: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
     let recommendation = total === 0
-      ? 'Belum ada data mood guru yang tercatat. Grafik dan rekomendasi akan muncul secara realtime begitu dewan guru mengisi mood check-in harian.'
+      ? 'Belum ada data mood guru yang tercatat pada periode ini. Grafik dan rekomendasi akan muncul secara realtime begitu dewan guru mengisi mood check-in harian.'
       : 'Tingkat kesejahteraan dewan guru dalam kondisi prima. Pertahankan iklim kerja kondusif dan apresiasi kinerja guru secara berkala.';
 
     if (stressPercentage >= 35) {
