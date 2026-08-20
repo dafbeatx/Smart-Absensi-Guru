@@ -17,7 +17,7 @@ export interface ExecutiveDashboardOverviewProps {
   onOpenScanner?: () => void;
   onSwitchToGuruView?: () => void;
   onOpenQrGenerator?: () => void;
-  onOpenCorrectionModal?: () => void;
+  onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
   onOpenTestRunner?: () => void;
   onNavigateTab?: (tabId: string) => void;
 }
@@ -440,7 +440,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           )}
           {onOpenCorrectionModal && (
             <button
-              onClick={onOpenCorrectionModal}
+              onClick={() => onOpenCorrectionModal()}
               className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
             >
               <span>✏️</span> Koreksi Manual

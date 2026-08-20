@@ -9,7 +9,7 @@ import { ProviderFactory } from '../../providers/provider-factory';
 export interface EarlyWarningSystemWidgetProps {
   teachers: UserProfile[];
   attendanceRecords: AttendanceRecord[];
-  onOpenCorrectionModal?: () => void;
+  onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
 }
 
 export interface EwsAlertTeacher {
@@ -139,7 +139,7 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
         {onOpenCorrectionModal && (
           <button
             type="button"
-            onClick={onOpenCorrectionModal}
+            onClick={() => onOpenCorrectionModal()}
             className="w-full sm:w-auto px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-800 font-extrabold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 active:scale-95 min-h-11"
           >
             <PenSquare className="w-3.5 h-3.5 text-slate-600" />
@@ -154,7 +154,7 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
           {flaggedTeachers.map(({ teacher, lateCount, unexcusedCount, riskLevel, lastLateDate }) => (
             <div
               key={teacher.id}
-              onClick={() => onOpenCorrectionModal && onOpenCorrectionModal()}
+              onClick={() => onOpenCorrectionModal && onOpenCorrectionModal(teacher, lastLateDate)}
               className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 cursor-pointer hover:shadow-md active:scale-[0.99] ${
                 riskLevel === 'HIGH'
                   ? 'bg-rose-50/60 border-rose-200/90 hover:border-rose-400'

@@ -16,6 +16,7 @@ import { getTodayDateInJakarta } from '../../../utils/time.utils';
 export interface GuruCorrectionRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialDate?: string;
   onSuccess?: () => void;
 }
 
@@ -24,13 +25,14 @@ export type CorrectionScope = 'MASUK' | 'PULANG' | 'KEDUANYA';
 export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProps> = ({
   isOpen,
   onClose,
+  initialDate,
   onSuccess,
 }) => {
   const { token, user } = useAuthStore();
   const { showToast } = useToastStore();
   const todayStr = getTodayDateInJakarta();
 
-  const [date, setDate] = useState(todayStr);
+  const [date, setDate] = useState(initialDate || todayStr);
   const [checkInTime, setCheckInTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
   const [checkOutTime, setCheckOutTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
   const [targetStatus, setTargetStatus] = useState<'HADIR' | 'IZIN' | 'SAKIT'>('HADIR');
@@ -48,8 +50,14 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
       ProviderFactory.getProvider().getSettings().then((st) => {
         if (st?.work_checkin_end) setCheckinEnd(st.work_checkin_end.slice(0, 5));
       }).catch(() => {});
+
+      if (initialDate) {
+        setDate(initialDate);
+      } else {
+        setDate(todayStr);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialDate, todayStr]);
 
   // Fetch existing attendance data for current teacher on selected date
   React.useEffect(() => {
@@ -61,10 +69,16 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
           const rec = records.find((r) => r.user_id === user.id);
           if (rec) {
             setExistingRecord(rec);
+            if (rec.status === 'HADIR' || rec.status === 'IZIN' || rec.status === 'SAKIT') {
+              setTargetStatus(rec.status);
+            }
             if (rec.check_in_time) setCheckInTime(rec.check_in_time.slice(0, 5));
             if (rec.check_out_time) setCheckOutTime(rec.check_out_time.slice(0, 5));
           } else {
             setExistingRecord(null);
+            setTargetStatus('HADIR');
+            setCheckInTime(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
+            setCheckOutTime(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
           }
         })
         .catch(() => {

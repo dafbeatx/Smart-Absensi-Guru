@@ -343,14 +343,42 @@ export class MockProvider implements IDataProvider {
 
   public async getTodayAttendance(userId: string, _token: string): Promise<AttendanceRecord | null> {
     const todayStr = getTodayDateInJakarta();
-    const saved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`) || safeGetStorage('smart_absensi_today_attendance');
+    const ALL_KEY = 'smart_absensi_all_attendance_history';
+    try {
+      const savedAll = safeGetStorage(ALL_KEY);
+      if (savedAll) {
+        const allRecords: AttendanceRecord[] = JSON.parse(savedAll);
+        if (Array.isArray(allRecords)) {
+          const match = allRecords.find((r) => r.user_id === userId && r.date === todayStr);
+          if (match) return match;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse all attendance history in getTodayAttendance:', e);
+    }
+
+    const saved = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed: AttendanceRecord = JSON.parse(saved);
+        if (parsed && parsed.user_id === userId && parsed.date === todayStr) {
+          return parsed;
+        }
       } catch (e) {
         console.error('Failed to parse today attendance:', e);
       }
     }
+
+    const globalSaved = safeGetStorage('smart_absensi_today_attendance');
+    if (globalSaved) {
+      try {
+        const parsed: AttendanceRecord = JSON.parse(globalSaved);
+        if (parsed && parsed.user_id === userId && parsed.date === todayStr) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+
     return null;
   }
 
@@ -379,11 +407,11 @@ export class MockProvider implements IDataProvider {
     }
 
     const todayStr = getTodayDateInJakarta();
-    const savedToday = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`) || safeGetStorage('smart_absensi_today_attendance');
+    const savedToday = safeGetStorage(`smart_absensi_today_attendance_${userId}_${todayStr}`);
     if (savedToday) {
       try {
         const rec: AttendanceRecord = JSON.parse(savedToday);
-        if (rec && rec.user_id === userId && !allRecords.some((r) => r.user_id === userId && r.date === rec.date)) {
+        if (rec && rec.user_id === userId && rec.date === todayStr && !allRecords.some((r) => r.user_id === userId && r.date === rec.date)) {
           allRecords.push(rec);
         }
       } catch (e) {
@@ -688,17 +716,49 @@ export class MockProvider implements IDataProvider {
 
     // Trigger Push Notification for Guru & Sync Attendance Record
     if (decision === 'APPROVED') {
-      const leaveStatus: AttendanceStatus =
-        targetLeave.leave_type === 'SAKIT' ? 'SAKIT' : targetLeave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+      let leaveStatus: AttendanceStatus = 'IZIN';
+      let checkInTime: string | null = null;
+      let checkOutTime: string | null = null;
+
+      if (targetLeave.leave_type === 'KOREKSI_ABSEN') {
+        const reasonText = targetLeave.reason || '';
+        if (reasonText.includes('menjadi HADIR') || reasonText.includes('Target Koreksi') || !reasonText.includes('menjadi ')) {
+          leaveStatus = 'HADIR';
+        } else if (reasonText.includes('menjadi SAKIT')) {
+          leaveStatus = 'SAKIT';
+        } else if (reasonText.includes('menjadi DINAS_LUAR')) {
+          leaveStatus = 'DINAS_LUAR';
+        } else if (reasonText.includes('menjadi ALFA')) {
+          leaveStatus = 'ALFA';
+        }
+
+        // Try extracting check-in / check-out time from reason
+        const inMatch = reasonText.match(/Masuk\s*\(([0-2]?[0-9]:[0-5][0-9])/i);
+        if (inMatch) checkInTime = `${inMatch[1]}:00`;
+        const outMatch = reasonText.match(/Pulang\s*\(([0-2]?[0-9]:[0-5][0-9])/i);
+        if (outMatch) checkOutTime = `${outMatch[1]}:00`;
+
+        if (leaveStatus === 'HADIR' && !checkInTime) {
+          checkInTime = '07:00:00';
+        }
+      } else {
+        leaveStatus =
+          targetLeave.leave_type === 'SAKIT' ? 'SAKIT' : targetLeave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+      }
 
       const startDate = new Date(targetLeave.start_date);
       const endDate = new Date(targetLeave.end_date);
       const curr = new Date(startDate);
 
-      const allRecordsStr = safeGetStorage('smart_absensi_daily_attendance') || '[]';
+      const ALL_KEY = 'smart_absensi_all_attendance_history';
+      const todayStr = getTodayDateInJakarta();
       let allRecords: AttendanceRecord[] = [];
       try {
-        allRecords = JSON.parse(allRecordsStr);
+        const savedAll = safeGetStorage(ALL_KEY);
+        if (savedAll) {
+          allRecords = JSON.parse(savedAll);
+          if (!Array.isArray(allRecords)) allRecords = [];
+        }
       } catch (e) {
         allRecords = [];
       }
@@ -711,8 +771,8 @@ export class MockProvider implements IDataProvider {
           id: existingIdx !== -1 ? allRecords[existingIdx].id : 'att_leave_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
           user_id: targetLeave.user_id,
           date: dateStr,
-          check_in_time: null,
-          check_out_time: null,
+          check_in_time: checkInTime,
+          check_out_time: checkOutTime,
           status: leaveStatus,
           check_in_lat: null,
           check_in_lng: null,
@@ -720,7 +780,7 @@ export class MockProvider implements IDataProvider {
           verification_method: 'MANUAL_OPERATOR',
           attendance_source: 'MANUAL',
           is_offline: false,
-          notes: `Izin Disetujui Kepsek: ${notes || targetLeave.reason}`,
+          notes: targetLeave.leave_type === 'KOREKSI_ABSEN' ? `Koreksi Disetujui: ${notes || targetLeave.reason}` : `Izin Disetujui Kepsek: ${notes || targetLeave.reason}`,
           created_at: new Date().toISOString(),
         };
 
@@ -731,9 +791,13 @@ export class MockProvider implements IDataProvider {
         }
 
         safeSetStorage(`smart_absensi_daily_attendance_${dateStr}`, JSON.stringify([newRec]));
+        if (dateStr === todayStr) {
+          safeSetStorage(`smart_absensi_today_attendance_${targetLeave.user_id}_${todayStr}`, JSON.stringify(newRec));
+        }
         curr.setDate(curr.getDate() + 1);
       }
 
+      safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
       safeSetStorage('smart_absensi_daily_attendance', JSON.stringify(allRecords));
     }
 

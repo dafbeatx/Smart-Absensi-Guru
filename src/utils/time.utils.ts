@@ -130,15 +130,41 @@ export function isDateOffDay(
   settings?: { saturday_is_holiday?: boolean; sunday_is_holiday?: boolean } | null,
   holidays?: Array<{ date: string; name: string }> | null
 ): { isOff: boolean; reason: string } {
-  const d = typeof targetDate === 'string' ? new Date(targetDate) : targetDate;
-  if (isNaN(d.getTime())) {
-    return { isOff: false, reason: '' };
+  let dateIso = '';
+  let dayOfWeek = 0;
+
+  if (typeof targetDate === 'string') {
+    const cleanStr = targetDate.trim();
+    if (cleanStr.includes('T')) {
+      const d = new Date(cleanStr);
+      if (isNaN(d.getTime())) return { isOff: false, reason: '' };
+      dateIso = cleanStr.substring(0, 10);
+      dayOfWeek = d.getDay();
+    } else {
+      const parts = cleanStr.split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const d = parseInt(parts[2], 10);
+        const localDate = new Date(y, m - 1, d);
+        if (isNaN(localDate.getTime())) return { isOff: false, reason: '' };
+        dateIso = cleanStr;
+        dayOfWeek = localDate.getDay();
+      } else {
+        const d = new Date(cleanStr);
+        if (isNaN(d.getTime())) return { isOff: false, reason: '' };
+        dateIso = d.toISOString().substring(0, 10);
+        dayOfWeek = d.getDay();
+      }
+    }
+  } else if (targetDate instanceof Date) {
+    if (isNaN(targetDate.getTime())) return { isOff: false, reason: '' };
+    dateIso = targetDate.toISOString().substring(0, 10);
+    dayOfWeek = targetDate.getDay();
   }
 
-  const dateIso = d.toISOString().substring(0, 10);
-
   // 1. Check explicit holiday record first
-  if (holidays && holidays.length > 0) {
+  if (holidays && holidays.length > 0 && dateIso) {
     const matchedHoliday = holidays.find((h) => h.date === dateIso);
     if (matchedHoliday) {
       return { isOff: true, reason: `Hari Libur: ${matchedHoliday.name}` };
@@ -146,14 +172,13 @@ export function isDateOffDay(
   }
 
   // 2. Check weekend settings (defaulting saturday_is_holiday=true, sunday_is_holiday=true)
-  const day = d.getDay(); // 0 = Sunday, 6 = Saturday
   const saturdayLibur = settings?.saturday_is_holiday ?? true;
   const sundayLibur = settings?.sunday_is_holiday ?? true;
 
-  if (day === 6 && saturdayLibur) {
+  if (dayOfWeek === 6 && saturdayLibur) {
     return { isOff: true, reason: 'Libur Akhir Pekan (Sabtu)' };
   }
-  if (day === 0 && sundayLibur) {
+  if (dayOfWeek === 0 && sundayLibur) {
     return { isOff: true, reason: 'Libur Akhir Pekan (Minggu)' };
   }
 

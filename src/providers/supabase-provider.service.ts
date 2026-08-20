@@ -452,13 +452,18 @@ export class SupabaseProvider implements IDataProvider {
     const lastDayNum = new Date(yearNum, monthNum, 0).getDate();
     const endDate = `${year}-${paddedMonth}-${String(lastDayNum).padStart(2, '0')}`;
 
-    const { data } = await this.client
+    let query = this.client
       .from('attendance')
       .select('*')
-      .eq('user_id', userId)
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: false });
+
+    if (userId !== 'ALL') {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data } = await query;
 
     return (data || []).map((row) => ({
       id: row.id,
@@ -741,6 +746,70 @@ export class SupabaseProvider implements IDataProvider {
 
       if (error2) throw new Error('Gagal memproses persetujuan izin: ' + error2.message);
     }
+
+    // Auto-upsert into attendance table for the approved leave/correction dates
+    if (decision === 'APPROVED') {
+      try {
+        const { data: leaveRow } = await this.client
+          .from('leaves')
+          .select('*')
+          .eq('id', leaveId)
+          .maybeSingle();
+
+        if (leaveRow) {
+          const lType = leaveRow.type || leaveRow.leave_type || 'IZIN';
+          let status: AttendanceStatus = 'IZIN';
+          let checkInTime: string | null = null;
+          let checkOutTime: string | null = null;
+
+          if (lType === 'KOREKSI_ABSEN') {
+            const reasonText = leaveRow.reason || '';
+            if (reasonText.includes('menjadi HADIR') || reasonText.includes('Target Koreksi') || !reasonText.includes('menjadi ')) {
+              status = 'HADIR';
+            } else if (reasonText.includes('menjadi SAKIT')) {
+              status = 'SAKIT';
+            } else if (reasonText.includes('menjadi DINAS_LUAR')) {
+              status = 'DINAS_LUAR';
+            } else if (reasonText.includes('menjadi ALFA')) {
+              status = 'ALFA';
+            }
+
+            const inMatch = reasonText.match(/Masuk\s*\(([0-2]?[0-9]:[0-5][0-9])/i);
+            if (inMatch) checkInTime = `${inMatch[1]}:00`;
+            const outMatch = reasonText.match(/Pulang\s*\(([0-2]?[0-9]:[0-5][0-9])/i);
+            if (outMatch) checkOutTime = `${outMatch[1]}:00`;
+
+            if (status === 'HADIR' && !checkInTime) checkInTime = '07:00:00';
+          } else {
+            status = lType === 'SAKIT' ? 'SAKIT' : lType === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+          }
+
+          const startDate = new Date(leaveRow.start_date);
+          const endDate = new Date(leaveRow.end_date);
+          const curr = new Date(startDate);
+
+          while (curr <= endDate) {
+            const dateStr = curr.toISOString().substring(0, 10);
+            await this.client.from('attendance').upsert(
+              {
+                id: `att_${leaveRow.user_id}_${dateStr}`,
+                user_id: leaveRow.user_id,
+                date: dateStr,
+                status: status,
+                check_in_time: checkInTime,
+                check_out_time: checkOutTime,
+                notes: lType === 'KOREKSI_ABSEN' ? `Koreksi Disetujui: ${notes || leaveRow.reason}` : `Izin Disetujui: ${notes || leaveRow.reason}`,
+              },
+              { onConflict: 'user_id,date' }
+            );
+            curr.setDate(curr.getDate() + 1);
+          }
+        }
+      } catch (upsertErr) {
+        logger.warn('SupabaseProvider', 'Failed to upsert attendance on leave approval:', upsertErr);
+      }
+    }
+
     return true;
   }
 

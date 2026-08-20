@@ -17,6 +17,7 @@ export interface AttendanceCorrectionModalProps {
   onClose: () => void;
   teachers: UserProfile[];
   selectedTeacherId?: string;
+  selectedDate?: string;
   onSuccess?: () => void;
 }
 
@@ -27,6 +28,7 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
   onClose,
   teachers,
   selectedTeacherId,
+  selectedDate,
   onSuccess,
 }) => {
   const { user } = useAuthStore();
@@ -34,24 +36,39 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
   const todayStr = getTodayDateInJakarta();
 
   const [selectedUserId, setSelectedUserId] = useState(selectedTeacherId || teachers[0]?.id || '');
-  const [date, setDate] = useState(todayStr);
+  const [date, setDate] = useState(selectedDate || todayStr);
   const [checkinEnd, setCheckinEnd] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_END);
   const [correctionScope, setCorrectionScope] = useState<CorrectionScope>('MASUK');
   const [existingRecord, setExistingRecord] = useState<AttendanceRecord | null>(null);
 
-  // Sync selectedUserId when selectedTeacherId prop changes or modal opens
+  const [newStatus, setNewStatus] = useState<AttendanceStatus>('HADIR');
+  const [checkInTime, setCheckInTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
+  const [checkOutTime, setCheckOutTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
+  const [reason, setReason] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
+
+  // Sync selectedUserId and date when props change or modal opens
   React.useEffect(() => {
     if (isOpen) {
       ProviderFactory.getProvider().getSettings().then((st) => {
         if (st?.work_checkin_end) setCheckinEnd(st.work_checkin_end.slice(0, 5));
       }).catch(() => {});
+
+      if (selectedDate) {
+        setDate(selectedDate);
+      } else {
+        setDate(todayStr);
+      }
+
+      if (selectedTeacherId) {
+        setSelectedUserId(selectedTeacherId);
+      } else if (teachers.length > 0) {
+        setSelectedUserId(teachers[0].id);
+      }
     }
-    if (selectedTeacherId) {
-      setSelectedUserId(selectedTeacherId);
-    } else if (teachers.length > 0) {
-      setSelectedUserId(teachers[0].id);
-    }
-  }, [isOpen, selectedTeacherId, teachers]);
+  }, [isOpen, selectedTeacherId, selectedDate, teachers, todayStr]);
 
   // Fetch existing attendance data when selectedUserId or date changes
   React.useEffect(() => {
@@ -63,10 +80,15 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
           const rec = records.find((r) => r.user_id === selectedUserId);
           if (rec) {
             setExistingRecord(rec);
+            setNewStatus(rec.status);
             if (rec.check_in_time) setCheckInTime(rec.check_in_time.slice(0, 5));
             if (rec.check_out_time) setCheckOutTime(rec.check_out_time.slice(0, 5));
+            if (rec.notes) setReason(rec.notes);
           } else {
             setExistingRecord(null);
+            setNewStatus('HADIR');
+            setCheckInTime(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
+            setCheckOutTime(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
           }
         })
         .catch(() => {
@@ -74,14 +96,6 @@ export const AttendanceCorrectionModal: React.FC<AttendanceCorrectionModalProps>
         });
     }
   }, [isOpen, selectedUserId, date]);
-
-  const [newStatus, setNewStatus] = useState<AttendanceStatus>('HADIR');
-  const [checkInTime, setCheckInTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
-  const [checkOutTime, setCheckOutTime] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
-  const [reason, setReason] = useState('');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isResetOpen, setIsResetOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

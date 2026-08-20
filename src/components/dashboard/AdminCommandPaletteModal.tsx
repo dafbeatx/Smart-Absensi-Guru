@@ -17,7 +17,7 @@ export interface AdminCommandPaletteModalProps {
   teachers: UserProfile[];
   onSelectTab: (tabId: string) => void;
   onOpenQrGenerator?: () => void;
-  onOpenCorrectionModal?: () => void;
+  onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
   onOpenTestRunner?: () => void;
   onSwitchToGuruView?: () => void;
 }

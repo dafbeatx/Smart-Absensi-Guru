@@ -11,7 +11,7 @@ export interface DailyAttendanceTrackerProps {
   teachers: UserProfile[];
   attendanceRecords?: AttendanceRecord[];
   leaveRequests?: LeaveRequest[];
-  onOpenCorrectionModal?: (teacher?: UserProfile) => void;
+  onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
 }
 
 type StatusFilter = 'ALL' | 'HADIR' | 'TERLAMBAT' | 'IZIN_SAKIT' | 'BELUM_ABSEN';
@@ -123,12 +123,36 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       });
 
       if (leave) {
-        const status: AttendanceStatus =
-          leave.leave_type === 'SAKIT' ? 'SAKIT' : leave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+        let status: AttendanceStatus = 'IZIN';
+        let checkInTime: string | undefined = undefined;
+        let checkOutTime: string | undefined = undefined;
+
+        if (leave.leave_type === 'KOREKSI_ABSEN') {
+          const reasonText = leave.reason || '';
+          if (reasonText.includes('menjadi HADIR') || reasonText.includes('Target Koreksi') || !reasonText.includes('menjadi ')) {
+            status = 'HADIR';
+          } else if (reasonText.includes('menjadi SAKIT')) {
+            status = 'SAKIT';
+          } else if (reasonText.includes('menjadi DINAS_LUAR')) {
+            status = 'DINAS_LUAR';
+          } else if (reasonText.includes('menjadi ALFA')) {
+            status = 'ALFA';
+          }
+          const inMatch = reasonText.match(/Masuk\s*\(([0-2]?[0-9]:[0-5][0-9])/i);
+          if (inMatch) checkInTime = inMatch[1];
+          const outMatch = reasonText.match(/Pulang\s*\(([0-2]?[0-9]:[0-5][0-9])/i);
+          if (outMatch) checkOutTime = outMatch[1];
+        } else {
+          status =
+            leave.leave_type === 'SAKIT' ? 'SAKIT' : leave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
+        }
+
         map.set(teacher.id, {
           leave,
           status,
-          notes: `Izin Disetujui Kepsek: ${leave.reason}`,
+          checkInTime,
+          checkOutTime,
+          notes: leave.leave_type === 'KOREKSI_ABSEN' ? `Koreksi Disetujui: ${leave.reason}` : `Izin Disetujui Kepsek: ${leave.reason}`,
         });
         continue;
       }
@@ -449,7 +473,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               return (
                 <div
                   key={teacher.id}
-                  onClick={() => onOpenCorrectionModal && onOpenCorrectionModal(teacher)}
+                  onClick={() => onOpenCorrectionModal && onOpenCorrectionModal(teacher, selectedDate)}
                   className={`p-4 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer active:scale-[0.99] ${getCardStyle(teacher.role)}`}
                   title="Klik untuk melihat / mengoreksi absensi personel ini"
                 >
@@ -523,7 +547,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onOpenCorrectionModal(teacher);
+                            onOpenCorrectionModal(teacher, selectedDate);
                           }}
                           className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl transition-colors cursor-pointer active:scale-95"
                           title="Koreksi Manual Absensi Personel Ini"

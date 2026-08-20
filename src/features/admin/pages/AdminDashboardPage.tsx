@@ -40,6 +40,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
+  const [selectedCorrectionDate, setSelectedCorrectionDate] = useState<string | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -391,8 +392,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 teachers={teachers}
                 attendanceRecords={attendanceRecords}
                 leaveRequests={allLeaves.length > 0 ? allLeaves : pendingRequests}
-                onOpenCorrectionModal={(teacher) => {
+                onOpenCorrectionModal={(teacher, date) => {
                   setSelectedCorrectionTeacher(teacher);
+                  setSelectedCorrectionDate(date);
                   setIsCorrectionModalOpen(true);
                 }}
               />
@@ -546,9 +548,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         onClose={() => {
           setIsCorrectionModalOpen(false);
           setSelectedCorrectionTeacher(undefined);
+          setSelectedCorrectionDate(undefined);
         }}
         teachers={teachers}
         selectedTeacherId={selectedCorrectionTeacher?.id}
+        selectedDate={selectedCorrectionDate}
         onSuccess={() => fetchAttendanceRecords()}
       />
 
@@ -588,7 +592,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         teachers={teachers}
         onSelectTab={handleSelectSidebarTab}
         onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
-        onOpenCorrectionModal={() => setIsCorrectionModalOpen(true)}
+        onOpenCorrectionModal={(teacher, date) => {
+          setSelectedCorrectionTeacher(teacher);
+          setSelectedCorrectionDate(date);
+          setIsCorrectionModalOpen(true);
+        }}
         onOpenTestRunner={() => setIsTestRunnerOpen(true)}
         onSwitchToGuruView={onSwitchToGuruView}
       />

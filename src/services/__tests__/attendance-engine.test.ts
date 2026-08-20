@@ -9,6 +9,7 @@ import type { GPSCoordinates } from '../gps.service';
 import { AttendanceEngine } from '../attendance-engine.service';
 import { AttendanceRepository } from '../../repositories/AttendanceRepository';
 import { CONSTANTS } from '../../config/constants';
+import { ProviderFactory } from '../../providers/provider-factory';
 
 export const runAttendanceEngineTestSuite = async (): Promise<{
   passed: number;
@@ -88,10 +89,18 @@ export const runAttendanceEngineTestSuite = async (): Promise<{
       target_user_id: 'usr_uuid_1001',
       date: '2026-08-05',
       status: 'HADIR',
-      check_in_time: '07:30:00',
+      check_in_time: '07:15:00',
       reason: 'Koreksi karena HP mati',
     });
     assert('Attendance Repository - Correct Attendance Execution', correctRes === true);
+
+    const provider = ProviderFactory.getProvider();
+    const pastDaily = await provider.getDailyAttendance('2026-08-05', 'MOCK_TOKEN');
+    const pastRec = pastDaily.find((r) => r.user_id === 'usr_uuid_1001');
+    assert('Attendance Date Isolation - Past date record updated in daily attendance', pastRec?.status === 'HADIR' && pastRec?.date === '2026-08-05');
+
+    const todayRec = await provider.getTodayAttendance('usr_uuid_1001', 'MOCK_TOKEN');
+    assert('Attendance Date Isolation - Today attendance is NOT contaminated by yesterday correction', todayRec === null || todayRec.date !== '2026-08-05');
   } catch (err) {
     assert('Attendance Repository - Correct Attendance Execution', false, String(err));
   }

@@ -179,6 +179,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
+  const [correctionInitialDate, setCorrectionInitialDate] = useState<string | undefined>(undefined);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
@@ -701,7 +702,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
   };
 
-  const handleOpenCorrectionModal = () => {
+  const handleOpenCorrectionModal = (targetDate?: string) => {
+    setCorrectionInitialDate(targetDate);
     if (onOpenCorrectionForm) {
       onOpenCorrectionForm();
     } else {
@@ -1470,7 +1472,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </button>
 
               <button
-                onClick={handleOpenCorrectionModal}
+                onClick={() => handleOpenCorrectionModal()}
                 className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-21"
               >
                 <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
@@ -2064,7 +2066,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       {/* Dedicated Guru Correction Request Modal */}
       <GuruCorrectionRequestModal
         isOpen={isCorrectionModalOpen}
-        onClose={() => setIsCorrectionModalOpen(false)}
+        initialDate={correctionInitialDate}
+        onClose={() => {
+          setIsCorrectionModalOpen(false);
+          setCorrectionInitialDate(undefined);
+        }}
         onSuccess={() => {
           showToast('success', 'Pengajuan Terkirim', 'Permohonan koreksi absen akan ditinjau Admin.');
         }}
@@ -2078,9 +2084,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             <Input
               type="password"
               maxLength={6}
+              placeholder="Masukkan 6 Digit Angka Baru"
               value={newPin}
               onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="Masukkan 6 angka PIN baru"
               required
             />
           </div>
@@ -2090,15 +2096,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             <Input
               type="password"
               maxLength={6}
+              placeholder="Ulangi 6 Digit Angka Baru"
               value={confirmPin}
               onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="Ulangi 6 angka PIN baru"
               required
             />
           </div>
 
           <div className="pt-2 flex justify-end gap-2">
-            <Button variant="secondary" type="button" onClick={() => setIsChangePinOpen(false)}>
+            <Button variant="secondary" type="button" onClick={() => setIsChangePinOpen(false)} disabled={isChangingPin}>
               Batal
             </Button>
             <Button variant="primary" type="submit" isLoading={isChangingPin}>
@@ -2123,38 +2129,28 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       {/* ── DAY DETAIL CALENDAR MODAL ───────────────────────────────────── */}
       {selectedCalendarDay && (
         <Modal
-          isOpen={!!selectedCalendarDay}
+          isOpen={true}
           onClose={() => setSelectedCalendarDay(null)}
-          title={`📅 Detail Presensi Tanggal ${selectedCalendarDay.dateStr}`}
+          title={`📅 Detail Presensi: ${selectedCalendarDay.dateStr}`}
           maxWidth="md"
         >
-          <div className="space-y-4">
-            <div className="bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-md">
-              <div>
-                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Tanggal Presensi</p>
-                <h3 className="text-sm sm:text-base font-black text-white">{selectedCalendarDay.dateStr}</h3>
-              </div>
-              <Badge status={selectedCalendarDay.record?.status || (selectedCalendarDay.isHoliday ? 'LIBUR' : 'BELUM_ABSEN')}>
-                {selectedCalendarDay.record?.status === 'HADIR'
-                  ? 'Hadir'
-                  : selectedCalendarDay.record?.status === 'TERLAMBAT'
-                  ? 'Terlambat'
-                  : selectedCalendarDay.record?.status || (selectedCalendarDay.isHoliday ? selectedCalendarDay.holidayDesc || 'Libur Sekolah' : 'Belum Absen')}
-              </Badge>
-            </div>
-
+          <div className="space-y-4 py-1">
             {selectedCalendarDay.record ? (
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                  <span className="text-xs font-bold text-slate-600">Status Kehadiran</span>
+                  <Badge status={selectedCalendarDay.record.status}>
+                    {selectedCalendarDay.record.status === 'HADIR'
+                      ? 'Hadir Tepat Waktu'
+                      : selectedCalendarDay.record.status === 'TERLAMBAT'
+                      ? 'Terlambat'
+                      : selectedCalendarDay.record.status}
+                  </Badge>
+                </div>
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
                   <span className="text-[10px] font-bold text-slate-500 uppercase block">Jam Masuk</span>
                   <p className="text-sm font-black text-slate-900">
                     {selectedCalendarDay.record.check_in_time ? `${selectedCalendarDay.record.check_in_time.substring(0, 5)} WIB` : 'Tidak Ada Data'}
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Jam Pulang</span>
-                  <p className="text-sm font-black text-slate-900">
-                    {selectedCalendarDay.record.check_out_time ? `${selectedCalendarDay.record.check_out_time.substring(0, 5)} WIB` : 'Belum Absen Pulang'}
                   </p>
                 </div>
               </div>
@@ -2175,8 +2171,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 variant="secondary"
                 type="button"
                 onClick={() => {
+                  const targetDay = selectedCalendarDay.dateStr;
                   setSelectedCalendarDay(null);
-                  handleOpenCorrectionModal();
+                  handleOpenCorrectionModal(targetDay);
                 }}
                 className="text-xs font-bold flex items-center gap-1 cursor-pointer"
               >
