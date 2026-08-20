@@ -214,8 +214,8 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
           </span>
         </div>
 
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-amber-200 shadow-2xs space-y-1 bg-amber-50/30">
-          <span className="text-[10px] sm:text-[11px] font-bold text-amber-800 uppercase tracking-wider block flex items-center gap-1">
+        <div className="p-3.5 sm:p-4 rounded-2xl border border-amber-200 shadow-2xs space-y-1 bg-amber-50/30">
+          <span className="text-[10px] sm:text-[11px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             <span>Menunggu</span>
           </span>
@@ -227,7 +227,7 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
           </span>
         </div>
 
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-sky-200 shadow-2xs space-y-1 bg-sky-50/30">
+        <div className="p-3.5 sm:p-4 rounded-2xl border border-sky-200 shadow-2xs space-y-1 bg-sky-50/30">
           <span className="text-[10px] sm:text-[11px] font-bold text-sky-800 uppercase tracking-wider block">
             Sedang Ditinjau
           </span>
@@ -239,7 +239,7 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
           </span>
         </div>
 
-        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-emerald-200 shadow-2xs space-y-1 bg-emerald-50/30">
+        <div className="p-3.5 sm:p-4 rounded-2xl border border-emerald-200 shadow-2xs space-y-1 bg-emerald-50/30">
           <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
             Ditindaklanjuti
           </span>
@@ -290,7 +290,7 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari kata kunci isi keluhan..."
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] shadow-2xs"
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] shadow-2xs"
           />
         </div>
       </div>
@@ -500,7 +500,7 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
                 value={responseText}
                 onChange={(e) => setResponseText(e.target.value)}
                 placeholder="Contoh: Terima kasih atas laporannya. Tim sarpras telah memperbaiki proyektor tersebut hari ini..."
-                className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] transition-all resize-none shadow-2xs leading-relaxed"
+                className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F] transition-all resize-none shadow-2xs leading-relaxed"
               />
             </div>
 
