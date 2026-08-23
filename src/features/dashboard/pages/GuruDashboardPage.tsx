@@ -32,7 +32,6 @@ import { VoiceSettingsCard } from '../../../components/dashboard/VoiceSettingsCa
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
 import { PWAInstallPrompt } from '../../../components/ui/PWAInstallPrompt';
 import { NotificationService } from '../../../services/notification-permission.service';
-import { useSyncQueueStore } from '../../../store/useSyncQueueStore';
 import { SyncEngine } from '../../../services/sync-engine.service';
 import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
 import {
@@ -146,12 +145,6 @@ const UserIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) =
   </svg>
 );
 
-const DocumentTextIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
 const PencilSquareIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -173,6 +166,50 @@ const KeyIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) =>
 const LogOutIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+  </svg>
+);
+
+const MegaphoneIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+  </svg>
+);
+
+const UsersIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+  </svg>
+);
+
+const MapPinIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+
+const AcademicCapIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+  </svg>
+);
+
+const Squares2X2Icon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+  </svg>
+);
+
+const ClockIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const FingerprintIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
   </svg>
 );
 
@@ -307,23 +344,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     return () => clearInterval(clockTimer);
   }, []);
 
-  const formattedTimeStr = currentTime.toLocaleTimeString('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).replace(/\./g, ':');
-
-  const formattedFullDateStr = currentTime.toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
   // Real-time Network Connection & Offline Queue State
   const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
-  const { pendingItems, syncState } = useSyncQueueStore();
 
   useEffect(() => {
     SyncEngine.initAutoSync();
@@ -1292,252 +1314,223 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
           <>
-            {/* 🌟 1. MASTER UNIFIED HERO HEADER CARD ──────────────────────────── */}
-            <div className="bg-[#023246] text-white rounded-3xl p-4.5 sm:p-5 shadow-sm border border-slate-700/60 relative overflow-hidden space-y-4">
-              {/* Profile Greeting & Avatar Row */}
-              <div className="flex items-center justify-between gap-3 relative z-10">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-white/10 p-0.5 border border-white/20 text-white font-black text-xl flex items-center justify-center overflow-hidden shrink-0 ring-2 ring-white/10">
-                    <UserAvatar
-                      avatarUrl={effectiveUser.avatar_url}
-                      name={effectiveUser.full_name}
-                      className="w-full h-full rounded-xl"
-                      textClassName="text-xl"
-                    />
-                  </div>
-                  <div className="space-y-0.5 min-w-0">
-                    <span className="text-[10px] font-extrabold text-emerald-400 tracking-wider uppercase flex items-center gap-1">
-                      <span>{getTimeBasedGreeting()}</span>
-                    </span>
-                    <h2 className="text-sm sm:text-base font-black text-white leading-tight truncate">
-                      {effectiveUser.full_name}
-                    </h2>
-                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-300 truncate">
-                      {effectiveUser.nip ? `NPP: ${effectiveUser.nip}` : effectiveUser.position || 'Guru Pengajar'}
-                    </p>
-                  </div>
+            {/* 🌟 1. MASTER UNIFIED HERO HEADER CARD (Navy #023246) ──────────────────────────── */}
+            <div className="bg-[#023246] text-white rounded-3xl p-4.5 sm:p-5 shadow-sm border border-slate-700/60 flex items-center justify-between gap-3">
+              {/* Left: Avatar & Teacher Info */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white/10 p-0.5 border-2 border-emerald-400 text-white font-black text-xl flex items-center justify-center overflow-hidden shrink-0 shadow-xs ring-2 ring-emerald-400/30">
+                  <UserAvatar
+                    avatarUrl={effectiveUser.avatar_url}
+                    name={effectiveUser.full_name}
+                    className="w-full h-full rounded-full"
+                    textClassName="text-xl"
+                  />
                 </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('NOTIFIKASI')}
-                    className="relative p-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer shrink-0 flex items-center justify-center min-h-11 min-w-11"
-                    title="Buka Notifikasi & Pengumuman"
-                    aria-label="Pusat Notifikasi & Pengumuman"
-                  >
-                    <BellIcon className={`w-5 h-5 ${unreadCount > 0 ? 'text-amber-400 animate-bell-ring' : 'text-slate-200'}`} />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[9px] font-black bg-red-500 text-white rounded-full min-w-4 text-center ring-2 ring-[#023246]">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('PROFIL')}
-                    className="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5 min-h-11"
-                  >
-                    <UserIcon className="w-4 h-4 text-emerald-300" />
-                    <span>Profil</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Digital Clock & Date Row */}
-              <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-white/10 flex items-center justify-between gap-3 relative z-10">
                 <div className="space-y-0.5 min-w-0">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-                    </span>
-                    <span>Waktu Perangkat</span>
-                  </div>
-                  <p className="text-xs font-semibold text-slate-200 truncate capitalize">
-                    {formattedFullDateStr}
+                  <h2 className="text-sm sm:text-base font-black text-white leading-tight truncate">
+                    {effectiveUser.full_name}
+                  </h2>
+                  <p className="text-xs text-slate-300 font-semibold truncate">
+                    {effectiveUser.position || (effectiveUser.nip ? `NPP: ${effectiveUser.nip}` : 'Guru Pengajar')}
                   </p>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-white flex items-center justify-end gap-1">
-                    <span>{formattedTimeStr}</span>
-                    <span className="text-[10px] font-extrabold text-emerald-400">WIB</span>
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                    <span className="text-[11px] font-bold text-emerald-300">
+                      {isOnline ? 'Online' : 'Offline'}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Status Badges Row (Network Signal & Mood & Piket) */}
-              <div className="flex flex-wrap items-center gap-2 relative z-10 pt-0.5">
-                {/* Network Signal Badge */}
-                <div className={`px-2.5 py-1 rounded-xl border text-[10px] font-extrabold flex items-center gap-1.5 ${
-                  isOnline
-                    ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-200'
-                    : 'bg-amber-500/30 border-amber-400/50 text-amber-200 animate-pulse'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
-                  <span>{isOnline ? 'Online' : 'Offline'}</span>
-                  {pendingItems.length > 0 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        SyncEngine.processSyncQueue();
-                      }}
-                      disabled={syncState === 'SYNCING'}
-                      className="ml-1 px-1.5 py-0.2 bg-emerald-600 text-white rounded font-black cursor-pointer hover:bg-emerald-700"
-                    >
-                      {syncState === 'SYNCING' ? '⏳' : `Sync (${pendingItems.length})`}
-                    </button>
-                  )}
-                </div>
-
-                {/* Mood Check-in Pill */}
-                <button
-                  type="button"
-                  onClick={() => setIsMoodModalOpen(true)}
-                  className="px-2.5 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 text-white text-[10px] font-extrabold transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 min-h-9"
-                >
-                  <span>
-                    {todayMood ? (
-                      todayMood.mood === 'VERY_HAPPY' ? '😊' :
-                      todayMood.mood === 'HAPPY' ? '🙂' :
-                      todayMood.mood === 'NEUTRAL' ? '😐' :
-                      todayMood.mood === 'TIRED' ? '😟' : '😫'
-                    ) : '💙'}
-                  </span>
-                  <span>{todayMood ? `Mood: ${todayMood.mood === 'VERY_HAPPY' ? 'Semangat' : todayMood.mood === 'HAPPY' ? 'Baik' : todayMood.mood === 'NEUTRAL' ? 'Biasa' : todayMood.mood === 'TIRED' ? 'Lelah' : 'Stres'}` : 'Isi Mood'}</span>
-                </button>
-
-                {/* Duty Piket Pill if Active Today */}
-                {isDutyTeacherToday && (
-                  <div className="px-2.5 py-1 rounded-xl border border-amber-300/40 bg-amber-500/30 text-amber-100 text-[10px] font-black flex items-center gap-1">
-                    <span>Guru Piket Hari Ini</span>
-                  </div>
-                )}
+              {/* Right: Day & Date Display */}
+              <div className="border-l border-white/20 pl-3.5 sm:pl-4 text-left shrink-0">
+                <p className="text-xs font-semibold text-slate-300 leading-tight">
+                  {new Date().toLocaleDateString('id-ID', { weekday: 'long' })},
+                </p>
+                <p className="text-xs sm:text-sm font-black text-white leading-tight mt-0.5">
+                  {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
               </div>
             </div>
 
-            {/* 🌟 GRID KUMPULAN IKON FITUR UTAMA (COMPACT & CLEAN) ───────────── */}
-            <section className="bg-white rounded-3xl p-3.5 sm:p-4.5 border border-slate-200/90 shadow-card space-y-2.5">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#0D7A5F]" />
-                  <h2 className="text-xs font-black text-[#023246] uppercase tracking-wider">
-                    Fitur Utama
-                  </h2>
-                </div>
-                <span className="text-[10px] font-bold text-slate-400">Akses Cepat</span>
+            {/* 🌟 2. WELCOME MOTIVATIONAL BANNER (Soft Pastel Green) ────────────── */}
+            <div className="bg-[#E8F8F0] border border-emerald-200/90 rounded-2xl p-3 sm:p-3.5 flex items-center gap-3 shadow-2xs">
+              <div className="w-9 h-9 rounded-xl bg-white/90 border border-emerald-200 flex items-center justify-center text-xl shrink-0 shadow-2xs">
+                👋
               </div>
+              <div className="min-w-0">
+                <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">
+                  {getTimeBasedGreeting()}, {effectiveUser.full_name.split(' ')[0]} 👋
+                </h3>
+                <p className="text-[11px] text-emerald-800 font-semibold truncate mt-0.5">
+                  Semoga hari ini lebih produktif
+                </p>
+              </div>
+            </div>
 
-              <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-2 sm:gap-2.5">
-                {/* 1. Presensi QR */}
+            {/* 🌟 3. GRID 12 IKON FITUR UTAMA (4 KOLOM x 3 BARIS) ───────────── */}
+            <section className="bg-white rounded-3xl p-3.5 sm:p-4.5 border border-slate-200/90 shadow-card">
+              <div className="grid grid-cols-4 gap-2.5 sm:gap-3.5">
+                {/* 1. Absensi */}
                 <button
                   type="button"
                   onClick={handleOpenScannerClick}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-emerald-50 text-[#0D7A5F] border border-emerald-200/80 flex items-center justify-center shadow-2xs group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-all shrink-0">
-                    <QrCodeScanIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#0D7A5F]" />
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E8F8F0] text-[#0D7A5F] border border-emerald-200/80 flex items-center justify-center shadow-2xs group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-all shrink-0">
+                    <FingerprintIcon className="w-6 h-6 text-[#0D7A5F]" />
                   </div>
-                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Presensi QR
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Absensi
                   </span>
                 </button>
 
-                {/* 2. Ajukan Izin */}
+                {/* 2. Izin */}
                 <button
                   type="button"
                   onClick={handleOpenLeaveModal}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-blue-50 text-[#2457A6] border border-blue-200/80 flex items-center justify-center shadow-2xs group-hover:bg-blue-100 group-hover:border-blue-300 transition-all shrink-0">
-                    <DocumentTextIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#2457A6]" />
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#FEF3EB] text-[#E06D26] border border-orange-200/80 flex items-center justify-center shadow-2xs group-hover:bg-orange-100 group-hover:border-orange-300 transition-all shrink-0">
+                    <ClockIcon className="w-6 h-6 text-[#E06D26]" />
                   </div>
-                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Ajukan Izin
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Izin
                   </span>
                 </button>
 
-                {/* 3. Koreksi Absen */}
-                <button
-                  type="button"
-                  onClick={() => handleOpenCorrectionModal()}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200/80 flex items-center justify-center shadow-2xs group-hover:bg-amber-100 group-hover:border-amber-300 transition-all shrink-0">
-                    <PencilSquareIcon className="w-5 h-5 sm:w-6 sm:h-6 text-amber-700" />
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Koreksi Absen
-                  </span>
-                </button>
-
-                {/* 4. Jadwal KBM */}
+                {/* 3. Jadwal */}
                 <button
                   type="button"
                   onClick={() => setIsScheduleModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200/80 flex items-center justify-center shadow-2xs group-hover:bg-purple-100 group-hover:border-purple-300 transition-all shrink-0">
-                    <CalendarDaysIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-700" />
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#EEF4FE] text-[#2563EB] border border-blue-200/80 flex items-center justify-center shadow-2xs group-hover:bg-blue-100 group-hover:border-blue-300 transition-all shrink-0">
+                    <CalendarDaysIcon className="w-6 h-6 text-[#2563EB]" />
                   </div>
-                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Jadwal KBM
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Jadwal
                   </span>
                 </button>
 
-                {/* 5. Kotak Aspirasi */}
-                <button
-                  type="button"
-                  onClick={() => setIsComplaintModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-teal-50 text-teal-700 border border-teal-200/80 flex items-center justify-center text-xl sm:text-2xl shadow-2xs group-hover:bg-teal-100 group-hover:border-teal-300 transition-all shrink-0">
-                    💬
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Aspirasi Guru
-                  </span>
-                </button>
-
-                {/* 6. Mood Harian */}
-                <button
-                  type="button"
-                  onClick={() => setIsMoodModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-rose-50 text-rose-700 border border-rose-200/80 flex items-center justify-center text-xl sm:text-2xl shadow-2xs group-hover:bg-rose-100 group-hover:border-rose-300 transition-all shrink-0">
-                    {todayMood ? (
-                      todayMood.mood === 'VERY_HAPPY' ? '😊' :
-                      todayMood.mood === 'HAPPY' ? '🙂' :
-                      todayMood.mood === 'NEUTRAL' ? '😐' :
-                      todayMood.mood === 'TIRED' ? '😟' : '😫'
-                    ) : '💙'}
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Mood Harian
-                  </span>
-                </button>
-
-                {/* 7. Riwayat Presensi */}
+                {/* 4. Rekap */}
                 <button
                   type="button"
                   onClick={() => {
                     setActiveTab('RIWAYAT');
                     setHistorySubTab('ATTENDANCE');
                   }}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-sky-50 text-sky-700 border border-sky-200/80 flex items-center justify-center text-xl sm:text-2xl shadow-2xs group-hover:bg-sky-100 group-hover:border-sky-300 transition-all shrink-0">
-                    📋
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#EAF7ED] text-[#16A34A] border border-green-200/80 flex items-center justify-center shadow-2xs group-hover:bg-green-100 group-hover:border-green-300 transition-all shrink-0">
+                    <ChartIcon className="w-6 h-6 text-[#16A34A]" />
                   </div>
-                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Riwayat Absen
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Rekap
                   </span>
                 </button>
 
-                {/* 8. Alarm KBM */}
+                {/* 5. Koreksi / Tugas */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenCorrectionModal()}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#F3EEFE] text-[#7C3AED] border border-purple-200/80 flex items-center justify-center shadow-2xs group-hover:bg-purple-100 group-hover:border-purple-300 transition-all shrink-0">
+                    <PencilSquareIcon className="w-6 h-6 text-[#7C3AED]" />
+                  </div>
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Koreksi
+                  </span>
+                </button>
+
+                {/* 6. Pengumuman */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('NOTIFIKASI')}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0 relative"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#FFF8E5] text-[#D97706] border border-amber-200/80 flex items-center justify-center shadow-2xs group-hover:bg-amber-100 group-hover:border-amber-300 transition-all shrink-0 relative">
+                    <MegaphoneIcon className="w-6 h-6 text-[#D97706]" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white animate-pulse">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Pengumuman
+                  </span>
+                </button>
+
+                {/* 7. Kelas */}
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleModalOpen(true)}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E6F7F8] text-[#0891B2] border border-cyan-200/80 flex items-center justify-center shadow-2xs group-hover:bg-cyan-100 group-hover:border-cyan-300 transition-all shrink-0">
+                    <UsersIcon className="w-6 h-6 text-[#0891B2]" />
+                  </div>
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Kelas
+                  </span>
+                </button>
+
+                {/* 8. Lokasi */}
+                <button
+                  type="button"
+                  onClick={handleOpenScannerClick}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#FEECEF] text-[#E11D48] border border-rose-200/80 flex items-center justify-center shadow-2xs group-hover:bg-rose-100 group-hover:border-rose-300 transition-all shrink-0">
+                    <MapPinIcon className="w-6 h-6 text-[#E11D48]" />
+                  </div>
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Lokasi
+                  </span>
+                </button>
+
+                {/* 9. Siswa / Piket */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isDutyTeacherToday) {
+                      showToast('info', 'Guru Piket Hari Ini', 'Anda terdaftar sebagai guru piket aktif hari ini.');
+                    } else {
+                      showToast('info', 'Status Siswa & KBM', 'Daftar KBM dan siswa aktif dapat dilihat pada Jadwal.');
+                    }
+                  }}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E8F8F0] text-[#0D7A5F] border border-emerald-200/80 flex items-center justify-center shadow-2xs group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-all shrink-0">
+                    <AcademicCapIcon className="w-6 h-6 text-[#0D7A5F]" />
+                  </div>
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Siswa
+                  </span>
+                </button>
+
+                {/* 10. Materi / Mood */}
+                <button
+                  type="button"
+                  onClick={() => setIsMoodModalOpen(true)}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#F4EEFD] text-[#8B5CF6] border border-violet-200/80 flex items-center justify-center text-xl shadow-2xs group-hover:bg-violet-100 group-hover:border-violet-300 transition-all shrink-0">
+                    {todayMood ? (
+                      todayMood.mood === 'VERY_HAPPY' ? '😊' :
+                      todayMood.mood === 'HAPPY' ? '🙂' :
+                      todayMood.mood === 'NEUTRAL' ? '😐' :
+                      todayMood.mood === 'TIRED' ? '😟' : '😫'
+                    ) : '🎓'}
+                  </div>
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Materi
+                  </span>
+                </button>
+
+                {/* 11. Acara / Alarm KBM */}
                 <button
                   type="button"
                   onClick={() => {
@@ -1547,15 +1540,103 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     }
                     showToast('info', 'Tes Suara Alarm KBM', 'Suara chime dan pengingat audio berfungsi normal.');
                   }}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-orange-50 text-orange-700 border border-orange-200/80 flex items-center justify-center text-xl sm:text-2xl shadow-2xs group-hover:bg-orange-100 group-hover:border-orange-300 transition-all shrink-0">
-                    ⏰
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#EEF5FD] text-[#2563EB] border border-blue-200/80 flex items-center justify-center shadow-2xs group-hover:bg-blue-100 group-hover:border-blue-300 transition-all shrink-0">
+                    <CalendarDaysIcon className="w-6 h-6 text-[#2563EB]" />
                   </div>
-                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Alarm KBM
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Acara
                   </span>
                 </button>
+
+                {/* 12. Lainnya */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('PROFIL')}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#F1F5F9] text-[#475569] border border-slate-200 flex items-center justify-center shadow-2xs group-hover:bg-slate-200 group-hover:border-slate-300 transition-all shrink-0">
+                    <Squares2X2Icon className="w-6 h-6 text-[#475569]" />
+                  </div>
+                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Lainnya
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            {/* 🌟 4. STATUS KEHADIRAN HARI INI CARD ──────────────────────────── */}
+            <section
+              onClick={handleOpenScannerClick}
+              className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card flex items-center justify-between gap-3 relative overflow-hidden cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all active:scale-[0.99] border-l-4 border-l-[#0D7A5F]"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-bold shrink-0 ${
+                  todayAttendance
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : isTodayOff.isOff
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {todayAttendance ? '✓' : isTodayOff.isOff ? '🌴' : '⏳'}
+                </div>
+                <div className="min-w-0 space-y-0.5">
+                  <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">
+                    Status Kehadiran Hari Ini
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-semibold truncate">
+                    {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} • {
+                      todayAttendance?.check_in_time
+                        ? `${todayAttendance.check_in_time.substring(0, 5)} WIB`
+                        : isTodayOff.isOff
+                        ? isTodayOff.reason
+                        : 'Belum Absen'
+                    }
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                {isTodayOff.isOff ? (
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-black rounded-full border border-emerald-300 shadow-2xs">
+                    Hari Libur
+                  </span>
+                ) : todayAttendance ? (
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-black rounded-full border border-emerald-300 shadow-2xs">
+                    Sudah Absen
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-amber-50 text-amber-800 text-xs font-black rounded-full border border-amber-300 shadow-2xs animate-pulse">
+                    Belum Absen
+                  </span>
+                )}
+              </div>
+            </section>
+
+            {/* 🌟 5. INFORMASI TERBARU BANNER ──────────────────────────── */}
+            <section
+              onClick={() => setActiveTab('NOTIFIKASI')}
+              className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card flex items-center justify-between gap-3 cursor-pointer hover:border-blue-400 hover:bg-slate-50/60 transition-all active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-[#EEF4FE] text-[#2563EB] border border-blue-200/80 flex items-center justify-center text-xl shrink-0 shadow-2xs">
+                  <MegaphoneIcon className="w-5 h-5 text-[#2563EB]" />
+                </div>
+                <div className="min-w-0 space-y-0.5">
+                  <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">
+                    Informasi Terbaru
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-semibold truncate">
+                    {unreadCount > 0
+                      ? `${unreadCount} pengumuman baru menunggu dibaca`
+                      : 'Tidak ada pengumuman terbaru'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-slate-400 text-base font-bold shrink-0">
+                ›
               </div>
             </section>
 
