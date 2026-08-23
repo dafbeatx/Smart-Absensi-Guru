@@ -14,6 +14,14 @@ import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleMod
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
 import { AnonymousComplaintModal } from '../../guru/components/AnonymousComplaintModal';
 import { TeacherLocationCard } from '../../guru/components/TeacherLocationCard';
+import { AttendanceRecapModal } from '../../guru/components/AttendanceRecapModal';
+import { TeacherAnnouncementModal } from '../../guru/components/TeacherAnnouncementModal';
+import { ClassroomManagementModal } from '../../guru/components/ClassroomManagementModal';
+import { TeacherLocationModal } from '../../guru/components/TeacherLocationModal';
+import { StudentDirectoryModal } from '../../guru/components/StudentDirectoryModal';
+import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
+import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCalendarModal';
+import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
@@ -300,6 +308,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
   const [teachingSlots, setTeachingSlots] = useState<TeachingSlot[]>([]);
   const lastChimedSlotKeyRef = useRef<string | null>(null);
+
+  // Dedicated Modal Layer States for 12-Icon Grid
+  const [isRecapModalOpen, setIsRecapModalOpen] = useState(false);
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [isClassroomModalOpen, setIsClassroomModalOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isStudentDirectoryModalOpen, setIsStudentDirectoryModalOpen] = useState(false);
+  const [studentDirectoryClassFilter, setStudentDirectoryClassFilter] = useState<string | undefined>(undefined);
+  const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
+  const [isEventsCalendarModalOpen, setIsEventsCalendarModalOpen] = useState(false);
+  const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
 
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -1416,10 +1435,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 {/* 4. Rekap */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setActiveTab('RIWAYAT');
-                    setHistorySubTab('ATTENDANCE');
-                  }}
+                  onClick={() => setIsRecapModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
                   <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#EAF7ED] text-[#16A34A] border border-green-200/80 flex items-center justify-center shadow-2xs group-hover:bg-green-100 group-hover:border-green-300 transition-all shrink-0">
@@ -1447,7 +1463,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 {/* 6. Pengumuman */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('NOTIFIKASI')}
+                  onClick={() => setIsAnnouncementModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0 relative"
                 >
                   <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#FFF8E5] text-[#D97706] border border-amber-200/80 flex items-center justify-center shadow-2xs group-hover:bg-amber-100 group-hover:border-amber-300 transition-all shrink-0 relative">
@@ -1466,7 +1482,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 {/* 7. Kelas */}
                 <button
                   type="button"
-                  onClick={() => setIsScheduleModalOpen(true)}
+                  onClick={() => setIsClassroomModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
                   <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E6F7F8] text-[#0891B2] border border-cyan-200/80 flex items-center justify-center shadow-2xs group-hover:bg-cyan-100 group-hover:border-cyan-300 transition-all shrink-0">
@@ -1480,7 +1496,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 {/* 8. Lokasi */}
                 <button
                   type="button"
-                  onClick={handleOpenScannerClick}
+                  onClick={() => setIsLocationModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
                   <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#FEECEF] text-[#E11D48] border border-rose-200/80 flex items-center justify-center shadow-2xs group-hover:bg-rose-100 group-hover:border-rose-300 transition-all shrink-0">
@@ -1495,11 +1511,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (isDutyTeacherToday) {
-                      showToast('info', 'Guru Piket Hari Ini', 'Anda terdaftar sebagai guru piket aktif hari ini.');
-                    } else {
-                      showToast('info', 'Status Siswa & KBM', 'Daftar KBM dan siswa aktif dapat dilihat pada Jadwal.');
-                    }
+                    setStudentDirectoryClassFilter(undefined);
+                    setIsStudentDirectoryModalOpen(true);
                   }}
                   className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
@@ -1511,35 +1524,24 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </span>
                 </button>
 
-                {/* 10. Materi / Mood */}
+                {/* 10. Materi */}
                 <button
                   type="button"
-                  onClick={() => setIsMoodModalOpen(true)}
+                  onClick={() => setIsTeachingMaterialsModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
                   <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#F4EEFD] text-[#8B5CF6] border border-violet-200/80 flex items-center justify-center text-xl shadow-2xs group-hover:bg-violet-100 group-hover:border-violet-300 transition-all shrink-0">
-                    {todayMood ? (
-                      todayMood.mood === 'VERY_HAPPY' ? '😊' :
-                      todayMood.mood === 'HAPPY' ? '🙂' :
-                      todayMood.mood === 'NEUTRAL' ? '😐' :
-                      todayMood.mood === 'TIRED' ? '😟' : '😫'
-                    ) : '🎓'}
+                    📚
                   </div>
                   <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
                     Materi
                   </span>
                 </button>
 
-                {/* 11. Acara / Alarm KBM */}
+                {/* 11. Acara */}
                 <button
                   type="button"
-                  onClick={() => {
-                    SoundService.playNotificationChime();
-                    if (smartAlarmStatus.speechText) {
-                      SpeechService.speak(smartAlarmStatus.speechText);
-                    }
-                    showToast('info', 'Tes Suara Alarm KBM', 'Suara chime dan pengingat audio berfungsi normal.');
-                  }}
+                  onClick={() => setIsEventsCalendarModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
                   <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#EEF5FD] text-[#2563EB] border border-blue-200/80 flex items-center justify-center shadow-2xs group-hover:bg-blue-100 group-hover:border-blue-300 transition-all shrink-0">
@@ -1553,7 +1555,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 {/* 12. Lainnya */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('PROFIL')}
+                  onClick={() => setIsMoreFeaturesModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
                 >
                   <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#F1F5F9] text-[#475569] border border-slate-200 flex items-center justify-center shadow-2xs group-hover:bg-slate-200 group-hover:border-slate-300 transition-all shrink-0">
@@ -3080,6 +3082,79 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onSuccess={() => {
           loadUserComplaints();
         }}
+      />
+
+      {/* ── 🌟 DEDICATED MODAL LAYERS FOR 12-ICON GRID ─────────────────────── */}
+      {/* 4. Rekap Presensi Bulanan */}
+      <AttendanceRecapModal
+        isOpen={isRecapModalOpen}
+        onClose={() => setIsRecapModalOpen(false)}
+        attendanceRecords={attendanceHistory}
+        user={effectiveUser}
+        onOpenExportModal={() => setIsExportModalOpen(true)}
+        onOpenCorrectionModal={(targetDate) => handleOpenCorrectionModal(targetDate)}
+      />
+
+      {/* 6. Pengumuman & Warta Sekolah */}
+      <TeacherAnnouncementModal
+        isOpen={isAnnouncementModalOpen}
+        onClose={() => setIsAnnouncementModalOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={(id) => handleMarkSingleNotificationRead(id)}
+        onMarkAllAsRead={() => handleMarkAllNotificationsRead()}
+      />
+
+      {/* 7. Kelas & Rombel Belajar */}
+      <ClassroomManagementModal
+        isOpen={isClassroomModalOpen}
+        onClose={() => setIsClassroomModalOpen(false)}
+        user={effectiveUser}
+        onOpenSchedule={() => setIsScheduleModalOpen(true)}
+        onOpenStudentDirectory={(cls) => {
+          setStudentDirectoryClassFilter(cls);
+          setIsStudentDirectoryModalOpen(true);
+        }}
+      />
+
+      {/* 8. Lokasi & Peta Geofence GPS */}
+      <TeacherLocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onOpenScanner={handleOpenScannerClick}
+        settings={settings}
+      />
+
+      {/* 9. Direktori Siswa & Kontak Wali */}
+      <StudentDirectoryModal
+        isOpen={isStudentDirectoryModalOpen}
+        onClose={() => setIsStudentDirectoryModalOpen(false)}
+        initialClassFilter={studentDirectoryClassFilter}
+      />
+
+      {/* 10. Modul & Bahan Ajar KBM */}
+      <TeachingMaterialsModal
+        isOpen={isTeachingMaterialsModalOpen}
+        onClose={() => setIsTeachingMaterialsModalOpen(false)}
+        user={effectiveUser}
+      />
+
+      {/* 11. Kalender Acara & Agenda Sekolah */}
+      <SchoolEventsCalendarModal
+        isOpen={isEventsCalendarModalOpen}
+        onClose={() => setIsEventsCalendarModalOpen(false)}
+      />
+
+      {/* 12. Menu Fitur Tambahan & Pengaturan */}
+      <MoreFeaturesModal
+        isOpen={isMoreFeaturesModalOpen}
+        onClose={() => setIsMoreFeaturesModalOpen(false)}
+        user={effectiveUser}
+        onOpenComplaintModal={() => setIsComplaintModalOpen(true)}
+        onOpenMoodModal={() => setIsMoodModalOpen(true)}
+        onOpenVoiceSettings={() => setActiveTab('PROFIL')}
+        onOpenTermsModal={() => setIsTermsModalOpen(true)}
+        onOpenChangePin={() => setIsChangePinOpen(true)}
+        onLogout={logout}
       />
     </div>
   );
