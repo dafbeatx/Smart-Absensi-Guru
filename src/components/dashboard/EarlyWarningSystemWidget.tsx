@@ -6,6 +6,32 @@ import { evaluateAttendanceStatus } from '../../utils/time.utils';
 import { CONSTANTS } from '../../config/constants';
 import { ProviderFactory } from '../../providers/provider-factory';
 
+export const EWS_THRESHOLDS = {
+  COACHING_LATE_COUNT: 8, // >= 8x terlambat -> Perlu Pembinaan
+  HIGH_RISK_LATE_COUNT: 16, // >= 16x terlambat -> Risiko Tinggi
+  COACHING_UNEXCUSED_COUNT: 2, // >= 2x tanpa keterangan -> Perlu Pembinaan
+  HIGH_RISK_UNEXCUSED_COUNT: 4, // >= 4x tanpa keterangan -> Risiko Tinggi
+};
+
+export function evaluateEwsTeacherRisk(
+  lateCount: number,
+  unexcusedCount: number
+): 'HIGH' | 'MEDIUM' | null {
+  if (
+    lateCount >= EWS_THRESHOLDS.HIGH_RISK_LATE_COUNT ||
+    unexcusedCount >= EWS_THRESHOLDS.HIGH_RISK_UNEXCUSED_COUNT
+  ) {
+    return 'HIGH';
+  }
+  if (
+    lateCount >= EWS_THRESHOLDS.COACHING_LATE_COUNT ||
+    unexcusedCount >= EWS_THRESHOLDS.COACHING_UNEXCUSED_COUNT
+  ) {
+    return 'MEDIUM';
+  }
+  return null;
+}
+
 export interface EarlyWarningSystemWidgetProps {
   teachers: UserProfile[];
   attendanceRecords: AttendanceRecord[];
@@ -77,9 +103,9 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
       const stats = teacherStatsMap.get(t.id) || { lateCount: 0, unexcusedCount: 0 };
       const totalAbsences = stats.lateCount + stats.unexcusedCount;
 
-      // Trigger EWS alert if teacher has >=4 latenesses or >=2 unexcused absences
-      if (stats.lateCount >= 4 || stats.unexcusedCount >= 2) {
-        const riskLevel: 'HIGH' | 'MEDIUM' = stats.lateCount >= 6 || stats.unexcusedCount >= 3 ? 'HIGH' : 'MEDIUM';
+      // Trigger EWS alert: >=8x lateness (Perlu Pembinaan) or >=16x lateness (Risiko Tinggi)
+      const riskLevel = evaluateEwsTeacherRisk(stats.lateCount, stats.unexcusedCount);
+      if (riskLevel) {
         results.push({
           teacher: t,
           lateCount: stats.lateCount,
@@ -99,10 +125,11 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
     });
   }, [teachers, attendanceRecords, checkinEnd]);
 
-  const handleSendWaReminder = (teacher: UserProfile, lateCount: number) => {
+  const handleSendWaReminder = (teacher: UserProfile, lateCount: number, riskLevel: 'HIGH' | 'MEDIUM') => {
     const phone = teacher.phone_number ? teacher.phone_number.replace(/^0/, '62') : '';
+    const riskLabel = riskLevel === 'HIGH' ? 'Risiko Tinggi (≥16x Terlambat)' : 'Perlu Pembinaan (≥8x Terlambat)';
     const msg = encodeURIComponent(
-      `Assalamu'alaikum wr. wb. Yth. Bapak/Ibu ${teacher.full_name}, semoga senantiasa diberikan kesehatan & kelancaran. Salam hormat, berikut pengingat pembinaan kedisiplinan presensi sekolah. Bulan ini terdata ${lateCount}x keterlambatan. Mohon berkenan Bapak/Ibu dapat hadir lebih awal sebelum pukul ${checkinEnd} WIB. Terima kasih atas dedikasi & kerja samanya.`
+      `Assalamu'alaikum wr. wb. Yth. Bapak/Ibu ${teacher.full_name}, semoga senantiasa diberikan kesehatan & kelancaran. Salam hormat, berikut pengingat pembinaan kedisiplinan presensi sekolah. Bulan ini terdata ${lateCount}x keterlambatan (Kategori: ${riskLabel}). Mohon berkenan Bapak/Ibu dapat hadir lebih awal sebelum pukul ${checkinEnd} WIB. Terima kasih atas dedikasi & kerja samanya.`
     );
 
     if (phone) {
@@ -131,7 +158,7 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
               </span>
             </div>
             <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-              Monitoring keterlambatan berulang (Toleransi wajar s.d 3x/bulan)
+              Monitoring keterlambatan berulang (Pembinaan mulai 8x/bulan, Risiko Tinggi ≥16x/bulan)
             </p>
           </div>
         </div>
@@ -218,7 +245,7 @@ export const EarlyWarningSystemWidget: React.FC<EarlyWarningSystemWidgetProps> =
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleSendWaReminder(teacher, lateCount);
+                    handleSendWaReminder(teacher, lateCount, riskLevel);
                   }}
                   className="w-full sm:w-auto px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 min-h-11"
                 >

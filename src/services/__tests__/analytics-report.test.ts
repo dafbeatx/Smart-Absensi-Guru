@@ -163,5 +163,29 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     yearAnalytics.total_responses === 3
   );
 
+  // Test 10: Early Warning System (EWS) Kedisiplinan Thresholds (8x Coaching, 16x High Risk)
+  const { evaluateEwsTeacherRisk, EWS_THRESHOLDS } = await import('../../components/dashboard/EarlyWarningSystemWidget');
+  assert(
+    'EWS Kedisiplinan - Threshold constants are 8x and 16x',
+    EWS_THRESHOLDS.COACHING_LATE_COUNT === 8 && EWS_THRESHOLDS.HIGH_RISK_LATE_COUNT === 16
+  );
+  assert(
+    'EWS Kedisiplinan - Under 8x late is clean (no warning)',
+    evaluateEwsTeacherRisk(7, 0) === null && evaluateEwsTeacherRisk(0, 0) === null
+  );
+  assert(
+    'EWS Kedisiplinan - 8x to 15x late is MEDIUM (Perlu Pembinaan)',
+    evaluateEwsTeacherRisk(8, 0) === 'MEDIUM' && evaluateEwsTeacherRisk(15, 0) === 'MEDIUM'
+  );
+  assert(
+    'EWS Kedisiplinan - >= 16x late is HIGH (Risiko Tinggi)',
+    evaluateEwsTeacherRisk(16, 0) === 'HIGH' && evaluateEwsTeacherRisk(20, 0) === 'HIGH'
+  );
+  assert(
+    'EWS Kedisiplinan - Unexcused absences evaluate correctly',
+    evaluateEwsTeacherRisk(0, 2) === 'MEDIUM' && evaluateEwsTeacherRisk(0, 4) === 'HIGH'
+  );
+
   return { passed, failed, results };
 };
+
