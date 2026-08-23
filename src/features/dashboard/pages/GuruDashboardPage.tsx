@@ -1418,6 +1418,147 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
             </div>
 
+            {/* 🌟 GRID KUMPULAN IKON FITUR UTAMA (COMPACT & CLEAN) ───────────── */}
+            <section className="bg-white rounded-3xl p-3.5 sm:p-4.5 border border-slate-200/90 shadow-card space-y-2.5">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#0D7A5F]" />
+                  <h2 className="text-xs font-black text-[#023246] uppercase tracking-wider">
+                    Fitur Utama
+                  </h2>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400">Akses Cepat</span>
+              </div>
+
+              <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-2 sm:gap-2.5">
+                {/* 1. Presensi QR */}
+                <button
+                  type="button"
+                  onClick={handleOpenScannerClick}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-emerald-50 text-[#0D7A5F] border border-emerald-200/80 flex items-center justify-center shadow-2xs group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-all shrink-0">
+                    <QrCodeScanIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#0D7A5F]" />
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Presensi QR
+                  </span>
+                </button>
+
+                {/* 2. Ajukan Izin */}
+                <button
+                  type="button"
+                  onClick={handleOpenLeaveModal}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-blue-50 text-[#2457A6] border border-blue-200/80 flex items-center justify-center shadow-2xs group-hover:bg-blue-100 group-hover:border-blue-300 transition-all shrink-0">
+                    <DocumentTextIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#2457A6]" />
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Ajukan Izin
+                  </span>
+                </button>
+
+                {/* 3. Koreksi Absen */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenCorrectionModal()}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200/80 flex items-center justify-center shadow-2xs group-hover:bg-amber-100 group-hover:border-amber-300 transition-all shrink-0">
+                    <PencilSquareIcon className="w-5 h-5 sm:w-6 sm:h-6 text-amber-700" />
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Koreksi Absen
+                  </span>
+                </button>
+
+                {/* 4. Jadwal KBM */}
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleModalOpen(true)}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200/80 flex items-center justify-center shadow-2xs group-hover:bg-purple-100 group-hover:border-purple-300 transition-all shrink-0">
+                    <CalendarDaysIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-700" />
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Jadwal KBM
+                  </span>
+                </button>
+
+                {/* 5. Kotak Aspirasi */}
+                <button
+                  type="button"
+                  onClick={() => setIsComplaintModalOpen(true)}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-teal-50 text-teal-700 border border-teal-200/80 flex items-center justify-center text-xl sm:text-2xl shadow-2xs group-hover:bg-teal-100 group-hover:border-teal-300 transition-all shrink-0">
+                    💬
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Aspirasi Guru
+                  </span>
+                </button>
+
+                {/* 6. Mood Harian */}
+                <button
+                  type="button"
+                  onClick={() => setIsMoodModalOpen(true)}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-rose-50 text-rose-700 border border-rose-200/80 flex items-center justify-center text-xl sm:text-2xl shadow-2xs group-hover:bg-rose-100 group-hover:border-rose-300 transition-all shrink-0">
+                    {todayMood ? (
+                      todayMood.mood === 'VERY_HAPPY' ? '😊' :
+                      todayMood.mood === 'HAPPY' ? '🙂' :
+                      todayMood.mood === 'NEUTRAL' ? '😐' :
+                      todayMood.mood === 'TIRED' ? '😟' : '😫'
+                    ) : '💙'}
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Mood Harian
+                  </span>
+                </button>
+
+                {/* 7. Riwayat Presensi */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('RIWAYAT');
+                    setHistorySubTab('ATTENDANCE');
+                  }}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-sky-50 text-sky-700 border border-sky-200/80 flex items-center justify-center text-xl sm:text-2xl shadow-2xs group-hover:bg-sky-100 group-hover:border-sky-300 transition-all shrink-0">
+                    📋
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Riwayat Absen
+                  </span>
+                </button>
+
+                {/* 8. Alarm KBM */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    SoundService.playNotificationChime();
+                    if (smartAlarmStatus.speechText) {
+                      SpeechService.speak(smartAlarmStatus.speechText);
+                    }
+                    showToast('info', 'Tes Suara Alarm KBM', 'Suara chime dan pengingat audio berfungsi normal.');
+                  }}
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer active:scale-95 min-w-0"
+                >
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-orange-50 text-orange-700 border border-orange-200/80 flex items-center justify-center text-xl sm:text-2xl shadow-2xs group-hover:bg-orange-100 group-hover:border-orange-300 transition-all shrink-0">
+                    ⏰
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
+                    Alarm KBM
+                  </span>
+                </button>
+              </div>
+            </section>
+
             {/* 📍 REAL-TIME GEOFENCE LOCATION CARD WIDGET ──────────────────── */}
             <TeacherLocationCard onOpenScanner={handleOpenScannerClick} />
 
@@ -1945,48 +2086,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 )}
               </div>
             </div>
-
-            {/* 🌟 3. QUICK ACTION FEATURE CARDS (INTUITIVE & MINIMALIST) ─────────── */}
-            <section className="grid grid-cols-3 gap-2 sm:gap-3">
-              <button
-                onClick={handleOpenLeaveModal}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-21"
-              >
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
-                  <DocumentTextIcon className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="min-w-0 w-full">
-                  <h3 className="font-extrabold text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Ajukan Izin</h3>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Sakit / Cuti</p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleOpenCorrectionModal()}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-21"
-              >
-                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
-                  <PencilSquareIcon className="w-5 h-5 text-amber-600" />
-                </div>
-                <div className="min-w-0 w-full">
-                  <h3 className="font-extrabold text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Koreksi Absen</h3>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Lapor Admin</p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setIsScheduleModalOpen(true)}
-                className="p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 shadow-2xs transition-all text-left flex flex-col items-start justify-between space-y-2 cursor-pointer group active:scale-95 min-w-0 w-full min-h-21"
-              >
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
-                  <CalendarDaysIcon className="w-5 h-5 text-emerald-700" />
-                </div>
-                <div className="min-w-0 w-full">
-                  <h3 className="font-extrabold text-[#023246] text-[11px] sm:text-xs leading-tight truncate">Jadwal Kelas</h3>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold truncate mt-0.5">Jam Mengajar</p>
-                </div>
-              </button>
-            </section>
           </>
         )}
 
