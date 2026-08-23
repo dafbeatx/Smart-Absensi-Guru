@@ -33,7 +33,7 @@ export const LocationAddressBadge: React.FC<LocationAddressBadgeProps> = ({
       {isLoading ? (
         <span className="text-slate-400 italic">Mendeteksi lokasi...</span>
       ) : displayText ? (
-        <span className="truncate max-w-[220px]">{displayText}</span>
+        <span className="truncate max-w-55">{displayText}</span>
       ) : (
         <span className="font-mono text-slate-400">
           {lat.toFixed(4)}, {lng.toFixed(4)}

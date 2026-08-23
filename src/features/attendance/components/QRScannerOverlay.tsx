@@ -663,7 +663,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
             {physicalAddress && (
               <div className="flex items-start justify-between text-xs pt-0.5">
                 <span className="text-slate-500 font-medium shrink-0">Alamat GPS:</span>
-                <span className="font-semibold text-slate-800 text-[11px] text-right truncate max-w-[200px]" title={physicalAddress}>
+                <span className="font-semibold text-slate-800 text-[11px] text-right truncate max-w-50" title={physicalAddress}>
                   📍 {shortPhysicalAddress || physicalAddress}
                 </span>
               </div>
