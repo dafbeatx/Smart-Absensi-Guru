@@ -5,6 +5,7 @@ import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { Modal } from '../../../components/ui/Modal';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { logger } from '../../../utils/logger.utils';
+import { useReverseGeocode } from '../../../services/reverse-geocoding.service';
 
 export interface TeacherLocationCardProps {
   className?: string;
@@ -16,6 +17,11 @@ export const TeacherLocationCard: React.FC<TeacherLocationCardProps> = ({ classN
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showMapModal, setShowMapModal] = useState(false);
+
+  const { address: fullAddress, isLoading: isAddressLoading } = useReverseGeocode(
+    gpsCoords?.latitude,
+    gpsCoords?.longitude
+  );
 
   const geofenceSettings = GPSService.getGeofenceSettings();
   const allowedRadius = getEffectiveAllowedRadius(geofenceSettings.radius);
@@ -125,6 +131,25 @@ export const TeacherLocationCard: React.FC<TeacherLocationCardProps> = ({ classN
               <span className="text-[10px] font-medium text-slate-500 block">
                 {gpsCoords?.accuracy && gpsCoords.accuracy <= 25 ? 'Presisi Sangat Baik' : 'Akurasi Standar'}
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Human-Readable Physical Address Widget */}
+        {gpsCoords && !errorMsg && (
+          <div className="bg-slate-50 border border-[#DDD9D0]/80 rounded-xl p-2.5 flex items-start gap-2 text-xs">
+            <span className="text-[#023246] text-sm shrink-0 mt-0.5">📍</span>
+            <div className="min-w-0 flex-1">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">
+                Alamat Fisik Terdeteksi (OpenStreetMap):
+              </span>
+              {isAddressLoading ? (
+                <span className="text-slate-400 text-[11px] italic">Mengambil nama jalan & area...</span>
+              ) : (
+                <p className="text-xs font-bold text-slate-800 leading-snug">
+                  {fullAddress || `${gpsCoords.latitude.toFixed(5)}, ${gpsCoords.longitude.toFixed(5)}`}
+                </p>
+              )}
             </div>
           </div>
         )}

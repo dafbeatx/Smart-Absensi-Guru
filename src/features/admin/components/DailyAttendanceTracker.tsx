@@ -6,6 +6,7 @@ import { evaluateAttendanceStatus, isDateOffDay } from '../../../utils/time.util
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { AttendanceResetModal } from './AttendanceResetModal';
+import { LocationAddressBadge } from '../../../components/ui/LocationAddressBadge';
 
 export interface DailyAttendanceTrackerProps {
   teachers: UserProfile[];
@@ -573,11 +574,20 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                           💬 {record?.notes || item?.notes}
                         </p>
                       )}
-                      {record?.check_in_distance_meters !== undefined && (
+                      {record?.check_in_lat && record?.check_in_lng ? (
+                        <div className="pt-0.5">
+                          <LocationAddressBadge
+                            lat={record.check_in_lat}
+                            lng={record.check_in_lng}
+                            distanceMeters={record.check_in_distance_meters}
+                            shortOnly
+                          />
+                        </div>
+                      ) : record?.check_in_distance_meters !== undefined ? (
                         <p className="text-[10px] text-slate-400 font-medium">
                           📍 Jarak: {record.check_in_distance_meters}m • {record.verification_method || 'QR_GPS'}
                         </p>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="flex items-center gap-1.5">

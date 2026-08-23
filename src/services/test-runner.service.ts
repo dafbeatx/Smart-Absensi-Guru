@@ -12,6 +12,7 @@ import { runSecurityConsistencyTestSuite } from './__tests__/security-consistenc
 import { runGroqAITestSuite } from './__tests__/groq-ai.test';
 import { runPWAGeofenceTestSuite } from './__tests__/pwa-geofence.test';
 import { runMobileUIE2ETestSuite } from './__tests__/mobile-ui-e2e.test';
+import { runGeocodingTestSuite } from './__tests__/geocoding.test';
 
 export interface TestResultItem {
   testName: string;
@@ -61,6 +62,7 @@ export class MasterTestRunner {
       { name: 'Security & Consistency Engine', fn: runSecurityConsistencyTestSuite },
       { name: 'PWA & Interactive Geofence Map', fn: runPWAGeofenceTestSuite },
       { name: 'Automated End-to-End (E2E) Mobile UI & QA', fn: runMobileUIE2ETestSuite },
+      { name: 'Reverse Geocoding & OpenStreetMap Engine', fn: runGeocodingTestSuite },
     ];
 
     let totalPassed = 0;

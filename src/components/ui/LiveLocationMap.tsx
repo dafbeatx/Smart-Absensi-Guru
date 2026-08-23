@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useReverseGeocode } from '../../services/reverse-geocoding.service';
 
 export interface LiveLocationMapProps {
   userLat?: number | null;
@@ -13,6 +14,7 @@ export interface LiveLocationMapProps {
   onSelectLocation?: (coords: { lat: number; lng: number }) => void;
   height?: string;
   className?: string;
+  showAddressBanner?: boolean;
 }
 
 // Calculate Haversine distance in meters
@@ -46,6 +48,7 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
   onSelectLocation,
   height = '280px',
   className = '',
+  showAddressBanner = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -53,6 +56,9 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
   const accuracyCircleRef = useRef<L.Circle | null>(null);
   const schoolMarkerRef = useRef<L.Marker | null>(null);
   const geofenceCircleRef = useRef<L.Circle | null>(null);
+
+  // Hook for user location physical address
+  const { address: userAddress, shortAddress: userShortAddress, isLoading: isUserAddressLoading } = useReverseGeocode(userLat, userLng);
 
   // Custom DivIcon with SVG icons for ultra-crisp UI
   const createSchoolIcon = () =>
@@ -141,7 +147,7 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
       schoolMarkerRef.current.setLatLng([schoolLat, schoolLng]);
     } else {
       const schoolMarker = L.marker([schoolLat, schoolLng], { icon: createSchoolIcon() }).addTo(map);
-      schoolMarker.bindPopup('<b>🏫 Pintu Utama Sekolah</b><br/>Pusat Geofence Presensi');
+      schoolMarker.bindPopup('<b>🏫 Pintu Utama Sekolah</b><br/><span style="font-size:11px;color:#64748b;">Pusat Geofence Presensi</span>');
       schoolMarkerRef.current = schoolMarker;
     }
 
@@ -176,12 +182,23 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
 
     // Update User Marker & Accuracy Circle
     if (userLat && userLng) {
+      const popupHtml = `
+        <div style="font-family:inherit;min-width:180px;">
+          <b style="color:#023246;font-size:12px;">📍 Posisi Presensi Guru</b><br/>
+          <span style="font-size:11px;color:${isInside ? '#166534' : '#991b1b'};font-weight:700;">
+            ${isInside ? '🟢 Dalam Radius Aman' : '🔴 Di Luar Radius Sekolah'}
+          </span>
+          ${userAddress ? `<div style="margin-top:4px;font-size:10px;color:#475569;border-top:1px solid #e2e8f0;padding-top:3px;">📍 ${userAddress}</div>` : ''}
+        </div>
+      `;
+
       if (userMarkerRef.current) {
         userMarkerRef.current.setLatLng([userLat, userLng]);
         userMarkerRef.current.setIcon(createUserIcon(isInside));
+        userMarkerRef.current.setPopupContent(popupHtml);
       } else {
         const userMarker = L.marker([userLat, userLng], { icon: createUserIcon(isInside) }).addTo(map);
-        userMarker.bindPopup('<b>📍 Lokasi Saya (Real-Time)</b>');
+        userMarker.bindPopup(popupHtml);
         userMarkerRef.current = userMarker;
       }
 
@@ -217,7 +234,7 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
     return () => {
       // Map cleanup on unmount
     };
-  }, [userLat, userLng, schoolLat, schoolLng, allowedRadius, accuracy, interactive, onSelectLocation]);
+  }, [userLat, userLng, schoolLat, schoolLng, allowedRadius, accuracy, interactive, onSelectLocation, userAddress]);
 
   const handleRecenter = () => {
     if (mapRef.current) {
@@ -273,6 +290,21 @@ export const LiveLocationMap: React.FC<LiveLocationMapProps> = ({
           </span>
         )}
       </div>
+
+      {/* Human-Readable Physical Address Bottom Banner */}
+      {showAddressBanner && (userAddress || isUserAddressLoading) && (
+        <div className="absolute bottom-3 left-3 z-10 max-w-[calc(100%-120px)] px-3 py-1.5 bg-white/95 backdrop-blur-md text-[10px] font-semibold rounded-xl shadow-xs border border-[#DDD9D0] flex items-center gap-1.5 text-slate-700 truncate">
+          <span className="shrink-0 text-emerald-600">📍</span>
+          {isUserAddressLoading ? (
+            <span className="text-slate-400 italic">Mendeteksi alamat fisik...</span>
+          ) : (
+            <span className="truncate" title={userAddress || ''}>
+              {userShortAddress || userAddress}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 };
+

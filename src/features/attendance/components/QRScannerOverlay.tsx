@@ -23,6 +23,7 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { logger } from '../../../utils/logger.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
+import { useReverseGeocode } from '../../../services/reverse-geocoding.service';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -40,6 +41,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [isCheckingGPS, setIsCheckingGPS] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [showLiveMap, setShowLiveMap] = useState(false);
+
+  const { address: physicalAddress, shortAddress: shortPhysicalAddress } = useReverseGeocode(
+    gpsCoords?.latitude,
+    gpsCoords?.longitude
+  );
   
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
@@ -653,6 +659,15 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
                 <span className="text-slate-400">({scanResult?.distance}m)</span>
               </span>
             </div>
+
+            {physicalAddress && (
+              <div className="flex items-start justify-between text-xs pt-0.5">
+                <span className="text-slate-500 font-medium shrink-0">Alamat GPS:</span>
+                <span className="font-semibold text-slate-800 text-[11px] text-right truncate max-w-[200px]" title={physicalAddress}>
+                  📍 {shortPhysicalAddress || physicalAddress}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between text-xs pt-0.5">
               <span className="text-slate-500 font-medium">Status Koneksi:</span>
