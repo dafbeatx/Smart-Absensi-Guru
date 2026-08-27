@@ -19,6 +19,7 @@ import type {
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
   TeachingSlot,
+  StudentItem,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -1794,5 +1795,183 @@ export class SupabaseProvider implements IDataProvider {
     // Always update local cache
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.saveTeachingSchedules(schedules);
+  }
+
+  // ── STUDENT DIRECTORY & GUARDIAN CONTACTS API ──────────────────────────────
+  public async getStudents(_token?: string): Promise<StudentItem[]> {
+    try {
+      const { data, error } = await this.client
+        .from('students')
+        .select('*')
+        .order('class_name', { ascending: true })
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getStudents Supabase query error, fallback to local storage:', error.message);
+      } else if (data && data.length > 0) {
+        return (data as any[]).map((row) => ({
+          id: row.id,
+          nisn: row.nisn,
+          fullName: row.full_name,
+          className: row.class_name,
+          gender: row.gender,
+          parentName: row.parent_name,
+          parentPhone: row.parent_phone,
+          attendanceRate: row.attendance_rate != null ? Number(row.attendance_rate) : 100,
+          address: row.address,
+          notes: row.notes,
+          created_at: row.created_at,
+        }));
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getStudents DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getStudents();
+  }
+
+  public async saveStudents(
+    students: StudentItem[],
+    _token?: string
+  ): Promise<boolean> {
+    try {
+      const dbRows = students.map((s) => ({
+        id: s.id,
+        nisn: s.nisn,
+        full_name: s.fullName,
+        class_name: s.className,
+        gender: s.gender,
+        parent_name: s.parentName,
+        parent_phone: s.parentPhone,
+        attendance_rate: s.attendanceRate ?? 100,
+        address: s.address,
+        notes: s.notes,
+      }));
+
+      // Delete existing and insert new
+      await this.client
+        .from('students')
+        .delete()
+        .neq('id', '__CLEAR_ALL_RECORDS__');
+
+      if (dbRows.length > 0) {
+        const { error: insertErr } = await this.client
+          .from('students')
+          .insert(dbRows);
+
+        if (insertErr) {
+          logger.warn('SupabaseProvider', 'saveStudents insert error:', insertErr.message);
+        }
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'saveStudents DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.saveStudents(students);
+  }
+
+  public async createStudent(
+    student: Omit<StudentItem, 'id' | 'created_at'>,
+    token?: string
+  ): Promise<StudentItem> {
+    try {
+      const { data, error } = await this.client
+        .from('students')
+        .insert([
+          {
+            nisn: student.nisn,
+            full_name: student.fullName,
+            class_name: student.className,
+            gender: student.gender,
+            parent_name: student.parentName,
+            parent_phone: student.parentPhone,
+            attendance_rate: student.attendanceRate ?? 100,
+            address: student.address,
+            notes: student.notes,
+          },
+        ])
+        .select()
+        .single();
+
+      if (!error && data) {
+        const created: StudentItem = {
+          id: data.id,
+          nisn: data.nisn,
+          fullName: data.full_name,
+          className: data.class_name,
+          gender: data.gender,
+          parentName: data.parent_name,
+          parentPhone: data.parent_phone,
+          attendanceRate: data.attendance_rate != null ? Number(data.attendance_rate) : 100,
+          address: data.address,
+          notes: data.notes,
+          created_at: data.created_at,
+        };
+        // sync to mock
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        const localList = await mockProv.getStudents();
+        localList.unshift(created);
+        await mockProv.saveStudents(localList);
+        return created;
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'createStudent DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.createStudent(student, token);
+  }
+
+  public async updateStudent(
+    id: string,
+    updates: Partial<StudentItem>,
+    token?: string
+  ): Promise<boolean> {
+    try {
+      const payload: Record<string, any> = {};
+      if (updates.nisn !== undefined) payload.nisn = updates.nisn;
+      if (updates.fullName !== undefined) payload.full_name = updates.fullName;
+      if (updates.className !== undefined) payload.class_name = updates.className;
+      if (updates.gender !== undefined) payload.gender = updates.gender;
+      if (updates.parentName !== undefined) payload.parent_name = updates.parentName;
+      if (updates.parentPhone !== undefined) payload.parent_phone = updates.parentPhone;
+      if (updates.attendanceRate !== undefined) payload.attendance_rate = updates.attendanceRate;
+      if (updates.address !== undefined) payload.address = updates.address;
+      if (updates.notes !== undefined) payload.notes = updates.notes;
+
+      const { error } = await this.client
+        .from('students')
+        .update(payload)
+        .eq('id', id);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'updateStudent DB error:', error.message);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'updateStudent DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.updateStudent(id, updates, token);
+  }
+
+  public async deleteStudent(id: string, token?: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('students')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'deleteStudent DB error:', error.message);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'deleteStudent DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.deleteStudent(id, token);
   }
 }

@@ -246,3 +246,17 @@ export interface UpdateComplaintStatusDTO {
   adminResponse?: string;
   respondedByRole?: 'ADMIN' | 'KEPSEK';
 }
+
+export interface StudentItem {
+  id: string;
+  nisn: string;
+  fullName: string;
+  className: string;
+  gender: 'L' | 'P';
+  parentName: string;
+  parentPhone: string;
+  attendanceRate?: number;
+  address?: string;
+  notes?: string;
+  created_at?: string;
+}

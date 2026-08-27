@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, User, LayoutDashboard, Eye, Users, Calendar, Settings, Shield, QrCode, Edit3, TestTube, ArrowRight, MessageSquare } from 'lucide-react';
+import { Search, X, User, LayoutDashboard, Eye, Users, Calendar, Settings, Shield, QrCode, Edit3, TestTube, ArrowRight, MessageSquare, GraduationCap } from 'lucide-react';
 import type { UserProfile } from '../../types/database.types';
 
 export interface CommandItem {
@@ -52,6 +52,7 @@ export const AdminCommandPaletteModal: React.FC<AdminCommandPaletteModalProps> =
       { id: 'DASHBOARD', title: 'Dashboard Eksekutif', subtitle: 'Ringkasan presensi & KPI sekolah', icon: <LayoutDashboard className="w-4 h-4 text-emerald-600" /> },
       { id: 'ATTENDANCE_TRACKING', title: 'Live Tracking Presensi', subtitle: 'Pantau kehadiran real-time hari ini', icon: <Eye className="w-4 h-4 text-teal-600" /> },
       { id: 'TEACHERS', title: 'Kelola Data Guru & Staf', subtitle: 'Manajemen akun, NIP, & status aktif', icon: <Users className="w-4 h-4 text-sky-600" /> },
+      { id: 'STUDENTS', title: 'Direktori Siswa & Kontak Wali', subtitle: 'Master data siswa & nomor WA orang tua/wali', icon: <GraduationCap className="w-4 h-4 text-emerald-600" /> },
       { id: 'COMPLAINTS', title: 'Kotak Aspirasi & Keluhan Guru', subtitle: 'Pantau laporan & keluhan guru secara 100% anonim', icon: <MessageSquare className="w-4 h-4 text-amber-600" /> },
       { id: 'SCHEDULE', title: 'Jadwal Mengajar Guru', subtitle: 'Atur alokasi kelas & mata pelajaran', icon: <Calendar className="w-4 h-4 text-purple-600" /> },
       { id: 'CALENDAR', title: 'Kalender Akademik', subtitle: 'Atur hari libur & agenda sekolah', icon: <Calendar className="w-4 h-4 text-indigo-600" /> },

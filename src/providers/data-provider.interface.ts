@@ -14,6 +14,7 @@ import type {
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
   TeachingSlot,
+  StudentItem,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -83,6 +84,13 @@ export interface IDataProvider {
   // Teaching Schedules API (Jadwal Mengajar Guru)
   getTeachingSchedules(token?: string): Promise<TeachingSlot[]>;
   saveTeachingSchedules(schedules: TeachingSlot[], token?: string): Promise<boolean>;
+
+  // Student Directory & Guardian Contacts API (Direktori Siswa & Kontak Wali)
+  getStudents(token?: string): Promise<StudentItem[]>;
+  saveStudents(students: StudentItem[], token?: string): Promise<boolean>;
+  createStudent(student: Omit<StudentItem, 'id' | 'created_at'>, token?: string): Promise<StudentItem>;
+  updateStudent(id: string, updates: Partial<StudentItem>, token?: string): Promise<boolean>;
+  deleteStudent(id: string, token?: string): Promise<boolean>;
 }
 
 

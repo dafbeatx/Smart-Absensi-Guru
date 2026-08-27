@@ -17,6 +17,7 @@ import type {
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
   TeachingSlot,
+  StudentItem,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -1361,6 +1362,62 @@ export class MockProvider implements IDataProvider {
     _token?: string
   ): Promise<boolean> {
     safeSetStorage('smart_absensi_teaching_schedules', JSON.stringify(schedules));
+    return true;
+  }
+
+  // ── STUDENT DIRECTORY & GUARDIAN CONTACTS API ──────────────────────────────
+  public async getStudents(_token?: string): Promise<StudentItem[]> {
+    const raw = safeGetStorage('smart_absensi_students');
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public async saveStudents(
+    students: StudentItem[],
+    _token?: string
+  ): Promise<boolean> {
+    safeSetStorage('smart_absensi_students', JSON.stringify(students));
+    return true;
+  }
+
+  public async createStudent(
+    student: Omit<StudentItem, 'id' | 'created_at'>,
+    token?: string
+  ): Promise<StudentItem> {
+    const list = await this.getStudents(token);
+    const newStudent: StudentItem = {
+      ...student,
+      id: `std_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      created_at: new Date().toISOString(),
+    };
+    list.unshift(newStudent);
+    await this.saveStudents(list, token);
+    return newStudent;
+  }
+
+  public async updateStudent(
+    id: string,
+    updates: Partial<StudentItem>,
+    token?: string
+  ): Promise<boolean> {
+    const list = await this.getStudents(token);
+    const index = list.findIndex((s) => s.id === id);
+    if (index === -1) return false;
+    list[index] = { ...list[index], ...updates };
+    await this.saveStudents(list, token);
+    return true;
+  }
+
+  public async deleteStudent(id: string, token?: string): Promise<boolean> {
+    const list = await this.getStudents(token);
+    const filtered = list.filter((s) => s.id !== id);
+    if (filtered.length === list.length) return false;
+    await this.saveStudents(filtered, token);
     return true;
   }
 }

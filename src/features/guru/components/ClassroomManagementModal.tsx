@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import type { UserProfile } from '../../../types/database.types';
+import React, { useState, useEffect } from 'react';
+import type { UserProfile, StudentItem } from '../../../types/database.types';
+import { StudentRepository, STUDENTS_UPDATED_EVENT } from '../../../repositories/StudentRepository';
 
 interface ClassroomManagementModalProps {
   isOpen: boolean;
@@ -30,57 +31,85 @@ export const ClassroomManagementModal: React.FC<ClassroomManagementModalProps> =
   onOpenStudentDirectory,
 }) => {
   const [selectedClass, setSelectedClass] = useState<ClassRoomInfo | null>(null);
+  const [students, setStudents] = useState<StudentItem[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      StudentRepository.getStudents().then((res) => {
+        setStudents(res || []);
+      });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleUpdated = () => {
+      StudentRepository.getStudents().then((res) => {
+        setStudents(res || []);
+      });
+    };
+    window.addEventListener(STUDENTS_UPDATED_EVENT, handleUpdated);
+    window.addEventListener('storage', handleUpdated);
+    return () => {
+      window.removeEventListener(STUDENTS_UPDATED_EVENT, handleUpdated);
+      window.removeEventListener('storage', handleUpdated);
+    };
+  }, []);
 
   if (!isOpen) return null;
 
-  // Mock list of assigned classes for teacher based on teaching subject
+  const getStudentCount = (clsName: string, fallback: number) => {
+    const matching = students.filter((s) => s.className === clsName);
+    return matching.length > 0 ? matching.length : fallback;
+  };
+
+  // Assigned classes for teacher based on teaching subject
   const sampleClasses: ClassRoomInfo[] = [
     {
       id: 'cls-7a',
       className: 'Kelas VII-A',
       grade: 'Kelas 7',
-      totalStudents: 32,
+      totalStudents: getStudentCount('Kelas VII-A', 0),
       roomName: 'Ruang 101 (Gedung Utama Lt. 1)',
       subject: user.position?.includes('Informatika') ? 'Informatika' : 'Mata Pelajaran Wajib',
       scheduleSummary: 'Senin (07:30 - 09:00), Rabu (10:00 - 11:30)',
       homeroomTeacher: 'Siti Aminah, S.Pd',
-      classPresident: 'Muhammad Rizky Pratama',
+      classPresident: 'Ketua Kelas VII-A',
       color: 'from-teal-500 to-emerald-600',
     },
     {
       id: 'cls-7b',
       className: 'Kelas VII-B',
       grade: 'Kelas 7',
-      totalStudents: 30,
+      totalStudents: getStudentCount('Kelas VII-B', 0),
       roomName: 'Ruang 102 (Gedung Utama Lt. 1)',
       subject: user.position?.includes('Informatika') ? 'Informatika' : 'Mata Pelajaran Wajib',
       scheduleSummary: 'Selasa (08:30 - 10:00), Kamis (07:30 - 09:00)',
       homeroomTeacher: 'Ahmad Fauzi, M.Pd',
-      classPresident: 'Alya Syakira Putri',
+      classPresident: 'Ketua Kelas VII-B',
       color: 'from-blue-500 to-indigo-600',
     },
     {
       id: 'cls-8a',
       className: 'Kelas VIII-A',
       grade: 'Kelas 8',
-      totalStudents: 31,
+      totalStudents: getStudentCount('Kelas VIII-A', 0),
       roomName: 'Ruang 201 (Gedung Barat Lt. 2)',
       subject: user.position?.includes('Informatika') ? 'Informatika' : 'Mata Pelajaran Wajib',
       scheduleSummary: 'Rabu (07:30 - 09:00), Jumat (08:00 - 09:30)',
       homeroomTeacher: 'Dra. Hj. Nurjanah',
-      classPresident: 'Bagas Aditya Nugraha',
+      classPresident: 'Ketua Kelas VIII-A',
       color: 'from-purple-500 to-violet-600',
     },
     {
       id: 'cls-9b',
       className: 'Kelas IX-B',
       grade: 'Kelas 9',
-      totalStudents: 29,
+      totalStudents: getStudentCount('Kelas IX-B', 0),
       roomName: 'Ruang Lab Komputer 1',
       subject: user.position?.includes('Informatika') ? 'Informatika' : 'Mata Pelajaran Wajib',
       scheduleSummary: 'Kamis (09:30 - 11:00), Jumat (09:45 - 11:15)',
       homeroomTeacher: 'Budi Santoso, S.Kom',
-      classPresident: 'Nabila Azzahra',
+      classPresident: 'Ketua Kelas IX-B',
       color: 'from-amber-500 to-orange-600',
     },
   ];

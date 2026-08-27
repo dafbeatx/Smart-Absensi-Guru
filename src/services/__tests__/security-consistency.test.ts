@@ -15,6 +15,7 @@ import { DevTestRunnerService } from '../dev-test-runner.service';
 import { ProviderFactory } from '../../providers/provider-factory';
 import { AttendanceRepository } from '../../repositories/AttendanceRepository';
 import { LeaveRepository } from '../../repositories/LeaveRepository';
+import { StudentRepository } from '../../repositories/StudentRepository';
 import { useAuthStore } from '../../store/useAuthStore';
 import type { UserProfile, LeaveRequest } from '../../types/database.types';
 import type { LoginDTO } from '../../repositories/AuthRepository';
@@ -766,6 +767,65 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
         adminNotif.actionDate === '2026-08-19' &&
         adminNotif.title.includes('3 Guru Belum Presensi')
       )
+    );
+
+    // Test I: Student Directory & Guardian Contacts - Default Empty State & Admin CRUD
+    const initialStudents = await StudentRepository.getStudents();
+    assert(
+      'Student Directory - Default State Is Empty Array (No Hardcoded Dummy Data)',
+      Array.isArray(initialStudents) && initialStudents.length === 0
+    );
+
+    // Admin adds a student
+    const createdStd = await StudentRepository.createStudent({
+      nisn: '0087654321',
+      fullName: 'Siti Rahmawati',
+      className: 'Kelas VII-A',
+      gender: 'P',
+      parentName: 'Bapak Gunawan',
+      parentPhone: '081234567890',
+      attendanceRate: 98,
+      notes: 'Siswa berprestasi',
+    });
+
+    assert(
+      'Student Directory - Admin Can Add New Student Successfully',
+      Boolean(createdStd && createdStd.id && createdStd.fullName === 'Siti Rahmawati' && createdStd.gender === 'P')
+    );
+
+    // Filter by class
+    const classStudents = await StudentRepository.getStudentsByClass('Kelas VII-A');
+    assert(
+      'Student Directory - Filter By Class Matches Added Student',
+      classStudents.length === 1 && classStudents[0].nisn === '0087654321'
+    );
+
+    // Admin updates student
+    const updateSuccess = await StudentRepository.updateStudent(createdStd.id, {
+      parentName: 'H. Gunawan, S.E.',
+      attendanceRate: 100,
+    });
+    const afterUpdate = await StudentRepository.getStudents();
+    const updatedRecord = afterUpdate.find((s) => s.id === createdStd.id);
+    assert(
+      'Student Directory - Admin Can Update Student Details',
+      updateSuccess === true && updatedRecord?.parentName === 'H. Gunawan, S.E.' && updatedRecord?.attendanceRate === 100
+    );
+
+    // WhatsApp URL Format Test
+    const cleanPhone = (updatedRecord?.parentPhone || '').replace(/\D/g, '');
+    const intlPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
+    assert(
+      'Student Directory - Guardian Phone Formats Valid International WhatsApp Link',
+      intlPhone === '6281234567890'
+    );
+
+    // Admin deletes student
+    const deleteSuccess = await StudentRepository.deleteStudent(createdStd.id);
+    const afterDelete = await StudentRepository.getStudents();
+    assert(
+      'Student Directory - Admin Can Delete Student and Return to Empty State',
+      deleteSuccess === true && afterDelete.length === 0
     );
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));

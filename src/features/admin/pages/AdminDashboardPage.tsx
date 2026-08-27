@@ -9,6 +9,7 @@ import { AcademicCalendarManagement } from '../components/AcademicCalendarManage
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { TeachingScheduleManagement } from '../components/TeachingScheduleManagement';
 import { DutyScheduleManagement } from '../components/DutyScheduleManagement';
+import { StudentManagement } from '../components/StudentManagement';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
@@ -376,6 +377,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       icon: '👥',
     },
     {
+      id: 'STUDENTS',
+      label: 'Direktori Siswa & Wali',
+      icon: '🎓',
+    },
+    {
       id: 'COMPLAINTS',
       label: 'Kotak Aspirasi Guru',
       icon: '💬',
@@ -519,6 +525,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           {(activeTab === 'TEACHERS' || activeTab === 'ACCOUNT_APPLICATIONS') && (
             <TeacherManagementTable teachers={teachers} onTeachersChange={handleTeachersChange} syncStatus={teachersSyncStatus} />
           )}
+
+          {/* TAB: STUDENT DIRECTORY & GUARDIAN CONTACTS */}
+          {activeTab === 'STUDENTS' && <StudentManagement />}
 
           {/* TAB 4: ACADEMIC CALENDAR */}
           {activeTab === 'CALENDAR' && <AcademicCalendarManagement />}

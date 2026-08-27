@@ -4,6 +4,7 @@ import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { TeachingScheduleManagement } from '../../admin/components/TeachingScheduleManagement';
+import { StudentManagement } from '../../admin/components/StudentManagement';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
@@ -14,7 +15,7 @@ import type { UserProfile, AttendanceRecord } from '../../../types/database.type
 export const OperatorDashboardPage: React.FC = () => {
   const { user, logout } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<'TEACHERS' | 'SCHEDULE' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('TEACHERS');
+  const [activeTab, setActiveTab] = useState<'TEACHERS' | 'STUDENTS' | 'SCHEDULE' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('TEACHERS');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -123,6 +124,7 @@ export const OperatorDashboardPage: React.FC = () => {
           <div className="flex flex-wrap gap-2 pt-2">
             {[
               { id: 'TEACHERS', label: '👥 Kelola Master Pengguna' },
+              { id: 'STUDENTS', label: '🎓 Direktori Siswa & Wali' },
               { id: 'SCHEDULE', label: '🗓️ Jadwal Mengajar' },
               { id: 'SETTINGS', label: '⚙️ Jam Kerja & Geofence' },
               { id: 'EXPORT', label: '📊 Export Multi-Sheet Excel' },
@@ -151,6 +153,8 @@ export const OperatorDashboardPage: React.FC = () => {
         {activeTab === 'TEACHERS' && (
           <TeacherManagementTable teachers={teachers} onTeachersChange={setTeachers} />
         )}
+
+        {activeTab === 'STUDENTS' && <StudentManagement />}
 
         {activeTab === 'SCHEDULE' && (
           <TeachingScheduleManagement teachers={teachers} />
