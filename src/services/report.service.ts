@@ -1,7 +1,7 @@
 import { ExcelReportGenerator, isTeacherLeaveMatch, isTeacherRecordMatch } from '../lib/excel-generator.lib';
 import type { MultiSheetReportPayload } from '../lib/excel-generator.lib';
 import { AnalyticsService } from './analytics.service';
-import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../types/database.types';
+import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog, HolidayRecord } from '../types/database.types';
 import { getTodayDateInJakarta, getMonthWorkingDays, parseIndonesianMonth, isDateOffDay } from '../utils/time.utils';
 
 export class ReportService {
@@ -11,9 +11,28 @@ export class ReportService {
     teachers: UserProfile[],
     attendanceRecords: AttendanceRecord[],
     leaveRequests: LeaveRequest[] = [],
-    auditLogs: AuditLog[] = []
+    auditLogs: AuditLog[] = [],
+    holidays: HolidayRecord[] = []
   ): MultiSheetReportPayload {
-    const workingDaysInfo = getMonthWorkingDays(month, year, true);
+    // Gather all holidays from arguments and localStorage
+    const allHolidays: HolidayRecord[] = [...holidays];
+    if (typeof window !== 'undefined') {
+      try {
+        const savedHols = localStorage.getItem('smart_absensi_holidays');
+        if (savedHols) {
+          const parsed = JSON.parse(savedHols);
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              if (!allHolidays.some((existing) => existing.id === item.id)) {
+                allHolidays.push(item);
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    const workingDaysInfo = getMonthWorkingDays(month, year, true, null, allHolidays);
     const monthNumber = parseIndonesianMonth(month);
     const yearNum = parseInt(year, 10) || new Date().getFullYear();
     const todayDateStr = getTodayDateInJakarta();
@@ -54,9 +73,9 @@ export class ReportService {
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${yearNum}-${String(monthNumber).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const offCheck = isDateOffDay(dateStr);
+      const offCheck = isDateOffDay(dateStr, null, allHolidays);
       if (offCheck.isOff || dateStr > todayDateStr) {
-        continue; // Skip holidays, weekends, and future days
+        continue; // Skip holidays (nasional/sekolah/cuti bersama) and weekends and future days
       }
 
       for (const teacher of activeTeachers) {
@@ -120,6 +139,7 @@ export class ReportService {
       leaveRequests: allLeaves,
       auditLogs,
       workingDaysInfo,
+      holidays: allHolidays,
     };
   }
 
@@ -132,9 +152,10 @@ export class ReportService {
     teachers: UserProfile[],
     attendanceRecords: AttendanceRecord[],
     leaveRequests: LeaveRequest[] = [],
-    auditLogs: AuditLog[] = []
+    auditLogs: AuditLog[] = [],
+    holidays: HolidayRecord[] = []
   ): Promise<boolean> {
-    const payload = this.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs);
+    const payload = this.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs, holidays);
     ExcelReportGenerator.generateMultiSheetXLSX(payload);
     return true;
   }
@@ -148,9 +169,10 @@ export class ReportService {
     teachers: UserProfile[],
     attendanceRecords: AttendanceRecord[],
     leaveRequests: LeaveRequest[] = [],
-    auditLogs: AuditLog[] = []
+    auditLogs: AuditLog[] = [],
+    holidays: HolidayRecord[] = []
   ): Promise<boolean> {
-    const payload = this.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs);
+    const payload = this.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs, holidays);
     ExcelReportGenerator.generatePrintablePDF(payload);
     return true;
   }
@@ -163,9 +185,10 @@ export class ReportService {
     month: string,
     year: string,
     attendanceRecords: AttendanceRecord[],
-    leaveRequests: LeaveRequest[] = []
+    leaveRequests: LeaveRequest[] = [],
+    holidays: HolidayRecord[] = []
   ): Promise<boolean> {
-    ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords, leaveRequests);
+    ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords, leaveRequests, holidays);
     return true;
   }
 
@@ -177,9 +200,10 @@ export class ReportService {
     month: string,
     year: string,
     attendanceRecords: AttendanceRecord[],
-    leaveRequests: LeaveRequest[] = []
+    leaveRequests: LeaveRequest[] = [],
+    holidays: HolidayRecord[] = []
   ): Promise<boolean> {
-    ExcelReportGenerator.generateIndividualTeacherXLSX(teacher, month, year, attendanceRecords, leaveRequests);
+    ExcelReportGenerator.generateIndividualTeacherXLSX(teacher, month, year, attendanceRecords, leaveRequests, holidays);
     return true;
   }
 }

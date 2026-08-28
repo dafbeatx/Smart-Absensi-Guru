@@ -27,6 +27,15 @@ async function main() {
   console.log('============================================================\n');
 
   if (summary.totalFailed > 0) {
+    console.log('❌ FAILED TESTS SUMMARY:');
+    summary.suites.forEach((suite) => {
+      suite.results
+        .filter((r) => r.status === 'FAIL')
+        .forEach((r) => {
+          console.log(`- [${suite.suiteName}] ${r.testName}: ${r.details || 'Assertion failed'}`);
+        });
+    });
+    console.log('');
     process.exit(1);
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus, SystemSettings, RoleCode } from '../../../types/database.types';
+import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus, SystemSettings, RoleCode, HolidayRecord } from '../../../types/database.types';
 import { AnalyticsService } from '../../../services/analytics.service';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
 import { Modal } from '../../../components/ui/Modal';
@@ -38,6 +38,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [holidays, setHolidays] = useState<HolidayRecord[]>([]);
 
   const [resetModalTeacher, setResetModalTeacher] = useState<UserProfile | null>(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -64,9 +65,24 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         })
         .catch(() => {});
     };
+    const fetchHolidays = () => {
+      ProviderFactory.getProvider()
+        .getHolidays()
+        .then((h) => {
+          if (h) setHolidays(h);
+        })
+        .catch(() => {});
+    };
+
     fetchSettings();
+    fetchHolidays();
+
     window.addEventListener('smart_absensi_settings_updated', fetchSettings);
-    return () => window.removeEventListener('smart_absensi_settings_updated', fetchSettings);
+    window.addEventListener('smart_absensi_holidays_updated', fetchHolidays);
+    return () => {
+      window.removeEventListener('smart_absensi_settings_updated', fetchSettings);
+      window.removeEventListener('smart_absensi_holidays_updated', fetchHolidays);
+    };
   }, []);
 
   const checkinEnd = systemSettings?.work_checkin_end ? systemSettings.work_checkin_end.slice(0, 5) : CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
@@ -98,10 +114,22 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     return list;
   }, [leaveRequests]);
 
-  // 1. Calculate Daily Analytics Stats
+  // Check if selectedDate is weekend or holiday
+  const isOffDayCheck = useMemo(() => {
+    return isDateOffDay(selectedDate, systemSettings, holidays);
+  }, [selectedDate, systemSettings, holidays]);
+
+  // 1. Calculate Daily Analytics Stats (100% Synchronized with holidays)
   const summary = useMemo(() => {
-    return AnalyticsService.calculateDailySummary(selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, systemSettings);
-  }, [selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, systemSettings]);
+    return AnalyticsService.calculateDailySummary(
+      selectedDate,
+      activeEligiblePersonnel,
+      attendanceRecords,
+      allLeavesToEvaluate,
+      systemSettings,
+      holidays
+    );
+  }, [selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, systemSettings, holidays]);
 
   // Historical Unabsented & ALFA records (Past 7 workdays)
   const historicalUnabsented = useMemo(() => {
@@ -110,10 +138,10 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       attendanceRecords,
       allLeavesToEvaluate,
       systemSettings,
-      null,
+      holidays,
       7
     );
-  }, [teachers, attendanceRecords, allLeavesToEvaluate, systemSettings]);
+  }, [teachers, attendanceRecords, allLeavesToEvaluate, systemSettings, holidays]);
 
   // 2. Identify attendance state map for each personnel for selectedDate
   const teacherAttendanceMap = useMemo(() => {
@@ -318,8 +346,6 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       return a.full_name.localeCompare(b.full_name, 'id');
     });
   }, [activeEligiblePersonnel, teacherAttendanceMap, searchQuery, statusFilter, roleFilter]);
-
-  const isOffDayCheck = useMemo(() => isDateOffDay(selectedDate), [selectedDate]);
 
   // Status Badge Builder with full support for Pending and Approved Leaves
   const getStatusBadge = (

@@ -163,17 +163,45 @@ export function isDateOffDay(
     dayOfWeek = targetDate.getDay();
   }
 
+  // Auto-resolve global holidays from LocalStorage if not explicitly passed
+  let effectiveHolidays = holidays;
+  if (!effectiveHolidays && typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('smart_absensi_holidays');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          effectiveHolidays = parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
   // 1. Check explicit holiday record first
-  if (holidays && holidays.length > 0 && dateIso) {
-    const matchedHoliday = holidays.find((h) => h.date === dateIso);
+  if (effectiveHolidays && effectiveHolidays.length > 0 && dateIso) {
+    const matchedHoliday = effectiveHolidays.find((h) => h.date === dateIso);
     if (matchedHoliday) {
       return { isOff: true, reason: `Hari Libur: ${matchedHoliday.name}` };
     }
   }
 
-  // 2. Check weekend settings (defaulting saturday_is_holiday=true, sunday_is_holiday=true)
-  const saturdayLibur = settings?.saturday_is_holiday ?? true;
-  const sundayLibur = settings?.sunday_is_holiday ?? true;
+  // Auto-resolve weekend settings from LocalStorage if not explicitly passed
+  let saturdayLibur = true;
+  let sundayLibur = true;
+
+  if (settings) {
+    saturdayLibur = settings.saturday_is_holiday ?? true;
+    sundayLibur = settings.sunday_is_holiday ?? true;
+  } else if (typeof window !== 'undefined') {
+    try {
+      const savedSettings = localStorage.getItem('smart_absensi_system_settings');
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed.saturday_is_holiday !== undefined) saturdayLibur = parsed.saturday_is_holiday;
+        if (parsed.sunday_is_holiday !== undefined) sundayLibur = parsed.sunday_is_holiday;
+      }
+    } catch (e) {}
+  }
 
   if (dayOfWeek === 6 && saturdayLibur) {
     return { isOff: true, reason: 'Libur Akhir Pekan (Sabtu)' };

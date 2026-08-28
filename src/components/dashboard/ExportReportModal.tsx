@@ -3,9 +3,10 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { ReportService } from '../../services/report.service';
 import { useToastStore } from '../../store/useToastStore';
+import { ProviderFactory } from '../../providers/provider-factory';
 import { SIGNATORY_OFFICIALS, ExcelReportGenerator } from '../../lib/excel-generator.lib';
 import { PDFPreviewModal } from './PDFPreviewModal';
-import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../../types/database.types';
+import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog, HolidayRecord } from '../../types/database.types';
 
 export interface ExportReportModalProps {
   isOpen: boolean;
@@ -77,6 +78,43 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
     return list;
   }, [leaveRequests]);
 
+  // Aggregate holidays from provider and localStorage for full cross-device synchronization
+  const [holidays, setHolidays] = React.useState<HolidayRecord[]>([]);
+
+  React.useEffect(() => {
+    const fetchHolidays = () => {
+      ProviderFactory.getProvider()
+        .getHolidays()
+        .then((h) => {
+          if (h) setHolidays(h);
+        })
+        .catch(() => {});
+    };
+    fetchHolidays();
+    window.addEventListener('smart_absensi_holidays_updated', fetchHolidays);
+    return () => window.removeEventListener('smart_absensi_holidays_updated', fetchHolidays);
+  }, []);
+
+  const effectiveHolidays = React.useMemo(() => {
+    const list = [...holidays];
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_holidays');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              if (!list.some((existing) => existing.id === item.id)) {
+                list.push(item);
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return list;
+  }, [holidays]);
+
   const handleExportXLSX = async () => {
     setIsLoading(true);
     try {
@@ -87,7 +125,8 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           teachers,
           attendanceRecords,
           effectiveLeaves,
-          auditLogs
+          auditLogs,
+          effectiveHolidays
         );
         showToast('success', 'Export Excel Berhasil!', 'File Excel Laporan Master Rekapitulasi Sekolah (.xlsx) diunduh.');
       } else {
@@ -97,7 +136,8 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           month,
           year,
           attendanceRecords,
-          effectiveLeaves
+          effectiveLeaves,
+          effectiveHolidays
         );
         showToast('success', 'Export Excel Berhasil!', `File Excel Laporan Presensi ${teacher.full_name} (.xlsx) diunduh.`);
       }
@@ -119,14 +159,36 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
 
       if (reportType === 'MASTER') {
         titleStr = `Laporan Presensi Master Sekolah - ${month} ${year}`;
-        const payload = ReportService.preparePayload(month, year, teachers, attendanceRecords, effectiveLeaves, auditLogs);
+        const payload = ReportService.preparePayload(
+          month,
+          year,
+          teachers,
+          attendanceRecords,
+          effectiveLeaves,
+          auditLogs,
+          effectiveHolidays
+        );
         htmlContent = ExcelReportGenerator.getPrintablePDFHTML(payload);
         windowOpened = ExcelReportGenerator.generatePrintablePDF(payload);
       } else {
         const teacher = teachers.find((t) => t.id === selectedTeacherId) || teachers[0];
         titleStr = `Laporan Presensi Individu - ${teacher.full_name}`;
-        htmlContent = ExcelReportGenerator.getIndividualTeacherPDFHTML(teacher, month, year, attendanceRecords, effectiveLeaves);
-        windowOpened = ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords, effectiveLeaves);
+        htmlContent = ExcelReportGenerator.getIndividualTeacherPDFHTML(
+          teacher,
+          month,
+          year,
+          attendanceRecords,
+          effectiveLeaves,
+          effectiveHolidays
+        );
+        windowOpened = ExcelReportGenerator.generateIndividualTeacherPDF(
+          teacher,
+          month,
+          year,
+          attendanceRecords,
+          effectiveLeaves,
+          effectiveHolidays
+        );
       }
 
       if (windowOpened) {

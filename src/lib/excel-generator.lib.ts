@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../types/database.types';
+import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog, HolidayRecord } from '../types/database.types';
 import type { DailyAttendanceSummary } from '../services/analytics.service';
 import { APP_CONFIG } from '../config/app.config';
 import { CONSTANTS } from '../config/constants';
@@ -22,6 +22,7 @@ export interface MultiSheetReportPayload {
   leaveRequests: LeaveRequest[];
   auditLogs: AuditLog[];
   workingDaysInfo?: MonthWorkingDaysInfo;
+  holidays?: HolidayRecord[];
 }
 
 // Helpers to match teacher profiles with attendance records and leave applications
@@ -69,7 +70,7 @@ export class ExcelReportGenerator {
    */
   public static generateMultiSheetXLSX(payload: MultiSheetReportPayload): void {
     const wb = XLSX.utils.book_new();
-    const workingDaysInfo = payload.workingDaysInfo || getMonthWorkingDays(payload.month, payload.year, true);
+    const workingDaysInfo = payload.workingDaysInfo || getMonthWorkingDays(payload.month, payload.year, true, null, payload.holidays);
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
     const monthNumber = parseIndonesianMonth(payload.month);
     const monthPrefix = `${payload.year}-${String(monthNumber).padStart(2, '0')}`;
@@ -269,7 +270,7 @@ export class ExcelReportGenerator {
    * 3. Halaman 3 / Seksi Rincian: Rekapitulasi Detail Pengajuan Izin & Sakit Lengkap dengan Alasan
    */
   public static getPrintablePDFHTML(payload: MultiSheetReportPayload): string {
-    const workingDaysInfo = payload.workingDaysInfo || getMonthWorkingDays(payload.month, payload.year, true);
+    const workingDaysInfo = payload.workingDaysInfo || getMonthWorkingDays(payload.month, payload.year, true, null, payload.holidays);
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
     const monthNumber = parseIndonesianMonth(payload.month);
     const monthPrefix = `${payload.year}-${String(monthNumber).padStart(2, '0')}`;
@@ -293,7 +294,7 @@ export class ExcelReportGenerator {
       const dateObj = new Date(yearNum, monthNumber - 1, dayNum);
       const dayOfWeek = dateObj.getDay();
       const dayName = dayNamesShort[dayOfWeek];
-      const offCheck = isDateOffDay(dateStr);
+      const offCheck = isDateOffDay(dateStr, null, payload.holidays);
       const isFuture = dateStr > todayDateStr;
       return {
         dayNum,
@@ -301,6 +302,7 @@ export class ExcelReportGenerator {
         dayName,
         dayOfWeek,
         isOff: offCheck.isOff,
+        offReason: offCheck.reason,
         isSunday: dayOfWeek === 0,
         isSaturday: dayOfWeek === 6,
         isFuture,
@@ -539,7 +541,7 @@ export class ExcelReportGenerator {
             <div class="legend-badge-item"><span class="badge-sample matrix-cell-d">D</span> Dinas Luar</div>
             <div class="legend-badge-item"><span class="badge-sample matrix-cell-c">C</span> Cuti Resmi</div>
             <div class="legend-badge-item"><span class="badge-sample matrix-cell-a">A</span> Alfa / Belum Absen</div>
-            <div class="legend-badge-item"><span class="badge-sample matrix-cell-l">L</span> Libur Akhir Pekan</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-l">L</span> Libur Nasional / Sekolah</div>
             <div class="legend-badge-item"><span class="badge-sample matrix-cell-dash">-</span> Belum Terlewati</div>
           </div>
 
@@ -550,7 +552,7 @@ export class ExcelReportGenerator {
                 <th style="width: 20px;">No</th>
                 <th style="width: 120px; text-align: left; padding-left: 4px;">Nama Dewan Guru &amp; Staf</th>
                 ${monthDaysList.map((m) => `
-                  <th class="${m.isOff ? 'off-col' : ''}" style="width: calc((100% - 240px) / ${daysInMonth});" title="${m.dateStr} (${m.dayName})">
+                  <th class="${m.isOff ? 'off-col' : ''}" style="width: calc((100% - 240px) / ${daysInMonth});" title="${m.dateStr} (${m.dayName}${m.offReason ? ` - ${m.offReason}` : ''})">
                     <div style="font-size: 7.5px; font-weight: 900;">${m.dayNum}</div>
                     <div style="font-size: 6px; opacity: 0.85;">${m.dayName}</div>
                   </th>
@@ -576,7 +578,7 @@ export class ExcelReportGenerator {
 
                 const dayCells = monthDaysList.map((day) => {
                   if (day.isOff) {
-                    return `<td><span class="matrix-cell-l">L</span></td>`;
+                    return `<td><span class="matrix-cell-l" title="${day.offReason || 'Libur'}">L</span></td>`;
                   }
 
                   const rec = payload.attendanceRecords.find((r) => r.date === day.dateStr && isTeacherRecordMatch(teacher, r));
@@ -782,9 +784,10 @@ export class ExcelReportGenerator {
     month: string,
     year: string,
     records: AttendanceRecord[],
-    leaveRequests: LeaveRequest[] = []
+    leaveRequests: LeaveRequest[] = [],
+    holidays: HolidayRecord[] = []
   ): string {
-    const workingDaysInfo = getMonthWorkingDays(month, year, true);
+    const workingDaysInfo = getMonthWorkingDays(month, year, true, null, holidays);
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
     const monthNumber = parseIndonesianMonth(month);
     const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
@@ -841,7 +844,7 @@ export class ExcelReportGenerator {
     // Days 1..daysInMonth
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${yearNum}-${String(monthNumber).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const offCheck = isDateOffDay(dateStr);
+      const offCheck = isDateOffDay(dateStr, null, holidays);
       const isFuture = dateStr > todayDateStr;
 
       const rec = teacherRecords.find((r) => r.date === dateStr);
@@ -856,7 +859,7 @@ export class ExcelReportGenerator {
 
       if (offCheck.isOff) {
         status = 'LIBUR';
-        label = 'Libur';
+        label = offCheck.reason ? offCheck.reason.replace('Hari Libur: ', '').replace('Libur Akhir Pekan ', '') : 'Libur';
       } else if (rec) {
         status = rec.status;
         label = rec.status === 'HADIR' ? `Hadir (${(rec.check_in_time || '').slice(0, 5)})` :
@@ -1155,9 +1158,10 @@ export class ExcelReportGenerator {
     month: string,
     year: string,
     records: AttendanceRecord[],
-    leaveRequests: LeaveRequest[] = []
+    leaveRequests: LeaveRequest[] = [],
+    holidays: HolidayRecord[] = []
   ): boolean {
-    const htmlContent = this.getIndividualTeacherPDFHTML(teacher, month, year, records, leaveRequests);
+    const htmlContent = this.getIndividualTeacherPDFHTML(teacher, month, year, records, leaveRequests, holidays);
     try {
       const printWindow = window.open('', '_blank', 'width=1000,height=800');
       if (!printWindow) return false;
@@ -1179,10 +1183,11 @@ export class ExcelReportGenerator {
     month: string,
     year: string,
     records: AttendanceRecord[],
-    leaveRequests: LeaveRequest[] = []
+    leaveRequests: LeaveRequest[] = [],
+    holidays: HolidayRecord[] = []
   ): void {
     const wb = XLSX.utils.book_new();
-    const workingDaysInfo = getMonthWorkingDays(month, year, true);
+    const workingDaysInfo = getMonthWorkingDays(month, year, true, null, holidays);
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
     const monthNumber = parseIndonesianMonth(month);
     const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;

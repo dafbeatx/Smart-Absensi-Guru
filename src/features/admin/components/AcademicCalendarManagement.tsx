@@ -106,6 +106,11 @@ export const AcademicCalendarManagement: React.FC = () => {
       }
       setIsFormModalOpen(false);
       await fetchHolidays();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('smart_absensi_holidays_updated'));
+        window.dispatchEvent(new Event('smart_absensi_records_updated'));
+        window.dispatchEvent(new Event('smart_absensi_settings_updated'));
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal menyimpan hari libur';
       showToast('error', 'Gagal Menyimpan', msg);
@@ -123,6 +128,11 @@ export const AcademicCalendarManagement: React.FC = () => {
       showToast('info', 'Hari Libur Dihapus', `"${deletingHoliday.name}" telah dihapus.`);
       setDeletingHoliday(null);
       await fetchHolidays();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('smart_absensi_holidays_updated'));
+        window.dispatchEvent(new Event('smart_absensi_records_updated'));
+        window.dispatchEvent(new Event('smart_absensi_settings_updated'));
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal menghapus hari libur';
       showToast('error', 'Gagal Menghapus', msg);
@@ -135,6 +145,11 @@ export const AcademicCalendarManagement: React.FC = () => {
     try {
       localStorage.removeItem('smart_absensi_holidays');
       await fetchHolidays();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('smart_absensi_holidays_updated'));
+        window.dispatchEvent(new Event('smart_absensi_records_updated'));
+        window.dispatchEvent(new Event('smart_absensi_settings_updated'));
+      }
       showToast('success', 'Preset Berhasil Dimuat!', 'Kalender Akademik & Tanggal Merah 2026 diperbarui.');
     } catch (err) {
       showToast('error', 'Gagal Memuat Preset', String(err));

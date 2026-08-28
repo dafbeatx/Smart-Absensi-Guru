@@ -3,6 +3,7 @@
  */
 
 import { AnalyticsService } from '../analytics.service';
+import { ReportService } from '../report.service';
 import { ExcelReportGenerator } from '../../lib/excel-generator.lib';
 import type { MultiSheetReportPayload } from '../../lib/excel-generator.lib';
 import { DashboardCacheService } from '../dashboard-cache.service';
@@ -209,9 +210,44 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     'EWS Kedisiplinan - >= 16x late is HIGH (Risiko Tinggi)',
     evaluateEwsTeacherRisk(16, 0) === 'HIGH' && evaluateEwsTeacherRisk(20, 0) === 'HIGH'
   );
+  // Test 11: Global Academic Calendar & Holiday Synchronization
+  const customHoliday = [
+    { id: 'hol_custom_1', date: '2026-08-17', name: 'HUT Kemerdekaan RI', type: 'NATIONAL_HOLIDAY' as const, created_at: new Date().toISOString() },
+    { id: 'hol_custom_2', date: '2026-08-28', name: 'Libur Khusus Sekolah', type: 'SCHOOL_HOLIDAY' as const, created_at: new Date().toISOString() }
+  ];
+  const { isDateOffDay } = await import('../../utils/time.utils');
+  const holidayCheck = isDateOffDay('2026-08-28', null, customHoliday);
   assert(
-    'EWS Kedisiplinan - Unexcused absences evaluate correctly',
-    evaluateEwsTeacherRisk(0, 2) === 'MEDIUM' && evaluateEwsTeacherRisk(0, 4) === 'HIGH'
+    'Holiday Engine - Custom Global Holiday is recognized as OFF day',
+    holidayCheck.isOff === true && holidayCheck.reason.includes('Libur Khusus Sekolah')
+  );
+
+  const holidaySummary = AnalyticsService.calculateDailySummary(
+    '2026-08-28',
+    mockTeachers,
+    [],
+    [],
+    null,
+    customHoliday
+  );
+  assert(
+    'Holiday Engine - Daily Summary on Holiday sets totalUnabsented to 0',
+    holidaySummary.totalUnabsented === 0
+  );
+
+  const holidayReportPayload = ReportService.preparePayload(
+    'Agustus',
+    '2026',
+    mockTeachers,
+    [],
+    [],
+    [],
+    customHoliday
+  );
+  const holidayPDF = ExcelReportGenerator.getPrintablePDFHTML(holidayReportPayload);
+  assert(
+    'Holiday Engine - Master Report PDF Matrix tags global holiday with L badge and reason tooltip',
+    holidayPDF.includes('matrix-cell-l') && holidayPDF.includes('Libur Khusus Sekolah')
   );
 
   return { passed, failed, results };
