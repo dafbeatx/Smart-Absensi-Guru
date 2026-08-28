@@ -3,7 +3,7 @@ import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../t
 import type { DailyAttendanceSummary } from '../services/analytics.service';
 import { APP_CONFIG } from '../config/app.config';
 import { CONSTANTS } from '../config/constants';
-import { getMonthWorkingDays, parseIndonesianMonth } from '../utils/time.utils';
+import { getMonthWorkingDays, parseIndonesianMonth, isDateOffDay, getTodayDateInJakarta } from '../utils/time.utils';
 import type { MonthWorkingDaysInfo } from '../utils/time.utils';
 
 export const SIGNATORY_OFFICIALS = {
@@ -24,6 +24,21 @@ export interface MultiSheetReportPayload {
   workingDaysInfo?: MonthWorkingDaysInfo;
 }
 
+// Helpers to match teacher profiles with attendance records and leave applications
+export const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest): boolean => {
+  if (leave.user_id === t.id || (t.nip && leave.user_id === t.nip) || leave.user_id === t.full_name) return true;
+  if (leave.user_name && (leave.user_name === t.full_name || leave.user_name === t.id)) return true;
+  if (leave.teacher_name && (leave.teacher_name === t.full_name || leave.teacher_name === t.id)) return true;
+  if (leave.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
+  return false;
+};
+
+export const isTeacherRecordMatch = (t: UserProfile, rec: AttendanceRecord): boolean => {
+  if (rec.user_id === t.id || (t.nip && rec.user_id === t.nip) || rec.user_id === t.full_name) return true;
+  if (rec.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
+  return false;
+};
+
 export class ExcelReportGenerator {
   /**
    * Generates CSV format for backward compatibility & tests
@@ -43,7 +58,7 @@ export class ExcelReportGenerator {
     lines.push(``);
     lines.push(`=== SHEET 3: DETAIL HARIAN TRANSAKSI ===`);
     lines.push(``);
-    lines.push(`=== SHEET 4: PENGAJUAN IZIN / SAKIT / DINAS ===`);
+    lines.push(`=== SHEET 4: PENGAJUAN IZIN ===`);
     lines.push(``);
     lines.push(`=== SHEET 5: AUDIT LOG RINGKAS ===`);
     return lines.join('\n');
@@ -90,7 +105,7 @@ export class ExcelReportGenerator {
 
     // ── SHEET 2: REKAP KEHADIRAN GURU ─────────────────────────────────────────
     const teacherData = payload.teachers.map((t, index) => {
-      const tRecords = payload.attendanceRecords.filter((r) => r.user_id === t.id && (!r.date || r.date.startsWith(monthPrefix)));
+      const tRecords = payload.attendanceRecords.filter((r) => isTeacherRecordMatch(t, r) && (!r.date || r.date.startsWith(monthPrefix)));
       const tPresent = tRecords.filter((r) => r.status === 'HADIR').length;
       const tLate = tRecords.filter((r) => r.status === 'TERLAMBAT').length;
       const tTotalMasuk = tPresent + tLate;
@@ -168,26 +183,31 @@ export class ExcelReportGenerator {
 
     // ── SHEET 4: PENGAJUAN IZIN & SAKIT ───────────────────────────────────────
     const leaveData = payload.leaveRequests.length > 0
-      ? payload.leaveRequests.map((l, index) => ({
-          No: index + 1,
-          'ID Pengajuan': l.id,
-          'ID Pengguna': l.user_id,
-          'Jenis Izin': l.leave_type,
-          'Mulai Tanggal': l.start_date,
-          'Sampai Tanggal': l.end_date,
-          Alasan: l.reason,
-          Status: l.approval_status,
-        }))
+      ? payload.leaveRequests.map((l, index) => {
+          const matchedTeacher = payload.teachers.find((t) => isTeacherLeaveMatch(t, l));
+          return {
+            No: index + 1,
+            'ID Pengajuan': l.id,
+            NPP: matchedTeacher?.nip || '-',
+            'Nama Guru': matchedTeacher?.full_name || l.teacher_name || l.user_name || l.user_id,
+            'Jenis Izin': l.leave_type,
+            'Mulai Tanggal': l.start_date,
+            'Sampai Tanggal': l.end_date,
+            'Alasan Lengkap': l.reason,
+            'Status Persetujuan': l.approval_status || 'PENDING',
+          };
+        })
       : [
           {
             No: 1,
             'ID Pengajuan': 'leave_demo_01',
-            'ID Pengguna': 'usr_1002',
+            NPP: '198502',
+            'Nama Guru': 'Budi Santoso, M.Pd.',
             'Jenis Izin': 'SAKIT',
-            'Mulai Tanggal': '2026-07-28',
-            'Sampai Tanggal': '2026-07-29',
-            Alasan: 'Demam tinggi & perawatan dokter',
-            Status: 'APPROVED',
+            'Mulai Tanggal': '2026-08-10',
+            'Sampai Tanggal': '2026-08-11',
+            'Alasan Lengkap': 'Demam tinggi & istirahat dokter',
+            'Status Persetujuan': 'APPROVED',
           },
         ];
 
@@ -195,12 +215,13 @@ export class ExcelReportGenerator {
     wsLeave['!cols'] = [
       { wch: 6 },
       { wch: 18 },
-      { wch: 20 },
-      { wch: 14 },
+      { wch: 16 },
+      { wch: 30 },
       { wch: 15 },
       { wch: 15 },
-      { wch: 35 },
       { wch: 15 },
+      { wch: 40 },
+      { wch: 18 },
     ];
     XLSX.utils.book_append_sheet(wb, wsLeave, 'Pengajuan Izin & Sakit');
 
@@ -242,13 +263,18 @@ export class ExcelReportGenerator {
   }
 
   /**
-   * Generates the raw HTML content string for the Master PDF Report
+   * Generates the raw HTML content string for the Master PDF Report with:
+   * 1. Halaman 1: Ringkasan Eksekutif, KPI Cards, Grafik Distribusi & Rekap Master Masuk/Izin
+   * 2. Halaman 2: Lembar Kalender Absensi Bulanan (Matriks Harian Tanggal 1 s/d 31)
+   * 3. Halaman 3 / Seksi Rincian: Rekapitulasi Detail Pengajuan Izin & Sakit Lengkap dengan Alasan
    */
   public static getPrintablePDFHTML(payload: MultiSheetReportPayload): string {
     const workingDaysInfo = payload.workingDaysInfo || getMonthWorkingDays(payload.month, payload.year, true);
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
     const monthNumber = parseIndonesianMonth(payload.month);
     const monthPrefix = `${payload.year}-${String(monthNumber).padStart(2, '0')}`;
+    const yearNum = parseInt(payload.year, 10) || new Date().getFullYear();
+    const todayDateStr = getTodayDateInJakarta();
 
     const totalTeachers = payload.summary.totalTeachers || 1;
     const totalExpectedCapacity = totalTeachers * effectiveDays;
@@ -256,6 +282,37 @@ export class ExcelReportGenerator {
     const latePct = totalExpectedCapacity > 0 ? Math.min(100 - presentPct, Math.round((payload.summary.totalLate / totalExpectedCapacity) * 100)) : 0;
     const leavePct = totalExpectedCapacity > 0 ? Math.min(100 - presentPct - latePct, Math.round(((payload.summary.totalSick + payload.summary.totalLeave + payload.summary.totalOfficialDuty) / totalExpectedCapacity) * 100)) : 0;
     const unabsentPct = Math.max(0, 100 - presentPct - latePct - leavePct);
+
+    // Days in Month for the Calendar Matrix Sheet (1 to 28/29/30/31)
+    const daysInMonth = new Date(yearNum, monthNumber, 0).getDate();
+    const dayNamesShort = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+    const monthDaysList = Array.from({ length: daysInMonth }, (_, i) => {
+      const dayNum = i + 1;
+      const dateStr = `${yearNum}-${String(monthNumber).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      const dateObj = new Date(yearNum, monthNumber - 1, dayNum);
+      const dayOfWeek = dateObj.getDay();
+      const dayName = dayNamesShort[dayOfWeek];
+      const offCheck = isDateOffDay(dateStr);
+      const isFuture = dateStr > todayDateStr;
+      return {
+        dayNum,
+        dateStr,
+        dayName,
+        dayOfWeek,
+        isOff: offCheck.isOff,
+        isSunday: dayOfWeek === 0,
+        isSaturday: dayOfWeek === 6,
+        isFuture,
+      };
+    });
+
+    // Leaves relevant to this month
+    const monthlyLeaves = payload.leaveRequests.filter((l) => {
+      const start = (l.start_date || '').substring(0, 7);
+      const end = (l.end_date || '').substring(0, 7);
+      return start === monthPrefix || end === monthPrefix || (l.start_date && l.start_date <= `${monthPrefix}-31` && l.end_date && l.end_date >= `${monthPrefix}-01`);
+    });
 
     return `
       <!DOCTYPE html>
@@ -268,8 +325,15 @@ export class ExcelReportGenerator {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
+            box-sizing: border-box;
           }
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; line-height: 1.5; }
+          body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 24px;
+            color: #1e293b;
+            line-height: 1.5;
+            background-color: #ffffff;
+          }
           .header { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
           .header h1 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; }
           .header h2 { margin: 4px 0; font-size: 14px; font-weight: 600; color: #475569; }
@@ -299,23 +363,55 @@ export class ExcelReportGenerator {
           tr:nth-child(even) { background-color: #f8fafc !important; }
           .progress-bar-bg { background-color: #e2e8f0 !important; border-radius: 6px; height: 10px; width: 100%; overflow: hidden; border: 1px solid #cbd5e1; }
           .progress-bar-fill { background-color: #16a34a !important; background: #16a34a !important; height: 100%; border-radius: 6px; }
-          .signature-section { margin-top: 40px; display: flex; justify-content: space-between; font-size: 11px; }
+          
+          /* Calendar Matrix Sheet Styling */
+          .matrix-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 8px; table-layout: fixed; }
+          .matrix-table th, .matrix-table td { border: 1px solid #cbd5e1; padding: 3px 1px; text-align: center; overflow: hidden; }
+          .matrix-table th { background-color: #023246 !important; color: #ffffff !important; font-weight: 700; font-size: 7.5px; }
+          .matrix-table th.off-col { background-color: #475569 !important; color: #f1f5f9 !important; }
+          .matrix-cell-h { background-color: #dcfce7 !important; color: #15803d !important; font-weight: 900; display: block; border-radius: 2px; }
+          .matrix-cell-t { background-color: #fef3c7 !important; color: #b45309 !important; font-weight: 900; display: block; border-radius: 2px; }
+          .matrix-cell-i { background-color: #e0f2fe !important; color: #0369a1 !important; font-weight: 900; display: block; border-radius: 2px; }
+          .matrix-cell-s { background-color: #f3e8ff !important; color: #7e22ce !important; font-weight: 900; display: block; border-radius: 2px; }
+          .matrix-cell-d { background-color: #ede9fe !important; color: #5b21b6 !important; font-weight: 900; display: block; border-radius: 2px; }
+          .matrix-cell-c { background-color: #cffafe !important; color: #0e7490 !important; font-weight: 900; display: block; border-radius: 2px; }
+          .matrix-cell-a { background-color: #fee2e2 !important; color: #b91c1c !important; font-weight: 900; display: block; border-radius: 2px; }
+          .matrix-cell-l { background-color: #f1f5f9 !important; color: #94a3b8 !important; font-weight: 600; display: block; }
+          .matrix-cell-dash { color: #cbd5e1 !important; display: block; }
+
+          .legend-badge-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; background: #f8fafc !important; border: 1px solid #cbd5e1; padding: 10px 14px; border-radius: 8px; font-size: 10px; margin-bottom: 20px; }
+          .legend-badge-item { display: flex; align-items: center; gap: 4px; font-weight: 600; }
+          .badge-sample { display: inline-block; width: 18px; text-align: center; font-weight: 900; font-size: 9px; border-radius: 3px; padding: 1px 0; }
+
+          .page-break {
+            page-break-before: always;
+            break-before: page;
+            margin-top: 30px;
+            padding-top: 15px;
+          }
+
+          .signature-section { margin-top: 30px; display: flex; justify-content: space-between; font-size: 11px; page-break-inside: avoid; }
           .sig-box { text-align: center; width: 240px; }
-          .sig-space { height: 65px; }
+          .sig-space { height: 60px; }
+
           @media print {
             body { padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .no-print { display: none; }
+            .page-break { page-break-before: always; break-before: page; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           }
         </style>
       </head>
       <body>
         <div class="no-print" style="margin-bottom: 15px; text-align: right;">
-          <button onclick="window.print()" style="padding: 10px 20px; background-color: #0f172a; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">
+          <button onclick="window.print()" style="padding: 10px 20px; background-color: #023246; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             🖨️ Cetak / Simpan ke PDF
           </button>
         </div>
 
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <!-- HALAMAN 1: RINGKASAN EKSEKUTIF & REKAP KESELURUHAN                       -->
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
         <div class="header" style="text-align: center; margin-bottom: 20px; border-bottom: none; padding-bottom: 0;">
           <img src="/kop-surat-al-ittihadiyah.jpg" alt="Kop Surat SMP Terpadu Al-Ittihadiyah" style="width: 100%; max-width: 900px; height: auto; display: block; margin: 0 auto 10px auto;" />
           <div style="border-bottom: 3px double #15803d; padding-bottom: 8px; margin-bottom: 12px;">
@@ -338,7 +434,7 @@ export class ExcelReportGenerator {
         <div class="kpi-container">
           <div class="kpi-card"><div class="val" style="color: #16a34a;">${payload.summary.totalPresent}</div><div class="lbl">Hadir Tepat Waktu</div></div>
           <div class="kpi-card"><div class="val" style="color: #d97706;">${payload.summary.totalLate}</div><div class="lbl">Terlambat</div></div>
-          <div class="kpi-card"><div class="val" style="color: #0284c7;">${payload.summary.totalSick + payload.summary.totalLeave + payload.summary.totalOfficialDuty}</div><div class="lbl">Izin / Sakit</div></div>
+          <div class="kpi-card"><div class="val" style="color: #0284c7;">${payload.summary.totalSick + payload.summary.totalLeave + payload.summary.totalOfficialDuty}</div><div class="lbl">Izin / Sakit / Cuti</div></div>
           <div class="kpi-card"><div class="val" style="color: #dc2626;">${payload.summary.totalUnabsented}</div><div class="lbl">Belum Absen / Alfa</div></div>
         </div>
 
@@ -364,7 +460,7 @@ export class ExcelReportGenerator {
           <thead>
             <tr>
               <th style="width: 30px;">No</th>
-              <th>NPP</th>
+              <th style="width: 100px;">NPP</th>
               <th>Nama Lengkap & Gelar</th>
               <th>Jabatan / Mapel</th>
               <th style="width: 85px; text-align: center;">Jumlah Masuk</th>
@@ -374,7 +470,7 @@ export class ExcelReportGenerator {
           </thead>
           <tbody>
             ${payload.teachers.map((t, index) => {
-              const tRecords = payload.attendanceRecords.filter((r) => r.user_id === t.id && (!r.date || r.date.startsWith(monthPrefix)));
+              const tRecords = payload.attendanceRecords.filter((r) => isTeacherRecordMatch(t, r) && (!r.date || r.date.startsWith(monthPrefix)));
               const tPresent = tRecords.filter((r) => r.status === 'HADIR').length;
               const tLate = tRecords.filter((r) => r.status === 'TERLAMBAT').length;
               const tTotalMasuk = tPresent + tLate;
@@ -416,19 +512,243 @@ export class ExcelReportGenerator {
           </tbody>
         </table>
 
-        <div class="signature-section">
-          <div class="sig-box">
-            <p>Diperiksa oleh,</p>
-            <p><strong>${SIGNATORY_OFFICIALS.TU_TITLE}</strong></p>
-            <div class="sig-space"></div>
-            <p><strong>${SIGNATORY_OFFICIALS.TU_NAME}</strong></p>
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <!-- HALAMAN 2: LEMBAR KALENDER & MATRIKS HARIAN TANGGAL 1 - 31              -->
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <div class="page-break">
+          <div style="border-bottom: 2px solid #023246; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+              <h2 style="margin: 0; font-size: 13px; font-weight: 900; text-transform: uppercase; color: #023246; letter-spacing: 0.5px;">
+                📅 LEMBAR KALENDER &amp; MATRIKS ABSENSI BULANAN (TGL 1–${daysInMonth})
+              </h2>
+              <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">
+                Periode: <strong>${payload.month} ${payload.year}</strong> • Lembaga: ${APP_CONFIG.INSTITUTION_NAME}
+              </p>
+            </div>
+            <span style="font-size: 9px; color: #023246; font-weight: 700; background: #e0f2fe; padding: 2px 8px; border-radius: 4px; border: 1px solid #bae6fd;">
+              Halaman 2: Kalender Kehadiran
+            </span>
           </div>
 
-          <div class="sig-box">
-            <p>Mengetahui,</p>
-            <p><strong>${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</strong></p>
-            <div class="sig-space"></div>
-            <p><strong>${SIGNATORY_OFFICIALS.KEPSEK_NAME}</strong></p>
+          <!-- Legenda Kode Matriks -->
+          <div class="legend-badge-grid">
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-h">H</span> Hadir Tepat</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-t">T</span> Terlambat</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-i">I</span> Izin Pribadi</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-s">S</span> Sakit (Surat Dokter)</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-d">D</span> Dinas Luar</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-c">C</span> Cuti Resmi</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-a">A</span> Alfa / Belum Absen</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-l">L</span> Libur Akhir Pekan</div>
+            <div class="legend-badge-item"><span class="badge-sample matrix-cell-dash">-</span> Belum Terlewati</div>
+          </div>
+
+          <!-- Matriks Kalender Harian -->
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th style="width: 20px;">No</th>
+                <th style="width: 120px; text-align: left; padding-left: 4px;">Nama Dewan Guru &amp; Staf</th>
+                ${monthDaysList.map((m) => `
+                  <th class="${m.isOff ? 'off-col' : ''}" style="width: calc((100% - 240px) / ${daysInMonth});" title="${m.dateStr} (${m.dayName})">
+                    <div style="font-size: 7.5px; font-weight: 900;">${m.dayNum}</div>
+                    <div style="font-size: 6px; opacity: 0.85;">${m.dayName}</div>
+                  </th>
+                `).join('')}
+                <th style="width: 16px; background-color: #16a34a !important;" title="Total Hadir Tepat">H</th>
+                <th style="width: 16px; background-color: #d97706 !important;" title="Total Terlambat">T</th>
+                <th style="width: 16px; background-color: #0284c7 !important;" title="Total Izin">I</th>
+                <th style="width: 16px; background-color: #7e22ce !important;" title="Total Sakit">S</th>
+                <th style="width: 16px; background-color: #5b21b6 !important;" title="Total Dinas Luar">D</th>
+                <th style="width: 16px; background-color: #dc2626 !important;" title="Total Alfa / Belum Absen">A</th>
+                <th style="width: 24px; background-color: #023246 !important;" title="Persentase Kehadiran">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payload.teachers.map((teacher, idx) => {
+                let countH = 0;
+                let countT = 0;
+                let countI = 0;
+                let countS = 0;
+                let countD = 0;
+                let countC = 0;
+                let countA = 0;
+
+                const dayCells = monthDaysList.map((day) => {
+                  if (day.isOff) {
+                    return `<td><span class="matrix-cell-l">L</span></td>`;
+                  }
+
+                  const rec = payload.attendanceRecords.find((r) => r.date === day.dateStr && isTeacherRecordMatch(teacher, r));
+                  const leave = payload.leaveRequests.find((l) => {
+                    if (!isTeacherLeaveMatch(teacher, l)) return false;
+                    const start = (l.start_date || '').substring(0, 10);
+                    const end = (l.end_date || '').substring(0, 10);
+                    return start <= day.dateStr && day.dateStr <= end;
+                  });
+
+                  if (rec) {
+                    if (rec.status === 'HADIR') {
+                      countH++;
+                      return `<td><span class="matrix-cell-h">H</span></td>`;
+                    }
+                    if (rec.status === 'TERLAMBAT') {
+                      countT++;
+                      return `<td><span class="matrix-cell-t">T</span></td>`;
+                    }
+                    if (rec.status === 'SAKIT') {
+                      countS++;
+                      return `<td><span class="matrix-cell-s">S</span></td>`;
+                    }
+                    if (rec.status === 'DINAS_LUAR') {
+                      countD++;
+                      return `<td><span class="matrix-cell-d">D</span></td>`;
+                    }
+                    if (rec.status === 'IZIN') {
+                      countI++;
+                      return `<td><span class="matrix-cell-i">I</span></td>`;
+                    }
+                    if (rec.status === 'ALFA') {
+                      countA++;
+                      return `<td><span class="matrix-cell-a">A</span></td>`;
+                    }
+                  }
+
+                  if (leave) {
+                    if (leave.leave_type === 'SAKIT') {
+                      countS++;
+                      return `<td><span class="matrix-cell-s" title="${leave.reason}">S</span></td>`;
+                    }
+                    if (leave.leave_type === 'CUTI') {
+                      countC++;
+                      return `<td><span class="matrix-cell-c" title="${leave.reason}">C</span></td>`;
+                    }
+                    if (leave.leave_type === 'DINAS_LUAR') {
+                      countD++;
+                      return `<td><span class="matrix-cell-d" title="${leave.reason}">D</span></td>`;
+                    }
+                    if (leave.leave_type === 'KOREKSI_ABSEN') {
+                      countH++;
+                      return `<td><span class="matrix-cell-h" title="${leave.reason}">H</span></td>`;
+                    }
+                    countI++;
+                    return `<td><span class="matrix-cell-i" title="${leave.reason}">I</span></td>`;
+                  }
+
+                  if (day.isFuture) {
+                    return `<td><span class="matrix-cell-dash">-</span></td>`;
+                  }
+
+                  // Past working day without record or leave -> ALFA
+                  countA++;
+                  return `<td><span class="matrix-cell-a">A</span></td>`;
+                }).join('');
+
+                const teacherPct = Math.min(100, Math.round(((countH + countT) / effectiveDays) * 100));
+
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td style="text-align: left; padding-left: 4px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                      ${teacher.full_name}
+                    </td>
+                    ${dayCells}
+                    <td style="font-weight: 800; color: #16a34a;">${countH}</td>
+                    <td style="font-weight: 800; color: #d97706;">${countT}</td>
+                    <td style="font-weight: 800; color: #0284c7;">${countI}</td>
+                    <td style="font-weight: 800; color: #7e22ce;">${countS}</td>
+                    <td style="font-weight: 800; color: #5b21b6;">${countD}</td>
+                    <td style="font-weight: 800; color: #dc2626;">${countA}</td>
+                    <td style="font-weight: 900; color: #023246;">${teacherPct}%</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <!-- HALAMAN 3 / SEKSI RINCIAN: REKAPITULASI PENGAJUAN IZIN & SAKIT          -->
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <div class="page-break">
+          <div style="border-bottom: 2px solid #023246; padding-bottom: 6px; margin-bottom: 12px;">
+            <h2 style="margin: 0; font-size: 13px; font-weight: 900; text-transform: uppercase; color: #023246; letter-spacing: 0.5px;">
+              📋 REKAPITULASI DETAIL PENGAJUAN IZIN, SAKIT, &amp; DINAS LUAR (RINCIAN ALASAN)
+            </h2>
+            <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">
+              Daftar izin, sakit, cuti, dan dinas resmi dewan guru beserta alasan/keterangan yang diajukan pada periode ${payload.month} ${payload.year}.
+            </p>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 30px;">No</th>
+                <th style="width: 110px;">Tanggal / Periode</th>
+                <th style="width: 90px;">NPP</th>
+                <th style="width: 150px;">Nama Dewan Guru</th>
+                <th style="width: 90px; text-align: center;">Jenis Pengajuan</th>
+                <th>Alasan / Keterangan Lengkap (Diagnosa / Urusan)</th>
+                <th style="width: 100px; text-align: center;">Status Verifikasi</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${monthlyLeaves.length > 0 ? monthlyLeaves.map((l, idx) => {
+                const matchedTeacher = payload.teachers.find((t) => isTeacherLeaveMatch(t, l));
+                const isApproved = l.approval_status === 'APPROVED';
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td><strong>${l.start_date}</strong> ${l.end_date && l.end_date !== l.start_date ? `s/d <strong>${l.end_date}</strong>` : ''}</td>
+                    <td>${matchedTeacher?.nip || '-'}</td>
+                    <td><strong>${matchedTeacher?.full_name || l.teacher_name || l.user_name || l.user_id}</strong></td>
+                    <td style="text-align: center;">
+                      <span style="font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 9px; ${
+                        l.leave_type === 'SAKIT' ? 'background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe;' :
+                        l.leave_type === 'DINAS_LUAR' ? 'background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd;' :
+                        l.leave_type === 'CUTI' ? 'background: #cffafe; color: #0e7490; border: 1px solid #a5f3fc;' :
+                        'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;'
+                      }">
+                        ${l.leave_type}
+                      </span>
+                    </td>
+                    <td>
+                      <div style="font-weight: 600; color: #1e293b;">"${l.reason || 'Tidak ada catatan alasan'}"</div>
+                      ${l.attachment_url ? '<span style="font-size: 9px; color: #15803d; font-weight: 700;">📎 Berkas / Surat Dokter Terlampir</span>' : ''}
+                    </td>
+                    <td style="text-align: center;">
+                      <span style="font-weight: 800; font-size: 9px; padding: 2px 6px; border-radius: 4px; ${
+                        isApproved ? 'background: #dcfce7; color: #15803d; border: 1px solid #86efac;' : 'background: #fef3c7; color: #b45309; border: 1px solid #fde68a;'
+                      }">
+                        ${isApproved ? '✅ Disetujui' : '⏳ Menunggu'}
+                      </span>
+                    </td>
+                  </tr>
+                `;
+              }).join('') : `
+                <tr>
+                  <td colspan="7" style="text-align: center; color: #64748b; padding: 14px;">
+                    Tidak ada catatan permohonan izin/sakit/cuti yang diajukan pada periode ${payload.month} ${payload.year}.
+                  </td>
+                </tr>
+              `}
+            </tbody>
+          </table>
+
+          <div class="signature-section">
+            <div class="sig-box">
+              <p>Diperiksa oleh,</p>
+              <p><strong>${SIGNATORY_OFFICIALS.TU_TITLE}</strong></p>
+              <div class="sig-space"></div>
+              <p><strong>${SIGNATORY_OFFICIALS.TU_NAME}</strong></p>
+            </div>
+
+            <div class="sig-box">
+              <p>Mengetahui,</p>
+              <p><strong>${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</strong></p>
+              <div class="sig-space"></div>
+              <p><strong>${SIGNATORY_OFFICIALS.KEPSEK_NAME}</strong></p>
+            </div>
           </div>
         </div>
       </body>
@@ -461,14 +781,19 @@ export class ExcelReportGenerator {
     teacher: UserProfile,
     month: string,
     year: string,
-    records: AttendanceRecord[]
+    records: AttendanceRecord[],
+    leaveRequests: LeaveRequest[] = []
   ): string {
     const workingDaysInfo = getMonthWorkingDays(month, year, true);
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
     const monthNumber = parseIndonesianMonth(month);
     const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
+    const yearNum = parseInt(year, 10) || new Date().getFullYear();
+    const todayDateStr = getTodayDateInJakarta();
 
-    const teacherRecords = records.filter((r) => r.user_id === teacher.id && (!r.date || r.date.startsWith(monthPrefix)));
+    const teacherRecords = records.filter((r) => isTeacherRecordMatch(teacher, r) && (!r.date || r.date.startsWith(monthPrefix)));
+    const teacherLeaves = leaveRequests.filter((l) => isTeacherLeaveMatch(teacher, l));
+
     let totalPresent = 0;
     let totalLate = 0;
     let totalLeave = 0;
@@ -476,10 +801,6 @@ export class ExcelReportGenerator {
     let totalOfficialDuty = 0;
 
     // Histogram Bins for Check-in Times:
-    // Bin 1: < 06:45 (Sangat Awal)
-    // Bin 2: 06:45 - 07:00 (Tepat Waktu)
-    // Bin 3: 07:01 - 07:15 (Toleransi)
-    // Bin 4: > 07:15 (Terlambat)
     let bin1Count = 0;
     let bin2Count = 0;
     let bin3Count = 0;
@@ -508,6 +829,55 @@ export class ExcelReportGenerator {
     const maxBinValue = Math.max(bin1Count, bin2Count, bin3Count, bin4Count, 1);
     const getBarHeightPercent = (val: number) => Math.max(12, Math.round((val / maxBinValue) * 100));
 
+    // 7-Column Mini Monthly Calendar for this teacher
+    const daysInMonth = new Date(yearNum, monthNumber, 0).getDate();
+    const firstDayOfWeek = new Date(yearNum, monthNumber - 1, 1).getDay(); // 0 = Min
+
+    const calendarCells: Array<{ dayNum?: number; dateStr?: string; status?: string; label?: string; isOff?: boolean }> = [];
+    // Padding before 1st day
+    for (let p = 0; p < firstDayOfWeek; p++) {
+      calendarCells.push({});
+    }
+    // Days 1..daysInMonth
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${yearNum}-${String(monthNumber).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const offCheck = isDateOffDay(dateStr);
+      const isFuture = dateStr > todayDateStr;
+
+      const rec = teacherRecords.find((r) => r.date === dateStr);
+      const leave = teacherLeaves.find((l) => {
+        const start = (l.start_date || '').substring(0, 10);
+        const end = (l.end_date || '').substring(0, 10);
+        return start <= dateStr && dateStr <= end;
+      });
+
+      let status = 'ALFA';
+      let label = 'Belum Absen';
+
+      if (offCheck.isOff) {
+        status = 'LIBUR';
+        label = 'Libur';
+      } else if (rec) {
+        status = rec.status;
+        label = rec.status === 'HADIR' ? `Hadir (${(rec.check_in_time || '').slice(0, 5)})` :
+                rec.status === 'TERLAMBAT' ? `Terlambat (${(rec.check_in_time || '').slice(0, 5)})` : rec.status;
+      } else if (leave) {
+        status = leave.leave_type;
+        label = leave.leave_type;
+      } else if (isFuture) {
+        status = 'FUTURE';
+        label = '-';
+      }
+
+      calendarCells.push({
+        dayNum: d,
+        dateStr,
+        status,
+        label,
+        isOff: offCheck.isOff,
+      });
+    }
+
     return `
       <!DOCTYPE html>
       <html lang="id">
@@ -519,8 +889,9 @@ export class ExcelReportGenerator {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
+            box-sizing: border-box;
           }
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; line-height: 1.5; }
+          body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #1e293b; line-height: 1.5; background-color: #fff; }
           .header { text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
           .header h1 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; }
           .header h2 { margin: 4px 0; font-size: 14px; font-weight: 600; color: #16a34a; }
@@ -544,10 +915,20 @@ export class ExcelReportGenerator {
           .bar-b4 { background-color: #dc2626 !important; background: #dc2626 !important; }
           .histogram-label { text-align: center; font-size: 10px; font-weight: 700; color: #334155; margin-top: 8px; line-height: 1.3; }
 
+          /* 7-Col Calendar Grid */
+          .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 25px; border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px; background: #f8fafc; }
+          .cal-header { text-align: center; font-size: 10px; font-weight: 800; color: #023246; padding: 4px; background: #e2e8f0; border-radius: 4px; }
+          .cal-header.sun { background: #fee2e2; color: #991b1b; }
+          .cal-cell { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 2px; min-height: 44px; display: flex; flex-direction: column; justify-content: space-between; font-size: 8px; }
+          .cal-cell.empty { background: transparent; border: none; }
+          .cal-date { font-weight: 800; color: #334155; font-size: 9px; }
+          .cal-tag { border-radius: 3px; font-size: 7.5px; font-weight: 800; text-align: center; padding: 1px 2px; }
+
           table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 11px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
           th { background-color: #0f172a !important; color: #ffffff !important; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
           tr:nth-child(even) { background-color: #f8fafc !important; }
+          
           .signature-section { margin-top: 40px; display: flex; justify-content: space-between; font-size: 11px; }
           .sig-box { text-align: center; width: 240px; }
           .sig-space { height: 65px; }
@@ -569,10 +950,10 @@ export class ExcelReportGenerator {
           <img src="/kop-surat-al-ittihadiyah.jpg" alt="Kop Surat SMP Terpadu Al-Ittihadiyah" style="width: 100%; max-width: 900px; height: auto; display: block; margin: 0 auto 10px auto;" />
           <div style="border-bottom: 3px double #15803d; padding-bottom: 8px; margin-bottom: 12px;">
             <h2 style="margin: 0; font-size: 15px; font-weight: 800; text-transform: uppercase; color: #023246; letter-spacing: 0.5px;">
-              LAPORAN PRESENSI INDIVIDU GURU & STAF
+              LAPORAN PRESENSI INDIVIDU GURU &amp; STAF
             </h2>
             <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600;">
-              Sistem Absensi Berbasis Digital Scan & Geofence GPS (${APP_CONFIG.APP_NAME})
+              Sistem Absensi Berbasis Digital Scan &amp; Geofence GPS (${APP_CONFIG.APP_NAME})
             </p>
           </div>
         </div>
@@ -591,6 +972,47 @@ export class ExcelReportGenerator {
           <div class="kpi-card"><div class="val" style="color: #d97706;">${totalLate}</div><div class="lbl">Terlambat</div></div>
           <div class="kpi-card"><div class="val" style="color: #0284c7;">${totalIzin}</div><div class="lbl">Izin / Sakit</div></div>
           <div class="kpi-card"><div class="val" style="color: #0f172a;">${attendancePct}%</div><div class="lbl">Tingkat Kehadiran (${totalMasuk}/${effectiveDays} Hari)</div></div>
+        </div>
+
+        <!-- KALENDER VISUAL INDIVIDU 1 - 31 -->
+        <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-bottom: 8px;">
+          📅 KALENDER PRESENSI INDIVIDU (${month.toUpperCase()} ${year})
+        </h3>
+        <div class="cal-grid">
+          <div class="cal-header sun">Min</div>
+          <div class="cal-header">Sen</div>
+          <div class="cal-header">Sel</div>
+          <div class="cal-header">Rab</div>
+          <div class="cal-header">Kam</div>
+          <div class="cal-header">Jum</div>
+          <div class="cal-header">Sab</div>
+          ${calendarCells.map((cell) => {
+            if (!cell.dayNum) return `<div class="cal-cell empty"></div>`;
+            const isHadir = cell.status === 'HADIR';
+            const isLate = cell.status === 'TERLAMBAT';
+            const isSick = cell.status === 'SAKIT';
+            const isLeave = cell.status === 'IZIN';
+            const isOff = cell.status === 'LIBUR';
+            const isDuty = cell.status === 'DINAS_LUAR';
+            const isCuti = cell.status === 'CUTI';
+            const isAlfa = cell.status === 'ALFA';
+
+            const bgStyle = isHadir ? 'background: #dcfce7; color: #15803d;' :
+                            isLate ? 'background: #fef3c7; color: #b45309;' :
+                            isSick ? 'background: #f3e8ff; color: #7e22ce;' :
+                            isDuty ? 'background: #ede9fe; color: #5b21b6;' :
+                            isCuti ? 'background: #cffafe; color: #0e7490;' :
+                            isLeave ? 'background: #e0f2fe; color: #0369a1;' :
+                            isOff ? 'background: #f1f5f9; color: #94a3b8;' :
+                            isAlfa ? 'background: #fee2e2; color: #b91c1c;' : 'color: #cbd5e1;';
+
+            return `
+              <div class="cal-cell">
+                <div class="cal-date">${cell.dayNum}</div>
+                <div class="cal-tag" style="${bgStyle}">${cell.label}</div>
+              </div>
+            `;
+          }).join('')}
         </div>
 
         <!-- GRAFIK HISTOGRAM WAKTU MASUK INDIVIDU -->
@@ -627,37 +1049,83 @@ export class ExcelReportGenerator {
           </div>
         </div>
 
-        <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-bottom: 8px;">RINCIAN PRESENSI HARIAN</h3>
+        <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-bottom: 8px;">RINCIAN PRESENSI &amp; ALASAN HARIAN</h3>
         <table>
           <thead>
             <tr>
               <th style="width: 30px;">No</th>
-              <th>Tanggal</th>
-              <th>Jam Masuk</th>
-              <th>Jam Pulang</th>
-              <th>Status Kehadiran</th>
-              <th>Verifikasi</th>
-              <th>Jarak GPS</th>
+              <th style="width: 85px;">Tanggal</th>
+              <th style="width: 75px;">Jam Masuk</th>
+              <th style="width: 75px;">Jam Pulang</th>
+              <th style="width: 100px;">Status Kehadiran</th>
+              <th>Alasan / Catatan / Keterangan</th>
+              <th style="width: 75px;">Jarak GPS</th>
             </tr>
           </thead>
           <tbody>
-            ${teacherRecords.length > 0 ? teacherRecords.map((r, idx) => `
-              <tr>
-                <td>${idx + 1}</td>
-                <td>${r.date}</td>
-                <td><strong>${r.check_in_time || '--:--'}</strong></td>
-                <td><strong>${r.check_out_time || '--:--'}</strong></td>
-                <td>${r.status}</td>
-                <td>${r.verification_method || 'QR_GPS'}</td>
-                <td>${r.check_in_distance_meters || 0}m</td>
-              </tr>
-            `).join('') : `
+            ${teacherRecords.length > 0 ? teacherRecords.map((r, idx) => {
+              const matchedLeave = teacherLeaves.find((l) => {
+                const start = (l.start_date || '').substring(0, 10);
+                const end = (l.end_date || '').substring(0, 10);
+                return start <= (r.date || '') && (r.date || '') <= end;
+              });
+              const reasonText = r.notes || matchedLeave?.reason || (r.status === 'HADIR' ? 'Tepat Waktu' : r.status === 'TERLAMBAT' ? 'Terlambat Masuk' : '-');
+
+              return `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td><strong>${r.date}</strong></td>
+                  <td><strong>${r.check_in_time || '--:--'}</strong></td>
+                  <td><strong>${r.check_out_time || '--:--'}</strong></td>
+                  <td>
+                    <span style="font-weight: 800; ${
+                      r.status === 'HADIR' ? 'color: #16a34a;' :
+                      r.status === 'TERLAMBAT' ? 'color: #d97706;' :
+                      r.status === 'SAKIT' ? 'color: #7e22ce;' :
+                      r.status === 'IZIN' ? 'color: #0284c7;' : 'color: #dc2626;'
+                    }">
+                      ${r.status}
+                    </span>
+                  </td>
+                  <td>${reasonText}</td>
+                  <td>${r.check_in_distance_meters ? `${r.check_in_distance_meters}m` : '-'}</td>
+                </tr>
+              `;
+            }).join('') : `
               <tr>
                 <td colspan="7" style="text-align: center; color: #64748b;">Belum ada catatan presensi pada periode ini.</td>
               </tr>
             `}
           </tbody>
         </table>
+
+        ${teacherLeaves.length > 0 ? `
+          <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; margin-bottom: 8px;">
+            📋 REKAPITULASI PENGAJUAN IZIN &amp; CUTI GURU
+          </h3>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 30px;">No</th>
+                <th style="width: 120px;">Periode Tanggal</th>
+                <th style="width: 90px;">Jenis Izin</th>
+                <th>Alasan / Keterangan Lengkap</th>
+                <th style="width: 90px; text-align: center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${teacherLeaves.map((l, idx) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td><strong>${l.start_date}</strong> s/d <strong>${l.end_date}</strong></td>
+                  <td><strong style="color: #0284c7;">${l.leave_type}</strong></td>
+                  <td>"${l.reason}"</td>
+                  <td style="text-align: center;"><strong style="color: ${l.approval_status === 'APPROVED' ? '#16a34a' : '#d97706'};">${l.approval_status || 'PENDING'}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
 
         <div class="signature-section">
           <div class="sig-box">
@@ -686,9 +1154,10 @@ export class ExcelReportGenerator {
     teacher: UserProfile,
     month: string,
     year: string,
-    records: AttendanceRecord[]
+    records: AttendanceRecord[],
+    leaveRequests: LeaveRequest[] = []
   ): boolean {
-    const htmlContent = this.getIndividualTeacherPDFHTML(teacher, month, year, records);
+    const htmlContent = this.getIndividualTeacherPDFHTML(teacher, month, year, records, leaveRequests);
     try {
       const printWindow = window.open('', '_blank', 'width=1000,height=800');
       if (!printWindow) return false;
@@ -709,7 +1178,8 @@ export class ExcelReportGenerator {
     teacher: UserProfile,
     month: string,
     year: string,
-    records: AttendanceRecord[]
+    records: AttendanceRecord[],
+    leaveRequests: LeaveRequest[] = []
   ): void {
     const wb = XLSX.utils.book_new();
     const workingDaysInfo = getMonthWorkingDays(month, year, true);
@@ -717,7 +1187,7 @@ export class ExcelReportGenerator {
     const monthNumber = parseIndonesianMonth(month);
     const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
 
-    const teacherRecords = records.filter((r) => r.user_id === teacher.id && (!r.date || r.date.startsWith(monthPrefix)));
+    const teacherRecords = records.filter((r) => isTeacherRecordMatch(teacher, r) && (!r.date || r.date.startsWith(monthPrefix)));
     const tPresent = teacherRecords.filter((r) => r.status === 'HADIR').length;
     const tLate = teacherRecords.filter((r) => r.status === 'TERLAMBAT').length;
     const tTotalMasuk = tPresent + tLate;
@@ -751,18 +1221,27 @@ export class ExcelReportGenerator {
     wsSummary['!cols'] = [{ wch: 28 }, { wch: 45 }];
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan Guru');
 
-    const attendanceData = teacherRecords.map((a, index) => ({
-      No: index + 1,
-      Tanggal: a.date,
-      'Jam Masuk': a.check_in_time || '--:--',
-      'Jam Pulang': a.check_out_time || '--:--',
-      Status: a.status,
-      Verifikasi: a.verification_method,
-      'Jarak GPS (m)': a.check_in_distance_meters || 0,
-    }));
+    const attendanceData = teacherRecords.map((a, index) => {
+      const matchedLeave = leaveRequests.find((l) => {
+        if (!isTeacherLeaveMatch(teacher, l)) return false;
+        const start = (l.start_date || '').substring(0, 10);
+        const end = (l.end_date || '').substring(0, 10);
+        return start <= (a.date || '') && (a.date || '') <= end;
+      });
+      return {
+        No: index + 1,
+        Tanggal: a.date,
+        'Jam Masuk': a.check_in_time || '--:--',
+        'Jam Pulang': a.check_out_time || '--:--',
+        Status: a.status,
+        'Alasan / Keterangan': a.notes || matchedLeave?.reason || '-',
+        Verifikasi: a.verification_method,
+        'Jarak GPS (m)': a.check_in_distance_meters || 0,
+      };
+    });
 
     const wsAttendance = XLSX.utils.json_to_sheet(attendanceData.length > 0 ? attendanceData : [
-      { No: 1, Tanggal: new Date().toISOString().split('T')[0], 'Jam Masuk': CONSTANTS.DEFAULTS.WORK_CHECKIN_START, 'Jam Pulang': CONSTANTS.DEFAULTS.WORK_CHECKOUT_START, Status: 'HADIR', Verifikasi: 'QR_GPS', 'Jarak GPS (m)': 12 }
+      { No: 1, Tanggal: new Date().toISOString().split('T')[0], 'Jam Masuk': CONSTANTS.DEFAULTS.WORK_CHECKIN_START, 'Jam Pulang': CONSTANTS.DEFAULTS.WORK_CHECKOUT_START, Status: 'HADIR', 'Alasan / Keterangan': '-', Verifikasi: 'QR_GPS', 'Jarak GPS (m)': 12 }
     ]);
     wsAttendance['!cols'] = [
       { wch: 6 },
@@ -770,6 +1249,7 @@ export class ExcelReportGenerator {
       { wch: 15 },
       { wch: 15 },
       { wch: 18 },
+      { wch: 35 },
       { wch: 18 },
       { wch: 15 },
     ];

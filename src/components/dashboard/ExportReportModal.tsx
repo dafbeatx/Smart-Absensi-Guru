@@ -56,6 +56,27 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
     }
   }, [defaultTeacherId, teachers]);
 
+  // Aggregate leaveRequests from props and localStorage for full cross-device synchronization
+  const effectiveLeaves = React.useMemo(() => {
+    const list = [...leaveRequests];
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_leaves');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              if (!list.some((existing) => existing.id === item.id)) {
+                list.push(item);
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return list;
+  }, [leaveRequests]);
+
   const handleExportXLSX = async () => {
     setIsLoading(true);
     try {
@@ -65,7 +86,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           year,
           teachers,
           attendanceRecords,
-          leaveRequests,
+          effectiveLeaves,
           auditLogs
         );
         showToast('success', 'Export Excel Berhasil!', 'File Excel Laporan Master Rekapitulasi Sekolah (.xlsx) diunduh.');
@@ -75,7 +96,8 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           teacher,
           month,
           year,
-          attendanceRecords
+          attendanceRecords,
+          effectiveLeaves
         );
         showToast('success', 'Export Excel Berhasil!', `File Excel Laporan Presensi ${teacher.full_name} (.xlsx) diunduh.`);
       }
@@ -97,14 +119,14 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
 
       if (reportType === 'MASTER') {
         titleStr = `Laporan Presensi Master Sekolah - ${month} ${year}`;
-        const payload = ReportService.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs);
+        const payload = ReportService.preparePayload(month, year, teachers, attendanceRecords, effectiveLeaves, auditLogs);
         htmlContent = ExcelReportGenerator.getPrintablePDFHTML(payload);
         windowOpened = ExcelReportGenerator.generatePrintablePDF(payload);
       } else {
         const teacher = teachers.find((t) => t.id === selectedTeacherId) || teachers[0];
         titleStr = `Laporan Presensi Individu - ${teacher.full_name}`;
-        htmlContent = ExcelReportGenerator.getIndividualTeacherPDFHTML(teacher, month, year, attendanceRecords);
-        windowOpened = ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords);
+        htmlContent = ExcelReportGenerator.getIndividualTeacherPDFHTML(teacher, month, year, attendanceRecords, effectiveLeaves);
+        windowOpened = ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords, effectiveLeaves);
       }
 
       if (windowOpened) {

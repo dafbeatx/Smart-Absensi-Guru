@@ -688,6 +688,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         onClose={() => setIsExportModalOpen(false)}
         teachers={teachers}
         attendanceRecords={attendanceRecords}
+        leaveRequests={allLeaves.length > 0 ? allLeaves : pendingRequests}
       />
 
       {/* Dev Suite Unit Test Runner Modal */}

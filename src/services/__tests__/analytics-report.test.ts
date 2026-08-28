@@ -146,21 +146,24 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     julyWorkingDays.workingDates.length === 23
   );
 
-  // Test 7: Master PDF HTML Visual Attendance Non-100% Calculation
+  // Test 7: Master PDF HTML Visual Attendance Non-100% Calculation & Calendar Sheet
   const pdfHTML = ExcelReportGenerator.getPrintablePDFHTML(reportPayload);
   assert(
     'Report Engine - Visual Attendance Progress Bar Calculation',
     pdfHTML.includes('Visual Kehadiran') &&
     pdfHTML.includes('progress-bar-fill') &&
-    pdfHTML.includes('Hari Kerja')
+    pdfHTML.includes('Hari Kerja') &&
+    pdfHTML.includes('LEMBAR KALENDER &amp; MATRIKS ABSENSI BULANAN') &&
+    pdfHTML.includes('REKAPITULASI DETAIL PENGAJUAN IZIN')
   );
 
-  // Test 8: Individual Teacher PDF & Excel Accurate Working Days
-  const indPDF = ExcelReportGenerator.getIndividualTeacherPDFHTML(mockTeachers[0], 'Juli', '2026', mockAttendance);
+  // Test 8: Individual Teacher PDF & Excel Accurate Working Days with Calendar Grid & Reasons
+  const indPDF = ExcelReportGenerator.getIndividualTeacherPDFHTML(mockTeachers[0], 'Juli', '2026', mockAttendance, pendingLeaveList);
   assert(
     'Report Engine - Individual Teacher PDF Attendance Ratio',
     indPDF.includes('Tingkat Kehadiran') &&
-    indPDF.includes('Ahmad Hidayat')
+    indPDF.includes('Ahmad Hidayat') &&
+    indPDF.includes('KALENDER PRESENSI INDIVIDU')
   );
 
   // Test 9: Burnout Analytics - Monthly isolation resets to 0 on empty month

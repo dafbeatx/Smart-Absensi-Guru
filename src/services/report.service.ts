@@ -1,8 +1,8 @@
-import { ExcelReportGenerator } from '../lib/excel-generator.lib';
+import { ExcelReportGenerator, isTeacherLeaveMatch, isTeacherRecordMatch } from '../lib/excel-generator.lib';
 import type { MultiSheetReportPayload } from '../lib/excel-generator.lib';
 import { AnalyticsService } from './analytics.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog } from '../types/database.types';
-import { getTodayDateInJakarta, getMonthWorkingDays, parseIndonesianMonth } from '../utils/time.utils';
+import { getTodayDateInJakarta, getMonthWorkingDays, parseIndonesianMonth, isDateOffDay } from '../utils/time.utils';
 
 export class ReportService {
   public static preparePayload(
@@ -10,34 +10,83 @@ export class ReportService {
     year: string,
     teachers: UserProfile[],
     attendanceRecords: AttendanceRecord[],
-    leaveRequests: LeaveRequest[],
-    auditLogs: AuditLog[]
+    leaveRequests: LeaveRequest[] = [],
+    auditLogs: AuditLog[] = []
   ): MultiSheetReportPayload {
     const workingDaysInfo = getMonthWorkingDays(month, year, true);
     const monthNumber = parseIndonesianMonth(month);
-    const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
+    const yearNum = parseInt(year, 10) || new Date().getFullYear();
+    const todayDateStr = getTodayDateInJakarta();
 
     const activeTeachers = AnalyticsService.getAttendanceEligibleUsers(teachers);
     const totalTeachers = activeTeachers.length;
     const effectiveDays = Math.max(1, workingDaysInfo.effectiveWorkingDays);
     const totalExpectedCapacity = totalTeachers * effectiveDays;
 
-    const monthlyAttendance = attendanceRecords.filter(
-      (r) => r.date && r.date.startsWith(monthPrefix)
-    );
+    // Gather all leaves from arguments and localStorage if available
+    const allLeaves: LeaveRequest[] = [...leaveRequests];
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_leaves');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              if (!allLeaves.some((existing) => existing.id === item.id)) {
+                allLeaves.push(item);
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
 
     let totalPresent = 0;
     let totalLate = 0;
     let totalLeave = 0;
     let totalSick = 0;
     let totalOfficialDuty = 0;
+    let totalAlfa = 0;
+    let totalPendingLeave = 0;
 
-    for (const rec of monthlyAttendance) {
-      if (rec.status === 'HADIR') totalPresent++;
-      else if (rec.status === 'TERLAMBAT') totalLate++;
-      else if (rec.status === 'IZIN') totalLeave++;
-      else if (rec.status === 'SAKIT') totalSick++;
-      else if (rec.status === 'DINAS_LUAR') totalOfficialDuty++;
+    // Days in Month for accurate day-by-day calculation
+    const daysInMonth = new Date(yearNum, monthNumber, 0).getDate();
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${yearNum}-${String(monthNumber).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const offCheck = isDateOffDay(dateStr);
+      if (offCheck.isOff || dateStr > todayDateStr) {
+        continue; // Skip holidays, weekends, and future days
+      }
+
+      for (const teacher of activeTeachers) {
+        const rec = attendanceRecords.find((r) => r.date === dateStr && isTeacherRecordMatch(teacher, r));
+        const leave = allLeaves.find((l) => {
+          if (!isTeacherLeaveMatch(teacher, l)) return false;
+          const start = (l.start_date || '').substring(0, 10);
+          const end = (l.end_date || '').substring(0, 10);
+          return start <= dateStr && dateStr <= end;
+        });
+
+        if (rec) {
+          if (rec.status === 'HADIR') totalPresent++;
+          else if (rec.status === 'TERLAMBAT') totalLate++;
+          else if (rec.status === 'SAKIT') totalSick++;
+          else if (rec.status === 'DINAS_LUAR') totalOfficialDuty++;
+          else if (rec.status === 'IZIN') totalLeave++;
+          else if (rec.status === 'ALFA') totalAlfa++;
+        } else if (leave) {
+          if (leave.approval_status === 'PENDING' || leave.approval_status === 'SUBMITTED' || leave.approval_status === 'UNDER_REVIEW') {
+            totalPendingLeave++;
+          }
+          if (leave.leave_type === 'SAKIT') totalSick++;
+          else if (leave.leave_type === 'DINAS_LUAR') totalOfficialDuty++;
+          else if (leave.leave_type === 'CUTI' || leave.leave_type === 'IZIN') totalLeave++;
+          else if (leave.leave_type === 'KOREKSI_ABSEN') totalPresent++;
+        } else {
+          totalAlfa++;
+        }
+      }
     }
 
     const totalActualMasuk = totalPresent + totalLate;
@@ -49,15 +98,15 @@ export class ReportService {
         : 0;
 
     const summary = {
-      date: getTodayDateInJakarta(),
+      date: todayDateStr,
       totalTeachers,
       totalPresent,
       totalLate,
       totalLeave,
       totalSick,
       totalOfficialDuty,
-      totalPendingLeave: 0,
-      totalAlfa: 0,
+      totalPendingLeave,
+      totalAlfa,
       totalUnabsented,
       attendancePercentage,
     };
@@ -66,9 +115,9 @@ export class ReportService {
       month,
       year,
       summary,
-      teachers,
+      teachers: activeTeachers.length > 0 ? activeTeachers : teachers,
       attendanceRecords,
-      leaveRequests,
+      leaveRequests: allLeaves,
       auditLogs,
       workingDaysInfo,
     };
@@ -82,8 +131,8 @@ export class ReportService {
     year: string,
     teachers: UserProfile[],
     attendanceRecords: AttendanceRecord[],
-    leaveRequests: LeaveRequest[],
-    auditLogs: AuditLog[]
+    leaveRequests: LeaveRequest[] = [],
+    auditLogs: AuditLog[] = []
   ): Promise<boolean> {
     const payload = this.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs);
     ExcelReportGenerator.generateMultiSheetXLSX(payload);
@@ -98,8 +147,8 @@ export class ReportService {
     year: string,
     teachers: UserProfile[],
     attendanceRecords: AttendanceRecord[],
-    leaveRequests: LeaveRequest[],
-    auditLogs: AuditLog[]
+    leaveRequests: LeaveRequest[] = [],
+    auditLogs: AuditLog[] = []
   ): Promise<boolean> {
     const payload = this.preparePayload(month, year, teachers, attendanceRecords, leaveRequests, auditLogs);
     ExcelReportGenerator.generatePrintablePDF(payload);
@@ -113,9 +162,10 @@ export class ReportService {
     teacher: UserProfile,
     month: string,
     year: string,
-    attendanceRecords: AttendanceRecord[]
+    attendanceRecords: AttendanceRecord[],
+    leaveRequests: LeaveRequest[] = []
   ): Promise<boolean> {
-    ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords);
+    ExcelReportGenerator.generateIndividualTeacherPDF(teacher, month, year, attendanceRecords, leaveRequests);
     return true;
   }
 
@@ -126,9 +176,10 @@ export class ReportService {
     teacher: UserProfile,
     month: string,
     year: string,
-    attendanceRecords: AttendanceRecord[]
+    attendanceRecords: AttendanceRecord[],
+    leaveRequests: LeaveRequest[] = []
   ): Promise<boolean> {
-    ExcelReportGenerator.generateIndividualTeacherXLSX(teacher, month, year, attendanceRecords);
+    ExcelReportGenerator.generateIndividualTeacherXLSX(teacher, month, year, attendanceRecords, leaveRequests);
     return true;
   }
 }
