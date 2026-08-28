@@ -17,7 +17,7 @@ import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { AnalyticsService } from '../../../services/analytics.service';
 import type { HistoricalUnabsentedRecord } from '../../../services/analytics.service';
-import type { LeaveRequest, UserProfile, AttendanceRecord } from '../../../types/database.types';
+import type { LeaveRequest, UserProfile, AttendanceRecord, HolidayRecord } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 
 export interface KepsekDashboardPageProps {
@@ -242,6 +242,34 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     enabled: !!user?.id,
   });
 
+  const [holidays, setHolidays] = useState<HolidayRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('smart_absensi_holidays');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const fetchHolidaysFromBackend = async () => {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const fetched = await provider.getHolidays();
+      if (fetched) {
+        setHolidays(fetched);
+        localStorage.setItem('smart_absensi_holidays', JSON.stringify(fetched));
+      }
+    } catch (err) {
+      console.warn('Kepsek fetch holidays error:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchHolidaysFromBackend();
+    window.addEventListener('smart_absensi_holidays_updated', fetchHolidaysFromBackend);
+    return () => window.removeEventListener('smart_absensi_holidays_updated', fetchHolidaysFromBackend);
+  }, []);
+
   const todayStr = getTodayDateInJakarta();
   const [unabsentedFilterScope, setUnabsentedFilterScope] = useState<
     'TODAY' | 'PAST_DAYS' | 'ALFA' | 'ALL_7_DAYS'
@@ -252,20 +280,23 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     todayStr,
     teachers,
     attendanceRecords,
-    allLeaves
+    allLeaves,
+    null,
+    holidays
   );
 
-  // Dynamic calculation of historical unabsented & ALFA teachers (Last 7 school days)
+  // Dynamic calculation of historical unabsented & ALFA teachers across the full month
   const historicalUnabsented: HistoricalUnabsentedRecord[] = useMemo(() => {
     return AnalyticsService.getHistoricalUnabsentedTeachers(
       teachers,
       attendanceRecords,
       allLeaves,
       null,
-      null,
-      7
+      holidays,
+      'FULL_MONTH',
+      todayStr
     );
-  }, [teachers, attendanceRecords, allLeaves]);
+  }, [teachers, attendanceRecords, allLeaves, holidays, todayStr]);
 
   const historicalPastOnly: HistoricalUnabsentedRecord[] = useMemo(() => {
     return historicalUnabsented.filter((h: HistoricalUnabsentedRecord) => h.date !== todayStr);
@@ -488,9 +519,9 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
                 {[
                   { id: 'TODAY', label: `Hari Ini (${unabsentedTeachers.length})` },
+                  { id: 'ALL_7_DAYS', label: `Bulan Ini: Semua (${historicalUnabsented.length})` },
                   { id: 'PAST_DAYS', label: `Hari-Hari Kemarin (${historicalPastOnly.length})` },
                   { id: 'ALFA', label: `Tanpa Keterangan (${historicalAlfaOnly.length})` },
-                  { id: 'ALL_7_DAYS', label: `Semua 7 Hari Terakhir (${historicalUnabsented.length})` },
                 ].map((st) => (
                   <button
                     key={st.id}

@@ -250,6 +250,23 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     holidayPDF.includes('matrix-cell-l') && holidayPDF.includes('Libur Khusus Sekolah')
   );
 
+  // Test 12: Historical Unabsented Full Month Scope Excludes Holidays and Weekends
+  const unabsentedFullMonth = AnalyticsService.getHistoricalUnabsentedTeachers(
+    mockTeachers,
+    [],
+    [],
+    null,
+    customHoliday,
+    'FULL_MONTH',
+    '2026-08-28'
+  );
+  const containsHoliday17 = unabsentedFullMonth.some((u) => u.date === '2026-08-17');
+  const containsHoliday28 = unabsentedFullMonth.some((u) => u.date === '2026-08-28');
+  assert(
+    'Historical Unabsented - Full Month Scope strictly excludes national/school holidays from Alfa/Belum Absen list',
+    !containsHoliday17 && !containsHoliday28 && unabsentedFullMonth.length > 0
+  );
+
   return { passed, failed, results };
 };
 

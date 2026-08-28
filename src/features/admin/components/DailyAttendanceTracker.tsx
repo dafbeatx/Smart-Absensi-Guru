@@ -131,7 +131,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     );
   }, [selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, systemSettings, holidays]);
 
-  // Historical Unabsented & ALFA records (Past 7 workdays)
+  const [unabsentedScope, setUnabsentedScope] = useState<'FULL_MONTH' | 7 | 14 | 30>('FULL_MONTH');
+
+  // Historical Unabsented & ALFA records (Bulan Berjalan / Seluruh Hari Kerja Efektif)
   const historicalUnabsented = useMemo(() => {
     return AnalyticsService.getHistoricalUnabsentedTeachers(
       teachers,
@@ -139,9 +141,10 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       allLeavesToEvaluate,
       systemSettings,
       holidays,
-      7
+      unabsentedScope,
+      selectedDate
     );
-  }, [teachers, attendanceRecords, allLeavesToEvaluate, systemSettings, holidays]);
+  }, [teachers, attendanceRecords, allLeavesToEvaluate, systemSettings, holidays, unabsentedScope, selectedDate]);
 
   // 2. Identify attendance state map for each personnel for selectedDate
   const teacherAttendanceMap = useMemo(() => {
@@ -888,38 +891,75 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         </div>
       </div>
 
-      {/* ── REKAP GURU BELUM ABSEN & ALFA HARI-HARI KEMARIN ─────────────────── */}
+      {/* ── REKAP GURU BELUM ABSEN & ALFA SATU BULAN BERJALAN ─────────────────── */}
       <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-card space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 font-extrabold text-[11px] rounded-full">
-                ⚠️ Audit Riwayat Hari-Hari Kemarin
+                ⚠️ Rekap Satu Bulan
               </span>
-              <span className="text-xs text-slate-400 font-medium">7 Hari Sekolah Terakhir</span>
+              <span className="text-xs text-slate-400 font-medium">
+                {unabsentedScope === 'FULL_MONTH' ? 'Semua Hari Kerja Bulan Berjalan (Tgl 1 s/d Hari Ini)' : `${unabsentedScope} Hari Terakhir`}
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                🏖️ Libur Kalender Dikecualikan
+              </span>
             </div>
             <h3 className="font-extrabold text-slate-900 text-sm sm:text-base mt-1">
-              Rekap Personel Belum Absen &amp; Tanpa Keterangan (Kemarin &amp; Hari Sebelumnya)
+              Rekap Personel Belum Absen &amp; Tanpa Keterangan (Satu Bulan)
             </h3>
             <p className="text-xs text-slate-500">
-              Daftar guru/staf yang belum melakukan absensi atau dialfakan pada hari kerja sebelumnya agar dapat ditindaklanjuti.
+              Daftar seluruh guru/staf yang belum melakukan absensi atau dialfakan pada hari kerja efektif bulan ini. Hari libur resmi sekolah otomatis tidak dihitung sebagai alfa.
             </p>
           </div>
-          <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-extrabold text-xs shrink-0 self-start sm:self-auto">
-            Total {historicalUnabsented.length} Catatan
-          </span>
+          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            {/* Scope Toggle */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-700">
+              <button
+                type="button"
+                onClick={() => setUnabsentedScope('FULL_MONTH')}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  unabsentedScope === 'FULL_MONTH' ? 'bg-[#023246] text-white shadow-xs' : 'hover:bg-slate-200'
+                }`}
+              >
+                📅 Seluruh Bulan
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnabsentedScope(7)}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  unabsentedScope === 7 ? 'bg-[#023246] text-white shadow-xs' : 'hover:bg-slate-200'
+                }`}
+              >
+                ⏱️ 7 Hari
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnabsentedScope(30)}
+                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  unabsentedScope === 30 ? 'bg-[#023246] text-white shadow-xs' : 'hover:bg-slate-200'
+                }`}
+              >
+                🗓️ 30 Hari
+              </button>
+            </div>
+            <span className="px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-extrabold text-xs shrink-0">
+              Total {historicalUnabsented.length} Catatan
+            </span>
+          </div>
         </div>
 
         {historicalUnabsented.length === 0 ? (
           <div className="p-8 text-center bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-2">
             <span className="text-3xl block">🎉</span>
-            <p className="font-bold text-emerald-900 text-sm">Semua Kehadiran Hari-Hari Kemarin Tertib</p>
+            <p className="font-bold text-emerald-900 text-sm">Semua Kehadiran Bulan Ini Tertib &amp; Lengkap</p>
             <p className="text-xs text-emerald-700">
-              Tidak ada guru yang terlewat absen tanpa keterangan pada 7 hari sekolah terakhir.
+              Tidak ada guru yang terlewat absen tanpa keterangan pada seluruh hari kerja efektif periode ini.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-1">
             {historicalUnabsented.map((item, idx) => (
               <div
                 key={`${item.teacher.id}_${item.date}_${idx}`}
