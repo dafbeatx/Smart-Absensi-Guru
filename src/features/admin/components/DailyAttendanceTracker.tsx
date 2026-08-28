@@ -2,6 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus, SystemSettings, RoleCode } from '../../../types/database.types';
 import { AnalyticsService } from '../../../services/analytics.service';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
+import { Modal } from '../../../components/ui/Modal';
+import { Button } from '../../../components/ui/Button';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { useToastStore } from '../../../store/useToastStore';
+import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { evaluateAttendanceStatus, isDateOffDay } from '../../../utils/time.utils';
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -15,7 +20,7 @@ export interface DailyAttendanceTrackerProps {
   onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
 }
 
-type StatusFilter = 'ALL' | 'HADIR' | 'TERLAMBAT' | 'IZIN_SAKIT' | 'ALFA' | 'BELUM_ABSEN';
+type StatusFilter = 'ALL' | 'HADIR' | 'TERLAMBAT' | 'IZIN_SAKIT' | 'PENDING_APPROVAL' | 'ALFA' | 'BELUM_ABSEN';
 type RoleFilter = 'ALL' | 'GURU' | 'PIMPINAN_ADMIN';
 
 export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
@@ -24,6 +29,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   leaveRequests = [],
   onOpenCorrectionModal,
 }) => {
+  const { token } = useAuthStore();
+  const { showToast } = useToastStore();
+
   const todayStr = useMemo(() => new Date().toISOString().substring(0, 10), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
@@ -33,6 +41,19 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
   const [resetModalTeacher, setResetModalTeacher] = useState<UserProfile | null>(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+
+  // Quick Review & Decision Modal for Pending Leave Requests
+  const [selectedReviewLeave, setSelectedReviewLeave] = useState<LeaveRequest | null>(null);
+  const [selectedReviewTeacher, setSelectedReviewTeacher] = useState<UserProfile | null>(null);
+  const [reviewNotes, setReviewNotes] = useState<string>('');
+  const [isReviewLoading, setIsReviewLoading] = useState<boolean>(false);
+  const [reviewErrorMsg, setReviewErrorMsg] = useState<string | null>(null);
+
+  // Attachment Preview Modal
+  const [selectedPreviewAttachment, setSelectedPreviewAttachment] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchSettings = () => {
@@ -63,7 +84,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         const saved = localStorage.getItem('smart_absensi_leaves');
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) list.push(...parsed);
+          if (Array.isArray(parsed)) {
+            // Deduplicate by ID
+            for (const item of parsed) {
+              if (!list.some((existing) => existing.id === item.id)) {
+                list.push(item);
+              }
+            }
+          }
         }
       } catch (e) {}
     }
@@ -93,14 +121,16 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       record?: AttendanceRecord;
       leave?: LeaveRequest;
       status: AttendanceStatus | 'BELUM_ABSEN';
+      leaveApprovalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED';
       checkInTime?: string;
       checkOutTime?: string;
       notes?: string;
+      attachmentUrl?: string | null;
     }>();
 
     // Helper to match personnel with leave request
     const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest) => {
-      if (leave.user_id === t.id || leave.user_id === t.nip || leave.user_id === t.full_name) return true;
+      if (leave.user_id === t.id || (t.nip && leave.user_id === t.nip) || leave.user_id === t.full_name) return true;
       if (leave.user_name && (leave.user_name === t.full_name || leave.user_name === t.id)) return true;
       if (leave.teacher_name && (leave.teacher_name === t.full_name || leave.teacher_name === t.id)) return true;
       if (leave.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
@@ -108,7 +138,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     };
 
     const isTeacherRecordMatch = (t: UserProfile, rec: AttendanceRecord) => {
-      if (rec.user_id === t.id || rec.user_id === t.nip || rec.user_id === t.full_name) return true;
+      if (rec.user_id === t.id || (t.nip && rec.user_id === t.nip) || rec.user_id === t.full_name) return true;
       if (rec.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
       return false;
     };
@@ -125,11 +155,26 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         return startStr <= selectedDate && selectedDate <= endStr;
       });
 
-      // 2. Check if personnel has explicit attendance record for selectedDate
+      // 2. Check if personnel has a PENDING leave application for selectedDate
+      const pendingLeave = allLeavesToEvaluate.find((l) => {
+        const isPending =
+          l.approval_status === 'PENDING' ||
+          l.approval_status === 'SUBMITTED' ||
+          l.approval_status === 'UNDER_REVIEW' ||
+          !l.approval_status;
+        if (!isPending) return false;
+        if (!isTeacherLeaveMatch(teacher, l)) return false;
+        const startStr = (l.start_date || '').substring(0, 10);
+        const endStr = (l.end_date || '').substring(0, 10);
+        return startStr <= selectedDate && selectedDate <= endStr;
+      });
+
+      // 3. Check if personnel has explicit attendance record for selectedDate
       const record = attendanceRecords.find(
         (r) => r.date === selectedDate && isTeacherRecordMatch(teacher, r)
       );
 
+      // Case 1: Approved Leave
       if (approvedLeave) {
         let status: AttendanceStatus = 'IZIN';
         let checkInTime: string | undefined = undefined;
@@ -167,16 +212,42 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           record,
           leave: approvedLeave,
           status,
+          leaveApprovalStatus: 'APPROVED',
           checkInTime: record?.check_in_time ? record.check_in_time.substring(0, 5) : checkInTime,
           checkOutTime: record?.check_out_time ? record.check_out_time.substring(0, 5) : checkOutTime,
           notes:
             approvedLeave.leave_type === 'KOREKSI_ABSEN'
               ? `Koreksi Disetujui: ${approvedLeave.reason}`
               : `Izin Disetujui: ${approvedLeave.reason}`,
+          attachmentUrl: approvedLeave.attachment_url,
         });
         continue;
       }
 
+      // Case 2: Pending Leave Application (Guru yang mengajukan izin/sakit/cuti)
+      if (pendingLeave) {
+        const leaveType = pendingLeave.leave_type;
+        const status: AttendanceStatus =
+          leaveType === 'SAKIT'
+            ? 'SAKIT'
+            : leaveType === 'DINAS_LUAR'
+            ? 'DINAS_LUAR'
+            : 'IZIN';
+
+        map.set(teacher.id, {
+          record,
+          leave: pendingLeave,
+          status,
+          leaveApprovalStatus: 'PENDING',
+          checkInTime: record?.check_in_time ? record.check_in_time.substring(0, 5) : undefined,
+          checkOutTime: record?.check_out_time ? record.check_out_time.substring(0, 5) : undefined,
+          notes: `Pengajuan ${leaveType}: ${pendingLeave.reason}`,
+          attachmentUrl: pendingLeave.attachment_url,
+        });
+        continue;
+      }
+
+      // Case 3: Explicit Scanned / Recorded Attendance
       if (record) {
         const effectiveStatus = evaluateAttendanceStatus(
           record.check_in_time,
@@ -193,7 +264,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         continue;
       }
 
-      // 3. Default to BELUM_ABSEN
+      // Case 4: Default to BELUM_ABSEN
       map.set(teacher.id, {
         status: 'BELUM_ABSEN',
       });
@@ -222,13 +293,15 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       // Status filter
       const item = teacherAttendanceMap.get(teacher.id);
       const status = item?.status || 'BELUM_ABSEN';
+      const isPending = item?.leaveApprovalStatus === 'PENDING';
 
       if (statusFilter === 'ALL') return true;
       if (statusFilter === 'HADIR') return status === 'HADIR';
       if (statusFilter === 'TERLAMBAT') return status === 'TERLAMBAT';
       if (statusFilter === 'IZIN_SAKIT') return status === 'IZIN' || status === 'SAKIT' || status === 'DINAS_LUAR';
+      if (statusFilter === 'PENDING_APPROVAL') return isPending;
       if (statusFilter === 'ALFA') return status === 'ALFA';
-      if (statusFilter === 'BELUM_ABSEN') return status === 'BELUM_ABSEN';
+      if (statusFilter === 'BELUM_ABSEN') return status === 'BELUM_ABSEN' && !isPending;
 
       return true;
     });
@@ -248,7 +321,53 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
   const isOffDayCheck = useMemo(() => isDateOffDay(selectedDate), [selectedDate]);
 
-  const getStatusBadge = (status: AttendanceStatus | 'BELUM_ABSEN') => {
+  // Status Badge Builder with full support for Pending and Approved Leaves
+  const getStatusBadge = (
+    status: AttendanceStatus | 'BELUM_ABSEN',
+    leave?: LeaveRequest,
+    leaveApprovalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED'
+  ) => {
+    // 1. Pending Leave Application (Menunggu Approval)
+    if (leaveApprovalStatus === 'PENDING' && leave) {
+      const typeLabel =
+        leave.leave_type === 'SAKIT'
+          ? '🤒 Pengajuan Sakit'
+          : leave.leave_type === 'CUTI'
+          ? '🏖️ Pengajuan Cuti'
+          : leave.leave_type === 'DINAS_LUAR'
+          ? '💼 Pengajuan Dinas'
+          : leave.leave_type === 'KOREKSI_ABSEN'
+          ? '✏️ Pengajuan Koreksi'
+          : '📝 Pengajuan Izin';
+
+      return (
+        <span className="px-2.5 py-1 bg-amber-100/90 text-amber-900 text-xs font-black rounded-full border border-amber-300 shadow-2xs flex items-center gap-1.5 animate-pulse">
+          <span>⏳</span>
+          <span>{typeLabel} (Menunggu Approval)</span>
+        </span>
+      );
+    }
+
+    // 2. Approved Leave
+    if (leaveApprovalStatus === 'APPROVED' && leave) {
+      const typeLabel =
+        leave.leave_type === 'SAKIT'
+          ? '🏥 Sakit (Disetujui)'
+          : leave.leave_type === 'CUTI'
+          ? '🏖️ Cuti (Disetujui)'
+          : leave.leave_type === 'DINAS_LUAR'
+          ? '💼 Dinas Luar (Disetujui)'
+          : leave.leave_type === 'KOREKSI_ABSEN'
+          ? '✏️ Koreksi Hadir (Disetujui)'
+          : '📝 Izin (Disetujui)';
+
+      return (
+        <span className="px-2.5 py-1 bg-blue-100 text-blue-900 text-xs font-bold rounded-full border border-blue-200 shadow-2xs flex items-center gap-1">
+          <span>{typeLabel}</span>
+        </span>
+      );
+    }
+
     switch (status) {
       case 'HADIR':
         return <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200">✅ Hadir Tepat Waktu</span>;
@@ -300,7 +419,13 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     }
   };
 
-  const getCardStyle = (role?: RoleCode) => {
+  const getCardStyle = (role?: RoleCode, leaveApprovalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED') => {
+    if (leaveApprovalStatus === 'PENDING') {
+      return 'border-l-4 border-l-amber-500 bg-amber-50/30 border-y border-r border-amber-200/90 shadow-xs hover:shadow-md';
+    }
+    if (leaveApprovalStatus === 'APPROVED') {
+      return 'border-l-4 border-l-blue-500 bg-blue-50/20 border-y border-r border-blue-200/80 shadow-xs hover:shadow-md';
+    }
     if (role === 'KEPSEK') {
       return 'border-l-4 border-l-amber-500 bg-amber-50/20 border-y border-r border-amber-200/80 shadow-xs hover:shadow-md';
     }
@@ -314,6 +439,42 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     if (role === 'KEPSEK') return 'bg-linear-to-br from-amber-500 to-amber-700 text-white ring-2 ring-amber-400/50 shadow-xs';
     if (role === 'ADMIN') return 'bg-linear-to-br from-indigo-600 to-violet-700 text-white ring-2 ring-indigo-400/50 shadow-xs';
     return 'bg-slate-900 text-white';
+  };
+
+  // Handle Approve / Reject Leave from Live Tracking Modal
+  const handleQuickDecision = async (decision: 'APPROVED' | 'REJECTED') => {
+    if (!selectedReviewLeave) return;
+    setReviewErrorMsg(null);
+    setIsReviewLoading(true);
+
+    try {
+      await LeaveRepository.approveLeave(
+        selectedReviewLeave.id,
+        decision,
+        reviewNotes,
+        token || 'MOCK_TOKEN'
+      );
+
+      showToast(
+        'success',
+        decision === 'APPROVED' ? 'Pengajuan Izin Disetujui! ✅' : 'Pengajuan Izin Ditolak ❌',
+        `Permohonan izin ${selectedReviewTeacher?.full_name || 'Guru'} telah berhasil diproses.`
+      );
+
+      setIsReviewLoading(false);
+      setSelectedReviewLeave(null);
+      setSelectedReviewTeacher(null);
+      setReviewNotes('');
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('smart_absensi_leave_updated'));
+        window.dispatchEvent(new Event('smart_absensi_records_updated'));
+      }
+    } catch (err: unknown) {
+      setIsReviewLoading(false);
+      const msg = err instanceof Error ? err.message : 'Gagal memproses persetujuan izin';
+      setReviewErrorMsg(msg);
+    }
   };
 
   return (
@@ -361,9 +522,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               title={`Terlambat: ${summary.totalLate}`}
             />
             <div
-              style={{ width: `${summary.totalTeachers > 0 ? ((summary.totalLeave + summary.totalSick + summary.totalOfficialDuty) / summary.totalTeachers) * 100 : 0}%` }}
-              className="bg-blue-400 transition-all duration-500"
-              title={`Izin / Sakit / Dinas: ${summary.totalLeave + summary.totalSick + summary.totalOfficialDuty}`}
+              style={{ width: `${summary.totalTeachers > 0 ? (Math.max(0, summary.totalLeave + summary.totalSick + summary.totalOfficialDuty - summary.totalPendingLeave) / summary.totalTeachers) * 100 : 0}%` }}
+              className="bg-blue-500 transition-all duration-500"
+              title={`Izin / Sakit / Dinas Disetujui: ${Math.max(0, summary.totalLeave + summary.totalSick + summary.totalOfficialDuty - summary.totalPendingLeave)}`}
+            />
+            <div
+              style={{ width: `${summary.totalTeachers > 0 ? (summary.totalPendingLeave / summary.totalTeachers) * 100 : 0}%` }}
+              className="bg-amber-500 transition-all duration-500"
+              title={`Pengajuan Izin Menunggu Approval: ${summary.totalPendingLeave}`}
             />
             <div
               style={{ width: `${summary.totalTeachers > 0 ? (summary.totalAlfa / summary.totalTeachers) * 100 : 0}%` }}
@@ -418,7 +584,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             }`}
           >
             <span className="text-xl font-black text-blue-700">{summary.totalSick + summary.totalLeave + summary.totalOfficialDuty}</span>
-            <p className="text-[10px] font-bold text-blue-800">Izin / Sakit</p>
+            <p className="text-[10px] font-bold text-blue-800">
+              Izin / Sakit
+              {summary.totalPendingLeave > 0 ? (
+                <span className="block text-[9px] text-amber-700 font-extrabold">
+                  ({summary.totalPendingLeave} Menunggu)
+                </span>
+              ) : null}
+            </p>
           </button>
           <button
             type="button"
@@ -458,7 +631,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -494,6 +667,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             { id: 'HADIR', label: `Hadir Tepat (${summary.totalPresent})` },
             { id: 'TERLAMBAT', label: `Terlambat (${summary.totalLate})` },
             { id: 'IZIN_SAKIT', label: `Izin / Sakit (${summary.totalSick + summary.totalLeave + summary.totalOfficialDuty})` },
+            ...(summary.totalPendingLeave > 0 ? [{ id: 'PENDING_APPROVAL', label: `⏳ Menunggu Approval (${summary.totalPendingLeave})` }] : []),
             { id: 'ALFA', label: `Tanpa Keterangan (${summary.totalAlfa})` },
             { id: 'BELUM_ABSEN', label: `Belum Absen (${summary.totalUnabsented})` },
           ].map((tab) => (
@@ -524,16 +698,26 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               const item = teacherAttendanceMap.get(teacher.id);
               const status = item?.status || 'BELUM_ABSEN';
               const record = item?.record;
+              const leave = item?.leave;
+              const leaveApprovalStatus = item?.leaveApprovalStatus;
+              const isPendingLeave = leaveApprovalStatus === 'PENDING';
               const isExecutiveRole = teacher.role === 'KEPSEK' || teacher.role === 'ADMIN';
 
               return (
                 <div
                   key={teacher.id}
-                  onClick={() => onOpenCorrectionModal && onOpenCorrectionModal(teacher, selectedDate)}
-                  className={`p-3.5 sm:p-4 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 my-1.5 cursor-pointer active:scale-[0.99] ${getCardStyle(teacher.role)}`}
-                  title="Klik untuk melihat / mengoreksi absensi personel ini"
+                  onClick={() => {
+                    if (isPendingLeave && leave) {
+                      setSelectedReviewLeave(leave);
+                      setSelectedReviewTeacher(teacher);
+                    } else if (onOpenCorrectionModal) {
+                      onOpenCorrectionModal(teacher, selectedDate);
+                    }
+                  }}
+                  className={`p-3.5 sm:p-4 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 my-1.5 cursor-pointer active:scale-[0.99] ${getCardStyle(teacher.role, leaveApprovalStatus)}`}
+                  title={isPendingLeave ? 'Klik untuk meninjau dan memproses persetujuan izin guru ini' : 'Klik untuk melihat / mengoreksi absensi personel ini'}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 overflow-hidden ${getAvatarBg(teacher.role)}`}>
                       {teacher.avatar_url ? (
                         <img src={teacher.avatar_url} alt={teacher.full_name} className="w-full h-full object-cover" />
@@ -545,9 +729,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                         teacher.full_name.charAt(0)
                       )}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-slate-900 text-xs sm:text-sm">{teacher.full_name}</h4>
+                        <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">{teacher.full_name}</h4>
                         {getRoleBadge(teacher.role)}
                         {isExecutiveRole && (
                           <span className="text-[9px] px-1.5 py-0.5 bg-amber-100/70 text-amber-900 font-extrabold rounded-md border border-amber-300/60">
@@ -555,7 +739,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                         NPP: {teacher.nip && !teacher.nip.startsWith('NIP_') ? teacher.nip : '-'} • {teacher.position || (teacher.role === 'KEPSEK' ? 'Kepala Sekolah' : teacher.role === 'ADMIN' ? 'Administrator Sekolah' : 'Tenaga Pendidik')}
                       </p>
                     </div>
@@ -563,16 +747,36 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                     <div className="text-right">
-                      {getStatusBadge(status)}
+                      {getStatusBadge(status, leave, leaveApprovalStatus)}
                       {item?.checkInTime && (
                         <p className="text-[11px] font-mono font-bold text-slate-700 mt-1">
                           Masuk: {item.checkInTime} {item.checkOutTime ? `• Pulang: ${item.checkOutTime}` : ''}
                         </p>
                       )}
                       {(record?.notes || item?.notes) && (
-                        <p className="text-[10px] text-amber-800 font-semibold mt-0.5 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 inline-block">
+                        <p className={`text-[10px] font-semibold mt-0.5 px-2 py-0.5 rounded-md border inline-block max-w-xs truncate ${
+                          isPendingLeave ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-slate-100 text-slate-800 border-slate-200'
+                        }`}>
                           💬 {record?.notes || item?.notes}
                         </p>
+                      )}
+                      {item?.attachmentUrl && (
+                        <div className="pt-0.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPreviewAttachment({
+                                url: item.attachmentUrl!,
+                                title: `Lampiran Bukti Izin - ${teacher.full_name}`,
+                              });
+                            }}
+                            className="text-[10px] text-emerald-800 bg-emerald-50 hover:bg-emerald-100 font-bold px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1 cursor-pointer ml-auto"
+                            title="Klik untuk melihat dokumen / surat dokter terlampir"
+                          >
+                            <span>📎</span> Lihat Surat/Bukti
+                          </button>
+                        </div>
                       )}
                       {record?.check_in_lat && record?.check_in_lng ? (
                         <div className="pt-0.5">
@@ -591,8 +795,24 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      {/* Action WhatsApp Reminder for Unabsented */}
-                      {status === 'BELUM_ABSEN' && (
+                      {/* Action Review Izin for Pending Leave Request */}
+                      {isPendingLeave && leave && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedReviewLeave(leave);
+                            setSelectedReviewTeacher(teacher);
+                          }}
+                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                          title="Tinjau dan proses permohonan izin/sakit guru ini"
+                        >
+                          <span>☑️</span> Review Izin
+                        </button>
+                      )}
+
+                      {/* Action WhatsApp Reminder for Unabsented without pending/approved leaves */}
+                      {status === 'BELUM_ABSEN' && !isPendingLeave && (
                         <FeatureGate flag="ENABLE_WHATSAPP">
                           <a
                             href={`https://wa.me/62${String(teacher.phone_number || '').replace(/^0/, '')}?text=Assalamu'alaikum%20Bapak/Ibu%20${encodeURIComponent(teacher.full_name)},%20mohon%20konfirmasi%20kehadiran%20hari%20ini.`}
@@ -726,6 +946,151 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal Quick Review & Approval Permohonan Izin Guru */}
+      <Modal
+        isOpen={Boolean(selectedReviewLeave && selectedReviewTeacher)}
+        onClose={() => {
+          setSelectedReviewLeave(null);
+          setSelectedReviewTeacher(null);
+          setReviewNotes('');
+          setReviewErrorMsg(null);
+        }}
+        title="📋 Review Pengajuan Izin / Sakit Guru"
+      >
+        <div className="space-y-4">
+          {reviewErrorMsg && (
+            <div className="p-3 rounded-xl bg-red-50 text-red-700 text-xs font-semibold border border-red-200">
+              ⚠️ {reviewErrorMsg}
+            </div>
+          )}
+
+          {selectedReviewLeave && selectedReviewTeacher && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Pemohon:</span>
+                <span className="font-extrabold px-2.5 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900 border border-amber-300">
+                  ⏳ Menunggu Approval
+                </span>
+              </div>
+              <p className="font-black text-slate-900 text-sm">
+                {selectedReviewTeacher.full_name}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                NPP: {selectedReviewTeacher.nip && !selectedReviewTeacher.nip.startsWith('NIP_') ? selectedReviewTeacher.nip : '-'} • {selectedReviewTeacher.position || 'Tenaga Pendidik'}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-slate-700">
+                <span className="font-bold px-2 py-0.5 bg-blue-100 text-blue-900 rounded text-[10px]">
+                  {selectedReviewLeave.leave_type}
+                </span>
+                <span className="font-bold">
+                  📅 {selectedReviewLeave.start_date} s/d {selectedReviewLeave.end_date}
+                </span>
+              </div>
+
+              <div className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 block uppercase">Alasan / Keterangan:</span>
+                <p className="text-slate-800 italic">"{selectedReviewLeave.reason}"</p>
+              </div>
+
+              {selectedReviewLeave.attachment_url && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPreviewAttachment({
+                        url: selectedReviewLeave.attachment_url!,
+                        title: `Lampiran Bukti Izin - ${selectedReviewTeacher.full_name}`,
+                      });
+                    }}
+                    className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl font-bold text-xs border border-emerald-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <span>📎</span> Buka Lampiran Surat Dokter / Dokumen
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700">
+              Catatan Persetujuan / Alasan Penolakan
+            </label>
+            <textarea
+              rows={3}
+              value={reviewNotes}
+              onChange={(e) => setReviewNotes(e.target.value)}
+              placeholder="Tuliskan catatan opsional atau alasan bila ditolak..."
+              className="w-full bg-white border border-slate-200 rounded-2xl p-3 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 pt-2">
+            <Button
+              variant="secondary"
+              className="w-1/3"
+              onClick={() => {
+                setSelectedReviewLeave(null);
+                setSelectedReviewTeacher(null);
+                setReviewNotes('');
+                setReviewErrorMsg(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              className="w-1/3"
+              isLoading={isReviewLoading}
+              onClick={() => handleQuickDecision('REJECTED')}
+            >
+              Tolak
+            </Button>
+            <Button
+              variant="primary"
+              className="w-1/3"
+              isLoading={isReviewLoading}
+              onClick={() => handleQuickDecision('APPROVED')}
+            >
+              Setujui
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Preview Berkas Lampiran Surat Dokter / Dokumen */}
+      <Modal
+        isOpen={Boolean(selectedPreviewAttachment)}
+        onClose={() => setSelectedPreviewAttachment(null)}
+        title={selectedPreviewAttachment?.title || '📎 Lampiran Dokumen'}
+      >
+        <div className="space-y-4">
+          {selectedPreviewAttachment?.url && (
+            <div className="max-h-[70vh] overflow-auto rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center p-2">
+              {selectedPreviewAttachment.url.startsWith('data:application/pdf') || selectedPreviewAttachment.url.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={selectedPreviewAttachment.url}
+                  title="Lampiran PDF"
+                  className="w-full h-96 rounded-xl border border-slate-200"
+                />
+              ) : (
+                <img
+                  src={selectedPreviewAttachment.url}
+                  alt="Lampiran Surat Bukti"
+                  className="max-w-full max-h-96 object-contain rounded-xl shadow-xs"
+                />
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setSelectedPreviewAttachment(null)}>
+              Tutup
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modal Reset Presensi Harian dengan Password Admin */}
       <AttendanceResetModal

@@ -56,6 +56,7 @@ export class ReportService {
       totalLeave,
       totalSick,
       totalOfficialDuty,
+      totalPendingLeave: 0,
       totalAlfa: 0,
       totalUnabsented,
       attendancePercentage,

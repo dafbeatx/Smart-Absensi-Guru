@@ -10,6 +10,7 @@ export interface DailyAttendanceSummary {
   totalLeave: number;
   totalSick: number;
   totalOfficialDuty: number;
+  totalPendingLeave: number;
   totalAlfa: number;
   totalUnabsented: number;
   attendancePercentage: number;
@@ -72,6 +73,7 @@ export class AnalyticsService {
     let totalLeave = 0;
     let totalSick = 0;
     let totalOfficialDuty = 0;
+    let totalPendingLeave = 0;
     let totalAlfa = 0;
 
     const userAttendanceMap = new Map<string, AttendanceRecord>();
@@ -83,15 +85,21 @@ export class AnalyticsService {
 
     const accountedUserIds = new Set<string>();
 
-    // 1. Process Approved Leaves FIRST (Highest Priority for accounting)
+    // 1. Process Approved & Pending Leaves FIRST (Highest Priority for accounting)
     for (const leave of leaveRequests) {
-      const isApproved =
-        leave.approval_status === 'APPROVED' || (leave as any).status === 'APPROVED';
-      if (isApproved) {
-        const startStr = (leave.start_date || '').substring(0, 10);
-        const endStr = (leave.end_date || '').substring(0, 10);
+      const startStr = (leave.start_date || '').substring(0, 10);
+      const endStr = (leave.end_date || '').substring(0, 10);
 
-        if (startStr <= dateStr && dateStr <= endStr) {
+      if (startStr && endStr && startStr <= dateStr && dateStr <= endStr) {
+        const isApproved =
+          leave.approval_status === 'APPROVED' || (leave as any).status === 'APPROVED';
+        const isPending =
+          leave.approval_status === 'PENDING' ||
+          leave.approval_status === 'SUBMITTED' ||
+          leave.approval_status === 'UNDER_REVIEW' ||
+          !leave.approval_status;
+
+        if (isApproved) {
           accountedUserIds.add(leave.user_id);
           if (leave.leave_type === 'SAKIT') {
             totalSick++;
@@ -103,7 +111,7 @@ export class AnalyticsService {
               totalSick++;
             } else if (reasonText.includes('menjadi DINAS_LUAR')) {
               totalOfficialDuty++;
-            } else if (reasonText.includes('menjadi IZIN')) {
+            } else if (reasonText.includes('menjadi IZIN') || reasonText.includes('menjadi CUTI')) {
               totalLeave++;
             } else if (reasonText.includes('menjadi ALFA')) {
               totalAlfa++;
@@ -113,11 +121,33 @@ export class AnalyticsService {
           } else {
             totalLeave++;
           }
+        } else if (isPending) {
+          accountedUserIds.add(leave.user_id);
+          totalPendingLeave++;
+          // Also classify pending into respective category for comprehensive view
+          if (leave.leave_type === 'SAKIT') {
+            totalSick++;
+          } else if (leave.leave_type === 'DINAS_LUAR') {
+            totalOfficialDuty++;
+          } else if (leave.leave_type === 'KOREKSI_ABSEN') {
+            const reasonText = leave.reason || '';
+            if (reasonText.includes('menjadi SAKIT')) {
+              totalSick++;
+            } else if (reasonText.includes('menjadi DINAS_LUAR')) {
+              totalOfficialDuty++;
+            } else if (reasonText.includes('menjadi ALFA')) {
+              totalAlfa++;
+            } else {
+              totalLeave++;
+            }
+          } else {
+            totalLeave++;
+          }
         }
       }
     }
 
-    // 2. Process remaining attendance records for personnel without approved leaves
+    // 2. Process remaining attendance records for personnel without leaves
     const checkinEnd =
       systemSettings?.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
@@ -174,6 +204,7 @@ export class AnalyticsService {
       totalLeave,
       totalSick,
       totalOfficialDuty,
+      totalPendingLeave,
       totalAlfa,
       totalUnabsented,
       attendancePercentage,
@@ -199,14 +230,20 @@ export class AnalyticsService {
 
     const activeUserIds = new Set<string>();
 
-    // 1. Account for Approved Leaves (Guru yang izin/sakit/dinasnya disetujui BUKAN belum absen!)
+    // 1. Account for Approved & Pending Leaves (Guru yang izin/sakit/dinasnya diajukan/disetujui BUKAN belum absen!)
     for (const leave of leaveRequests) {
-      const isApproved =
-        leave.approval_status === 'APPROVED' || (leave as any).status === 'APPROVED';
-      if (isApproved) {
+      const isApprovedOrPending =
+        leave.approval_status === 'APPROVED' ||
+        (leave as any).status === 'APPROVED' ||
+        leave.approval_status === 'PENDING' ||
+        leave.approval_status === 'SUBMITTED' ||
+        leave.approval_status === 'UNDER_REVIEW' ||
+        !leave.approval_status;
+
+      if (isApprovedOrPending) {
         const startStr = (leave.start_date || '').substring(0, 10);
         const endStr = (leave.end_date || '').substring(0, 10);
-        if (startStr <= dateStr && dateStr <= endStr) {
+        if (startStr && endStr && startStr <= dateStr && dateStr <= endStr) {
           activeUserIds.add(leave.user_id);
         }
       }

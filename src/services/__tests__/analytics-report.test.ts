@@ -111,6 +111,31 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     summaryCorrected.totalLeave === 1 && summaryCorrected.totalUnabsented === 0 && unabsentedCorrected.length === 0
   );
 
+  // Test 5b: Pending Leave Request Calculation & Unabsented Exclusion
+  const pendingLeaveList: LeaveRequest[] = [
+    {
+      id: 'leave_pending_1',
+      user_id: 'usr_3',
+      leave_type: 'SAKIT',
+      start_date: '2026-07-30',
+      end_date: '2026-07-30',
+      reason: 'Demam tinggi dan istirahat dokter',
+      approval_status: 'PENDING',
+      attachment_url: 'data:image/png;base64,sample',
+      approval_deadline: '',
+      created_at: '',
+    },
+  ];
+  const summaryPending = AnalyticsService.calculateDailySummary('2026-07-30', mockTeachers, mockAttendance, pendingLeaveList);
+  const unabsentedPending = AnalyticsService.getUnabsentedTeachers('2026-07-30', mockTeachers, mockAttendance, pendingLeaveList);
+  assert(
+    'Analytics - Pending Leave Application Counted and Excluded from Unabsented',
+    summaryPending.totalPendingLeave === 1 &&
+    summaryPending.totalSick === 1 &&
+    summaryPending.totalUnabsented === 0 &&
+    unabsentedPending.length === 0
+  );
+
   // Test 6: Working Days Calculation for Completed & Ongoing Months
   const { getMonthWorkingDays } = await import('../../utils/time.utils');
   const julyWorkingDays = getMonthWorkingDays('Juli', '2026', false);
