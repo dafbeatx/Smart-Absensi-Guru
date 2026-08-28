@@ -250,7 +250,7 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Contoh: Modul 1 - Pendahuluan Materi"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0D7A5F]"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
                 />
               </div>
 
@@ -264,7 +264,7 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
                   value={newSubject}
                   onChange={(e) => setNewSubject(e.target.value)}
                   placeholder="Contoh: Matematika / IPA / Bahasa"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0D7A5F]"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
                 />
               </div>
 
@@ -276,7 +276,7 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
                   <select
                     value={newClass}
                     onChange={(e) => setNewClass(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
                   >
                     <option value="Kelas VII-A">Kelas VII-A</option>
                     <option value="Kelas VII-B">Kelas VII-B</option>
@@ -296,7 +296,7 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
                     value={newChapter}
                     onChange={(e) => setNewChapter(e.target.value)}
                     placeholder="Contoh: Bab 1"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
                   />
                 </div>
               </div>
@@ -311,7 +311,7 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
                   value={newUrl}
                   onChange={(e) => setNewUrl(e.target.value)}
                   placeholder="https://drive.google.com/..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0D7A5F]"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
                 />
               </div>
 
