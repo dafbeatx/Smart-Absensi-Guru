@@ -959,7 +959,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-125 overflow-y-auto pr-1">
             {historicalUnabsented.map((item, idx) => (
               <div
                 key={`${item.teacher.id}_${item.date}_${idx}`}
