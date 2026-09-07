@@ -135,7 +135,7 @@ Berikan analisis diagnosa mendalam dan berikan HANYA format JSON berikut (tanpa 
       return null;
     }
 
-    const candidateModels = Array.from(new Set([configuredModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b']));
+    const candidateModels = Array.from(new Set([configuredModel, 'qwen/qwen3.8-27b', 'groq/compound-mini', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b']));
 
     for (const currentModel of candidateModels) {
       try {
@@ -156,10 +156,7 @@ Berikan analisis diagnosa mendalam dan berikan HANYA format JSON berikut (tanpa 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
           logger.warn('GroqAIService', `Model ${currentModel} returned ${response.status}:`, errData);
-          if (response.status === 404 || errData?.error?.code === 'model_not_found') {
-            continue; // try next candidate model
-          }
-          return null;
+          continue; // Try next candidate model on ANY error (429, 404, 500, etc.)
         }
 
         const data = await response.json();
@@ -308,22 +305,53 @@ Berikan jawaban yang ramah, singkat, akurat, dan membantu dalam bahasa Indonesia
       return 'Halo! Silakan ketik pertanyaan atau kendala teknis/error yang ingin Anda tanyakan.';
     }
 
-    const systemPrompt = `Kamu adalah asisten teknis Smart Absensi Guru (SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam).
+    const systemPrompt = `Kamu adalah asisten teknis resmi Smart Absensi Guru (SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam).
 Lawan bicaramu adalah Admin / Pengelola sekolah${senderName ? ` bernama ${senderName}` : ''}.
 
-PEDOMAN GAYA BICARA (SANGAT PENTING):
-1. Jawablah seperti MANUSIA ASLI yang ramah, santai tapi profesional, seperti rekan tim IT sekolah yang sigap dan asyik diajak diskusi di Telegram.
-2. JANGAN seperti robot kaku. HINDARI kalimat pembuka formal yang kaku seperti "Berdasarkan arsitektur sistem...", "Sebagai mesin teknis...", dsb.
-3. LANGSUNG ke inti jawaban secara padat, ringkas, dan jelas (cukup 2-3 paragraf pendek atau poin-poin ringkas). Sangat nyaman dibaca di layar HP.
-4. Gunakan bahasa Indonesia natural sehari-hari yang sopan dan hangat (pakai emoji secukupnya agar bersahabat 😊).
-5. WAJIB selalu menyelesaikan jawaban sampai tuntas dan ada titik/penutup, jangan sampai terpotong di tengah kalimat.
+GAYA BICARA & KEPRIBADIAN (WAJIB DIPATUHI):
+- Jawablah seperti MANUSIA ASLI yang ramah, hangat, santai tapi profesional, seperti rekan IT sekolah yang pintar, sigap, dan sangat menguasai seluk-beluk logika sistem Smart Absensi Guru.
+- JANGAN seperti robot kaku. HINDARI pembuka formal yang kaku seperti "Berdasarkan arsitektur sistem...".
+- LANGSUNG ke inti jawaban secara padat, ringkas, dan jelas (cukup 2-3 paragraf pendek atau poin-poin praktis). Sangat nyaman dibaca di layar HP.
+- Gunakan bahasa Indonesia natural sehari-hari yang sopan dan hangat (pakai emoji secukupnya agar bersahabat 😊).
+- Pastikan jawaban selalu TUNTAS dan selesai sampai akhir kalimat.
 
-INFORMASI PENTING SISTEM:
-- Jam Kerja & Pulang: Masuk sebelum 07:00 WIB. Pulang Senin-Kamis pukul 13:00 WIB, Jumat pukul 11:00 WIB.
-- Masalah Scan QR: Sering kali karena QR Code di layar admin sudah expired/berganti. Cukup refresh QR di layar admin, atau minta guru ketik kode manual di bawah barcode. Pastikan izin kamera di browser HP aktif.
-- Masalah GPS / Geofence: Radius normal 100m. Khusus scan QR poster pintu gerbang sekolah ada toleransi buffer 500m sehingga guru tetap bisa absen lancar. Kalau GPS mati/ditolak, cukup aktifkan izin lokasi di HP. Fake GPS otomatis ditolak.
-- Jadwal Piket: Hari piket Senin sampai Jumat. Jika ada kendala simpan jadwal di admin, periksa RLS policy tabel gm_schedule di Supabase.
-- Fitur Offline: Kalau internet mati, presensi aman tersimpan di HP guru dan otomatis terkirim saat online kembali.`;
+KNOWLEDGE BASE LENGKAP SMART ABSENSI GURU (HARUS TEPAT & AKURAT):
+
+1. ATURAN IZIN PERANGKAT & PERMISSION GUARD (SANGAT KETAT):
+   - Sistem memiliki fitur "Permission Guard" (AttendancePermissionBlockedModal).
+   - Sebelum guru bisa scan QR atau absen biometrik, sistem WAJIB memeriksa 3 izin perangkat:
+     a. Izin Notifikasi Web & Mobile (Wajib!)
+     b. Izin Lokasi GPS & Geofence (Wajib!)
+     c. Izin Kamera Scanner (Wajib jika scan QR!)
+   - JIKA ADA IZIN YANG TIDAK DIBERIKAN / DITOLAK (termasuk izin Notifikasi):
+     ABSENSI AKAN DITOLAK / DIBLOKIR TOTAL oleh sistem!
+     Layar HP guru langsung memunculkan pop-up modal "Izin Perangkat Diperlukan Sebelum Presensi" dan tombol absen tidak bisa diproses sampai menekan tombol "Izinkan" di perizinan browser.
+   - Mengapa notifikasi diwajibkan? Karena sistem memerlukan push notification untuk tanda terima konfirmasi presensi masuk/pulang sukses, alarm pengingat jam pulang (13:00 / 11:00), dan pengumuman resmi sekolah.
+
+2. METODE PRESENSI:
+   - Scan QR Code Dinamis (refresh berkala di layar monitor admin).
+   - Biometrik Sidik Jari (WebAuthn Platform Sensor di HP/laptop guru, tetap divalidasi dengan GPS fisik asli). Jika belum terdaftar, ada auto prompt modal pendaftaran sidik jari.
+   - Tap Kartu RFID (untuk siswa & guru piket di alat pembaca fisik, tersimpan di gm_attendance).
+   - Koreksi Manual oleh Admin jika ada kendala darurat.
+
+3. SAFETY ENGINE & GEOFENCING (GPS):
+   - 5-Step Deterministic State Machine: CHECKING_COOLDOWN -> VALIDATING_GPS -> CHECKING_PHOTO -> SUBMITTING -> RECORDED.
+   - Radius Geofence Standar: 100 meter dari sekolah.
+   - Mode Door Poster QR: Khusus poster QR di pintu gerbang sekolah, sistem memberi toleransi buffer 500 meter agar guru tidak gagal absen, dengan tetap mencatat titik koordinat GPS asli guru.
+   - Fake GPS / Mock Location otomatis ditolak (Error GPS_003).
+   - Auto Coordinate Sanitization: Koordinat integer (misal -6613144) otomatis disanitasi jadi -6.613144.
+
+4. JAM KERJA & JAM PULANG:
+   - Jam Masuk Standar: Sebelum pukul 07:00 WIB (lewat dari itu tercatat terlambat).
+   - Jam Pulang Senin s.d. Kamis: 13:00 WIB.
+   - Jam Pulang Jumat: 11:00 WIB.
+   - Hari Piket: SENIN s.d. JUMAT (jadwal tersimpan di tabel gm_schedule Supabase).
+
+5. DATABASE & SINKRONISASI:
+   - Backend: Supabase PostgreSQL Cloud dengan Row Level Security (RLS).
+   - NPP (Nomor Pokok Pegawai): Standar resmi penamaan ID guru/pegawai.
+   - Sinkronisasi Real-time: Status notifikasi dibaca/belum dan foto profil 100% tersinkron lintas perangkat (Desktop & HP).
+   - Mode Offline (IndexedDB): Jika internet sekolah mati, absen tetap tersimpan di HP dan otomatis sinkron saat online.`;
 
     const apiOutput = await this.callGroqAPI([
       { role: 'system', content: systemPrompt },
@@ -340,6 +368,15 @@ INFORMASI PENTING SISTEM:
    */
   private static getLocalTelegramFallbackAnswer(query: string): string {
     const q = query.toLowerCase();
+
+    if (q.includes('notifikasi') || q.includes('izin notifikasi') || q.includes('perizinan')) {
+      return (
+        '🔔 *Izin Notifikasi Wajib Diizinkan:*\n\n' +
+        'Jika izin notifikasi tidak diizinkan atau dimatikan, sistem **Permission Guard** akan langsung memblokir proses presensi. Layar HP guru akan menampilkan pop-up *"Izin Perangkat Diperlukan Sebelum Presensi"* dan tombol scan QR/biometrik tidak bisa diproses.\n\n' +
+        '💡 *Solusi:*\n' +
+        'Buka ikon gembok 🔒 di address bar browser HP ➡️ Menu Izin ➡️ Pilih **Izinkan Notifikasi**. Notifikasi ini wajib untuk tanda terima presensi, alarm jam pulang (13:00 / 11:00), dan pengumuman sekolah. 😊'
+      );
+    }
 
     if (q.includes('gps_002') || q.includes('luar radius') || q.includes('geofence')) {
       return (
@@ -376,6 +413,13 @@ INFORMASI PENTING SISTEM:
       );
     }
 
+    if (q.includes('sidik jari') || q.includes('biometrik') || q.includes('fingerprint')) {
+      return (
+        '👆 *Presensi & Pendaftaran Biometrik Sidik Jari:*\n\n' +
+        'Guru dapat mendaftarkan sidik jari langsung di HP atau laptop yang memiliki sensor biometrik (WebAuthn). Jika belum terdaftar, sistem akan otomatis menampilkan pop-up pendaftaran saat login. Saat absen biometrik, titik GPS asli guru tetap divalidasi oleh sistem. 😊'
+      );
+    }
+
     if (q.includes('piket') || q.includes('jadwal piket')) {
       return (
         '📅 *Jadwal Piket Guru:*\n\n' +
@@ -399,5 +443,3 @@ INFORMASI PENTING SISTEM:
     );
   }
 }
-
-
