@@ -23,6 +23,7 @@ import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCal
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
 import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
+import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricEnrollmentPromptModal';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
   Radio,
@@ -295,6 +296,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isStudentKioskOpen, setIsStudentKioskOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isBioEnrolled, setIsBioEnrolled] = useState(false);
+  const [isBiometricPromptOpen, setIsBiometricPromptOpen] = useState(false);
   const [isInfoExpanded, setIsInfoExpanded] = useState(false);
   const [isPermissionBlockedModalOpen, setIsPermissionBlockedModalOpen] = useState(false);
   const [permissionBlockedRequiresCamera, setPermissionBlockedRequiresCamera] = useState(false);
@@ -415,7 +417,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const checkDeviceStatus = async () => {
     if (!effectiveUser) return;
     try {
-      setIsBioEnrolled(BiometricService.isEnrolled(effectiveUser.id));
+      const isEnrolled = BiometricService.isEnrolled(effectiveUser.id);
+      setIsBioEnrolled(isEnrolled);
       const provider = ProviderFactory.getProvider();
       const bindingRes = await provider.checkDeviceBinding(
         effectiveUser.id,
@@ -423,8 +426,40 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         token || ''
       );
       setDeviceBindingStatus(bindingRes);
+
+      // 🌟 Jika HP mendukung sensor fisik dan guru belum mendaftar sidik jari:
+      if (!isEnrolled && !isPreviewMode) {
+        const todayStr = getTodayDateInJakarta();
+        const dismissKey = `smart_absensi_bio_prompt_dismissed_${effectiveUser.id}_${todayStr}`;
+        const isDismissed = sessionStorage.getItem(dismissKey) === 'true';
+
+        if (!isDismissed) {
+          const availability = await BiometricService.checkAvailability(effectiveUser.id);
+          if (availability.isSupported && availability.hasPlatformSensor && !availability.isEnrolled) {
+            setTimeout(() => {
+              setIsBiometricPromptOpen(true);
+            }, 600);
+          }
+        }
+      }
     } catch (err) {
-      console.warn('Failed to check device binding status:', err);
+      console.warn('Failed to check device binding or biometric status:', err);
+    }
+  };
+
+  const handleCloseBiometricPrompt = () => {
+    if (effectiveUser?.id) {
+      const todayStr = getTodayDateInJakarta();
+      sessionStorage.setItem(`smart_absensi_bio_prompt_dismissed_${effectiveUser.id}_${todayStr}`, 'true');
+    }
+    setIsBiometricPromptOpen(false);
+  };
+
+  const handleBiometricEnrollmentSuccess = () => {
+    setIsBioEnrolled(true);
+    if (effectiveUser?.id) {
+      const todayStr = getTodayDateInJakarta();
+      sessionStorage.setItem(`smart_absensi_bio_prompt_dismissed_${effectiveUser.id}_${todayStr}`, 'true');
     }
   };
 
@@ -3363,6 +3398,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             action();
           }
         }}
+      />
+
+      {/* Modal Ajakan Pendaftaran Sidik Jari Saat Absensi Baru Dibuka */}
+      <BiometricEnrollmentPromptModal
+        isOpen={isBiometricPromptOpen}
+        onClose={handleCloseBiometricPrompt}
+        onSuccess={handleBiometricEnrollmentSuccess}
+        user={effectiveUser}
       />
 
       {/* 13. Modal Presensi Sidik Jari HP Terintegrasi GPS Geofence */}

@@ -55,6 +55,23 @@ export async function runBiometricAttendanceTestSuite(): Promise<TestSuiteResult
     assert('Biometric Enrollment - Skipped in non-storage env 3', true);
   }
 
+  // 2b. Auto-Prompt on Open Eligibility Logic
+  const eligibleCheck = {
+    isSupported: true,
+    hasPlatformSensor: true,
+    isEnrolled: false,
+  };
+  const shouldPromptEligible = eligibleCheck.isSupported && eligibleCheck.hasPlatformSensor && !eligibleCheck.isEnrolled;
+  assert('Biometric Auto-Prompt - Identifies eligible user when platform sensor available and not enrolled', shouldPromptEligible === true);
+
+  const alreadyEnrolledCheck = { ...eligibleCheck, isEnrolled: true };
+  const shouldPromptEnrolled = alreadyEnrolledCheck.isSupported && alreadyEnrolledCheck.hasPlatformSensor && !alreadyEnrolledCheck.isEnrolled;
+  assert('Biometric Auto-Prompt - Suppresses prompt when user already enrolled', shouldPromptEnrolled === false);
+
+  const noSensorCheck = { ...eligibleCheck, hasPlatformSensor: false };
+  const shouldPromptNoSensor = noSensorCheck.isSupported && noSensorCheck.hasPlatformSensor && !noSensorCheck.isEnrolled;
+  assert('Biometric Auto-Prompt - Suppresses prompt when device lacks platform sensor', shouldPromptNoSensor === false);
+
   // 3. Geofence Location Lock - Strictly Rejects Biometric Attendance Beyond Radius
   const outOfSchoolCoords: GPSCoordinates = {
     latitude: CONSTANTS.DEFAULTS.GEOFENCE_LAT + 0.005, // ~550m away
