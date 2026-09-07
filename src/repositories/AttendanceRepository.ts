@@ -22,6 +22,8 @@ export interface ScanAttendanceDTO {
   gps_accuracy?: number;
   verification_method?: VerificationMethod;
   attendance_source?: AttendanceSource;
+  /** Optional silent auto-capture front camera photo for Telegram audit */
+  photoBlob?: Blob | null;
 }
 
 export interface AttendanceResponseDTO {
@@ -127,6 +129,7 @@ export class AttendanceRepository {
         distanceMeters: effectiveDistance,
         status: 'HADIR (MODE OFFLINE)',
         isOffline: true,
+        photoBlob: dto.photoBlob || null,
       }).catch((e) => console.warn('Telegram offline attendance log error:', e));
 
       return {
@@ -166,6 +169,7 @@ export class AttendanceRepository {
         distanceMeters: result.distance_meters,
         status: result.status,
         isOffline: result.is_offline,
+        photoBlob: dto.photoBlob || null,
       }).catch((e) => console.warn('Telegram attendance log error:', e));
 
       return result;

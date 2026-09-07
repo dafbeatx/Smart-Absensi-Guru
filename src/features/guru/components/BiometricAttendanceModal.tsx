@@ -10,6 +10,7 @@ import { SpeechService } from '../../../services/speech.service';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { logger } from '../../../utils/logger.utils';
+import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
 import type { SystemSettings, UserProfile } from '../../../types/database.types';
 
 export interface BiometricAttendanceModalProps {
@@ -152,9 +153,19 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         return;
       }
 
-      // 2. Simpan absensi via AttendanceRepository
+      // 2. Simpan absensi via AttendanceRepository dengan auto-capture hening kamera depan
       const activeToken = token || `TOKEN_${user.id}_${Date.now()}`;
       const activeDeviceUUID = deviceUUID || 'web_mobile_device';
+
+      let photoBlob: Blob | null = null;
+      try {
+        photoBlob = await Promise.race([
+          SilentCameraCaptureService.captureFrontCameraSilently(),
+          new Promise<null>((r) => setTimeout(() => r(null), 1000)),
+        ]);
+      } catch {
+        photoBlob = null;
+      }
 
       const scanRes = await AttendanceRepository.scanAttendance({
         token: activeToken,
@@ -167,6 +178,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         gps_accuracy: gpsCoords.accuracy,
         verification_method: 'BIOMETRIC_GPS',
         attendance_source: 'BIOMETRIC',
+        photoBlob: photoBlob,
       });
 
       // 3. Audio & Voice Feedback

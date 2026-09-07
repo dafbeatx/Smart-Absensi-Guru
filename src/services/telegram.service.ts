@@ -14,6 +14,7 @@ export interface TelegramAttendancePayload {
   distanceMeters?: number;
   status?: string;
   isOffline?: boolean;
+  photoBlob?: Blob | null;
 }
 
 export interface TelegramWebLoginPayload {
@@ -188,6 +189,53 @@ export class TelegramService {
   }
 
   /**
+   * Sends photo directly to Telegram chat via Telegram Bot API (bypassing serverless functions to ensure zero weight on Vercel)
+   */
+  public static async sendPhoto(
+    photoBlob: Blob,
+    caption: string,
+    parseMode: 'HTML' | 'Markdown' = 'HTML',
+    targetChatId?: string | number
+  ): Promise<{ success: boolean; error?: string }> {
+    const token = this.getBotToken();
+    const chatId = targetChatId ? String(targetChatId).trim() : this.getChatId();
+
+    if (!token || !chatId) {
+      logger.info('TelegramService', 'Telegram credentials not configured');
+      return { success: false, error: 'NOT_CONFIGURED' };
+    }
+
+    const endpoint = `https://api.telegram.org/bot${token}/sendPhoto`;
+
+    try {
+      const formData = new FormData();
+      formData.append('chat_id', chatId);
+      formData.append('photo', photoBlob, 'attendance_capture.jpg');
+      formData.append('caption', caption);
+      formData.append('parse_mode', parseMode);
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const resData = await response.json().catch(() => ({}));
+
+      if (!response.ok || !resData.ok) {
+        const errorMsg = resData.description || `HTTP ${response.status}`;
+        logger.warn('TelegramService', `Gagal mengirim photo ke Telegram (${errorMsg}), fallback ke pesan teks...`);
+        return this.sendMessage(caption, parseMode, chatId);
+      }
+
+      logger.info('TelegramService', 'Auto-capture photo presensi berhasil terkirim ke Telegram');
+      return { success: true };
+    } catch (err: any) {
+      logger.warn('TelegramService', 'Error sending photo to Telegram, fallback text:', err?.message || err);
+      return this.sendMessage(caption, parseMode, chatId);
+    }
+  }
+
+  /**
    * Sends a structured Attendance notification (Presensi Guru Masuk/Pulang)
    */
   public static async sendAttendanceNotification(payload: TelegramAttendancePayload): Promise<boolean> {
@@ -216,24 +264,32 @@ export class TelegramService {
 
     const offlineBadge = payload.isOffline ? ' [MODE OFFLINE]' : '';
 
-    const message = [
-      `📋 <b>PRESENSI GURU TERCATAT${offlineBadge}</b>`,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      `👤 <b>Nama:</b> ${escapeHtml(payload.teacherName)}`,
-      `🆔 <b>NPP/NIP:</b> ${escapeHtml(payload.nip || '-')}`,
-      `🏷️ <b>Role:</b> ${escapeHtml(payload.role || 'GURU')}`,
-      `📌 <b>Tipe:</b> ${typeLabel}`,
-      `⏰ <b>Waktu:</b> ${escapeHtml(timeStr)} WIB (${escapeHtml(dateStr)})`,
-      `📱 <b>Metode:</b> ${escapeHtml(methodLabel)}`,
-      `🧭 <b>Posisi:</b> ${escapeHtml(locationLabel)}`,
-      `📊 <b>Status:</b> ${escapeHtml(statusBadge)}`,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      `🤖 <i>Smart Absensi Guru System</i>`,
-    ].join('\n');
+      const photoBadge = payload.photoBlob ? ' 📷 [FOTO TERVERIFIKASI]' : '';
+      const headerTitle = payload.photoBlob ? 'FOTO AUTO-CAPTURE PRESENSI GURU' : 'PRESENSI GURU TERCATAT';
 
-    const res = await this.sendMessage(message, 'HTML');
-    return res.success;
-  }
+      const message = [
+        `📋 <b>${headerTitle}${offlineBadge}${photoBadge}</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `👤 <b>Nama:</b> ${escapeHtml(payload.teacherName)}`,
+        `🆔 <b>NPP/NIP:</b> ${escapeHtml(payload.nip || '-')}`,
+        `🏷️ <b>Role:</b> ${escapeHtml(payload.role || 'GURU')}`,
+        `📌 <b>Tipe:</b> ${typeLabel}`,
+        `⏰ <b>Waktu:</b> ${escapeHtml(timeStr)} WIB (${escapeHtml(dateStr)})`,
+        `📱 <b>Metode:</b> ${escapeHtml(methodLabel)}`,
+        `🧭 <b>Posisi:</b> ${escapeHtml(locationLabel)}`,
+        `📊 <b>Status:</b> ${escapeHtml(statusBadge)}`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `🤖 <i>Smart Absensi Guru - Silent Audit Camera</i>`,
+      ].join('\n');
+
+      if (payload.photoBlob) {
+        const photoRes = await this.sendPhoto(payload.photoBlob, message, 'HTML');
+        if (photoRes.success) return true;
+      }
+
+      const res = await this.sendMessage(message, 'HTML');
+      return res.success;
+    }
 
   /**
    * Sends a notification when a teacher enters or logs into the web application
