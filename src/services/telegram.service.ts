@@ -45,21 +45,31 @@ export class TelegramService {
    * Retrieves the Telegram Bot Token from environment
    */
   public static getBotToken(): string {
+    const metaEnv = typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env as Record<string, string | undefined>) : undefined;
+    const procEnv = typeof process !== 'undefined' && process.env ? process.env : undefined;
+
     return (
-      (typeof import.meta !== 'undefined' && import.meta.env
-        ? (import.meta.env.VITE_TELEGRAM_BOT_TOKEN as string)
-        : '') || ''
+      metaEnv?.VITE_TELEGRAM_BOT_TOKEN ||
+      metaEnv?.TELEGRAM_BOT_TOKEN ||
+      procEnv?.VITE_TELEGRAM_BOT_TOKEN ||
+      procEnv?.TELEGRAM_BOT_TOKEN ||
+      ''
     ).trim();
   }
 
   /**
-   * Retrieves the Telegram Target Chat ID from environment
+   * Retrieves the Telegram Target Chat ID from environment (supports VITE_TELEGRAM_CHAT_ID or TELEGRAM_CHAT_ID)
    */
   public static getChatId(): string {
+    const metaEnv = typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env as Record<string, string | undefined>) : undefined;
+    const procEnv = typeof process !== 'undefined' && process.env ? process.env : undefined;
+
     return (
-      (typeof import.meta !== 'undefined' && import.meta.env
-        ? (import.meta.env.VITE_TELEGRAM_CHAT_ID as string)
-        : '') || ''
+      metaEnv?.VITE_TELEGRAM_CHAT_ID ||
+      metaEnv?.TELEGRAM_CHAT_ID ||
+      procEnv?.VITE_TELEGRAM_CHAT_ID ||
+      procEnv?.TELEGRAM_CHAT_ID ||
+      ''
     ).trim();
   }
 
