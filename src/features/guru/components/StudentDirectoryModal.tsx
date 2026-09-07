@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { StudentItem } from '../../../types/database.types';
 import { StudentRepository, STUDENTS_UPDATED_EVENT } from '../../../repositories/StudentRepository';
+import { CreditCard, School, Search, X } from 'lucide-react';
 
 interface StudentDirectoryModalProps {
   isOpen: boolean;
@@ -66,20 +67,14 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
       const matchQuery =
         !q ||
         s.fullName.toLowerCase().includes(q) ||
-        s.nisn.toLowerCase().includes(q) ||
-        s.parentName.toLowerCase().includes(q);
+        (s.nisn && s.nisn.toLowerCase().includes(q)) ||
+        (s.rfidUid && s.rfidUid.toLowerCase().includes(q)) ||
+        s.className.toLowerCase().includes(q);
       return matchClass && matchQuery;
     });
   }, [students, selectedClass, searchQuery]);
 
   if (!isOpen) return null;
-
-  const formatWaUrl = (phone: string, parentName: string, studentName: string) => {
-    const cleanPhone = phone.replace(/\D/g, '');
-    const intlPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
-    const msg = `Assalamu'alaikum Warahmatullahi Wabarakatuh Bapak/Ibu ${parentName}, saya guru/wali pengajar dari ananda ${studentName}.`;
-    return `https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`;
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -91,9 +86,9 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
               🎓
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-extrabold leading-tight truncate">Direktori Siswa & Kontak Wali</h3>
+              <h3 className="text-sm font-extrabold leading-tight truncate">Direktori Siswa & Kartu RFID</h3>
               <p className="text-[11px] text-emerald-300 font-semibold truncate">
-                {isLoading ? 'Memuat data...' : `${filteredStudents.length} Siswa Ditemukan`}
+                {isLoading ? 'Memuat data...' : `${filteredStudents.length} Siswa Aktif Ditemukan`}
               </p>
             </div>
           </div>
@@ -102,7 +97,7 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-slate-200 transition-colors cursor-pointer text-sm font-bold shrink-0"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -110,19 +105,19 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
         <div className="p-3 px-4 bg-slate-50 border-b border-slate-200 space-y-2.5 shrink-0">
           {/* Search Box */}
           <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nama siswa, NISN, atau nama wali..."
+              placeholder="Cari nama siswa, kelas, atau UID RFID..."
               className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold placeholder:text-slate-400 focus:outline-none focus:border-[#0D7A5F]"
             />
-            <span className="absolute left-3 top-2.5 text-xs text-slate-400">🔍</span>
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 ✕
               </button>
@@ -143,7 +138,7 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
                       : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  {c === 'ALL' ? 'Semua Kelas' : c}
+                  {c === 'ALL' ? 'Semua Kelas' : `Kelas ${c}`}
                 </button>
               ))}
             </div>
@@ -162,7 +157,7 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
               <span className="text-4xl">👥</span>
               <h4 className="text-xs font-extrabold text-slate-800">Direktori Siswa Masih Kosong</h4>
               <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
-                Belum ada data siswa yang ditambahkan oleh Admin Website. Silakan hubungi Admin untuk menambahkan direktori siswa dan kontak wali murid.
+                Belum ada data siswa aktif yang disinkronkan. Admin dapat menyinkronkan data siswa dari GradeMaster.
               </p>
             </div>
           ) : filteredStudents.length === 0 ? (
@@ -175,13 +170,13 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
             filteredStudents.map((std) => (
               <div
                 key={std.id}
-                className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs hover:border-slate-300 transition-all space-y-2.5"
+                className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs hover:border-slate-300 transition-all space-y-2"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
                       className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs text-white shrink-0 ${
-                        std.gender === 'L' ? 'bg-blue-500' : 'bg-pink-500'
+                        std.gender === 'L' ? 'bg-blue-600' : 'bg-pink-600'
                       }`}
                     >
                       {std.fullName ? std.fullName.charAt(0).toUpperCase() : 'S'}
@@ -191,7 +186,7 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
                         {std.fullName}
                       </h4>
                       <span className="text-[10px] text-slate-400 font-semibold block truncate">
-                        NISN: {std.nisn || '-'} • {std.className} {std.gender ? `(${std.gender === 'L' ? 'Laki-laki' : 'Perempuan'})` : ''}
+                        {std.nisn ? `NISN: ${std.nisn} • ` : ''}Kelas {std.className} {std.gender ? `(${std.gender === 'L' ? 'Laki-laki' : 'Perempuan'})` : ''}
                       </span>
                     </div>
                   </div>
@@ -203,32 +198,20 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
                   )}
                 </div>
 
-                {/* Parent / Wali Murid Info */}
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2 text-xs">
-                  <div className="min-w-0">
-                    <span className="text-[10px] text-slate-500 font-medium block">Wali Murid:</span>
-                    <span className="font-bold text-slate-800 text-[11px] truncate block">
-                      {std.parentName || '-'}
-                    </span>
-                    {std.parentPhone && (
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {std.parentPhone}
-                      </span>
-                    )}
+                {/* RFID & Class Info Bar */}
+                <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <School className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-[11px] font-bold text-slate-700">Kelas {std.className}</span>
                   </div>
 
-                  {std.parentPhone ? (
-                    <a
-                      href={formatWaUrl(std.parentPhone, std.parentName, std.fullName)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black rounded-xl flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95 transition-all shrink-0"
-                    >
-                      <span>💬</span>
-                      <span>Hubungi WA</span>
-                    </a>
+                  {std.rfidUid ? (
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px] font-mono font-bold flex items-center gap-1 border border-emerald-200">
+                      <CreditCard className="w-3 h-3 text-emerald-600" />
+                      UID: {std.rfidUid}
+                    </span>
                   ) : (
-                    <span className="text-[10px] text-slate-400 italic">No WA belum ada</span>
+                    <span className="text-[10px] text-slate-400 italic">Belum pasang RFID</span>
                   )}
                 </div>
               </div>
@@ -241,7 +224,7 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-black rounded-xl transition-all cursor-pointer text-center"
+            className="w-full py-2.5 bg-[#023246] hover:bg-[#023246]/90 text-white text-xs font-black rounded-xl transition-all cursor-pointer text-center"
           >
             Tutup Direktori
           </button>

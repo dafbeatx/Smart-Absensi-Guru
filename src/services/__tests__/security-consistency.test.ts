@@ -769,21 +769,21 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
       )
     );
 
-    // Test I: Student Directory & Guardian Contacts - Default Empty State & Admin CRUD
+    // Test I: Student Directory & RFID Attendance - Default Empty State, Admin CRUD & RFID Tap
     const initialStudents = await StudentRepository.getStudents();
     assert(
       'Student Directory - Default State Is Empty Array (No Hardcoded Dummy Data)',
       Array.isArray(initialStudents) && initialStudents.length === 0
     );
 
-    // Admin adds a student
+    // Admin adds a student with RFID
     const createdStd = await StudentRepository.createStudent({
       nisn: '0087654321',
       fullName: 'Siti Rahmawati',
-      className: 'Kelas VII-A',
+      className: '8A',
+      academicYear: '2026/2027',
       gender: 'P',
-      parentName: 'Bapak Gunawan',
-      parentPhone: '081234567890',
+      rfidUid: 'A1B2C3D4',
       attendanceRate: 98,
       notes: 'Siswa berprestasi',
     });
@@ -794,30 +794,35 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     );
 
     // Filter by class
-    const classStudents = await StudentRepository.getStudentsByClass('Kelas VII-A');
+    const classStudents = await StudentRepository.getStudentsByClass('8A');
     assert(
       'Student Directory - Filter By Class Matches Added Student',
       classStudents.length === 1 && classStudents[0].nisn === '0087654321'
     );
 
-    // Admin updates student
+    // Admin updates student & binds/updates RFID
     const updateSuccess = await StudentRepository.updateStudent(createdStd.id, {
-      parentName: 'H. Gunawan, S.E.',
+      rfidUid: 'E5F6G7H8',
       attendanceRate: 100,
     });
     const afterUpdate = await StudentRepository.getStudents();
     const updatedRecord = afterUpdate.find((s) => s.id === createdStd.id);
     assert(
-      'Student Directory - Admin Can Update Student Details',
-      updateSuccess === true && updatedRecord?.parentName === 'H. Gunawan, S.E.' && updatedRecord?.attendanceRate === 100
+      'Student Directory - Admin Can Update Student Details & RFID',
+      updateSuccess === true && updatedRecord?.rfidUid === 'E5F6G7H8' && updatedRecord?.attendanceRate === 100
     );
 
-    // WhatsApp URL Format Test
-    const cleanPhone = (updatedRecord?.parentPhone || '').replace(/\D/g, '');
-    const intlPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
+    // RFID Lookup & Attendance Tap Test
+    const foundByRfid = await StudentRepository.getStudentByRfid('E5F6G7H8');
     assert(
-      'Student Directory - Guardian Phone Formats Valid International WhatsApp Link',
-      intlPhone === '6281234567890'
+      'Student Directory - Successfully Resolves Student by RFID UID',
+      Boolean(foundByRfid && foundByRfid.fullName === 'Siti Rahmawati')
+    );
+
+    const rfidTapResult = await StudentRepository.recordStudentRfidAttendance('E5F6G7H8', 'Presensi Harian');
+    assert(
+      'Student Directory - Tap RFID Successfully Records Attendance to gm_attendance',
+      rfidTapResult.success === true && rfidTapResult.student?.fullName === 'Siti Rahmawati' && rfidTapResult.attendance?.status === 'Hadir'
     );
 
     // Admin deletes student

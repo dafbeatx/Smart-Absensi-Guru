@@ -18,6 +18,7 @@ import type {
   UpdateComplaintStatusDTO,
   TeachingSlot,
   StudentItem,
+  StudentAttendanceRecord,
   VerificationMethod,
   AttendanceSource,
 } from '../types/database.types';
@@ -1372,7 +1373,7 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
-  // ── STUDENT DIRECTORY & GUARDIAN CONTACTS API ──────────────────────────────
+  // ── STUDENT DIRECTORY & RFID ATTENDANCE API ──────────────────────────────
   public async getStudents(_token?: string): Promise<StudentItem[]> {
     const raw = safeGetStorage('smart_absensi_students');
     if (!raw) return [];
@@ -1401,6 +1402,7 @@ export class MockProvider implements IDataProvider {
       ...student,
       id: `std_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
     list.unshift(newStudent);
     await this.saveStudents(list, token);
@@ -1415,7 +1417,7 @@ export class MockProvider implements IDataProvider {
     const list = await this.getStudents(token);
     const index = list.findIndex((s) => s.id === id);
     if (index === -1) return false;
-    list[index] = { ...list[index], ...updates };
+    list[index] = { ...list[index], ...updates, updated_at: new Date().toISOString() };
     await this.saveStudents(list, token);
     return true;
   }
@@ -1426,5 +1428,178 @@ export class MockProvider implements IDataProvider {
     if (filtered.length === list.length) return false;
     await this.saveStudents(filtered, token);
     return true;
+  }
+
+  public async syncStudentsFromGradeMaster(
+    academicYear = '2026/2027',
+    token?: string
+  ): Promise<{ syncedCount: number; classesCount: number }> {
+    // Initial 2026/2027 roster of promoted & new students for offline / fallback
+    const defaultRoster = [
+      // Kelas 7 (Siswa Baru)
+      { name: 'ADIBA KHANSA AZ-ZAHRA', class: '7' },
+      { name: 'AKBAR AZHI MUGHNI', class: '7' },
+      { name: 'CALISA CANIA MARYAM', class: '7' },
+      { name: 'HANIFAH AL-QUSYARI', class: '7' },
+      { name: 'IFHAM FATHAR MUBAROK', class: '7' },
+      { name: 'MUHAMAD IBNU ZIKRA', class: '7' },
+      // Kelas 8A (Naik dari 7A)
+      { name: 'BILQIS AINUN NISSA', class: '8A' },
+      { name: 'KIRANA AURA ANWARUDIN', class: '8A' },
+      { name: 'NAJWA NUR FADILLAH', class: '8A' },
+      { name: 'RADISTI PUTRI RIANTI', class: '8A' },
+      { name: 'SUCI RAHMAWATI', class: '8A' },
+      { name: 'TASYIRA AFIFA', class: '8A' },
+      { name: 'YOLA AULIA SANTOSO', class: '8A' },
+      // Kelas 8B (Naik dari 7B)
+      { name: 'ABILA YAZID RIZAQI', class: '8B' },
+      { name: 'FARDHAN HANIF', class: '8B' },
+      { name: 'MARVHEL PUTRA IHSANUL ALIM', class: '8B' },
+      { name: 'MUHAMAD RAKA ADITYA', class: '8B' },
+      { name: 'ROMADONI', class: '8B' },
+      // Kelas 9A (Naik dari 8A)
+      { name: 'AJENG ALIFATUL KHOIR', class: '9A' },
+      { name: 'AZZAHRA ASHILA ROHMAH', class: '9A' },
+      { name: 'FUJI HIKMAH', class: '9A' },
+      { name: 'SEPTI MUJIANTI', class: '9A' },
+      { name: 'SIFA NURKHALIFAH', class: '9A' },
+      // Kelas 9B (Naik dari 8B)
+      { name: 'ANDIKA PRATAMA', class: '9B' },
+      { name: 'FAIRUZ PRASETIA', class: '9B' },
+      { name: 'FARIZ ABQORI MAULANA', class: '9B' },
+      { name: 'FITRA RAMADHAN', class: '9B' },
+      { name: 'WILDAN KHOER BASUKI', class: '9B' },
+      // Kelas SMA
+      { name: 'ARNESTA HADIWINATA', class: 'SMA' },
+      { name: 'EVIANA', class: 'SMA' },
+      { name: 'HAYATUSSIFA', class: 'SMA' },
+      { name: 'NAZWATUNNISA', class: 'SMA' },
+      { name: 'NYIMAS RANI RAHMAWATI', class: 'SMA' },
+    ];
+
+    const currentList = await this.getStudents(token);
+    const existingRfid = new Map<string, string>();
+    currentList.forEach((s) => {
+      if (s.rfidUid) existingRfid.set(`${s.className}|||${s.fullName}`, s.rfidUid);
+    });
+
+    const synced: StudentItem[] = defaultRoster.map((item, idx) => {
+      const key = `${item.class}|||${item.name}`;
+      return {
+        id: `std_mock_${item.class.toLowerCase()}_${String(idx + 1).padStart(3, '0')}`,
+        nisn: '',
+        fullName: item.name,
+        className: item.class,
+        academicYear,
+        gender: 'L',
+        rfidUid: existingRfid.get(key) || undefined,
+        cardStatus: 'ACTIVE',
+        attendanceRate: 100,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    });
+
+    await this.saveStudents(synced, token);
+    const classes = new Set(synced.map((s) => s.className));
+    return {
+      syncedCount: synced.length,
+      classesCount: classes.size,
+    };
+  }
+
+  public async recordStudentRfidAttendance(
+    rfidUid: string,
+    subject = 'Presensi Harian',
+    token?: string
+  ): Promise<{
+    success: boolean;
+    student?: StudentItem;
+    attendance?: StudentAttendanceRecord;
+    message: string;
+    isDuplicate?: boolean;
+  }> {
+    const cleanRfid = rfidUid.trim().toUpperCase();
+    const students = await this.getStudents(token);
+    const student = students.find(
+      (s) => s.rfidUid && s.rfidUid.trim().toUpperCase() === cleanRfid
+    );
+
+    if (!student) {
+      return {
+        success: false,
+        message: `Kartu RFID (UID: ${cleanRfid}) belum terdaftar pada siswa manapun.`,
+      };
+    }
+
+    const todayDate = getTodayDateInJakarta();
+    const currentTime = getCurrentTimeInJakarta();
+    const rawAttendance = safeGetStorage('smart_absensi_gm_attendance') || '[]';
+    let attendanceList: StudentAttendanceRecord[] = [];
+    try {
+      attendanceList = JSON.parse(rawAttendance);
+    } catch {
+      attendanceList = [];
+    }
+
+    const exist = attendanceList.find(
+      (a) => a.studentName === student.fullName && a.className === student.className && a.date === todayDate
+    );
+
+    if (exist) {
+      return {
+        success: true,
+        isDuplicate: true,
+        student,
+        attendance: exist,
+        message: `Siswa ${student.fullName} (${student.className}) sudah tercatat hadir hari ini pukul ${exist.checkInTime || currentTime}.`,
+      };
+    }
+
+    const newRecord: StudentAttendanceRecord = {
+      id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      studentName: student.fullName,
+      className: student.className,
+      subject,
+      academicYear: student.academicYear || '2026/2027',
+      status: 'Hadir',
+      date: todayDate,
+      checkInTime: currentTime,
+      rfidUid: cleanRfid,
+      createdAt: new Date().toISOString(),
+    };
+
+    attendanceList.unshift(newRecord);
+    safeSetStorage('smart_absensi_gm_attendance', JSON.stringify(attendanceList));
+
+    // Update last tap
+    await this.updateStudent(student.id, { lastTapAt: `${todayDate} ${currentTime}` }, token);
+
+    return {
+      success: true,
+      student,
+      attendance: newRecord,
+      message: `Presensi Hadir berhasil dicatat untuk ${student.fullName} (${student.className}) pukul ${currentTime}.`,
+    };
+  }
+
+  public async getStudentAttendance(
+    date: string,
+    className?: string,
+    academicYear = '2026/2027',
+    _token?: string
+  ): Promise<StudentAttendanceRecord[]> {
+    const raw = safeGetStorage('smart_absensi_gm_attendance') || '[]';
+    try {
+      const parsed: StudentAttendanceRecord[] = JSON.parse(raw);
+      return parsed.filter((r) => {
+        const matchDate = r.date === date;
+        const matchClass = !className || className === 'ALL' || r.className === className;
+        const matchYear = !r.academicYear || r.academicYear === academicYear;
+        return matchDate && matchClass && matchYear;
+      });
+    } catch {
+      return [];
+    }
   }
 }

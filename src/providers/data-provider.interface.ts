@@ -15,6 +15,7 @@ import type {
   UpdateComplaintStatusDTO,
   TeachingSlot,
   StudentItem,
+  StudentAttendanceRecord,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -85,12 +86,21 @@ export interface IDataProvider {
   getTeachingSchedules(token?: string): Promise<TeachingSlot[]>;
   saveTeachingSchedules(schedules: TeachingSlot[], token?: string): Promise<boolean>;
 
-  // Student Directory & Guardian Contacts API (Direktori Siswa & Kontak Wali)
+  // Student Directory & RFID Attendance API (Direktori Siswa & Absensi RFID)
   getStudents(token?: string): Promise<StudentItem[]>;
   saveStudents(students: StudentItem[], token?: string): Promise<boolean>;
   createStudent(student: Omit<StudentItem, 'id' | 'created_at'>, token?: string): Promise<StudentItem>;
   updateStudent(id: string, updates: Partial<StudentItem>, token?: string): Promise<boolean>;
   deleteStudent(id: string, token?: string): Promise<boolean>;
+  syncStudentsFromGradeMaster(academicYear?: string, token?: string): Promise<{ syncedCount: number; classesCount: number }>;
+  recordStudentRfidAttendance(rfidUid: string, subject?: string, token?: string): Promise<{
+    success: boolean;
+    student?: StudentItem;
+    attendance?: StudentAttendanceRecord;
+    message: string;
+    isDuplicate?: boolean;
+  }>;
+  getStudentAttendance(date: string, className?: string, academicYear?: string, token?: string): Promise<StudentAttendanceRecord[]>;
 }
 
 

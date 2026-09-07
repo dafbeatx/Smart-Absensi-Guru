@@ -253,10 +253,27 @@ export interface StudentItem {
   fullName: string;
   className: string;
   gender: 'L' | 'P';
-  parentName: string;
-  parentPhone: string;
+  rfidUid?: string;
+  cardStatus?: 'ACTIVE' | 'INACTIVE' | 'LOST';
+  academicYear?: string;
   attendanceRate?: number;
+  lastTapAt?: string;
   address?: string;
   notes?: string;
   created_at?: string;
+  updated_at?: string;
+}
+
+export interface StudentAttendanceRecord {
+  id: string;
+  studentName: string;
+  className: string;
+  subject?: string;
+  academicYear?: string;
+  status: 'Hadir' | 'Izin' | 'Sakit' | 'Alpa';
+  date: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  rfidUid?: string;
+  createdAt?: string;
 }

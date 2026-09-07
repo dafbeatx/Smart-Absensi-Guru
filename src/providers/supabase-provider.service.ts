@@ -20,6 +20,7 @@ import type {
   UpdateComplaintStatusDTO,
   TeachingSlot,
   StudentItem,
+  StudentAttendanceRecord,
   VerificationMethod,
   AttendanceSource,
 } from '../types/database.types';
@@ -1832,31 +1833,76 @@ export class SupabaseProvider implements IDataProvider {
     return mockProv.saveTeachingSchedules(schedules);
   }
 
-  // ── STUDENT DIRECTORY & GUARDIAN CONTACTS API ──────────────────────────────
+  // ── STUDENT DIRECTORY & RFID ATTENDANCE API ──────────────────────────────
   public async getStudents(_token?: string): Promise<StudentItem[]> {
     try {
+      // 1. Try fetching from public.students
       const { data, error } = await this.client
         .from('students')
         .select('*')
         .order('class_name', { ascending: true })
         .order('full_name', { ascending: true });
 
-      if (error) {
-        logger.warn('SupabaseProvider', 'getStudents Supabase query error, fallback to local storage:', error.message);
-      } else if (data && data.length > 0) {
+      if (!error && data && data.length > 0) {
         return (data as any[]).map((row) => ({
           id: row.id,
-          nisn: row.nisn,
+          nisn: row.nisn || '',
           fullName: row.full_name,
           className: row.class_name,
-          gender: row.gender,
-          parentName: row.parent_name,
-          parentPhone: row.parent_phone,
+          academicYear: row.academic_year || '2026/2027',
+          gender: row.gender || 'L',
+          rfidUid: row.rfid_uid || undefined,
+          cardStatus: row.card_status || 'ACTIVE',
           attendanceRate: row.attendance_rate != null ? Number(row.attendance_rate) : 100,
+          lastTapAt: row.last_tap_at || undefined,
           address: row.address,
           notes: row.notes,
           created_at: row.created_at,
+          updated_at: row.updated_at,
         }));
+      }
+
+      // 2. If table doesn't exist yet or is empty, auto-read from gm_behaviors (Active Academic Year 2026/2027)
+      const { data: activeBehaviors, error: bErr } = await this.client
+        .from('gm_behaviors')
+        .select('student_name, class_name, academic_year')
+        .eq('academic_year', '2026/2027');
+
+      if (!bErr && activeBehaviors && activeBehaviors.length > 0) {
+        const uniqueMap = new Map<string, StudentItem>();
+        activeBehaviors.forEach((b: any) => {
+          if (!b.student_name || !b.class_name) return;
+          const cleanName = b.student_name.trim().toUpperCase();
+          const cleanClass = b.class_name.trim().toUpperCase();
+          const key = `${cleanClass}|||${cleanName}`;
+          if (!uniqueMap.has(key)) {
+            const hashId = `std_${cleanClass.toLowerCase()}_${Math.abs(
+              cleanName.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0)
+            )}`;
+            uniqueMap.set(key, {
+              id: hashId,
+              nisn: '',
+              fullName: cleanName,
+              className: cleanClass,
+              academicYear: '2026/2027',
+              gender: 'L',
+              cardStatus: 'ACTIVE',
+              attendanceRate: 100,
+              created_at: new Date().toISOString(),
+            });
+          }
+        });
+
+        const activeList = Array.from(uniqueMap.values()).sort((a, b) =>
+          a.className.localeCompare(b.className) || a.fullName.localeCompare(b.fullName)
+        );
+
+        if (activeList.length > 0) {
+          // Sync to mock provider cache
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          await mockProv.saveStudents(activeList);
+          return activeList;
+        }
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'getStudents DB exception:', err);
@@ -1876,12 +1922,14 @@ export class SupabaseProvider implements IDataProvider {
         nisn: s.nisn,
         full_name: s.fullName,
         class_name: s.className,
+        academic_year: s.academicYear || '2026/2027',
         gender: s.gender,
-        parent_name: s.parentName,
-        parent_phone: s.parentPhone,
+        rfid_uid: s.rfidUid || null,
+        card_status: s.cardStatus || 'ACTIVE',
         attendance_rate: s.attendanceRate ?? 100,
         address: s.address,
         notes: s.notes,
+        updated_at: new Date().toISOString(),
       }));
 
       // Delete existing and insert new
@@ -1919,9 +1967,10 @@ export class SupabaseProvider implements IDataProvider {
             nisn: student.nisn,
             full_name: student.fullName,
             class_name: student.className,
+            academic_year: student.academicYear || '2026/2027',
             gender: student.gender,
-            parent_name: student.parentName,
-            parent_phone: student.parentPhone,
+            rfid_uid: student.rfidUid || null,
+            card_status: student.cardStatus || 'ACTIVE',
             attendance_rate: student.attendanceRate ?? 100,
             address: student.address,
             notes: student.notes,
@@ -1933,16 +1982,18 @@ export class SupabaseProvider implements IDataProvider {
       if (!error && data) {
         const created: StudentItem = {
           id: data.id,
-          nisn: data.nisn,
+          nisn: data.nisn || '',
           fullName: data.full_name,
           className: data.class_name,
+          academicYear: data.academic_year || '2026/2027',
           gender: data.gender,
-          parentName: data.parent_name,
-          parentPhone: data.parent_phone,
+          rfidUid: data.rfid_uid || undefined,
+          cardStatus: data.card_status || 'ACTIVE',
           attendanceRate: data.attendance_rate != null ? Number(data.attendance_rate) : 100,
           address: data.address,
           notes: data.notes,
           created_at: data.created_at,
+          updated_at: data.updated_at,
         };
         // sync to mock
         const mockProv = new (await import('./mock-provider.service')).MockProvider();
@@ -1969,12 +2020,15 @@ export class SupabaseProvider implements IDataProvider {
       if (updates.nisn !== undefined) payload.nisn = updates.nisn;
       if (updates.fullName !== undefined) payload.full_name = updates.fullName;
       if (updates.className !== undefined) payload.class_name = updates.className;
+      if (updates.academicYear !== undefined) payload.academic_year = updates.academicYear;
       if (updates.gender !== undefined) payload.gender = updates.gender;
-      if (updates.parentName !== undefined) payload.parent_name = updates.parentName;
-      if (updates.parentPhone !== undefined) payload.parent_phone = updates.parentPhone;
+      if (updates.rfidUid !== undefined) payload.rfid_uid = updates.rfidUid;
+      if (updates.cardStatus !== undefined) payload.card_status = updates.cardStatus;
       if (updates.attendanceRate !== undefined) payload.attendance_rate = updates.attendanceRate;
+      if (updates.lastTapAt !== undefined) payload.last_tap_at = updates.lastTapAt;
       if (updates.address !== undefined) payload.address = updates.address;
       if (updates.notes !== undefined) payload.notes = updates.notes;
+      payload.updated_at = new Date().toISOString();
 
       const { error } = await this.client
         .from('students')
@@ -2008,5 +2062,239 @@ export class SupabaseProvider implements IDataProvider {
 
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.deleteStudent(id, token);
+  }
+
+  public async syncStudentsFromGradeMaster(
+    academicYear = '2026/2027',
+    _token?: string
+  ): Promise<{ syncedCount: number; classesCount: number }> {
+    try {
+      // Pull active 2026/2027 students from gm_behaviors
+      const { data: behaviors, error: bErr } = await this.client
+        .from('gm_behaviors')
+        .select('student_name, class_name, academic_year')
+        .eq('academic_year', academicYear);
+
+      if (bErr) throw bErr;
+
+      // Also fetch gm_student_accounts for 2026/2027
+      const { data: accounts } = await this.client
+        .from('gm_student_accounts')
+        .select('student_name, class_name, academic_year')
+        .eq('academic_year', academicYear);
+
+      // Merge and deduplicate
+      const mergedMap = new Map<string, { fullName: string; className: string }>();
+
+      (behaviors || []).forEach((b: any) => {
+        if (!b.student_name || !b.class_name) return;
+        const cName = b.student_name.trim().toUpperCase();
+        const cClass = b.class_name.trim().toUpperCase();
+        mergedMap.set(`${cClass}|||${cName}`, { fullName: cName, className: cClass });
+      });
+
+      (accounts || []).forEach((a: any) => {
+        if (!a.student_name || !a.class_name) return;
+        const cName = a.student_name.trim().toUpperCase();
+        const cClass = a.class_name.trim().toUpperCase();
+        const key = `${cClass}|||${cName}`;
+        if (!mergedMap.has(key)) {
+          mergedMap.set(key, { fullName: cName, className: cClass });
+        }
+      });
+
+      const existingStudents = await this.getStudents();
+      const existingRfidByStudent = new Map<string, string>();
+      existingStudents.forEach((s) => {
+        if (s.rfidUid) {
+          existingRfidByStudent.set(`${s.className.toUpperCase()}|||${s.fullName.toUpperCase()}`, s.rfidUid);
+        }
+      });
+
+      const syncedList: StudentItem[] = Array.from(mergedMap.values()).map((item, idx) => {
+        const studentKey = `${item.className}|||${item.fullName}`;
+        const preservedRfid = existingRfidByStudent.get(studentKey);
+        return {
+          id: `std_${item.className.toLowerCase()}_${String(idx + 1).padStart(3, '0')}`,
+          nisn: '',
+          fullName: item.fullName,
+          className: item.className,
+          academicYear: academicYear,
+          gender: 'L',
+          rfidUid: preservedRfid || undefined,
+          cardStatus: 'ACTIVE',
+          attendanceRate: 100,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      });
+
+      // Save to students table
+      await this.saveStudents(syncedList);
+
+      const uniqueClasses = new Set(syncedList.map((s) => s.className));
+      return {
+        syncedCount: syncedList.length,
+        classesCount: uniqueClasses.size,
+      };
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'syncStudentsFromGradeMaster error:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.syncStudentsFromGradeMaster(academicYear);
+    }
+  }
+
+  public async recordStudentRfidAttendance(
+    rfidUid: string,
+    subject = 'Presensi Harian',
+    _token?: string
+  ): Promise<{
+    success: boolean;
+    student?: StudentItem;
+    attendance?: StudentAttendanceRecord;
+    message: string;
+    isDuplicate?: boolean;
+  }> {
+    try {
+      const cleanRfid = rfidUid.trim().toUpperCase();
+      const students = await this.getStudents();
+      const student = students.find(
+        (s) => s.rfidUid && s.rfidUid.trim().toUpperCase() === cleanRfid
+      );
+
+      if (!student) {
+        return {
+          success: false,
+          message: `Kartu RFID (UID: ${cleanRfid}) belum terdaftar pada siswa manapun.`,
+        };
+      }
+
+      const todayDate = getTodayDateInJakarta();
+      const currentTime = getCurrentTimeInJakarta();
+      const academicYear = student.academicYear || '2026/2027';
+
+      // Check if already tapped today in gm_attendance
+      const { data: existingRecords } = await this.client
+        .from('gm_attendance')
+        .select('*')
+        .eq('student_name', student.fullName)
+        .eq('class_name', student.className)
+        .eq('date', todayDate)
+        .limit(1);
+
+      if (existingRecords && existingRecords.length > 0) {
+        const exist = existingRecords[0];
+        return {
+          success: true,
+          isDuplicate: true,
+          student,
+          attendance: {
+            id: exist.id,
+            studentName: exist.student_name,
+            className: exist.class_name,
+            subject: exist.subject,
+            academicYear: exist.academic_year,
+            status: exist.status,
+            date: exist.date,
+            checkInTime: exist.check_in_time || currentTime,
+            checkOutTime: exist.check_out_time,
+            rfidUid: cleanRfid,
+            createdAt: exist.created_at,
+          },
+          message: `Siswa ${student.fullName} (${student.className}) sudah tercatat hadir hari ini pukul ${exist.check_in_time || currentTime}.`,
+        };
+      }
+
+      // Record to public.gm_attendance
+      const newAttendanceRow = {
+        student_name: student.fullName,
+        class_name: student.className,
+        subject: subject,
+        academic_year: academicYear,
+        status: 'Hadir',
+        date: todayDate,
+        check_in_time: currentTime,
+        rfid_uid: cleanRfid,
+      };
+
+      const { data: inserted, error: insertErr } = await this.client
+        .from('gm_attendance')
+        .insert([newAttendanceRow])
+        .select()
+        .single();
+
+      if (insertErr) {
+        logger.warn('SupabaseProvider', 'recordStudentRfidAttendance insert gm_attendance error:', insertErr.message);
+      }
+
+      // Update student last tap
+      await this.updateStudent(student.id, { lastTapAt: `${todayDate} ${currentTime}` });
+
+      const attendanceRecord: StudentAttendanceRecord = {
+        id: inserted?.id || `att_std_${Date.now()}`,
+        studentName: student.fullName,
+        className: student.className,
+        subject: subject,
+        academicYear: academicYear,
+        status: 'Hadir',
+        date: todayDate,
+        checkInTime: currentTime,
+        rfidUid: cleanRfid,
+        createdAt: inserted?.created_at || new Date().toISOString(),
+      };
+
+      return {
+        success: true,
+        student,
+        attendance: attendanceRecord,
+        message: `Presensi Hadir berhasil dicatat untuk ${student.fullName} (${student.className}) pukul ${currentTime}.`,
+      };
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'recordStudentRfidAttendance exception:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.recordStudentRfidAttendance(rfidUid, subject);
+    }
+  }
+
+  public async getStudentAttendance(
+    date: string,
+    className?: string,
+    academicYear = '2026/2027',
+    _token?: string
+  ): Promise<StudentAttendanceRecord[]> {
+    try {
+      let query = this.client
+        .from('gm_attendance')
+        .select('*')
+        .eq('date', date)
+        .eq('academic_year', academicYear)
+        .order('created_at', { ascending: false });
+
+      if (className && className !== 'ALL') {
+        query = query.eq('class_name', className);
+      }
+
+      const { data, error } = await query;
+      if (!error && data) {
+        return (data as any[]).map((row) => ({
+          id: row.id,
+          studentName: row.student_name,
+          className: row.class_name,
+          subject: row.subject,
+          academicYear: row.academic_year,
+          status: row.status,
+          date: row.date,
+          checkInTime: row.check_in_time,
+          checkOutTime: row.check_out_time,
+          rfidUid: row.rfid_uid,
+          createdAt: row.created_at,
+        }));
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getStudentAttendance exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getStudentAttendance(date, className, academicYear);
   }
 }

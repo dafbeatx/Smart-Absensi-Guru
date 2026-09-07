@@ -412,7 +412,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     },
     {
       id: 'STUDENTS',
-      label: 'Direktori Siswa & Wali',
+      label: 'Direktori Siswa & RFID',
       icon: '🎓',
     },
     {

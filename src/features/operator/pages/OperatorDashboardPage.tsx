@@ -124,7 +124,7 @@ export const OperatorDashboardPage: React.FC = () => {
           <div className="flex flex-wrap gap-2 pt-2">
             {[
               { id: 'TEACHERS', label: '👥 Kelola Master Pengguna' },
-              { id: 'STUDENTS', label: '🎓 Direktori Siswa & Wali' },
+              { id: 'STUDENTS', label: '🎓 Direktori Siswa & RFID' },
               { id: 'SCHEDULE', label: '🗓️ Jadwal Mengajar' },
               { id: 'SETTINGS', label: '⚙️ Jam Kerja & Geofence' },
               { id: 'EXPORT', label: '📊 Export Multi-Sheet Excel' },

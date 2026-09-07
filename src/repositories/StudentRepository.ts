@@ -164,4 +164,90 @@ export class StudentRepository {
 
     return success;
   }
+
+  /**
+   * Finds a student by RFID UID.
+   */
+  public static async getStudentByRfid(rfidUid: string, token?: string): Promise<StudentItem | null> {
+    if (!rfidUid) return null;
+    const cleanRfid = rfidUid.trim().toUpperCase();
+    const students = await this.getStudents(token);
+    return students.find((s) => s.rfidUid && s.rfidUid.trim().toUpperCase() === cleanRfid) || null;
+  }
+
+  /**
+   * Binds an RFID card UID to a student. Checks uniqueness.
+   */
+  public static async bindRfidCard(studentId: string, rfidUid: string, token?: string): Promise<{ success: boolean; message: string }> {
+    const cleanRfid = rfidUid.trim().toUpperCase();
+    const students = await this.getStudents(token);
+
+    // Check if RFID already assigned to someone else
+    const conflict = students.find(
+      (s) => s.id !== studentId && s.rfidUid && s.rfidUid.trim().toUpperCase() === cleanRfid
+    );
+    if (conflict) {
+      return {
+        success: false,
+        message: `Kartu RFID ${cleanRfid} sudah terpasang pada siswa ${conflict.fullName} (${conflict.className}).`,
+      };
+    }
+
+    const updated = await this.updateStudent(studentId, { rfidUid: cleanRfid, cardStatus: 'ACTIVE' }, token);
+    return {
+      success: updated,
+      message: updated ? `Kartu RFID berhasil ditautkan ke siswa.` : `Gagal menautkan kartu RFID ke database.`,
+    };
+  }
+
+  /**
+   * Unbinds an RFID card from a student.
+   */
+  public static async unbindRfidCard(studentId: string, token?: string): Promise<boolean> {
+    return this.updateStudent(studentId, { rfidUid: undefined, cardStatus: 'INACTIVE' }, token);
+  }
+
+  /**
+   * Synchronizes active students directly from GradeMaster (Year 2026/2027).
+   */
+  public static async syncFromGradeMaster(
+    academicYear = '2026/2027',
+    token?: string
+  ): Promise<{ syncedCount: number; classesCount: number }> {
+    const provider = ProviderFactory.getProvider();
+    const result = await provider.syncStudentsFromGradeMaster(academicYear, token);
+    const updated = await provider.getStudents(token);
+    safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: updated })
+      );
+    }
+    return result;
+  }
+
+  /**
+   * Records student attendance when an RFID card is scanned.
+   */
+  public static async recordStudentRfidAttendance(
+    rfidUid: string,
+    subject = 'Presensi Harian',
+    token?: string
+  ) {
+    const provider = ProviderFactory.getProvider();
+    return provider.recordStudentRfidAttendance(rfidUid, subject, token);
+  }
+
+  /**
+   * Fetches attendance records for a specific date and class from gm_attendance.
+   */
+  public static async getStudentAttendance(
+    date: string,
+    className?: string,
+    academicYear = '2026/2027',
+    token?: string
+  ) {
+    const provider = ProviderFactory.getProvider();
+    return provider.getStudentAttendance(date, className, academicYear, token);
+  }
 }
