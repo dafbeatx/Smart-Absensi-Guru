@@ -170,6 +170,10 @@
   color: #94a3b8;
 }
 
+.rfid-kiosk-input::placeholder {
+  color: #64748b;
+}
+
 /* 🔔 Bell Ringing & Shaking Animation for Real-time Notifications */
 @keyframes bell-ring {
   0% { transform: rotate(0); }

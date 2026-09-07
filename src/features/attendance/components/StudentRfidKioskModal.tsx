@@ -327,7 +327,7 @@ export const StudentRfidKioskModal: React.FC<StudentRfidKioskModalProps> = ({
                       value={manualUid}
                       onChange={(e) => setManualUid(e.target.value)}
                       placeholder="Tempel kartu atau ketik UID..."
-                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-bold text-white rfid-kiosk-input focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     />
                     <button
                       type="submit"
