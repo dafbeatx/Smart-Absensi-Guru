@@ -373,7 +373,7 @@ export const SchoolEventsCalendarModal: React.FC<SchoolEventsCalendarModalProps>
                   SpeechService.speak('Pengingat KBM: Jadwal KBM dan kegiatan sekolah berjalan sesuai kalender akademik.');
                 }
               }}
-              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] font-black rounded-xl cursor-pointer shadow-xs transition-all shrink-0 min-h-[44px] flex items-center gap-1.5"
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[11px] font-black rounded-xl cursor-pointer shadow-xs transition-all shrink-0 min-h-11 flex items-center gap-1.5"
             >
               <span>🔔 Uji Suara</span>
             </button>
