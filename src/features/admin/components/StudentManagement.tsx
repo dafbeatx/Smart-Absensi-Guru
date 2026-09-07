@@ -42,6 +42,11 @@ export const StudentManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
+
+  // Keep a ref to current students to prevent unnecessary loading flash on re-fetches
+  const studentsRef = useRef<StudentItem[]>(students);
+  studentsRef.current = students;
 
   // Search, Filter & Pagination
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,8 +80,11 @@ export const StudentManagement: React.FC = () => {
   const [formAttendanceRate, setFormAttendanceRate] = useState('100');
   const [formNotes, setFormNotes] = useState('');
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    // Only trigger full loading spinner if there is no cached data yet
+    if (!silent && studentsRef.current.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const data = await StudentRepository.getStudents();
       setStudents(data || []);
@@ -90,7 +98,14 @@ export const StudentManagement: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    const handleUpdated = () => loadData();
+    const handleUpdated = (e?: Event) => {
+      const customEvent = e as CustomEvent<StudentItem[]>;
+      if (customEvent?.detail && Array.isArray(customEvent.detail)) {
+        setStudents(customEvent.detail);
+      } else {
+        loadData(true);
+      }
+    };
     window.addEventListener(STUDENTS_UPDATED_EVENT, handleUpdated);
     window.addEventListener('storage', handleUpdated);
     return () => {
@@ -174,7 +189,7 @@ export const StudentManagement: React.FC = () => {
         'Sinkronisasi Sukses',
         `Berhasil menyinkronkan ${res.syncedCount} siswa aktif (${res.classesCount} rombel) dari GradeMaster!`
       );
-      loadData();
+      await loadData(true);
     } catch (err: any) {
       console.error('Sync error:', err);
       SoundService.playError();
@@ -229,22 +244,46 @@ export const StudentManagement: React.FC = () => {
     e.preventDefault();
     if (!bindingStudent || !bindingUid.trim()) return;
 
+    const targetStudentId = bindingStudent.id;
+    const cleanUid = bindingUid.trim().toUpperCase();
+    const initialScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+
     setIsBinding(true);
     try {
-      const res = await StudentRepository.bindRfidCard(bindingStudent.id, bindingUid.trim());
+      // Optimistic update
+      setStudents((prev) =>
+        prev.map((s) => (s.id === targetStudentId ? { ...s, rfidUid: cleanUid, cardStatus: 'ACTIVE' } : s))
+      );
+      setBindingStudent(null);
+      setBindingUid('');
+      setHighlightedStudentId(targetStudentId);
+      setTimeout(() => setHighlightedStudentId(null), 3000);
+
+      setTimeout(() => {
+        const targetEl =
+          document.getElementById(`student-row-${targetStudentId}`) ||
+          document.getElementById(`student-card-${targetStudentId}`);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else if (typeof window !== 'undefined' && window.scrollY !== initialScrollY) {
+          window.scrollTo({ top: initialScrollY, behavior: 'instant' });
+        }
+      }, 60);
+
+      const res = await StudentRepository.bindRfidCard(targetStudentId, cleanUid);
       if (res.success) {
         SoundService.playSuccess();
-        showToast('success', 'RFID Terpasang', `Kartu ${bindingUid.trim().toUpperCase()} berhasil ditautkan ke ${bindingStudent.fullName}`);
-        setBindingStudent(null);
-        setBindingUid('');
-        loadData();
+        showToast('success', 'RFID Terpasang', `Kartu ${cleanUid} berhasil ditautkan ke ${bindingStudent.fullName}`);
+        await loadData(true);
       } else {
         SoundService.playError();
         showToast('error', 'Konflik Kartu RFID', res.message);
+        await loadData(true);
       }
     } catch (err: any) {
       SoundService.playError();
       showToast('error', 'Gagal Menautkan', err?.message || 'Gagal menyimpan kartu ke database');
+      await loadData(true);
     } finally {
       setIsBinding(false);
     }
@@ -252,13 +291,20 @@ export const StudentManagement: React.FC = () => {
 
   const handleUnbindRfid = async (studentId: string, studentName: string) => {
     try {
+      setStudents((prev) =>
+        prev.map((s) => (s.id === studentId ? { ...s, rfidUid: undefined, cardStatus: 'INACTIVE' } : s))
+      );
+      setHighlightedStudentId(studentId);
+      setTimeout(() => setHighlightedStudentId(null), 3000);
+
       await StudentRepository.unbindRfidCard(studentId);
       SoundService.playSuccess();
       showToast('info', 'RFID Dilepas', `Kartu RFID untuk ${studentName} telah dinonaktifkan`);
-      loadData();
+      await loadData(true);
     } catch {
       SoundService.playError();
       showToast('error', 'Gagal', 'Gagal melepas kartu RFID');
+      await loadData(true);
     }
   };
 
@@ -275,14 +321,17 @@ export const StudentManagement: React.FC = () => {
       return;
     }
 
+    const targetStudentId = editingStudent?.id;
+    const initialScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+
     setIsSaving(true);
     try {
       const parsedRate = Number(formAttendanceRate);
       const attendanceRate = !isNaN(parsedRate) && parsedRate >= 0 && parsedRate <= 100 ? parsedRate : 100;
       const cleanRfid = formRfidUid.trim().toUpperCase() || undefined;
 
-      if (editingStudent) {
-        const ok = await StudentRepository.updateStudent(editingStudent.id, {
+      if (editingStudent && targetStudentId) {
+        const updatePayload: Partial<StudentItem> = {
           nisn: formNisn.trim() || undefined,
           fullName: formFullName.trim(),
           className: effectiveClass,
@@ -291,14 +340,44 @@ export const StudentManagement: React.FC = () => {
           cardStatus: cleanRfid ? 'ACTIVE' : 'INACTIVE',
           attendanceRate,
           notes: formNotes.trim() || undefined,
-        });
+        };
+
+        // 1. Optimistic in-place update in state immediately: ZERO unmount, ZERO layout shift!
+        setStudents((prev) =>
+          prev.map((s) => (s.id === targetStudentId ? { ...s, ...updatePayload } : s))
+        );
+
+        // 2. Close modal immediately
+        setIsModalOpen(false);
+
+        // 3. Highlight the edited row/card for clear visual feedback
+        setHighlightedStudentId(targetStudentId);
+        setTimeout(() => setHighlightedStudentId(null), 3000);
+
+        // 4. Smoothly ensure scroll position is preserved right at this student
+        setTimeout(() => {
+          const targetEl =
+            document.getElementById(`student-row-${targetStudentId}`) ||
+            document.getElementById(`student-card-${targetStudentId}`);
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else if (typeof window !== 'undefined' && window.scrollY !== initialScrollY) {
+            window.scrollTo({ top: initialScrollY, behavior: 'instant' });
+          }
+        }, 60);
+
+        // 5. Persist to server in background
+        const ok = await StudentRepository.updateStudent(targetStudentId, updatePayload);
         if (!ok) {
           throw new Error('Gagal memperbarui data siswa di server');
         }
         SoundService.playSuccess();
         showToast('success', 'Berhasil Diperbarui', `Data siswa "${formFullName.trim()}" berhasil diperbarui`);
+
+        // 6. Silent sync with fresh backend data (never sets isLoading to true!)
+        await loadData(true);
       } else {
-        await StudentRepository.createStudent({
+        const newStudent = await StudentRepository.createStudent({
           nisn: formNisn.trim(),
           fullName: formFullName.trim(),
           className: effectiveClass,
@@ -311,13 +390,18 @@ export const StudentManagement: React.FC = () => {
         });
         SoundService.playSuccess();
         showToast('success', 'Berhasil Ditambahkan', `Siswa "${formFullName.trim()}" berhasil ditambahkan ke direktori`);
+        setIsModalOpen(false);
+        if (newStudent?.id) {
+          setHighlightedStudentId(newStudent.id);
+          setTimeout(() => setHighlightedStudentId(null), 3000);
+        }
+        await loadData(true);
       }
-      setIsModalOpen(false);
-      await loadData();
     } catch (err: any) {
       console.error('Save student error:', err);
       SoundService.playError();
       showToast('error', 'Gagal Menyimpan', err?.message || 'Gagal menyimpan data siswa ke database');
+      await loadData(true);
     } finally {
       setIsSaving(false);
     }
@@ -325,18 +409,22 @@ export const StudentManagement: React.FC = () => {
 
   const handleDeleteStudent = async () => {
     if (!deleteTarget) return;
+    const targetId = deleteTarget.id;
     setIsSaving(true);
     try {
-      const ok = await StudentRepository.deleteStudent(deleteTarget.id);
+      setStudents((prev) => prev.filter((s) => s.id !== targetId));
+      setDeleteTarget(null);
+
+      const ok = await StudentRepository.deleteStudent(targetId);
       if (!ok) throw new Error('Gagal menghapus data siswa di server');
       SoundService.playSuccess();
       showToast('success', 'Berhasil Dihapus', `Data siswa "${deleteTarget.fullName}" berhasil dihapus`);
-      setDeleteTarget(null);
-      await loadData();
+      await loadData(true);
     } catch (err: any) {
       console.error('Delete student error:', err);
       SoundService.playError();
       showToast('error', 'Gagal Menghapus', err?.message || 'Gagal menghapus data siswa dari database');
+      await loadData(true);
     } finally {
       setIsSaving(false);
     }
@@ -640,7 +728,15 @@ export const StudentManagement: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedStudents.map((std) => (
-                    <tr key={std.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={std.id}
+                      id={`student-row-${std.id}`}
+                      className={`transition-all duration-500 ${
+                        highlightedStudentId === std.id
+                          ? 'bg-emerald-50/90 ring-2 ring-emerald-500/50'
+                          : 'hover:bg-slate-50/70'
+                      }`}
+                    >
                       {/* Siswa */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
@@ -751,7 +847,15 @@ export const StudentManagement: React.FC = () => {
             {/* B. MOBILE VIEW: ERGONOMIC CARDS (block md:hidden) */}
             <div className="block md:hidden divide-y divide-slate-100">
               {paginatedStudents.map((std) => (
-                <div key={std.id} className="p-4 space-y-3">
+                <div
+                  key={std.id}
+                  id={`student-card-${std.id}`}
+                  className={`p-4 space-y-3 transition-all duration-500 ${
+                    highlightedStudentId === std.id
+                      ? 'bg-emerald-50/90 ring-2 ring-emerald-500/50 rounded-xl'
+                      : ''
+                  }`}
+                >
                   {/* Top: Avatar, Name, Class */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
