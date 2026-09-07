@@ -222,7 +222,8 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   };
 
   // Helper to extract initials
-  const getInitials = (name: string) => {
+  const getInitials = (name?: string | null) => {
+    if (!name) return 'GP';
     return name
       .split(' ')
       .filter(Boolean)
@@ -234,9 +235,9 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
   // Teacher Options for SearchableSelect
   const teacherOptions: SelectOption[] = useMemo(() => {
-    return teachers.map((t) => ({
+    return (teachers || []).filter(Boolean).map((t) => ({
       value: t.id,
-      label: t.full_name,
+      label: t.full_name || 'Guru Pengajar',
       subtitle: t.position || 'Guru Pengajar',
       avatarText: getInitials(t.full_name),
       avatarUrl: t.avatar_url || undefined,

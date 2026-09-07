@@ -44,17 +44,23 @@ export interface HistoricalUnabsentedRecord {
 
 // Helper to match personnel with leave request
 const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest): boolean => {
-  if (leave.user_id === t.id || (t.nip && leave.user_id === t.nip) || leave.user_id === t.full_name) return true;
-  if (leave.user_name && (leave.user_name === t.full_name || leave.user_name === t.id)) return true;
-  if (leave.teacher_name && (leave.teacher_name === t.full_name || leave.teacher_name === t.id)) return true;
-  if (leave.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
+  if (!t || !leave) return false;
+  const tName = t.full_name || '';
+  const tId = t.id || '';
+  if (leave.user_id === t.id || (t.nip && leave.user_id === t.nip) || (tName && leave.user_id === tName)) return true;
+  if (leave.user_name && (leave.user_name === tName || leave.user_name === tId)) return true;
+  if (leave.teacher_name && (leave.teacher_name === tName || leave.teacher_name === tId)) return true;
+  if (leave.user_id === 'usr_guru_010' && (tName.includes('Mawar') || tId.includes('1001'))) return true;
   return false;
 };
 
 // Helper to match personnel with attendance record
 const isTeacherRecordMatch = (t: UserProfile, rec: AttendanceRecord): boolean => {
-  if (rec.user_id === t.id || (t.nip && rec.user_id === t.nip) || rec.user_id === t.full_name) return true;
-  if (rec.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
+  if (!t || !rec) return false;
+  const tName = t.full_name || '';
+  const tId = t.id || '';
+  if (rec.user_id === t.id || (t.nip && rec.user_id === t.nip) || (tName && rec.user_id === tName)) return true;
+  if (rec.user_id === 'usr_guru_010' && (tName.includes('Mawar') || tId.includes('1001'))) return true;
   return false;
 };
 

@@ -190,7 +190,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 <div className="flex items-start gap-2.5">
                   <div className="relative shrink-0">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#023246] text-white flex items-center justify-center font-black text-base sm:text-lg shadow-sm border-2 border-amber-300">
-                      {topTeacher.name.charAt(0)}
+                      {topTeacher?.name ? topTeacher.name.charAt(0) : 'G'}
                     </div>
                     <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-[10px] font-black shadow-2xs border border-white">
                       🥇
@@ -200,14 +200,14 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   <div className="min-w-0 flex-1">
                     <h4
                       className="text-xs sm:text-sm font-black text-slate-900 leading-snug truncate"
-                      title={topTeacher.name}
+                      title={topTeacher?.name || 'Guru'}
                     >
-                      {formatShortTeacherName(topTeacher.name)}
+                      {formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}
                     </h4>
                     <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium truncate mt-0.5">
-                      {topTeacher.position}
+                      {topTeacher?.position || 'Guru Pengajar'}
                     </p>
-                    {topTeacher.nip && (
+                    {topTeacher?.nip && (
                       <p className="text-[9px] sm:text-[10px] font-mono text-slate-500 mt-0.5 truncate">
                         NPP: {topTeacher.nip}
                       </p>
@@ -216,11 +216,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                       <div className="px-2 py-0.5 rounded-lg bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-black flex items-center gap-1 shadow-2xs shrink-0">
                         <span>⭐</span>
-                        <span>{topTeacher.totalPoints} Poin</span>
+                        <span>{topTeacher?.totalPoints ?? 0} Poin</span>
                       </div>
                       <div className="px-1.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[9.5px] sm:text-[10.5px] font-bold flex items-center gap-1 shrink-0">
-                        <span>{topTeacher.topBadge.icon}</span>
-                        <span className="truncate max-w-28 sm:max-w-40">{topTeacher.topBadge.title.split(' ')[0]}</span>
+                        <span>{topTeacher?.topBadge?.icon || '🏆'}</span>
+                        <span className="truncate max-w-28 sm:max-w-40">{topTeacher?.topBadge?.title ? topTeacher.topBadge.title.split(' ')[0] : 'Teladan'}</span>
                       </div>
                     </div>
                   </div>
@@ -231,13 +231,13 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   <div className="bg-amber-100/50 rounded-xl p-1.5 sm:p-2 border border-amber-200/60 min-w-0">
                     <span className="text-[9px] sm:text-[10px] text-amber-800 font-semibold block truncate">Ketepatan Waktu</span>
                     <span className="font-extrabold text-[11px] sm:text-xs text-amber-950 block mt-0.5 truncate">
-                      {topTeacher.hadirTepatWaktuCount} Hari On-Time
+                      {topTeacher?.hadirTepatWaktuCount ?? 0} Hari On-Time
                     </span>
                   </div>
                   <div className="bg-amber-100/50 rounded-xl p-1.5 sm:p-2 border border-amber-200/60 min-w-0">
                     <span className="text-[9px] sm:text-[10px] text-amber-800 font-semibold block truncate">Tugas Piket</span>
                     <span className="font-extrabold text-[11px] sm:text-xs text-amber-950 block mt-0.5 truncate">
-                      {topTeacher.piketCount} Kali Bertugas
+                      {topTeacher?.piketCount ?? 0} Kali Bertugas
                     </span>
                   </div>
                 </div>
@@ -247,7 +247,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               <div className="bg-slate-50 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-slate-200/80 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <div className="w-8 h-8 rounded-xl bg-[#023246] text-white flex items-center justify-center text-xs font-black shrink-0">
-                    #{currentUserRank}
+                    #{currentUserRank ?? 1}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -259,17 +259,17 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       </span>
                     </div>
                     <p className="text-[9.5px] sm:text-[10.5px] text-slate-500 font-medium truncate mt-0.5">
-                      Peringkat #{currentUserRank} dari {totalTeachers} Guru
+                      Peringkat #{currentUserRank ?? 1} dari {totalTeachers ?? 12} Guru
                     </p>
                   </div>
                 </div>
 
                 <div className="text-right shrink-0">
                   <span className="text-xs font-black text-emerald-700 block">
-                    {currentUserScore.totalPoints} Poin
+                    {currentUserScore?.totalPoints ?? 0} Poin
                   </span>
                   <span className="text-[9.5px] text-slate-500 font-semibold block">
-                    {currentUserScore.hadirTepatWaktuCount} On-Time
+                    {currentUserScore?.hadirTepatWaktuCount ?? 0} On-Time
                   </span>
                 </div>
               </div>
@@ -325,23 +325,23 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <h5
                                 className="text-xs font-extrabold text-slate-900 leading-snug truncate max-w-36 sm:max-w-xs"
-                                title={teacher.name}
+                                title={teacher?.name || 'Guru'}
                               >
-                                {formatShortTeacherName(teacher.name)}
+                                {formatShortTeacherName(teacher?.name || 'Guru')}
                               </h5>
                               {teacher.isCurrentUser && (
                                 <span className="px-1.5 py-0.2 bg-[#023246] text-white text-[8.5px] font-bold rounded shrink-0">
                                   Anda
                                 </span>
                               )}
-                              {teacher.topBadge.icon === '🏖️' && (
+                              {teacher.topBadge?.icon === '🏖️' && (
                                 <span className="px-1.5 py-0.2 bg-amber-100 text-amber-900 text-[8.5px] font-extrabold rounded border border-amber-200 shrink-0">
                                   Cuti
                                 </span>
                               )}
                             </div>
                             <p className="text-[9.5px] sm:text-[10.5px] text-slate-500 truncate mt-0.5">
-                              {teacher.position}
+                              {teacher.position || 'Guru'}
                               {teacher.hadirTepatWaktuCount > 0 ? ` • ${teacher.hadirTepatWaktuCount} Hadir` : ''}
                             </p>
                           </div>
@@ -350,12 +350,12 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                         {/* Right: Points & Badge */}
                         <div className="text-right shrink-0">
                           <span className={`text-xs font-black block ${teacher.totalPoints === 0 ? 'text-slate-400' : 'text-slate-900'}`}>
-                            {teacher.totalPoints} Poin
+                            {teacher.totalPoints ?? 0} Poin
                           </span>
                           <span className="text-[9px] text-slate-500 flex items-center justify-end gap-1 font-medium mt-0.5">
-                            <span>{teacher.topBadge.icon}</span>
+                            <span>{teacher.topBadge?.icon || '⭐'}</span>
                             <span className="truncate max-w-16 sm:max-w-24">
-                              {teacher.topBadge.icon === '🏖️' ? 'Cuti' : teacher.topBadge.title.split(' ')[0]}
+                              {teacher.topBadge?.icon === '🏖️' ? 'Cuti' : (teacher.topBadge?.title ? teacher.topBadge.title.split(' ')[0] : 'Aktif')}
                             </span>
                           </span>
                         </div>
@@ -569,7 +569,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 </div>
                 <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed wrap-break-word">
                   Diberikan kepada guru dengan akumulasi poin kedisiplinan tertinggi. Saat ini dipegang oleh:{' '}
-                  <strong>{formatShortTeacherName(topTeacher.name)}</strong> ({topTeacher.totalPoints} Poin).
+                  <strong>{formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}</strong> ({topTeacher?.totalPoints ?? 0} Poin).
                 </p>
               </div>
 
@@ -579,7 +579,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   Status Lencana Anda Bulan Ini
                 </span>
 
-                {currentUserScore.badges.map((badge) => (
+                {(currentUserScore?.badges || []).map((badge) => (
                   <div
                     key={badge.id}
                     className={`p-3 rounded-2xl border transition-all overflow-hidden ${
@@ -687,13 +687,13 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
         <div className="p-2.5 sm:p-3.5 border-t border-slate-100 bg-slate-50/90 flex items-center justify-between gap-2 shrink-0">
           <div className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate flex-1 min-w-0">
             {activeTab === 'LEADERBOARD' && (
-              <span className="truncate block">Juara 1: <strong>{formatShortTeacherName(topTeacher.name)}</strong> ({topTeacher.totalPoints} Poin)</span>
+              <span className="truncate block">Juara 1: <strong>{formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}</strong> ({topTeacher?.totalPoints ?? 0} Poin)</span>
             )}
             {activeTab === 'RULES' && (
               <span className="truncate block">Hadir: +15 • Telat: +5 • Piket: +10</span>
             )}
             {activeTab === 'BADGES' && (
-              <span className="truncate block">{currentUserScore.badges.filter(b => b.isUnlocked).length} dari {currentUserScore.badges.length} Lencana Aktif</span>
+              <span className="truncate block">{(currentUserScore?.badges || []).filter(b => b.isUnlocked).length} dari {(currentUserScore?.badges || []).length} Lencana Aktif</span>
             )}
             {activeTab === 'MESSAGE' && (
               <span className="truncate block">Apresiasi Resmi Manajemen Sekolah</span>

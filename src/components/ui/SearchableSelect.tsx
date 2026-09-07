@@ -46,11 +46,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   }, [options, value]);
 
   const filteredOptions = useMemo(() => {
-    if (!search.trim()) return options;
+    if (!search.trim()) return options || [];
     const q = search.toLowerCase();
-    return options.filter(
+    return (options || []).filter(
       (opt) =>
-        opt.label.toLowerCase().includes(q) ||
+        (opt.label || '').toLowerCase().includes(q) ||
         (opt.subtitle && opt.subtitle.toLowerCase().includes(q)) ||
         (opt.badge && opt.badge.toLowerCase().includes(q))
     );

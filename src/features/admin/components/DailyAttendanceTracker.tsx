@@ -307,11 +307,13 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   // 3. Filtered & Priority-Sorted list of personnel based on search, status filter, and role filter
   const filteredTeachers = useMemo(() => {
     const list = activeEligiblePersonnel.filter((teacher) => {
+      if (!teacher) return false;
       // Search query filter (Name, NIP, Position)
       const query = searchQuery.trim().toLowerCase();
+      const teacherName = teacher.full_name || '';
       const matchesSearch =
         !query ||
-        teacher.full_name.toLowerCase().includes(query) ||
+        teacherName.toLowerCase().includes(query) ||
         (teacher.nip ? teacher.nip.includes(query) : false) ||
         (teacher.position && teacher.position.toLowerCase().includes(query));
 
@@ -344,9 +346,9 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         if (role === 'ADMIN') return 2;
         return 3;
       };
-      const priorityDiff = getPriority(a.role) - getPriority(b.role);
+      const priorityDiff = getPriority(a?.role) - getPriority(b?.role);
       if (priorityDiff !== 0) return priorityDiff;
-      return a.full_name.localeCompare(b.full_name, 'id');
+      return (a?.full_name || '').localeCompare(b?.full_name || '', 'id');
     });
   }, [activeEligiblePersonnel, teacherAttendanceMap, searchQuery, statusFilter, roleFilter]);
 

@@ -488,7 +488,7 @@ export function getTeacherDisciplineLeaderboard(
   let teachers = isCurrent ? [...currentMonthTeachers] : [...previousMonthTeachers];
 
   if (currentUser) {
-    const activeBadge = currentUserScore.badges.find((b) => b.isUnlocked) || {
+    const activeBadge = currentUserScore?.badges?.find((b) => b.isUnlocked) || {
       icon: '🥉',
       title: 'Pendidik Berkomitmen',
     };
@@ -497,7 +497,7 @@ export function getTeacherDisciplineLeaderboard(
     const matchedIdx = teachers.findIndex(
       (t) =>
         (currentUser.id && t.id === currentUser.id) ||
-        (currentUser.full_name && t.name.toLowerCase() === currentUser.full_name.toLowerCase()) ||
+        (currentUser.full_name && t.name && t.name.toLowerCase() === currentUser.full_name.toLowerCase()) ||
         (currentUser.nip && t.nip && t.nip.replace(/\s+/g, '') === currentUser.nip.replace(/\s+/g, ''))
     );
 
@@ -505,11 +505,11 @@ export function getTeacherDisciplineLeaderboard(
       if (isCurrent) {
         teachers[matchedIdx] = {
           ...teachers[matchedIdx],
-          totalPoints: currentUserScore.totalPoints,
-          level: currentUserScore.level,
-          hadirTepatWaktuCount: currentUserScore.hadirTepatWaktuCount,
-          terlambatCount: currentUserScore.terlambatCount,
-          piketCount: currentUserScore.piketCount,
+          totalPoints: currentUserScore?.totalPoints ?? 0,
+          level: currentUserScore?.level || '🥉 Pendidik Berkomitmen',
+          hadirTepatWaktuCount: currentUserScore?.hadirTepatWaktuCount ?? 0,
+          terlambatCount: currentUserScore?.terlambatCount ?? 0,
+          piketCount: currentUserScore?.piketCount ?? 0,
           topBadge: { icon: activeBadge.icon, title: activeBadge.title },
           avatar_url: currentUser.avatar_url || teachers[matchedIdx].avatar_url,
           isCurrentUser: true,
@@ -528,12 +528,12 @@ export function getTeacherDisciplineLeaderboard(
         nip: currentUser.nip || null,
         position: currentUser.position || 'Guru Pengajar',
         avatar_url: currentUser.avatar_url || null,
-        totalPoints: isCurrent ? currentUserScore.totalPoints : 380,
-        level: isCurrent ? currentUserScore.level : '🥇 Pendidik Disiplin Emas',
+        totalPoints: isCurrent ? (currentUserScore?.totalPoints ?? 0) : 380,
+        level: isCurrent ? (currentUserScore?.level || '🥉 Pendidik Berkomitmen') : '🥇 Pendidik Disiplin Emas',
         rank: 0,
-        hadirTepatWaktuCount: isCurrent ? currentUserScore.hadirTepatWaktuCount : 17,
-        terlambatCount: isCurrent ? currentUserScore.terlambatCount : 1,
-        piketCount: isCurrent ? currentUserScore.piketCount : 2,
+        hadirTepatWaktuCount: isCurrent ? (currentUserScore?.hadirTepatWaktuCount ?? 0) : 17,
+        terlambatCount: isCurrent ? (currentUserScore?.terlambatCount ?? 0) : 1,
+        piketCount: isCurrent ? (currentUserScore?.piketCount ?? 0) : 2,
         topBadge: { icon: activeBadge.icon, title: activeBadge.title },
         isCurrentUser: true,
       });
@@ -549,7 +549,18 @@ export function getTeacherDisciplineLeaderboard(
     rank: idx + 1,
   }));
 
-  const topTeacher = teachers[0];
+  const topTeacher = teachers[0] || {
+    id: 'usr_default',
+    name: 'Guru Pendidik',
+    position: 'Guru Pengajar',
+    totalPoints: 0,
+    level: '🏆 Pendidik Teladan Utama',
+    rank: 1,
+    hadirTepatWaktuCount: 0,
+    terlambatCount: 0,
+    piketCount: 0,
+    topBadge: { icon: '🏆', title: 'Pendidik Teladan Utama Kepsek' },
+  };
   const currentUserIdx = teachers.findIndex((t) => t.isCurrentUser);
   const currentUserRank = currentUserIdx !== -1 ? currentUserIdx + 1 : 1;
 

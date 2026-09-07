@@ -1672,17 +1672,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="flex items-center justify-between gap-2 pt-0.5">
                   <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border border-amber-300/60 shadow-xs">
-                      {disciplineLeaderboard.topTeacher.name.charAt(0)}
+                      {disciplineLeaderboard?.topTeacher?.name ? disciplineLeaderboard.topTeacher.name.charAt(0) : 'G'}
                     </div>
                     <div className="min-w-0 flex-1">
                       <h4
                         className="text-xs sm:text-sm font-black text-slate-900 leading-snug truncate group-hover:text-[#023246]"
-                        title={disciplineLeaderboard.topTeacher.name}
+                        title={disciplineLeaderboard?.topTeacher?.name || 'Guru'}
                       >
-                        {formatShortTeacherName(disciplineLeaderboard.topTeacher.name)}
+                        {formatShortTeacherName(disciplineLeaderboard?.topTeacher?.name || 'Guru Teladan')}
                       </h4>
                       <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                        {disciplineLeaderboard.topTeacher.position}
+                        {disciplineLeaderboard?.topTeacher?.position || 'Guru Pengajar'}
                       </p>
                     </div>
                   </div>
@@ -1690,10 +1690,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <div className="text-right shrink-0">
                     <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs flex items-center gap-1 justify-end">
                       <span>⭐</span>
-                      <span>{disciplineLeaderboard.topTeacher.totalPoints} Poin</span>
+                      <span>{disciplineLeaderboard?.topTeacher?.totalPoints ?? 0} Poin</span>
                     </div>
                     <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 block mt-0.5 sm:mt-1">
-                      Juara 1 🥇<span className="hidden sm:inline"> ({disciplineLeaderboard.topTeacher.hadirTepatWaktuCount} Hari On-Time)</span>
+                      Juara 1 🥇<span className="hidden sm:inline"> ({disciplineLeaderboard?.topTeacher?.hadirTepatWaktuCount ?? 0} Hari On-Time)</span>
                     </span>
                   </div>
                 </div>
@@ -1706,8 +1706,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     Performa Disiplin Anda:
                   </span>
                   <p className="text-[10.5px] sm:text-xs font-black text-slate-800 truncate">
-                    #{disciplineLeaderboard.currentUserRank} dari {disciplineLeaderboard.totalTeachers} Guru{' '}
-                    <span className="text-emerald-600 font-bold">({appreciationScore.totalPoints} Poin)</span>
+                    #{disciplineLeaderboard?.currentUserRank ?? 1} dari {disciplineLeaderboard?.totalTeachers ?? 12} Guru{' '}
+                    <span className="text-emerald-600 font-bold">({appreciationScore?.totalPoints ?? 0} Poin)</span>
                   </p>
                 </div>
 
@@ -3709,10 +3709,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           setIsCelebrationModalOpen(false);
           setIsDisciplineBadgeModalOpen(true);
         }}
-        rank={disciplineLeaderboard.currentUserRank}
-        totalPoints={appreciationScore.totalPoints}
+        rank={disciplineLeaderboard?.currentUserRank ?? 1}
+        totalPoints={appreciationScore?.totalPoints ?? 0}
         user={effectiveUser}
-        teacherData={disciplineLeaderboard.leaderboard.find((t) => t.isCurrentUser)}
+        teacherData={disciplineLeaderboard?.leaderboard?.find((t) => t.isCurrentUser)}
       />
     </div>
   );

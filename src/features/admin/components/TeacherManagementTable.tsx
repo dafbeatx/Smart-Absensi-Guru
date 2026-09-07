@@ -47,9 +47,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-  const filteredTeachers = teachers.filter((t) => {
+  const filteredTeachers = (teachers || []).filter((t) => {
+    if (!t) return false;
+    const name = (t.full_name || '').toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
-      t.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      name.includes(query) ||
       (t.nip && t.nip.includes(searchQuery)) ||
       String(t.phone_number || '').includes(searchQuery);
 
