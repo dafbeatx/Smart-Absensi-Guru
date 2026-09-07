@@ -23,6 +23,7 @@ import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsM
 import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCalendarModal';
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
+import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
 import { BiometricService } from '../../../services/biometric.service';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -262,6 +263,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
 
   // Change PIN Form State
   const [newPin, setNewPin] = useState('');
@@ -1016,6 +1018,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     if (onOpenScanner) onOpenScanner();
   };
 
+  const handleOpenAttendanceChoice = () => {
+    setIsAttendanceChoiceModalOpen(true);
+  };
+
   const handleOpenLeaveModal = () => {
     if (onOpenLeaveForm) {
       onOpenLeaveForm();
@@ -1650,7 +1656,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             </section>
 
             {/* 📍 REAL-TIME GEOFENCE LOCATION CARD WIDGET ──────────────────── */}
-            <TeacherLocationCard onOpenScanner={handleOpenScannerClick} />
+            <TeacherLocationCard onOpenScanner={handleOpenAttendanceChoice} />
 
             {/* 🌟 1.5 TEACHER APPRECIATION & GAMIFICATION WIDGET ─────────── */}
             <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
@@ -1901,9 +1907,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <button
                   type="button"
-                  onClick={() => setIsBiometricModalOpen(true)}
+                  onClick={handleOpenAttendanceChoice}
                   className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1 shadow-2xs text-left cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95 transition-all"
-                  title="Klik untuk Presensi Masuk (Sidik Jari / Lokasi)"
+                  title="Klik untuk Presensi Masuk (Pilih Metode)"
                 >
                   <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Jam Masuk (Klik Absen)</span>
                   <p className="font-black text-emerald-950 text-base sm:text-lg">
@@ -1916,9 +1922,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setIsBiometricModalOpen(true)}
+                  onClick={handleOpenAttendanceChoice}
                   className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1 shadow-2xs text-left cursor-pointer hover:border-blue-400 hover:shadow-md active:scale-95 transition-all"
-                  title="Klik untuk Presensi Pulang (Sidik Jari / Lokasi)"
+                  title="Klik untuk Presensi Pulang (Pilih Metode)"
                 >
                   <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider block">Jam Pulang (Klik Absen)</span>
                   <p className="font-black text-blue-950 text-base sm:text-lg">
@@ -1981,27 +1987,38 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="space-y-2.5">
                   <Button
                     variant="primary"
-                    leftIcon={<FingerprintIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white shrink-0" />}
-                    onClick={() => setIsBiometricModalOpen(true)}
-                    className="w-full py-3.5 sm:py-4 text-xs sm:text-sm font-black tracking-tight shadow-md shadow-slate-900/15 flex-row items-center justify-center gap-2 sm:gap-2.5 cursor-pointer rounded-2xl bg-linear-to-r from-[#023246] via-[#095744] to-[#0D7A5F] hover:brightness-110 transition-all active:scale-[0.98] whitespace-normal leading-tight text-center"
+                    onClick={handleOpenAttendanceChoice}
+                    className="w-full py-3.5 sm:py-4 text-xs sm:text-sm font-black tracking-tight shadow-md shadow-slate-900/15 flex items-center justify-center gap-2 sm:gap-2.5 cursor-pointer rounded-2xl bg-linear-to-r from-[#023246] via-[#095744] to-[#0D7A5F] hover:brightness-110 transition-all active:scale-[0.98] whitespace-normal leading-tight text-center min-h-12"
                   >
-                    ABSEN DENGAN SIDIK JARI HP
+                    <span>👆</span>
+                    <span>LAKUKAN PRESENSI SEKARANG</span>
+                    <span>📷</span>
                   </Button>
 
-                  <button
-                    type="button"
-                    onClick={handleOpenScannerClick}
-                    onMouseEnter={() => {
-                      import('html5-qrcode').catch(() => {});
-                    }}
-                    onTouchStart={() => {
-                      import('html5-qrcode').catch(() => {});
-                    }}
-                    className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-2xs min-h-11"
-                  >
-                    <QrCodeScanIcon className="w-4 h-4 text-slate-600 shrink-0" />
-                    <span>Atau Pindai QR Code Sekolah</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsBiometricModalOpen(true)}
+                      className="py-2.5 px-3 rounded-2xl border border-teal-200 bg-teal-50 hover:bg-teal-100/80 text-teal-800 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] shadow-2xs min-h-11"
+                    >
+                      <span>👆</span>
+                      <span>Sidik Jari HP</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenScannerClick}
+                      onMouseEnter={() => {
+                        import('html5-qrcode').catch(() => {});
+                      }}
+                      onTouchStart={() => {
+                        import('html5-qrcode').catch(() => {});
+                      }}
+                      className="py-2.5 px-3 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] shadow-2xs min-h-11"
+                    >
+                      <QrCodeScanIcon className="w-4 h-4 text-slate-600 shrink-0" />
+                      <span>Scan Barcode</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
@@ -2933,13 +2950,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           {/* Center Compact FAB Scanner Button */}
           <div className="relative -top-3 flex flex-col items-center">
             <button
-              onClick={handleOpenScannerClick}
+              onClick={handleOpenAttendanceChoice}
               className="w-12 h-12 rounded-2xl bg-[#023246] hover:bg-[#0D7A5F] text-white flex items-center justify-center shadow-md ring-4 ring-white active:scale-95 transition-all cursor-pointer min-h-12 min-w-12"
-              title="Pindai QR Code Absensi"
+              title="Presensi (Pilih Sidik Jari atau Scan Barcode)"
             >
               <QrCodeScanIcon className="w-6 h-6 text-white" />
             </button>
-            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Scan QR</span>
+            <span className="text-[9px] font-extrabold text-[#023246] mt-0.5">Absen</span>
           </div>
 
           <button
@@ -3169,7 +3186,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <TeacherLocationModal
         isOpen={isLocationModalOpen}
         onClose={() => setIsLocationModalOpen(false)}
-        onOpenScanner={handleOpenScannerClick}
+        onOpenScanner={handleOpenAttendanceChoice}
         settings={settings}
       />
 
@@ -3204,6 +3221,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenTermsModal={() => setIsTermsModalOpen(true)}
         onOpenChangePin={() => setIsChangePinOpen(true)}
         onLogout={logout}
+      />
+
+      {/* Modal Pilihan Metode Presensi (Scan Barcode / QR vs Sidik Jari HP) */}
+      <AttendanceMethodChoiceModal
+        isOpen={isAttendanceChoiceModalOpen}
+        onClose={() => setIsAttendanceChoiceModalOpen(false)}
+        onSelectBiometric={() => setIsBiometricModalOpen(true)}
+        onSelectQrScan={handleOpenScannerClick}
       />
 
       {/* 13. Modal Presensi Sidik Jari HP Terintegrasi GPS Geofence */}
