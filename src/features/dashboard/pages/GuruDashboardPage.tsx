@@ -22,6 +22,8 @@ import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsM
 import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCalendarModal';
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
+import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
+import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
   Radio,
   Fingerprint,
@@ -294,6 +296,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isBioEnrolled, setIsBioEnrolled] = useState(false);
   const [isInfoExpanded, setIsInfoExpanded] = useState(false);
+  const [isPermissionBlockedModalOpen, setIsPermissionBlockedModalOpen] = useState(false);
+  const [permissionBlockedRequiresCamera, setPermissionBlockedRequiresCamera] = useState(false);
+  const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -983,12 +988,37 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     return 'Selamat Malam';
   };
 
+  const executeWithPermissionGuard = async (action: () => void, requiresCamera = false) => {
+    try {
+      const report = await PermissionGuardService.evaluatePermissions(requiresCamera);
+      if (!report.isReadyForAttendance) {
+        pendingAttendanceActionRef.current = action;
+        setPermissionBlockedRequiresCamera(requiresCamera);
+        setIsPermissionBlockedModalOpen(true);
+        return;
+      }
+      action();
+    } catch {
+      action();
+    }
+  };
+
   const handleOpenScannerClick = () => {
-    if (onOpenScanner) onOpenScanner();
+    executeWithPermissionGuard(() => {
+      if (onOpenScanner) onOpenScanner();
+    }, true);
   };
 
   const handleOpenAttendanceChoice = () => {
-    setIsAttendanceChoiceModalOpen(true);
+    executeWithPermissionGuard(() => {
+      setIsAttendanceChoiceModalOpen(true);
+    }, false);
+  };
+
+  const handleOpenBiometricModal = () => {
+    executeWithPermissionGuard(() => {
+      setIsBiometricModalOpen(true);
+    }, false);
   };
 
   const handleOpenLeaveModal = () => {
@@ -1436,7 +1466,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <div className="flex items-center gap-2.5">
                       <button
                         type="button"
-                        onClick={() => setIsBiometricModalOpen(true)}
+                        onClick={handleOpenBiometricModal}
                         className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1 cursor-pointer py-0.5"
                       >
                         <span>👆 Sidik Jari</span>
@@ -1984,7 +2014,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   {/* Sidik Jari HP */}
                   <button
                     type="button"
-                    onClick={() => setIsBiometricModalOpen(true)}
+                    onClick={handleOpenBiometricModal}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                   >
                     <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
@@ -2890,7 +2920,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="flex justify-end gap-2 pt-0.5">
                   <button
                     type="button"
-                    onClick={() => setIsBiometricModalOpen(true)}
+                    onClick={handleOpenBiometricModal}
                     className="px-3 py-1.5 bg-[#023246] hover:bg-[#0D7A5F] text-white font-extrabold text-[10px] sm:text-[11px] rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                   >
                     <span>👆</span>
@@ -3317,8 +3347,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <AttendanceMethodChoiceModal
         isOpen={isAttendanceChoiceModalOpen}
         onClose={() => setIsAttendanceChoiceModalOpen(false)}
-        onSelectBiometric={() => setIsBiometricModalOpen(true)}
+        onSelectBiometric={handleOpenBiometricModal}
         onSelectQrScan={handleOpenScannerClick}
+      />
+
+      {/* Modal Pemblokiran Presensi & Panduan Perizinan Perangkat Transparan (Anti Hide Error) */}
+      <AttendancePermissionBlockedModal
+        isOpen={isPermissionBlockedModalOpen}
+        onClose={() => setIsPermissionBlockedModalOpen(false)}
+        requiresCamera={permissionBlockedRequiresCamera}
+        onPermissionsSatisfied={() => {
+          if (pendingAttendanceActionRef.current) {
+            const action = pendingAttendanceActionRef.current;
+            pendingAttendanceActionRef.current = null;
+            action();
+          }
+        }}
       />
 
       {/* 13. Modal Presensi Sidik Jari HP Terintegrasi GPS Geofence */}

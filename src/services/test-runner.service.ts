@@ -14,6 +14,7 @@ import { runPWAGeofenceTestSuite } from './__tests__/pwa-geofence.test';
 import { runMobileUIE2ETestSuite } from './__tests__/mobile-ui-e2e.test';
 import { runGeocodingTestSuite } from './__tests__/geocoding.test';
 import { runBiometricAttendanceTestSuite } from './__tests__/biometric-attendance.test';
+import { runPermissionGuardTestSuite } from './__tests__/permission-guard.test';
 
 export interface TestResultItem {
   testName: string;
@@ -65,6 +66,7 @@ export class MasterTestRunner {
       { name: 'Automated End-to-End (E2E) Mobile UI & QA', fn: runMobileUIE2ETestSuite },
       { name: 'Reverse Geocoding & OpenStreetMap Engine', fn: runGeocodingTestSuite },
       { name: 'Geofenced Biometric Fingerprint Attendance Engine', fn: runBiometricAttendanceTestSuite },
+      { name: 'Permission Guard & Attendance Blocking Engine', fn: runPermissionGuardTestSuite },
     ];
 
     let totalPassed = 0;
