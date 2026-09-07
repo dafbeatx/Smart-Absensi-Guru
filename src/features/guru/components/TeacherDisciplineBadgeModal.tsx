@@ -228,7 +228,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </span>
                 </div>
 
-                <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs divide-y divide-slate-100 overflow-hidden">
+                <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs overflow-hidden">
                   {leaderboard.map((teacher) => {
                     const rankMedal =
                       teacher.rank === 1
@@ -242,7 +242,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     return (
                       <div
                         key={teacher.id}
-                        className={`p-3.5 flex items-center justify-between gap-3 transition-colors ${
+                        className={`p-3.5 flex items-center justify-between gap-3 transition-colors border-b border-slate-100 last:border-b-0 ${
                           teacher.isCurrentUser ? 'bg-cyan-50/50' : 'hover:bg-slate-50'
                         }`}
                       >
@@ -460,7 +460,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     <span className="font-extrabold text-amber-700 block">Level 3: Disiplin Emas</span>
                     <span className="text-[11px] text-slate-500">200 – 299 Poin</span>
                   </div>
-                  <div className="p-2.5 bg-white rounded-xl border border-amber-300 bg-amber-50/40">
+                  <div className="p-2.5 rounded-xl border border-amber-300 bg-amber-50/40">
                     <span className="font-extrabold text-amber-900 block">Level 4: Teladan Utama</span>
                     <span className="text-[11px] text-amber-800">300+ Poin</span>
                   </div>
