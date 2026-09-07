@@ -1605,7 +1605,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     setBerandaLayer('ALL_FEATURES');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-full py-2.5 px-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 active:scale-[0.99] border border-slate-200/80 text-xs font-bold text-[#023246] flex items-center justify-between transition-all cursor-pointer group"
+                  className="w-full py-2.5 px-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-xs font-bold text-[#023246] flex items-center justify-between transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-6 h-6 rounded-lg bg-[#023246] text-white flex items-center justify-center shrink-0 shadow-2xs">
