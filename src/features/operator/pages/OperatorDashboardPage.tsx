@@ -8,14 +8,13 @@ import { StudentManagement } from '../../admin/components/StudentManagement';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
-import { AuditLogTable } from '../components/AuditLogTable';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { UserProfile, AttendanceRecord } from '../../../types/database.types';
 
 export const OperatorDashboardPage: React.FC = () => {
   const { user, logout } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<'TEACHERS' | 'STUDENTS' | 'SCHEDULE' | 'SETTINGS' | 'EXPORT' | 'AUDIT'>('TEACHERS');
+  const [activeTab, setActiveTab] = useState<'TEACHERS' | 'STUDENTS' | 'SCHEDULE' | 'SETTINGS' | 'EXPORT'>('TEACHERS');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -128,7 +127,6 @@ export const OperatorDashboardPage: React.FC = () => {
               { id: 'SCHEDULE', label: '🗓️ Jadwal Mengajar' },
               { id: 'SETTINGS', label: '⚙️ Jam Kerja & Geofence' },
               { id: 'EXPORT', label: '📊 Export Multi-Sheet Excel' },
-              { id: 'AUDIT', label: '📜 Audit Trail Logging' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -176,8 +174,6 @@ export const OperatorDashboardPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        {activeTab === 'AUDIT' && <AuditLogTable />}
       </main>
 
       {/* Manual Attendance Correction Modal */}

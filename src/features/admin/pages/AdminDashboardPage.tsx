@@ -14,7 +14,6 @@ import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionMod
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
-import { AuditLogTable } from '../components/AuditLogTable';
 import { DailyAttendanceTracker } from '../components/DailyAttendanceTracker';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
@@ -452,7 +451,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'CORRECTION', label: 'Koreksi Manual', icon: '✏️' },
     { id: 'EXPORT', label: 'Laporan', icon: '📊', hasDropdown: true },
     { id: 'SETTINGS', label: 'Pengaturan', icon: '⚙️', hasDropdown: true },
-    { id: 'AUDIT', label: 'Audit Log', icon: '📜' },
     { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
     { id: 'TESTS', label: 'Tests / Diagnostik', icon: '🧪' },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
@@ -701,10 +699,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             </div>
           )}
 
-          {/* TAB 9: AUDIT LOG */}
-          {activeTab === 'AUDIT' && <AuditLogTable />}
-
-          {/* TAB 10: DEVELOPER TEST MODE */}
+          {/* TAB: DEVELOPER TEST MODE */}
           {activeTab === 'DEV_TEST' && <DevTestPage onBackToDashboard={() => setActiveTab('DASHBOARD')} />}
         </main>
       </div>

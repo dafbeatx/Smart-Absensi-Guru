@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, User, LayoutDashboard, Eye, Users, Calendar, Settings, Shield, QrCode, Edit3, TestTube, ArrowRight, MessageSquare, GraduationCap } from 'lucide-react';
+import { Search, X, User, LayoutDashboard, Eye, Users, Calendar, Settings, QrCode, Edit3, TestTube, ArrowRight, MessageSquare, GraduationCap } from 'lucide-react';
 import type { UserProfile } from '../../types/database.types';
 
 export interface CommandItem {
@@ -56,7 +56,6 @@ export const AdminCommandPaletteModal: React.FC<AdminCommandPaletteModalProps> =
       { id: 'COMPLAINTS', title: 'Kotak Aspirasi & Keluhan Guru', subtitle: 'Pantau laporan & keluhan guru secara 100% anonim', icon: <MessageSquare className="w-4 h-4 text-amber-600" /> },
       { id: 'SCHEDULE', title: 'Jadwal Mengajar Guru', subtitle: 'Atur alokasi kelas & mata pelajaran', icon: <Calendar className="w-4 h-4 text-purple-600" /> },
       { id: 'CALENDAR', title: 'Kalender Akademik', subtitle: 'Atur hari libur & agenda sekolah', icon: <Calendar className="w-4 h-4 text-indigo-600" /> },
-      { id: 'AUDIT', title: 'Audit Log Aktivitas', subtitle: 'Catatan jejak sistem & keamanan', icon: <Shield className="w-4 h-4 text-slate-600" /> },
       { id: 'SETTINGS', title: 'Pengaturan Sistem', subtitle: 'Konfigurasi geofence & radius sekolah', icon: <Settings className="w-4 h-4 text-amber-600" /> },
     ];
 
