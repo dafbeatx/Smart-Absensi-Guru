@@ -29,7 +29,7 @@
   ],
   "rewrites": [
     {
-      "source": "/:path*",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]

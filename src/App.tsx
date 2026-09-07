@@ -78,6 +78,14 @@ export const App: React.FC = () => {
   const userRole = user?.role;
 
   useEffect(() => {
+    // Start Telegram silent background listener for /start and admin Groq AI queries
+    TelegramService.init();
+    return () => {
+      TelegramService.stopPolling();
+    };
+  }, []);
+
+  useEffect(() => {
     // Android Hardware Back Button Listener (Capacitor Native)
     import('@capacitor/app')
       .then(({ App: CapApp }) => {

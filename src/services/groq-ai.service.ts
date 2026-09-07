@@ -128,40 +128,51 @@ Berikan analisis diagnosa mendalam dan berikan HANYA format JSON berikut (tanpa 
     }
 
     const apiKey = APP_CONFIG.GROQ_API_KEY;
-    const model = APP_CONFIG.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    const configuredModel = APP_CONFIG.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
     if (!apiKey || apiKey.includes('YOUR_') || apiKey.trim() === '') {
       logger.warn('GroqAIService', 'GROQ API key is missing or default');
       return null;
     }
 
-    try {
-      const response = await fetch(this.API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.5,
-          max_tokens: 600,
-        }),
-      });
+    const candidateModels = Array.from(new Set([configuredModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b']));
 
-      if (!response.ok) {
-        logger.error('GroqAIService', `Groq API responded with status ${response.status}`);
-        return null;
+    for (const currentModel of candidateModels) {
+      try {
+        const response = await fetch(this.API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: currentModel,
+            messages,
+            temperature: 0.5,
+            max_tokens: 800,
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          logger.warn('GroqAIService', `Model ${currentModel} returned ${response.status}:`, errData);
+          if (response.status === 404 || errData?.error?.code === 'model_not_found') {
+            continue; // try next candidate model
+          }
+          return null;
+        }
+
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (text && text.trim()) {
+          return text.trim();
+        }
+      } catch (error) {
+        logger.error('GroqAIService', `Failed to communicate with Groq API on model ${currentModel}:`, error);
       }
-
-      const data = await response.json();
-      const text = data?.choices?.[0]?.message?.content;
-      return text ? text.trim() : null;
-    } catch (error) {
-      logger.error('GroqAIService', 'Failed to communicate with Groq API:', error);
-      return null;
     }
+
+    return null;
   }
 
   /**
@@ -287,5 +298,123 @@ Berikan jawaban yang ramah, singkat, akurat, dan membantu dalam bahasa Indonesia
 
     return `Terima kasih atas pertanyaan Anda mengenai "${question}". Poin utama presensi sekolah berjalan sesuai aturan geofence GPS dan QR Code resmi.`;
   }
+
+  /**
+   * Telegram Admin AI Technical Assistant
+   * Understands all bugs, errors, geofencing, QR codes, biometric, RFID, schedules, and Supabase architecture.
+   */
+  public static async answerTelegramAdminQuery(query: string, senderName?: string): Promise<string> {
+    if (!query || !query.trim()) {
+      return 'Halo! Silakan ketik pertanyaan atau kendala teknis/error yang ingin Anda tanyakan.';
+    }
+
+    const systemPrompt = `Anda adalah "Smart AI Technical Diagnostic Engine" untuk Telegram Bot resmi aplikasi "Smart Absensi Guru" (SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam).
+Pengguna adalah Admin / Pengelola Sistem${senderName ? ` bernama ${senderName}` : ''}.
+
+Konteks Arsitektur & Pengetahuan Sistem Lengkap:
+1. INFRASTRUKTUR & DATABASE:
+   - Backend: Supabase PostgreSQL Cloud dengan Row Level Security (RLS) ketat.
+   - Provider Pattern: Seluruh data lewat ProviderFactory (SupabaseProvider / MockProvider).
+   - Tabel Kunci: gm_attendance (log presensi guru & siswa RFID), gm_users (pengguna, role, NPP, password), gm_schedule (jadwal piket guru SENIN-JUMAT), gm_leaves (pengajuan izin/cuti), gm_system_settings (radius geofence, nama instansi).
+   - NPP (Nomor Pokok Pegawai): Standar wajib penamaan ID seluruh pegawai.
+
+2. ATURAN JADWAL KERJA & JAM PULANG:
+   - Jam Masuk Standar: Sebelum pukul 07:00 WIB.
+   - Jam Pulang Senin s.d. Kamis: 13:00 WIB.
+   - Jam Pulang Jumat: 11:00 WIB.
+
+3. ALUR PRESENSI & SAFETY ENGINE (5-Step State Machine):
+   - CHECKING_COOLDOWN -> VALIDATING_GPS -> CHECKING_PHOTO -> SUBMITTING -> RECORDED.
+   - Metode: Scan Barcode/QR Dinamis, Biometrik Fingerprint (WebAuthn Platform Sensor), dan Tap Kartu RFID (gm_attendance).
+   - Door Poster QR Mode: Khusus scan QR poster di pintu masuk sekolah, radius toleransi otomatis diperluas hingga 500 meter agar guru tidak gagal absen, dengan tetap mencatat titik koordinat GPS fisik asli guru ke database.
+   - Auto Coordinate Sanitization: Koordinat GPS tanpa desimal (misal -6613144) otomatis disanitasi menjadi -6.613144.
+
+4. DIAGNOSA BUG & KODE ERROR RESMI:
+   - [GPS_001]: Izin lokasi GPS tidak aktif / ditolak browser. Solusi: Izinkan akses lokasi di pengaturan browser HP / Device.
+   - [GPS_002]: Di luar radius geofence sekolah (>100m). Solusi: Mendekat ke gerbang/sekolah atau scan QR poster pintu sekolah (buffer 500m).
+   - [GPS_003]: Terdeteksi Fake GPS / Mock Location. Solusi: Matikan aplikasi Mock GPS atau matikan opsi pengembang (developer options) di HP.
+   - [QR_001]: QR Code kadaluarsa / Invalid Signature. Solusi: Refresh QR Code di layar monitor admin atau gunakan tombol input kode manual.
+   - [PHOTO_001]: Kamera tidak dapat diakses / izin ditolak. Solusi: Izinkan izin kamera di Chrome/browser.
+   - [OFFLINE_SYNC]: Koneksi internet terputus. Solusi: Presensi aman tersimpan di IndexedDB offline dan otomatis dikirim saat online kembali.
+   - [PIKET_NOT_SAVED]: Jika jadwal piket guru tidak tersimpan di Supabase, periksa RLS policy pada tabel gm_schedule (pastikan RLS mengizinkan INSERT/UPDATE untuk role authenticated atau service_role).
+   - [SYNC_COOLDOWN]: Notifikasi dan status tersinkronisasi lintas perangkat (Desktop & HP) dengan jeda aman 30 detik untuk stabilitas.
+
+PANDUAN MENJAWAB:
+- Jawab secara langsung, ramah, solutif, dan berwawasan teknis dalam Bahasa Indonesia.
+- Gunakan format Markdown yang rapi (bold untuk istilah/error code, bullet points untuk instruksi perbaikan).
+- Jika ditanya tentang error/bug, jelaskan penyebab dan berikan solusi langkah demi langkah yang aplikatif.
+- Jangan gunakan istilah yang meragukan; berikan kepastian teknis berdasarkan panduan arsitektur di atas.`;
+
+    const apiOutput = await this.callGroqAPI([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: query },
+    ]);
+
+    if (apiOutput) return apiOutput;
+
+    return this.getLocalTelegramFallbackAnswer(query);
+  }
+
+  /**
+   * Smart local fallback answers for common queries if Groq API is offline
+   */
+  private static getLocalTelegramFallbackAnswer(query: string): string {
+    const q = query.toLowerCase();
+
+    if (q.includes('gps_002') || q.includes('luar radius') || q.includes('geofence')) {
+      return (
+        '📍 *Diagnosa Geofence (GPS_002):*\n\n' +
+        'Error ini terjadi karena posisi GPS guru berada di luar radius standar sekolah (>100m).\n\n' +
+        '💡 *Solusi:*\n' +
+        '1. Pastikan GPS di HP dalam mode akurasi tinggi.\n' +
+        '2. Gunakan mode **Scan QR Poster Pintu Sekolah**, sistem memberikan toleransi buffer hingga 500m sehingga absensi langsung diterima sambil tetap merekam koordinat asli guru.\n' +
+        '3. Koordinat integer otomatis disanitasi oleh sistem (contoh: -6613144 disanitasi menjadi -6.613144).'
+      );
+    }
+
+    if (q.includes('gps_001') || q.includes('izin lokasi') || q.includes('permission')) {
+      return (
+        '⚠️ *Diagnosa Izin Lokasi (GPS_001):*\n\n' +
+        'Browser atau perangkat memblokir akses lokasi GPS.\n\n' +
+        '💡 *Solusi:*\n' +
+        'Buka pengaturan browser (Chrome/Safari) ➡️ Pengaturan Situs ➡️ Lokasi ➡️ Pilih **Izinkan** untuk web Smart Absensi Guru.'
+      );
+    }
+
+    if (q.includes('gps_003') || q.includes('fake gps') || q.includes('mock')) {
+      return (
+        '🛡️ *Keamanan Fake GPS (GPS_003):*\n\n' +
+        'Sistem mendeteksi penggunaan Fake GPS atau Mock Location provider.\n\n' +
+        '💡 *Solusi:*\n' +
+        'Matikan aplikasi Fake GPS dan nonaktifkan opsi *Select mock location app* di Opsi Pengembang (Developer Options) Android.'
+      );
+    }
+
+    if (q.includes('piket') || q.includes('jadwal piket')) {
+      return (
+        '📅 *Diagnosa Jadwal Piket Guru:*\n\n' +
+        'Jika penambahan jadwal piket guru tidak tersimpan setelah refresh:\n' +
+        '1. Pastikan tabel `gm_schedule` di Supabase memiliki RLS Policy aktif untuk INSERT/UPDATE.\n' +
+        '2. Kolom hari menggunakan standar enum: `SENIN`, `SELASA`, `RABU`, `KAMIS`, `JUMAT`.\n' +
+        '3. Gunakan tombol simpan di panel admin setelah mengubah nama guru piket.'
+      );
+    }
+
+    if (q.includes('jam pulang') || q.includes('jadwal') || q.includes('waktu')) {
+      return (
+        '⏰ *Jadwal Presensi Sekolah:*\n\n' +
+        '• **Batas Tepat Waktu:** Sebelum 07:00 WIB\n' +
+        '• **Jam Pulang Senin s.d. Kamis:** 13:00 WIB\n' +
+        '• **Jam Pulang Jumat:** 11:00 WIB'
+      );
+    }
+
+    return (
+      '🤖 *Smart Absensi AI Assistant:*\n\n' +
+      `Saya telah menerima pesan Anda: "${query}".\n\n` +
+      'Sistem absensi berjalan normal dengan Supabase Cloud, toleransi Door Poster QR 500m, dan integrasi Biometrik/RFID. Silakan tanyakan kode error spesifik (misal: GPS_002, QR_001, atau kendala jadwal piket) jika membutuhkan bantuan lebih mendalam.'
+    );
+  }
 }
+
 

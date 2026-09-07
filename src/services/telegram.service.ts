@@ -1,5 +1,7 @@
 import { logger } from '../utils/logger.utils';
 import { getCurrentTimeInJakarta, getTodayDateInJakarta } from '../utils/time.utils';
+import { GroqAIService } from './groq-ai.service';
+import { APP_CONFIG } from '../config/app.config';
 
 export interface TelegramAttendancePayload {
   teacherName: string;
@@ -87,10 +89,11 @@ export class TelegramService {
    */
   public static async sendMessage(
     text: string,
-    parseMode: 'HTML' | 'Markdown' = 'HTML'
+    parseMode: 'HTML' | 'Markdown' = 'HTML',
+    targetChatId?: string | number
   ): Promise<{ success: boolean; error?: string }> {
     const token = this.getBotToken();
-    const chatId = this.getChatId();
+    const chatId = targetChatId ? String(targetChatId).trim() : this.getChatId();
 
     if (!token || !chatId) {
       logger.info('TelegramService', 'Telegram Bot Token / Chat ID belum diisi di .env. Notifikasi Telegram dilewati.');
@@ -243,5 +246,185 @@ export class TelegramService {
     ].join('\n');
 
     return this.sendMessage(testMessage, 'HTML');
+  }
+
+  // =========================================================================
+  // BACKGROUND POLLING & GROQ AI INTERACTIVE ENGINE
+  // =========================================================================
+
+  private static isPollingActive = false;
+  private static lastUpdateId = 0;
+  private static pollingAbortController: AbortController | null = null;
+
+  /**
+   * Initializes background silent polling when client web app is open
+   */
+  public static init(): void {
+    if (typeof window === 'undefined') return;
+    this.startPolling();
+  }
+
+  /**
+   * Starts background long-polling for incoming updates (/start, admin queries)
+   */
+  public static startPolling(): void {
+    const token = this.getBotToken();
+    if (!token || this.isPollingActive) return;
+
+    this.isPollingActive = true;
+    this.pollLoop().catch((err) => {
+      logger.warn('TelegramService', 'Background polling loop encountered an error:', err);
+    });
+  }
+
+  /**
+   * Stops background polling cleanly
+   */
+  public static stopPolling(): void {
+    this.isPollingActive = false;
+    if (this.pollingAbortController) {
+      this.pollingAbortController.abort();
+      this.pollingAbortController = null;
+    }
+  }
+
+  /**
+   * Main background polling loop
+   */
+  private static async pollLoop(): Promise<void> {
+    const token = this.getBotToken();
+    if (!token) {
+      this.isPollingActive = false;
+      return;
+    }
+
+    try {
+      const savedOffset = localStorage.getItem('smart_absensi_tele_offset');
+      if (savedOffset) {
+        this.lastUpdateId = parseInt(savedOffset, 10) || 0;
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    while (this.isPollingActive) {
+      try {
+        const offsetQuery = this.lastUpdateId > 0 ? `?offset=${this.lastUpdateId + 1}&timeout=20` : `?timeout=20`;
+        const url = `https://api.telegram.org/bot${token}/getUpdates${offsetQuery}`;
+
+        const controller = new AbortController();
+        this.pollingAbortController = controller;
+
+        const res = await fetch(url, { signal: controller.signal });
+        const data = await res.json().catch(() => ({}));
+
+        if (!data.ok) {
+          // If webhook is active (error 409), stop client polling gracefully
+          if (data.error_code === 409) {
+            logger.info('TelegramService', 'Telegram Webhook aktif, polling browser dihentikan.');
+            this.isPollingActive = false;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 6000));
+          continue;
+        }
+
+        const updates = data.result || [];
+        for (const update of updates) {
+          if (update.update_id) {
+            this.lastUpdateId = Math.max(this.lastUpdateId, update.update_id);
+            try {
+              localStorage.setItem('smart_absensi_tele_offset', String(this.lastUpdateId));
+            } catch {
+              // ignore
+            }
+          }
+          await this.handleIncomingUpdate(update);
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') break;
+        await new Promise((resolve) => setTimeout(resolve, 6000));
+      }
+    }
+  }
+
+  /**
+   * Handles incoming update from Telegram (/start, questions, error queries)
+   */
+  public static async handleIncomingUpdate(update: any): Promise<void> {
+    const message = update?.message;
+    if (!message || !message.text) return;
+
+    const chatId = message.chat?.id;
+    const text = message.text.trim();
+    const senderName = message.from?.first_name || 'Admin';
+
+    if (!chatId) return;
+
+    // Command: /start
+    if (text === '/start' || text.startsWith('/start ')) {
+      const welcomeMsg = [
+        `🤖 <b>Smart Absensi AI Assistant</b>`,
+        `<i>SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</i>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `Halo <b>${escapeHtml(senderName)}</b>! 👋`,
+        `Bot ini kini dilengkapi dengan <b>Groq AI Engine</b> yang memahami seluruh alur sistem, kode error, dan aturan presensi sekolah.`,
+        ``,
+        `📌 <b>Info Koneksi Anda:</b>`,
+        `• <b>Chat ID Anda:</b> <code>${chatId}</code>`,
+        `• <b>Status:</b> 🟢 Online & Siaga`,
+        ``,
+        `💡 <b>Hal yang Bisa Anda Tanyakan Langsung:</b>`,
+        `• <i>"Kenapa guru gagal scan QR atau muncul error GPS_002?"</i>`,
+        `• <i>"Jadwal piket guru tidak tersimpan, apa solusinya?"</i>`,
+        `• <i>"Kapan batas jam masuk dan jam pulang hari ini?"</i>`,
+        `• <i>"Bagaimana cara verifikasi biometrik fingerprint?"</i>`,
+        ``,
+        `Silakan ketik pertanyaan atau kendala Anda di sini! 👇`,
+      ].join('\n');
+
+      await this.sendMessage(welcomeMsg, 'HTML', chatId);
+      return;
+    }
+
+    // Command: /status or /info
+    if (text === '/status' || text === '/info') {
+      const statusMsg = [
+        `📊 <b>STATUS SISTEM SMART ABSENSI GURU</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `• <b>Backend:</b> Supabase PostgreSQL Cloud`,
+        `• <b>AI Diagnostic:</b> Groq Engine (${APP_CONFIG.GROQ_MODEL || 'qwen/qwen3.8-27b'})`,
+        `• <b>Door Poster QR:</b> Buffer 500 meter`,
+        `• <b>Metode Presensi:</b> QR Code, Biometrik, RFID`,
+        `• <b>Jam Pulang:</b> 13:00 (Senin-Kamis), 11:00 (Jumat)`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `✅ Sistem siap memantau presensi dan melayani konsultasi teknis.`,
+      ].join('\n');
+
+      await this.sendMessage(statusMsg, 'HTML', chatId);
+      return;
+    }
+
+    // Interactive Technical Query via Groq AI Engine
+    try {
+      const token = this.getBotToken();
+      if (token) {
+        fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, action: 'typing' }),
+        }).catch(() => {});
+      }
+
+      const aiReply = await GroqAIService.answerTelegramAdminQuery(text, senderName);
+      await this.sendMessage(aiReply, 'Markdown', chatId);
+    } catch (err) {
+      logger.error('TelegramService', 'Gagal memproses AI query Telegram:', err);
+      await this.sendMessage(
+        'Maaf, terjadi kendala saat memproses jawaban AI. Silakan coba kembali sesaat lagi.',
+        'Markdown',
+        chatId
+      );
+    }
   }
 }
