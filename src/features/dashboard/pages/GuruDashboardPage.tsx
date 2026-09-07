@@ -80,6 +80,7 @@ import {
   getTeacherDisciplineLeaderboard,
 } from '../../../utils/teacher-appreciation.utils';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
+import { TopDisciplineCelebrationModal } from '../../guru/components/TopDisciplineCelebrationModal';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import type {
   AttendanceRecord,
@@ -305,6 +306,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPermissionBlockedModalOpen, setIsPermissionBlockedModalOpen] = useState(false);
   const [permissionBlockedRequiresCamera, setPermissionBlockedRequiresCamera] = useState(false);
   const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
+  const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // Notifications List State (Backend-Driven)
@@ -992,6 +994,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const disciplineLeaderboard = useMemo(() => {
     return getTeacherDisciplineLeaderboard(effectiveUser, appreciationScore);
   }, [effectiveUser, appreciationScore]);
+
+  // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
+  useEffect(() => {
+    if (!effectiveUser?.id) return;
+    const rank = disciplineLeaderboard.currentUserRank;
+    if (rank >= 1 && rank <= 3) {
+      const todayStr = getTodayDateInJakarta();
+      const storageKey = `smart_absensi_celebrated_top3_${effectiveUser.id}_${todayStr}`;
+      const alreadyCelebrated = sessionStorage.getItem(storageKey);
+      if (!alreadyCelebrated) {
+        const timer = setTimeout(() => {
+          setIsCelebrationModalOpen(true);
+          SoundService.play('SUCCESS');
+          sessionStorage.setItem(storageKey, 'true');
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank]);
 
   // Smart Class & Duty Alarm Evaluation (No AI Fake Data!)
   const smartAlarmStatus = evaluateSmartClassAlarm(
@@ -3523,6 +3544,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={() => setIsDisciplineBadgeModalOpen(false)}
         currentUser={effectiveUser}
         currentUserScore={appreciationScore}
+      />
+
+      {/* 15. Modal Pop-up Apresiasi Kehormatan Juara 1, 2, dan 3 */}
+      <TopDisciplineCelebrationModal
+        isOpen={isCelebrationModalOpen}
+        onClose={() => setIsCelebrationModalOpen(false)}
+        onOpenLeaderboard={() => {
+          setIsCelebrationModalOpen(false);
+          setIsDisciplineBadgeModalOpen(true);
+        }}
+        rank={disciplineLeaderboard.currentUserRank}
+        totalPoints={appreciationScore.totalPoints}
+        user={effectiveUser}
+        teacherData={disciplineLeaderboard.leaderboard.find((t) => t.isCurrentUser)}
       />
     </div>
   );
