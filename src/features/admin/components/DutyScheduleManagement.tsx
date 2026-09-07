@@ -4,6 +4,8 @@ import { Modal } from '../../../components/ui/Modal';
 import { useToastStore } from '../../../store/useToastStore';
 import { DutyScheduleRepository } from '../../../repositories/DutyScheduleRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { AuditLogger } from '../../../services/audit-logger.service';
+import { useAuthStore } from '../../../store/useAuthStore';
 import type { TeacherDutySchedule, UserProfile } from '../../../types/database.types';
 
 const DAYS_OF_WEEK = [
@@ -98,6 +100,22 @@ export const DutyScheduleManagement: React.FC = () => {
       setSelectedTeacherId('');
       setDutyNotes('');
       showToast('success', 'Guru Piket Ditambahkan', `Berhasil menugaskan ${teacherObj.full_name} ke Jadwal Piket (Tersimpan ke Cloud).`);
+
+      const currentUser = useAuthStore.getState().user;
+      await AuditLogger.log({
+        actorId: currentUser?.id || 'admin',
+        actorRole: currentUser?.role || 'ADMIN',
+        actionType: 'ADD_DUTY_SCHEDULE',
+        targetEntity: 'DutySchedule',
+        newValue: JSON.stringify({
+          day_of_week: selectedDay,
+          teacher_id: teacherObj.id,
+          teacher_name: teacherObj.full_name,
+          notes: dutyNotes.trim() || 'Tugas Piket & Pengawasan Ketertiban Presensi',
+        }),
+        reason: `Menambahkan ${teacherObj.full_name} ke Jadwal Piket Hari ${activeDayObj.name}`,
+      }).catch((e) => console.warn('Audit log error:', e));
+
       await loadData();
     } catch (err: any) {
       console.error('Gagal menambahkan jadwal piket:', err);
@@ -124,6 +142,17 @@ export const DutyScheduleManagement: React.FC = () => {
 
       setSchedules(updatedSchedules);
       showToast('info', 'Dihapus Dari Jadwal', `${teacherToRemove?.teacher_name || 'Guru'} berhasil dihapus dari jadwal piket.`);
+
+      const currentUser = useAuthStore.getState().user;
+      await AuditLogger.log({
+        actorId: currentUser?.id || 'admin',
+        actorRole: currentUser?.role || 'ADMIN',
+        actionType: 'REMOVE_DUTY_SCHEDULE',
+        targetEntity: 'DutySchedule',
+        oldValue: JSON.stringify(teacherToRemove || { teacher_id: teacherId, day_of_week: selectedDay }),
+        reason: `Menghapus ${teacherToRemove?.teacher_name || teacherId} dari Jadwal Piket Hari ${activeDayObj.name}`,
+      }).catch((e) => console.warn('Audit log error:', e));
+
       await loadData();
     } catch (err: any) {
       console.error('Gagal menghapus jadwal piket:', err);
