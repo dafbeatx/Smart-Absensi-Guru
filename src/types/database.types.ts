@@ -284,6 +284,7 @@ export interface StudentBehaviorLog {
   reason: string;
   timestamp: string;
   recordedBy?: string;
+  violation_date?: string;
 }
 
 export interface StudentBehaviorRecord {
@@ -292,6 +293,8 @@ export interface StudentBehaviorRecord {
   class_name: string;
   academic_year: string;
   total_points: number;
+  merits_points?: number; // Akumulasi Poin Kebaikan Siswa
+  demerits_points?: number; // Akumulasi Poin Pelanggaran / Kedisiplinan Siswa
   behavior_logs: StudentBehaviorLog[];
   avatar_url?: string | null;
   points_used_today?: number;
@@ -308,6 +311,7 @@ export interface RecordStudentBehaviorParams {
   reason: string;
   teacherName?: string;
   academicYear?: string;
+  violationDate?: string; // Tanggal & waktu kejadian (ISO string)
 }
 
 export interface GradeMasterBehaviorCategory {
@@ -316,5 +320,6 @@ export interface GradeMasterBehaviorCategory {
   isGood: boolean;
   icon?: string;
 }
+
 
 

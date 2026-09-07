@@ -2414,19 +2414,86 @@ export class SupabaseProvider implements IDataProvider {
 
       const { data, error } = await query;
       if (!error && data && data.length > 0) {
-        return (data as any[]).map((row) => ({
-          id: row.id,
-          student_name: row.student_name,
-          class_name: row.class_name,
-          academic_year: row.academic_year || academicYear,
-          total_points: typeof row.total_points === 'number' ? row.total_points : 10,
-          behavior_logs: Array.isArray(row.behavior_logs) ? row.behavior_logs : [],
-          avatar_url: row.avatar_url || null,
-          points_used_today: row.points_used_today || 0,
-          points_date: row.points_date || null,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
-        }));
+        const studentIds = data.map((d: any) => d.id).filter(Boolean);
+
+        // Fetch logs directly from relational gm_behavior_logs (GradeMaster OS primary logs table)
+        let dbLogsByStudentId: Record<string, any[]> = {};
+        if (studentIds.length > 0) {
+          try {
+            const { data: dbLogs } = await this.client
+              .from('gm_behavior_logs')
+              .select('*')
+              .in('student_id', studentIds)
+              .order('violation_date', { ascending: false });
+
+            if (dbLogs) {
+              dbLogs.forEach((l: any) => {
+                if (!dbLogsByStudentId[l.student_id]) {
+                  dbLogsByStudentId[l.student_id] = [];
+                }
+                dbLogsByStudentId[l.student_id].push(l);
+              });
+            }
+          } catch (logErr) {
+            logger.warn('SupabaseProvider', 'Failed fetching gm_behavior_logs:', logErr);
+          }
+        }
+
+        return (data as any[]).map((row) => {
+          const rawDbLogs = dbLogsByStudentId[row.id] || [];
+          const existingLogs: StudentBehaviorLog[] = Array.isArray(row.behavior_logs) ? row.behavior_logs : [];
+
+          // Convert relational logs from GradeMaster OS
+          const convertedRelationalLogs: StudentBehaviorLog[] = rawDbLogs.map((l: any) => ({
+            type: l.points_delta < 0 ? ('GOOD' as const) : ('BAD' as const),
+            points: Math.abs(l.points_delta),
+            reason: l.reason || 'Catatan Sikap',
+            timestamp: l.violation_date || l.created_at,
+            violation_date: l.violation_date || l.created_at,
+            recordedBy: 'Guru',
+          }));
+
+          // Merge logs avoiding duplicates
+          const seenKeys = new Set<string>();
+          const allMergedLogs: StudentBehaviorLog[] = [];
+
+          [...convertedRelationalLogs, ...existingLogs].forEach((log) => {
+            const key = `${log.timestamp}_${log.reason}_${log.points}_${log.type}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              allMergedLogs.push(log);
+            }
+          });
+
+          // Calculate merits (Poin Kebaikan) & demerits (Poin Pelanggaran/Kedisiplinan) separately
+          let meritsTotal = 0;
+          let demeritsTotal = 0;
+
+          allMergedLogs.forEach((l) => {
+            const p = Math.abs(l.points || 0);
+            if (l.type === 'GOOD') {
+              meritsTotal += p;
+            } else {
+              demeritsTotal += p;
+            }
+          });
+
+          return {
+            id: row.id,
+            student_name: row.student_name,
+            class_name: row.class_name,
+            academic_year: row.academic_year || academicYear,
+            total_points: typeof row.total_points === 'number' ? row.total_points : 10,
+            merits_points: meritsTotal,
+            demerits_points: demeritsTotal,
+            behavior_logs: allMergedLogs,
+            avatar_url: row.avatar_url || null,
+            points_used_today: row.points_used_today || 0,
+            points_date: row.points_date || null,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+          };
+        });
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'getStudentBehaviors DB exception:', err);
@@ -2448,6 +2515,8 @@ export class SupabaseProvider implements IDataProvider {
     const cleanName = params.studentName.trim().toUpperCase();
     const cleanClass = params.className.trim().toUpperCase();
     const academicYear = params.academicYear || '2026/2027';
+    const violationDateIso = params.violationDate || new Date().toISOString();
+    const pointsAbs = Math.abs(params.points);
 
     try {
       // 1. Cari catatan siswa di tabel gm_behaviors
@@ -2461,16 +2530,23 @@ export class SupabaseProvider implements IDataProvider {
 
       const newLog: StudentBehaviorLog = {
         type: params.type,
-        points: params.points,
+        points: pointsAbs,
         reason: params.reason.trim(),
-        timestamp: new Date().toISOString(),
+        timestamp: violationDateIso,
+        violation_date: violationDateIso,
         recordedBy: params.teacherName || 'Guru',
       };
 
+      let targetStudentId: string | null = null;
+      let targetRecord: StudentBehaviorRecord | undefined;
+      let calculatedTotal = 10;
+
       if (!findErr && existing) {
+        targetStudentId = existing.id;
         const currentTotal = typeof existing.total_points === 'number' ? existing.total_points : 10;
         const currentLogs: StudentBehaviorLog[] = Array.isArray(existing.behavior_logs) ? existing.behavior_logs : [];
-        const newTotal = currentTotal + params.points;
+        const newTotal = currentTotal + (params.type === 'GOOD' ? pointsAbs : -pointsAbs);
+        calculatedTotal = newTotal;
         const updatedLogs = [newLog, ...currentLogs];
 
         const { data: updated, error: updateErr } = await this.client
@@ -2485,7 +2561,7 @@ export class SupabaseProvider implements IDataProvider {
           .single();
 
         if (!updateErr && updated) {
-          const resultRecord: StudentBehaviorRecord = {
+          targetRecord = {
             id: updated.id,
             student_name: updated.student_name,
             class_name: updated.class_name,
@@ -2496,25 +2572,11 @@ export class SupabaseProvider implements IDataProvider {
             created_at: updated.created_at,
             updated_at: updated.updated_at,
           };
-
-          // Sync to mock provider cache
-          try {
-            const mockProv = new (await import('./mock-provider.service')).MockProvider();
-            await mockProv.recordStudentBehavior(params);
-          } catch {
-            // ignore
-          }
-
-          return {
-            success: true,
-            newTotal,
-            record: resultRecord,
-            message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (${params.points > 0 ? '+' : ''}${params.points}) berhasil dicatat untuk ${cleanName}. Total sekarang: ${newTotal} poin.`,
-          };
         }
       } else {
         // Jika belum ada di gm_behaviors, buat catatan baru
-        const startingTotal = 10 + params.points;
+        const startingTotal = 10 + (params.type === 'GOOD' ? pointsAbs : -pointsAbs);
+        calculatedTotal = startingTotal;
         const { data: inserted, error: insertErr } = await this.client
           .from('gm_behaviors')
           .insert({
@@ -2530,7 +2592,8 @@ export class SupabaseProvider implements IDataProvider {
           .single();
 
         if (!insertErr && inserted) {
-          const resultRecord: StudentBehaviorRecord = {
+          targetStudentId = inserted.id;
+          targetRecord = {
             id: inserted.id,
             student_name: inserted.student_name,
             class_name: inserted.class_name,
@@ -2540,14 +2603,41 @@ export class SupabaseProvider implements IDataProvider {
             created_at: inserted.created_at,
             updated_at: inserted.updated_at,
           };
-
-          return {
-            success: true,
-            newTotal: startingTotal,
-            record: resultRecord,
-            message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (${params.points > 0 ? '+' : ''}${params.points}) berhasil dicatat untuk ${cleanName}.`,
-          };
         }
+      }
+
+      // 2. Insert into relational gm_behavior_logs (Standard GradeMaster OS table)
+      if (targetStudentId) {
+        try {
+          // GradeMaster OS convention: Demerits (pelanggaran) > 0, Merits (kebaikan) < 0
+          const pointsDelta = params.type === 'GOOD' ? -pointsAbs : pointsAbs;
+          await this.client.from('gm_behavior_logs').insert({
+            student_id: targetStudentId,
+            points_delta: pointsDelta,
+            reason: params.reason.trim(),
+            violation_date: violationDateIso,
+            created_at: new Date().toISOString(),
+          });
+        } catch (logInsertErr) {
+          logger.warn('SupabaseProvider', 'Failed writing into gm_behavior_logs:', logInsertErr);
+        }
+      }
+
+      // Sync to mock provider cache
+      try {
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        await mockProv.recordStudentBehavior(params);
+      } catch {
+        // ignore
+      }
+
+      if (targetRecord) {
+        return {
+          success: true,
+          newTotal: calculatedTotal,
+          record: targetRecord,
+          message: `Berhasil mencatat ${params.type === 'GOOD' ? 'Poin Kebaikan' : 'Poin Kedisiplinan'} (+${pointsAbs} Poin) untuk ${cleanName}.`,
+        };
       }
     } catch (err: any) {
       logger.warn('SupabaseProvider', 'recordStudentBehavior DB exception:', err);
@@ -2567,14 +2657,53 @@ export class SupabaseProvider implements IDataProvider {
       const cleanName = studentName.trim().toUpperCase();
       const { data, error } = await this.client
         .from('gm_behaviors')
-        .select('behavior_logs')
+        .select('id, behavior_logs')
         .eq('academic_year', '2026/2027')
         .ilike('student_name', cleanName)
         .limit(1)
         .maybeSingle();
 
-      if (!error && data && Array.isArray(data.behavior_logs)) {
-        return (data.behavior_logs as StudentBehaviorLog[]).sort((a, b) =>
+      const existingLogs: StudentBehaviorLog[] = !error && data && Array.isArray(data.behavior_logs) ? data.behavior_logs : [];
+
+      if (data?.id) {
+        try {
+          const { data: dbLogs } = await this.client
+            .from('gm_behavior_logs')
+            .select('*')
+            .eq('student_id', data.id)
+            .order('violation_date', { ascending: false });
+
+          if (dbLogs && dbLogs.length > 0) {
+            const relLogs: StudentBehaviorLog[] = dbLogs.map((l: any) => ({
+              type: l.points_delta < 0 ? ('GOOD' as const) : ('BAD' as const),
+              points: Math.abs(l.points_delta),
+              reason: l.reason || 'Catatan Sikap',
+              timestamp: l.violation_date || l.created_at,
+              violation_date: l.violation_date || l.created_at,
+              recordedBy: 'Guru',
+            }));
+
+            const seenKeys = new Set<string>();
+            const merged: StudentBehaviorLog[] = [];
+            [...relLogs, ...existingLogs].forEach((l) => {
+              const key = `${l.timestamp}_${l.reason}_${l.points}_${l.type}`;
+              if (!seenKeys.has(key)) {
+                seenKeys.add(key);
+                merged.push(l);
+              }
+            });
+
+            return merged.sort(
+              (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            );
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (existingLogs.length > 0) {
+        return existingLogs.sort((a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
       }

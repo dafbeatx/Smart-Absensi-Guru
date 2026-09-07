@@ -1635,6 +1635,8 @@ export class MockProvider implements IDataProvider {
         class_name: s.className,
         academic_year: s.academicYear || academicYear,
         total_points: 10,
+        merits_points: 0,
+        demerits_points: 0,
         behavior_logs: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -1642,7 +1644,28 @@ export class MockProvider implements IDataProvider {
       safeSetStorage('smart_absensi_gm_behaviors', JSON.stringify(list));
     }
 
-    return list.filter((b) => {
+    // Ensure merits_points and demerits_points are calculated
+    const computedList = list.map((record) => {
+      let merits = 0;
+      let demerits = 0;
+      if (Array.isArray(record.behavior_logs)) {
+        record.behavior_logs.forEach((log) => {
+          const pts = Math.abs(log.points || 0);
+          if (log.type === 'GOOD') {
+            merits += pts;
+          } else {
+            demerits += pts;
+          }
+        });
+      }
+      return {
+        ...record,
+        merits_points: merits,
+        demerits_points: demerits,
+      };
+    });
+
+    return computedList.filter((b) => {
       const matchYear = !b.academic_year || b.academic_year === academicYear;
       const matchClass = !className || className === 'ALL' || b.class_name === className;
       return matchYear && matchClass;
@@ -1662,6 +1685,8 @@ export class MockProvider implements IDataProvider {
     const cleanName = params.studentName.trim().toUpperCase();
     const cleanClass = params.className.trim().toUpperCase();
     const academicYear = params.academicYear || '2026/2027';
+    const violationDate = params.violationDate || new Date().toISOString();
+    const pointsAbs = Math.abs(params.points);
 
     let idx = list.findIndex(
       (b) => b.student_name.toUpperCase() === cleanName && b.academic_year === academicYear
@@ -1669,33 +1694,51 @@ export class MockProvider implements IDataProvider {
 
     const newLog: StudentBehaviorLog = {
       type: params.type,
-      points: params.points,
+      points: pointsAbs,
       reason: params.reason.trim(),
-      timestamp: new Date().toISOString(),
+      timestamp: violationDate,
+      violation_date: violationDate,
       recordedBy: params.teacherName || 'Guru',
     };
 
     let targetRecord: StudentBehaviorRecord;
 
+    // Handle legacy point calculation for test compatibility
+    const pointDelta = params.points !== 0 ? (params.type === 'GOOD' ? pointsAbs : -pointsAbs) : 0;
+
     if (idx !== -1) {
       const existing = list[idx];
       const currentTotal = typeof existing.total_points === 'number' ? existing.total_points : 10;
-      const newTotal = currentTotal + params.points;
+      const newTotal = currentTotal + pointDelta;
+      const updatedLogs = [newLog, ...(existing.behavior_logs || [])];
+
+      let merits = 0;
+      let demerits = 0;
+      updatedLogs.forEach((l) => {
+        const p = Math.abs(l.points || 0);
+        if (l.type === 'GOOD') merits += p;
+        else demerits += p;
+      });
+
       targetRecord = {
         ...existing,
         total_points: newTotal,
-        behavior_logs: [newLog, ...(existing.behavior_logs || [])],
+        merits_points: merits,
+        demerits_points: demerits,
+        behavior_logs: updatedLogs,
         updated_at: new Date().toISOString(),
       };
       list[idx] = targetRecord;
     } else {
-      const startingTotal = 10 + params.points;
+      const startingTotal = 10 + pointDelta;
       targetRecord = {
         id: `gm_beh_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         student_name: cleanName,
         class_name: cleanClass,
         academic_year: academicYear,
         total_points: startingTotal,
+        merits_points: params.type === 'GOOD' ? pointsAbs : 0,
+        demerits_points: params.type === 'BAD' ? pointsAbs : 0,
         behavior_logs: [newLog],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -1709,7 +1752,7 @@ export class MockProvider implements IDataProvider {
       success: true,
       newTotal: targetRecord.total_points,
       record: targetRecord,
-      message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (${params.points > 0 ? '+' : ''}${params.points}) berhasil dicatat untuk ${cleanName}. Total: ${targetRecord.total_points} poin.`,
+      message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (+${pointsAbs}) berhasil dicatat untuk ${cleanName}. Total: ${targetRecord.total_points} poin.`,
     };
   }
 
