@@ -310,3 +310,11 @@ export interface RecordStudentBehaviorParams {
   academicYear?: string;
 }
 
+export interface GradeMasterBehaviorCategory {
+  text: string;
+  weight: number;
+  isGood: boolean;
+  icon?: string;
+}
+
+

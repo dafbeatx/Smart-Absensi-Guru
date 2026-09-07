@@ -3,11 +3,38 @@ import type {
   StudentBehaviorRecord,
   StudentBehaviorLog,
   RecordStudentBehaviorParams,
+  GradeMasterBehaviorCategory,
 } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
 
 export const BEHAVIORS_STORAGE_KEY = 'smart_absensi_gm_behaviors';
+export const BEHAVIORS_CATEGORIES_KEY = 'smart_absensi_gm_categories';
 export const BEHAVIORS_UPDATED_EVENT = 'smart_absensi_behaviors_updated';
+
+// ==============================================================================
+// OFFICIAL GRADEMASTER OS MASTER LISTS (Identik 100% dengan GradeMaster OS Sikap)
+// ==============================================================================
+
+export const GRADEMASTER_PELANGGARAN_PRESETS: GradeMasterBehaviorCategory[] = [
+  { text: 'Terlambat Masuk Sekolah / Kelas', weight: 5, isGood: false, icon: '⏰' },
+  { text: 'Tidak Mengerjakan Tugas / PR', weight: 5, isGood: false, icon: '📝' },
+  { text: 'Bermain HP / Gadget saat Pelajaran', weight: 10, isGood: false, icon: '📱' },
+  { text: 'Mengganggu Ketertiban & Suasana Kelas', weight: 10, isGood: false, icon: '📢' },
+  { text: 'Atribut Seragam Tidak Lengkap / Rapi', weight: 5, isGood: false, icon: '👔' },
+  { text: 'Meninggalkan Kelas Tanpa Izin', weight: 15, isGood: false, icon: '🏃' },
+  { text: 'Tidak Mengikuti Upacara / Kegiatan Sekolah', weight: 15, isGood: false, icon: '🚩' },
+  { text: 'Merusak Fasilitas / Inventaris Sekolah', weight: 25, isGood: false, icon: '🪑' },
+  { text: 'Tindakan Indisipliner / Melawan Guru', weight: 30, isGood: false, icon: '⚠️' },
+];
+
+export const GRADEMASTER_KEBAIKAN_PRESETS: GradeMasterBehaviorCategory[] = [
+  { text: 'Aktif Berdiskusi & Tanya Jawab', weight: 5, isGood: true, icon: '🙋' },
+  { text: 'Membantu Teman / Tutor Sebaya', weight: 5, isGood: true, icon: '🤝' },
+  { text: 'Menjaga Kebersihan Kelas (Piket)', weight: 5, isGood: true, icon: '🧹' },
+  { text: 'Jujur & Menjunjung Integritas', weight: 10, isGood: true, icon: '💎' },
+  { text: 'Pencapaian Prestasi Sekolah', weight: 15, isGood: true, icon: '🏆' },
+  { text: 'Sopan Santun & Ramah pada Guru', weight: 5, isGood: true, icon: '🌱' },
+];
 
 const safeGetStorage = (key: string): string | null => {
   try {
@@ -134,4 +161,61 @@ export class StudentBehaviorRepository {
       return [];
     }
   }
+
+  /**
+   * Retrieves official GradeMaster OS behavior categories & preset point weights.
+   * Checks live GradeMaster OS settings endpoint if available, with robust fallback to official presets.
+   */
+  public static async getCategories(): Promise<{
+    kebaikan: GradeMasterBehaviorCategory[];
+    pelanggaran: GradeMasterBehaviorCategory[];
+  }> {
+    // 1. Try to load cached categories from storage
+    const cached = safeGetStorage(BEHAVIORS_CATEGORIES_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed?.kebaikan?.length && parsed?.pelanggaran?.length) {
+          return parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Try fetching dynamic settings from GradeMaster OS
+    try {
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        const res = await window.fetch(
+          'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/api/grademaster/behaviors/settings',
+          {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          }
+        );
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.settings && Array.isArray(json.settings.reasons) && json.settings.reasons.length > 0) {
+            const reasons: GradeMasterBehaviorCategory[] = json.settings.reasons;
+            const result = {
+              kebaikan: reasons.filter((r) => r.isGood),
+              pelanggaran: reasons.filter((r) => !r.isGood),
+            };
+            safeSetStorage(BEHAVIORS_CATEGORIES_KEY, JSON.stringify(result));
+            return result;
+          }
+        }
+      }
+    } catch {
+      // Fallback silently to official GradeMaster OS master presets
+    }
+
+    const official = {
+      kebaikan: GRADEMASTER_KEBAIKAN_PRESETS,
+      pelanggaran: GRADEMASTER_PELANGGARAN_PRESETS,
+    };
+    safeSetStorage(BEHAVIORS_CATEGORIES_KEY, JSON.stringify(official));
+    return official;
+  }
 }
+

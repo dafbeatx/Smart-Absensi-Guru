@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import type { StudentBehaviorRecord, StudentBehaviorLog } from '../../../types/database.types';
-import { StudentBehaviorRepository, BEHAVIORS_UPDATED_EVENT } from '../../../repositories/StudentBehaviorRepository';
+import type {
+  StudentBehaviorRecord,
+  StudentBehaviorLog,
+  GradeMasterBehaviorCategory,
+} from '../../../types/database.types';
+import {
+  StudentBehaviorRepository,
+  BEHAVIORS_UPDATED_EVENT,
+  GRADEMASTER_KEBAIKAN_PRESETS,
+  GRADEMASTER_PELANGGARAN_PRESETS,
+} from '../../../repositories/StudentBehaviorRepository';
 import {
   Sparkles,
   AlertTriangle,
@@ -25,25 +34,6 @@ interface StudentBehaviorModalProps {
   currentTeacherName?: string;
 }
 
-const PRESET_KEBAIKAN = [
-  { reason: 'Membantu Guru/Teman', points: 10, icon: '🤝' },
-  { reason: 'Membersihkan Kelas/Lingkungan', points: 10, icon: '🧹' },
-  { reason: 'Aktif Menjawab di Kelas', points: 10, icon: '🙋' },
-  { reason: 'Mengerjakan Tugas Tepat Waktu', points: 10, icon: '📝' },
-  { reason: 'Berperilaku Sopan & Santun', points: 10, icon: '🌱' },
-  { reason: 'Prestasi / Teladan Sekolah', points: 15, icon: '🏆' },
-];
-
-const PRESET_PELANGGARAN = [
-  { reason: 'Berkata Kotor/Kasar', points: -10, icon: '🚫' },
-  { reason: 'Bolos PBM', points: -10, icon: '🏃' },
-  { reason: 'Sering Bolos PBM', points: -10, icon: '⚠️' },
-  { reason: 'Terlambat Masuk Kelas', points: -5, icon: '⏰' },
-  { reason: 'Tidak Memakai Seragam Lengkap', points: -5, icon: '👔' },
-  { reason: 'Membuat Gaduh di Jam Pelajaran', points: -5, icon: '📢' },
-  { reason: 'Penggunaan HP Tanpa Izin', points: -10, icon: '📱' },
-];
-
 export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
   isOpen,
   onClose,
@@ -52,6 +42,13 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<BehaviorModalTab>(initialTab);
   const [students, setStudents] = useState<StudentBehaviorRecord[]>([]);
+  const [categories, setCategories] = useState<{
+    kebaikan: GradeMasterBehaviorCategory[];
+    pelanggaran: GradeMasterBehaviorCategory[];
+  }>({
+    kebaikan: GRADEMASTER_KEBAIKAN_PRESETS,
+    pelanggaran: GRADEMASTER_PELANGGARAN_PRESETS,
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -61,10 +58,22 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
   const [selectedStudent, setSelectedStudent] = useState<StudentBehaviorRecord | null>(null);
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [customReason, setCustomReason] = useState<string>('');
-  const [pointsAmount, setPointsAmount] = useState<number>(10);
+  const [pointsAmount, setPointsAmount] = useState<number>(5);
   const [customPointsInput, setCustomPointsInput] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Load official GradeMaster OS categories
+  const loadCategories = useCallback(async () => {
+    try {
+      const cats = await StudentBehaviorRepository.getCategories();
+      if (cats?.kebaikan && cats?.pelanggaran) {
+        setCategories(cats);
+      }
+    } catch (err) {
+      console.warn('Gagal memuat kategori resmi GradeMaster OS:', err);
+    }
+  }, []);
 
   // Load student behaviors
   const loadBehaviors = useCallback(async () => {
@@ -82,16 +91,17 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadBehaviors();
+      loadCategories();
       setActiveTab(initialTab);
       setSuccessMessage(null);
       setErrorMessage(null);
       setSelectedStudent(null);
       setSelectedReason('');
       setCustomReason('');
-      setPointsAmount(initialTab === 'KEDISIPLINAN' ? -10 : 10);
+      setPointsAmount(initialTab === 'KEDISIPLINAN' ? -5 : 5);
       setCustomPointsInput('');
     }
-  }, [isOpen, initialTab, loadBehaviors]);
+  }, [isOpen, initialTab, loadBehaviors, loadCategories]);
 
   useEffect(() => {
     const handleUpdated = () => {
@@ -115,10 +125,10 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
     setSelectedReason('');
     setCustomReason('');
     if (tab === 'KEBAIKAN') {
-      setPointsAmount(10);
+      setPointsAmount(5);
       setCustomPointsInput('');
     } else if (tab === 'KEDISIPLINAN') {
-      setPointsAmount(-10);
+      setPointsAmount(-5);
       setCustomPointsInput('');
     }
   };
@@ -486,27 +496,33 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                 )}
               </div>
 
-              {/* 2. PILIHAN KATEGORI ALASAN */}
+              {/* 2. PILIHAN KATEGORI ALASAN (GRADEMASTER OS) */}
               <div className="bg-slate-50/90 rounded-2xl p-3.5 border border-slate-200 space-y-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <Award className="w-3.5 h-3.5 text-[#023246]" />
-                  2. Pilih Alasan / Kategori
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-[#023246]" />
+                    2. Pilih Kategori & Poin GradeMaster OS
+                  </label>
+                  <span className="text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    Otomatis Berbobot
+                  </span>
+                </div>
 
                 {/* Preset Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {(activeTab === 'KEBAIKAN' ? PRESET_KEBAIKAN : PRESET_PELANGGARAN).map((p) => {
-                    const isSelected = selectedReason === p.reason;
+                  {(activeTab === 'KEBAIKAN' ? categories.kebaikan : categories.pelanggaran).map((p) => {
+                    const isSelected = selectedReason === p.text;
+                    const pointVal = p.isGood ? p.weight : -p.weight;
                     return (
                       <button
-                        key={p.reason}
+                        key={p.text}
                         type="button"
                         onClick={() => {
-                          setSelectedReason(p.reason);
-                          setPointsAmount(p.points);
+                          setSelectedReason(p.text);
+                          setPointsAmount(pointVal);
                           setCustomPointsInput('');
                         }}
-                        className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer min-h-[44px] ${
                           isSelected
                             ? activeTab === 'KEBAIKAN'
                               ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 shadow-2xs'
@@ -514,20 +530,20 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                             : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-base shrink-0">{p.icon}</span>
-                          <span className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">
-                            {p.reason}
+                        <div className="flex items-center gap-2 min-w-0 pr-2">
+                          <span className="text-base shrink-0">{p.icon || (p.isGood ? '✨' : '⚠️')}</span>
+                          <span className="text-xs font-bold text-slate-800 leading-snug">
+                            {p.text}
                           </span>
                         </div>
                         <span
-                          className={`text-xs font-extrabold px-1.5 py-0.5 rounded-md shrink-0 ml-1.5 ${
-                            p.points > 0
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-rose-100 text-rose-800'
+                          className={`text-xs font-black px-2 py-0.5 rounded-lg shrink-0 ${
+                            p.isGood
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-rose-100 text-rose-800 border border-rose-200'
                           }`}
                         >
-                          {p.points > 0 ? `+${p.points}` : p.points}
+                          {p.isGood ? `+${p.weight}` : `-${p.weight}`}
                         </span>
                       </button>
                     );
@@ -538,8 +554,11 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                     type="button"
                     onClick={() => {
                       setSelectedReason('CUSTOM');
+                      if (!pointsAmount || pointsAmount === 0) {
+                        setPointsAmount(activeTab === 'KEBAIKAN' ? 5 : -5);
+                      }
                     }}
-                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer col-span-1 sm:col-span-2 ${
+                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer min-h-[44px] col-span-1 sm:col-span-2 ${
                       selectedReason === 'CUSTOM'
                         ? 'bg-cyan-50 border-cyan-600 ring-2 ring-cyan-600/20 shadow-2xs'
                         : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
@@ -548,24 +567,30 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="text-base shrink-0">✍️</span>
                       <span className="text-xs font-bold text-slate-800">
-                        Alasan Kustom / Ketik Sendiri
+                        {activeTab === 'KEBAIKAN'
+                          ? 'Tulis Kebaikan Khusus (Manual)'
+                          : 'Tulis Pelanggaran Khusus (Manual)'}
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">
-                      Lainnya
+                    <span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded-md">
+                      Khusus
                     </span>
                   </button>
                 </div>
 
                 {/* Custom Reason Text Input */}
                 {selectedReason === 'CUSTOM' && (
-                  <div className="space-y-1 pt-1 animate-fadeIn">
+                  <div className="space-y-1.5 pt-1 animate-fadeIn">
                     <input
                       type="text"
-                      placeholder="Ketik keterangan alasan di sini..."
+                      placeholder={
+                        activeTab === 'KEBAIKAN'
+                          ? 'Tulis kebaikan khusus...'
+                          : 'Tulis pelanggaran khusus...'
+                      }
                       value={customReason}
                       onChange={(e) => setCustomReason(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
+                      className="w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
                       required
                     />
                   </div>
@@ -575,53 +600,63 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
               {/* 3. PENYESUAIAN JUMLAH POIN */}
               <div className="bg-slate-50/90 rounded-2xl p-3.5 border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Star className="w-3.5 h-3.5 text-[#023246]" />
-                    3. Nilai Poin
-                  </label>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Star className="w-3.5 h-3.5 text-[#023246]" />
+                      3. Nilai Bobot Poin
+                    </label>
+                    <span className="text-[10px] text-slate-500 block">
+                      {selectedReason && selectedReason !== 'CUSTOM'
+                        ? 'Terkunci otomatis sesuai bobot GradeMaster OS'
+                        : 'Tentukan bobot poin untuk siswa'}
+                    </span>
+                  </div>
                   <span
-                    className={`text-xs font-black px-2 py-0.5 rounded-md ${
+                    className={`text-xs font-black px-2.5 py-1 rounded-xl shadow-2xs ${
                       pointsAmount > 0
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-rose-100 text-rose-800'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-rose-100 text-rose-800 border border-rose-200'
                     }`}
                   >
                     {pointsAmount > 0 ? `+${pointsAmount}` : pointsAmount} Poin
                   </span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2">
-                  {(activeTab === 'KEBAIKAN' ? [5, 10, 15, 20] : [-5, -10, -15, -20]).map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => {
-                        setPointsAmount(num);
-                        setCustomPointsInput('');
-                      }}
-                      className={`py-2 text-xs font-black rounded-xl border transition-all cursor-pointer ${
-                        pointsAmount === num && customPointsInput === ''
-                          ? activeTab === 'KEBAIKAN'
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                            : 'bg-rose-600 text-white border-rose-600 shadow-2xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {num > 0 ? `+${num}` : num}
-                    </button>
-                  ))}
+                {/* Tombol Cepat Sesuai Bobot Standar GradeMaster OS */}
+                <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                  {(activeTab === 'KEBAIKAN' ? [5, 10, 15, 20, 25] : [-5, -10, -15, -25, -30]).map(
+                    (num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => {
+                          setPointsAmount(num);
+                          setCustomPointsInput('');
+                        }}
+                        className={`py-2 text-xs font-black rounded-xl border transition-all cursor-pointer min-h-[40px] ${
+                          pointsAmount === num && customPointsInput === ''
+                            ? activeTab === 'KEBAIKAN'
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                              : 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {num > 0 ? `+${num}` : num}
+                      </button>
+                    )
+                  )}
                 </div>
 
                 {/* Custom Point Input */}
                 <div className="flex items-center gap-2 pt-1">
-                  <span className="text-[11px] font-semibold text-slate-600 shrink-0">
-                    Kustom:
+                  <span className="text-[11px] font-bold text-slate-600 shrink-0">
+                    Bobot Lain:
                   </span>
                   <input
                     type="number"
                     min="1"
                     max="100"
-                    placeholder="Nominal lain..."
+                    placeholder="Ketik angka poin..."
                     value={customPointsInput}
                     onChange={(e) => {
                       const val = e.target.value;
