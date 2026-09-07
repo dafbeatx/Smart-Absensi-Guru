@@ -439,12 +439,12 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                         placeholder="Cari nama siswa..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-[#023246]/20 focus:border-[#023246]"
+                        className="w-full pl-9 pr-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
                       />
                     </div>
 
                     {/* Student List Picker */}
-                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100 bg-white rounded-xl border border-slate-200 p-1.5">
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 bg-white rounded-xl border border-slate-200 p-1.5">
                       {isLoading ? (
                         <div className="p-4 text-center text-xs text-slate-400 animate-pulse">
                           Memuat daftar siswa dari Supabase...
@@ -565,7 +565,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                       placeholder="Ketik keterangan alasan di sini..."
                       value={customReason}
                       onChange={(e) => setCustomReason(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-[#023246]/20 focus:border-[#023246]"
+                      className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
                       required
                     />
                   </div>
@@ -631,7 +631,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                         setPointsAmount(activeTab === 'KEDISIPLINAN' ? -parsed : parsed);
                       }
                     }}
-                    className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-[#023246]/20"
+                    className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
                   />
                 </div>
               </div>
@@ -640,7 +640,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting || !selectedStudent}
-                className={`w-full h-11 sm:h-12 rounded-2xl text-xs sm:text-sm font-extrabold text-white shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`w-full h-11 sm:h-12 rounded-2xl text-xs sm:text-sm font-extrabold text-white shadow-md flex items-center justify-center gap-2 transition-all enabled:cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
                   activeTab === 'KEBAIKAN'
                     ? 'bg-linear-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 shadow-emerald-700/20'
                     : 'bg-linear-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 shadow-rose-700/20'
