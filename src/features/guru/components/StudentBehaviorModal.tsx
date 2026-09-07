@@ -640,7 +640,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting || !selectedStudent}
-                className={`w-full h-11 sm:h-12 rounded-2xl text-xs sm:text-sm font-extrabold text-white shadow-md flex items-center justify-center gap-2 transition-all enabled:cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`w-full h-11 sm:h-12 rounded-2xl text-xs sm:text-sm font-extrabold text-white shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
                   activeTab === 'KEBAIKAN'
                     ? 'bg-linear-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 shadow-emerald-700/20'
                     : 'bg-linear-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 shadow-rose-700/20'
