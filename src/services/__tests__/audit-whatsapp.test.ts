@@ -5,6 +5,7 @@
 import { NotificationTemplateEngine } from '../notification-template.service';
 import { WhatsAppService } from '../whatsapp.service';
 import { AuditLogger } from '../audit-logger.service';
+import { TelegramService } from '../telegram.service';
 
 export const runAuditWhatsAppTestSuite = async (): Promise<{
   passed: number;
@@ -76,6 +77,54 @@ export const runAuditWhatsAppTestSuite = async (): Promise<{
   assert(
     'Audit Logger - Immutable Audit Entry Generated',
     auditLog.action_type === 'EDIT_ATTENDANCE' && (auditLog.request_id ? auditLog.request_id.startsWith('req_') : true)
+  );
+
+  // Test 5: Telegram Service - Unconfigured credentials handled safely
+  const tgRes = await TelegramService.sendMessage('Test Message');
+  assert(
+    'Telegram Service - Unconfigured Credentials Handled Gracefully',
+    typeof tgRes.success === 'boolean'
+  );
+
+  // Test 6: Telegram Service - Attendance notification execution
+  const attRes = await TelegramService.sendAttendanceNotification({
+    teacherName: 'Dafa Maulana, S.Pd',
+    nip: '198501012010011001',
+    role: 'GURU',
+    type: 'CHECK_IN',
+    timeStr: '06:55:00 WIB',
+    method: 'BIOMETRIC_GPS',
+    distanceMeters: 15,
+    status: 'HADIR',
+  });
+  assert(
+    'Telegram Service - Attendance Notification Execution Safe',
+    typeof attRes === 'boolean'
+  );
+
+  // Test 7: Telegram Service - Web login notification execution
+  const loginRes = await TelegramService.sendWebLoginNotification({
+    teacherName: 'Fitri Ani Rahayu, S.Mat',
+    nip: '199002022015022002',
+    role: 'GURU',
+    device: 'Mobile Android Chrome',
+  });
+  assert(
+    'Telegram Service - Web Login Notification Execution Safe',
+    typeof loginRes === 'boolean'
+  );
+
+  // Test 8: Telegram Service - Audit Log notification execution
+  const auditTgRes = await TelegramService.sendAuditLog({
+    actorId: 'usr_admin_001',
+    actorRole: 'ADMIN',
+    actionType: 'UPDATE_DUTY_SCHEDULE',
+    targetEntity: 'DutySchedule',
+    reason: 'Pembaruan Jadwal Piket Hari Senin',
+  });
+  assert(
+    'Telegram Service - Audit Log Notification Execution Safe',
+    typeof auditTgRes === 'boolean'
   );
 
   return { passed, failed, results };

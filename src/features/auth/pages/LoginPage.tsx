@@ -8,6 +8,8 @@ import { AuthRepository } from '../../../repositories/AuthRepository';
 import { logger } from '../../../utils/logger.utils';
 import { handleAppError, notifySuccess } from '../../../utils/error.utils';
 import { TurnstileWidget } from '../../../components/ui/TurnstileWidget';
+import { TelegramService } from '../../../services/telegram.service';
+import { getCurrentTimeInJakarta, getTodayDateInJakarta } from '../../../utils/time.utils';
 
 export const LoginPage: React.FC = () => {
   const [identity, setIdentity] = useState('');
@@ -58,6 +60,16 @@ export const LoginPage: React.FC = () => {
       logger.info('LoginPage', `Login successful for user: ${res.user.full_name} (${res.user.role})`);
       notifySuccess('Login Berhasil!', `Selamat datang kembali, ${res.user.full_name}`);
       loginSuccess(res.token, res.user);
+
+      // Dispatch Telegram web login notification
+      TelegramService.sendWebLoginNotification({
+        teacherName: res.user.full_name,
+        nip: res.user.nip || undefined,
+        role: res.user.role,
+        device: deviceModel || (typeof navigator !== 'undefined' ? navigator.userAgent : 'Web Browser'),
+        timeStr: getCurrentTimeInJakarta(),
+        dateStr: getTodayDateInJakarta(),
+      }).catch((e) => console.warn('Telegram login notification error:', e));
     } catch (err: unknown) {
       setIsLoading(false);
       const cleanMsg = handleAppError(err, 'LoginPage', 'Kendala Login', false);

@@ -1,144 +1,152 @@
-import React, { useState, useEffect } from 'react';
-import { Input } from '../../../components/ui/Input';
-import { Modal } from '../../../components/ui/Modal';
-import type { AuditLog } from '../../../types/database.types';
-import { AuditLogger } from '../../../services/audit-logger.service';
+import React, { useState } from 'react';
+import { TelegramService } from '../../../services/telegram.service';
+import { useToastStore } from '../../../store/useToastStore';
+import { Button } from '../../../components/ui/Button';
 
-export interface AuditLogTableProps {
-  auditLogs?: AuditLog[];
-}
+export const AuditLogTable: React.FC = () => {
+  const { showToast } = useToastStore();
+  const [isTesting, setIsTesting] = useState(false);
 
-export const AuditLogTable: React.FC<AuditLogTableProps> = ({
-  auditLogs,
-}) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
-  const [logs, setLogs] = useState<AuditLog[]>(() => auditLogs || AuditLogger.getLogs());
+  const botToken = TelegramService.getBotToken();
+  const chatId = TelegramService.getChatId();
+  const isConfigured = TelegramService.isConfigured();
 
-  useEffect(() => {
-    if (auditLogs && auditLogs.length > 0) {
-      setLogs(auditLogs);
-    } else {
-      setLogs(AuditLogger.getLogs());
+  const handleTestTelegram = async () => {
+    if (!isConfigured) {
+      showToast(
+        'warning',
+        'Kredensial Belum Diisi',
+        'Silakan isi VITE_TELEGRAM_BOT_TOKEN dan VITE_TELEGRAM_CHAT_ID pada file .env terlebih dahulu.'
+      );
+      return;
     }
-  }, [auditLogs]);
 
-  useEffect(() => {
-    const handleUpdate = () => {
-      setLogs(AuditLogger.getLogs());
-    };
-
-    window.addEventListener('smart_absensi_audit_log_added', handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-
-    return () => {
-      window.removeEventListener('smart_absensi_audit_log_added', handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
-    };
-  }, []);
-
-  const activeLogs = logs;
-
-  const filteredLogs = activeLogs.filter(
-    (l) =>
-      l.action_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.actor_role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (l.change_reason && l.change_reason.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (l.request_id && l.request_id.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+    setIsTesting(true);
+    try {
+      const res = await TelegramService.sendTestMessage();
+      if (res.success) {
+        showToast('success', 'Telegram Berhasil Terhubung!', 'Pesan uji coba berhasil masuk ke grup/channel Telegram.');
+      } else {
+        showToast('error', 'Gagal Terhubung ke Telegram', res.error || 'Periksa kembali Bot Token dan Chat ID.');
+      }
+    } catch (err: any) {
+      showToast('error', 'Kendala Jaringan', err?.message || 'Gagal menghubungi server Telegram.');
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   return (
-    <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-card space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div>
-          <h3 className="font-bold text-slate-900 text-sm">📜 Jurnal Audit Log Sistem (Strict Append-Only)</h3>
-          <p className="text-xs text-slate-500">Mencatat seluruh perubahan data, reset kredensial, dan keputusan approval.</p>
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="bg-linear-to-r from-[#023246] via-[#1E5670] to-[#287094] rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-15 pointer-events-none">
+          <span className="text-9xl">✈️</span>
         </div>
-
-        <Input
-          placeholder="Cari Action, Role, atau Reason..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-64"
-        />
+        <div className="relative z-10 max-w-3xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-semibold mb-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Real-time Telegram Bot Stream Active
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Audit Log & Notifikasi Telegram</h2>
+          <p className="text-sm text-cyan-100 mt-1 leading-relaxed">
+            Seluruh catatan presensi guru, akses login web, dan mutasi data sistem disalurkan secara real-time langsung ke saluran Telegram sekolah.
+          </p>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
-            <tr>
-              <th className="p-3">Waktu & Request ID</th>
-              <th className="p-3">Aktor & Role</th>
-              <th className="p-3">Aktivitas (Action)</th>
-              <th className="p-3">Keterangan / Alasan</th>
-              <th className="p-3 text-right">Inspeksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredLogs.map((log) => (
-              <tr key={log.id} className="hover:bg-slate-50/50">
-                <td className="p-3">
-                  <p className="font-bold text-slate-900">
-                    {new Date(log.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-mono">{log.request_id || '-'}</p>
-                </td>
-                <td className="p-3">
-                  <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                    log.actor_role === 'OPERATOR' ? 'bg-blue-100 text-blue-800' : log.actor_role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                  }`}>
-                    {log.actor_role}
-                  </span>
-                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">{log.actor_id}</p>
-                </td>
-                <td className="p-3">
-                  <span className="font-bold text-slate-900 font-mono text-[11px]">{log.action_type}</span>
-                  <p className="text-[10px] text-slate-400">Target: {log.target_entity}</p>
-                </td>
-                <td className="p-3 text-slate-700 font-medium">{log.change_reason || '-'}</td>
-                <td className="p-3 text-right">
-                  <button
-                    onClick={() => setSelectedLog(log)}
-                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] rounded-lg transition-colors"
-                  >
-                    🔍 Detail
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Log Detail Inspector Modal */}
-      <Modal isOpen={Boolean(selectedLog)} onClose={() => setSelectedLog(null)} title="🔍 Inspeksi Detail Audit Log Entry">
-        <div className="space-y-3 font-mono text-xs">
+      {/* Integration Status Card */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
           <div>
-            <span className="text-slate-400 block text-[10px]">REQUEST ID & TIMESTAMP:</span>
-            <p className="font-bold text-slate-900">{selectedLog?.request_id} • {selectedLog?.created_at}</p>
+            <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <span>📡</span> Status Koneksi Bot Telegram
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Konfigurasi token dan ID obrolan disetel melalui file environment <code>.env</code>
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleTestTelegram}
+            disabled={isTesting}
+            className="bg-[#287094] hover:bg-[#023246] text-white font-bold flex items-center gap-2"
+          >
+            {isTesting ? '⏳ Menguji Koneksi...' : '🧪 Uji Coba Kirim ke Telegram'}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-600">BOT TOKEN (VITE_TELEGRAM_BOT_TOKEN)</span>
+              {botToken ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Terisi
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Belum Diisi
+                </span>
+              )}
+            </div>
+            <p className="text-xs font-mono text-gray-700 truncate">
+              {botToken ? `${botToken.substring(0, 10)}****************` : 'Belum dikonfigurasi di file .env'}
+            </p>
           </div>
 
-          <div>
-            <span className="text-slate-400 block text-[10px]">AKTOR & PERANGKAT:</span>
-            <p className="font-bold text-slate-900">{selectedLog?.actor_role} ({selectedLog?.actor_id}) • IP: {selectedLog?.ip_address}</p>
-            <p className="text-[11px] text-slate-500">{selectedLog?.device}</p>
-          </div>
-
-          <div>
-            <span className="text-slate-400 block text-[10px]">NILAI SEBELUMNYA (BEFORE VALUE):</span>
-            <pre className="bg-slate-900 text-emerald-400 p-2.5 rounded-xl overflow-x-auto text-[11px]">
-              {selectedLog?.before_value || 'NULL'}
-            </pre>
-          </div>
-
-          <div>
-            <span className="text-slate-400 block text-[10px]">NILAI SESUDAHNYA (AFTER VALUE):</span>
-            <pre className="bg-slate-900 text-blue-400 p-2.5 rounded-xl overflow-x-auto text-[11px]">
-              {selectedLog?.after_value || 'NULL'}
-            </pre>
+          <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-600">CHAT ID (VITE_TELEGRAM_CHAT_ID)</span>
+              {chatId ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Terisi
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Belum Diisi
+                </span>
+              )}
+            </div>
+            <p className="text-xs font-mono text-gray-700 truncate">
+              {chatId ? `${chatId.substring(0, 4)}****` : 'Belum dikonfigurasi di file .env'}
+            </p>
           </div>
         </div>
-      </Modal>
+
+        {/* Feature Streams Overview */}
+        <div className="pt-2">
+          <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">
+            🎯 Aktivitas yang Otomatis Masuk ke Saluran Telegram:
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3.5 rounded-xl border border-blue-100 bg-blue-50/50 space-y-1">
+              <span className="text-lg">📋</span>
+              <h5 className="text-xs font-bold text-blue-900">Presensi Masuk & Pulang</h5>
+              <p className="text-[11px] text-blue-700 leading-relaxed">
+                Setiap guru yang melakukan scan presensi (QR, Biometrik, RFID) langsung dilaporkan lengkap dengan nama, jam, dan status presensi.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/50 space-y-1">
+              <span className="text-lg">🌐</span>
+              <h5 className="text-xs font-bold text-emerald-900">Akses Web Guru (Login)</h5>
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
+                Notifikasi instan terkirim saat guru masuk atau membuka dashboard aplikasi web presensi.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-amber-100 bg-amber-50/50 space-y-1">
+              <span className="text-lg">🛡️</span>
+              <h5 className="text-xs font-bold text-amber-900">Mutasi Data & Jadwal</h5>
+              <p className="text-[11px] text-amber-700 leading-relaxed">
+                Perubahan data pengguna, jadwal piket guru, dan persetujuan izin otomatis tercatat sebagai audit trail ke Telegram.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -9,6 +9,8 @@ import { AppInstallModal } from './components/ui/AppInstallModal';
 import { QueueMonitor } from './components/ui/QueueMonitor';
 import { GPSService } from './services/gps.service';
 import { AuthRepository } from './repositories/AuthRepository';
+import { TelegramService } from './services/telegram.service';
+import { getTodayDateInJakarta } from './utils/time.utils';
 
 // Helper: retry a dynamic import once by reloading the page when the chunk
 // is missing (stale deployment).  Uses sessionStorage to prevent infinite loops.
@@ -103,6 +105,20 @@ export const App: React.FC = () => {
               full_name: latestUser.full_name,
               position: latestUser.position,
             });
+          }
+
+          // Send Telegram Web Login notification once per browser session
+          if (latestUser && typeof sessionStorage !== 'undefined') {
+            const sessionKey = `tg_web_entry_${latestUser.id}_${getTodayDateInJakarta()}`;
+            if (!sessionStorage.getItem(sessionKey)) {
+              sessionStorage.setItem(sessionKey, '1');
+              TelegramService.sendWebLoginNotification({
+                teacherName: latestUser.full_name,
+                nip: latestUser.nip || undefined,
+                role: latestUser.role,
+                device: typeof navigator !== 'undefined' ? navigator.userAgent : 'Web Browser',
+              }).catch(console.warn);
+            }
           }
         })
         .catch(console.warn);

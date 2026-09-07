@@ -5,6 +5,8 @@ import { logger } from '../utils/logger.utils';
 import { indexedDBService } from '../services/indexed-db.service';
 import { useSyncQueueStore } from '../store/useSyncQueueStore';
 import { CONSTANTS } from '../config/constants';
+import { TelegramService } from '../services/telegram.service';
+import { getTodayDateInJakarta } from '../utils/time.utils';
 
 export interface ScanAttendanceDTO {
   token: string;
@@ -111,10 +113,26 @@ export class AttendanceRepository {
       const pendingItems = await indexedDBService.getPendingQueue();
       useSyncQueueStore.getState().setPendingItems(pendingItems);
 
+      const currentUser = useAuthStore.getState().user;
+      const offlineTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+
+      TelegramService.sendAttendanceNotification({
+        teacherName: currentUser?.full_name || dto.user_id || 'Guru',
+        nip: currentUser?.nip || undefined,
+        role: currentUser?.role || 'GURU',
+        type: 'CHECK_IN',
+        timeStr: offlineTime,
+        dateStr: getTodayDateInJakarta(),
+        method: dto.verification_method || 'QR_CODE',
+        distanceMeters: effectiveDistance,
+        status: 'HADIR (MODE OFFLINE)',
+        isOffline: true,
+      }).catch((e) => console.warn('Telegram offline attendance log error:', e));
+
       return {
         attendance_id: recordId,
         status: 'HADIR (MODE OFFLINE)',
-        timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+        timestamp: offlineTime,
         distance_meters: effectiveDistance,
         geofence_verified: true,
         attendance_action: 'CHECK_IN',
@@ -134,6 +152,22 @@ export class AttendanceRepository {
       ]);
 
       logger.info('AttendanceRepository', 'scanAttendance success:', result);
+
+      // Dispatch Telegram attendance notification
+      const currentUser = useAuthStore.getState().user;
+      TelegramService.sendAttendanceNotification({
+        teacherName: currentUser?.full_name || dto.user_id || 'Guru',
+        nip: currentUser?.nip || undefined,
+        role: currentUser?.role || 'GURU',
+        type: result.attendance_action || 'CHECK_IN',
+        timeStr: result.timestamp,
+        dateStr: getTodayDateInJakarta(),
+        method: dto.verification_method || 'QR_CODE',
+        distanceMeters: result.distance_meters,
+        status: result.status,
+        isOffline: result.is_offline,
+      }).catch((e) => console.warn('Telegram attendance log error:', e));
+
       return result;
     } catch (err: unknown) {
       if (!isNetworkOrTimeoutError(err)) {
