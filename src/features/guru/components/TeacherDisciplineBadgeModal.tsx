@@ -631,7 +631,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       Farhan Sopian Sahid, S.Pd.I
                     </h4>
                     <p className="text-xs text-cyan-200 font-medium">
-                      Kepala Sekolah SMATAS
+                      Kepala Sekolah SMP Terpadu Al-Ittihadiyah (SMPTAL)
                     </p>
                   </div>
                 </div>
@@ -655,8 +655,8 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 </div>
 
                 <div className="pt-3 border-t border-white/15 flex items-center justify-between text-[11px] text-cyan-200">
-                  <span>Disahkan di Tasikmalaya</span>
-                  <span>Kepala Sekolah SMATAS</span>
+                  <span>Disahkan di Ciampea</span>
+                  <span>Kepala Sekolah SMPTAL</span>
                 </div>
               </div>
 
