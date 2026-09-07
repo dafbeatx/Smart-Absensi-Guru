@@ -309,7 +309,8 @@ export class TelegramService {
 
     while (this.isPollingActive) {
       try {
-        const offsetQuery = this.lastUpdateId > 0 ? `?offset=${this.lastUpdateId + 1}&timeout=20` : `?timeout=20`;
+        // Short polling timeout (3s) for fast /start responsiveness
+        const offsetQuery = this.lastUpdateId > 0 ? `?offset=${this.lastUpdateId + 1}&timeout=3` : `?timeout=3`;
         const url = `https://api.telegram.org/bot${token}/getUpdates${offsetQuery}`;
 
         const controller = new AbortController();
@@ -325,7 +326,7 @@ export class TelegramService {
             this.isPollingActive = false;
             break;
           }
-          await new Promise((resolve) => setTimeout(resolve, 6000));
+          await new Promise((resolve) => setTimeout(resolve, 3000));
           continue;
         }
 
@@ -339,11 +340,14 @@ export class TelegramService {
               // ignore
             }
           }
-          await this.handleIncomingUpdate(update);
+          // Fire-and-forget: don't block the polling loop while waiting for Groq AI
+          this.handleIncomingUpdate(update).catch((e) =>
+            logger.warn('TelegramService', 'Error handling Telegram update:', e)
+          );
         }
       } catch (err: any) {
         if (err?.name === 'AbortError') break;
-        await new Promise((resolve) => setTimeout(resolve, 6000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
   }
