@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { Badge } from '../../../components/ui/Badge';
@@ -75,7 +75,11 @@ import {
   TEACHING_SCHEDULES_UPDATED_EVENT,
 } from '../../../repositories/TeachingScheduleRepository';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
-import { calculateTeacherAppreciationScore } from '../../../utils/teacher-appreciation.utils';
+import {
+  calculateTeacherAppreciationScore,
+  getTeacherDisciplineLeaderboard,
+} from '../../../utils/teacher-appreciation.utils';
+import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import type {
   AttendanceRecord,
@@ -300,6 +304,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isInfoExpanded, setIsInfoExpanded] = useState(false);
   const [isPermissionBlockedModalOpen, setIsPermissionBlockedModalOpen] = useState(false);
   const [permissionBlockedRequiresCamera, setPermissionBlockedRequiresCamera] = useState(false);
+  const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // Notifications List State (Backend-Driven)
@@ -983,6 +988,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     effectiveUser?.id
   );
 
+  // Teacher Discipline Leaderboard & Top Teacher Recognition
+  const disciplineLeaderboard = useMemo(() => {
+    return getTeacherDisciplineLeaderboard(effectiveUser, appreciationScore);
+  }, [effectiveUser, appreciationScore]);
+
   // Smart Class & Duty Alarm Evaluation (No AI Fake Data!)
   const smartAlarmStatus = evaluateSmartClassAlarm(
     teachingSlots,
@@ -1592,6 +1602,95 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               );
             })()}
 
+            {/* 🌟 2.5 CARD LENCANA PENGHARGAAN & APRESIASI KEPSEK (MONITORING PERFORMA DISIPLIN) ── */}
+            <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3">
+              {/* Header Card */}
+              <div className="flex items-center justify-between gap-2 px-0.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-amber-300 flex items-center justify-center text-sm shadow-2xs shrink-0">
+                    🏆
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">
+                      Lencana Penghargaan &amp; Apresiasi Kepsek
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 truncate mt-0.5">
+                      Monitoring performa disiplin internal sekolah
+                    </p>
+                  </div>
+                </div>
+
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0">
+                  Resmi Kepsek
+                </span>
+              </div>
+
+              {/* 👑 Highlight Poin Paling Banyak */}
+              <div
+                onClick={() => setIsDisciplineBadgeModalOpen(true)}
+                className="bg-linear-to-br from-amber-50 via-white to-amber-50/50 rounded-2xl p-3.5 border border-amber-300/80 shadow-2xs hover:border-amber-400 transition-all cursor-pointer space-y-2 group"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-amber-900 text-[11px] font-extrabold tracking-wide uppercase">
+                    <span className="text-sm">👑</span>
+                    <span>Poin Paling Banyak Bulan Ini</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors">
+                    <span>Lihat Rincian</span>
+                    <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-0.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm shrink-0 border border-amber-300/60 shadow-xs">
+                      {disciplineLeaderboard.topTeacher.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                        {disciplineLeaderboard.topTeacher.name}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                        {disciplineLeaderboard.topTeacher.position}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs flex items-center gap-1 justify-end">
+                      <span>⭐</span>
+                      <span>{disciplineLeaderboard.topTeacher.totalPoints} Poin</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-800 block mt-1">
+                      Peringkat 1 (Juara)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ringkasan Performa Guru yang Login & Tombol Layer Penjelasan */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
+                <div className="min-w-0">
+                  <span className="text-[11px] text-slate-500 font-medium block">
+                    Performa Disiplin Anda:
+                  </span>
+                  <p className="text-xs font-black text-slate-800 truncate">
+                    #{disciplineLeaderboard.currentUserRank} dari {disciplineLeaderboard.totalTeachers} Guru{' '}
+                    <span className="text-emerald-600 font-bold">({appreciationScore.totalPoints} Poin)</span>
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsDisciplineBadgeModalOpen(true)}
+                  className="h-9 px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-[11px] font-bold text-[#023246] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
+                >
+                  <span>Layer Penjelasan</span>
+                  <span className="text-cyan-800">→</span>
+                </button>
+              </div>
+            </section>
+
             {/* 🌟 3. FITUR UTAMA GURU (4 ICON PENTING + MORE LAYER) ─────────── */}
             <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3.5">
               <div className="flex items-center justify-between px-1">
@@ -1905,11 +2004,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 icon: <span className="text-base">⭐</span>,
                 title: `Poin Apresiasi: ${appreciation.totalPoints} Poin`,
                 description: `${appreciation.level} • Dedikasi pengajar bulan ini`,
-                action: () => {
-                  setActiveTab('RIWAYAT');
-                  setHistorySubTab('ATTENDANCE');
-                },
-                badge: 'Riwayat',
+                action: () => setIsDisciplineBadgeModalOpen(true),
+                badge: 'Peringkat & Layer →',
                 badgeColor: 'text-amber-800 bg-amber-50 border-amber-300',
               });
 
@@ -3419,6 +3515,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           loadAllDataRef.current?.();
           showToast('success', 'Presensi Sidik Jari Berhasil', 'Data kehadiran Anda telah tercatat.');
         }}
+      />
+
+      {/* 14. Modal Lencana Penghargaan & Apresiasi Kepsek (Layer Penjelasan & Peringkat) */}
+      <TeacherDisciplineBadgeModal
+        isOpen={isDisciplineBadgeModalOpen}
+        onClose={() => setIsDisciplineBadgeModalOpen(false)}
+        currentUser={effectiveUser}
+        currentUserScore={appreciationScore}
       />
     </div>
   );
