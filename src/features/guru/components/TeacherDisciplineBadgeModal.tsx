@@ -381,10 +381,10 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     </div>
                     <div>
                       <h5 className="text-xs font-bold text-slate-900">
-                        Hadir Tepat Waktu (&lt; 07:00 WIB)
+                        Kehadiran Masuk Tepat Waktu (≤ 07:30 WIB)
                       </h5>
                       <p className="text-[11px] text-slate-500">
-                        Scan QR atau Sidik Jari sebelum jam masuk sekolah
+                        Scan QR Code atau Sidik Jari tepat waktu di lingkungan sekolah
                       </p>
                     </div>
                   </div>
@@ -393,7 +393,27 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </span>
                 </div>
 
-                {/* 2. Tugas Piket Sekolah */}
+                {/* 2. Kehadiran Terlambat */}
+                <div className="p-3.5 rounded-2xl bg-white border border-amber-100 flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0">
+                      ⚠️
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-900">
+                        Kehadiran Masuk Terlambat (&gt; 07:30 WIB)
+                      </h5>
+                      <p className="text-[11px] text-slate-500">
+                        Tetap masuk dan hadir bekerja, mendapat poin dasar kedatangan
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-black shrink-0 border border-amber-200">
+                    +5 Poin
+                  </span>
+                </div>
+
+                {/* 3. Tugas Piket Sekolah */}
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-between gap-3 shadow-2xs">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-700 flex items-center justify-center font-bold shrink-0">
@@ -404,107 +424,27 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                         Melaksanakan Tugas Piket Sekolah
                       </h5>
                       <p className="text-[11px] text-slate-500">
-                        Mendampingi absensi RFID murid &amp; ketertiban gerbang
+                        Hadir di sekolah bertugas mendampingi RFID siswa &amp; ketertiban gerbang
                       </p>
                     </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-xl bg-cyan-50 text-cyan-800 text-xs font-black shrink-0 border border-cyan-200">
-                    +20 Poin
+                    +10 Poin
                   </span>
                 </div>
 
-                {/* 3. Presensi Pulang */}
+                {/* 4. Status Sakit & Izin Resmi */}
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-between gap-3 shadow-2xs">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
-                      🚪
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold shrink-0">
+                      📋
                     </div>
                     <div>
                       <h5 className="text-xs font-bold text-slate-900">
-                        Presensi Pulang Tertib (Check-Out)
+                        Status Izin &amp; Sakit Resmi
                       </h5>
                       <p className="text-[11px] text-slate-500">
-                        Melakukan absensi kepulangan sesuai jam dinas selesai
-                      </p>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-xl bg-blue-50 text-blue-800 text-xs font-black shrink-0 border border-blue-200">
-                    +5 Poin
-                  </span>
-                </div>
-
-                {/* 4. Mood Check-in */}
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-between gap-3 shadow-2xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center font-bold shrink-0">
-                      💚
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-bold text-slate-900">
-                        Mood Check-in &amp; Evaluasi Harian
-                      </h5>
-                      <p className="text-[11px] text-slate-500">
-                        Memperbarui status kebugaran &amp; kenyamanan mengajar
-                      </p>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-xl bg-rose-50 text-rose-800 text-xs font-black shrink-0 border border-rose-200">
-                    +15 Poin
-                  </span>
-                </div>
-
-                {/* 5. Bonus Awal Bulan */}
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-between gap-3 shadow-2xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0">
-                      🎖️
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-bold text-slate-900">
-                        Bonus Komitmen Awal Bulan
-                      </h5>
-                      <p className="text-[11px] text-slate-500">
-                        Modal poin dasar yang diberikan otomatis setiap awal bulan
-                      </p>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-black shrink-0 border border-amber-200">
-                    +50 Poin
-                  </span>
-                </div>
-
-                {/* 6. Keterlambatan */}
-                <div className="p-3.5 rounded-2xl bg-white border border-amber-100 flex items-center justify-between gap-3 shadow-2xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold shrink-0">
-                      ⚠️
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-bold text-slate-900">
-                        Kehadiran Terlambat (&gt; 07:00 WIB)
-                      </h5>
-                      <p className="text-[11px] text-slate-500">
-                        Mendapat poin minimum dengan pengurangan efisiensi
-                      </p>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-black shrink-0 border border-amber-200">
-                    +5 Poin
-                  </span>
-                </div>
-
-                {/* 7. Status Cuti & Izin Resmi */}
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-between gap-3 shadow-2xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center font-bold shrink-0">
-                      🏖️
-                    </div>
-                    <div>
-                      <h5 className="text-xs font-bold text-slate-900">
-                        Status Cuti, Izin, &amp; Sakit Resmi
-                      </h5>
-                      <p className="text-[11px] text-slate-500">
-                        Tidak ada akumulasi poin harian maupun komitmen (0 Poin) selama masa cuti/izin berlangsung
+                        Pengajuan sah disetujui, tidak ada penambahan poin kehadiran fisik
                       </p>
                     </div>
                   </div>
@@ -512,29 +452,69 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     0 Poin
                   </span>
                 </div>
+
+                {/* 5. Status Cuti Resmi */}
+                <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center font-bold shrink-0">
+                      🏖️
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-900">
+                        Status Cuti Resmi (Melahirkan / Tahunan)
+                      </h5>
+                      <p className="text-[11px] text-slate-500">
+                        Tercatat resmi cuti, tidak ada akumulasi poin harian selama masa cuti
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-600 text-xs font-black shrink-0 border border-slate-200">
+                    0 Poin
+                  </span>
+                </div>
+
+                {/* 6. Pengecualian Status ALFA (Disetel Admin) */}
+                <div className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200/80 flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold shrink-0">
+                      🚫
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-bold text-rose-950">
+                        Pengecualian Status ALFA (Disetel Admin)
+                      </h5>
+                      <p className="text-[11px] text-rose-800">
+                        Tidak masuk tanpa kabar/izin sah yang ditetapkan oleh Admin (Penalti Kedisiplinan)
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-xl bg-rose-100 text-rose-900 text-xs font-black shrink-0 border border-rose-300">
+                    -10 Poin
+                  </span>
+                </div>
               </div>
 
               {/* Tier Level */}
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-3">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                  Jenjang Level Apresiasi Pendidik
+                  Jenjang Level Apresiasi Pendidik (Berdasarkan Kehadiran Nyata)
                 </span>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 bg-white rounded-xl border border-slate-200/70">
                     <span className="font-extrabold text-slate-800 block">Level 1: Berkomitmen</span>
-                    <span className="text-[11px] text-slate-500">50 – 99 Poin</span>
+                    <span className="text-[11px] text-slate-500">1 – 49 Poin</span>
                   </div>
                   <div className="p-2.5 bg-white rounded-xl border border-slate-200/70">
                     <span className="font-extrabold text-slate-800 block">Level 2: Berdedikasi</span>
-                    <span className="text-[11px] text-slate-500">100 – 199 Poin</span>
+                    <span className="text-[11px] text-slate-500">50 – 64 Poin</span>
                   </div>
                   <div className="p-2.5 bg-white rounded-xl border border-slate-200/70">
                     <span className="font-extrabold text-amber-700 block">Level 3: Disiplin Emas</span>
-                    <span className="text-[11px] text-slate-500">200 – 299 Poin</span>
+                    <span className="text-[11px] text-slate-500">65 – 79 Poin</span>
                   </div>
                   <div className="p-2.5 rounded-xl border border-amber-300 bg-amber-50/40">
                     <span className="font-extrabold text-amber-900 block">Level 4: Teladan Utama</span>
-                    <span className="text-[11px] text-amber-800">300+ Poin</span>
+                    <span className="text-[11px] text-amber-800">80+ Poin</span>
                   </div>
                 </div>
               </div>
