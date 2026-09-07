@@ -36,6 +36,7 @@ dist-electron
 # Temporary & Workspace storage
 .tempmediaStorage
 brain
+scratch/
 
 # =====================================
 # AI Internal Working Memory
