@@ -19,6 +19,9 @@ import type {
   TeachingSlot,
   StudentItem,
   StudentAttendanceRecord,
+  StudentBehaviorRecord,
+  StudentBehaviorLog,
+  RecordStudentBehaviorParams,
   VerificationMethod,
   AttendanceSource,
 } from '../types/database.types';
@@ -1602,4 +1605,126 @@ export class MockProvider implements IDataProvider {
       return [];
     }
   }
+
+  // ==============================================================================
+  // STUDENT BEHAVIOR & POINTS API (Mock Provider / LocalStorage)
+  // ==============================================================================
+
+  public async getStudentBehaviors(
+    className?: string,
+    academicYear = '2026/2027',
+    _token?: string
+  ): Promise<StudentBehaviorRecord[]> {
+    const raw = safeGetStorage('smart_absensi_gm_behaviors');
+    let list: StudentBehaviorRecord[] = [];
+
+    if (raw) {
+      try {
+        list = JSON.parse(raw);
+      } catch {
+        list = [];
+      }
+    }
+
+    // Jika belum ada data di storage, inisialisasi dari daftar siswa aktif
+    if (list.length === 0) {
+      const students = await this.getStudents();
+      list = students.map((s) => ({
+        id: `gm_beh_${s.id}`,
+        student_name: s.fullName,
+        class_name: s.className,
+        academic_year: s.academicYear || academicYear,
+        total_points: 10,
+        behavior_logs: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+      safeSetStorage('smart_absensi_gm_behaviors', JSON.stringify(list));
+    }
+
+    return list.filter((b) => {
+      const matchYear = !b.academic_year || b.academic_year === academicYear;
+      const matchClass = !className || className === 'ALL' || b.class_name === className;
+      return matchYear && matchClass;
+    });
+  }
+
+  public async recordStudentBehavior(
+    params: RecordStudentBehaviorParams,
+    _token?: string
+  ): Promise<{
+    success: boolean;
+    newTotal: number;
+    record?: StudentBehaviorRecord;
+    message: string;
+  }> {
+    const list = await this.getStudentBehaviors('ALL', params.academicYear || '2026/2027');
+    const cleanName = params.studentName.trim().toUpperCase();
+    const cleanClass = params.className.trim().toUpperCase();
+    const academicYear = params.academicYear || '2026/2027';
+
+    let idx = list.findIndex(
+      (b) => b.student_name.toUpperCase() === cleanName && b.academic_year === academicYear
+    );
+
+    const newLog: StudentBehaviorLog = {
+      type: params.type,
+      points: params.points,
+      reason: params.reason.trim(),
+      timestamp: new Date().toISOString(),
+      recordedBy: params.teacherName || 'Guru',
+    };
+
+    let targetRecord: StudentBehaviorRecord;
+
+    if (idx !== -1) {
+      const existing = list[idx];
+      const currentTotal = typeof existing.total_points === 'number' ? existing.total_points : 10;
+      const newTotal = currentTotal + params.points;
+      targetRecord = {
+        ...existing,
+        total_points: newTotal,
+        behavior_logs: [newLog, ...(existing.behavior_logs || [])],
+        updated_at: new Date().toISOString(),
+      };
+      list[idx] = targetRecord;
+    } else {
+      const startingTotal = 10 + params.points;
+      targetRecord = {
+        id: `gm_beh_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        student_name: cleanName,
+        class_name: cleanClass,
+        academic_year: academicYear,
+        total_points: startingTotal,
+        behavior_logs: [newLog],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      list.unshift(targetRecord);
+    }
+
+    safeSetStorage('smart_absensi_gm_behaviors', JSON.stringify(list));
+
+    return {
+      success: true,
+      newTotal: targetRecord.total_points,
+      record: targetRecord,
+      message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (${params.points > 0 ? '+' : ''}${params.points}) berhasil dicatat untuk ${cleanName}. Total: ${targetRecord.total_points} poin.`,
+    };
+  }
+
+  public async getStudentBehaviorHistory(
+    studentName: string,
+    _className: string,
+    _token?: string
+  ): Promise<StudentBehaviorLog[]> {
+    const list = await this.getStudentBehaviors('ALL');
+    const cleanName = studentName.trim().toUpperCase();
+    const record = list.find((b) => b.student_name.toUpperCase() === cleanName);
+    if (!record || !Array.isArray(record.behavior_logs)) return [];
+    return [...record.behavior_logs].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }
 }
+

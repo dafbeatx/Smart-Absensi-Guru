@@ -277,3 +277,36 @@ export interface StudentAttendanceRecord {
   rfidUid?: string;
   createdAt?: string;
 }
+
+export interface StudentBehaviorLog {
+  type: 'GOOD' | 'BAD';
+  points: number;
+  reason: string;
+  timestamp: string;
+  recordedBy?: string;
+}
+
+export interface StudentBehaviorRecord {
+  id: string;
+  student_name: string;
+  class_name: string;
+  academic_year: string;
+  total_points: number;
+  behavior_logs: StudentBehaviorLog[];
+  avatar_url?: string | null;
+  points_used_today?: number;
+  points_date?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RecordStudentBehaviorParams {
+  studentName: string;
+  className: string;
+  type: 'GOOD' | 'BAD';
+  points: number;
+  reason: string;
+  teacherName?: string;
+  academicYear?: string;
+}
+

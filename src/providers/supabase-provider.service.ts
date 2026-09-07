@@ -21,6 +21,9 @@ import type {
   TeachingSlot,
   StudentItem,
   StudentAttendanceRecord,
+  StudentBehaviorRecord,
+  StudentBehaviorLog,
+  RecordStudentBehaviorParams,
   VerificationMethod,
   AttendanceSource,
 } from '../types/database.types';
@@ -2387,4 +2390,200 @@ export class SupabaseProvider implements IDataProvider {
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.getStudentAttendance(date, className, academicYear);
   }
+
+  // ==============================================================================
+  // STUDENT BEHAVIOR & POINTS API (Tersinkron dengan GradeMaster OS - gm_behaviors)
+  // ==============================================================================
+
+  public async getStudentBehaviors(
+    className?: string,
+    academicYear = '2026/2027',
+    _token?: string
+  ): Promise<StudentBehaviorRecord[]> {
+    try {
+      let query = this.client
+        .from('gm_behaviors')
+        .select('*')
+        .eq('academic_year', academicYear)
+        .order('class_name', { ascending: true })
+        .order('student_name', { ascending: true });
+
+      if (className && className !== 'ALL') {
+        query = query.eq('class_name', className);
+      }
+
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        return (data as any[]).map((row) => ({
+          id: row.id,
+          student_name: row.student_name,
+          class_name: row.class_name,
+          academic_year: row.academic_year || academicYear,
+          total_points: typeof row.total_points === 'number' ? row.total_points : 10,
+          behavior_logs: Array.isArray(row.behavior_logs) ? row.behavior_logs : [],
+          avatar_url: row.avatar_url || null,
+          points_used_today: row.points_used_today || 0,
+          points_date: row.points_date || null,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        }));
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getStudentBehaviors DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getStudentBehaviors(className, academicYear);
+  }
+
+  public async recordStudentBehavior(
+    params: RecordStudentBehaviorParams,
+    _token?: string
+  ): Promise<{
+    success: boolean;
+    newTotal: number;
+    record?: StudentBehaviorRecord;
+    message: string;
+  }> {
+    const cleanName = params.studentName.trim().toUpperCase();
+    const cleanClass = params.className.trim().toUpperCase();
+    const academicYear = params.academicYear || '2026/2027';
+
+    try {
+      // 1. Cari catatan siswa di tabel gm_behaviors
+      const { data: existing, error: findErr } = await this.client
+        .from('gm_behaviors')
+        .select('*')
+        .eq('academic_year', academicYear)
+        .ilike('student_name', cleanName)
+        .limit(1)
+        .maybeSingle();
+
+      const newLog: StudentBehaviorLog = {
+        type: params.type,
+        points: params.points,
+        reason: params.reason.trim(),
+        timestamp: new Date().toISOString(),
+        recordedBy: params.teacherName || 'Guru',
+      };
+
+      if (!findErr && existing) {
+        const currentTotal = typeof existing.total_points === 'number' ? existing.total_points : 10;
+        const currentLogs: StudentBehaviorLog[] = Array.isArray(existing.behavior_logs) ? existing.behavior_logs : [];
+        const newTotal = currentTotal + params.points;
+        const updatedLogs = [newLog, ...currentLogs];
+
+        const { data: updated, error: updateErr } = await this.client
+          .from('gm_behaviors')
+          .update({
+            total_points: newTotal,
+            behavior_logs: updatedLogs,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (!updateErr && updated) {
+          const resultRecord: StudentBehaviorRecord = {
+            id: updated.id,
+            student_name: updated.student_name,
+            class_name: updated.class_name,
+            academic_year: updated.academic_year,
+            total_points: updated.total_points,
+            behavior_logs: updated.behavior_logs,
+            avatar_url: updated.avatar_url,
+            created_at: updated.created_at,
+            updated_at: updated.updated_at,
+          };
+
+          // Sync to mock provider cache
+          try {
+            const mockProv = new (await import('./mock-provider.service')).MockProvider();
+            await mockProv.recordStudentBehavior(params);
+          } catch {
+            // ignore
+          }
+
+          return {
+            success: true,
+            newTotal,
+            record: resultRecord,
+            message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (${params.points > 0 ? '+' : ''}${params.points}) berhasil dicatat untuk ${cleanName}. Total sekarang: ${newTotal} poin.`,
+          };
+        }
+      } else {
+        // Jika belum ada di gm_behaviors, buat catatan baru
+        const startingTotal = 10 + params.points;
+        const { data: inserted, error: insertErr } = await this.client
+          .from('gm_behaviors')
+          .insert({
+            student_name: cleanName,
+            class_name: cleanClass,
+            academic_year: academicYear,
+            total_points: startingTotal,
+            behavior_logs: [newLog],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (!insertErr && inserted) {
+          const resultRecord: StudentBehaviorRecord = {
+            id: inserted.id,
+            student_name: inserted.student_name,
+            class_name: inserted.class_name,
+            academic_year: inserted.academic_year,
+            total_points: inserted.total_points,
+            behavior_logs: inserted.behavior_logs,
+            created_at: inserted.created_at,
+            updated_at: inserted.updated_at,
+          };
+
+          return {
+            success: true,
+            newTotal: startingTotal,
+            record: resultRecord,
+            message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (${params.points > 0 ? '+' : ''}${params.points}) berhasil dicatat untuk ${cleanName}.`,
+          };
+        }
+      }
+    } catch (err: any) {
+      logger.warn('SupabaseProvider', 'recordStudentBehavior DB exception:', err);
+    }
+
+    // Fallback to mock provider
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.recordStudentBehavior(params);
+  }
+
+  public async getStudentBehaviorHistory(
+    studentName: string,
+    className: string,
+    _token?: string
+  ): Promise<StudentBehaviorLog[]> {
+    try {
+      const cleanName = studentName.trim().toUpperCase();
+      const { data, error } = await this.client
+        .from('gm_behaviors')
+        .select('behavior_logs')
+        .eq('academic_year', '2026/2027')
+        .ilike('student_name', cleanName)
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data && Array.isArray(data.behavior_logs)) {
+        return (data.behavior_logs as StudentBehaviorLog[]).sort((a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getStudentBehaviorHistory exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getStudentBehaviorHistory(studentName, className);
+  }
 }
+

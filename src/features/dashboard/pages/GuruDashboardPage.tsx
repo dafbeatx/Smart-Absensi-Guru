@@ -24,6 +24,7 @@ import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
 import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
 import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricEnrollmentPromptModal';
+import { StudentBehaviorModal } from '../../guru/components/StudentBehaviorModal';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
   Radio,
@@ -48,6 +49,8 @@ import {
   LayoutGrid,
   FileSpreadsheet,
   ClipboardCheck,
+  Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -308,6 +311,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [permissionBlockedRequiresCamera, setPermissionBlockedRequiresCamera] = useState(false);
   const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
+  const [isStudentBehaviorModalOpen, setIsStudentBehaviorModalOpen] = useState(false);
+  const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // Notifications List State (Backend-Driven)
@@ -1802,6 +1807,67 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </a>
               </div>
 
+              {/* Poin Karakter Siswa: Kebaikan & Kedisiplinan (Sinkron GradeMaster OS) */}
+              <div className="pt-2.5 pb-1 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2 px-0.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[11px] font-extrabold text-slate-800 tracking-tight truncate">
+                      Poin Karakter Siswa
+                    </span>
+                    <span className="px-1.5 py-0.2 text-[8px] font-black bg-emerald-100 text-emerald-800 rounded-md shrink-0">
+                      Live Sync
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-semibold text-slate-400 shrink-0">
+                    GradeMaster OS
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentBehaviorInitialTab('KEBAIKAN');
+                      setIsStudentBehaviorModalOpen(true);
+                    }}
+                    className="p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50/70 hover:from-emerald-100/70 hover:to-teal-100/70 active:scale-[0.98] border border-emerald-200/80 flex items-center gap-2 transition-all cursor-pointer group shadow-2xs"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-[11px] sm:text-xs font-black text-emerald-950 truncate leading-tight">
+                        + Poin Kebaikan
+                      </p>
+                      <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-700/90 truncate">
+                        Apresiasi &amp; Prestasi
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentBehaviorInitialTab('KEDISIPLINAN');
+                      setIsStudentBehaviorModalOpen(true);
+                    }}
+                    className="p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-rose-50 to-amber-50/60 hover:from-rose-100/70 hover:to-amber-100/70 active:scale-[0.98] border border-rose-200/80 flex items-center gap-2 transition-all cursor-pointer group shadow-2xs"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                      <AlertTriangle className="w-4 h-4 text-amber-200" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-[11px] sm:text-xs font-black text-rose-950 truncate leading-tight">
+                        - Kedisiplinan
+                      </p>
+                      <p className="text-[9px] sm:text-[10px] font-semibold text-rose-700/90 truncate">
+                        Pelanggaran Disiplin
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* Tulisan & Tombol More: Pindah Layer ke Semua Fitur */}
               <div className="pt-2 border-t border-slate-100">
                 <button
@@ -2368,6 +2434,40 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Koreksi Soal
                     </span>
                   </a>
+
+                  {/* Poin Kebaikan Siswa */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentBehaviorInitialTab('KEBAIKAN');
+                      setIsStudentBehaviorModalOpen(true);
+                    }}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <Sparkles className="w-6 h-6 stroke-[1.8] text-amber-300" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-emerald-700 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Poin Kebaikan
+                    </span>
+                  </button>
+
+                  {/* Poin Kedisiplinan Siswa */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentBehaviorInitialTab('KEDISIPLINAN');
+                      setIsStudentBehaviorModalOpen(true);
+                    }}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-rose-600 to-red-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <AlertTriangle className="w-6 h-6 stroke-[1.8] text-amber-200" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-rose-700 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Kedisiplinan
+                    </span>
+                  </button>
 
                   {/* Terminal RFID Siswa (Jika Piket Aktif) */}
                   {isDutyTeacherToday && (
@@ -3526,6 +3626,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenStudentDirectoryModal={() => setIsStudentDirectoryModalOpen(true)}
         onOpenTeachingMaterialsModal={() => setIsTeachingMaterialsModalOpen(true)}
         onOpenEventsCalendarModal={() => setIsEventsCalendarModalOpen(true)}
+        onOpenStudentBehaviorModal={(tab) => {
+          setStudentBehaviorInitialTab(tab || 'KEBAIKAN');
+          setIsStudentBehaviorModalOpen(true);
+        }}
+      />
+
+      {/* Poin Kedisiplinan & Poin Kebaikan Siswa (Sinkron GradeMaster OS) */}
+      <StudentBehaviorModal
+        isOpen={isStudentBehaviorModalOpen}
+        onClose={() => setIsStudentBehaviorModalOpen(false)}
+        initialTab={studentBehaviorInitialTab}
+        currentTeacherName={effectiveUser?.full_name || 'Guru'}
       />
 
       {/* 13. Terminal Presensi RFID Siswa 2 (Akses Cepat Guru Piket & Pengajar) */}

@@ -16,6 +16,9 @@ import type {
   TeachingSlot,
   StudentItem,
   StudentAttendanceRecord,
+  StudentBehaviorRecord,
+  StudentBehaviorLog,
+  RecordStudentBehaviorParams,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -101,6 +104,17 @@ export interface IDataProvider {
     isDuplicate?: boolean;
   }>;
   getStudentAttendance(date: string, className?: string, academicYear?: string, token?: string): Promise<StudentAttendanceRecord[]>;
+
+  // Student Behavior & Disciplinary / Kindness Points API (Poin Siswa - Sinkron gm_behaviors)
+  getStudentBehaviors(className?: string, academicYear?: string, token?: string): Promise<StudentBehaviorRecord[]>;
+  recordStudentBehavior(params: RecordStudentBehaviorParams, token?: string): Promise<{
+    success: boolean;
+    newTotal: number;
+    record?: StudentBehaviorRecord;
+    message: string;
+  }>;
+  getStudentBehaviorHistory(studentName: string, className: string, token?: string): Promise<StudentBehaviorLog[]>;
 }
+
 
 

@@ -18,6 +18,7 @@ interface MoreFeaturesModalProps {
   onOpenStudentDirectoryModal?: () => void;
   onOpenTeachingMaterialsModal?: () => void;
   onOpenEventsCalendarModal?: () => void;
+  onOpenStudentBehaviorModal?: (tab?: 'KEBAIKAN' | 'KEDISIPLINAN') => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -37,6 +38,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenStudentDirectoryModal,
   onOpenTeachingMaterialsModal,
   onOpenEventsCalendarModal,
+  onOpenStudentBehaviorModal,
 }) => {
   if (!isOpen) return null;
 
@@ -67,6 +69,30 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
             window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
           },
         },
+        ...(onOpenStudentBehaviorModal
+          ? [
+              {
+                id: 'student_good_points',
+                title: 'Poin Kebaikan Siswa',
+                subtitle: 'Apresiasi sikap, kebersihan, dan keaktifan siswa (Sinkron)',
+                icon: '🌟',
+                action: () => {
+                  onClose();
+                  onOpenStudentBehaviorModal('KEBAIKAN');
+                },
+              },
+              {
+                id: 'student_discipline_points',
+                title: 'Poin Kedisiplinan Siswa',
+                subtitle: 'Catatan pelanggaran tata tertib & pengurangan poin',
+                icon: '⚠️',
+                action: () => {
+                  onClose();
+                  onOpenStudentBehaviorModal('KEDISIPLINAN');
+                },
+              },
+            ]
+          : []),
         ...(onOpenStudentDirectoryModal
           ? [
               {

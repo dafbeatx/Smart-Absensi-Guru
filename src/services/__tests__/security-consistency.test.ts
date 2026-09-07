@@ -16,6 +16,7 @@ import { ProviderFactory } from '../../providers/provider-factory';
 import { AttendanceRepository } from '../../repositories/AttendanceRepository';
 import { LeaveRepository } from '../../repositories/LeaveRepository';
 import { StudentRepository } from '../../repositories/StudentRepository';
+import { StudentBehaviorRepository } from '../../repositories/StudentBehaviorRepository';
 import { useAuthStore } from '../../store/useAuthStore';
 import type { UserProfile, LeaveRequest } from '../../types/database.types';
 import type { LoginDTO } from '../../repositories/AuthRepository';
@@ -831,6 +832,50 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     assert(
       'Student Directory - Admin Can Delete Student and Return to Empty State',
       deleteSuccess === true && afterDelete.length === 0
+    );
+
+    // Student Behavior & Disciplinary / Kindness Points Tests
+    const initialBehaviors = await StudentBehaviorRepository.getBehaviors('ALL', '2026/2027');
+    assert(
+      'Student Behavior - Repository returns list of student behaviors',
+      Array.isArray(initialBehaviors)
+    );
+
+    // Guru awards +10 points for good deed (Kebaikan)
+    const goodResult = await StudentBehaviorRepository.recordBehavior({
+      studentName: 'Ahmad Fauzi',
+      className: '8A',
+      type: 'GOOD',
+      points: 10,
+      reason: 'Membantu Guru/Teman',
+      teacherName: 'Budi Santoso, S.Pd',
+      academicYear: '2026/2027',
+    });
+    assert(
+      'Student Behavior - Guru can award positive good deed points (Kebaikan)',
+      goodResult.success === true && goodResult.newTotal >= 20
+    );
+
+    // Guru records -10 points for infraction (Pelanggaran)
+    const badResult = await StudentBehaviorRepository.recordBehavior({
+      studentName: 'Ahmad Fauzi',
+      className: '8A',
+      type: 'BAD',
+      points: -10,
+      reason: 'Terlambat Masuk Kelas',
+      teacherName: 'Budi Santoso, S.Pd',
+      academicYear: '2026/2027',
+    });
+    assert(
+      'Student Behavior - Guru can record discipline infraction (Pelanggaran)',
+      badResult.success === true && badResult.newTotal === goodResult.newTotal - 10
+    );
+
+    // Guru fetches behavior history
+    const history = await StudentBehaviorRepository.getHistory('Ahmad Fauzi', '8A');
+    assert(
+      'Student Behavior - History contains recorded entries',
+      Array.isArray(history) && history.length >= 2 && history[0].type === 'BAD'
     );
   } catch (e) {
     assert('Admin Mutation Error Propagation - Test Execution', false, String(e));
