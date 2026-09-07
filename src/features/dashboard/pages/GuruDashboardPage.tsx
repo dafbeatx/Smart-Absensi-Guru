@@ -1796,8 +1796,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Link
                     </span>
                   </div>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                    Koreksi
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center w-full">
+                    Koreksi Soal
                   </span>
                 </a>
               </div>
@@ -2235,7 +2235,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <FileEdit className="w-6 h-6 stroke-[1.8]" />
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Koreksi
+                      Koreksi Absen
                     </span>
                   </button>
 
@@ -2365,7 +2365,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       </span>
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Koreksi
+                      Koreksi Soal
                     </span>
                   </a>
 
