@@ -40,6 +40,10 @@ import {
   Smile,
   Lock,
   FileText,
+  ArrowLeft,
+  ArrowRight,
+  LayoutGrid,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -218,6 +222,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     : (authUser || fallbackUser);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [correctionInitialDate, setCorrectionInitialDate] = useState<string | undefined>(undefined);
@@ -1325,7 +1330,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         <NotificationPermissionBanner />
         <PWAInstallPrompt />
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
-        {activeTab === 'BERANDA' && (
+        {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
           <>
             {/* 🌟 1. CARD LOG PRESENSI HARI INI (DEVICE LOG TODAY MODEL) ─────────── */}
             {(() => {
@@ -1522,294 +1527,97 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               );
             })()}
 
-            {/* 🌟 3. GRID FITUR OPERASIONAL GURU (SQUIRCLE BIRU + PUTIH MODEL) ─── */}
-            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-6">
-              {/* Kategori 1: Presensi & Absensi */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-                  Presensi &amp; Absensi
-                </h3>
-                <div className="grid grid-cols-4 gap-y-4 gap-x-2">
-                  {/* Absen Sekarang */}
-                  <button
-                    type="button"
-                    onClick={handleOpenAttendanceChoice}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Fingerprint className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Presensi
-                    </span>
-                  </button>
-
-                  {/* Sidik Jari HP */}
-                  <button
-                    type="button"
-                    onClick={() => setIsBiometricModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Fingerprint className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Sidik Jari
-                    </span>
-                  </button>
-
-                  {/* Scan Barcode QR */}
-                  <button
-                    type="button"
-                    onClick={handleOpenScannerClick}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <QrCode className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Scan QR
-                    </span>
-                  </button>
-
-                  {/* Izin & Cuti */}
-                  <button
-                    type="button"
-                    onClick={handleOpenLeaveModal}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Clock className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Izin Cuti
-                    </span>
-                  </button>
-
-                  {/* Koreksi Absen */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenCorrectionModal()}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <FileEdit className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Koreksi
-                    </span>
-                  </button>
-
-                  {/* Rekap Presensi */}
-                  <button
-                    type="button"
-                    onClick={() => setIsRecapModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <BarChart3 className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Rekap
-                    </span>
-                  </button>
-
-                  {/* Peta Lokasi GPS */}
-                  <button
-                    type="button"
-                    onClick={() => setIsLocationModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <MapPin className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Lokasi GPS
-                    </span>
-                  </button>
-                </div>
+            {/* 🌟 3. FITUR UTAMA GURU (4 ICON PENTING + MORE LAYER) ─────────── */}
+            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3.5">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Menu Utama
+                </span>
+                <span className="text-[10px] font-semibold text-slate-400">
+                  4 Fitur Harian
+                </span>
               </div>
 
-              {/* Kategori 2: Akademik & KBM */}
-              <div className="space-y-3 pt-2 border-t border-slate-100">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-                  Akademik &amp; KBM
-                </h3>
-                <div className="grid grid-cols-4 gap-y-4 gap-x-2">
-                  {/* Jadwal KBM */}
-                  <button
-                    type="button"
-                    onClick={() => setIsScheduleModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Calendar className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Jadwal
-                    </span>
-                  </button>
+              {/* 4 Icon Utama Saja */}
+              <div className="grid grid-cols-4 gap-2">
+                {/* 1. Presensi */}
+                <button
+                  type="button"
+                  onClick={handleOpenAttendanceChoice}
+                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <Fingerprint className="w-6 h-6 stroke-[1.8]" />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    Presensi
+                  </span>
+                </button>
 
-                  {/* Ruang Kelas & Rombel */}
-                  <button
-                    type="button"
-                    onClick={() => setIsClassroomModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <School className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Kelas
-                    </span>
-                  </button>
+                {/* 2. Izin & Cuti */}
+                <button
+                  type="button"
+                  onClick={handleOpenLeaveModal}
+                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <Clock className="w-6 h-6 stroke-[1.8]" />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    Izin Cuti
+                  </span>
+                </button>
 
-                  {/* Direktori Siswa & RFID */}
-                  <button
-                    type="button"
-                    onClick={() => setIsStudentDirectoryModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <GraduationCap className="w-6 h-6 stroke-[1.8]" />
-                      {isDutyTeacherToday && (
-                        <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-cyan-500 text-white rounded-full min-w-3 text-center ring-2 ring-white">
-                          RFID
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Siswa
-                    </span>
-                  </button>
+                {/* 3. Jadwal KBM */}
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleModalOpen(true)}
+                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <Calendar className="w-6 h-6 stroke-[1.8]" />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    Jadwal
+                  </span>
+                </button>
 
-                  {/* Bahan Ajar KBM */}
-                  <button
-                    type="button"
-                    onClick={() => setIsTeachingMaterialsModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <BookOpen className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Materi
-                    </span>
-                  </button>
-
-                  {/* Kalender Acara */}
-                  <button
-                    type="button"
-                    onClick={() => setIsEventsCalendarModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <CalendarRange className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Acara
-                    </span>
-                  </button>
-
-                  {/* Terminal RFID Siswa 2 (Jika Piket Aktif) */}
-                  {isDutyTeacherToday && (
-                    <button
-                      type="button"
-                      onClick={() => setIsStudentKioskOpen(true)}
-                      className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                    >
-                      <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                        <Radio className="w-6 h-6 stroke-[1.8] text-cyan-300" />
-                      </div>
-                      <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                        Kiosk RFID
-                      </span>
-                    </button>
-                  )}
-                </div>
+                {/* 4. Rekap Presensi */}
+                <button
+                  type="button"
+                  onClick={() => setIsRecapModalOpen(true)}
+                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                >
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <BarChart3 className="w-6 h-6 stroke-[1.8]" />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    Rekap
+                  </span>
+                </button>
               </div>
 
-              {/* Kategori 3: Layanan & Sekolah */}
-              <div className="space-y-3 pt-2 border-t border-slate-100">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-                  Layanan &amp; Pengaturan
-                </h3>
-                <div className="grid grid-cols-4 gap-y-4 gap-x-2">
-                  {/* Pengumuman */}
-                  <button
-                    type="button"
-                    onClick={() => setIsAnnouncementModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                      <Megaphone className="w-6 h-6 stroke-[1.8]" />
-                      {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-3.5 text-center ring-2 ring-white">
-                          {unreadCount}
-                        </span>
-                      )}
+              {/* Tulisan & Tombol More: Pindah Layer ke Semua Fitur */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBerandaLayer('ALL_FEATURES');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="w-full py-2.5 px-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200/80 border border-slate-200/80 text-xs font-bold text-[#023246] flex items-center justify-between transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-lg bg-[#023246] text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <LayoutGrid className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Pengumuman
-                    </span>
-                  </button>
-
-                  {/* Kotak Aspirasi Guru */}
-                  <button
-                    type="button"
-                    onClick={() => setIsComplaintModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <MessageSquare className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Aspirasi
-                    </span>
-                  </button>
-
-                  {/* Mood Harian */}
-                  <button
-                    type="button"
-                    onClick={() => setIsMoodModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Smile className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Mood
-                    </span>
-                  </button>
-
-                  {/* Ubah PIN */}
-                  <button
-                    type="button"
-                    onClick={() => setIsChangePinOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <Lock className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Ubah PIN
-                    </span>
-                  </button>
-
-                  {/* Aturan & SK */}
-                  <button
-                    type="button"
-                    onClick={() => setIsTermsModalOpen(true)}
-                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                      <FileText className="w-6 h-6 stroke-[1.8]" />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                      Aturan
-                    </span>
-                  </button>
-                </div>
+                    <span className="truncate">Lihat Semua Menu &amp; Layanan (More)</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-cyan-800 group-hover:text-[#023246] shrink-0">
+                    <span>More</span>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -2115,6 +1923,360 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               );
             })()}
           </>
+        )}
+
+        {/* ── LAYER: SEMUA FITUR GURU (PINDAH LAYER, BUKAN CARD / POPUP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'ALL_FEATURES' && (
+          <section className="space-y-3.5">
+            {/* Top Navigation Bar: Tombol Kembali ke Beranda */}
+            <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setBerandaLayer('HOME');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200 text-xs font-bold text-[#023246] transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Kembali ke Beranda</span>
+              </button>
+              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                Layer Semua Fitur
+              </span>
+            </div>
+
+            {/* Banner Header Layer */}
+            <div className="bg-linear-to-r from-[#023246] to-[#18536B] rounded-3xl p-4 sm:p-5 text-white shadow-sm flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm sm:text-base font-black">Semua Menu &amp; Fitur Guru</h2>
+                <p className="text-[11px] sm:text-xs text-cyan-100/90 mt-0.5 font-medium">
+                  Akses modul operasional presensi, akademik KBM, dan layanan sekolah
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white shrink-0">
+                <LayoutGrid className="w-5 h-5" />
+              </div>
+            </div>
+
+            {/* Grid Lengkap Seluruh Fitur Guru dengan Icon Blue Squircle */}
+            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-6">
+              {/* Kategori 1: Presensi & Absensi */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                  Presensi &amp; Absensi
+                </h3>
+                <div className="grid grid-cols-4 gap-y-4 gap-x-2">
+                  {/* Absen Sekarang */}
+                  <button
+                    type="button"
+                    onClick={handleOpenAttendanceChoice}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <Fingerprint className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Presensi
+                    </span>
+                  </button>
+
+                  {/* Sidik Jari HP */}
+                  <button
+                    type="button"
+                    onClick={() => setIsBiometricModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <Fingerprint className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Sidik Jari
+                    </span>
+                  </button>
+
+                  {/* Scan Barcode QR */}
+                  <button
+                    type="button"
+                    onClick={handleOpenScannerClick}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <QrCode className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Scan QR
+                    </span>
+                  </button>
+
+                  {/* Izin & Cuti */}
+                  <button
+                    type="button"
+                    onClick={handleOpenLeaveModal}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <Clock className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Izin Cuti
+                    </span>
+                  </button>
+
+                  {/* Koreksi Absen */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCorrectionModal()}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <FileEdit className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Koreksi
+                    </span>
+                  </button>
+
+                  {/* Rekap Presensi */}
+                  <button
+                    type="button"
+                    onClick={() => setIsRecapModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <BarChart3 className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Rekap
+                    </span>
+                  </button>
+
+                  {/* Peta Lokasi GPS */}
+                  <button
+                    type="button"
+                    onClick={() => setIsLocationModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <MapPin className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Lokasi GPS
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Kategori 2: Akademik & KBM */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                  Akademik &amp; KBM
+                </h3>
+                <div className="grid grid-cols-4 gap-y-4 gap-x-2">
+                  {/* Jadwal KBM */}
+                  <button
+                    type="button"
+                    onClick={() => setIsScheduleModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <Calendar className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Jadwal
+                    </span>
+                  </button>
+
+                  {/* Ruang Kelas & Rombel */}
+                  <button
+                    type="button"
+                    onClick={() => setIsClassroomModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <School className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Kelas
+                    </span>
+                  </button>
+
+                  {/* Direktori Siswa & RFID */}
+                  <button
+                    type="button"
+                    onClick={() => setIsStudentDirectoryModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <GraduationCap className="w-6 h-6 stroke-[1.8]" />
+                      {isDutyTeacherToday && (
+                        <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-cyan-500 text-white rounded-full min-w-3 text-center ring-2 ring-white">
+                          RFID
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Siswa
+                    </span>
+                  </button>
+
+                  {/* Bahan Ajar KBM */}
+                  <button
+                    type="button"
+                    onClick={() => setIsTeachingMaterialsModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <BookOpen className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Materi
+                    </span>
+                  </button>
+
+                  {/* Kalender Acara */}
+                  <button
+                    type="button"
+                    onClick={() => setIsEventsCalendarModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <CalendarRange className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Acara
+                    </span>
+                  </button>
+
+                  {/* Terminal RFID Siswa (Jika Piket Aktif) */}
+                  {isDutyTeacherToday && (
+                    <button
+                      type="button"
+                      onClick={() => setIsStudentKioskOpen(true)}
+                      className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    >
+                      <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                        <Radio className="w-6 h-6 stroke-[1.8] text-cyan-300" />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                        Kiosk RFID
+                      </span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Kategori 3: Layanan & Pengaturan */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                  Layanan &amp; Pengaturan
+                </h3>
+                <div className="grid grid-cols-4 gap-y-4 gap-x-2">
+                  {/* Pengumuman */}
+                  <button
+                    type="button"
+                    onClick={() => setIsAnnouncementModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <Megaphone className="w-6 h-6 stroke-[1.8]" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-3.5 text-center ring-2 ring-white">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Pengumuman
+                    </span>
+                  </button>
+
+                  {/* Kotak Aspirasi Guru */}
+                  <button
+                    type="button"
+                    onClick={() => setIsComplaintModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <MessageSquare className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Aspirasi
+                    </span>
+                  </button>
+
+                  {/* Mood Harian */}
+                  <button
+                    type="button"
+                    onClick={() => setIsMoodModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <Smile className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Mood
+                    </span>
+                  </button>
+
+                  {/* Ubah PIN */}
+                  <button
+                    type="button"
+                    onClick={() => setIsChangePinOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <Lock className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Ubah PIN
+                    </span>
+                  </button>
+
+                  {/* Aturan & SK */}
+                  <button
+                    type="button"
+                    onClick={() => setIsTermsModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <FileText className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Aturan
+                    </span>
+                  </button>
+
+                  {/* Ekspor Laporan */}
+                  <button
+                    type="button"
+                    onClick={() => setIsExportModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <FileSpreadsheet className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Ekspor
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Tombol Kembali di Bawah */}
+            <button
+              type="button"
+              onClick={() => {
+                setBerandaLayer('HOME');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 active:scale-98 border border-slate-200/90 shadow-xs text-xs font-bold text-[#023246] flex items-center justify-center gap-2 transition-all cursor-pointer min-h-12"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Kembali ke Beranda Utama</span>
+            </button>
+          </section>
         )}
 
         {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}
@@ -2838,7 +3000,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <nav className="fixed bottom-0 left-0 right-0 w-full max-w-120 mx-auto bg-white/95 backdrop-blur-xl border-t border-[#DDD9D0] px-2 py-1.5 z-40 shadow-xl rounded-t-2xl">
         <div className="flex items-center justify-around relative">
           <button
-            onClick={() => setActiveTab('BERANDA')}
+            onClick={() => {
+              setActiveTab('BERANDA');
+              setBerandaLayer('HOME');
+            }}
             className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-11 justify-center active:scale-95 ${
               activeTab === 'BERANDA' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
