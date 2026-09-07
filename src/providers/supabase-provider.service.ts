@@ -20,6 +20,8 @@ import type {
   UpdateComplaintStatusDTO,
   TeachingSlot,
   StudentItem,
+  VerificationMethod,
+  AttendanceSource,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -355,11 +357,30 @@ export class SupabaseProvider implements IDataProvider {
           ? `${timeStr} WIB (Pulang Awal < ${targetCheckoutStart})`
           : `${timeStr} WIB (Absen Pulang)`;
 
+        const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
+        const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
+
         // Record or Update Check-out (Absen Pulang ke jam scan WIB pertama)
-        const { error: updateErr } = await this.client
+        const updatePayload: Record<string, unknown> = {
+          check_out_time: timeStr,
+          verification_method: vMethod,
+          attendance_source: aSource,
+        };
+
+        let { error: updateErr } = await this.client
           .from('attendance')
-          .update({ check_out_time: timeStr })
+          .update(updatePayload)
           .eq('id', existing.id);
+
+        if (updateErr && (updateErr.message.includes('column') || updateErr.message.includes('verification_method'))) {
+          delete updatePayload.verification_method;
+          delete updatePayload.attendance_source;
+          const retryRes = await this.client
+            .from('attendance')
+            .update(updatePayload)
+            .eq('id', existing.id);
+          updateErr = retryRes.error;
+        }
 
         if (updateErr) {
           throw new Error('Gagal mencatat absensi pulang: ' + updateErr.message);
@@ -376,21 +397,35 @@ export class SupabaseProvider implements IDataProvider {
       }
     }
 
+    const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
+    const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
+
     // Insert new check-in record
-    const { error } = await this.client.from('attendance').upsert(
-      {
-        id: attId,
-        user_id: userId,
-        date: todayStr,
-        check_in_time: timeStr,
-        status: status,
-        distance_meters: distanceMeters,
-        device_uuid: dto.device_uuid,
-        check_in_lat: userLat,
-        check_in_lng: userLng,
-      },
+    const insertPayload: Record<string, unknown> = {
+      id: attId,
+      user_id: userId,
+      date: todayStr,
+      check_in_time: timeStr,
+      status: status,
+      distance_meters: distanceMeters,
+      device_uuid: dto.device_uuid,
+      check_in_lat: userLat,
+      check_in_lng: userLng,
+      verification_method: vMethod,
+      attendance_source: aSource,
+    };
+
+    let { error } = await this.client.from('attendance').upsert(
+      insertPayload,
       { onConflict: 'user_id,date' }
     );
+
+    if (error && (error.message.includes('column') || error.message.includes('verification_method') || error.message.includes('attendance_source'))) {
+      delete insertPayload.verification_method;
+      delete insertPayload.attendance_source;
+      const retryRes = await this.client.from('attendance').upsert(insertPayload, { onConflict: 'user_id,date' });
+      error = retryRes.error;
+    }
 
     if (error) {
       throw new Error('Gagal menyimpan data absensi ke Supabase: ' + error.message);
@@ -427,8 +462,8 @@ export class SupabaseProvider implements IDataProvider {
       check_in_lat: data.check_in_lat ? parseFloat(data.check_in_lat) : null,
       check_in_lng: data.check_in_lng ? parseFloat(data.check_in_lng) : null,
       check_in_distance_meters: data.distance_meters || 0,
-      verification_method: 'QR_GPS',
-      attendance_source: 'QR',
+      verification_method: (data.verification_method as VerificationMethod) || 'QR_GPS',
+      attendance_source: (data.attendance_source as AttendanceSource) || 'QR',
       is_offline: false,
       created_at: data.created_at,
     };
@@ -480,8 +515,8 @@ export class SupabaseProvider implements IDataProvider {
       check_in_lat: row.check_in_lat ? parseFloat(row.check_in_lat) : null,
       check_in_lng: row.check_in_lng ? parseFloat(row.check_in_lng) : null,
       check_in_distance_meters: row.distance_meters || 0,
-      verification_method: 'QR_GPS',
-      attendance_source: 'QR',
+      verification_method: (row.verification_method as VerificationMethod) || 'QR_GPS',
+      attendance_source: (row.attendance_source as AttendanceSource) || 'QR',
       is_offline: false,
       notes: row.notes || row.reason || null,
       created_at: row.created_at,
@@ -595,8 +630,8 @@ export class SupabaseProvider implements IDataProvider {
       check_in_lat: row.check_in_lat ? parseFloat(row.check_in_lat) : null,
       check_in_lng: row.check_in_lng ? parseFloat(row.check_in_lng) : null,
       check_in_distance_meters: row.distance_meters || 0,
-      verification_method: 'QR_GPS',
-      attendance_source: 'QR',
+      verification_method: (row.verification_method as VerificationMethod) || 'QR_GPS',
+      attendance_source: (row.attendance_source as AttendanceSource) || 'QR',
       is_offline: false,
       notes: row.notes || row.reason || null,
       created_at: row.created_at,

@@ -1,5 +1,5 @@
 import { ProviderFactory } from '../providers/provider-factory';
-import type { AttendanceRecord, AttendanceAction } from '../types/database.types';
+import type { AttendanceRecord, AttendanceAction, VerificationMethod, AttendanceSource } from '../types/database.types';
 import { useAuthStore } from '../store/useAuthStore';
 import { logger } from '../utils/logger.utils';
 import { indexedDBService } from '../services/indexed-db.service';
@@ -18,6 +18,8 @@ export interface ScanAttendanceDTO {
   distance_meters?: number;
   /** GPS accuracy in meters at time of scan – used for audit logging */
   gps_accuracy?: number;
+  verification_method?: VerificationMethod;
+  attendance_source?: AttendanceSource;
 }
 
 export interface AttendanceResponseDTO {

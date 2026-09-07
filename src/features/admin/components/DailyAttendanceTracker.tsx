@@ -818,7 +818,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                         </div>
                       ) : record?.check_in_distance_meters !== undefined ? (
                         <p className="text-[10px] text-slate-400 font-medium">
-                          📍 Jarak: {record.check_in_distance_meters}m • {record.verification_method || 'QR_GPS'}
+                          📍 Jarak: {record.check_in_distance_meters}m • {record.verification_method === 'BIOMETRIC_GPS' ? '👆 Sidik Jari + GPS' : (record.verification_method || 'QR_GPS')}
                         </p>
                       ) : null}
                     </div>

@@ -22,6 +22,8 @@ import { StudentDirectoryModal } from '../../guru/components/StudentDirectoryMod
 import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
 import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCalendarModal';
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
+import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
+import { BiometricService } from '../../../services/biometric.service';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
@@ -319,6 +321,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
   const [isEventsCalendarModalOpen, setIsEventsCalendarModalOpen] = useState(false);
   const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
+  const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
+  const [isBioEnrolled, setIsBioEnrolled] = useState(false);
 
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -435,6 +439,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const checkDeviceStatus = async () => {
     if (!effectiveUser) return;
     try {
+      setIsBioEnrolled(BiometricService.isEnrolled(effectiveUser.id));
       const provider = ProviderFactory.getProvider();
       const bindingRes = await provider.checkDeviceBinding(
         effectiveUser.id,
@@ -1896,31 +1901,31 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <button
                   type="button"
-                  onClick={onOpenScanner}
+                  onClick={() => setIsBiometricModalOpen(true)}
                   className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1 shadow-2xs text-left cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95 transition-all"
-                  title="Klik untuk membuka Kamera Scanner QR Presensi Masuk"
+                  title="Klik untuk Presensi Masuk (Sidik Jari / Lokasi)"
                 >
                   <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Jam Masuk (Klik Absen)</span>
                   <p className="font-black text-emerald-950 text-base sm:text-lg">
                     {todayAttendance?.check_in_time ? todayAttendance.check_in_time.substring(0, 5) : '--:--'}
                   </p>
                   <span className="text-[10px] text-emerald-700 font-bold block truncate">
-                    {todayAttendance?.check_in_time ? 'Tercatat Valid ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Scan Sekarang →'}
+                    {todayAttendance?.check_in_time ? 'Tercatat Valid ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Absen Sekarang →'}
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={onOpenScanner}
+                  onClick={() => setIsBiometricModalOpen(true)}
                   className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1 shadow-2xs text-left cursor-pointer hover:border-blue-400 hover:shadow-md active:scale-95 transition-all"
-                  title="Klik untuk membuka Kamera Scanner QR Presensi Pulang"
+                  title="Klik untuk Presensi Pulang (Sidik Jari / Lokasi)"
                 >
                   <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider block">Jam Pulang (Klik Absen)</span>
                   <p className="font-black text-blue-950 text-base sm:text-lg">
                     {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
                   </p>
                   <span className="text-[10px] text-blue-700 font-bold block truncate">
-                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Scan Sekarang →'}
+                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Absen Sekarang →'}
                   </span>
                 </button>
               </div>
@@ -1973,20 +1978,31 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </div>
                 </div>
               ) : (
-                <Button
-                  variant="primary"
-                  leftIcon={<QrCodeScanIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white shrink-0" />}
-                  onClick={handleOpenScannerClick}
-                  onMouseEnter={() => {
-                    import('html5-qrcode').catch(() => {});
-                  }}
-                  onTouchStart={() => {
-                    import('html5-qrcode').catch(() => {});
-                  }}
-                  className="w-full py-3.5 sm:py-4 text-xs sm:text-sm font-black tracking-tight shadow-md shadow-emerald-700/20 flex-row items-center justify-center gap-2 sm:gap-2.5 cursor-pointer rounded-2xl bg-linear-to-r from-[#0D7A5F] to-[#095744] hover:from-[#095744] hover:to-[#023246] transition-all active:scale-[0.98] whitespace-normal leading-tight text-center"
-                >
-                  PINDAI QR CODE ABSENSI
-                </Button>
+                <div className="space-y-2.5">
+                  <Button
+                    variant="primary"
+                    leftIcon={<FingerprintIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white shrink-0" />}
+                    onClick={() => setIsBiometricModalOpen(true)}
+                    className="w-full py-3.5 sm:py-4 text-xs sm:text-sm font-black tracking-tight shadow-md shadow-slate-900/15 flex-row items-center justify-center gap-2 sm:gap-2.5 cursor-pointer rounded-2xl bg-linear-to-r from-[#023246] via-[#095744] to-[#0D7A5F] hover:brightness-110 transition-all active:scale-[0.98] whitespace-normal leading-tight text-center"
+                  >
+                    ABSEN DENGAN SIDIK JARI HP
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenScannerClick}
+                    onMouseEnter={() => {
+                      import('html5-qrcode').catch(() => {});
+                    }}
+                    onTouchStart={() => {
+                      import('html5-qrcode').catch(() => {});
+                    }}
+                    className="w-full py-2.5 px-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-2xs min-h-11"
+                  >
+                    <QrCodeScanIcon className="w-4 h-4 text-slate-600 shrink-0" />
+                    <span>Atau Pindai QR Code Sekolah</span>
+                  </button>
+                </div>
               )}
             </section>
 
@@ -2763,6 +2779,37 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               </div>
 
+              {/* Biometric Fingerprint HP Section */}
+              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between text-xs gap-2">
+                  <span className="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                    <span>👆</span> Sidik Jari HP Guru (Biometric)
+                  </span>
+                  <span className={`px-2 py-0.5 text-[9px] sm:text-[10px] font-black rounded-full border shrink-0 ${
+                    isBioEnrolled ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-200 text-slate-700 border-slate-300'
+                  }`}>
+                    {isBioEnrolled ? '✅ TERDAFTAR DI HP INI' : '⚪ BELUM TERDAFTAR'}
+                  </span>
+                </div>
+
+                <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium leading-relaxed bg-white p-2 rounded-lg sm:rounded-xl border border-slate-200">
+                  {isBioEnrolled
+                    ? 'Sensor sidik jari HP Anda aktif dan siap digunakan untuk presensi masuk & pulang saat berada di area sekolah.'
+                    : 'Daftarkan sidik jari HP ini agar Anda bisa langsung absen dengan menyentuh sensor fingerprint HP tanpa perlu scan QR.'}
+                </p>
+
+                <div className="flex justify-end gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsBiometricModalOpen(true)}
+                    className="px-3 py-1.5 bg-[#023246] hover:bg-[#0D7A5F] text-white font-extrabold text-[10px] sm:text-[11px] rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                  >
+                    <span>👆</span>
+                    <span>{isBioEnrolled ? 'Uji Coba Sidik Jari' : 'Daftarkan Sidik Jari Sekarang'}</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Teacher Appreciation Badge Showcase Section */}
               <div className="p-3.5 sm:p-4 rounded-2xl bg-[#FFFDF7] border border-amber-200/90 space-y-3 shadow-2xs">
                 <div className="flex items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
@@ -3157,6 +3204,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenTermsModal={() => setIsTermsModalOpen(true)}
         onOpenChangePin={() => setIsChangePinOpen(true)}
         onLogout={logout}
+      />
+
+      {/* 13. Modal Presensi Sidik Jari HP Terintegrasi GPS Geofence */}
+      <BiometricAttendanceModal
+        isOpen={isBiometricModalOpen}
+        onClose={() => setIsBiometricModalOpen(false)}
+        settings={settings}
+        user={effectiveUser}
+        onSuccess={() => {
+          setIsBioEnrolled(true);
+          loadAllDataRef.current?.();
+          showToast('success', 'Presensi Sidik Jari Berhasil', 'Data kehadiran Anda telah tercatat.');
+        }}
       />
     </div>
   );

@@ -609,7 +609,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                         </span>
                       )}
                       <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-full border border-blue-200">
-                        🔐 Verifikasi: {todayAttendance.verification_method === 'QR_GPS' ? 'QR + GPS' : todayAttendance.verification_method}
+                        🔐 Verifikasi: {todayAttendance.verification_method === 'BIOMETRIC_GPS' ? '👆 Sidik Jari + GPS' : todayAttendance.verification_method === 'QR_GPS' ? 'QR + GPS' : todayAttendance.verification_method}
                       </span>
                     </div>
                   )}

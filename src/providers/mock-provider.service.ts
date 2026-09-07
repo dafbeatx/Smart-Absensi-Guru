@@ -18,6 +18,8 @@ import type {
   UpdateComplaintStatusDTO,
   TeachingSlot,
   StudentItem,
+  VerificationMethod,
+  AttendanceSource,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -251,6 +253,9 @@ export class MockProvider implements IDataProvider {
     let record: AttendanceRecord;
     let action: AttendanceAction = 'CHECK_IN';
 
+    const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
+    const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
+
     if (existingSaved) {
       try {
         const parsed = JSON.parse(existingSaved);
@@ -262,6 +267,8 @@ export class MockProvider implements IDataProvider {
           record = {
             ...parsed,
             check_out_time: timeStr,
+            verification_method: vMethod,
+            attendance_source: aSource,
           };
           action = 'CHECK_OUT';
         } else {
@@ -275,8 +282,8 @@ export class MockProvider implements IDataProvider {
             check_in_lat: dto.user_lat || -6.2088,
             check_in_lng: dto.user_lng || 106.8456,
             check_in_distance_meters: 12,
-            verification_method: 'QR_GPS',
-            attendance_source: 'QR',
+            verification_method: vMethod,
+            attendance_source: aSource,
             is_offline: false,
             created_at: new Date().toISOString(),
           };
@@ -293,8 +300,8 @@ export class MockProvider implements IDataProvider {
           check_in_lat: dto.user_lat || -6.2088,
           check_in_lng: dto.user_lng || 106.8456,
           check_in_distance_meters: 12,
-          verification_method: 'QR_GPS',
-          attendance_source: 'QR',
+          verification_method: vMethod,
+          attendance_source: aSource,
           is_offline: false,
           created_at: new Date().toISOString(),
         };
@@ -311,8 +318,8 @@ export class MockProvider implements IDataProvider {
         check_in_lat: dto.user_lat || -6.2088,
         check_in_lng: dto.user_lng || 106.8456,
         check_in_distance_meters: 12,
-        verification_method: 'QR_GPS',
-        attendance_source: 'QR',
+        verification_method: vMethod,
+        attendance_source: aSource,
         is_offline: false,
         created_at: new Date().toISOString(),
       };

@@ -17,9 +17,9 @@ export type LeaveType = 'SAKIT' | 'IZIN' | 'DINAS_LUAR' | 'CUTI' | 'KOREKSI_ABSE
 
 export type ApprovalStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
 
-export type VerificationMethod = 'QR_GPS' | 'MANUAL_OPERATOR' | 'SYSTEM_AUTO';
+export type VerificationMethod = 'QR_GPS' | 'MANUAL_OPERATOR' | 'SYSTEM_AUTO' | 'BIOMETRIC_GPS';
 
-export type AttendanceSource = 'QR' | 'MANUAL' | 'OFFLINE_SYNC';
+export type AttendanceSource = 'QR' | 'MANUAL' | 'OFFLINE_SYNC' | 'BIOMETRIC';
 
 export type NotificationType = 'IN_APP' | 'WHATSAPP' | 'SYSTEM' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
 
