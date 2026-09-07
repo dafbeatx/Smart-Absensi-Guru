@@ -13,7 +13,6 @@ import { TermsAndConditionsModal } from '../../guru/components/TermsAndCondition
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
 import { AnonymousComplaintModal } from '../../guru/components/AnonymousComplaintModal';
-import { TeacherLocationCard } from '../../guru/components/TeacherLocationCard';
 import { AttendanceRecapModal } from '../../guru/components/AttendanceRecapModal';
 import { TeacherAnnouncementModal } from '../../guru/components/TeacherAnnouncementModal';
 import { ClassroomManagementModal } from '../../guru/components/ClassroomManagementModal';
@@ -37,7 +36,6 @@ import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
 import { isDateOffDay, getTodayDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays } from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
-import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
@@ -158,12 +156,6 @@ const UserIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) =
   </svg>
 );
 
-const PencilSquareIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-  </svg>
-);
-
 const CalendarDaysIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -185,32 +177,6 @@ const LogOutIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' })
 const MegaphoneIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-  </svg>
-);
-
-const UsersIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-  </svg>
-);
-
-const MapPinIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-
-const AcademicCapIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-  </svg>
-);
-
-const Squares2X2Icon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
   </svg>
 );
 
@@ -328,6 +294,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isStudentKioskOpen, setIsStudentKioskOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isBioEnrolled, setIsBioEnrolled] = useState(false);
+  const [isInfoExpanded, setIsInfoExpanded] = useState(false);
 
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -1305,7 +1272,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen guru-pattern-bg pb-28 text-[#023246]">
+    <div className="min-h-screen bg-slate-50 pb-28 text-[#023246]">
       {/* ── PREVIEW MODE WARNING BANNER ───────────────────────────────────── */}
       {isPreviewMode && (
         <div className="bg-purple-900 text-purple-100 px-4 py-2 text-xs font-bold text-center border-b border-purple-700 flex items-center justify-center gap-2">
@@ -1314,22 +1281,28 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       )}
 
       {/* ── TOP NAV BAR (HEADER) ────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-[#DDD9D0] sticky top-0 z-30 shadow-2xs w-full max-w-120 mx-auto">
+      <header className="flex items-center justify-between px-4 py-2.5 bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-2xs w-full max-w-120 mx-auto">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-emerald-500/20 flex items-center justify-center shrink-0 shadow-xs ring-2 ring-emerald-50">
-            <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
+          <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
+            <UserAvatar
+              avatarUrl={effectiveUser.avatar_url}
+              name={effectiveUser.full_name}
+              className="w-full h-full object-cover"
+              textClassName="text-xs font-bold"
+            />
           </div>
           <div className="min-w-0">
-            <h1 className="font-extrabold text-[#023246] text-xs tracking-tight leading-tight uppercase truncate">
-              Smart Absensi Guru
+            <h1 className="font-bold text-[#023246] text-xs leading-tight truncate">
+              {getTimeBasedGreeting()}, {effectiveUser.full_name ? effectiveUser.full_name.split(' ')[0] : 'Guru'}
             </h1>
-            <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate max-w-50">
-              {settings.institution_name}
+            <p className="text-[10px] font-medium text-slate-500 truncate mt-0.5">
+              {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })} • {isOnline ? 'Online' : 'Offline'}
             </p>
           </div>
         </div>
 
         <button
+          type="button"
           onClick={() => setActiveTab('NOTIFIKASI')}
           className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0 min-h-11 min-w-11 flex items-center justify-center active:scale-95"
           aria-label="Notifikasi"
@@ -1349,899 +1322,566 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && (
           <>
-            {/* 🌟 1. MASTER UNIFIED HERO HEADER CARD (Navy #023246) ──────────────────────────── */}
-            <div className="bg-[#023246] text-white rounded-3xl p-4.5 sm:p-5 shadow-sm border border-slate-700/60 flex items-center justify-between gap-3">
-              {/* Left: Avatar & Teacher Info */}
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white/10 p-0.5 border-2 border-emerald-400 text-white font-black text-xl flex items-center justify-center overflow-hidden shrink-0 shadow-xs ring-2 ring-emerald-400/30">
-                  <UserAvatar
-                    avatarUrl={effectiveUser.avatar_url}
-                    name={effectiveUser.full_name}
-                    className="w-full h-full rounded-full"
-                    textClassName="text-xl"
-                  />
-                </div>
-                <div className="space-y-0.5 min-w-0">
-                  <h2 className="text-sm sm:text-base font-black text-white leading-tight truncate">
-                    {effectiveUser.full_name}
-                  </h2>
-                  <p className="text-xs text-slate-300 font-semibold truncate">
-                    {effectiveUser.position || (effectiveUser.nip ? `NPP: ${effectiveUser.nip}` : 'Guru Pengajar')}
-                  </p>
-                  <div className="flex items-center gap-1.5 pt-0.5">
-                    <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                    <span className="text-[11px] font-bold text-emerald-300">
-                      {isOnline ? 'Online' : 'Offline'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+            {/* 1. KARTU PRESENSI SEBAGAI FOKUS UTAMA ───────────────────────── */}
+            {(() => {
+              const isFriday = new Date().getDay() === 5;
+              const checkoutStart = isFriday
+                ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
+                : settings.work_checkout_start;
 
-              {/* Right: Day & Date Display */}
-              <div className="border-l border-white/20 pl-3.5 sm:pl-4 text-left shrink-0">
-                <p className="text-xs font-semibold text-slate-300 leading-tight">
-                  {new Date().toLocaleDateString('id-ID', { weekday: 'long' })},
-                </p>
-                <p className="text-xs sm:text-sm font-black text-white leading-tight mt-0.5">
-                  {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-              </div>
-            </div>
+              // Determine Semantic Status
+              let statusLabel = 'Belum Absen';
+              let statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
+              let ctaText = 'Absen Masuk Sekarang';
+              let ctaAction = handleOpenAttendanceChoice;
+              let ctaStyle = 'bg-[#0D7A5F] hover:bg-[#0A634D] text-white active:scale-[0.98]';
+              let isCtaDisabled = false;
 
-            {/* 🌟 2. WELCOME MOTIVATIONAL BANNER (Soft Pastel Green) ────────────── */}
-            <div className="bg-[#E8F8F0] border border-emerald-200/90 rounded-2xl p-3 sm:p-3.5 flex items-center gap-3 shadow-2xs">
-              <div className="w-9 h-9 rounded-xl bg-white/90 border border-emerald-200 flex items-center justify-center text-xl shrink-0 shadow-2xs">
-                👋
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">
-                  {getTimeBasedGreeting()}, {effectiveUser.full_name.split(' ')[0]} 👋
-                </h3>
-                <p className="text-[11px] text-emerald-800 font-semibold truncate mt-0.5">
-                  Semoga hari ini lebih produktif
-                </p>
-              </div>
-            </div>
+              if (isTodayOff.isOff) {
+                statusLabel = 'Hari Libur';
+                statusBadgeStyle = 'bg-slate-100 text-slate-700 border-slate-200';
+                ctaText = `Hari Libur (${isTodayOff.reason || 'Tidak Ada Presensi'})`;
+                isCtaDisabled = true;
+                ctaStyle = 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed';
+              } else if (todayAttendance?.check_out_time) {
+                statusLabel = 'Sudah Check-out';
+                statusBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                ctaText = 'Lihat Rekap Kehadiran Hari Ini';
+                ctaAction = () => setIsRecapModalOpen(true);
+                ctaStyle = 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 active:scale-[0.98]';
+              } else if (todayAttendance?.check_in_time) {
+                const nowTimeJakarta = getCurrentTimeInJakarta();
+                const isReadyToCheckout = nowTimeJakarta >= checkoutStart;
 
-            {/* 🌟 3. GRID 12 IKON FITUR UTAMA (4 KOLOM x 3 BARIS) ───────────── */}
-            <section className="bg-white rounded-3xl p-3.5 sm:p-4.5 border border-slate-200/90 shadow-card">
-              <div className="grid grid-cols-4 gap-2.5 sm:gap-3.5">
-                {/* 1. Absensi */}
-                <button
-                  type="button"
-                  onClick={handleOpenScannerClick}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E8F8F0] text-[#0D7A5F] border border-emerald-200/80 flex items-center justify-center shadow-2xs group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-all shrink-0">
-                    <FingerprintIcon className="w-6 h-6 text-[#0D7A5F]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Absensi
-                  </span>
-                </button>
-
-                {/* 2. Izin */}
-                <button
-                  type="button"
-                  onClick={handleOpenLeaveModal}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#FEF3EB] text-[#E06D26] border border-orange-200/80 flex items-center justify-center shadow-2xs group-hover:bg-orange-100 group-hover:border-orange-300 transition-all shrink-0">
-                    <ClockIcon className="w-6 h-6 text-[#E06D26]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Izin
-                  </span>
-                </button>
-
-                {/* 3. Jadwal */}
-                <button
-                  type="button"
-                  onClick={() => setIsScheduleModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#EEF4FE] text-[#2563EB] border border-blue-200/80 flex items-center justify-center shadow-2xs group-hover:bg-blue-100 group-hover:border-blue-300 transition-all shrink-0">
-                    <CalendarDaysIcon className="w-6 h-6 text-[#2563EB]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Jadwal
-                  </span>
-                </button>
-
-                {/* 4. Rekap */}
-                <button
-                  type="button"
-                  onClick={() => setIsRecapModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#EAF7ED] text-[#16A34A] border border-green-200/80 flex items-center justify-center shadow-2xs group-hover:bg-green-100 group-hover:border-green-300 transition-all shrink-0">
-                    <ChartIcon className="w-6 h-6 text-[#16A34A]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Rekap
-                  </span>
-                </button>
-
-                {/* 5. Koreksi / Tugas */}
-                <button
-                  type="button"
-                  onClick={() => handleOpenCorrectionModal()}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#F3EEFE] text-[#7C3AED] border border-purple-200/80 flex items-center justify-center shadow-2xs group-hover:bg-purple-100 group-hover:border-purple-300 transition-all shrink-0">
-                    <PencilSquareIcon className="w-6 h-6 text-[#7C3AED]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Koreksi
-                  </span>
-                </button>
-
-                {/* 6. Pengumuman */}
-                <button
-                  type="button"
-                  onClick={() => setIsAnnouncementModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0 relative"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#FFF8E5] text-[#D97706] border border-amber-200/80 flex items-center justify-center shadow-2xs group-hover:bg-amber-100 group-hover:border-amber-300 transition-all shrink-0 relative">
-                    <MegaphoneIcon className="w-6 h-6 text-[#D97706]" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[8px] font-black bg-red-600 text-white rounded-full min-w-4 text-center ring-2 ring-white animate-pulse">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Pengumuman
-                  </span>
-                </button>
-
-                {/* 7. Kelas */}
-                <button
-                  type="button"
-                  onClick={() => setIsClassroomModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E6F7F8] text-[#0891B2] border border-cyan-200/80 flex items-center justify-center shadow-2xs group-hover:bg-cyan-100 group-hover:border-cyan-300 transition-all shrink-0">
-                    <UsersIcon className="w-6 h-6 text-[#0891B2]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Kelas
-                  </span>
-                </button>
-
-                {/* 8. Lokasi */}
-                <button
-                  type="button"
-                  onClick={() => setIsLocationModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#FEECEF] text-[#E11D48] border border-rose-200/80 flex items-center justify-center shadow-2xs group-hover:bg-rose-100 group-hover:border-rose-300 transition-all shrink-0">
-                    <MapPinIcon className="w-6 h-6 text-[#E11D48]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Lokasi
-                  </span>
-                </button>
-
-                {/* 9. Siswa / Piket */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStudentDirectoryClassFilter(undefined);
-                    setIsStudentDirectoryModalOpen(true);
-                  }}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0 relative"
-                  title="Direktori Siswa & Terminal Presensi RFID Siswa 2"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E8F8F0] text-[#0D7A5F] border border-emerald-200/80 flex items-center justify-center shadow-2xs group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-all shrink-0 relative">
-                    <AcademicCapIcon className="w-6 h-6 text-[#0D7A5F]" />
-                    {isDutyTeacherToday && (
-                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-cyan-600 text-white rounded-full min-w-3 text-center ring-2 ring-white animate-pulse">
-                        RFID
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    {isDutyTeacherToday ? 'Siswa / RFID' : 'Siswa'}
-                  </span>
-                </button>
-
-                {/* 10. Materi */}
-                <button
-                  type="button"
-                  onClick={() => setIsTeachingMaterialsModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#F4EEFD] text-[#8B5CF6] border border-violet-200/80 flex items-center justify-center text-xl shadow-2xs group-hover:bg-violet-100 group-hover:border-violet-300 transition-all shrink-0">
-                    📚
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Materi
-                  </span>
-                </button>
-
-                {/* 11. Acara */}
-                <button
-                  type="button"
-                  onClick={() => setIsEventsCalendarModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#EEF5FD] text-[#2563EB] border border-blue-200/80 flex items-center justify-center shadow-2xs group-hover:bg-blue-100 group-hover:border-blue-300 transition-all shrink-0">
-                    <CalendarDaysIcon className="w-6 h-6 text-[#2563EB]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Acara
-                  </span>
-                </button>
-
-                {/* 12. Lainnya */}
-                <button
-                  type="button"
-                  onClick={() => setIsMoreFeaturesModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
-                >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#F1F5F9] text-[#475569] border border-slate-200 flex items-center justify-center shadow-2xs group-hover:bg-slate-200 group-hover:border-slate-300 transition-all shrink-0">
-                    <Squares2X2Icon className="w-6 h-6 text-[#475569]" />
-                  </div>
-                  <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Lainnya
-                  </span>
-                </button>
-              </div>
-            </section>
-
-            {/* 🌟 4. STATUS KEHADIRAN HARI INI CARD ──────────────────────────── */}
-            <section
-              onClick={handleOpenScannerClick}
-              className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card flex items-center justify-between gap-3 relative overflow-hidden cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all active:scale-[0.99] border-l-4 border-l-[#0D7A5F]"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-bold shrink-0 ${
-                  todayAttendance
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : isTodayOff.isOff
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-amber-100 text-amber-800'
-                }`}>
-                  {todayAttendance ? '✓' : isTodayOff.isOff ? '🌴' : '⏳'}
-                </div>
-                <div className="min-w-0 space-y-0.5">
-                  <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">
-                    Status Kehadiran Hari Ini
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-semibold truncate">
-                    {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} • {
-                      todayAttendance?.check_in_time
-                        ? `${todayAttendance.check_in_time.substring(0, 5)} WIB`
-                        : isTodayOff.isOff
-                        ? isTodayOff.reason
-                        : 'Belum Absen'
-                    }
-                  </p>
-                </div>
-              </div>
-
-              <div className="shrink-0">
-                {isTodayOff.isOff ? (
-                  <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-black rounded-full border border-emerald-300 shadow-2xs">
-                    Hari Libur
-                  </span>
-                ) : todayAttendance ? (
-                  <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-black rounded-full border border-emerald-300 shadow-2xs">
-                    Sudah Absen
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 bg-amber-50 text-amber-800 text-xs font-black rounded-full border border-amber-300 shadow-2xs animate-pulse">
-                    Belum Absen
-                  </span>
-                )}
-              </div>
-            </section>
-
-            {/* 🌟 5. INFORMASI TERBARU BANNER ──────────────────────────── */}
-            <section
-              onClick={() => setActiveTab('NOTIFIKASI')}
-              className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-card flex items-center justify-between gap-3 cursor-pointer hover:border-blue-400 hover:bg-slate-50/60 transition-all active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-11 h-11 rounded-2xl bg-[#EEF4FE] text-[#2563EB] border border-blue-200/80 flex items-center justify-center text-xl shrink-0 shadow-2xs">
-                  <MegaphoneIcon className="w-5 h-5 text-[#2563EB]" />
-                </div>
-                <div className="min-w-0 space-y-0.5">
-                  <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">
-                    Informasi Terbaru
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-semibold truncate">
-                    {unreadCount > 0
-                      ? `${unreadCount} pengumuman baru menunggu dibaca`
-                      : 'Tidak ada pengumuman terbaru'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-slate-400 text-base font-bold shrink-0">
-                ›
-              </div>
-            </section>
-
-            {/* 📍 REAL-TIME GEOFENCE LOCATION CARD WIDGET ──────────────────── */}
-            <TeacherLocationCard onOpenScanner={handleOpenAttendanceChoice} />
-
-            {/* 🌟 1.5 TEACHER APPRECIATION & GAMIFICATION WIDGET ─────────── */}
-            <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-lg font-bold shrink-0 shadow-2xs">
-                    🏆
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider block truncate">Apresiasi & Disiplin Guru</span>
-                    <h3 className="text-xs font-black text-[#023246] truncate">{appreciationScore.level}</h3>
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="text-base font-black text-amber-600 font-mono leading-none block">{appreciationScore.totalPoints}</span>
-                  <span className="text-[9px] font-bold text-slate-500 block">Poin Kehadiran</span>
-                </div>
-              </div>
-
-              {/* Level Progress Bar */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-[10px] font-bold text-slate-600">
-                  <span>Kemajuan Level</span>
-                  <span>{appreciationScore.levelProgressPercent}% (Target: {appreciationScore.nextLevelPoints} Poin)</span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/60">
-                  <div
-                    className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${appreciationScore.levelProgressPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Badges Carousel / Grid */}
-              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
-                {appreciationScore.badges.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => setActiveTab('PROFIL')}
-                    title={`${b.title}: ${b.description}`}
-                    className={`p-2 rounded-2xl border text-center flex flex-col items-center justify-center transition-all cursor-pointer ${
-                      b.isUnlocked
-                        ? 'bg-amber-50/80 border-amber-200 text-amber-950 shadow-2xs hover:scale-105'
-                        : 'bg-slate-50 border-slate-200/80 text-slate-400 opacity-60 hover:opacity-80'
-                    }`}
-                  >
-                    <span className="text-xl mb-0.5 leading-none">{b.icon}</span>
-                    <span className="text-[9px] font-extrabold leading-tight truncate w-full">{b.title.split(' ')[0]}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Piket Details Expand Banner if duty teacher */}
-            {isDutyTeacherToday && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2.5 text-amber-950 shadow-2xs">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 font-black text-xs text-amber-900">
-                    <span>🛡️ Selamat Bertugas Menjadi Guru Piket Hari Ini!</span>
-                  </div>
-                  <span className="bg-amber-200/80 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
-                    Piket Aktif
-                  </span>
-                </div>
-                <p className="text-[11px] text-amber-900 font-medium leading-relaxed">
-                  {todayDutyDetails?.notes || 'Mari sambut siswa dengan senyuman dan bina ketertiban sekolah.'}
-                </p>
-                {fellowDutyTeachers.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1 text-[10px] pt-1 border-t border-amber-200/60">
-                    <span className="font-bold text-amber-800">Rekan Piket:</span>
-                    {fellowDutyTeachers.map((t) => (
-                      <span key={t.id} className="bg-amber-100 px-1.5 py-0.2 rounded font-extrabold text-amber-900">
-                        👤 {t.teacher_name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Tombol Akses Terminal Presensi RFID Siswa 2 untuk Guru Piket */}
-                <button
-                  type="button"
-                  onClick={() => setIsStudentKioskOpen(true)}
-                  className="w-full h-11 px-4 bg-[#023246] hover:bg-[#034560] active:scale-[0.98] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer border border-cyan-500/30"
-                  title="Buka Terminal Presensi RFID Siswa 2"
-                >
-                  <Radio className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
-                  <span>Buka Terminal Presensi RFID Siswa 2</span>
-                </button>
-              </div>
-            )}
-
-            {/* Active Leave Request Status Alert Banner */}
-            {userLeaves.length > 0 && (() => {
-              const latestLeave = userLeaves[0];
-              const isApproved = latestLeave.approval_status === 'APPROVED';
-              const isRejected = latestLeave.approval_status === 'REJECTED';
-
-              let bannerStyle = 'bg-amber-500/10 border-amber-400/80 text-amber-950';
-              if (isApproved) bannerStyle = 'bg-emerald-500/10 border-emerald-400/80 text-emerald-950';
-              if (isRejected) bannerStyle = 'bg-rose-500/10 border-rose-400/80 text-rose-950';
+                if (isReadyToCheckout) {
+                  statusLabel = 'Siap Check-out';
+                  statusBadgeStyle = 'bg-blue-50 text-blue-800 border-blue-200';
+                  ctaText = 'Absen Pulang Sekarang';
+                  ctaAction = handleOpenAttendanceChoice;
+                  ctaStyle = 'bg-[#023246] hover:bg-[#034560] text-white active:scale-[0.98]';
+                } else {
+                  statusLabel = 'Sudah Check-in';
+                  statusBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                  ctaText = `Absen Pulang (Mulai ${checkoutStart} WIB)`;
+                  ctaAction = handleOpenAttendanceChoice;
+                  ctaStyle = 'bg-[#023246] hover:bg-[#034560] text-white active:scale-[0.98]';
+                }
+              }
 
               return (
-                <div className={`p-4 rounded-3xl border shadow-card transition-all space-y-2 ${bannerStyle}`}>
+                <section className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+                  {/* Top: Card Header with Date & Status Badge */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">
-                        {isApproved ? '🟢' : isRejected ? '🔴' : '🟡'}
+                    <div className="min-w-0">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Status Presensi
                       </span>
-                      <span className="font-extrabold text-xs tracking-tight">
-                        Status Izin ({latestLeave.leave_type}): {isApproved ? 'DISETUJUI KEPSEK' : isRejected ? 'DITOLAK KEPSEK' : 'MENUNGGU PERSETUJUAN KEPSEK'}
-                      </span>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">
+                        {new Date().toLocaleDateString('id-ID', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('RIWAYAT');
-                        setHistorySubTab('LEAVES');
-                      }}
-                      className="text-[10px] font-extrabold px-2.5 py-1 bg-white/80 border border-slate-200 rounded-xl hover:bg-white cursor-pointer shrink-0 shadow-2xs"
-                    >
-                      Detail →
-                    </button>
+
+                    <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border shrink-0 ${statusBadgeStyle}`}>
+                      {statusLabel}
+                    </span>
                   </div>
 
-                  <div className="text-[11px] font-medium leading-relaxed bg-white/90 p-2.5 rounded-2xl border border-slate-200/60 space-y-1">
-                    <p className="font-bold text-slate-800">
-                      📅 Periode: {latestLeave.start_date} {latestLeave.end_date !== latestLeave.start_date ? `s/d ${latestLeave.end_date}` : ''}
-                    </p>
-                    <p className="text-slate-600 italic">"{latestLeave.reason}"</p>
-                    {latestLeave.approval_notes && (
-                      <div className={`pt-1.5 mt-1 border-t text-[11px] font-semibold ${
-                        isApproved ? 'border-emerald-200 text-emerald-900' : 'border-rose-200 text-rose-900'
-                      }`}>
-                        💬 <strong className="uppercase font-bold text-[10px]">{isApproved ? 'Catatan Kepala Sekolah:' : 'Alasan Penolakan:'}</strong>{' '}
-                        <span>{latestLeave.approval_notes}</span>
-                        {latestLeave.approved_by && (
-                          <span className="block text-[9px] text-slate-400 font-normal mt-0.5">
-                            Oleh: {latestLeave.approved_by}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                  {/* Middle: Masuk & Pulang Time Details */}
+                  <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/70 space-y-0.5">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Jam Masuk
+                      </span>
+                      <p className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+                        {todayAttendance?.check_in_time ? `${todayAttendance.check_in_time.substring(0, 5)} WIB` : '--:--'}
+                      </p>
+                      <span className="text-[10px] text-slate-500 font-medium block truncate">
+                        Maks. {settings.work_checkin_end} WIB
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/70 space-y-0.5">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Jam Pulang
+                      </span>
+                      <p className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+                        {todayAttendance?.check_out_time ? `${todayAttendance.check_out_time.substring(0, 5)} WIB` : '--:--'}
+                      </p>
+                      <span className="text-[10px] text-slate-500 font-medium block truncate">
+                        Mulai {checkoutStart} WIB
+                      </span>
+                    </div>
                   </div>
-                </div>
+
+                  {/* Single Primary Full-Width CTA Button (48-52px height) */}
+                  <button
+                    type="button"
+                    disabled={isCtaDisabled}
+                    onClick={ctaAction}
+                    className={`w-full h-12 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs ${ctaStyle}`}
+                  >
+                    {!todayAttendance && !isTodayOff.isOff && (
+                      <FingerprintIcon className="w-5 h-5 text-emerald-200 shrink-0" />
+                    )}
+                    {todayAttendance && !todayAttendance.check_out_time && !isTodayOff.isOff && (
+                      <FingerprintIcon className="w-5 h-5 text-cyan-200 shrink-0" />
+                    )}
+                    <span>{ctaText}</span>
+                  </button>
+
+                  {/* Secondary Fast Choice & GPS Status Row */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsBiometricModalOpen(true)}
+                        className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1 cursor-pointer py-0.5"
+                      >
+                        <span>👆 Sidik Jari</span>
+                      </button>
+                      <span className="text-slate-300">•</span>
+                      <button
+                        type="button"
+                        onClick={handleOpenScannerClick}
+                        className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1 cursor-pointer py-0.5"
+                      >
+                        <span>📷 Scan QR</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsLocationModalOpen(true)}
+                      className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1.5 cursor-pointer py-0.5 truncate max-w-[170px]"
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          gpsHealth.status === 'READY' ? 'bg-emerald-500' : 'bg-amber-500'
+                        }`}
+                      />
+                      <span className="truncate">{gpsHealth.text.replace('📍 ', '')}</span>
+                    </button>
+                  </div>
+                </section>
               );
             })()}
 
-            {/* 💬 Kotak Aspirasi & Keluhan Anonim (Mobile Professional Card) */}
-            <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-card space-y-3.5 relative overflow-hidden transition-all hover:border-slate-300">
-              {/* Subtle ambient accent */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
-
-              <div className="flex items-start justify-between gap-3 relative">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-linear-to-br from-[#023246] to-[#287094] text-white flex items-center justify-center text-xl shrink-0 shadow-sm ring-4 ring-[#023246]/5">
-                    💬
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h3 className="font-black text-[#023246] text-xs sm:text-sm tracking-tight">
-                        Kotak Aspirasi &amp; Keluhan Guru
-                      </h3>
-                    </div>
-                    <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5 leading-snug">
-                      Sampaikan laporan sarpras, kendala sistem, atau usulan sekolah secara aman.
-                    </p>
-                  </div>
-                </div>
-
-                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300/80 text-[10px] font-black rounded-full shrink-0 flex items-center gap-1 shadow-2xs">
-                  <span>🔒</span>
-                  <span>100% Anonim</span>
-                </span>
-              </div>
-
-              {/* Action Button Bar (Mobile Touch Target standard min 44px) */}
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('RIWAYAT');
-                    setHistorySubTab('COMPLAINTS');
-                  }}
-                  className="min-h-11 px-3 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black rounded-2xl border border-slate-200/90 transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                >
-                  <span>📋 Riwayat Saya</span>
-                  <span className="px-1.5 py-0.2 bg-slate-200 text-slate-800 font-mono text-[10px] rounded-full font-bold">
-                    {userComplaints.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsComplaintModalOpen(true)}
-                  className="min-h-11 px-3 py-2.5 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-black rounded-2xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
-                >
-                  <span>+</span>
-                  <span>Tulis Catatan</span>
-                </button>
-              </div>
-            </section>
-
-            {/* 🌟 2. TODAY ATTENDANCE & WORK SCHEDULE HUB ────────────────────── */}
-            <section className="bg-white rounded-3xl p-4 sm:p-4.5 shadow-card border border-slate-200/80 space-y-4">
-              {/* Card Header & Status Badge */}
-              <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
-                <div>
-                  <h3 className="text-xs font-black text-[#023246] uppercase tracking-wider">
-                    Status Presensi Hari Ini
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                    {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-
-                {isTodayOff.isOff ? (
-                  <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-black rounded-full border border-emerald-300 shrink-0 flex items-center gap-1 shadow-2xs">
-                    <span>🌴</span>
-                    <span>{isTodayOff.reason}</span>
-                  </span>
-                ) : todayHoliday ? (
-                  <Badge status="SAKIT">🎉 {todayHoliday.name}</Badge>
-                ) : todayAttendance ? (
-                  <Badge status={todayAttendance.status}>
-                    {todayAttendance.status === 'HADIR'
-                      ? '✅ Hadir'
-                      : todayAttendance.status === 'TERLAMBAT'
-                      ? '⚠️ Terlambat'
-                      : todayAttendance.status}
-                  </Badge>
-                ) : (
-                  <span className="px-2.5 py-1 bg-amber-50 text-amber-800 text-xs font-black rounded-full border border-amber-300 shrink-0">
-                    ⏳ Belum Presensi
-                  </span>
-                )}
-              </div>
-
-              {/* Work Hours Schedule Banner */}
-              {(() => {
-                const isFriday = new Date().getDay() === 5;
-                const checkoutStart = isFriday
-                  ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
-                  : settings.work_checkout_start;
-
-                return (
-                  <div className="bg-slate-50 p-3 rounded-2xl flex items-center justify-between text-xs border border-slate-200/80">
-                    <div className="space-y-0.5">
-                      <span className="text-slate-500 font-extrabold block text-[10px] uppercase tracking-wider">Batas Absen Masuk</span>
-                      <span className="font-black text-[#023246] text-xs sm:text-sm">{settings.work_checkin_end} WIB</span>
-                    </div>
-                    <div className="h-7 w-px bg-slate-200 mx-2" />
-                    <div className="space-y-0.5 text-right">
-                      <span className="text-slate-500 font-extrabold block text-[10px] uppercase tracking-wider">
-                        Absen Pulang {isFriday ? '(Jumat)' : ''}
-                      </span>
-                      <span className="font-black text-[#023246] text-xs sm:text-sm">{checkoutStart} WIB</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Check-In / Check-Out Log Details Grid (Interactive Clickable Cards) */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <button
-                  type="button"
-                  onClick={handleOpenAttendanceChoice}
-                  className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1 shadow-2xs text-left cursor-pointer hover:border-emerald-400 hover:shadow-md active:scale-95 transition-all"
-                  title="Klik untuk Presensi Masuk (Pilih Metode)"
-                >
-                  <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Jam Masuk (Klik Absen)</span>
-                  <p className="font-black text-emerald-950 text-base sm:text-lg">
-                    {todayAttendance?.check_in_time ? todayAttendance.check_in_time.substring(0, 5) : '--:--'}
-                  </p>
-                  <span className="text-[10px] text-emerald-700 font-bold block truncate">
-                    {todayAttendance?.check_in_time ? 'Tercatat Valid ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Absen Sekarang →'}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleOpenAttendanceChoice}
-                  className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-1 shadow-2xs text-left cursor-pointer hover:border-blue-400 hover:shadow-md active:scale-95 transition-all"
-                  title="Klik untuk Presensi Pulang (Pilih Metode)"
-                >
-                  <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider block">Jam Pulang (Klik Absen)</span>
-                  <p className="font-black text-blue-950 text-base sm:text-lg">
-                    {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
-                  </p>
-                  <span className="text-[10px] text-blue-700 font-bold block truncate">
-                    {todayAttendance?.check_out_time ? 'Absen Pulang Selesai ✨' : isTodayOff.isOff ? 'Hari Libur' : 'Absen Sekarang →'}
-                  </span>
-                </button>
-              </div>
-
-              {/* GPS Readiness & Live Map Box */}
-              {(() => {
-                const isOfflineMode = typeof navigator !== 'undefined' && !navigator.onLine;
-                const rawAllowed = getEffectiveAllowedRadius(settings.geofence_radius);
-                const effectiveAllowedRadius = isOfflineMode ? Math.max(rawAllowed, 500) : rawAllowed;
-
-                return (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-0.5">
-                      <span className="flex items-center gap-1.5 font-black text-[#023246]">
-                        <span>🗺️ Lokasi Real-time Anda</span>
-                      </span>
-                      <span className={`px-2 py-0.5 text-[10px] font-black rounded-lg border ${
-                        gpsHealth.status === 'READY'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-amber-50 text-amber-800 border-amber-300'
-                      }`}>
-                        📍 {gpsHealth.text}
-                      </span>
-                    </div>
-
-                    <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
-                      <LiveLocationMap
-                        userLat={userCoords?.latitude}
-                        userLng={userCoords?.longitude}
-                        schoolLat={settings.geofence_lat || CONSTANTS.DEFAULTS.GEOFENCE_LAT}
-                        schoolLng={settings.geofence_lng || CONSTANTS.DEFAULTS.GEOFENCE_LNG}
-                        allowedRadius={effectiveAllowedRadius}
-                        accuracy={userCoords?.accuracy}
-                        height="160px"
-                      />
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Action Button or Off-Day Informative Banner */}
-              {isTodayOff.isOff ? (
-                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-center gap-3 shadow-2xs">
-                  <span className="text-3xl shrink-0">🌴</span>
-                  <div className="space-y-0.5 text-xs">
-                    <p className="font-black text-emerald-950 text-sm">Hari Ini Libur ({isTodayOff.reason})</p>
-                    <p className="text-[11px] text-emerald-800 font-medium leading-relaxed">
-                      Sesuai jadwal sekolah, tidak ada kewajiban presensi hari ini. Selamat beristirahat!
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  <Button
-                    variant="primary"
-                    onClick={handleOpenAttendanceChoice}
-                    className="w-full py-3.5 sm:py-4 text-xs sm:text-sm font-black tracking-tight shadow-md shadow-slate-900/15 flex items-center justify-center gap-2 sm:gap-2.5 cursor-pointer rounded-2xl bg-linear-to-r from-[#023246] via-[#095744] to-[#0D7A5F] hover:brightness-110 transition-all active:scale-[0.98] whitespace-normal leading-tight text-center min-h-12"
-                  >
-                    <span>👆</span>
-                    <span>LAKUKAN PRESENSI SEKARANG</span>
-                    <span>📷</span>
-                  </Button>
-
-                  <div className="grid grid-cols-2 gap-2 pt-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setIsBiometricModalOpen(true)}
-                      className="py-2.5 px-3 rounded-2xl border border-teal-200 bg-teal-50 hover:bg-teal-100/80 text-teal-800 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] shadow-2xs min-h-11"
-                    >
-                      <span>👆</span>
-                      <span>Sidik Jari HP</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenScannerClick}
-                      onMouseEnter={() => {
-                        import('html5-qrcode').catch(() => {});
-                      }}
-                      onTouchStart={() => {
-                        import('html5-qrcode').catch(() => {});
-                      }}
-                      className="py-2.5 px-3 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98] shadow-2xs min-h-11"
-                    >
-                      <QrCodeScanIcon className="w-4 h-4 text-slate-600 shrink-0" />
-                      <span>Scan Barcode</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* 🌟 2.5 JADWAL MENGAJAR HARI INI (REAL-TIME KBM TIMETABLE HUB) ───── */}
+            {/* 2. JADWAL MENGAJAR HARI INI ───────────────────────────────────── */}
             {(() => {
               const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
               const todayDayName = dayNames[new Date().getDay()];
               const todaySlots = teachingSlots.filter((s) => s && s.day === todayDayName);
 
-              return (
-                <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-card space-y-3.5 relative overflow-hidden">
-                  {/* Header */}
-                  <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#023246] to-[#0D7A5F] text-white flex items-center justify-center text-lg shrink-0 shadow-xs ring-4 ring-[#023246]/5">
-                        📖
+              // Find slot that is CURRENT, or NEXT, or first UPCOMING, or fallback to last slot
+              let activeOrNextSlot = todaySlots.find((s) => {
+                const status = getSlotLiveStatus(s.time, currentTime);
+                return status === 'CURRENT';
+              });
+              if (!activeOrNextSlot) {
+                activeOrNextSlot = todaySlots.find((s) => {
+                  const status = getSlotLiveStatus(s.time, currentTime);
+                  return status === 'NEXT';
+                });
+              }
+              if (!activeOrNextSlot) {
+                activeOrNextSlot = todaySlots.find((s) => {
+                  const status = getSlotLiveStatus(s.time, currentTime);
+                  return status === 'UPCOMING';
+                });
+              }
+              if (!activeOrNextSlot && todaySlots.length > 0) {
+                activeOrNextSlot = todaySlots[todaySlots.length - 1];
+              }
+
+              const slotStatus = activeOrNextSlot ? getSlotLiveStatus(activeOrNextSlot.time, currentTime) : null;
+
+              if (todaySlots.length === 0) {
+                return (
+                  <section className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-500 shrink-0">
+                        <CalendarDaysIcon className="w-5 h-5 text-slate-500" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-xs sm:text-sm font-black text-[#023246] tracking-tight uppercase">
-                            Jadwal Mengajar Hari Ini
-                          </h3>
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-black rounded-full">
-                            {todayDayName}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-semibold truncate mt-0.5">
-                          {todaySlots.length > 0
-                            ? `${todaySlots.length} Mata Pelajaran Terjadwal`
-                            : 'Tidak ada jam mengajar tatap muka hari ini'}
-                        </p>
+                        <h3 className="text-xs font-bold text-slate-800 leading-tight">
+                          Tidak Ada Jadwal Mengajar Hari Ini
+                        </h3>
+                        <p className="text-[11px] text-slate-500 font-medium">Hari {todayDayName}</p>
                       </div>
                     </div>
-
                     <button
                       type="button"
                       onClick={() => setIsScheduleModalOpen(true)}
-                      className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-extrabold cursor-pointer transition-all active:scale-95 flex items-center gap-1 shadow-2xs shrink-0"
+                      className="text-xs font-bold text-[#023246] hover:text-[#0D7A5F] active:opacity-75 transition-opacity shrink-0 px-2 py-1"
                     >
-                      <span>📅 Semua Jadwal</span>
+                      Semua Jadwal →
                     </button>
+                  </section>
+                );
+              }
+
+              return (
+                <section className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        Jadwal Mengajar Hari Ini
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">• {todayDayName}</span>
+                    </div>
+
+                    {slotStatus === 'CURRENT' ? (
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold rounded-full">
+                        Sedang Berlangsung
+                      </span>
+                    ) : slotStatus === 'NEXT' ? (
+                      <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold rounded-full">
+                        Berikutnya
+                      </span>
+                    ) : slotStatus === 'FINISHED' ? (
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-medium rounded-full">
+                        Selesai
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold rounded-full">
+                        Mendatang
+                      </span>
+                    )}
                   </div>
 
-                  {/* Schedule Slots List */}
-                  {todaySlots.length === 0 ? (
-                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-xl shrink-0">☕</span>
-                        <p className="text-[11px] font-medium leading-tight">
-                          Tidak ada jam mengajar tatap muka di kelas untuk hari <strong>{todayDayName}</strong>.
-                        </p>
+                  {activeOrNextSlot && (
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/60 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-sm font-bold text-[#023246] truncate">
+                          {activeOrNextSlot.subject}
+                        </h4>
+                        <span className="px-2 py-0.5 bg-white text-slate-700 border border-slate-200 text-[11px] font-bold rounded-lg shrink-0">
+                          {activeOrNextSlot.className}
+                        </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsScheduleModalOpen(true)}
-                        className="text-[11px] font-black text-[#0D7A5F] hover:underline shrink-0 cursor-pointer"
-                      >
-                        Lihat Mingguan →
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {todaySlots.map((slot) => {
-                        const status = getSlotLiveStatus(slot.time, currentTime);
-                        const isOngoing = status === 'CURRENT';
-                        const isNext = status === 'NEXT';
-                        const isDone = status === 'FINISHED';
-
-                        return (
-                          <div
-                            key={slot.id}
-                            className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
-                              isOngoing
-                                ? 'bg-emerald-50/90 border-emerald-400 shadow-xs ring-2 ring-emerald-300/40'
-                                : isNext
-                                ? 'bg-amber-50/80 border-amber-300 shadow-2xs'
-                                : isDone
-                                ? 'bg-slate-50/60 border-slate-200 opacity-75'
-                                : 'bg-white border-slate-200/90 shadow-2xs'
-                            }`}
-                          >
-                            <div className="min-w-0 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs sm:text-sm font-black text-[#023246] truncate">
-                                  {slot.subject}
-                                </span>
-                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-black rounded-lg">
-                                  {slot.className}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium">
-                                <span className="flex items-center gap-1 font-mono font-bold text-slate-700">
-                                  ⏱️ {slot.time} WIB
-                                </span>
-                                <span>📍 {slot.room}</span>
-                              </div>
-                            </div>
-
-                            {/* Real-time Status Badge */}
-                            <div className="shrink-0 text-right">
-                              {isOngoing ? (
-                                <span className="px-2.5 py-1 bg-emerald-600 text-white text-[10px] font-black rounded-xl flex items-center gap-1 shadow-xs animate-pulse">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                                  <span>BERLANGSUNG</span>
-                                </span>
-                              ) : isNext ? (
-                                <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl flex items-center gap-1 shadow-xs">
-                                  <span>SELANJUTNYA</span>
-                                </span>
-                              ) : isDone ? (
-                                <span className="px-2 py-0.5 bg-slate-200 text-slate-600 text-[10px] font-bold rounded-lg">
-                                  ✓ Selesai
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold rounded-lg">
-                                  Menunggu
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      <div className="flex items-center gap-3 text-xs text-slate-500 font-medium pt-0.5">
+                        <span className="flex items-center gap-1 font-mono font-semibold text-slate-700">
+                          ⏱️ {activeOrNextSlot.time} WIB
+                        </span>
+                        <span>📍 {activeOrNextSlot.room || 'Kelas'}</span>
+                      </div>
                     </div>
                   )}
+
+                  <div className="pt-0.5 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setIsScheduleModalOpen(true)}
+                      className="text-xs font-bold text-[#023246] hover:text-[#0D7A5F] active:opacity-75 flex items-center justify-between w-full transition-colors cursor-pointer"
+                    >
+                      <span>
+                        {todaySlots.length > 1
+                          ? `Lihat semua jadwal hari ini (${todaySlots.length} mapel)`
+                          : 'Lihat jadwal mingguan'}
+                      </span>
+                      <span className="text-slate-400">›</span>
+                    </button>
+                  </div>
                 </section>
               );
             })()}
 
-            {/* 🌟 2.6 SMART CLASS ALARM BANNER (PENGINGAT KBM & PIKET) ─────────── */}
-            <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xl shrink-0">
-                    {smartAlarmStatus.type === 'UPCOMING_10MIN' ? '⏰' :
-                     smartAlarmStatus.type === 'CURRENTLY_TEACHING' ? '📚' :
-                     smartAlarmStatus.type === 'DUTY_TODAY' ? '🛡️' : '📅'}
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="text-xs font-black text-[#023246] tracking-tight uppercase truncate">
-                      Pengingat Smart KBM & Piket
-                    </h3>
-                    <p className="text-[10px] text-slate-500 font-semibold truncate">Alarm Persiapan Kelas Hari Ini</p>
-                  </div>
-                </div>
-
+            {/* 3. AKSI CEPAT (4 AKSI UTAMA DENGAN GRID 2X2) ────────────────── */}
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between px-0.5">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Aksi Cepat
+                </h3>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={() => setIsMoreFeaturesModalOpen(true)}
+                  className="text-xs font-bold text-[#023246] hover:text-[#0D7A5F] active:opacity-75 transition-colors cursor-pointer flex items-center gap-0.5"
+                >
+                  <span>Fitur Lainnya</span>
+                  <span className="text-slate-400">›</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* 1. Izin & Cuti */}
+                <button
+                  type="button"
+                  onClick={handleOpenLeaveModal}
+                  className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer flex items-center gap-3 text-left min-h-14"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-[#023246] shrink-0">
+                    <ClockIcon className="w-5 h-5 text-[#023246]" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-sm font-bold text-slate-800 block leading-tight truncate">
+                      Izin & Cuti
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium block truncate mt-0.5">
+                      Permohonan
+                    </span>
+                  </div>
+                </button>
+
+                {/* 2. Jadwal KBM */}
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleModalOpen(true)}
+                  className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer flex items-center gap-3 text-left min-h-14"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-[#023246] shrink-0">
+                    <CalendarDaysIcon className="w-5 h-5 text-[#023246]" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-sm font-bold text-slate-800 block leading-tight truncate">
+                      Jadwal
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium block truncate mt-0.5">
+                      KBM mingguan
+                    </span>
+                  </div>
+                </button>
+
+                {/* 3. Rekap Presensi */}
+                <button
+                  type="button"
+                  onClick={() => setIsRecapModalOpen(true)}
+                  className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer flex items-center gap-3 text-left min-h-14"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-[#023246] shrink-0">
+                    <ChartIcon className="w-5 h-5 text-[#023246]" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-sm font-bold text-slate-800 block leading-tight truncate">
+                      Rekap
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium block truncate mt-0.5">
+                      Bulan ini
+                    </span>
+                  </div>
+                </button>
+
+                {/* 4. Pengumuman */}
+                <button
+                  type="button"
+                  onClick={() => setIsAnnouncementModalOpen(true)}
+                  className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:border-slate-300 active:scale-[0.98] transition-all cursor-pointer flex items-center gap-3 text-left min-h-14 relative"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-[#023246] shrink-0">
+                    <MegaphoneIcon className="w-5 h-5 text-[#023246]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-slate-800 block leading-tight truncate">
+                        Pengumuman
+                      </span>
+                      {unreadCount > 0 && (
+                        <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                      )}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium block truncate mt-0.5">
+                      {unreadCount > 0 ? `${unreadCount} info baru` : 'Warta sekolah'}
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </section>
+
+            {/* 4. INFORMASI SEKUNDER: UNTUK ANDA ───────────────────────────── */}
+            {(() => {
+              interface InfoItem {
+                id: string;
+                icon: React.ReactNode;
+                title: string;
+                description: string;
+                action: () => void;
+                badge?: string;
+                badgeColor?: string;
+              }
+
+              const items: InfoItem[] = [];
+
+              // 1. Guru Piket Hari Ini (Highest Priority if active)
+              if (isDutyTeacherToday) {
+                const dutyFellows = fellowDutyTeachers.length > 0
+                  ? ` (Rekan: ${fellowDutyTeachers.map((t) => t.teacher_name).join(', ')})`
+                  : '';
+                items.push({
+                  id: 'duty',
+                  icon: <Radio className="w-5 h-5 text-cyan-700 animate-pulse" />,
+                  title: 'Tugas Guru Piket Hari Ini',
+                  description: (todayDutyDetails?.notes || 'Bantu absensi kartu RFID siswa & ketertiban gerbang') + dutyFellows,
+                  action: () => setIsStudentKioskOpen(true),
+                  badge: 'Terminal RFID →',
+                  badgeColor: 'text-cyan-800 bg-cyan-50 border-cyan-300',
+                });
+              }
+
+              // 2. Status Izin Aktif (if any recent leave)
+              if (userLeaves.length > 0) {
+                const latest = userLeaves[0];
+                const statusText =
+                  latest.approval_status === 'APPROVED'
+                    ? 'Disetujui'
+                    : latest.approval_status === 'REJECTED'
+                    ? 'Ditolak'
+                    : 'Menunggu Persetujuan';
+                items.push({
+                  id: 'leave_status',
+                  icon: <span className="text-base">📋</span>,
+                  title: `Status Izin: ${statusText}`,
+                  description: `${latest.leave_type} (${latest.start_date}) • ${latest.reason}`,
+                  action: () => {
+                    setActiveTab('RIWAYAT');
+                    setHistorySubTab('LEAVES');
+                  },
+                  badge: 'Detail Izin →',
+                  badgeColor:
+                    latest.approval_status === 'APPROVED'
+                      ? 'text-emerald-800 bg-emerald-50 border-emerald-300'
+                      : 'text-amber-800 bg-amber-50 border-amber-300',
+                });
+              }
+
+              // 3. Smart Alarm KBM & Piket
+              if (smartAlarmStatus.type !== 'NO_SCHEDULE') {
+                items.push({
+                  id: 'smart_alarm',
+                  icon: <span className="text-base">⏰</span>,
+                  title: 'Pengingat KBM & Kelas',
+                  description: smartAlarmStatus.message,
+                  action: () => {
                     SoundService.playNotificationChime();
                     if (smartAlarmStatus.speechText) {
                       SpeechService.speak(smartAlarmStatus.speechText);
                     }
-                    showToast('info', 'Tes Suara Alarm KBM', 'Suara chime dan pengingat audio berfungsi normal.');
-                  }}
-                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all active:scale-95 flex items-center gap-1 shadow-2xs shrink-0"
-                >
-                  <span>🔊 Tes Alarm</span>
-                </button>
-              </div>
+                    showToast('info', 'Alarm KBM', 'Suara pengingat berfungsi normal.');
+                  },
+                  badge: 'Tes Suara',
+                  badgeColor: 'text-blue-800 bg-blue-50 border-blue-300',
+                });
+              }
 
-              <div className={`p-3 rounded-2xl border text-xs leading-relaxed space-y-1 ${
-                smartAlarmStatus.type === 'UPCOMING_10MIN'
-                  ? 'bg-amber-500/10 border-amber-400 text-amber-950 font-semibold animate-pulse'
-                  : smartAlarmStatus.type === 'CURRENTLY_TEACHING'
-                  ? 'bg-emerald-500/10 border-emerald-400 text-emerald-950 font-semibold'
-                  : smartAlarmStatus.type === 'DUTY_TODAY'
-                  ? 'bg-blue-500/10 border-blue-400 text-blue-950 font-semibold'
-                  : 'bg-slate-50 border-slate-200 text-slate-600 font-medium'
-              }`}>
-                <p className="font-extrabold text-[11px] leading-tight">{smartAlarmStatus.message}</p>
-                {smartAlarmStatus.type === 'DUTY_TODAY' && (
-                  <div className="flex items-center justify-between pt-1 border-t border-blue-200/60 mt-1">
-                    <span className="text-[10px] text-blue-800 font-medium">Bantu absensi kartu RFID siswa:</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsStudentKioskOpen(true)}
-                      className="text-[10px] font-black text-[#023246] hover:text-[#0D7A5F] underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Radio className="w-3 h-3 text-cyan-600 animate-pulse" />
-                      <span>Terminal RFID 2 →</span>
-                    </button>
+              // 4. Pengumuman Sekolah Terbaru
+              if (notifications.length > 0) {
+                items.push({
+                  id: 'announcement',
+                  icon: <span className="text-base">📢</span>,
+                  title: notifications[0].title,
+                  description: notifications[0].message,
+                  action: () => setIsAnnouncementModalOpen(true),
+                  badge: 'Buka Warta',
+                  badgeColor: 'text-indigo-800 bg-indigo-50 border-indigo-300',
+                });
+              }
+
+              // 5. Kotak Aspirasi & Keluhan Anonim
+              items.push({
+                id: 'complaint',
+                icon: <span className="text-base">💬</span>,
+                title: 'Kotak Aspirasi Guru',
+                description: 'Sampaikan kendala sarpras atau usulan secara aman ke Kepala Sekolah',
+                action: () => setIsComplaintModalOpen(true),
+                badge: 'Tulis',
+                badgeColor: 'text-teal-800 bg-teal-50 border-teal-300',
+              });
+
+              // 6. Poin Apresiasi Dedikasi
+              const appreciation = calculateTeacherAppreciationScore(
+                attendanceHistory,
+                _dutySchedules,
+                todayMood,
+                effectiveUser?.id
+              );
+              items.push({
+                id: 'appreciation',
+                icon: <span className="text-base">⭐</span>,
+                title: `Poin Apresiasi: ${appreciation.totalPoints} Poin`,
+                description: `${appreciation.level} • Dedikasi pengajar bulan ini`,
+                action: () => {
+                  setActiveTab('RIWAYAT');
+                  setHistorySubTab('ATTENDANCE');
+                },
+                badge: 'Riwayat',
+                badgeColor: 'text-amber-800 bg-amber-50 border-amber-300',
+              });
+
+              // 7. Lokasi & Peta GPS
+              const rawAllowed = getEffectiveAllowedRadius(settings.geofence_radius);
+              const effectiveAllowedRadius = (typeof navigator !== 'undefined' && !navigator.onLine)
+                ? Math.max(rawAllowed, 500)
+                : rawAllowed;
+              const coordsAccuracy = userCoords?.accuracy ? ` (±${Math.round(userCoords.accuracy)}m)` : '';
+              items.push({
+                id: 'location',
+                icon: <span className="text-base">📍</span>,
+                title: 'Peta & Geofence Sekolah',
+                description: `Radius izin: ${effectiveAllowedRadius}m • GPS: ${gpsHealth.text.replace('📍 ', '')}${coordsAccuracy}`,
+                action: () => setIsLocationModalOpen(true),
+                badge: 'Lihat Peta',
+                badgeColor: 'text-slate-700 bg-slate-100 border-slate-300',
+              });
+
+              const visibleItems = isInfoExpanded ? items : items.slice(0, 2);
+
+              return (
+                <section className="space-y-2">
+                  <div className="flex items-center justify-between px-0.5">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      Untuk Anda
+                    </h3>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      {items.length} Info
+                    </span>
                   </div>
-                )}
-                {smartAlarmStatus.type === 'NO_SCHEDULE' && (
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 mt-1">
-                    <span className="text-[10px] text-slate-500 italic">Jadwal resmi dikelola oleh Kurikulum / Operator.</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsScheduleModalOpen(true)}
-                      className="text-[10px] font-black text-[#0D7A5F] underline cursor-pointer"
-                    >
-                      Lihat Jadwal →
-                    </button>
+
+                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100 overflow-hidden">
+                    {visibleItems.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={item.action}
+                        className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-base shrink-0">
+                            {item.icon}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-800 leading-tight truncate">
+                              {item.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+                        {item.badge ? (
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border shrink-0 ${item.badgeColor}`}>
+                            {item.badge}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-bold text-sm shrink-0">›</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {items.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsInfoExpanded(!isInfoExpanded)}
+                        className="w-full py-2.5 px-4 text-xs font-bold text-[#023246] hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        <span>{isInfoExpanded ? 'Tampilkan Lebih Sedikit ▴' : `Lihat Semua Informasi (${items.length}) ▾`}</span>
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </section>
+              );
+            })()}
           </>
         )}
 
@@ -3262,6 +2902,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenChangePin={() => setIsChangePinOpen(true)}
         onLogout={logout}
         onOpenStudentKiosk={() => setIsStudentKioskOpen(true)}
+        onOpenCorrectionModal={() => handleOpenCorrectionModal()}
+        onOpenClassroomModal={() => setIsClassroomModalOpen(true)}
+        onOpenLocationModal={() => setIsLocationModalOpen(true)}
+        onOpenStudentDirectoryModal={() => setIsStudentDirectoryModalOpen(true)}
+        onOpenTeachingMaterialsModal={() => setIsTeachingMaterialsModalOpen(true)}
+        onOpenEventsCalendarModal={() => setIsEventsCalendarModalOpen(true)}
       />
 
       {/* 13. Terminal Presensi RFID Siswa 2 (Akses Cepat Guru Piket & Pengajar) */}
