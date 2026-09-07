@@ -600,7 +600,7 @@ export const StudentRfidKioskModal: React.FC<StudentRfidKioskModalProps> = ({
                   value={feedSearch}
                   onChange={(e) => setFeedSearch(e.target.value)}
                   placeholder="Cari nama atau kelas siswa..."
-                  className="w-full h-9 bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full h-9 bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-cyan-500"
                 />
               </div>
             )}
