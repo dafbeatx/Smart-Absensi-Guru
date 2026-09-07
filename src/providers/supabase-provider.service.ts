@@ -2517,16 +2517,32 @@ export class SupabaseProvider implements IDataProvider {
     const academicYear = params.academicYear || '2026/2027';
     const violationDateIso = params.violationDate || new Date().toISOString();
     const pointsAbs = Math.abs(params.points);
+    // GradeMaster OS convention: Demerits (pelanggaran) > 0, Merits (kebaikan) < 0
+    const pointsDelta = params.type === 'GOOD' ? -pointsAbs : pointsAbs;
 
     try {
       // 1. Cari catatan siswa di tabel gm_behaviors
-      const { data: existing, error: findErr } = await this.client
+      let { data: existing, error: findErr } = await this.client
         .from('gm_behaviors')
         .select('*')
         .eq('academic_year', academicYear)
         .ilike('student_name', cleanName)
         .limit(1)
         .maybeSingle();
+
+      // Fallback jika tidak ditemukan dengan academicYear spesifik: cari berdasarkan nama siswa
+      if (!existing) {
+        const { data: fallbackExisting } = await this.client
+          .from('gm_behaviors')
+          .select('*')
+          .ilike('student_name', cleanName)
+          .order('academic_year', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (fallbackExisting) {
+          existing = fallbackExisting;
+        }
+      }
 
       const newLog: StudentBehaviorLog = {
         type: params.type,
@@ -2539,13 +2555,13 @@ export class SupabaseProvider implements IDataProvider {
 
       let targetStudentId: string | null = null;
       let targetRecord: StudentBehaviorRecord | undefined;
-      let calculatedTotal = 10;
+      let calculatedTotal = 0;
 
       if (!findErr && existing) {
         targetStudentId = existing.id;
-        const currentTotal = typeof existing.total_points === 'number' ? existing.total_points : 10;
+        const currentTotal = typeof existing.total_points === 'number' ? existing.total_points : 0;
         const currentLogs: StudentBehaviorLog[] = Array.isArray(existing.behavior_logs) ? existing.behavior_logs : [];
-        const newTotal = currentTotal + (params.type === 'GOOD' ? pointsAbs : -pointsAbs);
+        const newTotal = currentTotal + pointsDelta;
         calculatedTotal = newTotal;
         const updatedLogs = [newLog, ...currentLogs];
 
@@ -2575,15 +2591,14 @@ export class SupabaseProvider implements IDataProvider {
         }
       } else {
         // Jika belum ada di gm_behaviors, buat catatan baru
-        const startingTotal = 10 + (params.type === 'GOOD' ? pointsAbs : -pointsAbs);
-        calculatedTotal = startingTotal;
+        calculatedTotal = pointsDelta;
         const { data: inserted, error: insertErr } = await this.client
           .from('gm_behaviors')
           .insert({
             student_name: cleanName,
             class_name: cleanClass,
             academic_year: academicYear,
-            total_points: startingTotal,
+            total_points: calculatedTotal,
             behavior_logs: [newLog],
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -2606,18 +2621,25 @@ export class SupabaseProvider implements IDataProvider {
         }
       }
 
-      // 2. Insert into relational gm_behavior_logs (Standard GradeMaster OS table)
+      // 2. Insert into relational gm_behavior_logs (Primary GradeMaster OS table)
       if (targetStudentId) {
         try {
-          // GradeMaster OS convention: Demerits (pelanggaran) > 0, Merits (kebaikan) < 0
-          const pointsDelta = params.type === 'GOOD' ? -pointsAbs : pointsAbs;
-          await this.client.from('gm_behavior_logs').insert({
-            student_id: targetStudentId,
-            points_delta: pointsDelta,
-            reason: params.reason.trim(),
-            violation_date: violationDateIso,
-            created_at: new Date().toISOString(),
-          });
+          const { data: insertedLog, error: logInsertErr } = await this.client
+            .from('gm_behavior_logs')
+            .insert({
+              student_id: targetStudentId,
+              points_delta: pointsDelta,
+              reason: params.reason.trim(),
+              violation_date: violationDateIso,
+              created_at: new Date().toISOString(),
+            })
+            .select();
+
+          if (logInsertErr) {
+            logger.error('SupabaseProvider', 'Failed writing into gm_behavior_logs:', logInsertErr);
+          } else {
+            logger.info('SupabaseProvider', 'Successfully synced log to gm_behavior_logs:', insertedLog?.[0]?.id);
+          }
         } catch (logInsertErr) {
           logger.warn('SupabaseProvider', 'Failed writing into gm_behavior_logs:', logInsertErr);
         }
