@@ -3247,6 +3247,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <SchoolEventsCalendarModal
         isOpen={isEventsCalendarModalOpen}
         onClose={() => setIsEventsCalendarModalOpen(false)}
+        initialHolidays={allHolidays}
       />
 
       {/* 12. Menu Fitur Tambahan & Pengaturan */}
