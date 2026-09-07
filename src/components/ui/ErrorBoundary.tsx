@@ -108,7 +108,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     {this.state.isCopied ? '✅ Disalin!' : '📋 Salin Error'}
                   </button>
                 </div>
-                <p className="text-xs font-mono text-red-200/90 break-words leading-snug">
+                <p className="text-xs font-mono text-red-200/90 wrap-break-word leading-snug">
                   {this.state.errorMessage}
                 </p>
                 {this.state.errorStack && (
