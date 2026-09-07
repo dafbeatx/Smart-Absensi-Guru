@@ -48,6 +48,14 @@ export async function runMobileUIE2ETestSuite(): Promise<TestSuiteResult> {
   assert('Teacher Photo Management - Automatic 1:1 square crop & WebP compression (max 400x400)', true);
   assert('Teacher Photo Management - Cross-device sync via smart_absensi_teachers_updated event', true);
 
+  // 7. Compact Teacher Name Shortener Contract (Infinix Note 8 Mobile Layout)
+  const { formatShortTeacherName } = await import('../../utils/teacher-appreciation.utils');
+  assert('Teacher Name Shortener - 3 words with Muhammad formats to M. <second word>', formatShortTeacherName('Muhammad Hadatul Zidan') === 'M. Hadatul');
+  assert('Teacher Name Shortener - 2 words returns first word', formatShortTeacherName('Dafa Maulana, S.Pd') === 'Dafa');
+  assert('Teacher Name Shortener - 3 words returns second word', formatShortTeacherName('Farhan Sopian Sahid, S.Pd.I') === 'Sopian');
+  assert('Teacher Name Shortener - 2 words with Muhammad formats to M. <second word>', formatShortTeacherName('Muhammad Ilham') === 'M. Ilham');
+  assert('Teacher Name Shortener - Single word preserved', formatShortTeacherName('Ferdiansyah') === 'Ferdiansyah');
+
   return {
     suiteName: 'Automated End-to-End (E2E) Mobile UI & QA',
     passed,

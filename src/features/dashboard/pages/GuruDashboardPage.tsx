@@ -82,6 +82,7 @@ import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
+  formatShortTeacherName,
 } from '../../../utils/teacher-appreciation.utils';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { TopDisciplineCelebrationModal } from '../../guru/components/TopDisciplineCelebrationModal';
@@ -1668,14 +1669,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between gap-2.5 pt-0.5">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border border-amber-300/60 shadow-xs">
                       {disciplineLeaderboard.topTeacher.name.charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug wrap-break-word group-hover:text-[#023246]">
-                        {disciplineLeaderboard.topTeacher.name}
+                      <h4
+                        className="text-xs sm:text-sm font-black text-slate-900 leading-snug truncate group-hover:text-[#023246]"
+                        title={disciplineLeaderboard.topTeacher.name}
+                      >
+                        {formatShortTeacherName(disciplineLeaderboard.topTeacher.name)}
                       </h4>
                       <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
                         {disciplineLeaderboard.topTeacher.position}
@@ -1689,7 +1693,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <span>{disciplineLeaderboard.topTeacher.totalPoints} Poin</span>
                     </div>
                     <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 block mt-0.5 sm:mt-1">
-                      Peringkat 1 (5 Hari On-Time)
+                      Juara 1 🥇<span className="hidden sm:inline"> ({disciplineLeaderboard.topTeacher.hadirTepatWaktuCount} Hari On-Time)</span>
                     </span>
                   </div>
                 </div>
@@ -1698,10 +1702,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               {/* Ringkasan Performa Guru yang Login & Tombol Layer Penjelasan */}
               <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
                 <div className="min-w-0 flex-1">
-                  <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium block">
+                  <span className="text-[9.5px] sm:text-[11px] text-slate-500 font-medium block">
                     Performa Disiplin Anda:
                   </span>
-                  <p className="text-[11px] sm:text-xs font-black text-slate-800 truncate">
+                  <p className="text-[10.5px] sm:text-xs font-black text-slate-800 truncate">
                     #{disciplineLeaderboard.currentUserRank} dari {disciplineLeaderboard.totalTeachers} Guru{' '}
                     <span className="text-emerald-600 font-bold">({appreciationScore.totalPoints} Poin)</span>
                   </p>
@@ -1710,7 +1714,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                  className="h-10 px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-[11px] font-bold text-[#023246] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
+                  className="h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-[10.5px] sm:text-[11px] font-bold text-[#023246] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
                 >
                   <span>Layer Penjelasan</span>
                   <span className="text-cyan-800">→</span>
