@@ -60,7 +60,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 <Trophy className="w-5 h-5 text-amber-300" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm sm:text-base font-black text-slate-900 leading-tight break-words">
+                <h3 className="text-sm sm:text-base font-black text-slate-900 leading-tight wrap-break-word">
                   Lencana Penghargaan &amp; Apresiasi Kepsek
                 </h3>
                 <p className="text-[10px] sm:text-xs font-semibold text-slate-500 truncate mt-0.5">
@@ -197,7 +197,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug break-words">
+                    <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug wrap-break-word">
                       {topTeacher.name}
                     </h4>
                     <p className="text-[11px] font-semibold text-slate-600 truncate mt-0.5">
@@ -319,7 +319,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <h5 className="text-xs font-extrabold text-slate-900 leading-snug break-words">
+                              <h5 className="text-xs font-extrabold text-slate-900 leading-snug wrap-break-word">
                                 {teacher.name}
                               </h5>
                               {teacher.isCurrentUser && (
@@ -696,7 +696,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
           <button
             type="button"
             onClick={onClose}
-            className="h-10 sm:h-11 px-5 rounded-xl bg-[#023246] hover:bg-[#034560] active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center min-w-[70px]"
+            className="h-10 sm:h-11 px-5 rounded-xl bg-[#023246] hover:bg-[#034560] active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center min-w-17.5"
           >
             Tutup
           </button>

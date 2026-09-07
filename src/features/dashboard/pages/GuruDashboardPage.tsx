@@ -1668,7 +1668,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       {disciplineLeaderboard.topTeacher.name.charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug break-words group-hover:text-[#023246]">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug wrap-break-word group-hover:text-[#023246]">
                         {disciplineLeaderboard.topTeacher.name}
                       </h4>
                       <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
