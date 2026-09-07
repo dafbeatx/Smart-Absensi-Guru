@@ -247,7 +247,7 @@ export const StudentRfidKioskModal: React.FC<StudentRfidKioskModalProps> = ({
             {/* Tapper Card Feedback Box */}
             <div className="bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center text-center relative overflow-hidden min-h-75">
               {/* Scan Wave Animation */}
-              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-transparent rounded-3xl blur-xl pointer-events-none" />
+              <div className="absolute -inset-1 bg-linear-to-r from-emerald-500/10 via-cyan-500/10 to-transparent rounded-3xl blur-xl pointer-events-none" />
 
               {lastStudent ? (
                 <div className="animate-scaleUp flex flex-col items-center space-y-3 z-10">
@@ -327,7 +327,7 @@ export const StudentRfidKioskModal: React.FC<StudentRfidKioskModalProps> = ({
                       value={manualUid}
                       onChange={(e) => setManualUid(e.target.value)}
                       placeholder="Tempel kartu atau ketik UID..."
-                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500"
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     />
                     <button
                       type="submit"
@@ -346,7 +346,7 @@ export const StudentRfidKioskModal: React.FC<StudentRfidKioskModalProps> = ({
                   <select
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
                     <option value="Presensi Harian">Presensi Harian</option>
                     <option value="Informatika">Informatika</option>

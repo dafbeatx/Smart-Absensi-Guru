@@ -406,7 +406,7 @@ export const StudentManagement: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari nama, kelas, atau UID RFID..."
-              className="pl-9 pr-4 py-2 text-xs bg-slate-50/70 border-slate-200 focus:bg-white w-full rounded-xl"
+              className="pl-9 pr-4 py-2 text-xs"
             />
             {searchQuery && (
               <button
@@ -770,7 +770,7 @@ export const StudentManagement: React.FC = () => {
               <select
                 value={formClass}
                 onChange={(e) => setFormClass(e.target.value)}
-                className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0D7A5F]"
+                className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
               >
                 {availableClasses.map((c) => (
                   <option key={c} value={c}>
