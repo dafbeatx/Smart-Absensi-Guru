@@ -1624,15 +1624,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             })()}
 
             {/* 🌟 2.5 CARD LENCANA PENGHARGAAN & APRESIASI KEPSEK (MONITORING PERFORMA DISIPLIN) ── */}
-            <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3">
+            <section className="bg-white rounded-3xl p-3.5 sm:p-5 border border-slate-200/90 shadow-sm space-y-3">
               {/* Header Card */}
               <div className="flex items-center justify-between gap-2 px-0.5">
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <div className="w-8 h-8 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-amber-300 flex items-center justify-center text-sm shadow-2xs shrink-0">
                     🏆
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xs sm:text-sm font-black text-slate-800 leading-tight">
                       Lencana Penghargaan &amp; Apresiasi Kepsek
                     </h3>
                     <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 truncate mt-0.5">
@@ -1641,7 +1641,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </div>
                 </div>
 
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0">
+                <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-bold rounded-lg bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0">
                   September 2026
                 </span>
               </div>
@@ -1649,40 +1649,40 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               {/* 👑 Highlight Poin Paling Banyak */}
               <div
                 onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                className="bg-linear-to-br from-amber-50 via-white to-amber-50/50 rounded-2xl p-3.5 border border-amber-300/80 shadow-2xs hover:border-amber-400 transition-all cursor-pointer space-y-2 group"
+                className="bg-linear-to-br from-amber-50 via-white to-amber-50/50 rounded-2xl p-3 sm:p-3.5 border border-amber-300/80 shadow-2xs hover:border-amber-400 transition-all cursor-pointer space-y-2 group"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 text-amber-900 text-[11px] font-extrabold tracking-wide uppercase">
+                  <div className="flex items-center gap-1.5 text-amber-900 text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase">
                     <span className="text-sm">👑</span>
                     <span>Poin Terbanyak Bulan Berjalan</span>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors">
-                    <span>Lihat Rincian</span>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors shrink-0">
+                    <span>Rincian</span>
                     <span className="group-hover:translate-x-0.5 transition-transform">→</span>
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 pt-0.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm shrink-0 border border-amber-300/60 shadow-xs">
+                <div className="flex items-center justify-between gap-2.5 pt-0.5">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border border-amber-300/60 shadow-xs">
                       {disciplineLeaderboard.topTeacher.name.charAt(0)}
                     </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug break-words group-hover:text-[#023246]">
                         {disciplineLeaderboard.topTeacher.name}
                       </h4>
-                      <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                      <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
                         {disciplineLeaderboard.topTeacher.position}
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right shrink-0">
-                    <div className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs flex items-center gap-1 justify-end">
+                    <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs flex items-center gap-1 justify-end">
                       <span>⭐</span>
                       <span>{disciplineLeaderboard.topTeacher.totalPoints} Poin</span>
                     </div>
-                    <span className="text-[10px] font-bold text-amber-800 block mt-1">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 block mt-0.5 sm:mt-1">
                       Peringkat 1 (5 Hari On-Time)
                     </span>
                   </div>
@@ -1691,11 +1691,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
               {/* Ringkasan Performa Guru yang Login & Tombol Layer Penjelasan */}
               <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
-                <div className="min-w-0">
-                  <span className="text-[11px] text-slate-500 font-medium block">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium block">
                     Performa Disiplin Anda:
                   </span>
-                  <p className="text-xs font-black text-slate-800 truncate">
+                  <p className="text-[11px] sm:text-xs font-black text-slate-800 truncate">
                     #{disciplineLeaderboard.currentUserRank} dari {disciplineLeaderboard.totalTeachers} Guru{' '}
                     <span className="text-emerald-600 font-bold">({appreciationScore.totalPoints} Poin)</span>
                   </p>
@@ -1704,7 +1704,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                  className="h-9 px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-[11px] font-bold text-[#023246] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
+                  className="h-10 px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-[11px] font-bold text-[#023246] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
                 >
                   <span>Layer Penjelasan</span>
                   <span className="text-cyan-800">→</span>
