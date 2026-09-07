@@ -15,6 +15,7 @@ export interface ExecutiveDashboardOverviewProps {
   allLeaves?: LeaveRequest[];
   attendanceRecords?: AttendanceRecord[];
   onOpenScanner?: () => void;
+  onOpenBiometric?: () => void;
   onSwitchToGuruView?: () => void;
   onOpenQrGenerator?: () => void;
   onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
@@ -28,6 +29,8 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
   pendingRequests = [],
   allLeaves = [],
   attendanceRecords = [],
+  onOpenScanner,
+  onOpenBiometric,
   onSwitchToGuruView,
   onOpenQrGenerator,
   onOpenCorrectionModal,
@@ -443,6 +446,24 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+          {onOpenBiometric && (
+            <button
+              onClick={onOpenBiometric}
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-[#023246] hover:bg-[#0D7A5F] text-white text-xs font-bold rounded-xl shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
+              title="Presensi Cepat Menggunakan Sidik Jari HP"
+            >
+              <span>👆</span> Absen Sidik Jari
+            </button>
+          )}
+          {onOpenScanner && (
+            <button
+              onClick={onOpenScanner}
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer active:scale-95"
+              title="Scan QR Code Absensi"
+            >
+              <span>📷</span> Scan QR
+            </button>
+          )}
           {onOpenQrGenerator && (
             <button
               onClick={onOpenQrGenerator}
@@ -787,9 +808,18 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
                       <p className="text-xs font-extrabold text-slate-900 truncate">
                         {teacher.full_name}
                       </p>
-                      <p className="text-[10px] text-slate-500 font-semibold truncate">
-                        Masuk: {record.check_in_time ? record.check_in_time.substring(0, 5) + ' WIB' : '--:--'}
-                      </p>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold truncate">
+                        <span>Masuk: {record.check_in_time ? record.check_in_time.substring(0, 5) + ' WIB' : '--:--'}</span>
+                        {record.verification_method === 'BIOMETRIC_GPS' ? (
+                          <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-800 border border-teal-200 text-[9px] font-bold shrink-0">
+                            👆 Sidik Jari
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 text-[9px] font-semibold shrink-0">
+                            📷 QR
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 

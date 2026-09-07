@@ -30,8 +30,11 @@ import { AnalyticsService } from '../../../services/analytics.service';
 import { DevTestPage } from './DevTestPage';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
-import type { UserProfile, LeaveRequest, AttendanceRecord } from '../../../types/database.types';
+import type { UserProfile, LeaveRequest, AttendanceRecord, SystemSettings } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
+import { CONSTANTS } from '../../../config/constants';
+import { useToastStore } from '../../../store/useToastStore';
+import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -40,6 +43,7 @@ export interface AdminDashboardPageProps {
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenScanner, onSwitchToGuruView }) => {
   const { user, logout } = useAuthStore();
+  const { showToast } = useToastStore();
 
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
@@ -50,6 +54,36 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
+
+  // Settings for Geofence & Work Hours
+  const [settings, setSettings] = useState<SystemSettings>({
+    app_name: 'Smart Absensi Guru',
+    institution_name: 'SMK Smart Absensi',
+    work_checkin_start: CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
+    work_checkin_end: CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
+    work_checkout_start: CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
+    friday_checkout_start: CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START,
+    saturday_is_holiday: CONSTANTS.DEFAULTS.SATURDAY_IS_HOLIDAY,
+    sunday_is_holiday: CONSTANTS.DEFAULTS.SUNDAY_IS_HOLIDAY,
+    geofence_lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+    geofence_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+    geofence_radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+  });
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const st = await ProviderFactory.getProvider().getSettings();
+        if (st) setSettings(st);
+      } catch (err) {
+        console.warn('Gagal memuat pengaturan:', err);
+      }
+    };
+    loadSettings();
+    window.addEventListener('smart_absensi_settings_updated', loadSettings);
+    return () => window.removeEventListener('smart_absensi_settings_updated', loadSettings);
+  }, []);
 
   // Status absensi pribadi Admin hari ini (real data from DB)
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
@@ -491,6 +525,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               allLeaves={allLeaves}
               attendanceRecords={attendanceRecords}
               onOpenScanner={onOpenScanner}
+              onOpenBiometric={() => setIsBiometricModalOpen(true)}
               onSwitchToGuruView={onSwitchToGuruView}
               onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
               onOpenCorrectionModal={() => setIsCorrectionModalOpen(true)}
@@ -552,10 +587,22 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                   </p>
                 </div>
 
-                <Button variant="primary" onClick={onOpenScanner} className="flex items-center gap-2">
-                  <QrCodeScanIcon className="w-5 h-5 text-white" />
-                  <span>Scan QR Code Absensi (Masuk / Pulang)</span>
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsBiometricModalOpen(true)}
+                    className="px-4 py-2 bg-[#023246] hover:bg-[#0D7A5F] text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <span>👆</span>
+                    <span>Absen Sidik Jari HP</span>
+                  </button>
+                  {onOpenScanner && (
+                    <Button variant="outline" onClick={onOpenScanner} className="flex items-center gap-2">
+                      <QrCodeScanIcon className="w-4 h-4 text-[#023246]" />
+                      <span>Scan QR Code</span>
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {isLoadingMyAttendance ? (
@@ -721,6 +768,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         onOpenTestRunner={() => setIsTestRunnerOpen(true)}
         onSwitchToGuruView={onSwitchToGuruView}
       />
+
+      {/* Modal Presensi Sidik Jari HP Terintegrasi GPS Geofence */}
+      {user && (
+        <BiometricAttendanceModal
+          isOpen={isBiometricModalOpen}
+          onClose={() => setIsBiometricModalOpen(false)}
+          settings={settings}
+          user={user}
+          onSuccess={() => {
+            fetchMyAttendance();
+            fetchAttendanceRecords(teachers);
+            showToast('success', 'Presensi Berhasil', 'Absensi Sidik Jari Admin berhasil dicatat.');
+          }}
+        />
+      )}
     </div>
   );
 };

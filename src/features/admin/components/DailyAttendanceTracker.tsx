@@ -807,20 +807,31 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
                           </button>
                         </div>
                       )}
-                      {record?.check_in_lat && record?.check_in_lng ? (
-                        <div className="pt-0.5">
-                          <LocationAddressBadge
-                            lat={record.check_in_lat}
-                            lng={record.check_in_lng}
-                            distanceMeters={record.check_in_distance_meters}
-                            shortOnly
-                          />
+                      {record && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          {record.verification_method === 'BIOMETRIC_GPS' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                              <span>👆</span> Sidik Jari + GPS
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                              <span>📷</span> {record.verification_method || 'QR_GPS'}
+                            </span>
+                          )}
+                          {record.check_in_lat && record.check_in_lng ? (
+                            <LocationAddressBadge
+                              lat={record.check_in_lat}
+                              lng={record.check_in_lng}
+                              distanceMeters={record.check_in_distance_meters}
+                              shortOnly
+                            />
+                          ) : record.check_in_distance_meters !== undefined ? (
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              📍 Jarak: {record.check_in_distance_meters}m
+                            </span>
+                          ) : null}
                         </div>
-                      ) : record?.check_in_distance_meters !== undefined ? (
-                        <p className="text-[10px] text-slate-400 font-medium">
-                          📍 Jarak: {record.check_in_distance_meters}m • {record.verification_method === 'BIOMETRIC_GPS' ? '👆 Sidik Jari + GPS' : (record.verification_method || 'QR_GPS')}
-                        </p>
-                      ) : null}
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5">

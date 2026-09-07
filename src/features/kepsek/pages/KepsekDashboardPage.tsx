@@ -13,12 +13,15 @@ import { ExecutiveDashboardOverview } from '../../../components/dashboard/Execut
 import { AnonymousComplaintManagement } from '../../admin/components/AnonymousComplaintManagement';
 import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
 import { DevTestPage } from '../../admin/pages/DevTestPage';
-import { getTodayDateInJakarta } from '../../../utils/time.utils';
+import { getTodayDateInJakarta, isDateOffDay } from '../../../utils/time.utils';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { AnalyticsService } from '../../../services/analytics.service';
 import type { HistoricalUnabsentedRecord } from '../../../services/analytics.service';
-import type { LeaveRequest, UserProfile, AttendanceRecord, HolidayRecord } from '../../../types/database.types';
+import type { LeaveRequest, UserProfile, AttendanceRecord, HolidayRecord, SystemSettings } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
+import { CONSTANTS } from '../../../config/constants';
+import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
+import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -31,9 +34,62 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
+  const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [pendingComplaintsCount, setPendingComplaintsCount] = useState<number>(0);
+
+  // Status absensi pribadi Kepala Sekolah hari ini
+  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
+  const [isLoadingMyAttendance, setIsLoadingMyAttendance] = useState(false);
+
+  // Settings for Geofence & Work Hours
+  const [settings, setSettings] = useState<SystemSettings>({
+    app_name: 'Smart Absensi Guru',
+    institution_name: 'SMK Smart Absensi',
+    work_checkin_start: CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
+    work_checkin_end: CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
+    work_checkout_start: CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
+    friday_checkout_start: CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START,
+    saturday_is_holiday: CONSTANTS.DEFAULTS.SATURDAY_IS_HOLIDAY,
+    sunday_is_holiday: CONSTANTS.DEFAULTS.SUNDAY_IS_HOLIDAY,
+    geofence_lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+    geofence_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+    geofence_radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+  });
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const st = await ProviderFactory.getProvider().getSettings();
+        if (st) setSettings(st);
+      } catch (err) {
+        console.warn('Gagal memuat pengaturan kepsek:', err);
+      }
+    };
+    loadSettings();
+    window.addEventListener('smart_absensi_settings_updated', loadSettings);
+    return () => window.removeEventListener('smart_absensi_settings_updated', loadSettings);
+  }, []);
+
+  const fetchMyAttendance = useCallback(async () => {
+    if (!user) return;
+    setIsLoadingMyAttendance(true);
+    try {
+      const provider = ProviderFactory.getProvider();
+      const token = useAuthStore.getState().token || '';
+      const record = await provider.getTodayAttendance(user.id, token);
+      setTodayAttendance(record);
+    } catch (err) {
+      console.warn('Gagal memuat absensi pribadi kepsek:', err);
+    } finally {
+      setIsLoadingMyAttendance(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchMyAttendance();
+  }, [fetchMyAttendance]);
 
   const fetchComplaintsCount = async () => {
     try {
@@ -332,11 +388,22 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     historicalUnabsented,
   ]);
 
+  const hasKepsekCheckedIn = Boolean(
+    todayAttendance && (todayAttendance.status === 'HADIR' || todayAttendance.status === 'TERLAMBAT' || todayAttendance.check_in_time)
+  );
+
   const sidebarItems: SidebarItem[] = [
     {
       id: 'DASHBOARD',
       label: 'Dashboard',
       icon: '🏠',
+    },
+    {
+      id: 'MY_ATTENDANCE',
+      label: 'Absensi Pribadi',
+      icon: '👆',
+      badge: !hasKepsekCheckedIn && !isDateOffDay(new Date(), settings, holidays).isOff ? 1 : undefined,
+      badgeVariant: 'RED',
     },
     {
       id: 'ACCOUNT_APPLICATIONS',
@@ -468,10 +535,107 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               allLeaves={allLeaves}
               attendanceRecords={attendanceRecords}
               onOpenScanner={onOpenScanner}
+              onOpenBiometric={() => setIsBiometricModalOpen(true)}
               onOpenQrGenerator={() => setIsQrGeneratorOpen(true)}
               onSwitchToGuruView={onSwitchToGuruView}
               onNavigateTab={(tab: string) => setActiveTab(tab)}
             />
+          )}
+
+          {/* TAB: MY_ATTENDANCE (Absensi Pribadi Kepala Sekolah) */}
+          {activeTab === 'MY_ATTENDANCE' && (
+            <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div className="space-y-1">
+                  <span className="px-2.5 py-0.5 bg-[#287094]/10 text-[#287094] font-bold text-[11px] rounded-full border border-[#287094]/30">
+                    Kartu Absensi Pribadi Kepala Sekolah
+                  </span>
+                  <h3 className="font-extrabold text-[#023246] text-lg">Absensi Harian Kepala Sekolah</h3>
+                  <p className="text-xs text-slate-500">
+                    Sebagai Pimpinan Sekolah, kehadiran Anda tercatat resmi dalam daftar presensi harian.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsBiometricModalOpen(true)}
+                    className="px-4 py-2 bg-[#023246] hover:bg-[#0D7A5F] text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <span>👆</span>
+                    <span>Absen Sidik Jari HP</span>
+                  </button>
+                  {onOpenScanner && (
+                    <button
+                      type="button"
+                      onClick={onOpenScanner}
+                      className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold rounded-xl border border-slate-200 shadow-2xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <QrCodeScanIcon className="w-4 h-4 text-[#023246]" />
+                      <span>Scan QR Code</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {isLoadingMyAttendance ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-8 h-8 border-4 border-[#287094] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {/* Status Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                      <p className="text-xs font-semibold text-slate-500">Status Kehadiran Hari Ini</p>
+                      <p className="font-black text-[#023246] text-base">
+                        {todayAttendance
+                          ? todayAttendance.status === 'HADIR'
+                            ? '✅ HADIR'
+                            : todayAttendance.status === 'TERLAMBAT'
+                              ? '⚠️ TERLAMBAT'
+                              : `📋 ${todayAttendance.status}`
+                          : isDateOffDay(new Date(), settings, holidays).isOff
+                            ? '🏖️ LIBUR SEKOLAH'
+                            : '⏳ BELUM ABSEN'}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                      <p className="text-xs font-semibold text-slate-500">Jam Absen Masuk</p>
+                      <p className="font-mono font-bold text-slate-800 text-base">
+                        {todayAttendance?.check_in_time
+                          ? `${todayAttendance.check_in_time} WIB`
+                          : '-- : -- WIB'}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                      <p className="text-xs font-semibold text-slate-500">Jam Absen Pulang</p>
+                      <p className="font-mono font-bold text-slate-800 text-base">
+                        {todayAttendance?.check_out_time
+                          ? `${todayAttendance.check_out_time} WIB`
+                          : '-- : -- WIB'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Extra info: distance & verification */}
+                  {todayAttendance && (
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      {todayAttendance.check_in_distance_meters != null && (
+                        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-full border border-emerald-200">
+                          📍 Jarak: {todayAttendance.check_in_distance_meters.toFixed(0)}m dari sekolah
+                        </span>
+                      )}
+                      <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-full border border-blue-200">
+                        🔐 Verifikasi: {todayAttendance.verification_method === 'BIOMETRIC_GPS' ? '👆 Sidik Jari + GPS' : todayAttendance.verification_method === 'QR_GPS' ? 'QR + GPS' : todayAttendance.verification_method}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           {/* TAB 2: ACCOUNT APPLICATIONS */}
@@ -664,6 +828,21 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         isOpen={isQrGeneratorOpen}
         onClose={() => setIsQrGeneratorOpen(false)}
       />
+
+      {/* Modal Presensi Sidik Jari HP Terintegrasi GPS Geofence */}
+      {user && (
+        <BiometricAttendanceModal
+          isOpen={isBiometricModalOpen}
+          onClose={() => setIsBiometricModalOpen(false)}
+          settings={settings}
+          user={user}
+          onSuccess={() => {
+            fetchMyAttendance();
+            handleManualRefresh();
+            showToast('success', 'Presensi Berhasil', 'Absensi Sidik Jari Kepala Sekolah berhasil dicatat.');
+          }}
+        />
+      )}
     </div>
   );
 };
