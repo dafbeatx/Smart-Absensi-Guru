@@ -1449,7 +1449,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsLocationModalOpen(true)}
-                      className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1.5 cursor-pointer py-0.5 truncate max-w-[170px]"
+                      className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1.5 cursor-pointer py-0.5 truncate max-w-42.5"
                     >
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 ${
