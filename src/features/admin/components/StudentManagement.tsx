@@ -472,9 +472,10 @@ export const StudentManagement: React.FC = () => {
             type="button"
             onClick={() => setIsKioskOpen(true)}
             className="h-10 px-3.5 bg-[#023246] hover:bg-[#023246]/90 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 shadow-2xs cursor-pointer active:scale-[0.98]"
+            title="Buka Terminal Presensi RFID Siswa 2 (Smartphone & Kiosk Ready)"
           >
             <ScanLine className="w-4 h-4 text-emerald-400" />
-            <span>Terminal Kiosk RFID</span>
+            <span>Terminal Presensi RFID 2</span>
           </button>
 
           {/* Tambah Siswa */}
