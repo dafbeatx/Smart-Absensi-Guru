@@ -87,7 +87,10 @@ SELECT
   b.student_name as full_name,
   b.class_name as class_name,
   '2026/2027' as academic_year,
-  'L' as gender,
+  CASE 
+    WHEN b.class_name IN ('8A', '9A') THEN 'P'
+    ELSE 'L'
+  END as gender,
   'ACTIVE' as card_status,
   100 as attendance_rate,
   NOW() as created_at,
@@ -101,3 +104,9 @@ ON CONFLICT (id) DO UPDATE SET
   class_name = EXCLUDED.class_name,
   academic_year = EXCLUDED.academic_year,
   updated_at = NOW();
+
+-- 5. SET GENDER PEREMPUAN UNTUK KELAS 8A & 9A
+UPDATE public.students
+SET gender = 'P', updated_at = NOW()
+WHERE class_name IN ('8A', '9A');
+

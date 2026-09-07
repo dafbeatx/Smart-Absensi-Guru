@@ -1879,13 +1879,14 @@ export class SupabaseProvider implements IDataProvider {
             const hashId = `std_${cleanClass.toLowerCase()}_${Math.abs(
               cleanName.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0)
             )}`;
+            const isFemaleClass = cleanClass === '8A' || cleanClass === '9A';
             uniqueMap.set(key, {
               id: hashId,
               nisn: '',
               fullName: cleanName,
               className: cleanClass,
               academicYear: '2026/2027',
-              gender: 'L',
+              gender: isFemaleClass ? 'P' : 'L',
               cardStatus: 'ACTIVE',
               attendanceRate: 100,
               created_at: new Date().toISOString(),
@@ -2105,22 +2106,30 @@ export class SupabaseProvider implements IDataProvider {
 
       const existingStudents = await this.getStudents();
       const existingRfidByStudent = new Map<string, string>();
+      const existingGenderByStudent = new Map<string, 'L' | 'P'>();
       existingStudents.forEach((s) => {
+        const studentKey = `${s.className.toUpperCase()}|||${s.fullName.toUpperCase()}`;
         if (s.rfidUid) {
-          existingRfidByStudent.set(`${s.className.toUpperCase()}|||${s.fullName.toUpperCase()}`, s.rfidUid);
+          existingRfidByStudent.set(studentKey, s.rfidUid);
+        }
+        if (s.gender) {
+          existingGenderByStudent.set(studentKey, s.gender);
         }
       });
 
       const syncedList: StudentItem[] = Array.from(mergedMap.values()).map((item, idx) => {
-        const studentKey = `${item.className}|||${item.fullName}`;
+        const studentKey = `${item.className.toUpperCase()}|||${item.fullName.toUpperCase()}`;
         const preservedRfid = existingRfidByStudent.get(studentKey);
+        const preservedGender = existingGenderByStudent.get(studentKey);
+        const isFemaleClass = item.className.toUpperCase() === '8A' || item.className.toUpperCase() === '9A';
+        const defaultGender: 'L' | 'P' = preservedGender || (isFemaleClass ? 'P' : 'L');
         return {
           id: `std_${item.className.toLowerCase()}_${String(idx + 1).padStart(3, '0')}`,
           nisn: '',
           fullName: item.fullName,
           className: item.className,
           academicYear: academicYear,
-          gender: 'L',
+          gender: defaultGender,
           rfidUid: preservedRfid || undefined,
           cardStatus: 'ACTIVE',
           attendanceRate: 100,

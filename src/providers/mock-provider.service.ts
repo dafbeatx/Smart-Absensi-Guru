@@ -1491,7 +1491,7 @@ export class MockProvider implements IDataProvider {
         fullName: item.name,
         className: item.class,
         academicYear,
-        gender: 'L',
+        gender: item.class === '8A' || item.class === '9A' ? 'P' : 'L',
         rfidUid: existingRfid.get(key) || undefined,
         cardStatus: 'ACTIVE',
         attendanceRate: 100,

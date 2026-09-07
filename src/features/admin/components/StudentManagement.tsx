@@ -156,9 +156,10 @@ export const StudentManagement: React.FC = () => {
     setEditingStudent(null);
     setFormNisn('');
     setFormFullName('');
-    setFormClass(availableClasses[0] || '7');
+    const defaultCls = (selectedClass !== 'ALL' ? selectedClass : availableClasses[0]) || '7';
+    setFormClass(defaultCls);
     setFormCustomClass('');
-    setFormGender('L');
+    setFormGender(defaultCls === '8A' || defaultCls === '9A' ? 'P' : 'L');
     setFormRfidUid('');
     setFormAttendanceRate('100');
     setFormNotes('');
@@ -769,7 +770,13 @@ export const StudentManagement: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <select
                 value={formClass}
-                onChange={(e) => setFormClass(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormClass(val);
+                  if (!editingStudent && (val === '8A' || val === '9A')) {
+                    setFormGender('P');
+                  }
+                }}
                 className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0D7A5F]"
               >
                 {availableClasses.map((c) => (
