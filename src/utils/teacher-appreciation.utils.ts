@@ -23,10 +23,12 @@ export function calculateTeacherAppreciationScore(
   const moodCheckinCount = todayMood ? 1 : 0;
 
   // Points Formula
-  const basePoints = 50; // Initial commitment bonus
+  // Jika sedang Cuti/Izin resmi (tidak ada catatan hadir fisik & tidak ada tugas piket):
+  const isCutiOrIzin = totalRecords > 0 && hadirTepatWaktuCount === 0 && terlambatCount === 0 && piketCount === 0;
+  const basePoints = isCutiOrIzin ? 0 : 50; // Guru yang sedang cuti tidak mendapat poin komitmen dasar
   const attendancePoints = hadirTepatWaktuCount * 15 + terlambatCount * 5;
   const dutyPoints = piketCount * 20;
-  const moodPoints = moodCheckinCount * 15;
+  const moodPoints = isCutiOrIzin ? 0 : moodCheckinCount * 15;
 
   const totalPoints = basePoints + attendancePoints + dutyPoints + moodPoints;
 
@@ -35,7 +37,11 @@ export function calculateTeacherAppreciationScore(
   let nextLevelPoints = 100;
   let levelProgressPercent = Math.min(100, Math.round((totalPoints / 100) * 100));
 
-  if (totalPoints >= 300) {
+  if (totalPoints === 0) {
+    level = '🏖️ Sedang Cuti / Izin Resmi';
+    nextLevelPoints = 100;
+    levelProgressPercent = 0;
+  } else if (totalPoints >= 300) {
     level = '🏆 Pendidik Teladan Utama (Level 4)';
     nextLevelPoints = 500;
     levelProgressPercent = Math.min(100, Math.round(((totalPoints - 300) / 200) * 100));
@@ -210,26 +216,13 @@ export function getTeacherDisciplineLeaderboard(
       topBadge: { icon: '🛡️', title: 'Piket Responsif & Teladan' },
     },
     {
-      id: 'usr_guru_008',
-      name: 'Windiani, S.E., G.r',
-      nip: '19900822 201704 2 005',
-      position: 'Bendahara Sekolah',
-      totalPoints: 130,
-      level: '🥈 Pendidik Berdedikasi (Level 2)',
-      rank: 5,
-      hadirTepatWaktuCount: 4,
-      terlambatCount: 0,
-      piketCount: 0,
-      topBadge: { icon: '🎖️', title: 'Guru Terdisiplin Waktu' },
-    },
-    {
       id: 'usr_guru_005',
       name: 'Fitri Ani Rahayu',
       nip: '19931201 202103 2 007',
       position: 'Guru Mapel Matematika',
       totalPoints: 120,
       level: '🥈 Pendidik Berdedikasi (Level 2)',
-      rank: 6,
+      rank: 5,
       hadirTepatWaktuCount: 3,
       terlambatCount: 1,
       piketCount: 0,
@@ -242,7 +235,7 @@ export function getTeacherDisciplineLeaderboard(
       position: 'Guru Mapel B. Indonesia',
       totalPoints: 115,
       level: '🥈 Pendidik Berdedikasi (Level 2)',
-      rank: 7,
+      rank: 6,
       hadirTepatWaktuCount: 3,
       terlambatCount: 0,
       piketCount: 0,
@@ -255,7 +248,7 @@ export function getTeacherDisciplineLeaderboard(
       position: 'Bimbingan Konseling (BK)',
       totalPoints: 110,
       level: '🥈 Pendidik Berdedikasi (Level 2)',
-      rank: 8,
+      rank: 7,
       hadirTepatWaktuCount: 3,
       terlambatCount: 0,
       piketCount: 0,
@@ -268,7 +261,7 @@ export function getTeacherDisciplineLeaderboard(
       position: 'Tata Usaha (TU)',
       totalPoints: 105,
       level: '🥈 Pendidik Berdedikasi (Level 2)',
-      rank: 9,
+      rank: 8,
       hadirTepatWaktuCount: 3,
       terlambatCount: 0,
       piketCount: 0,
@@ -281,11 +274,24 @@ export function getTeacherDisciplineLeaderboard(
       position: 'Operator Sekolah',
       totalPoints: 95,
       level: '🥉 Pendidik Berkomitmen (Level 1)',
-      rank: 10,
+      rank: 9,
       hadirTepatWaktuCount: 2,
       terlambatCount: 1,
       piketCount: 0,
       topBadge: { icon: '🎖️', title: 'Guru Terdisiplin Waktu' },
+    },
+    {
+      id: 'usr_guru_008',
+      name: 'Windiani, S.E., G.r',
+      nip: '19900822 201704 2 005',
+      position: 'Bendahara Sekolah',
+      totalPoints: 0, // 0 poin karena sedang Cuti Resmi (tidak ada akumulasi poin kehadiran/komitmen)
+      level: '🏖️ Sedang Cuti Resmi',
+      rank: 10,
+      hadirTepatWaktuCount: 0, // Sedang Cuti Resmi (0 Hadir)
+      terlambatCount: 0,
+      piketCount: 0,
+      topBadge: { icon: '🏖️', title: 'Sedang Cuti Resmi' },
     },
   ];
 

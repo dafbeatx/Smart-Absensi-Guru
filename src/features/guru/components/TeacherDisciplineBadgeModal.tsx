@@ -317,6 +317,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                   Anda
                                 </span>
                               )}
+                              {teacher.topBadge.icon === '🏖️' && (
+                                <span className="px-1.5 py-0.2 bg-amber-100 text-amber-900 text-[9px] font-extrabold rounded border border-amber-200">
+                                  Sedang Cuti
+                                </span>
+                              )}
                             </div>
                             <p className="text-[11px] text-slate-500 truncate mt-0.5">
                               {teacher.position}
@@ -332,7 +337,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                           </span>
                           <span className="text-[10px] text-slate-500 flex items-center justify-end gap-1 font-medium mt-0.5">
                             <span>{teacher.topBadge.icon}</span>
-                            <span className="truncate max-w-28">{teacher.topBadge.title}</span>
+                            <span className="truncate max-w-28">
+                              {teacher.topBadge.icon === '🏖️' ? 'Sedang Cuti (0 Hadir)' : teacher.topBadge.title}
+                            </span>
                           </span>
                         </div>
                       </div>
@@ -483,6 +490,26 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </div>
                   <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-black shrink-0 border border-amber-200">
                     +5 Poin
+                  </span>
+                </div>
+
+                {/* 7. Status Cuti & Izin Resmi */}
+                <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center font-bold shrink-0">
+                      🏖️
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-900">
+                        Status Cuti, Izin, &amp; Sakit Resmi
+                      </h5>
+                      <p className="text-[11px] text-slate-500">
+                        Tidak ada akumulasi poin harian maupun komitmen (0 Poin) selama masa cuti/izin berlangsung
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-600 text-xs font-black shrink-0 border border-slate-200">
+                    0 Poin
                   </span>
                 </div>
               </div>
