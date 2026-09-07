@@ -100,6 +100,39 @@ export class TelegramService {
       return { success: false, error: 'NOT_CONFIGURED' };
     }
 
+    // Telegram 4096 character limit safeguard: chunk message safely
+    const MAX_LEN = 3900;
+    if (text.length > MAX_LEN) {
+      const chunks: string[] = [];
+      let remaining = text;
+      while (remaining.length > 0) {
+        if (remaining.length <= MAX_LEN) {
+          chunks.push(remaining);
+          break;
+        }
+        let splitIdx = remaining.lastIndexOf('\n', MAX_LEN);
+        if (splitIdx === -1 || splitIdx < 1000) splitIdx = MAX_LEN;
+        chunks.push(remaining.slice(0, splitIdx));
+        remaining = remaining.slice(splitIdx).trimStart();
+      }
+
+      let allOk = true;
+      for (const chunk of chunks) {
+        const res = await this.sendSingleMessage(token, chatId, chunk, parseMode);
+        if (!res.success) allOk = false;
+      }
+      return { success: allOk };
+    }
+
+    return this.sendSingleMessage(token, chatId, text, parseMode);
+  }
+
+  private static async sendSingleMessage(
+    token: string,
+    chatId: string,
+    text: string,
+    parseMode: 'HTML' | 'Markdown' = 'HTML'
+  ): Promise<{ success: boolean; error?: string }> {
     const endpoint = `https://api.telegram.org/bot${token}/sendMessage`;
 
     try {
@@ -394,17 +427,17 @@ export class TelegramService {
         `<i>SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam</i>`,
         `━━━━━━━━━━━━━━━━━━━━`,
         `Halo <b>${escapeHtml(senderName)}</b>! 👋`,
-        `Bot ini kini dilengkapi dengan <b>Groq AI Engine</b> yang memahami seluruh alur sistem, kode error, dan aturan presensi sekolah.`,
+        `Saya siap membantu menjawab pertanyaan teknis, info jadwal jam pulang/masuk, solusi gagal scan QR, maupun kendala absensi lainnya.`,
         ``,
-        `📌 <b>Info Koneksi Anda:</b>`,
-        `• <b>Chat ID Anda:</b> <code>${chatId}</code>`,
-        `• <b>Status:</b> 🟢 Online & Siaga`,
+        `📌 <b>Info Koneksi:</b>`,
+        `• <b>Chat ID:</b> <code>${chatId}</code>`,
+        `• <b>Status:</b> 🟢 Online & Siap Melayani`,
         ``,
-        `💡 <b>Hal yang Bisa Anda Tanyakan Langsung:</b>`,
-        `• <i>"Kenapa guru gagal scan QR atau muncul error GPS_002?"</i>`,
-        `• <i>"Jadwal piket guru tidak tersimpan, apa solusinya?"</i>`,
-        `• <i>"Kapan batas jam masuk dan jam pulang hari ini?"</i>`,
-        `• <i>"Bagaimana cara verifikasi biometrik fingerprint?"</i>`,
+        `💡 <b>Contoh yang Bisa Ditanyakan:</b>`,
+        `• <i>"Kapan jam pulang hari ini?"</i>`,
+        `• <i>"Kenapa guru gagal scan QR?"</i>`,
+        `• <i>"Ada guru di luar radius GPS, solusinya bagaimana?"</i>`,
+        `• <i>"Jadwal piket guru tidak tersimpan, apa yang harus dicek?"</i>`,
         ``,
         `Silakan ketik pertanyaan atau kendala Anda di sini! 👇`,
       ].join('\n');
