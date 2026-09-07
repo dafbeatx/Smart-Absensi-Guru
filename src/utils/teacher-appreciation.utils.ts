@@ -569,42 +569,12 @@ export function getTeacherDisciplineLeaderboard(
 }
 
 /**
- * Memendekkan nama guru untuk tampilan mobile compact (misal Infinix Note 8 / layar sempit).
- * Aturan sesuai instruksi:
- * 1. Singkatkan variasi kata "Muhammad" / "Muhamad" menjadi "M.".
- * 2. Jika nama terdiri lebih dari 2 kata, ambil kata ke-2 (dengan prefix M. jika ada).
- * 3. Jika hanya 2 kata, ambil kata pertama (dengan M. jika kata pertama Muhammad).
- * 4. Gelar kehormatan/akademik belakang (setelah koma) dibersihkan.
+ * Memformat nama guru agar tetap utuh dan lengkap,
+ * hanya menyingkat kata "Muhammad" (atau variasinya) menjadi "M.".
+ * Nama-nama yang tidak mengandung kata "Muhammad" tetap dipulihkan utuh (tidak dipotong menjadi satu kata).
  */
 export function formatShortTeacherName(fullName: string): string {
   if (!fullName) return '';
-  // 1. Bersihkan gelar belakang (setelah koma) misal ", S.Pd", ", M.Pd", ", S.Pd.I"
-  const withoutTitles = fullName.split(',')[0].trim();
-  // 2. Bersihkan gelar depan umum jika ada (misal "Drs. ", "Dr. ", "Ust. ", "H. ", "Hj. ")
-  const cleaned = withoutTitles.replace(/^(drs\.|dr\.|ust\.|ustadz\.|h\.|hj\.)\s+/i, '');
-  const words = cleaned.split(/\s+/).filter(Boolean);
-
-  if (words.length <= 1) {
-    return words[0] || fullName;
-  }
-
-  // Cek apakah kata pertama adalah variasi Muhammad
-  const isFirstWordMuhammad = /^(muhammad|muhamad|moch|mohammad|moch\.|muh\.|mhd\.?)$/i.test(words[0]);
-
-  // Kasus: Tepat 2 kata
-  if (words.length === 2) {
-    if (isFirstWordMuhammad) {
-      return `M. ${words[1]}`;
-    }
-    // "jika hanya 2 kata ambil yang pertama"
-    return words[0];
-  }
-
-  // Kasus: Lebih dari 2 kata (> 2 kata)
-  // "jadi kalau namanya lebih dari 2 kata ambil yang ke 2"
-  if (isFirstWordMuhammad) {
-    return `M. ${words[1]}`;
-  }
-  return words[1];
+  return fullName.replace(/\b(muhammad|muhamad|mohammad|mochamad|moch\.|muh\.)\b/gi, 'M.').trim();
 }
 

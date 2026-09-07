@@ -50,9 +50,9 @@ export async function runMobileUIE2ETestSuite(): Promise<TestSuiteResult> {
 
   // 7. Compact Teacher Name Shortener Contract (Infinix Note 8 Mobile Layout)
   const { formatShortTeacherName } = await import('../../utils/teacher-appreciation.utils');
-  assert('Teacher Name Shortener - 3 words with Muhammad formats to M. <second word>', formatShortTeacherName('Muhammad Hadatul Zidan') === 'M. Hadatul');
-  assert('Teacher Name Shortener - 2 words returns first word', formatShortTeacherName('Dafa Maulana, S.Pd') === 'Dafa');
-  assert('Teacher Name Shortener - 3 words returns second word', formatShortTeacherName('Farhan Sopian Sahid, S.Pd.I') === 'Sopian');
+  assert('Teacher Name Shortener - Muhammad in full name is abbreviated to M. while keeping all words intact', formatShortTeacherName('Muhammad Hadatul Zidan') === 'M. Hadatul Zidan');
+  assert('Teacher Name Shortener - Names without Muhammad are preserved in full', formatShortTeacherName('Dafa Maulana, S.Pd') === 'Dafa Maulana, S.Pd');
+  assert('Teacher Name Shortener - 3 words without Muhammad preserved in full', formatShortTeacherName('Farhan Sopian Sahid, S.Pd.I') === 'Farhan Sopian Sahid, S.Pd.I');
   assert('Teacher Name Shortener - 2 words with Muhammad formats to M. <second word>', formatShortTeacherName('Muhammad Ilham') === 'M. Ilham');
   assert('Teacher Name Shortener - Single word preserved', formatShortTeacherName('Ferdiansyah') === 'Ferdiansyah');
 
