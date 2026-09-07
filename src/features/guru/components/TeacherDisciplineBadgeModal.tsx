@@ -229,7 +229,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 </div>
 
                 <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                  {leaderboard.map((teacher) => {
+                  {leaderboard.map((teacher, idx) => {
                     const rankMedal =
                       teacher.rank === 1
                         ? '🥇'
@@ -242,7 +242,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     return (
                       <div
                         key={teacher.id}
-                        className={`p-3.5 flex items-center justify-between gap-3 transition-colors border-b border-slate-100 last:border-b-0 ${
+                        className={`p-3.5 flex items-center justify-between gap-3 transition-colors ${
+                          idx > 0 ? 'border-t border-slate-100' : ''
+                        } ${
                           teacher.isCurrentUser ? 'bg-cyan-50/50' : 'hover:bg-slate-50'
                         }`}
                       >
