@@ -1614,37 +1614,85 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<boolean> {
     try {
-      // 1. Clear existing schedule in Supabase table
+      // 1. Sanitize, validate, and deduplicate schedules by (day_of_week, teacher_id)
+      const uniqueMap = new Map<string, Omit<TeacherDutySchedule, 'id' | 'created_at'>>();
+      for (const item of schedules) {
+        if (!item.teacher_id || !item.teacher_name) continue;
+        if (item.day_of_week < 1 || item.day_of_week > 5) continue;
+        const key = `${item.day_of_week}_${item.teacher_id}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, item);
+        }
+      }
+      const uniqueSchedules = Array.from(uniqueMap.values());
+
+      // 2. Validate foreign key: verify teacher_ids exist in public.users to prevent FK violation
+      let validSchedules = uniqueSchedules;
+      try {
+        const { data: validUsers, error: usersErr } = await this.client
+          .from('users')
+          .select('id');
+        if (!usersErr && validUsers && validUsers.length > 0) {
+          const validIdSet = new Set(validUsers.map((u) => u.id));
+          validSchedules = uniqueSchedules.filter((s) => validIdSet.has(s.teacher_id));
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'Could not verify user IDs before saving duty schedules:', err);
+      }
+
+      // 3. Clear existing schedule in Supabase table
       const { error: delError } = await this.client
         .from('teacher_duty_schedules')
         .delete()
         .neq('day_of_week', 0); // Deletes all rows since day_of_week is 1..5
 
       if (delError) {
-        logger.warn('SupabaseProvider', 'Failed to clear teacher_duty_schedules in Supabase:', delError.message);
+        logger.error('SupabaseProvider', 'Failed to clear teacher_duty_schedules in Supabase:', delError);
+        throw new Error(`Gagal memperbarui jadwal piket di database: ${delError.message}`);
       }
 
-      // 2. Insert new schedule records into Supabase (without custom non-UUID strings)
-      if (schedules.length > 0) {
-        const dbPayload = schedules.map((item) => ({
+      // 4. Insert new schedule records into Supabase
+      if (validSchedules.length > 0) {
+        const dbPayload = validSchedules.map((item) => ({
           day_of_week: item.day_of_week,
           teacher_id: item.teacher_id,
           teacher_name: item.teacher_name,
           notes: item.notes || null,
         }));
 
-        const { error: insError } = await this.client.from('teacher_duty_schedules').insert(dbPayload);
+        const { data: insertedData, error: insError } = await this.client
+          .from('teacher_duty_schedules')
+          .insert(dbPayload)
+          .select();
+
         if (insError) {
-          logger.warn('SupabaseProvider', 'Failed to insert teacher_duty_schedules to Supabase:', insError.message);
+          logger.error('SupabaseProvider', 'Failed to insert teacher_duty_schedules to Supabase:', insError);
+          throw new Error(`Gagal menyimpan jadwal piket ke database: ${insError.message}`);
+        }
+
+        // Cache the newly inserted records with real DB UUIDs and timestamps
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('smart_absensi_duty_schedules', JSON.stringify(insertedData || validSchedules));
+        }
+      } else {
+        // Table cleared (0 schedules)
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('smart_absensi_duty_schedules', JSON.stringify([]));
         }
       }
-    } catch (err) {
-      logger.warn('SupabaseProvider', 'saveDutySchedules DB operation error:', err);
-    }
 
-    // 3. Always update local cache for instant UI rendering and offline fallback
-    const mockProv = new (await import('./mock-provider.service')).MockProvider();
-    return mockProv.saveDutySchedules(schedules);
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'saveDutySchedules operation failed:', err);
+      // Fallback update to local storage only if offline/network error, but rethrow so UI does NOT hide error!
+      try {
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        await mockProv.saveDutySchedules(schedules);
+      } catch {
+        // Ignore fallback write error
+      }
+      throw err;
+    }
   }
 
   // ─── ANONYMOUS TEACHER COMPLAINTS & FEEDBACK API ──────────────────────────

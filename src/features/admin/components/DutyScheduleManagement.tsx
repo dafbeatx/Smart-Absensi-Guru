@@ -55,7 +55,7 @@ export const DutyScheduleManagement: React.FC = () => {
   // Filter schedules for the current selected day
   const daySchedules = schedules.filter((s) => s.day_of_week === selectedDay);
 
-  const handleAddTeacherDuty = () => {
+  const handleAddTeacherDuty = async () => {
     if (!selectedTeacherId) {
       showToast('warning', 'Pilih Guru', 'Pilih guru terlebih dahulu dari daftar.');
       return;
@@ -80,16 +80,57 @@ export const DutyScheduleManagement: React.FC = () => {
       created_at: new Date().toISOString(),
     };
 
-    setSchedules((prev) => [...prev, newEntry]);
-    setIsAddModalOpen(false);
-    setSelectedTeacherId('');
-    setDutyNotes('');
-    showToast('success', 'Guru Piket Ditambahkan', `Berhasil menambahkan ${teacherObj.full_name} ke Jadwal Piket.`);
+    const updatedSchedules = [...schedules, newEntry];
+    const payload = updatedSchedules.map((s) => ({
+      day_of_week: s.day_of_week,
+      teacher_id: s.teacher_id,
+      teacher_name: s.teacher_name,
+      notes: s.notes || 'Pengawasan Ketertiban Presensi & Piket Sekolah',
+    }));
+
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('smart_absensi_token') || '';
+      await DutyScheduleRepository.saveDutySchedules(payload, token);
+
+      setSchedules(updatedSchedules);
+      setIsAddModalOpen(false);
+      setSelectedTeacherId('');
+      setDutyNotes('');
+      showToast('success', 'Guru Piket Ditambahkan', `Berhasil menugaskan ${teacherObj.full_name} ke Jadwal Piket (Tersimpan ke Cloud).`);
+      await loadData();
+    } catch (err: any) {
+      console.error('Gagal menambahkan jadwal piket:', err);
+      showToast('error', 'Gagal Menyimpan', err?.message || 'Gagal menyimpan guru piket ke server database.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleRemoveDuty = (teacherId: string) => {
-    setSchedules((prev) => prev.filter((s) => !(s.day_of_week === selectedDay && s.teacher_id === teacherId)));
-    showToast('info', 'Dihapus Dari Jadwal', 'Guru piket dihapus dari jadwal hari ini.');
+  const handleRemoveDuty = async (teacherId: string) => {
+    const teacherToRemove = schedules.find((s) => s.day_of_week === selectedDay && s.teacher_id === teacherId);
+    const updatedSchedules = schedules.filter((s) => !(s.day_of_week === selectedDay && s.teacher_id === teacherId));
+    const payload = updatedSchedules.map((s) => ({
+      day_of_week: s.day_of_week,
+      teacher_id: s.teacher_id,
+      teacher_name: s.teacher_name,
+      notes: s.notes || 'Pengawasan Ketertiban Presensi & Piket Sekolah',
+    }));
+
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('smart_absensi_token') || '';
+      await DutyScheduleRepository.saveDutySchedules(payload, token);
+
+      setSchedules(updatedSchedules);
+      showToast('info', 'Dihapus Dari Jadwal', `${teacherToRemove?.teacher_name || 'Guru'} berhasil dihapus dari jadwal piket.`);
+      await loadData();
+    } catch (err: any) {
+      console.error('Gagal menghapus jadwal piket:', err);
+      showToast('error', 'Gagal Menghapus', err?.message || 'Gagal menghapus guru piket dari database.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveAllSchedules = async () => {
@@ -102,12 +143,13 @@ export const DutyScheduleManagement: React.FC = () => {
         notes: s.notes || 'Pengawasan Ketertiban Presensi & Piket Sekolah',
       }));
 
-      await DutyScheduleRepository.saveDutySchedules(payload);
-      showToast('success', 'Jadwal Disimpan', 'Jadwal Piket Guru berhasil disimpan dan diperbarui!');
+      const token = localStorage.getItem('smart_absensi_token') || '';
+      await DutyScheduleRepository.saveDutySchedules(payload, token);
+      showToast('success', 'Jadwal Disimpan', 'Jadwal Piket Guru berhasil disimpan dan disinkronkan ke server!');
       await loadData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gagal menyimpan jadwal piket:', err);
-      showToast('error', 'Gagal Menyimpan', 'Gagal menyimpan jadwal piket.');
+      showToast('error', 'Gagal Menyimpan', err?.message || 'Gagal menyimpan jadwal piket ke server.');
     } finally {
       setIsSaving(false);
     }
@@ -231,7 +273,8 @@ export const DutyScheduleManagement: React.FC = () => {
 
                   <button
                     onClick={() => handleRemoveDuty(item.teacher_id)}
-                    className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    disabled={isSaving}
+                    className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Hapus dari Piket"
                   >
                     🗑️
@@ -246,7 +289,7 @@ export const DutyScheduleManagement: React.FC = () => {
       {/* Modal Tambah Guru Piket */}
       <Modal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => !isSaving && setIsAddModalOpen(false)}
         title={`Tambah Guru Piket (Hari ${activeDayObj.name})`}
       >
         <div className="space-y-4">
@@ -255,7 +298,8 @@ export const DutyScheduleManagement: React.FC = () => {
             <select
               value={selectedTeacherId}
               onChange={(e) => setSelectedTeacherId(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 p-2.5 text-sm font-medium focus:ring-2 focus:ring-[#287094]"
+              disabled={isSaving}
+              className="w-full rounded-xl border border-gray-300 p-2.5 text-sm font-medium focus:ring-2 focus:ring-[#287094] disabled:bg-gray-100"
             >
               <option value="">-- Pilih Guru --</option>
               {teachers.map((t) => (
@@ -273,16 +317,17 @@ export const DutyScheduleManagement: React.FC = () => {
               placeholder="Contoh: Piket Pintu Gerbang Utama & Pengawasan Presensi Pagi"
               value={dutyNotes}
               onChange={(e) => setDutyNotes(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 p-2.5 text-sm font-medium focus:ring-2 focus:ring-[#287094]"
+              disabled={isSaving}
+              className="w-full rounded-xl border border-gray-300 p-2.5 text-sm font-medium focus:ring-2 focus:ring-[#287094] disabled:bg-gray-100"
             />
           </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t">
-            <Button variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>
+            <Button variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)} disabled={isSaving}>
               Batal
             </Button>
-            <Button variant="primary" size="sm" onClick={handleAddTeacherDuty}>
-              Tambahkan ke Hari {activeDayObj.name}
+            <Button variant="primary" size="sm" onClick={handleAddTeacherDuty} disabled={isSaving || !selectedTeacherId}>
+              {isSaving ? '⏳ Menyimpan...' : `Tambahkan ke Hari ${activeDayObj.name}`}
             </Button>
           </div>
         </div>
