@@ -74,9 +74,46 @@ CREATE TABLE IF NOT EXISTS public.gm_attendance (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Pastikan kolom pendukung RFID & jam tap tersedia bila tabel sudah dibuat sebelumnya oleh web-input-nilai
+ALTER TABLE public.gm_attendance ADD COLUMN IF NOT EXISTS check_in_time TIME;
+ALTER TABLE public.gm_attendance ADD COLUMN IF NOT EXISTS check_out_time TIME;
+ALTER TABLE public.gm_attendance ADD COLUMN IF NOT EXISTS rfid_uid TEXT;
+
 -- Index performa pencarian absensi
 CREATE INDEX IF NOT EXISTS idx_gm_attendance_date_class ON public.gm_attendance (date, class_name, academic_year);
 CREATE INDEX IF NOT EXISTS idx_gm_attendance_student_date ON public.gm_attendance (student_name, date);
+
+-- ROW LEVEL SECURITY (RLS) UNTUK TABEL GM_ATTENDANCE
+ALTER TABLE public.gm_attendance ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow authenticated read gm_attendance" ON public.gm_attendance;
+CREATE POLICY "Allow authenticated read gm_attendance"
+  ON public.gm_attendance
+  FOR SELECT
+  TO authenticated, anon
+  USING (true);
+
+DROP POLICY IF EXISTS "Allow authenticated insert gm_attendance" ON public.gm_attendance;
+CREATE POLICY "Allow authenticated insert gm_attendance"
+  ON public.gm_attendance
+  FOR INSERT
+  TO authenticated, anon
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow authenticated update gm_attendance" ON public.gm_attendance;
+CREATE POLICY "Allow authenticated update gm_attendance"
+  ON public.gm_attendance
+  FOR UPDATE
+  TO authenticated, anon
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow authenticated delete gm_attendance" ON public.gm_attendance;
+CREATE POLICY "Allow authenticated delete gm_attendance"
+  ON public.gm_attendance
+  FOR DELETE
+  TO authenticated, anon
+  USING (true);
 
 -- 4. MIGRASI DATA SISWA AKTIF DARI GM_BEHAVIORS (TAHUN AJARAN 2026/2027)
 -- Mengisi tabel public.students dengan 149 siswa aktif 2026/2027 yang sudah naik kelas
