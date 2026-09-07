@@ -522,7 +522,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                           setPointsAmount(pointVal);
                           setCustomPointsInput('');
                         }}
-                        className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer min-h-[44px] ${
+                        className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer min-h-11 ${
                           isSelected
                             ? activeTab === 'KEBAIKAN'
                               ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 shadow-2xs'
@@ -558,7 +558,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                         setPointsAmount(activeTab === 'KEBAIKAN' ? 5 : -5);
                       }
                     }}
-                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer min-h-[44px] col-span-1 sm:col-span-2 ${
+                    className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer min-h-11 col-span-1 sm:col-span-2 ${
                       selectedReason === 'CUSTOM'
                         ? 'bg-cyan-50 border-cyan-600 ring-2 ring-cyan-600/20 shadow-2xs'
                         : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
@@ -633,7 +633,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                           setPointsAmount(num);
                           setCustomPointsInput('');
                         }}
-                        className={`py-2 text-xs font-black rounded-xl border transition-all cursor-pointer min-h-[40px] ${
+                        className={`py-2 text-xs font-black rounded-xl border transition-all cursor-pointer min-h-10 ${
                           pointsAmount === num && customPointsInput === ''
                             ? activeTab === 'KEBAIKAN'
                               ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
