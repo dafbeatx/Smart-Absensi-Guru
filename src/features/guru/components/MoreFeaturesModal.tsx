@@ -252,7 +252,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-1">
                   {group.category}
                 </h4>
-                <div className="bg-slate-50/70 rounded-2xl border border-slate-200/80 divide-y divide-slate-200/60 overflow-hidden">
+                <div className="bg-slate-50/70 rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
                   {group.items.map((item) => (
                     <button
                       key={item.id}
