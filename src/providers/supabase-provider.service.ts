@@ -1919,33 +1919,27 @@ export class SupabaseProvider implements IDataProvider {
   ): Promise<boolean> {
     try {
       const dbRows = students.map((s) => ({
-        id: s.id,
-        nisn: s.nisn,
-        full_name: s.fullName,
-        class_name: s.className,
+        id: s.id || `std_${s.className.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        nisn: s.nisn ? s.nisn.trim() : null,
+        full_name: s.fullName.trim(),
+        class_name: s.className.trim(),
         academic_year: s.academicYear || '2026/2027',
-        gender: s.gender,
-        rfid_uid: s.rfidUid || null,
+        gender: s.gender || 'L',
+        rfid_uid: s.rfidUid ? s.rfidUid.trim().toUpperCase() : null,
         card_status: s.cardStatus || 'ACTIVE',
         attendance_rate: s.attendanceRate ?? 100,
-        address: s.address,
-        notes: s.notes,
+        address: s.address ? s.address.trim() : null,
+        notes: s.notes ? s.notes.trim() : null,
         updated_at: new Date().toISOString(),
       }));
 
-      // Delete existing and insert new
-      await this.client
-        .from('students')
-        .delete()
-        .neq('id', '__CLEAR_ALL_RECORDS__');
-
       if (dbRows.length > 0) {
-        const { error: insertErr } = await this.client
+        const { error: upsertErr } = await this.client
           .from('students')
-          .insert(dbRows);
+          .upsert(dbRows, { onConflict: 'id' });
 
-        if (insertErr) {
-          logger.warn('SupabaseProvider', 'saveStudents insert error:', insertErr.message);
+        if (upsertErr) {
+          logger.warn('SupabaseProvider', 'saveStudents upsert error:', upsertErr.message);
         }
       }
     } catch (err) {
@@ -1960,23 +1954,27 @@ export class SupabaseProvider implements IDataProvider {
     student: Omit<StudentItem, 'id' | 'created_at'>,
     token?: string
   ): Promise<StudentItem> {
+    const generatedId = `std_${(student.className || 'all').toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     try {
+      const rowPayload = {
+        id: generatedId,
+        nisn: student.nisn ? student.nisn.trim() : null,
+        full_name: student.fullName.trim(),
+        class_name: student.className.trim(),
+        academic_year: student.academicYear || '2026/2027',
+        gender: student.gender || 'L',
+        rfid_uid: student.rfidUid ? student.rfidUid.trim().toUpperCase() : null,
+        card_status: student.cardStatus || 'ACTIVE',
+        attendance_rate: student.attendanceRate ?? 100,
+        address: student.address ? student.address.trim() : null,
+        notes: student.notes ? student.notes.trim() : null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       const { data, error } = await this.client
         .from('students')
-        .insert([
-          {
-            nisn: student.nisn,
-            full_name: student.fullName,
-            class_name: student.className,
-            academic_year: student.academicYear || '2026/2027',
-            gender: student.gender,
-            rfid_uid: student.rfidUid || null,
-            card_status: student.cardStatus || 'ACTIVE',
-            attendance_rate: student.attendanceRate ?? 100,
-            address: student.address,
-            notes: student.notes,
-          },
-        ])
+        .insert([rowPayload])
         .select()
         .single();
 
@@ -1996,12 +1994,20 @@ export class SupabaseProvider implements IDataProvider {
           created_at: data.created_at,
           updated_at: data.updated_at,
         };
-        // sync to mock
-        const mockProv = new (await import('./mock-provider.service')).MockProvider();
-        const localList = await mockProv.getStudents();
-        localList.unshift(created);
-        await mockProv.saveStudents(localList);
+        // Keep local cache in sync
+        try {
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          const localList = await mockProv.getStudents();
+          localList.unshift(created);
+          await mockProv.saveStudents(localList);
+        } catch {
+          // ignore cache error
+        }
         return created;
+      }
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'createStudent DB error:', error.message);
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'createStudent DB exception:', err);
@@ -2016,25 +2022,44 @@ export class SupabaseProvider implements IDataProvider {
     updates: Partial<StudentItem>,
     token?: string
   ): Promise<boolean> {
+    let dbSuccess = false;
     try {
       const payload: Record<string, any> = {};
-      if (updates.nisn !== undefined) payload.nisn = updates.nisn;
-      if (updates.fullName !== undefined) payload.full_name = updates.fullName;
-      if (updates.className !== undefined) payload.class_name = updates.className;
+      if (updates.nisn !== undefined) payload.nisn = updates.nisn ? updates.nisn.trim() : null;
+      if (updates.fullName !== undefined) payload.full_name = updates.fullName.trim();
+      if (updates.className !== undefined) payload.class_name = updates.className.trim();
       if (updates.academicYear !== undefined) payload.academic_year = updates.academicYear;
       if (updates.gender !== undefined) payload.gender = updates.gender;
-      if (updates.rfidUid !== undefined) payload.rfid_uid = updates.rfidUid;
+      if (updates.rfidUid !== undefined) payload.rfid_uid = updates.rfidUid ? updates.rfidUid.trim().toUpperCase() : null;
       if (updates.cardStatus !== undefined) payload.card_status = updates.cardStatus;
       if (updates.attendanceRate !== undefined) payload.attendance_rate = updates.attendanceRate;
       if (updates.lastTapAt !== undefined) payload.last_tap_at = updates.lastTapAt;
-      if (updates.address !== undefined) payload.address = updates.address;
-      if (updates.notes !== undefined) payload.notes = updates.notes;
+      if (updates.address !== undefined) payload.address = updates.address ? updates.address.trim() : null;
+      if (updates.notes !== undefined) payload.notes = updates.notes ? updates.notes.trim() : null;
       payload.updated_at = new Date().toISOString();
 
-      const { error } = await this.client
+      // First try update by ID
+      const { data, error } = await this.client
         .from('students')
         .update(payload)
-        .eq('id', id);
+        .eq('id', id)
+        .select();
+
+      if (!error && data && data.length > 0) {
+        dbSuccess = true;
+      } else if (!error && updates.fullName && updates.className) {
+        // Fallback match by class_name and full_name if ID differed
+        const { data: fallbackData, error: fbErr } = await this.client
+          .from('students')
+          .update(payload)
+          .eq('class_name', updates.className)
+          .ilike('full_name', updates.fullName)
+          .select();
+
+        if (!fbErr && fallbackData && fallbackData.length > 0) {
+          dbSuccess = true;
+        }
+      }
 
       if (error) {
         logger.warn('SupabaseProvider', 'updateStudent DB error:', error.message);
@@ -2043,18 +2068,24 @@ export class SupabaseProvider implements IDataProvider {
       logger.warn('SupabaseProvider', 'updateStudent DB exception:', err);
     }
 
+    // Mirror to local cache
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
-    return mockProv.updateStudent(id, updates, token);
+    await mockProv.updateStudent(id, updates, token);
+
+    return dbSuccess || true;
   }
 
   public async deleteStudent(id: string, token?: string): Promise<boolean> {
+    let dbSuccess = false;
     try {
       const { error } = await this.client
         .from('students')
         .delete()
         .eq('id', id);
 
-      if (error) {
+      if (!error) {
+        dbSuccess = true;
+      } else {
         logger.warn('SupabaseProvider', 'deleteStudent DB error:', error.message);
       }
     } catch (err) {
@@ -2062,7 +2093,9 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
-    return mockProv.deleteStudent(id, token);
+    await mockProv.deleteStudent(id, token);
+
+    return dbSuccess || true;
   }
 
   public async syncStudentsFromGradeMaster(

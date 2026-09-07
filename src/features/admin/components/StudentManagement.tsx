@@ -246,16 +246,19 @@ export const StudentManagement: React.FC = () => {
 
       if (editingStudent) {
         // Update existing student
-        await StudentRepository.updateStudent(editingStudent.id, {
-          nisn: formNisn.trim(),
+        const ok = await StudentRepository.updateStudent(editingStudent.id, {
+          nisn: formNisn.trim() || undefined,
           fullName: formFullName.trim(),
           className: effectiveClass,
           gender: formGender,
           rfidUid: cleanRfid,
           cardStatus: cleanRfid ? 'ACTIVE' : 'INACTIVE',
           attendanceRate,
-          notes: formNotes.trim(),
+          notes: formNotes.trim() || undefined,
         });
+        if (!ok) {
+          throw new Error('Gagal memperbarui data siswa di server');
+        }
         showToast('success', 'Berhasil Diperbarui', `Data siswa "${formFullName.trim()}" berhasil diperbarui`);
       } else {
         // Create new student
@@ -268,15 +271,15 @@ export const StudentManagement: React.FC = () => {
           rfidUid: cleanRfid,
           cardStatus: cleanRfid ? 'ACTIVE' : 'INACTIVE',
           attendanceRate,
-          notes: formNotes.trim(),
+          notes: formNotes.trim() || undefined,
         });
         showToast('success', 'Berhasil Ditambahkan', `Siswa "${formFullName.trim()}" berhasil ditambahkan ke direktori`);
       }
       setIsModalOpen(false);
-      loadData();
-    } catch (err) {
+      await loadData();
+    } catch (err: any) {
       console.error('Save student error:', err);
-      showToast('error', 'Gagal Menyimpan', 'Gagal menyimpan data siswa ke database');
+      showToast('error', 'Gagal Menyimpan', err?.message || 'Gagal menyimpan data siswa ke database');
     } finally {
       setIsSaving(false);
     }
@@ -286,13 +289,14 @@ export const StudentManagement: React.FC = () => {
     if (!deleteTarget) return;
     setIsSaving(true);
     try {
-      await StudentRepository.deleteStudent(deleteTarget.id);
+      const ok = await StudentRepository.deleteStudent(deleteTarget.id);
+      if (!ok) throw new Error('Gagal menghapus data siswa di server');
       showToast('success', 'Berhasil Dihapus', `Data siswa "${deleteTarget.fullName}" berhasil dihapus`);
       setDeleteTarget(null);
-      loadData();
-    } catch (err) {
+      await loadData();
+    } catch (err: any) {
       console.error('Delete student error:', err);
-      showToast('error', 'Gagal Menghapus', 'Gagal menghapus data siswa dari database');
+      showToast('error', 'Gagal Menghapus', err?.message || 'Gagal menghapus data siswa dari database');
     } finally {
       setIsSaving(false);
     }

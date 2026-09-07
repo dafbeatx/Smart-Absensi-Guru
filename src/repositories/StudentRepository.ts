@@ -100,7 +100,22 @@ export class StudentRepository {
     const provider = ProviderFactory.getProvider();
     const created = await provider.createStudent(student, token);
 
-    // Sync localStorage
+    try {
+      const freshList = await provider.getStudents(token);
+      if (Array.isArray(freshList) && freshList.length > 0) {
+        safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(freshList));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: freshList })
+          );
+        }
+        return created;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Sync localStorage fallback
     const existing = await this.getStudents(token);
     if (!existing.some((s) => s.id === created.id)) {
       existing.unshift(created);
@@ -128,6 +143,21 @@ export class StudentRepository {
     const success = await provider.updateStudent(id, updates, token);
 
     if (success) {
+      try {
+        const freshList = await provider.getStudents(token);
+        if (Array.isArray(freshList) && freshList.length > 0) {
+          safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(freshList));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: freshList })
+            );
+          }
+          return true;
+        }
+      } catch {
+        // ignore
+      }
+
       const existing = await this.getStudents(token);
       const idx = existing.findIndex((s) => s.id === id);
       if (idx !== -1) {
@@ -152,6 +182,21 @@ export class StudentRepository {
     const success = await provider.deleteStudent(id, token);
 
     if (success) {
+      try {
+        const freshList = await provider.getStudents(token);
+        if (Array.isArray(freshList)) {
+          safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(freshList));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: freshList })
+            );
+          }
+          return true;
+        }
+      } catch {
+        // ignore
+      }
+
       const existing = await this.getStudents(token);
       const filtered = existing.filter((s) => s.id !== id);
       safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(filtered));

@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS public.students (
 CREATE INDEX IF NOT EXISTS idx_students_rfid_uid ON public.students (rfid_uid);
 CREATE INDEX IF NOT EXISTS idx_students_class_academic ON public.students (class_name, academic_year);
 CREATE INDEX IF NOT EXISTS idx_students_full_name ON public.students (full_name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_students_class_fullname ON public.students (class_name, full_name);
+
+-- Default ID generator jika tidak disertakan saat insert
+ALTER TABLE public.students ALTER COLUMN id SET DEFAULT ('std_' || encode(gen_random_bytes(16), 'hex'));
 
 -- 2. ROW LEVEL SECURITY (RLS) UNTUK TABEL STUDENTS
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
