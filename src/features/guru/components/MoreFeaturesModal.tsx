@@ -252,13 +252,15 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-1">
                   {group.category}
                 </h4>
-                <div className="bg-slate-50/70 rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
-                  {group.items.map((item) => (
+                <div className="bg-slate-50/70 rounded-2xl border border-slate-200 overflow-hidden">
+                  {group.items.map((item, idx) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={item.action}
-                      className="w-full p-3.5 flex items-center justify-between gap-3 text-left hover:bg-white active:bg-slate-100 transition-colors cursor-pointer"
+                      className={`w-full p-3.5 flex items-center justify-between gap-3 text-left hover:bg-white active:bg-slate-100 transition-colors cursor-pointer ${
+                        idx > 0 ? 'border-t border-slate-100' : ''
+                      }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-base shrink-0 shadow-2xs">

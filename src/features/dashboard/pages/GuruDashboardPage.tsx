@@ -1839,12 +1839,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </span>
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100 overflow-hidden">
-                    {visibleItems.map((item) => (
+                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                    {visibleItems.map((item, idx) => (
                       <div
                         key={item.id}
                         onClick={item.action}
-                        className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                        className={`p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer ${
+                          idx > 0 ? 'border-t border-slate-100' : ''
+                        }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-base shrink-0">
