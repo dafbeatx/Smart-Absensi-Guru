@@ -119,6 +119,28 @@ export class TelegramService {
       const resData = await response.json().catch(() => ({}));
 
       if (!response.ok || !resData.ok) {
+        // Fallback: If Telegram failed to parse Markdown/HTML formatting, retry as plain text
+        if (parseMode) {
+          try {
+            const retryResponse = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text,
+                disable_web_page_preview: true,
+              }),
+            });
+            const retryData = await retryResponse.json().catch(() => ({}));
+            if (retryResponse.ok && retryData.ok) {
+              logger.info('TelegramService', 'Pesan Telegram berhasil terkirim (fallback plain text) ke chat ID:', chatId);
+              return { success: true };
+            }
+          } catch {
+            // ignore retry fetch error
+          }
+        }
+
         const errorMsg = resData.description || `HTTP ${response.status}`;
         logger.warn('TelegramService', `Gagal mengirim pesan Telegram: ${errorMsg}`);
         return { success: false, error: errorMsg };
@@ -320,11 +342,11 @@ export class TelegramService {
         const data = await res.json().catch(() => ({}));
 
         if (!data.ok) {
-          // If webhook is active (error 409), stop client polling gracefully
+          // If webhook is active (error 409), pause and recheck rather than dying forever
           if (data.error_code === 409) {
-            logger.info('TelegramService', 'Telegram Webhook aktif, polling browser dihentikan.');
-            this.isPollingActive = false;
-            break;
+            logger.info('TelegramService', 'Telegram Webhook sedang aktif, menunda polling browser 10 detik...');
+            await new Promise((resolve) => setTimeout(resolve, 10000));
+            continue;
           }
           await new Promise((resolve) => setTimeout(resolve, 3000));
           continue;

@@ -46,7 +46,7 @@ async function callGroq(apiKey: string, messages: Array<{ role: string; content:
 
 async function sendTelegramMessage(token: string, chatId: string | number, text: string, parseMode: 'HTML' | 'Markdown' = 'HTML') {
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -56,9 +56,32 @@ async function sendTelegramMessage(token: string, chatId: string | number, text:
         disable_web_page_preview: true,
       }),
     });
+
+    // If parsing entities failed (e.g. Markdown unescaped character), fallback to plain text
+    if (!res.ok) {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          disable_web_page_preview: true,
+        }),
+      });
+    }
   } catch (e) {
     console.error('Failed to send Telegram message:', e);
   }
+}
+
+async function sendTypingAction(token: string, chatId: string | number) {
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, action: 'typing' }),
+    });
+  } catch {}
 }
 
 export default async function handler(req: any, res: any) {
@@ -74,15 +97,23 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const token = process.env.VITE_TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '';
-  const groqKey = process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY || '';
+  const token = (process.env.VITE_TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const groqKey = (process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY || '').trim();
 
   if (!token) {
     return res.status(200).json({ status: 'ignored', reason: 'TELEGRAM_BOT_TOKEN not configured' });
   }
 
-  const update = req.body;
-  const message = update?.message;
+  let update: any = req.body;
+  if (typeof update === 'string') {
+    try {
+      update = JSON.parse(update);
+    } catch {
+      update = {};
+    }
+  }
+
+  const message = update?.message || update?.edited_message;
 
   if (!message || !message.text) {
     return res.status(200).json({ status: 'ok', note: 'no text message in update' });
@@ -142,6 +173,8 @@ export default async function handler(req: any, res: any) {
 
   // 3. Admin / Technical Query with Groq AI
   if (groqKey) {
+    sendTypingAction(token, chatId);
+
     const systemPrompt = `Anda adalah "Smart AI Technical Diagnostic Engine" untuk Telegram Bot resmi aplikasi "Smart Absensi Guru" (SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam).
 Pengguna adalah Admin / Pengelola Sistem bernama ${senderName}.
 
