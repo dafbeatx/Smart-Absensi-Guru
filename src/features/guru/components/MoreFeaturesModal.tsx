@@ -11,6 +11,7 @@ interface MoreFeaturesModalProps {
   onOpenTermsModal: () => void;
   onOpenChangePin: () => void;
   onLogout: () => void;
+  onOpenStudentKiosk?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -23,10 +24,26 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenTermsModal,
   onOpenChangePin,
   onLogout,
+  onOpenStudentKiosk,
 }) => {
   if (!isOpen) return null;
 
   const menuItems = [
+    ...(onOpenStudentKiosk
+      ? [
+          {
+            id: 'rfid_kiosk',
+            title: 'Terminal Presensi RFID Siswa 2',
+            subtitle: 'Kiosk tap kartu RFID/NFC untuk absensi siswa masuk / piket gerbang',
+            icon: '📡',
+            bgIcon: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+            action: () => {
+              onClose();
+              onOpenStudentKiosk();
+            },
+          },
+        ]
+      : []),
     {
       id: 'complaint',
       title: 'Kotak Aspirasi Guru',

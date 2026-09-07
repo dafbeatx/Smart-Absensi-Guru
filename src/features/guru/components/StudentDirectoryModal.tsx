@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { StudentItem } from '../../../types/database.types';
 import { StudentRepository, STUDENTS_UPDATED_EVENT } from '../../../repositories/StudentRepository';
-import { CreditCard, School, Search, X } from 'lucide-react';
+import { CreditCard, Radio, School, Search, X } from 'lucide-react';
 
 interface StudentDirectoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialClassFilter?: string;
+  onOpenKiosk?: () => void;
 }
 
 export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
   isOpen,
   onClose,
   initialClassFilter,
+  onOpenKiosk,
 }) => {
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -92,13 +94,31 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-slate-200 transition-colors cursor-pointer text-sm font-bold shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {onOpenKiosk && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenKiosk();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0D7A5F] hover:bg-[#0D7A5F]/90 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                title="Buka Terminal Presensi RFID Siswa 2"
+              >
+                <Radio className="w-3.5 h-3.5 text-cyan-200 animate-pulse shrink-0" />
+                <span className="hidden sm:inline">Terminal RFID 2</span>
+                <span className="sm:hidden">RFID 2</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-slate-200 transition-colors cursor-pointer text-sm font-bold shrink-0"
+              title="Tutup"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Search & Filter Bar */}

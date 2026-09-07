@@ -22,6 +22,8 @@ import { StudentDirectoryModal } from '../../guru/components/StudentDirectoryMod
 import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
 import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCalendarModal';
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
+import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
+import { Radio } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
 import { BiometricService } from '../../../services/biometric.service';
@@ -323,6 +325,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
   const [isEventsCalendarModalOpen, setIsEventsCalendarModalOpen] = useState(false);
   const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
+  const [isStudentKioskOpen, setIsStudentKioskOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isBioEnrolled, setIsBioEnrolled] = useState(false);
 
@@ -1527,13 +1530,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     setStudentDirectoryClassFilter(undefined);
                     setIsStudentDirectoryModalOpen(true);
                   }}
-                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0"
+                  className="group flex flex-col items-center justify-start text-center p-1 rounded-2xl hover:bg-slate-50/80 transition-all cursor-pointer active:scale-95 min-w-0 relative"
+                  title="Direktori Siswa & Terminal Presensi RFID Siswa 2"
                 >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E8F8F0] text-[#0D7A5F] border border-emerald-200/80 flex items-center justify-center shadow-2xs group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-all shrink-0">
+                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#E8F8F0] text-[#0D7A5F] border border-emerald-200/80 flex items-center justify-center shadow-2xs group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-all shrink-0 relative">
                     <AcademicCapIcon className="w-6 h-6 text-[#0D7A5F]" />
+                    {isDutyTeacherToday && (
+                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-cyan-600 text-white rounded-full min-w-3 text-center ring-2 ring-white animate-pulse">
+                        RFID
+                      </span>
+                    )}
                   </div>
                   <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight truncate w-full">
-                    Siswa
+                    {isDutyTeacherToday ? 'Siswa / RFID' : 'Siswa'}
                   </span>
                 </button>
 
@@ -1713,9 +1722,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
             {/* Piket Details Expand Banner if duty teacher */}
             {isDutyTeacherToday && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-1.5 text-amber-950 shadow-2xs">
-                <div className="flex items-center gap-2 font-black text-xs text-amber-900">
-                  <span>🛡️ Selamat Bertugas Menjadi Guru Piket Hari Ini!</span>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2.5 text-amber-950 shadow-2xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 font-black text-xs text-amber-900">
+                    <span>🛡️ Selamat Bertugas Menjadi Guru Piket Hari Ini!</span>
+                  </div>
+                  <span className="bg-amber-200/80 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                    Piket Aktif
+                  </span>
                 </div>
                 <p className="text-[11px] text-amber-900 font-medium leading-relaxed">
                   {todayDutyDetails?.notes || 'Mari sambut siswa dengan senyuman dan bina ketertiban sekolah.'}
@@ -1730,6 +1744,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     ))}
                   </div>
                 )}
+
+                {/* Tombol Akses Terminal Presensi RFID Siswa 2 untuk Guru Piket */}
+                <button
+                  type="button"
+                  onClick={() => setIsStudentKioskOpen(true)}
+                  className="w-full h-11 px-4 bg-[#023246] hover:bg-[#034560] active:scale-[0.98] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer border border-cyan-500/30"
+                  title="Buka Terminal Presensi RFID Siswa 2"
+                >
+                  <Radio className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
+                  <span>Buka Terminal Presensi RFID Siswa 2</span>
+                </button>
               </div>
             )}
 
@@ -2190,6 +2215,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   : 'bg-slate-50 border-slate-200 text-slate-600 font-medium'
               }`}>
                 <p className="font-extrabold text-[11px] leading-tight">{smartAlarmStatus.message}</p>
+                {smartAlarmStatus.type === 'DUTY_TODAY' && (
+                  <div className="flex items-center justify-between pt-1 border-t border-blue-200/60 mt-1">
+                    <span className="text-[10px] text-blue-800 font-medium">Bantu absensi kartu RFID siswa:</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsStudentKioskOpen(true)}
+                      className="text-[10px] font-black text-[#023246] hover:text-[#0D7A5F] underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Radio className="w-3 h-3 text-cyan-600 animate-pulse" />
+                      <span>Terminal RFID 2 →</span>
+                    </button>
+                  </div>
+                )}
                 {smartAlarmStatus.type === 'NO_SCHEDULE' && (
                   <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 mt-1">
                     <span className="text-[10px] text-slate-500 italic">Jadwal resmi dikelola oleh Kurikulum / Operator.</span>
@@ -3195,6 +3233,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         isOpen={isStudentDirectoryModalOpen}
         onClose={() => setIsStudentDirectoryModalOpen(false)}
         initialClassFilter={studentDirectoryClassFilter}
+        onOpenKiosk={() => setIsStudentKioskOpen(true)}
       />
 
       {/* 10. Modul & Bahan Ajar KBM */}
@@ -3221,6 +3260,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenTermsModal={() => setIsTermsModalOpen(true)}
         onOpenChangePin={() => setIsChangePinOpen(true)}
         onLogout={logout}
+        onOpenStudentKiosk={() => setIsStudentKioskOpen(true)}
+      />
+
+      {/* 13. Terminal Presensi RFID Siswa 2 (Akses Cepat Guru Piket & Pengajar) */}
+      <StudentRfidKioskModal
+        isOpen={isStudentKioskOpen}
+        onClose={() => setIsStudentKioskOpen(false)}
       />
 
       {/* Modal Pilihan Metode Presensi (Scan Barcode / QR vs Sidik Jari HP) */}
