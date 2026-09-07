@@ -127,7 +127,14 @@ export interface TeacherLeaderboardItem {
   isCurrentUser?: boolean;
 }
 
+export type DisciplinePeriodType = 'CURRENT_MONTH' | 'PREVIOUS_MONTH';
+
 export interface TeacherDisciplineLeaderboardResult {
+  periodType: DisciplinePeriodType;
+  periodLabel: string;
+  monthName: string;
+  year: number;
+  elapsedWorkingDays: number;
   leaderboard: TeacherLeaderboardItem[];
   topTeacher: TeacherLeaderboardItem;
   currentUserRank: number;
@@ -136,14 +143,154 @@ export interface TeacherDisciplineLeaderboardResult {
 
 /**
  * Mendapatkan Leaderboard Monitoring Performa Disiplin Internal Sekolah
- * Menggabungkan dewan guru resmi dengan performa aktual akun guru yang sedang aktif
+ * Mendukung filter periode real-time:
+ * 1. CURRENT_MONTH: Bulan Berjalan (September 2026, hari ke-7 • ~5 hari kerja efektif, poin proporsional 95-185)
+ * 2. PREVIOUS_MONTH: Rekap Final Bulan Penuh (Agustus 2026 • 22 hari kerja efektif, poin 305-520)
  */
 export function getTeacherDisciplineLeaderboard(
   currentUser: { id?: string; full_name?: string; nip?: string | null; position?: string; avatar_url?: string | null; phone_number?: string } | null,
-  currentUserScore: TeacherAppreciationScore
+  currentUserScore: TeacherAppreciationScore,
+  period: DisciplinePeriodType = 'CURRENT_MONTH'
 ): TeacherDisciplineLeaderboardResult {
-  // Dewan Guru Resmi (Baseline Performa Disiplin Internal Sekolah)
-  const baselineTeachers: TeacherLeaderboardItem[] = [
+  const isCurrent = period === 'CURRENT_MONTH';
+
+  // 1. Baseline Bulan Berjalan (September 2026, hari ke-7 • 5 hari kerja efektif berlalu)
+  //    Nilai poin realistis dan proporsional (Base 50 + kehadiran 5 hari + piket/mood)
+  const currentMonthTeachers: TeacherLeaderboardItem[] = [
+    {
+      id: 'usr_guru_002',
+      name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+      nip: '19880512 201503 1 002',
+      position: 'Wakasek Sarana dan Prasarana',
+      totalPoints: 185,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 1,
+      hadirTepatWaktuCount: 5,
+      terlambatCount: 0,
+      piketCount: 1,
+      topBadge: { icon: '🏆', title: 'Pendidik Teladan Utama Kepsek' },
+    },
+    {
+      id: 'usr_guru_006',
+      name: 'Nurul Fahriya, S.Pd., G.r',
+      nip: '19910415 201902 2 004',
+      position: 'Wakasek Kurikulum',
+      totalPoints: 165,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 2,
+      hadirTepatWaktuCount: 5,
+      terlambatCount: 0,
+      piketCount: 0,
+      topBadge: { icon: '🎖️', title: 'Garda Disiplin Waktu' },
+    },
+    {
+      id: 'usr_guru_003',
+      name: 'Adi Prasetyo, S.Pd., G.r',
+      nip: '19890918 201801 1 003',
+      position: 'Guru Mapel Bahasa Inggris',
+      totalPoints: 150,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 3,
+      hadirTepatWaktuCount: 4,
+      terlambatCount: 0,
+      piketCount: 1,
+      topBadge: { icon: '🌟', title: '100% Kehadiran Sempurna' },
+    },
+    {
+      id: 'usr_guru_009',
+      name: 'Widianingsih, S.Si., G.r',
+      nip: '19920311 202002 2 006',
+      position: 'Guru Mapel IPA',
+      totalPoints: 135,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 4,
+      hadirTepatWaktuCount: 4,
+      terlambatCount: 1,
+      piketCount: 0,
+      topBadge: { icon: '🛡️', title: 'Piket Responsif & Teladan' },
+    },
+    {
+      id: 'usr_guru_008',
+      name: 'Windiani, S.E., G.r',
+      nip: '19900822 201704 2 005',
+      position: 'Bendahara Sekolah',
+      totalPoints: 130,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 5,
+      hadirTepatWaktuCount: 4,
+      terlambatCount: 0,
+      piketCount: 0,
+      topBadge: { icon: '🎖️', title: 'Guru Terdisiplin Waktu' },
+    },
+    {
+      id: 'usr_guru_005',
+      name: 'Fitri Ani Rahayu',
+      nip: '19931201 202103 2 007',
+      position: 'Guru Mapel Matematika',
+      totalPoints: 120,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 6,
+      hadirTepatWaktuCount: 3,
+      terlambatCount: 1,
+      piketCount: 0,
+      topBadge: { icon: '🌟', title: '100% Kehadiran Sempurna' },
+    },
+    {
+      id: 'usr_guru_007',
+      name: 'Septi Nur Aeni, S.E',
+      nip: '19921105 202102 2 009',
+      position: 'Guru Mapel B. Indonesia',
+      totalPoints: 115,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 7,
+      hadirTepatWaktuCount: 3,
+      terlambatCount: 0,
+      piketCount: 0,
+      topBadge: { icon: '💚', title: 'Kesejahteraan & Self-Care' },
+    },
+    {
+      id: 'usr_guru_010',
+      name: 'Mawar Andinia, S.Pd., G.r',
+      nip: '19940725 202201 2 008',
+      position: 'Bimbingan Konseling (BK)',
+      totalPoints: 110,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 8,
+      hadirTepatWaktuCount: 3,
+      terlambatCount: 0,
+      piketCount: 0,
+      topBadge: { icon: '💚', title: 'Kesejahteraan & Self-Care' },
+    },
+    {
+      id: 'usr_guru_004',
+      name: 'Mira Nurdianti, S.Pd',
+      nip: '19950117 202303 2 010',
+      position: 'Tata Usaha (TU)',
+      totalPoints: 105,
+      level: '🥈 Pendidik Berdedikasi (Level 2)',
+      rank: 9,
+      hadirTepatWaktuCount: 3,
+      terlambatCount: 0,
+      piketCount: 0,
+      topBadge: { icon: '🛡️', title: 'Piket Responsif & Teladan' },
+    },
+    {
+      id: 'usr_op_002',
+      name: 'Qodiatul Asrof Ramadhoni, S.E., G.r',
+      nip: '19940608 202202 1 005',
+      position: 'Operator Sekolah',
+      totalPoints: 95,
+      level: '🥉 Pendidik Berkomitmen (Level 1)',
+      rank: 10,
+      hadirTepatWaktuCount: 2,
+      terlambatCount: 1,
+      piketCount: 0,
+      topBadge: { icon: '🎖️', title: 'Guru Terdisiplin Waktu' },
+    },
+  ];
+
+  // 2. Baseline Bulan Lalu (Agustus 2026 - Rekap Final Sebulan Penuh, 22 hari kerja efektif)
+  const previousMonthTeachers: TeacherLeaderboardItem[] = [
     {
       id: 'usr_guru_002',
       name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
@@ -276,7 +423,7 @@ export function getTeacherDisciplineLeaderboard(
     },
   ];
 
-  let teachers = [...baselineTeachers];
+  let teachers = isCurrent ? [...currentMonthTeachers] : [...previousMonthTeachers];
 
   if (currentUser) {
     const activeBadge = currentUserScore.badges.find((b) => b.isUnlocked) || {
@@ -293,17 +440,24 @@ export function getTeacherDisciplineLeaderboard(
     );
 
     if (matchedIdx !== -1) {
-      teachers[matchedIdx] = {
-        ...teachers[matchedIdx],
-        totalPoints: currentUserScore.totalPoints,
-        level: currentUserScore.level,
-        hadirTepatWaktuCount: currentUserScore.hadirTepatWaktuCount,
-        terlambatCount: currentUserScore.terlambatCount,
-        piketCount: currentUserScore.piketCount,
-        topBadge: { icon: activeBadge.icon, title: activeBadge.title },
-        avatar_url: currentUser.avatar_url || teachers[matchedIdx].avatar_url,
-        isCurrentUser: true,
-      };
+      if (isCurrent) {
+        teachers[matchedIdx] = {
+          ...teachers[matchedIdx],
+          totalPoints: currentUserScore.totalPoints,
+          level: currentUserScore.level,
+          hadirTepatWaktuCount: currentUserScore.hadirTepatWaktuCount,
+          terlambatCount: currentUserScore.terlambatCount,
+          piketCount: currentUserScore.piketCount,
+          topBadge: { icon: activeBadge.icon, title: activeBadge.title },
+          avatar_url: currentUser.avatar_url || teachers[matchedIdx].avatar_url,
+          isCurrentUser: true,
+        };
+      } else {
+        teachers[matchedIdx] = {
+          ...teachers[matchedIdx],
+          isCurrentUser: true,
+        };
+      }
     } else {
       // Akun guru lain yang terdaftar secara dinamis
       teachers.push({
@@ -312,12 +466,12 @@ export function getTeacherDisciplineLeaderboard(
         nip: currentUser.nip || null,
         position: currentUser.position || 'Guru Pengajar',
         avatar_url: currentUser.avatar_url || null,
-        totalPoints: currentUserScore.totalPoints,
-        level: currentUserScore.level,
+        totalPoints: isCurrent ? currentUserScore.totalPoints : 380,
+        level: isCurrent ? currentUserScore.level : '🥇 Pendidik Disiplin Emas',
         rank: 0,
-        hadirTepatWaktuCount: currentUserScore.hadirTepatWaktuCount,
-        terlambatCount: currentUserScore.terlambatCount,
-        piketCount: currentUserScore.piketCount,
+        hadirTepatWaktuCount: isCurrent ? currentUserScore.hadirTepatWaktuCount : 17,
+        terlambatCount: isCurrent ? currentUserScore.terlambatCount : 1,
+        piketCount: isCurrent ? currentUserScore.piketCount : 2,
         topBadge: { icon: activeBadge.icon, title: activeBadge.title },
         isCurrentUser: true,
       });
@@ -338,6 +492,13 @@ export function getTeacherDisciplineLeaderboard(
   const currentUserRank = currentUserIdx !== -1 ? currentUserIdx + 1 : 1;
 
   return {
+    periodType: period,
+    periodLabel: isCurrent
+      ? 'September 2026 (Bulan Berjalan • s/d Hari ke-7)'
+      : 'Agustus 2026 (Rekap Final Penuh • 22 Hari Kerja)',
+    monthName: isCurrent ? 'September' : 'Agustus',
+    year: 2026,
+    elapsedWorkingDays: isCurrent ? 5 : 22,
     leaderboard: teachers,
     topTeacher,
     currentUserRank,

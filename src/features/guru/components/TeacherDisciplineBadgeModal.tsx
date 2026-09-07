@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { TeacherAppreciationScore, UserProfile } from '../../../types/database.types';
 import {
   getTeacherDisciplineLeaderboard,
+  type DisciplinePeriodType,
 } from '../../../utils/teacher-appreciation.utils';
 import {
   Trophy,
@@ -27,10 +28,16 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   currentUserScore,
 }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('LEADERBOARD');
+  const [selectedPeriod, setSelectedPeriod] = useState<DisciplinePeriodType>('CURRENT_MONTH');
 
-  const { leaderboard, topTeacher, currentUserRank, totalTeachers } = useMemo(() => {
-    return getTeacherDisciplineLeaderboard(currentUser, currentUserScore);
-  }, [currentUser, currentUserScore]);
+  const {
+    leaderboard,
+    topTeacher,
+    currentUserRank,
+    totalTeachers,
+  } = useMemo(() => {
+    return getTeacherDisciplineLeaderboard(currentUser, currentUserScore, selectedPeriod);
+  }, [currentUser, currentUserScore, selectedPeriod]);
 
   if (!isOpen) return null;
 
@@ -128,15 +135,50 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
           {/* TAB 1: LEADERBOARD / PERINGKAT DISIPLIN */}
           {activeTab === 'LEADERBOARD' && (
             <div className="space-y-3.5">
+              {/* 🗓️ FILTER PERIODE BULAN (BULAN BERJALAN vs REKAP FINAL BULAN LALU) */}
+              <div className="bg-slate-100 p-1 rounded-2xl flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPeriod('CURRENT_MONTH')}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer truncate ${
+                    selectedPeriod === 'CURRENT_MONTH'
+                      ? 'bg-white text-[#023246] shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="truncate">September 2026 (Berjalan • Hari ke-7)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedPeriod('PREVIOUS_MONTH')}
+                  className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer truncate ${
+                    selectedPeriod === 'PREVIOUS_MONTH'
+                      ? 'bg-white text-[#023246] shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🏅</span>
+                  <span className="truncate">Agustus 2026 (Final • 22 Hari)</span>
+                </button>
+              </div>
+
               {/* 👑 HERO CARD: SIAPA POIN PALING BANYAK */}
               <div className="relative overflow-hidden rounded-3xl border border-amber-300/80 bg-linear-to-br from-amber-50 via-white to-amber-50/40 p-4 sm:p-5 shadow-xs">
                 <div className="flex items-center justify-between gap-2 mb-2.5">
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-900 text-[11px] font-extrabold tracking-wide uppercase">
                     <span>👑</span>
-                    <span>Poin Terbanyak Bulan Ini</span>
+                    <span>
+                      {selectedPeriod === 'CURRENT_MONTH'
+                        ? 'Poin Terbanyak Bulan Berjalan'
+                        : 'Juara Poin Tertinggi Bulan Agustus'}
+                    </span>
                   </div>
                   <span className="text-[11px] font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-lg">
-                    Peringkat 1 Nasional Sekolah
+                    {selectedPeriod === 'CURRENT_MONTH'
+                      ? 'Peringkat 1 (s/d Hari ke-7)'
+                      : 'Peringkat 1 Final (22 Hari)'}
                   </span>
                 </div>
 
@@ -176,9 +218,10 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </div>
                 </div>
 
-                <div className="mt-3.5 pt-3 border-t border-amber-200/60 flex items-center justify-between text-[11px] text-amber-900">
+                <div className="mt-3.5 pt-3 border-t border-amber-200/60 flex items-center justify-between text-[11px] text-amber-900 flex-wrap gap-1">
                   <span className="font-medium">
-                    Ketepatan Waktu: <strong>{topTeacher.hadirTepatWaktuCount} Hari On-Time</strong>
+                    Ketepatan Waktu: <strong>{topTeacher.hadirTepatWaktuCount} Hari On-Time</strong>{' '}
+                    ({selectedPeriod === 'CURRENT_MONTH' ? 'dari 5 hari kerja efektif berjalan' : 'dari 22 hari kerja penuh'})
                   </span>
                   <span className="font-medium">
                     Tugas Piket: <strong>{topTeacher.piketCount} Kali</strong>

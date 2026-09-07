@@ -1621,7 +1621,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
 
                 <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0">
-                  Resmi Kepsek
+                  September 2026
                 </span>
               </div>
 
@@ -1633,7 +1633,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-amber-900 text-[11px] font-extrabold tracking-wide uppercase">
                     <span className="text-sm">👑</span>
-                    <span>Poin Paling Banyak Bulan Ini</span>
+                    <span>Poin Terbanyak Bulan Berjalan</span>
                   </div>
                   <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors">
                     <span>Lihat Rincian</span>
@@ -1662,7 +1662,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <span>{disciplineLeaderboard.topTeacher.totalPoints} Poin</span>
                     </div>
                     <span className="text-[10px] font-bold text-amber-800 block mt-1">
-                      Peringkat 1 (Juara)
+                      Peringkat 1 (5 Hari On-Time)
                     </span>
                   </div>
                 </div>
