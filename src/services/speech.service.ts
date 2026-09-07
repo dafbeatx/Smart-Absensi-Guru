@@ -201,6 +201,31 @@ class VoiceAnnouncementService {
     const text = `Selamat bertugas menjadi Guru Piket hari ini, ${cleanName}! Semoga amanah dan diberikan kelancaran serta keberkahan dalam bertugas.`;
     this.speak(text);
   }
+
+  /**
+   * Ucapan Apresiasi Perolehan Poin Kedisiplinan Guru
+   */
+  public speakPointReward(points: number, teacherName: string, reasonText?: string, isDutyToday?: boolean) {
+    const cleanName = teacherName.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\.|S\.E\.|G\.r/g, '').trim();
+    
+    let pointsSpoken = `${points}`;
+    if (points === 15) pointsSpoken = 'lima belas';
+    else if (points === 25) pointsSpoken = 'dua puluh lima';
+    else if (points === 5) pointsSpoken = 'lima';
+    else if (points === 10) pointsSpoken = 'sepuluh';
+
+    let text = `Selamat ${cleanName}! Anda memperoleh ${pointsSpoken} poin disiplin hari ini.`;
+
+    if (isDutyToday && reasonText?.includes('Tepat Waktu')) {
+      text = `Luar biasa ${cleanName}! Anda berhasil memperoleh ${pointsSpoken} poin disiplin, atas kehadiran tepat waktu dan tugas piket sekolah hari ini.`;
+    } else if (reasonText?.includes('Tepat Waktu')) {
+      text = `Selamat ${cleanName}! Anda berhasil memperoleh ${pointsSpoken} poin kedisiplinan, atas kehadiran tepat waktu hari ini. Pertahankan keteladanan Anda!`;
+    } else if (reasonText?.includes('Terlambat') || reasonText?.includes('Masuk')) {
+      text = `Terima kasih atas kehadiran Anda, ${cleanName}. Anda memperoleh ${pointsSpoken} poin disiplin hari ini.`;
+    }
+
+    this.speak(text);
+  }
 }
 
 export const SpeechService = new VoiceAnnouncementService();

@@ -25,6 +25,8 @@ import { logger } from '../../../utils/logger.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { useReverseGeocode } from '../../../services/reverse-geocoding.service';
 import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
+import { PointRewardCelebrationOverlay } from '../../../components/ui/PointRewardCelebrationOverlay';
+import type { PointRewardData } from '../../../components/ui/PointRewardCelebrationOverlay';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -58,6 +60,8 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [pointRewardData, setPointRewardData] = useState<PointRewardData | null>(null);
+  const [isPointCelebrationOpen, setIsPointCelebrationOpen] = useState(false);
   const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [scanResult, setScanResult] = useState<{
@@ -372,6 +376,43 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       isPiketGuru: isPiketGuruToday,
     };
 
+    // 🌟 Hitung perolehan poin disiplin kehadiran nyata
+    const isCheckIn = returnedAction === 'CHECK_IN' || !returnedAction;
+    let earnedPoints = 0;
+    let pointReason = '';
+    let attendancePoints = 0;
+    let dutyPoints = 0;
+
+    if (isCheckIn) {
+      if (!isLate) {
+        attendancePoints = 15;
+        pointReason = 'Kehadiran Tepat Waktu (≤ 07:30 WIB)';
+      } else {
+        attendancePoints = 5;
+        pointReason = 'Kehadiran Masuk Sekolah (> 07:30 WIB)';
+      }
+      if (isPiketGuruToday) {
+        dutyPoints = 10;
+      }
+      earnedPoints = attendancePoints + dutyPoints;
+    }
+
+    if (earnedPoints > 0) {
+      setPointRewardData({
+        points: earnedPoints,
+        status: returnedStatus,
+        reason: pointReason,
+        breakdown: {
+          attendance: attendancePoints,
+          piket: dutyPoints > 0 ? dutyPoints : undefined,
+        },
+        teacherName: teacherName,
+        timestamp: timestampStr,
+      });
+    } else {
+      setPointRewardData(null);
+    }
+
     setScanResult(result);
     setLatenessReason('');
     setIsSuccessModalOpen(true);
@@ -380,11 +421,16 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     if (!isLate) {
       if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = setTimeout(() => {
-        setIsSuccessModalOpen(false);
-        onSuccess(result);
-        onClose();
+        handleSaveReasonAndClose('NONE');
       }, 4500);
     }
+  };
+
+  const handlePointCelebrationClose = () => {
+    setIsPointCelebrationOpen(false);
+    setPointRewardData(null);
+    if (scanResult) onSuccess(scanResult);
+    onClose();
   };
 
   const handleSaveReasonAndClose = async (openTarget: 'NONE' | 'MOOD' | 'COMPLAINT' = 'NONE') => {
@@ -420,8 +466,12 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     } else if (openTarget === 'COMPLAINT') {
       setIsComplaintModalOpen(true);
     } else {
-      if (scanResult) onSuccess(scanResult);
-      onClose();
+      if (pointRewardData && pointRewardData.points > 0) {
+        setIsPointCelebrationOpen(true);
+      } else {
+        if (scanResult) onSuccess(scanResult);
+        onClose();
+      }
     }
   };
 
@@ -879,13 +929,21 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         isOpen={isMoodModalOpen}
         onClose={() => {
           setIsMoodModalOpen(false);
-          if (scanResult) onSuccess(scanResult);
-          onClose();
+          if (pointRewardData && pointRewardData.points > 0) {
+            setIsPointCelebrationOpen(true);
+          } else {
+            if (scanResult) onSuccess(scanResult);
+            onClose();
+          }
         }}
         onSaved={() => {
           setIsMoodModalOpen(false);
-          if (scanResult) onSuccess(scanResult);
-          onClose();
+          if (pointRewardData && pointRewardData.points > 0) {
+            setIsPointCelebrationOpen(true);
+          } else {
+            if (scanResult) onSuccess(scanResult);
+            onClose();
+          }
         }}
       />
 
@@ -894,14 +952,29 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         isOpen={isComplaintModalOpen}
         onClose={() => {
           setIsComplaintModalOpen(false);
-          if (scanResult) onSuccess(scanResult);
-          onClose();
+          if (pointRewardData && pointRewardData.points > 0) {
+            setIsPointCelebrationOpen(true);
+          } else {
+            if (scanResult) onSuccess(scanResult);
+            onClose();
+          }
         }}
         onSuccess={() => {
           setIsComplaintModalOpen(false);
-          if (scanResult) onSuccess(scanResult);
-          onClose();
+          if (pointRewardData && pointRewardData.points > 0) {
+            setIsPointCelebrationOpen(true);
+          } else {
+            if (scanResult) onSuccess(scanResult);
+            onClose();
+          }
         }}
+      />
+
+      {/* 🌟 Popup Apresiasi Poin Kedisiplinan (Tanpa Card) */}
+      <PointRewardCelebrationOverlay
+        isOpen={isPointCelebrationOpen}
+        onClose={handlePointCelebrationClose}
+        data={pointRewardData}
       />
     </>
   );

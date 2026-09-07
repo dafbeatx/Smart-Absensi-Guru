@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
+import { PointRewardCelebrationOverlay } from '../../../components/ui/PointRewardCelebrationOverlay';
+import type { PointRewardData } from '../../../components/ui/PointRewardCelebrationOverlay';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { BiometricService } from '../../../services/biometric.service';
@@ -57,6 +59,8 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     action: string;
     status: string;
   } | null>(null);
+  const [pointRewardData, setPointRewardData] = useState<PointRewardData | null>(null);
+  const [isPointCelebrationOpen, setIsPointCelebrationOpen] = useState(false);
 
   const effectiveAllowedRadius = getEffectiveAllowedRadius(settings.geofence_radius);
 
@@ -199,6 +203,39 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         status: scanRes.status || 'HADIR',
       };
 
+      // 🌟 Hitung perolehan poin kedisiplinan
+      const isCheckIn = scanRes.attendance_action === 'CHECK_IN' || !scanRes.attendance_action;
+      const isLate = (scanRes.status || '').toUpperCase() === 'TERLAMBAT';
+      let earnedPoints = 0;
+      let pointReason = '';
+      let attendancePoints = 0;
+
+      if (isCheckIn) {
+        if (!isLate) {
+          attendancePoints = 15;
+          pointReason = 'Kehadiran Tepat Waktu (≤ 07:30 WIB)';
+        } else {
+          attendancePoints = 5;
+          pointReason = 'Kehadiran Masuk Sekolah (> 07:30 WIB)';
+        }
+        earnedPoints = attendancePoints;
+      }
+
+      if (earnedPoints > 0) {
+        setPointRewardData({
+          points: earnedPoints,
+          status: scanRes.status || 'HADIR',
+          reason: pointReason,
+          breakdown: {
+            attendance: attendancePoints,
+          },
+          teacherName: user.full_name,
+          timestamp: successData.timestamp,
+        });
+      } else {
+        setPointRewardData(null);
+      }
+
       setAttendanceSuccess(successData);
       onSuccess({
         timestamp: successData.timestamp,
@@ -219,13 +256,28 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     }
   };
 
+  const handleModalClose = () => {
+    if (attendanceSuccess && pointRewardData && pointRewardData.points > 0) {
+      setIsPointCelebrationOpen(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleCelebrationClose = () => {
+    setIsPointCelebrationOpen(false);
+    setPointRewardData(null);
+    onClose();
+  };
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Presensi Sidik Jari HP"
-      maxWidth="md"
-    >
+    <>
+      <Modal
+        isOpen={isOpen && !isPointCelebrationOpen}
+        onClose={handleModalClose}
+        title="Presensi Sidik Jari HP"
+        maxWidth="md"
+      >
       <div className="space-y-4 text-slate-800">
         {/* State 1: Presensi Sukses */}
         {attendanceSuccess ? (
@@ -263,7 +315,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
 
             <Button
               variant="primary"
-              onClick={onClose}
+              onClick={handleModalClose}
               className="w-full py-3 text-xs font-black min-h-11 bg-[#023246] hover:bg-[#0D7A5F]"
             >
               Selesai &amp; Kembali ke Beranda
@@ -407,7 +459,15 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
             </div>
           </>
         )}
-      </div>
-    </Modal>
+        </div>
+      </Modal>
+
+      {/* 🌟 Popup Apresiasi Poin Kedisiplinan (Tanpa Card) */}
+      <PointRewardCelebrationOverlay
+        isOpen={isPointCelebrationOpen}
+        onClose={handleCelebrationClose}
+        data={pointRewardData}
+      />
+    </>
   );
 };

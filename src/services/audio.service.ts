@@ -178,6 +178,43 @@ class SoundEffectsService {
 
 
   /**
+   * Suara Fanfare Kehormatan / Perolehan Poin Kedisiplinan
+   * Arpeggio Chime Emas Menanjak: G4 -> C5 -> E5 -> G5 -> B5 -> C6
+   */
+  public playPointRewardSound() {
+    if (this.isMuted) return;
+    if (typeof window === 'undefined') return;
+
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      // Golden celebratory arpeggio tones: G4, C5, E5, G5, B5, C6
+      const freqs = [392.00, 523.25, 659.25, 783.99, 987.77, 1046.50];
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'triangle';
+
+        const startTime = ctx.currentTime + idx * 0.09;
+        const duration = idx === freqs.length - 1 ? 0.65 : 0.25;
+
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.28, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      });
+    } catch {
+      this.playSuccess();
+    }
+  }
+
+  /**
    * Shortcut untuk suara GAGAL / ERROR
    */
   public playError() {
