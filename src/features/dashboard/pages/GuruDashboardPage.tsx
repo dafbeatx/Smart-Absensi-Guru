@@ -47,6 +47,7 @@ import {
   ArrowRight,
   LayoutGrid,
   FileSpreadsheet,
+  ClipboardCheck,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -1719,22 +1720,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   Menu Utama
                 </span>
                 <span className="text-[10px] font-semibold text-slate-400">
-                  4 Fitur Harian
+                  5 Layanan Utama
                 </span>
               </div>
 
-              {/* 4 Icon Utama Saja */}
-              <div className="grid grid-cols-4 gap-2">
+              {/* 5 Icon Utama */}
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                 {/* 1. Presensi */}
                 <button
                   type="button"
                   onClick={handleOpenAttendanceChoice}
                   className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                 >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                    <Fingerprint className="w-6 h-6 stroke-[1.8]" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <Fingerprint className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                     Presensi
                   </span>
                 </button>
@@ -1745,10 +1746,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   onClick={handleOpenLeaveModal}
                   className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                 >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                    <Clock className="w-6 h-6 stroke-[1.8]" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <Clock className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                     Izin Cuti
                   </span>
                 </button>
@@ -1759,10 +1760,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   onClick={() => setIsScheduleModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                 >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                    <Calendar className="w-6 h-6 stroke-[1.8]" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <Calendar className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                     Jadwal
                   </span>
                 </button>
@@ -1773,13 +1774,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   onClick={() => setIsRecapModalOpen(true)}
                   className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                 >
-                  <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                    <BarChart3 className="w-6 h-6 stroke-[1.8]" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <BarChart3 className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                     Rekap
                   </span>
                 </button>
+
+                {/* 5. Koreksi Soal (Aplikasi Input Nilai Eksternal) */}
+                <a
+                  href="https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  title="Koreksi Soal & Input Nilai"
+                >
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                    <ClipboardCheck className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                    <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                      Link
+                    </span>
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                    Koreksi
+                  </span>
+                </a>
               </div>
 
               {/* Tulisan & Tombol More: Pindah Layer ke Semua Fitur */}
@@ -2329,6 +2349,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Acara
                     </span>
                   </button>
+
+                  {/* Koreksi Soal & Input Nilai (Link Eksternal) */}
+                  <a
+                    href="https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    title="Koreksi Soal & Input Nilai"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <ClipboardCheck className="w-6 h-6 stroke-[1.8]" />
+                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                        Link
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Koreksi
+                    </span>
+                  </a>
 
                   {/* Terminal RFID Siswa (Jika Piket Aktif) */}
                   {isDutyTeacherToday && (

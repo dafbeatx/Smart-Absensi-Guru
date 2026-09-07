@@ -57,6 +57,16 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
     {
       category: 'Akademik & KBM',
       items: [
+        {
+          id: 'koreksi_soal',
+          title: 'Koreksi Soal & Input Nilai',
+          subtitle: 'Aplikasi koreksi lembar ujian & rekap nilai siswa',
+          icon: '📝',
+          action: () => {
+            onClose();
+            window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
+          },
+        },
         ...(onOpenStudentDirectoryModal
           ? [
               {
