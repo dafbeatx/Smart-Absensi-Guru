@@ -1761,6 +1761,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
                         {disciplineLeaderboard?.topTeacher?.position || 'Guru Pengajar'}
                       </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <div className="flex items-end gap-0.5 h-3.5 w-6 bg-amber-100/80 p-0.5 rounded">
+                          <div className="w-1 bg-amber-500 rounded-xs h-2.5" />
+                          <div className="w-1 bg-amber-500 rounded-xs h-3" />
+                          <div className="w-1 bg-amber-500 rounded-xs h-2" />
+                          <div className="w-1 bg-amber-500 rounded-xs h-3" />
+                        </div>
+                        <span className="text-[9px] font-bold text-amber-900">
+                          📊 {disciplineLeaderboard?.topTeacher?.hadirTepatWaktuCount ?? 0} Hari On-Time
+                        </span>
+                      </div>
                     </div>
                   </div>
 
