@@ -13,6 +13,7 @@ import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { logger } from '../../../utils/logger.utils';
 import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
+import { NotificationService } from '../../../services/notification-permission.service';
 import type { SystemSettings, UserProfile } from '../../../types/database.types';
 
 export interface BiometricAttendanceModalProps {
@@ -242,6 +243,12 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         distance: successData.distance,
         status: successData.status,
       });
+
+      if (isCheckIn) {
+        NotificationService.notifyTeacherCheckIn(user.full_name || 'Guru', successData.timestamp, user.id);
+      } else {
+        NotificationService.notifyTeacherCheckOut(user.full_name || 'Guru', successData.timestamp, user.id);
+      }
 
       logger.info('BiometricAttendanceModal', 'Attendance recorded successfully via Fingerprint:', successData);
     } catch (err: unknown) {

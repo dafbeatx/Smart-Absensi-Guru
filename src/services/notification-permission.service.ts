@@ -388,6 +388,31 @@ class NotificationPermissionService {
   }
 
   /**
+   * Helper: Kirim Web Push Notification melalui Vercel Serverless Function (/api/send-push)
+   * Mengirimkan notifikasi ke perangkat guru / admin / kepsek yang sedang offline/tertutup
+   */
+  public async triggerServerWebPush(params: {
+    targetRoles?: ('ADMIN' | 'KEPSEK' | 'GURU' | 'OPERATOR')[];
+    targetUserId?: string;
+    title: string;
+    body: string;
+    url?: string;
+    tag?: string;
+  }): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    try {
+      const res = await fetch('/api/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Helper: Trigger Notifikasi Guru Absen Masuk (Check-In)
    */
   public notifyTeacherCheckIn(teacherName: string, timeStr: string, userId?: string) {
@@ -402,6 +427,15 @@ class NotificationPermissionService {
       userId,
       roleTarget: 'ALL',
     });
+
+    // Otomatis kirimkan Web Push ke HP Admin & Kepsek di latar belakang
+    this.triggerServerWebPush({
+      targetRoles: ['ADMIN', 'KEPSEK'],
+      title: `🟢 Presensi Masuk: ${teacherName}`,
+      body: `Bapak/Ibu ${teacherName} telah melakukan presensi masuk pada pukul ${timeStr} WIB.`,
+      tag: `in_${userId || 'guru'}_${Date.now()}`,
+      url: '/?tab=TEACHERS',
+    }).catch(() => {});
   }
 
   /**
@@ -419,6 +453,15 @@ class NotificationPermissionService {
       userId,
       roleTarget: 'ALL',
     });
+
+    // Otomatis kirimkan Web Push ke HP Admin & Kepsek di latar belakang
+    this.triggerServerWebPush({
+      targetRoles: ['ADMIN', 'KEPSEK'],
+      title: `🔵 Presensi Pulang: ${teacherName}`,
+      body: `Bapak/Ibu ${teacherName} telah melakukan presensi pulang pada pukul ${timeStr} WIB.`,
+      tag: `out_${userId || 'guru'}_${Date.now()}`,
+      url: '/?tab=TEACHERS',
+    }).catch(() => {});
   }
 
   /**
@@ -461,6 +504,15 @@ class NotificationPermissionService {
       roleTarget: 'ALL',
       actionDate: targetDate,
     });
+
+    // Otomatis kirimkan Web Push ke HP Guru, Admin & Kepsek di latar belakang
+    this.triggerServerWebPush({
+      targetRoles: ['GURU', 'ADMIN', 'KEPSEK'],
+      title: customTitle || `💰 Hari Gajian Telah Tiba! (${targetDate})`,
+      body: customBody || `Selamat ${greeting}! Hari ini tanggal 10 adalah Hari Gajian. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang!`,
+      tag: `payday_${targetDate}_${reminderStatus || 'H'}`,
+      url: '/?tab=BERANDA',
+    }).catch(() => {});
   }
 
   /**
@@ -476,6 +528,15 @@ class NotificationPermissionService {
       teacherName,
       roleTarget: 'ADMIN',
     });
+
+    // Otomatis kirimkan Web Push ke HP Admin & Kepsek di latar belakang
+    this.triggerServerWebPush({
+      targetRoles: ['ADMIN', 'KEPSEK'],
+      title: `📝 Pengajuan Izin Baru: ${teacherName}`,
+      body: `${teacherName} mengajukan ${leaveType} (${reason}). Perlu persetujuan Kepala Sekolah/Admin.`,
+      tag: `leave_${Date.now()}`,
+      url: '/?tab=LEAVES',
+    }).catch(() => {});
   }
 
   /**
