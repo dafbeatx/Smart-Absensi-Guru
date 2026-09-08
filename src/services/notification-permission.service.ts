@@ -5,6 +5,42 @@
 
 import { SoundService } from './audio.service';
 import { pwaService } from './pwa.service';
+import { ProviderFactory } from '../providers/provider-factory';
+import { useAuthStore } from '../store/useAuthStore';
+
+/**
+ * Helper: Konversi URL-safe base64 string ke Uint8Array untuk VAPID applicationServerKey
+ */
+export function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData =
+    typeof window !== 'undefined'
+      ? window.atob(base64)
+      : Buffer.from(base64, 'base64').toString('binary');
+  const buffer = new ArrayBuffer(rawData.length);
+  const outputArray = new Uint8Array(buffer);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+/**
+ * Helper: Konversi ArrayBuffer ke Base64URL string
+ */
+function arrayBufferToBase64Url(buffer: ArrayBuffer | null): string {
+  if (!buffer) return '';
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+    return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  return Buffer.from(binary, 'binary').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 export interface AttendanceNotificationPayload {
   id?: string;
@@ -47,8 +83,9 @@ class NotificationPermissionService {
 
   /**
    * Minta Perizinan Notifikasi Browser ke Pengguna (Admin / Kepsek / Guru)
+   * dan otomatis mendaftarkan Web Push Subscription ke Supabase
    */
-  public async requestPermission(): Promise<boolean> {
+  public async requestPermission(userId?: string): Promise<boolean> {
     if (typeof window === 'undefined' || !('Notification' in window)) {
       console.warn('Browser ini tidak mendukung Web Notification API.');
       return false;
@@ -58,6 +95,11 @@ class NotificationPermissionService {
       const permission = await Notification.requestPermission();
       
       if (permission === 'granted') {
+        // Otomatis daftarkan Web Push Subscription ke Google FCM / Supabase di background
+        this.subscribeUserToPush(userId).catch((err) =>
+          console.warn('Silent failure subscribing user to push:', err)
+        );
+
         // Kirim konfirmasi notifikasi selamat datang
         this.sendNativeNotification({
           title: '🔔 Notifikasi Real-time Aktif!',
@@ -240,30 +282,108 @@ class NotificationPermissionService {
       SoundService.playSuccess();
     }
 
-    // 3. Kirim Native OS Browser Notification jika diizinkan
-    if (this.isPermissionGranted()) {
-      try {
-        const iconPath = '/pwa-192x192.png';
-        const notification = new Notification(payload.title, {
-          body: payload.body,
-          icon: iconPath,
-          badge: iconPath,
-          tag: `sag-notif-${Date.now()}`,
-          requireInteraction: false,
-        });
+    // 3. Kirim Native OS Browser Notification via Service Worker (Android & PWA Safe) dengan Fallback
+    if (this.isPermissionGranted() && typeof window !== 'undefined') {
+      const iconPath = '/pwa-192x192.png';
+      const notificationOptions: NotificationOptions = {
+        body: payload.body,
+        icon: iconPath,
+        badge: iconPath,
+        tag: payload.id || `sag-notif-${Date.now()}`,
+        requireInteraction: false,
+      };
 
-        notification.onclick = () => {
-          window.focus();
-          notification.close();
-        };
-      } catch (e) {
-        console.warn('Error displaying native notification:', e);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready
+          .then((registration) => {
+            return registration.showNotification(payload.title, notificationOptions);
+          })
+          .catch(() => {
+            try {
+              const notification = new Notification(payload.title, notificationOptions);
+              notification.onclick = () => {
+                window.focus();
+                notification.close();
+              };
+            } catch (e) {
+              console.warn('Fallback window notification error:', e);
+            }
+          });
+      } else {
+        try {
+          const notification = new Notification(payload.title, notificationOptions);
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+        } catch (e) {
+          console.warn('Error displaying native notification:', e);
+        }
       }
     }
 
     // 4. Dispatch internal custom event for instant UI bell & feed update
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smart_absensi_notification_pushed', { detail: payload }));
+    }
+  }
+
+  /**
+   * Daftarkan PushSubscription ke Google FCM / Apple APNs via ServiceWorker PushManager
+   * dan simpan endpoint ke Supabase Database
+   */
+  public async subscribeUserToPush(userId?: string): Promise<boolean> {
+    if (
+      typeof window === 'undefined' ||
+      !('serviceWorker' in navigator) ||
+      !('PushManager' in window)
+    ) {
+      console.warn('[PushManager] Web Push API tidak didukung pada browser ini.');
+      return false;
+    }
+
+    try {
+      const vapidPublicKey =
+        (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_VAPID_PUBLIC_KEY) ||
+        'BJxAOVY7XCFiipXVppN_IPu5rWUzXaLzhM33dytmGI6oQ0SES9Qspm3sTPYcz9euG1NhSOSZb8BHLShozXnotnI';
+
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedVapidKey as unknown as BufferSource,
+        });
+      }
+
+      if (!subscription) {
+        console.warn('[PushManager] Gagal memperoleh PushSubscription dari browser.');
+        return false;
+      }
+
+      const p256dh = arrayBufferToBase64Url(subscription.getKey('p256dh'));
+      const auth = arrayBufferToBase64Url(subscription.getKey('auth'));
+      const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent);
+
+      const effectiveUserId = userId || useAuthStore.getState().user?.id || 'unknown_user';
+      const provider = ProviderFactory.getProvider();
+
+      await provider.savePushSubscription({
+        user_id: effectiveUserId,
+        endpoint: subscription.endpoint,
+        p256dh,
+        auth,
+        device_type: isMobile ? 'MOBILE' : 'DESKTOP',
+        user_agent: navigator.userAgent,
+      });
+
+      console.info('[PushManager] Web Push Subscription berhasil tersimpan ke Supabase.');
+      return true;
+    } catch (error) {
+      console.warn('[PushManager] Error mendaftarkan push subscription:', error);
+      return false;
     }
   }
 

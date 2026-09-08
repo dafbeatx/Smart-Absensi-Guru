@@ -234,6 +234,12 @@ export class PermissionGuardService {
     try {
       const res = await notifAPI.requestPermission();
       if (res === 'granted') {
+        try {
+          const { NotificationService } = await import('./notification-permission.service');
+          NotificationService.subscribeUserToPush().catch(() => {});
+        } catch {
+          // ignore
+        }
         return { success: true, status: 'granted' };
       }
       return {

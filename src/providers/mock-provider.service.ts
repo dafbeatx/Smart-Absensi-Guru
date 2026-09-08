@@ -24,6 +24,7 @@ import type {
   RecordStudentBehaviorParams,
   VerificationMethod,
   AttendanceSource,
+  PushSubscriptionPayload,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -1798,6 +1799,47 @@ export class MockProvider implements IDataProvider {
     return [...record.behavior_logs].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
+  }
+
+  public async savePushSubscription(
+    subscription: PushSubscriptionPayload,
+    _token?: string
+  ): Promise<boolean> {
+    const raw = safeGetStorage('smart_absensi_push_subscriptions');
+    let list: PushSubscriptionPayload[] = [];
+    if (raw) {
+      try {
+        list = JSON.parse(raw);
+        if (!Array.isArray(list)) list = [];
+      } catch {
+        list = [];
+      }
+    }
+    const filtered = list.filter((s) => s.endpoint !== subscription.endpoint);
+    filtered.unshift({
+      ...subscription,
+      device_type: subscription.device_type || 'MOBILE',
+    });
+    safeSetStorage('smart_absensi_push_subscriptions', JSON.stringify(filtered));
+    return true;
+  }
+
+  public async deletePushSubscription(
+    endpoint: string,
+    _token?: string
+  ): Promise<boolean> {
+    const raw = safeGetStorage('smart_absensi_push_subscriptions');
+    if (!raw) return true;
+    try {
+      const list: PushSubscriptionPayload[] = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        const filtered = list.filter((s) => s.endpoint !== endpoint);
+        safeSetStorage('smart_absensi_push_subscriptions', JSON.stringify(filtered));
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 

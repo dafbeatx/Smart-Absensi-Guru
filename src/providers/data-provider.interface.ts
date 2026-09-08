@@ -19,6 +19,7 @@ import type {
   StudentBehaviorRecord,
   StudentBehaviorLog,
   RecordStudentBehaviorParams,
+  PushSubscriptionPayload,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -114,6 +115,10 @@ export interface IDataProvider {
     message: string;
   }>;
   getStudentBehaviorHistory(studentName: string, className: string, token?: string): Promise<StudentBehaviorLog[]>;
+
+  // Web Push Subscriptions API (VAPID)
+  savePushSubscription(subscription: PushSubscriptionPayload, token?: string): Promise<boolean>;
+  deletePushSubscription(endpoint: string, token?: string): Promise<boolean>;
 }
 
 

@@ -359,3 +359,19 @@ export interface CreateEmergencyAlertDTO {
   category: EmergencyCategory;
   notes?: string;
 }
+
+// Web Push Notifications Subscription
+export interface PushSubscriptionPayload {
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  device_type?: 'MOBILE' | 'DESKTOP' | 'TABLET' | 'UNKNOWN';
+  user_agent?: string;
+}
+
+export interface PushSubscriptionRecord extends PushSubscriptionPayload {
+  id: string;
+  created_at: string;
+  updated_at: string;
+}

@@ -12,6 +12,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'school-logo.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       workbox: {
+        importScripts: ['sw-push-handler.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {

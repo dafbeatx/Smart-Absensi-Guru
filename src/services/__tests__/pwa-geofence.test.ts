@@ -72,6 +72,33 @@ export async function runPWAGeofenceTestSuite(): Promise<TestSuiteResult> {
   }
   assert('NotificationService - scheduleCheckoutReminder and cancel execute safely', notifScheduleSafe);
 
+  // 9. VAPID Key URL-Safe Base64 to Uint8Array conversion
+  const { urlBase64ToUint8Array } = await import('../notification-permission.service');
+  const sampleVapid = 'BJxAOVY7XCFiipXVppN_IPu5rWUzXaLzhM33dytmGI6oQ0SES9Qspm3sTPYcz9euG1NhSOSZb8BHLShozXnotnI';
+  const uint8Vapid = urlBase64ToUint8Array(sampleVapid);
+  assert(
+    'Web Push VAPID - urlBase64ToUint8Array converts P-256 public key (65 bytes uncompressed point)',
+    uint8Vapid.length === 65 && uint8Vapid[0] === 4
+  );
+
+  // 10. Provider Push Subscription Save & Delete Lifecycle
+  const { ProviderFactory } = await import('../../providers/provider-factory');
+  const provider = ProviderFactory.getProvider();
+  const testSub = {
+    user_id: 'usr_test_push_123',
+    endpoint: 'https://fcm.googleapis.com/fcm/send/test_sub_endpoint_456',
+    p256dh: 'BNcRdreALRF8FsII...',
+    auth: 'tBHItDaAhsTBHig...',
+    device_type: 'MOBILE' as const,
+    user_agent: 'Test Browser',
+  };
+
+  const saveSubSuccess = await provider.savePushSubscription(testSub);
+  assert('Push Subscription - Provider saves subscription payload successfully', saveSubSuccess === true);
+
+  const deleteSubSuccess = await provider.deletePushSubscription(testSub.endpoint);
+  assert('Push Subscription - Provider deletes subscription endpoint successfully', deleteSubSuccess === true);
+
   return {
     suiteName: 'PWA & Interactive Geofence Map',
     passed,

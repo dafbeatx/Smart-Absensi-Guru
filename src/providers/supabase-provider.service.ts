@@ -26,6 +26,7 @@ import type {
   RecordStudentBehaviorParams,
   VerificationMethod,
   AttendanceSource,
+  PushSubscriptionPayload,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -2776,6 +2777,56 @@ export class SupabaseProvider implements IDataProvider {
 
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.getStudentBehaviorHistory(studentName, className);
+  }
+
+  public async savePushSubscription(subscription: PushSubscriptionPayload, _token?: string): Promise<boolean> {
+    try {
+      const payload = {
+        user_id: subscription.user_id,
+        endpoint: subscription.endpoint,
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+        device_type: subscription.device_type || 'MOBILE',
+        user_agent: subscription.user_agent || (typeof navigator !== 'undefined' ? navigator.userAgent : null),
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await this.client
+        .from('push_subscriptions')
+        .upsert(payload, { onConflict: 'endpoint' });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'savePushSubscription error (tabel mungkin belum dimigrasi):', error.message);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(`smart_absensi_push_sub_${subscription.user_id}`, JSON.stringify(payload));
+        }
+        return false;
+      }
+
+      logger.info('SupabaseProvider', 'Web push subscription saved successfully for user:', subscription.user_id);
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'savePushSubscription exception:', err);
+      return false;
+    }
+  }
+
+  public async deletePushSubscription(endpoint: string, _token?: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('push_subscriptions')
+        .delete()
+        .eq('endpoint', endpoint);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'deletePushSubscription error:', error.message);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'deletePushSubscription exception:', err);
+      return false;
+    }
   }
 }
 
