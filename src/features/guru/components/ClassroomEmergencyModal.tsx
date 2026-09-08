@@ -272,7 +272,7 @@ export const ClassroomEmergencyModal: React.FC<ClassroomEmergencyModalProps> = (
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
 
       {/* Main Modal Card: Ergonomic, Non-Overlapping & Viewport Constrained */}
-      <div className="relative w-full max-w-[460px] bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden z-10 animate-scale-up">
+      <div className="relative w-full max-w-115 bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden z-10 animate-scale-up">
         {/* ── 1. STICKY HEADER (Always visible at top, never covered) ────────── */}
         <div className="shrink-0 bg-white border-b border-slate-100 px-4 py-3">
           <div className="flex items-center justify-between gap-2">
@@ -452,7 +452,7 @@ export const ClassroomEmergencyModal: React.FC<ClassroomEmergencyModalProps> = (
                               setSelectedCategory(catKey);
                               setCallStep(2); // Auto-advance to Step 2 for speed
                             }}
-                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[76px] ${
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-19 ${
                               isSelected
                                 ? 'bg-rose-50/90 border-2 border-rose-500 shadow-2xs scale-[1.01]'
                                 : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
@@ -759,7 +759,7 @@ export const ClassroomEmergencyModal: React.FC<ClassroomEmergencyModalProps> = (
               <Button
                 type="button"
                 variant="primary"
-                className="flex-[2] bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-black text-xs h-11 rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-2 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-black text-xs h-11 rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                 onClick={() => setCallStep(2)}
               >
                 <span>Lanjut: Ruang &amp; Kirim</span>
@@ -783,7 +783,7 @@ export const ClassroomEmergencyModal: React.FC<ClassroomEmergencyModalProps> = (
                 type="button"
                 disabled={isSubmitting || !roomName.trim()}
                 variant="primary"
-                className="flex-[2] bg-linear-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-98 text-white font-black text-xs h-11 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-1.5 border-none disabled:opacity-50"
+                className="flex-2 bg-linear-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-98 text-white font-black text-xs h-11 rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-1.5 border-none disabled:opacity-50"
                 onClick={() => handleSendSOS()}
               >
                 <ShieldAlert className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
