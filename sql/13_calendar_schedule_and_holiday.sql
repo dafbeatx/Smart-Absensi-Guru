@@ -8,32 +8,48 @@
 -- https://supabase.com/dashboard/project/_/sql
 -- ============================================================================
 
--- 1. Tambahkan kolom 'category_type' ke tabel holidays
--- Nilai: 'HOLIDAY' (Hari Libur) atau 'SCHEDULE' (Jadwal Agenda Acara)
-ALTER TABLE public.holidays 
-ADD COLUMN IF NOT EXISTS category_type TEXT DEFAULT 'HOLIDAY';
+-- 1. Pastikan tabel 'holidays' sudah ada (Idempotent DDL)
+CREATE TABLE IF NOT EXISTS public.holidays (
+  id TEXT PRIMARY KEY,
+  date DATE NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT DEFAULT 'SCHOOL_HOLIDAY',
+  category_type TEXT DEFAULT 'HOLIDAY',
+  is_holiday BOOLEAN DEFAULT TRUE,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
--- 2. Tambahkan kolom 'is_holiday' (BOOLEAN)
--- TRUE  = Membuat guru libur (presensi dinonaktifkan)
--- FALSE = Tidak membuat guru libur (pengingat acara, KBM/presensi tetap wajib)
-ALTER TABLE public.holidays 
-ADD COLUMN IF NOT EXISTS is_holiday BOOLEAN DEFAULT TRUE;
+-- 2. Tambahkan kolom 'category_type' & 'is_holiday' jika tabel sudah ada sebelumnya
+ALTER TABLE public.holidays ADD COLUMN IF NOT EXISTS category_type TEXT DEFAULT 'HOLIDAY';
+ALTER TABLE public.holidays ADD COLUMN IF NOT EXISTS is_holiday BOOLEAN DEFAULT TRUE;
 
--- 3. Update data lama jika ada yang bertipe acara/agenda khusus
+-- 3. Row Level Security (RLS) Policies
+ALTER TABLE public.holidays ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "holidays_select" ON public.holidays;
+CREATE POLICY "holidays_select" ON public.holidays FOR SELECT USING (true);
+DROP POLICY IF EXISTS "holidays_insert" ON public.holidays;
+CREATE POLICY "holidays_insert" ON public.holidays FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "holidays_update" ON public.holidays;
+CREATE POLICY "holidays_update" ON public.holidays FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "holidays_delete" ON public.holidays;
+CREATE POLICY "holidays_delete" ON public.holidays FOR DELETE USING (true);
+
+-- 4. Update data lama jika ada yang bertipe acara/agenda khusus
 UPDATE public.holidays
 SET 
   category_type = 'SCHEDULE',
   is_holiday = FALSE
 WHERE type IN ('OTHER', 'RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP');
 
--- 4. Indeks untuk performa query pencarian kalender per rentang tanggal
+-- 5. Indeks untuk performa query pencarian kalender per rentang tanggal
 CREATE INDEX IF NOT EXISTS idx_holidays_date_category 
 ON public.holidays (date, category_type);
 
--- 5. Muat ulang cache skema Supabase PostgREST
+-- 6. Muat ulang cache skema Supabase PostgREST
 NOTIFY pgrst, 'reload schema';
 
--- 6. Insert Otomatis Jadwal Agenda Rutin: Hari Gajian Guru & Staf (Setiap Bulan Tanggal 10)
+-- 7. Insert Otomatis Jadwal Agenda Rutin: Hari Gajian Guru & Staf (Setiap Bulan Tanggal 10)
 -- Kategori: SCHEDULE, is_holiday: FALSE (Tetap Masuk & Presensi Normal)
 INSERT INTO public.holidays (id, date, name, type, category_type, is_holiday, description)
 VALUES
