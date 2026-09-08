@@ -26,6 +26,11 @@ import { AttendancePermissionBlockedModal } from '../../guru/components/Attendan
 import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricEnrollmentPromptModal';
 import { StudentBehaviorModal } from '../../guru/components/StudentBehaviorModal';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
+import {
+  CustomizeQuickIconsModal,
+  ALL_QUICK_ICONS,
+  DEFAULT_8_QUICK_ICONS,
+} from '../../guru/components/CustomizeQuickIconsModal';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
   Radio,
@@ -53,6 +58,7 @@ import {
   Sparkles,
   AlertTriangle,
   ShieldAlert,
+  Settings2,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -324,6 +330,91 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [activeEmergencies, setActiveEmergencies] = useState<ClassroomEmergencyAlert[]>([]);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
+
+  // 8 Quick Icons Customization State
+  const [isCustomizeIconsModalOpen, setIsCustomizeIconsModalOpen] = useState(false);
+  const [quickIconIds, setQuickIconIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(`smart_absensi_quick_icons_${effectiveUser?.id || 'default'}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length === 8) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_8_QUICK_ICONS;
+  });
+
+  const handleSaveQuickIcons = (newIds: string[]) => {
+    setQuickIconIds(newIds);
+    try {
+      localStorage.setItem(`smart_absensi_quick_icons_${effectiveUser?.id || 'default'}`, JSON.stringify(newIds));
+    } catch {
+      // ignore
+    }
+    showToast('success', 'Menu Utama Diperbarui', 'Susunan 8 ikon menu utama berhasil disimpan!');
+  };
+
+  const handleQuickIconClick = (iconId: string) => {
+    switch (iconId) {
+      case 'presensi':
+        handleOpenAttendanceChoice();
+        break;
+      case 'izin_cuti':
+        handleOpenLeaveModal();
+        break;
+      case 'jadwal':
+        setIsScheduleModalOpen(true);
+        break;
+      case 'rekap':
+        setIsRecapModalOpen(true);
+        break;
+      case 'koreksi':
+        handleOpenCorrectionModal();
+        break;
+      case 'koreksi_soal':
+        window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
+        break;
+      case 'direktori_siswa':
+        setIsStudentDirectoryModalOpen(true);
+        break;
+      case 'kalender':
+        setIsEventsCalendarModalOpen(true);
+        break;
+      case 'classroom':
+        setIsClassroomModalOpen(true);
+        break;
+      case 'materials':
+        setIsTeachingMaterialsModalOpen(true);
+        break;
+      case 'student_good':
+        setStudentBehaviorInitialTab('KEBAIKAN');
+        setIsStudentBehaviorModalOpen(true);
+        break;
+      case 'student_discipline':
+        setStudentBehaviorInitialTab('KEDISIPLINAN');
+        setIsStudentBehaviorModalOpen(true);
+        break;
+      case 'emergency':
+        setIsEmergencyModalOpen(true);
+        break;
+      case 'location':
+        setIsLocationModalOpen(true);
+        break;
+      case 'student_kiosk':
+        setIsStudentKioskOpen(true);
+        break;
+      case 'complaint':
+        setIsComplaintModalOpen(true);
+        break;
+      case 'mood':
+        setIsMoodModalOpen(true);
+        break;
+      default:
+        setIsMoreFeaturesModalOpen(true);
+    }
+  };
 
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -1810,93 +1901,62 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
             </section>
 
-            {/* 🌟 3. FITUR UTAMA GURU (4 ICON PENTING + MORE LAYER) ─────────── */}
+            {/* 🌟 3. FITUR UTAMA GURU (8 IKON KUSTOM: 2 BARIS X 4 KOLOM) ─────────── */}
             <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3.5">
               <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Menu Utama
-                </span>
-                <span className="text-[10px] font-semibold text-slate-400">
-                  5 Layanan Utama
-                </span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    Menu Utama
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    8 Layanan Pilihan
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomizeIconsModalOpen(true)}
+                  className="px-2 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-600 text-[10.5px] font-bold border border-slate-200/80 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                  title="Atur Susunan 8 Ikon Menu Utama"
+                >
+                  <Settings2 className="w-3 h-3 text-slate-500" />
+                  <span>Atur Ikon</span>
+                </button>
               </div>
 
-              {/* 5 Icon Utama */}
-              <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-                {/* 1. Presensi */}
-                <button
-                  type="button"
-                  onClick={handleOpenAttendanceChoice}
-                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                    <Fingerprint className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                    Presensi
-                  </span>
-                </button>
+              {/* 8 Icon Grid: 2 Baris x 4 Kolom */}
+              <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
+                {quickIconIds.map((iconId) => {
+                  const item = ALL_QUICK_ICONS.find((i) => i.id === iconId) || ALL_QUICK_ICONS[0];
+                  const IconComponent = item.icon;
+                  const isExternal = item.id === 'koreksi_soal';
 
-                {/* 2. Izin & Cuti */}
-                <button
-                  type="button"
-                  onClick={handleOpenLeaveModal}
-                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                    <Clock className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                    Izin Cuti
-                  </span>
-                </button>
-
-                {/* 3. Jadwal KBM */}
-                <button
-                  type="button"
-                  onClick={() => setIsScheduleModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                    <Calendar className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                    Jadwal
-                  </span>
-                </button>
-
-                {/* 4. Rekap Presensi */}
-                <button
-                  type="button"
-                  onClick={() => setIsRecapModalOpen(true)}
-                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
-                    <BarChart3 className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
-                    Rekap
-                  </span>
-                </button>
-
-                {/* 5. Koreksi Soal (Aplikasi Input Nilai Eksternal) */}
-                <a
-                  href="https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
-                  title="Koreksi Soal & Input Nilai"
-                >
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
-                    <ClipboardCheck className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
-                    <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
-                      Link
-                    </span>
-                  </div>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center w-full">
-                    Koreksi Soal
-                  </span>
-                </a>
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleQuickIconClick(item.id)}
+                      className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                      title={item.description}
+                    >
+                      <div
+                        className={`w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-linear-to-b ${item.colorClass} text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative`}
+                      >
+                        <IconComponent className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.8]" />
+                        {isExternal && (
+                          <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                            Link
+                          </span>
+                        )}
+                        {item.id === 'emergency' && activeEmergencies.length > 0 && (
+                          <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-600 rounded-full animate-ping ring-2 ring-white" />
+                        )}
+                      </div>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                        {item.title}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Poin Karakter Siswa: Kebaikan & Kedisiplinan (Sinkron GradeMaster OS) */}
@@ -3775,6 +3835,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           setIsStudentBehaviorModalOpen(true);
         }}
         onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+      />
+
+      {/* ⚙️ Modal Kustomisasi 8 Ikon Menu Utama Guru */}
+      <CustomizeQuickIconsModal
+        isOpen={isCustomizeIconsModalOpen}
+        onClose={() => setIsCustomizeIconsModalOpen(false)}
+        currentIconIds={quickIconIds}
+        onSave={handleSaveQuickIcons}
       />
 
       {/* 🚨 Panggilan Bantuan Darurat Kelas (SOS UKS / Piket) */}
