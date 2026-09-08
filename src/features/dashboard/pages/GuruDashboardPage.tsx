@@ -25,6 +25,7 @@ import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKi
 import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
 import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricEnrollmentPromptModal';
 import { StudentBehaviorModal } from '../../guru/components/StudentBehaviorModal';
+import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
   Radio,
@@ -51,6 +52,7 @@ import {
   ClipboardCheck,
   Sparkles,
   AlertTriangle,
+  ShieldAlert,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -78,6 +80,10 @@ import {
   TeachingScheduleRepository,
   TEACHING_SCHEDULES_UPDATED_EVENT,
 } from '../../../repositories/TeachingScheduleRepository';
+import {
+  EmergencyRepository,
+  EMERGENCY_UPDATED_EVENT,
+} from '../../../repositories/EmergencyRepository';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import {
   calculateTeacherAppreciationScore,
@@ -99,6 +105,7 @@ import type {
   TeacherDutySchedule,
   TeachingSlot,
   TeacherComplaint,
+  ClassroomEmergencyAlert,
 } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
@@ -314,6 +321,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
   const [isStudentBehaviorModalOpen, setIsStudentBehaviorModalOpen] = useState(false);
   const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
+  const [activeEmergencies, setActiveEmergencies] = useState<ClassroomEmergencyAlert[]>([]);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // Notifications List State (Backend-Driven)
@@ -965,6 +974,33 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
   }, [effectiveUser?.id, effectiveUser?.full_name, token]);
 
+  // Real-time Classroom Emergency Alerts (SOS UKS & Piket) Listener
+  useEffect(() => {
+    const handleEmergencyUpdated = () => {
+      EmergencyRepository.getActiveAlerts(token || undefined).then((activeSos) => {
+        setActiveEmergencies((prev) => {
+          if (activeSos.length > prev.length) {
+            SoundService.playEmergencyAlert();
+          }
+          return activeSos;
+        });
+      });
+    };
+
+    window.addEventListener(EMERGENCY_UPDATED_EVENT, handleEmergencyUpdated);
+    window.addEventListener('storage', handleEmergencyUpdated);
+
+    // Initial load
+    EmergencyRepository.getActiveAlerts(token || undefined).then((activeSos) => {
+      setActiveEmergencies(activeSos);
+    });
+
+    return () => {
+      window.removeEventListener(EMERGENCY_UPDATED_EVENT, handleEmergencyUpdated);
+      window.removeEventListener('storage', handleEmergencyUpdated);
+    };
+  }, [token]);
+
   useCrossDeviceSync({
     onSync: handleCrossDeviceSync,
     cooldownMs: 30000,
@@ -1432,6 +1468,47 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <main className="px-4 -mt-3.5 pb-24 space-y-3.5 w-full max-w-120 mx-auto">
         <NotificationPermissionBanner />
         <PWAInstallPrompt />
+
+        {/* 🚨 CLASSROOM EMERGENCY ALERT BANNER (High-Priority Realtime Alert for Piket & Teachers) */}
+        {activeEmergencies.length > 0 && (
+          <div className="bg-linear-to-r from-rose-600 to-red-700 text-white rounded-2xl p-3.5 shadow-lg border-2 border-amber-300 animate-pulse space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="p-2 bg-white text-rose-600 rounded-xl shadow-xs shrink-0 animate-bounce">
+                  <ShieldAlert className="w-5 h-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 text-[9px] font-black rounded-md tracking-wider uppercase">
+                      SOS KELAS AKTIF
+                    </span>
+                    <span className="text-[10px] text-rose-100 font-bold">
+                      {activeEmergencies.length} Panggilan Membutuhkan Bantuan
+                    </span>
+                  </div>
+                  <p className="text-xs font-black truncate leading-tight mt-0.5">
+                    📍 {activeEmergencies[0].room_name}
+                    {activeEmergencies[0].class_name ? ` (${activeEmergencies[0].class_name})` : ''} • {activeEmergencies[0].teacher_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEmergencyModalOpen(true)}
+                className="px-3 py-2 bg-white hover:bg-rose-50 active:scale-95 text-rose-700 font-black text-xs rounded-xl shadow-xs shrink-0 cursor-pointer transition-all"
+              >
+                Lihat &amp; Tangani
+              </button>
+            </div>
+
+            {isDutyTeacherToday && (
+              <div className="bg-black/25 rounded-xl px-2.5 py-1.5 text-[10px] font-bold text-amber-200 flex items-center gap-1.5 border border-amber-400/30">
+                <span>⚠️</span>
+                <span>Anda bertugas sebagai Guru Piket hari ini. Segera menuju lokasi bantuan!</span>
+              </div>
+            )}
+          </div>
+        )}
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
           <>
@@ -1870,6 +1947,39 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                   </button>
                 </div>
+              </div>
+
+              {/* 🚨 Quick Emergency Call (SOS UKS / Piket) */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEmergencyModalOpen(true)}
+                  className="w-full p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-rose-50 to-red-50/70 hover:from-rose-100/80 hover:to-red-100/80 active:scale-[0.98] border border-rose-200/90 flex items-center justify-between transition-all cursor-pointer group shadow-2xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                      <ShieldAlert className="w-4 h-4 text-amber-300" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[11px] sm:text-xs font-black text-rose-950 truncate leading-tight">
+                          🚨 Panggilan Darurat Kelas (SOS)
+                        </p>
+                        {activeEmergencies.length > 0 && (
+                          <span className="px-1.5 py-0.2 text-[8px] font-black bg-rose-600 text-white rounded-full">
+                            {activeEmergencies.length} Aktif
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[9px] sm:text-[10px] font-semibold text-rose-700/90 truncate">
+                        Panggil Guru Piket &amp; UKS (Siswa pingsan / cedera)
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-rose-700 group-hover:text-rose-900 shrink-0 px-2 py-1 rounded-lg bg-white/80 border border-rose-200">
+                    Panggil SOS →
+                  </span>
+                </button>
               </div>
 
               {/* Tulisan & Tombol More: Pindah Layer ke Semua Fitur */}
@@ -2497,6 +2607,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   Layanan &amp; Pengaturan
                 </h3>
                 <div className="grid grid-cols-4 gap-y-4 gap-x-2">
+                  {/* Panggilan Darurat Kelas (SOS UKS & Piket) */}
+                  <button
+                    type="button"
+                    onClick={() => setIsEmergencyModalOpen(true)}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-rose-600 to-red-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <ShieldAlert className="w-6 h-6 stroke-[1.8] text-amber-300" />
+                      {activeEmergencies.length > 0 && (
+                        <span className="absolute -top-1 -right-1 px-1.5 py-0.2 text-[8px] font-black bg-white text-rose-700 rounded-full min-w-3 text-center ring-2 ring-rose-600 animate-bounce">
+                          {activeEmergencies.length}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-rose-700 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      SOS Kelas
+                    </span>
+                  </button>
+
                   {/* Pengumuman */}
                   <button
                     type="button"
@@ -3634,6 +3763,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           setStudentBehaviorInitialTab(tab || 'KEBAIKAN');
           setIsStudentBehaviorModalOpen(true);
         }}
+        onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+      />
+
+      {/* 🚨 Panggilan Bantuan Darurat Kelas (SOS UKS / Piket) */}
+      <ClassroomEmergencyModal
+        isOpen={isEmergencyModalOpen}
+        onClose={() => setIsEmergencyModalOpen(false)}
+        currentUser={effectiveUser}
+        teachingSlots={teachingSlots}
+        dutyTeachersToday={fellowDutyTeachers.concat(todayDutyDetails ? [todayDutyDetails] : [])}
       />
 
       {/* Poin Kedisiplinan & Poin Kebaikan Siswa (Sinkron GradeMaster OS) */}

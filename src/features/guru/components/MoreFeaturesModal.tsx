@@ -19,6 +19,7 @@ interface MoreFeaturesModalProps {
   onOpenTeachingMaterialsModal?: () => void;
   onOpenEventsCalendarModal?: () => void;
   onOpenStudentBehaviorModal?: (tab?: 'KEBAIKAN' | 'KEDISIPLINAN') => void;
+  onOpenEmergencyModal?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -39,6 +40,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenTeachingMaterialsModal,
   onOpenEventsCalendarModal,
   onOpenStudentBehaviorModal,
+  onOpenEmergencyModal,
 }) => {
   if (!isOpen) return null;
 
@@ -192,6 +194,25 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 action: () => {
                   onClose();
                   onOpenStudentKiosk();
+                },
+              },
+            ]
+          : []),
+      ],
+    },
+    {
+      category: 'Bantuan & Tanggap Darurat',
+      items: [
+        ...(onOpenEmergencyModal
+          ? [
+              {
+                id: 'classroom_emergency',
+                title: 'Panggilan Bantuan Darurat Kelas (SOS)',
+                subtitle: 'Panggil Guru Piket & Tim UKS instan dengan deteksi ruang kelas otomatis',
+                icon: '🚨',
+                action: () => {
+                  onClose();
+                  onOpenEmergencyModal();
                 },
               },
             ]

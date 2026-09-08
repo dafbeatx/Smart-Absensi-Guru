@@ -321,5 +321,29 @@ export interface GradeMasterBehaviorCategory {
   icon?: string;
 }
 
+// Classroom Emergency (SOS UKS & Guru Piket)
+export type EmergencyCategory = 'MEDIS_UKS' | 'DISIPLIN_PERKELAHIAN' | 'LAB_K3' | 'LAINNYA';
+export type EmergencyStatus = 'ACTIVE' | 'RESPONDED' | 'RESOLVED' | 'CANCELLED';
 
+export interface ClassroomEmergencyAlert {
+  id: string;
+  teacher_id: string;
+  teacher_name: string;
+  room_name: string;
+  class_name?: string;
+  category: EmergencyCategory;
+  notes?: string;
+  status: EmergencyStatus;
+  responded_by?: string;
+  responded_at?: string;
+  resolved_at?: string;
+  resolution_notes?: string;
+  created_at: string;
+}
 
+export interface CreateEmergencyAlertDTO {
+  room_name: string;
+  class_name?: string;
+  category: EmergencyCategory;
+  notes?: string;
+}

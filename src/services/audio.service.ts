@@ -269,6 +269,37 @@ class SoundEffectsService {
   }
 
   /**
+   * Suara Peringatan Panggilan Darurat Kelas (SOS Alert - nada sirine lembut berulang)
+   */
+  public playEmergencyAlert() {
+    if (this.isMuted) return;
+    if (typeof window === 'undefined') return;
+
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = new AudioCtx();
+      const freqs = [880, 659, 880, 659];
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'triangle';
+        const startTime = ctx.currentTime + idx * 0.18;
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0.35, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.16);
+        osc.start(startTime);
+        osc.stop(startTime + 0.16);
+      });
+    } catch {
+      this.play('WARNING');
+    }
+  }
+
+  /**
    * Synthesizer fallback menggunakan Web Audio API (Otomatis berbunyi nada jika file MP3 belum di-copy)
    */
   private playSynthesizedTone(type: SoundType) {
