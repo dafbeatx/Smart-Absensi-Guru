@@ -1223,14 +1223,24 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getHolidays(_token?: string): Promise<HolidayRecord[]> {
     const { data } = await this.client.from('holidays').select('*').order('date', { ascending: true });
-    return (data || []).map((row) => ({
-      id: row.id,
-      date: row.date,
-      name: row.name,
-      type: (row.type || 'SCHOOL_HOLIDAY') as HolidayType,
-      description: row.description,
-      created_at: row.created_at,
-    }));
+    return (data || []).map((row) => {
+      const isSchedule =
+        row.category_type === 'SCHEDULE' ||
+        row.is_holiday === false ||
+        (row.is_holiday === undefined &&
+          ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP', 'OTHER'].includes(row.type));
+
+      return {
+        id: row.id,
+        date: row.date,
+        name: row.name,
+        type: (row.type || 'SCHOOL_HOLIDAY') as HolidayType,
+        category_type: (row.category_type || (isSchedule ? 'SCHEDULE' : 'HOLIDAY')) as 'HOLIDAY' | 'SCHEDULE',
+        is_holiday: row.is_holiday !== undefined ? Boolean(row.is_holiday) : !isSchedule,
+        description: row.description,
+        created_at: row.created_at,
+      };
+    });
   }
 
   public async createHoliday(
@@ -1238,25 +1248,48 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<HolidayRecord> {
     const newId = `hol_${Date.now()}`;
+    const isSchedule =
+      holiday.category_type === 'SCHEDULE' ||
+      holiday.is_holiday === false ||
+      (holiday.is_holiday === undefined &&
+        ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP', 'OTHER'].includes(holiday.type));
+
     const fullRec = {
       id: newId,
       date: holiday.date,
       name: holiday.name,
       type: holiday.type || 'SCHOOL_HOLIDAY',
+      category_type: holiday.category_type || (isSchedule ? 'SCHEDULE' : 'HOLIDAY'),
+      is_holiday: holiday.is_holiday !== undefined ? holiday.is_holiday : !isSchedule,
       description: holiday.description,
     };
 
     let { error } = await this.client.from('holidays').insert(fullRec);
 
-    // Fallback retry if 'type' column is missing in Supabase schema cache
-    if (error && (error.message.includes("Could not find the 'type' column") || error.code === 'PGRST204')) {
-      logger.warn('SupabaseProvider', "'type' column missing on holidays table. Retrying insert without 'type' column...");
-      const { type, ...recWithoutType } = fullRec;
-      const retry = await this.client.from('holidays').insert(recWithoutType);
-      error = retry.error;
+    // Fallback retry if 'category_type' / 'is_holiday' / 'type' column is missing in Supabase schema cache
+    if (
+      error &&
+      (error.message.includes("Could not find the 'category_type' column") ||
+        error.message.includes("Could not find the 'is_holiday' column") ||
+        error.message.includes("Could not find the 'type' column") ||
+        error.code === 'PGRST204')
+    ) {
+      logger.warn('SupabaseProvider', 'New columns missing on holidays table. Retrying insert with base columns...');
+      const { category_type, is_holiday, type, ...basicRec } = fullRec;
+      const retry = await this.client.from('holidays').insert({
+        ...basicRec,
+        type: fullRec.type,
+      });
+      if (retry.error) {
+        // Retry with pure minimal columns
+        const minimalRetry = await this.client.from('holidays').insert(basicRec);
+        error = minimalRetry.error;
+      } else {
+        error = null;
+      }
     }
 
-    if (error) throw new Error('Gagal menambahkan hari libur: ' + error.message);
+    if (error) throw new Error('Gagal menambahkan hari libur / agenda: ' + error.message);
 
     return {
       ...fullRec,
@@ -1271,22 +1304,30 @@ export class SupabaseProvider implements IDataProvider {
   ): Promise<HolidayRecord> {
     let { error } = await this.client.from('holidays').update(holiday).eq('id', id);
 
-    // Fallback retry if 'type' column is missing in Supabase schema cache
-    if (error && (error.message.includes("Could not find the 'type' column") || error.code === 'PGRST204')) {
-      logger.warn('SupabaseProvider', "'type' column missing on holidays table. Retrying update without 'type' column...");
+    // Fallback retry if 'category_type' / 'is_holiday' / 'type' column is missing in Supabase schema cache
+    if (
+      error &&
+      (error.message.includes("Could not find the 'category_type' column") ||
+        error.message.includes("Could not find the 'is_holiday' column") ||
+        error.message.includes("Could not find the 'type' column") ||
+        error.code === 'PGRST204')
+    ) {
+      logger.warn('SupabaseProvider', 'New columns missing on holidays table. Retrying update with base columns...');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { type, ...holidayWithoutType } = holiday as any;
-      const retry = await this.client.from('holidays').update(holidayWithoutType).eq('id', id);
+      const { category_type, is_holiday, ...basicHoliday } = holiday as any;
+      const retry = await this.client.from('holidays').update(basicHoliday).eq('id', id);
       error = retry.error;
     }
 
-    if (error) throw new Error('Gagal memperbarui hari libur: ' + error.message);
+    if (error) throw new Error('Gagal memperbarui hari libur / agenda: ' + error.message);
 
     return {
       id,
       date: holiday.date || '',
       name: holiday.name || '',
       type: holiday.type || 'SCHOOL_HOLIDAY',
+      category_type: holiday.category_type,
+      is_holiday: holiday.is_holiday,
       description: holiday.description,
       created_at: new Date().toISOString(),
     };

@@ -128,7 +128,13 @@ export function getCurrentTimeInJakarta(timeZone: string = 'Asia/Jakarta'): stri
 export function isDateOffDay(
   targetDate: string | Date = new Date(),
   settings?: { saturday_is_holiday?: boolean; sunday_is_holiday?: boolean } | null,
-  holidays?: Array<{ date: string; name: string }> | null
+  holidays?: Array<{
+    date: string;
+    name: string;
+    is_holiday?: boolean;
+    category_type?: string;
+    type?: string;
+  }> | null
 ): { isOff: boolean; reason: string } {
   let dateIso = '';
   let dayOfWeek = 0;
@@ -178,8 +184,22 @@ export function isDateOffDay(
   }
 
   // 1. Check explicit holiday record first
+  // HANYA record yang bertipe Hari Libur resmi yang membuat libur (is_holiday !== false && category_type !== 'SCHEDULE')
+  // Record yang bertipe 'SCHEDULE' (Rapat, UTS/UAS, Upacara, dll) adalah pengingat agenda dan TIDAK membuat guru libur.
   if (effectiveHolidays && effectiveHolidays.length > 0 && dateIso) {
-    const matchedHoliday = effectiveHolidays.find((h) => h.date === dateIso);
+    const matchedHoliday = effectiveHolidays.find((h) => {
+      if (h.date !== dateIso) return false;
+      if (h.is_holiday === false) return false;
+      if (h.category_type === 'SCHEDULE') return false;
+      if (
+        h.is_holiday === undefined &&
+        (h.type === 'RAPAT' || h.type === 'UJIAN' || h.type === 'UPACARA' || h.type === 'WORKSHOP' || h.type === 'OTHER')
+      ) {
+        return false;
+      }
+      return true;
+    });
+
     if (matchedHoliday) {
       return { isOff: true, reason: `Hari Libur: ${matchedHoliday.name}` };
     }

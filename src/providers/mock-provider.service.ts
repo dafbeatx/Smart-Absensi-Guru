@@ -1075,25 +1075,30 @@ export class MockProvider implements IDataProvider {
     }
 
     const defaultHolidays: HolidayRecord[] = [
-      { id: 'hol_1001', date: '2026-01-01', name: 'Tahun Baru 2026 Masehi', type: 'NATIONAL_HOLIDAY', description: 'Libur Nasional', created_at: new Date().toISOString() },
-      { id: 'hol_1002', date: '2026-01-16', name: 'Isra Mikraj Nabi Muhammad SAW', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1003', date: '2026-02-17', name: 'Tahun Baru Imlek 2577 Kongzili', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1004', date: '2026-03-19', name: 'Hari Raya Nyepi (Saka 1948)', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1005', date: '2026-03-20', name: 'Hari Raya Idul Fitri 1447 H (Hari 1)', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1006', date: '2026-03-21', name: 'Hari Raya Idul Fitri 1447 H (Hari 2)', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1007', date: '2026-03-22', name: 'Cuti Bersama Idul Fitri 1447 H', type: 'CUTI_BERSAMA', description: 'Cuti Bersama Pemerintah', created_at: new Date().toISOString() },
-      { id: 'hol_1008', date: '2026-03-23', name: 'Cuti Bersama Idul Fitri 1447 H', type: 'CUTI_BERSAMA', description: 'Cuti Bersama Pemerintah', created_at: new Date().toISOString() },
-      { id: 'hol_1009', date: '2026-04-03', name: 'Wafat Yesus Kristus', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1010', date: '2026-05-01', name: 'Hari Buruh Internasional', type: 'NATIONAL_HOLIDAY', description: 'Libur Nasional', created_at: new Date().toISOString() },
-      { id: 'hol_1011', date: '2026-05-14', name: 'Kenaikan Yesus Kristus', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1012', date: '2026-05-27', name: 'Hari Raya Waisak 2570 BE', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1013', date: '2026-06-01', name: 'Hari Lahir Pancasila', type: 'NATIONAL_HOLIDAY', description: 'Libur Nasional', created_at: new Date().toISOString() },
-      { id: 'hol_1014', date: '2026-06-22', name: 'Libur Kenaikan Kelas (Semester Genap)', type: 'SCHOOL_HOLIDAY', description: 'Libur Sekolah Terpadu', created_at: new Date().toISOString() },
-      { id: 'hol_1015', date: '2026-06-23', name: 'Libur Kenaikan Kelas (Semester Genap)', type: 'SCHOOL_HOLIDAY', description: 'Libur Sekolah Terpadu', created_at: new Date().toISOString() },
-      { id: 'hol_1016', date: '2026-08-17', name: 'Proklamasi Kemerdekaan RI Ke-81', type: 'NATIONAL_HOLIDAY', description: 'HUT Kemerdekaan Indonesia', created_at: new Date().toISOString() },
-      { id: 'hol_1017', date: '2026-08-25', name: 'Maulid Nabi Muhammad SAW', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1018', date: '2026-12-25', name: 'Hari Raya Natal', type: 'NATIONAL_HOLIDAY', description: 'Libur Keagamaan', created_at: new Date().toISOString() },
-      { id: 'hol_1019', date: '2026-12-28', name: 'Libur Akhir Semester Ganjil T.A 2026/2027', type: 'SCHOOL_HOLIDAY', description: 'Libur Semester Sekolah', created_at: new Date().toISOString() },
+      { id: 'hol_1001', date: '2026-01-01', name: 'Tahun Baru 2026 Masehi', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Nasional', created_at: new Date().toISOString() },
+      { id: 'hol_1002', date: '2026-01-05', name: 'Rapat Dinas Awal Semester Genap', type: 'RAPAT', category_type: 'SCHEDULE', is_holiday: false, description: 'Rapat koordinasi guru dan wali kelas di aula utama (Tetap Presensi)', created_at: new Date().toISOString() },
+      { id: 'hol_1003', date: '2026-01-16', name: 'Isra Mikraj Nabi Muhammad SAW', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1004', date: '2026-02-17', name: 'Tahun Baru Imlek 2577 Kongzili', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1005', date: '2026-03-09', name: 'Pekan Penilaian Tengah Semester (PTS)', type: 'UJIAN', category_type: 'SCHEDULE', is_holiday: false, description: 'Pelaksanaan ujian tertulis & CBT untuk siswa seluruh kelas', created_at: new Date().toISOString() },
+      { id: 'hol_1006', date: '2026-03-19', name: 'Hari Raya Nyepi (Saka 1948)', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1007', date: '2026-03-20', name: 'Hari Raya Idul Fitri 1447 H (Hari 1)', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1008', date: '2026-03-21', name: 'Hari Raya Idul Fitri 1447 H (Hari 2)', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1009', date: '2026-03-22', name: 'Cuti Bersama Idul Fitri 1447 H', type: 'CUTI_BERSAMA', category_type: 'HOLIDAY', is_holiday: true, description: 'Cuti Bersama Pemerintah', created_at: new Date().toISOString() },
+      { id: 'hol_1010', date: '2026-03-23', name: 'Cuti Bersama Idul Fitri 1447 H', type: 'CUTI_BERSAMA', category_type: 'HOLIDAY', is_holiday: true, description: 'Cuti Bersama Pemerintah', created_at: new Date().toISOString() },
+      { id: 'hol_1011', date: '2026-04-03', name: 'Wafat Yesus Kristus', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1012', date: '2026-05-01', name: 'Hari Buruh Internasional', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Nasional', created_at: new Date().toISOString() },
+      { id: 'hol_1013', date: '2026-05-14', name: 'Kenaikan Yesus Kristus', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1014', date: '2026-05-27', name: 'Hari Raya Waisak 2570 BE', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1015', date: '2026-06-01', name: 'Hari Lahir Pancasila', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Nasional', created_at: new Date().toISOString() },
+      { id: 'hol_1016', date: '2026-06-08', name: 'Penilaian Akhir Tahun (PAT) Genap', type: 'UJIAN', category_type: 'SCHEDULE', is_holiday: false, description: 'Pekan ujian semester genap tahun ajaran 2025/2026', created_at: new Date().toISOString() },
+      { id: 'hol_1017', date: '2026-06-15', name: 'Rapat Pleno Kenaikan Kelas & Kelulusan', type: 'RAPAT', category_type: 'SCHEDULE', is_holiday: false, description: 'Rapat dewan guru penentuan kelulusan dan kenaikan kelas', created_at: new Date().toISOString() },
+      { id: 'hol_1018', date: '2026-06-22', name: 'Libur Kenaikan Kelas (Semester Genap)', type: 'SCHOOL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Sekolah Terpadu', created_at: new Date().toISOString() },
+      { id: 'hol_1019', date: '2026-06-23', name: 'Libur Kenaikan Kelas (Semester Genap)', type: 'SCHOOL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Sekolah Terpadu', created_at: new Date().toISOString() },
+      { id: 'hol_1020', date: '2026-08-17', name: 'Proklamasi Kemerdekaan RI Ke-81', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'HUT Kemerdekaan Indonesia', created_at: new Date().toISOString() },
+      { id: 'hol_1021', date: '2026-08-25', name: 'Maulid Nabi Muhammad SAW', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1022', date: '2026-11-25', name: 'Upacara Hari Guru Nasional (HGN)', type: 'UPACARA', category_type: 'SCHEDULE', is_holiday: false, description: 'Apel peringatan Hari Guru Nasional di lapangan utama', created_at: new Date().toISOString() },
+      { id: 'hol_1023', date: '2026-12-25', name: 'Hari Raya Natal', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
+      { id: 'hol_1024', date: '2026-12-28', name: 'Libur Akhir Semester Ganjil T.A 2026/2027', type: 'SCHOOL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Semester Sekolah', created_at: new Date().toISOString() },
     ];
 
     safeSetStorage('smart_absensi_holidays', JSON.stringify(defaultHolidays));
@@ -1102,8 +1107,16 @@ export class MockProvider implements IDataProvider {
 
   public async createHoliday(holiday: Omit<HolidayRecord, 'id' | 'created_at'>, _token?: string): Promise<HolidayRecord> {
     const list = await this.getHolidays();
+    const isSchedule =
+      holiday.category_type === 'SCHEDULE' ||
+      holiday.is_holiday === false ||
+      (holiday.is_holiday === undefined &&
+        ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP', 'OTHER'].includes(holiday.type));
+
     const newRecord: HolidayRecord = {
       ...holiday,
+      category_type: holiday.category_type || (isSchedule ? 'SCHEDULE' : 'HOLIDAY'),
+      is_holiday: holiday.is_holiday !== undefined ? holiday.is_holiday : !isSchedule,
       id: 'hol_' + Date.now(),
       created_at: new Date().toISOString(),
     };

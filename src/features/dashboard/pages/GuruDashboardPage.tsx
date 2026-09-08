@@ -283,6 +283,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   // Today Attendance Status, History, & Holiday Info
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [todayHoliday, setTodayHoliday] = useState<HolidayRecord | null>(null);
+  const [todaySchedule, setTodaySchedule] = useState<HolidayRecord | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [todayMood, setTodayMood] = useState<TeacherMoodLog | null>(null);
@@ -296,6 +297,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     record?: AttendanceRecord;
     isHoliday?: boolean;
     holidayDesc?: string;
+    isSchedule?: boolean;
+    scheduleTitle?: string;
+    scheduleDesc?: string;
   } | null>(null);
   const [allHolidays, setAllHolidays] = useState<HolidayRecord[]>([]);
   const [userLeaves, setUserLeaves] = useState<LeaveRequest[]>([]);
@@ -668,17 +672,43 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         handleAppError(err, 'GuruDashboard.loadTodayAttendance', 'Gagal memuat presensi hari ini', false);
       }
 
-      // 3. Holidays
+      // 3. Holidays & School Schedules
       let loadedHolidays: HolidayRecord[] = [];
       try {
         const holidays = await provider.getHolidays(authToken);
         loadedHolidays = holidays || [];
         setAllHolidays(loadedHolidays);
         const todayIso = new Date().toISOString().substring(0, 10);
-        const holidayToday = loadedHolidays.find((h) => h.date === todayIso);
+
+        // Cari apakah ada Libur Resmi hari ini (bukan schedule agenda)
+        const holidayToday = loadedHolidays.find((h) => {
+          if (h.date !== todayIso) return false;
+          if (h.category_type === 'SCHEDULE' || h.is_holiday === false) return false;
+          if (
+            h.is_holiday === undefined &&
+            ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(h.type)
+          ) {
+            return false;
+          }
+          return true;
+        });
         setTodayHoliday(holidayToday || null);
+
+        // Cari apakah ada Agenda Acara (Schedule) hari ini (Rapat, UTS/UAS, Upacara, dll)
+        const scheduleToday = loadedHolidays.find((h) => {
+          if (h.date !== todayIso) return false;
+          if (h.category_type === 'SCHEDULE' || h.is_holiday === false) return true;
+          if (
+            h.is_holiday === undefined &&
+            ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(h.type)
+          ) {
+            return true;
+          }
+          return false;
+        });
+        setTodaySchedule(scheduleToday || null);
       } catch (err) {
-        handleAppError(err, 'GuruDashboard.loadHolidays', 'Gagal memuat data hari libur', false);
+        handleAppError(err, 'GuruDashboard.loadHolidays', 'Gagal memuat data hari libur & agenda', false);
       }
 
       // 4. Monthly Attendance History
@@ -1348,6 +1378,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       record?: AttendanceRecord;
       isHoliday?: boolean;
       holidayDesc?: string;
+      isSchedule?: boolean;
+      scheduleTitle?: string;
+      scheduleDesc?: string;
       isToday?: boolean;
       isWeekend?: boolean;
     }> = [];
@@ -1370,7 +1403,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
       const record = attendanceHistory.find((r) => r.date === dateStr);
       const holiday = allHolidays.find((h) => h.date === dateStr);
-      const isHoliday = isWeekendHoliday || !!holiday;
+
+      const isScheduleEvent = Boolean(
+        holiday &&
+          (holiday.category_type === 'SCHEDULE' ||
+            holiday.is_holiday === false ||
+            ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(holiday.type))
+      );
+
+      const isActualHoliday = Boolean(
+        holiday &&
+          !isScheduleEvent &&
+          (holiday.category_type === 'HOLIDAY' ||
+            holiday.is_holiday === true ||
+            ['NATIONAL_HOLIDAY', 'SCHOOL_HOLIDAY', 'CUTI_BERSAMA'].includes(holiday.type))
+      );
+
+      const isHoliday = isWeekendHoliday || isActualHoliday;
 
       cells.push({
         isPadding: false,
@@ -1379,7 +1428,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         dateStr,
         record,
         isHoliday,
-        holidayDesc: holiday ? holiday.name || holiday.description : isWeekendHoliday ? 'Libur Akhir Pekan' : undefined,
+        holidayDesc: isActualHoliday
+          ? holiday?.name || holiday?.description
+          : isWeekendHoliday
+          ? 'Libur Akhir Pekan'
+          : undefined,
+        isSchedule: isScheduleEvent,
+        scheduleTitle: isScheduleEvent ? holiday?.name : undefined,
+        scheduleDesc: isScheduleEvent ? holiday?.description : undefined,
         isToday: dateStr === todayIso,
         isWeekend: isWeekendHoliday,
       });
@@ -1432,6 +1488,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               } else if (status === 'ALFA') {
                 tileClass = 'bg-red-500/10 border-red-400/80 hover:bg-red-500/20 text-red-950 shadow-2xs';
               }
+            } else if (cell.isSchedule) {
+              tileClass = 'bg-blue-50/70 border-blue-200 hover:border-blue-400 hover:bg-blue-50 text-blue-950 shadow-2xs';
             } else if (cell.isHoliday) {
               tileClass = 'bg-slate-100 border-slate-200 text-slate-400';
             }
@@ -1446,6 +1504,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     record: cell.record,
                     isHoliday: cell.isHoliday,
                     holidayDesc: cell.holidayDesc,
+                    isSchedule: cell.isSchedule,
+                    scheduleTitle: cell.scheduleTitle,
+                    scheduleDesc: cell.scheduleDesc,
                   })
                 }
                 className={`aspect-square p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border flex flex-col justify-between items-center transition-all cursor-pointer relative group ${tileClass} ${
@@ -1456,9 +1517,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <span className={`text-[10px] sm:text-xs font-black leading-none ${cell.isToday ? 'text-emerald-700' : cell.isWeekend ? 'text-red-500' : 'text-slate-800'}`}>
                     {cell.dayNumber}
                   </span>
-                  {cell.isToday && (
+                  {cell.isToday ? (
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                  )}
+                  ) : cell.isSchedule ? (
+                    <span className="text-[8px] leading-none" title="Ada Agenda Sekolah">📢</span>
+                  ) : null}
                 </div>
 
                 <div className="w-full flex items-center justify-center mt-auto pb-0.5 min-w-0">
@@ -1474,6 +1537,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                           : 'bg-blue-500 ring-2 ring-blue-200'
                       }`}
                       title={status}
+                    />
+                  ) : cell.isSchedule ? (
+                    <span
+                      className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-blue-600 ring-2 ring-blue-200 shrink-0 shadow-2xs"
+                      title={`Agenda: ${cell.scheduleTitle}`}
                     />
                   ) : cell.isHoliday ? (
                     <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-slate-300 shrink-0" title="Libur" />
@@ -1494,7 +1562,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Terlambat</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Izin / Sakit</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Alfa</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-300" /> Libur</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-600 ring-2 ring-blue-200" /> Agenda (Tetap Masuk)</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-300" /> Libur Resmi</span>
         </div>
       </div>
     );
@@ -1603,6 +1672,37 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
           <>
+            {/* 📢 BANNER PENGINGAT JADWAL AGENDA HARI INI (RAPAT / UTS / UAS / UPACARA) */}
+            {todaySchedule && (
+              <div
+                onClick={() => setIsEventsCalendarModalOpen(true)}
+                className="bg-linear-to-r from-blue-700 via-indigo-700 to-[#18536B] rounded-3xl p-3.5 sm:p-4 text-white shadow-sm border border-blue-400/40 flex items-center justify-between gap-3 cursor-pointer hover:brightness-105 active:scale-[0.99] transition-all"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center text-base shrink-0">
+                    📢
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-1.5 py-0.2 bg-amber-300 text-slate-900 text-[9px] font-black rounded-md tracking-wider uppercase">
+                        AGENDA HARI INI
+                      </span>
+                      <span className="text-[10.5px] text-blue-100 font-bold">
+                        Tetap Masuk &amp; Presensi
+                      </span>
+                    </div>
+                    <p className="text-xs font-black truncate leading-tight mt-0.5">
+                      {todaySchedule.name}
+                      {todaySchedule.description ? ` • ${todaySchedule.description}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs text-blue-200 hover:text-white font-bold shrink-0">
+                  Detail Agenda →
+                </span>
+              </div>
+            )}
+
             {/* 🌟 1. CARD LOG PRESENSI HARI INI (DEVICE LOG TODAY MODEL) ─────────── */}
             {(() => {
               const isFriday = new Date().getDay() === 5;

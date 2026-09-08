@@ -32,11 +32,15 @@ export const AcademicCalendarManagement: React.FC = () => {
   const [formData, setFormData] = useState<{
     date: string;
     name: string;
+    category_type: 'HOLIDAY' | 'SCHEDULE';
+    is_holiday: boolean;
     type: HolidayType;
     description: string;
   }>({
     date: new Date().toISOString().substring(0, 10),
     name: '',
+    category_type: 'HOLIDAY',
+    is_holiday: true,
     type: 'NATIONAL_HOLIDAY',
     description: '',
   });
@@ -64,12 +68,14 @@ export const AcademicCalendarManagement: React.FC = () => {
     fetchHolidays();
   }, [token]);
 
-  const handleOpenAdd = (defaultDate?: string) => {
+  const handleOpenAdd = (defaultDate?: string, defaultCategory: 'HOLIDAY' | 'SCHEDULE' = 'HOLIDAY') => {
     setEditingHoliday(null);
     setFormData({
       date: defaultDate || new Date().toISOString().substring(0, 10),
       name: '',
-      type: 'NATIONAL_HOLIDAY',
+      category_type: defaultCategory,
+      is_holiday: defaultCategory === 'HOLIDAY',
+      type: defaultCategory === 'HOLIDAY' ? 'NATIONAL_HOLIDAY' : 'RAPAT',
       description: '',
     });
     setIsFormModalOpen(true);
@@ -77,9 +83,16 @@ export const AcademicCalendarManagement: React.FC = () => {
 
   const handleOpenEdit = (item: HolidayRecord) => {
     setEditingHoliday(item);
+    const isSchedule =
+      item.category_type === 'SCHEDULE' ||
+      item.is_holiday === false ||
+      ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(item.type);
+
     setFormData({
       date: item.date,
       name: item.name,
+      category_type: item.category_type || (isSchedule ? 'SCHEDULE' : 'HOLIDAY'),
+      is_holiday: item.is_holiday !== undefined ? item.is_holiday : !isSchedule,
       type: item.type,
       description: item.description || '',
     });
@@ -89,20 +102,41 @@ export const AcademicCalendarManagement: React.FC = () => {
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.date || !formData.name.trim()) {
-      showToast('error', 'Input Tidak Lengkap', 'Tanggal dan Nama Libur wajib diisi.');
+      showToast('error', 'Input Tidak Lengkap', 'Tanggal dan Nama Acara/Libur wajib diisi.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       const provider = ProviderFactory.getProvider();
+      const payload: Omit<HolidayRecord, 'id' | 'created_at'> = {
+        date: formData.date,
+        name: formData.name.trim(),
+        type: formData.type,
+        category_type: formData.category_type,
+        is_holiday: formData.category_type === 'HOLIDAY',
+        description: formData.description.trim() || undefined,
+      };
+
       if (editingHoliday) {
-        await provider.updateHoliday(editingHoliday.id, formData, token || undefined);
-        showToast('success', 'Perubahan Disimpan', `Hari libur "${formData.name}" berhasil diperbarui.`);
+        await provider.updateHoliday(editingHoliday.id, payload, token || undefined);
+        showToast(
+          'success',
+          'Perubahan Disimpan',
+          `"${formData.name}" berhasil diperbarui sebagai ${
+            formData.category_type === 'HOLIDAY' ? 'Hari Libur' : 'Jadwal Agenda'
+          }.`
+        );
       } else {
-        await provider.createHoliday(formData, token || undefined);
+        await provider.createHoliday(payload, token || undefined);
         NotificationService.notifySchoolEvent(formData.name, formData.date, formData.description);
-        showToast('success', 'Hari Libur Ditambahkan', `"${formData.name}" berhasil dimasukkan ke Kalender Akademik.`);
+        showToast(
+          'success',
+          formData.category_type === 'HOLIDAY' ? 'Hari Libur Ditambahkan' : 'Agenda Ditambahkan',
+          `"${formData.name}" berhasil dimasukkan ke Kalender Akademik (${
+            formData.category_type === 'HOLIDAY' ? 'Guru Libur' : 'Tetap Masuk'
+          }).`
+        );
       }
       setIsFormModalOpen(false);
       await fetchHolidays();
@@ -112,7 +146,7 @@ export const AcademicCalendarManagement: React.FC = () => {
         window.dispatchEvent(new Event('smart_absensi_settings_updated'));
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menyimpan hari libur';
+      const msg = err instanceof Error ? err.message : 'Gagal menyimpan data kalender';
       showToast('error', 'Gagal Menyimpan', msg);
     } finally {
       setIsSubmitting(false);
@@ -125,7 +159,7 @@ export const AcademicCalendarManagement: React.FC = () => {
     try {
       const provider = ProviderFactory.getProvider();
       await provider.deleteHoliday(deletingHoliday.id, token || undefined);
-      showToast('info', 'Hari Libur Dihapus', `"${deletingHoliday.name}" telah dihapus.`);
+      showToast('info', 'Data Dihapus', `"${deletingHoliday.name}" telah dihapus dari Kalender.`);
       setDeletingHoliday(null);
       await fetchHolidays();
       if (typeof window !== 'undefined') {
@@ -134,7 +168,7 @@ export const AcademicCalendarManagement: React.FC = () => {
         window.dispatchEvent(new Event('smart_absensi_settings_updated'));
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghapus hari libur';
+      const msg = err instanceof Error ? err.message : 'Gagal menghapus data kalender';
       showToast('error', 'Gagal Menghapus', msg);
     } finally {
       setIsDeleting(false);
@@ -150,31 +184,83 @@ export const AcademicCalendarManagement: React.FC = () => {
         window.dispatchEvent(new Event('smart_absensi_records_updated'));
         window.dispatchEvent(new Event('smart_absensi_settings_updated'));
       }
-      showToast('success', 'Preset Berhasil Dimuat!', 'Kalender Akademik & Tanggal Merah 2026 diperbarui.');
+      showToast('success', 'Preset Berhasil Dimuat!', 'Kalender Akademik, Jadwal Agenda, & Tanggal Merah 2026 diperbarui.');
     } catch (err) {
       showToast('error', 'Gagal Memuat Preset', String(err));
     }
   };
 
   // Helper formatting for holiday type badges
-  const getTypeBadge = (type: HolidayType) => {
-    switch (type) {
+  const getTypeBadge = (item: HolidayRecord) => {
+    const isSchedule =
+      item.category_type === 'SCHEDULE' ||
+      item.is_holiday === false ||
+      ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(item.type);
+
+    switch (item.type) {
       case 'NATIONAL_HOLIDAY':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800 border border-red-200">🔴 Libur Nasional</span>;
       case 'SCHOOL_HOLIDAY':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">🏫 Libur Sekolah</span>;
       case 'CUTI_BERSAMA':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">🗓️ Cuti Bersama</span>;
+      case 'RAPAT':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">👥 Rapat Guru</span>;
+      case 'UJIAN':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">🎓 Ujian PTS/PAS</span>;
+      case 'UPACARA':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">🏛️ Upacara</span>;
+      case 'WORKSHOP':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-100 text-cyan-800 border border-cyan-200">💡 Workshop</span>;
       case 'OTHER':
       default:
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">📢 Agenda Khusus</span>;
+        return isSchedule ? (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200">📢 Agenda Sekolah</span>
+        ) : (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-800 border border-slate-200">🏖️ Libur Khusus</span>
+        );
     }
+  };
+
+  // Helper formatting for operational attendance impact badge
+  const getAttendanceImpactBadge = (item: HolidayRecord) => {
+    const isSchedule =
+      item.category_type === 'SCHEDULE' ||
+      item.is_holiday === false ||
+      ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(item.type);
+
+    if (isSchedule) {
+      return (
+        <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
+          ✅ Tetap Masuk (Presensi Aktif)
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-red-50 text-red-700 border border-red-200">
+        ⛔ Libur Resmi (Presensi Tutup)
+      </span>
+    );
   };
 
   // Filtering for List view
   const filteredHolidays = holidays.filter((h) => {
     const matchesSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase()) || h.date.includes(searchQuery);
-    const matchesType = filterType === 'ALL' || h.type === filterType;
+
+    const isSchedule =
+      h.category_type === 'SCHEDULE' ||
+      h.is_holiday === false ||
+      ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(h.type);
+
+    let matchesType = true;
+    if (filterType === 'ONLY_HOLIDAY') {
+      matchesType = !isSchedule;
+    } else if (filterType === 'ONLY_SCHEDULE') {
+      matchesType = isSchedule;
+    } else if (filterType !== 'ALL') {
+      matchesType = h.type === filterType;
+    }
+
     return matchesSearch && matchesType;
   });
 
@@ -240,7 +326,7 @@ export const AcademicCalendarManagement: React.FC = () => {
             onClick={handleLoadPresets}
             className="text-xs py-2 px-3.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-extrabold rounded-2xl border border-amber-300 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
           >
-            <span>⚡</span> Preset Tanggal Merah 2026
+            <span>⚡</span> Preset Agenda & Libur 2026
           </button>
 
           <Button
@@ -248,7 +334,7 @@ export const AcademicCalendarManagement: React.FC = () => {
             onClick={() => handleOpenAdd()}
             className="text-xs py-2 px-3.5 flex items-center gap-1.5"
           >
-            <span>➕</span> Tambah Hari Libur
+            <span>➕</span> Tambah Kalender / Agenda
           </Button>
         </div>
       </div>
@@ -258,7 +344,7 @@ export const AcademicCalendarManagement: React.FC = () => {
         <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 w-full sm:w-auto">
           <button
             onClick={() => setViewMode('CALENDAR')}
-            className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
               viewMode === 'CALENDAR'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -268,7 +354,7 @@ export const AcademicCalendarManagement: React.FC = () => {
           </button>
           <button
             onClick={() => setViewMode('LIST')}
-            className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
               viewMode === 'LIST'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'text-slate-600 hover:bg-slate-100'
@@ -286,7 +372,7 @@ export const AcademicCalendarManagement: React.FC = () => {
             <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" /> Libur Sekolah
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Cuti Bersama
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" /> Jadwal Agenda (Tetap Masuk)
           </span>
         </div>
       </div>
@@ -298,7 +384,7 @@ export const AcademicCalendarManagement: React.FC = () => {
           <div className="flex items-center justify-between bg-slate-900 text-white p-4 rounded-2xl shadow-md">
             <button
               onClick={handlePrevMonth}
-              className="p-2 hover:bg-slate-800 rounded-xl transition-colors font-extrabold text-sm"
+              className="p-2 hover:bg-slate-800 rounded-xl transition-colors font-extrabold text-sm cursor-pointer"
             >
               ◀️ Bulan Sebelumnya
             </button>
@@ -307,15 +393,18 @@ export const AcademicCalendarManagement: React.FC = () => {
                 {monthNames[currentMonth]} {currentYear}
               </h3>
               <p className="text-[11px] text-purple-300 font-semibold mt-0.5">
-                {holidays.filter((h) => {
-                  const [y, m] = h.date.split('-').map(Number);
-                  return y === currentYear && m === currentMonth + 1;
-                }).length} Hari Libur di Bulan Ini
+                {
+                  holidays.filter((h) => {
+                    const [y, m] = h.date.split('-').map(Number);
+                    return y === currentYear && m === currentMonth + 1;
+                  }).length
+                }{' '}
+                Agenda &amp; Libur di Bulan Ini
               </p>
             </div>
             <button
               onClick={handleNextMonth}
-              className="p-2 hover:bg-slate-800 rounded-xl transition-colors font-extrabold text-sm"
+              className="p-2 hover:bg-slate-800 rounded-xl transition-colors font-extrabold text-sm cursor-pointer"
             >
               Bulan Berikutnya ▶️
             </button>
@@ -350,6 +439,12 @@ export const AcademicCalendarManagement: React.FC = () => {
               const isSaturday = (firstDay + idx) % 7 === 5;
               const holiday = holidaysMap.get(dateIso);
 
+              const isSchedule =
+                holiday &&
+                (holiday.category_type === 'SCHEDULE' ||
+                  holiday.is_holiday === false ||
+                  ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(holiday.type));
+
               return (
                 <div
                   key={dateIso}
@@ -362,13 +457,15 @@ export const AcademicCalendarManagement: React.FC = () => {
                   }}
                   className={`min-h-24 p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group ${
                     holiday
-                      ? holiday.type === 'NATIONAL_HOLIDAY'
+                      ? isSchedule
+                        ? 'bg-blue-50/80 border-blue-200 hover:border-blue-400'
+                        : holiday.type === 'NATIONAL_HOLIDAY'
                         ? 'bg-red-50/80 border-red-200 hover:border-red-400'
                         : holiday.type === 'SCHOOL_HOLIDAY'
                         ? 'bg-purple-50/80 border-purple-200 hover:border-purple-400'
                         : holiday.type === 'CUTI_BERSAMA'
                         ? 'bg-amber-50/80 border-amber-200 hover:border-amber-400'
-                        : 'bg-blue-50/80 border-blue-200 hover:border-blue-400'
+                        : 'bg-emerald-50/80 border-emerald-200 hover:border-emerald-400'
                       : isSunday
                       ? 'bg-red-50/30 border-slate-100 hover:bg-slate-50'
                       : isSaturday
@@ -380,7 +477,9 @@ export const AcademicCalendarManagement: React.FC = () => {
                     <span
                       className={`text-xs font-black w-6 h-6 rounded-full flex items-center justify-center ${
                         holiday
-                          ? 'bg-white shadow-xs font-extrabold text-slate-900'
+                          ? isSchedule
+                            ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
+                            : 'bg-white shadow-xs font-extrabold text-slate-900'
                           : isSunday
                           ? 'text-red-600 font-bold'
                           : isSaturday
@@ -402,13 +501,17 @@ export const AcademicCalendarManagement: React.FC = () => {
                       <p className="text-[11px] font-extrabold text-slate-900 leading-tight line-clamp-2">
                         {holiday.name}
                       </p>
-                      <p className="text-[9px] text-slate-500 font-medium">
-                        {holiday.type === 'NATIONAL_HOLIDAY' ? '🔴 Nasional' : holiday.type === 'SCHOOL_HOLIDAY' ? '🏫 Sekolah' : '🗓️ Cuti'}
+                      <p className="text-[9px] font-bold">
+                        {isSchedule ? (
+                          <span className="text-blue-700">📢 Tetap Masuk</span>
+                        ) : (
+                          <span className="text-red-600">🔴 Libur Resmi</span>
+                        )}
                       </p>
                     </div>
                   ) : (
                     <span className="text-[10px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">
-                      + Libur
+                      + Agenda
                     </span>
                   )}
                 </div>
@@ -425,24 +528,29 @@ export const AcademicCalendarManagement: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="w-full sm:w-72">
               <Input
-                placeholder="Cari hari libur atau tanggal (YYYY-MM-DD)..."
+                placeholder="Cari agenda/libur atau tanggal (YYYY-MM-DD)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-xs font-bold text-slate-500">Kategori:</span>
+              <span className="text-xs font-bold text-slate-500">Filter:</span>
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="text-xs font-bold p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                className="text-xs font-bold p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer"
               >
-                <option value="ALL">Semua Kategori ({holidays.length})</option>
+                <option value="ALL">Semua Kalender ({holidays.length})</option>
+                <option value="ONLY_HOLIDAY">🔴 Hari Libur Saja (Guru Libur)</option>
+                <option value="ONLY_SCHEDULE">📢 Jadwal Agenda Saja (Tetap Masuk)</option>
                 <option value="NATIONAL_HOLIDAY">🔴 Libur Nasional</option>
                 <option value="SCHOOL_HOLIDAY">🏫 Libur Sekolah</option>
                 <option value="CUTI_BERSAMA">🗓️ Cuti Bersama</option>
-                <option value="OTHER">📢 Agenda Khusus</option>
+                <option value="RAPAT">👥 Rapat Guru</option>
+                <option value="UJIAN">🎓 Ujian PTS/PAS</option>
+                <option value="UPACARA">🏛️ Upacara</option>
+                <option value="WORKSHOP">💡 Workshop</option>
               </select>
             </div>
           </div>
@@ -458,8 +566,9 @@ export const AcademicCalendarManagement: React.FC = () => {
                 <thead className="bg-slate-900 text-white font-extrabold uppercase text-[10px] tracking-wider">
                   <tr>
                     <th className="py-3 px-4">Tanggal (YYYY-MM-DD)</th>
-                    <th className="py-3 px-4">Nama Hari Libur / Agenda</th>
+                    <th className="py-3 px-4">Nama Acara / Libur</th>
                     <th className="py-3 px-4">Kategori</th>
+                    <th className="py-3 px-4">Dampak Presensi</th>
                     <th className="py-3 px-4">Keterangan</th>
                     <th className="py-3 px-4 text-center">Aksi</th>
                   </tr>
@@ -474,7 +583,10 @@ export const AcademicCalendarManagement: React.FC = () => {
                         {item.name}
                       </td>
                       <td className="py-3 px-4">
-                        {getTypeBadge(item.type)}
+                        {getTypeBadge(item)}
+                      </td>
+                      <td className="py-3 px-4">
+                        {getAttendanceImpactBadge(item)}
                       </td>
                       <td className="py-3 px-4 text-slate-500">
                         {item.description || '-'}
@@ -483,13 +595,13 @@ export const AcademicCalendarManagement: React.FC = () => {
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             onClick={() => handleOpenEdit(item)}
-                            className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg transition-colors"
+                            className="px-2.5 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg transition-colors cursor-pointer"
                           >
                             ✏️ Edit
                           </button>
                           <button
                             onClick={() => setDeletingHoliday(item)}
-                            className="px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg transition-colors"
+                            className="px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 font-bold rounded-lg transition-colors cursor-pointer"
                           >
                             🗑️ Hapus
                           </button>
@@ -503,22 +615,92 @@ export const AcademicCalendarManagement: React.FC = () => {
           ) : (
             <div className="p-8 text-center bg-slate-50 rounded-2xl space-y-2 border border-slate-200">
               <span className="text-3xl">🗓️</span>
-              <p className="font-extrabold text-slate-800 text-sm">Tidak Ada Data Hari Libur</p>
-              <p className="text-xs text-slate-500">Tidak ada jadwal libur yang sesuai pencarian/kategori.</p>
+              <p className="font-extrabold text-slate-800 text-sm">Tidak Ada Data Kalender</p>
+              <p className="text-xs text-slate-500">Tidak ada jadwal atau libur yang sesuai pencarian/kategori.</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Add / Edit Holiday Modal */}
+      {/* Add / Edit Holiday & Schedule Modal */}
       <Modal
         isOpen={isFormModalOpen}
         onClose={() => setIsFormModalOpen(false)}
-        title={editingHoliday ? '✏️ Edit Hari Libur / Agenda' : '➕ Tambah Hari Libur Baru'}
+        title={editingHoliday ? '✏️ Edit Kalender / Agenda Sekolah' : '➕ Tambah Kalender / Agenda Baru'}
       >
         <form onSubmit={handleSubmitForm} className="space-y-4">
+          {/* Pilihan 1: Schedule vs 2: Hari Libur */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-black text-slate-800">
+              Pilih Jenis Entri Kalender:
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Mode 1: Schedule (Agenda, Tetap Masuk) */}
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    category_type: 'SCHEDULE',
+                    is_holiday: false,
+                    type: prev.type === 'NATIONAL_HOLIDAY' || prev.type === 'SCHOOL_HOLIDAY' || prev.type === 'CUTI_BERSAMA' ? 'RAPAT' : prev.type,
+                  }))
+                }
+                className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                  formData.category_type === 'SCHEDULE'
+                    ? 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-300 shadow-xs'
+                    : 'bg-white hover:bg-slate-50 border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">📢</span>
+                    <span className="text-xs font-black text-blue-950">1. Jadwal Agenda</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium mt-1 leading-snug">
+                    Rapat, UTS/UAS, Upacara, Workshop, dll.
+                  </p>
+                </div>
+                <span className="mt-2 text-[9.5px] font-black text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md inline-block">
+                  ✓ Tetap Masuk &amp; Presensi
+                </span>
+              </button>
+
+              {/* Mode 2: Holiday (Hari Libur, Guru Libur) */}
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    category_type: 'HOLIDAY',
+                    is_holiday: true,
+                    type: prev.type === 'RAPAT' || prev.type === 'UJIAN' || prev.type === 'UPACARA' || prev.type === 'WORKSHOP' ? 'NATIONAL_HOLIDAY' : prev.type,
+                  }))
+                }
+                className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                  formData.category_type === 'HOLIDAY'
+                    ? 'bg-red-50/90 border-red-400 ring-2 ring-red-300 shadow-xs'
+                    : 'bg-white hover:bg-slate-50 border-slate-200'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base">🔴</span>
+                    <span className="text-xs font-black text-red-950">2. Hari Libur</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium mt-1 leading-snug">
+                    Tanggal merah, libur semester, cuti bersama.
+                  </p>
+                </div>
+                <span className="mt-2 text-[9.5px] font-black text-red-700 bg-red-100/80 px-2 py-0.5 rounded-md inline-block">
+                  ⛔ Presensi Diliburkan
+                </span>
+              </button>
+            </div>
+          </div>
+
           <Input
-            label="Tanggal Libur (YYYY-MM-DD)"
+            label="Tanggal (YYYY-MM-DD)"
             type="date"
             required
             value={formData.date}
@@ -526,25 +708,49 @@ export const AcademicCalendarManagement: React.FC = () => {
           />
 
           <Input
-            label="Nama Hari Libur / Agenda Akademik"
+            label={
+              formData.category_type === 'SCHEDULE'
+                ? 'Nama Acara / Agenda Sekolah'
+                : 'Nama Hari Libur Resmi'
+            }
             type="text"
             required
-            placeholder="Contoh: Hari Raya Idul Fitri / Libur Kenaikan Kelas"
+            placeholder={
+              formData.category_type === 'SCHEDULE'
+                ? 'Contoh: Rapat Pleno Dewan Guru / Pekan UTS Semester Genap'
+                : 'Contoh: Hari Raya Idul Fitri / Libur Kenaikan Kelas'
+            }
             value={formData.name}
             onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
           />
 
           <div className="space-y-1">
-            <label className="block text-xs font-bold text-slate-700">Kategori Hari Libur</label>
+            <label className="block text-xs font-bold text-slate-700">
+              {formData.category_type === 'SCHEDULE'
+                ? 'Kategori Agenda Acara'
+                : 'Kategori Hari Libur'}
+            </label>
             <select
               value={formData.type}
               onChange={(e) => setFormData((prev) => ({ ...prev, type: e.target.value as HolidayType }))}
-              className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+              className="w-full text-xs font-bold p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer"
             >
-              <option value="NATIONAL_HOLIDAY">🔴 Libur Nasional / Tanggal Merah</option>
-              <option value="SCHOOL_HOLIDAY">🏫 Libur Sekolah / Semester</option>
-              <option value="CUTI_BERSAMA">🗓️ Cuti Bersama Pemerintah</option>
-              <option value="OTHER">📢 Agenda / Kegiatan Sekolah</option>
+              {formData.category_type === 'SCHEDULE' ? (
+                <>
+                  <option value="RAPAT">👥 Rapat Dinas / Koordinasi Dewan Guru</option>
+                  <option value="UJIAN">🎓 Pekan Ujian Sekolah (UTS / PTS / PAS / PAT)</option>
+                  <option value="UPACARA">🏛️ Upacara Bendera / Peringatan Hari Besar</option>
+                  <option value="WORKSHOP">💡 Workshop / Pelatihan / Bimtek Guru</option>
+                  <option value="OTHER">📢 Kegiatan / Agenda Sekolah Lainnya</option>
+                </>
+              ) : (
+                <>
+                  <option value="NATIONAL_HOLIDAY">🔴 Libur Nasional / Tanggal Merah</option>
+                  <option value="SCHOOL_HOLIDAY">🏫 Libur Sekolah / Semester</option>
+                  <option value="CUTI_BERSAMA">🗓️ Cuti Bersama Pemerintah</option>
+                  <option value="OTHER">🏖️ Libur Khusus Sekolah Lainnya</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -553,7 +759,11 @@ export const AcademicCalendarManagement: React.FC = () => {
             <textarea
               rows={3}
               className="w-full text-xs font-medium p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-purple-500"
-              placeholder="Catatan tambahan seperti edaran Kepala Sekolah atau SKB 3 Menteri..."
+              placeholder={
+                formData.category_type === 'SCHEDULE'
+                  ? 'Catatan agenda, ruang pertemuan, pakaian dinas, atau berkas yang perlu disiapkan...'
+                  : 'Catatan tambahan seperti edaran Kepala Sekolah atau SKB 3 Menteri...'
+              }
               value={formData.description}
               onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
             />
@@ -563,7 +773,16 @@ export const AcademicCalendarManagement: React.FC = () => {
             <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsFormModalOpen(false)}>
               Batal
             </Button>
-            <Button type="submit" variant="primary" className="w-1/2 bg-purple-600 hover:bg-purple-700" isLoading={isSubmitting}>
+            <Button
+              type="submit"
+              variant="primary"
+              className={`w-1/2 ${
+                formData.category_type === 'SCHEDULE'
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-purple-600 hover:bg-purple-700'
+              }`}
+              isLoading={isSubmitting}
+            >
               {editingHoliday ? 'Simpan Perubahan' : 'Tambah Ke Kalender'}
             </Button>
           </div>
@@ -574,7 +793,7 @@ export const AcademicCalendarManagement: React.FC = () => {
       <Modal
         isOpen={!!deletingHoliday}
         onClose={() => setDeletingHoliday(null)}
-        title="⚠️ Konfirmasi Hapus Hari Libur"
+        title="⚠️ Konfirmasi Hapus Data Kalender"
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-600 leading-relaxed">
@@ -582,7 +801,7 @@ export const AcademicCalendarManagement: React.FC = () => {
           </p>
 
           <div className="p-3 bg-red-50 rounded-2xl border border-red-100 text-[11px] text-red-800 font-semibold">
-            Tindakan ini akan membatalkan status libur global untuk tanggal tersebut pada sistem absensi.
+            Tindakan ini akan menghapus entri kalender dan memperbarui status tanggal tersebut untuk seluruh guru.
           </div>
 
           <div className="flex items-center gap-2 pt-2">

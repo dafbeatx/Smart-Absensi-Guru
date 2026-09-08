@@ -71,8 +71,41 @@ export const SchoolEventsCalendarModal: React.FC<SchoolEventsCalendarModalProps>
     };
   }, [loadHolidays]);
 
+  // Helper to determine if item is an active schedule (tetap masuk) or official holiday (libur resmi)
+  const isScheduleEvent = useCallback((item: HolidayRecord): boolean => {
+    if (item.category_type === 'SCHEDULE') return true;
+    if (item.is_holiday === false) return false ? false : true;
+    if (item.category_type === 'HOLIDAY' || item.is_holiday === true) return false;
+    if (['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP'].includes(item.type)) return true;
+    if (['NATIONAL_HOLIDAY', 'SCHOOL_HOLIDAY', 'CUTI_BERSAMA'].includes(item.type)) return false;
+    const text = `${item.name} ${item.description || ''}`.toLowerCase();
+    if (
+      text.includes('rapat') ||
+      text.includes('upacara') ||
+      text.includes('ujian') ||
+      text.includes('pts') ||
+      text.includes('pas') ||
+      text.includes('workshop') ||
+      text.includes('bimtek')
+    ) {
+      return true;
+    }
+    return false;
+  }, []);
+
   // Helper to categorize holiday record
   const getEventCategory = useCallback((item: HolidayRecord): EventCategory => {
+    // 1. Explicit type check
+    if (item.type === 'RAPAT') return 'RAPAT';
+    if (item.type === 'UPACARA') return 'UPACARA';
+    if (item.type === 'UJIAN') return 'UJIAN';
+    if (item.type === 'WORKSHOP') return 'WORKSHOP';
+
+    // 2. Explicit category / holiday check
+    if (item.category_type === 'HOLIDAY' || item.is_holiday === true) {
+      return 'LIBUR';
+    }
+
     const text = `${item.name} ${item.description || ''}`.toLowerCase();
     if (text.includes('rapat') || text.includes('evaluasi') || text.includes('koordinasi') || text.includes('musyawarah')) {
       return 'RAPAT';
@@ -104,8 +137,8 @@ export const SchoolEventsCalendarModal: React.FC<SchoolEventsCalendarModalProps>
     if (item.type === 'NATIONAL_HOLIDAY' || item.type === 'SCHOOL_HOLIDAY' || item.type === 'CUTI_BERSAMA') {
       return 'LIBUR';
     }
-    return 'AGENDA';
-  }, []);
+    return isScheduleEvent(item) ? 'AGENDA' : 'LIBUR';
+  }, [isScheduleEvent]);
 
   // Format date helper: "2026-08-17" -> "Senin, 17 Agustus 2026"
   const formatIndonesianDate = (dateString: string) => {
@@ -134,11 +167,19 @@ export const SchoolEventsCalendarModal: React.FC<SchoolEventsCalendarModalProps>
   // Filtered list
   const filteredEvents = useMemo(() => {
     return holidays.filter((item) => {
+      const isSched = isScheduleEvent(item);
       const category = getEventCategory(item);
-      const matchCategory =
-        selectedCategory === 'ALL' ||
-        category === selectedCategory ||
-        (selectedCategory === 'AGENDA' && category !== 'LIBUR');
+
+      let matchCategory = false;
+      if (selectedCategory === 'ALL') {
+        matchCategory = true;
+      } else if (selectedCategory === 'AGENDA') {
+        matchCategory = isSched;
+      } else if (selectedCategory === 'LIBUR') {
+        matchCategory = !isSched;
+      } else {
+        matchCategory = category === selectedCategory;
+      }
 
       const q = searchQuery.toLowerCase().trim();
       const matchQuery =
@@ -149,7 +190,7 @@ export const SchoolEventsCalendarModal: React.FC<SchoolEventsCalendarModalProps>
 
       return matchCategory && matchQuery;
     });
-  }, [holidays, selectedCategory, searchQuery, getEventCategory]);
+  }, [holidays, selectedCategory, searchQuery, getEventCategory, isScheduleEvent]);
 
   const getCategoryBadge = (item: HolidayRecord) => {
     const cat = getEventCategory(item);
@@ -342,7 +383,15 @@ export const SchoolEventsCalendarModal: React.FC<SchoolEventsCalendarModalProps>
                 )}
 
                 <div className="bg-slate-50 p-2 px-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between text-[10px] text-slate-600 font-semibold">
-                  <span>⏰ Sesuai Kalender Akademik</span>
+                  {isScheduleEvent(evt) ? (
+                    <span className="text-blue-700 font-bold flex items-center gap-1">
+                      <span>📢</span> Agenda Sekolah (Tetap Masuk &amp; Presensi)
+                    </span>
+                  ) : (
+                    <span className="text-rose-700 font-bold flex items-center gap-1">
+                      <span>🔴</span> Libur Resmi (KBM Libur)
+                    </span>
+                  )}
                   <span className="font-mono text-[9px] text-slate-400">ID: {evt.id.substring(0, 10)}</span>
                 </div>
               </div>

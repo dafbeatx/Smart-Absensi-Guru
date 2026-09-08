@@ -267,6 +267,54 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     !containsHoliday17 && !containsHoliday28 && unabsentedFullMonth.length > 0
   );
 
+  // Test 13: Academic Calendar Differentiation - SCHEDULE (Tetap Masuk) vs HOLIDAY (Libur Resmi)
+  const calendarScheduleAndHolidays = [
+    {
+      id: 'cal_sched_1',
+      date: '2026-08-25', // Selasa
+      name: 'Rapat Pleno Dewan Guru & Evaluasi KBM',
+      type: 'RAPAT' as const,
+      category_type: 'SCHEDULE' as const,
+      is_holiday: false,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'cal_sched_2',
+      date: '2026-08-26', // Rabu
+      name: 'Pekan Penilaian Tengah Semester (PTS)',
+      type: 'UJIAN' as const,
+      category_type: 'SCHEDULE' as const,
+      is_holiday: false,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'cal_hol_1',
+      date: '2026-08-28', // Jumat
+      name: 'Hari Libur Khusus Yayasan',
+      type: 'SCHOOL_HOLIDAY' as const,
+      category_type: 'HOLIDAY' as const,
+      is_holiday: true,
+      created_at: new Date().toISOString(),
+    },
+  ];
+
+  const rapatCheck = isDateOffDay('2026-08-25', null, calendarScheduleAndHolidays);
+  const ujianCheck = isDateOffDay('2026-08-26', null, calendarScheduleAndHolidays);
+  const holidayCheckNew = isDateOffDay('2026-08-28', null, calendarScheduleAndHolidays);
+
+  assert(
+    'Calendar Differentiation - SCHEDULE entry (Rapat Guru) DOES NOT make day off (isOff is false, tetap masuk)',
+    rapatCheck.isOff === false
+  );
+  assert(
+    'Calendar Differentiation - SCHEDULE entry (Pekan Ujian) DOES NOT make day off (isOff is false, tetap masuk)',
+    ujianCheck.isOff === false
+  );
+  assert(
+    'Calendar Differentiation - HOLIDAY entry (Libur Khusus) strictly makes day off (isOff is true, libur resmi)',
+    holidayCheckNew.isOff === true && holidayCheckNew.reason.includes('Hari Libur Khusus Yayasan')
+  );
+
   return { passed, failed, results };
 };
 

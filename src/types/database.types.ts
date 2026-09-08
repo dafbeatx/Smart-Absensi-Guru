@@ -133,13 +133,25 @@ export interface SystemSettings {
   admin_reset_password?: string; // Password keamanan khusus buatan Admin untuk reset absensi harian
 }
 
-export type HolidayType = 'NATIONAL_HOLIDAY' | 'SCHOOL_HOLIDAY' | 'CUTI_BERSAMA' | 'OTHER';
+export type CalendarCategoryType = 'HOLIDAY' | 'SCHEDULE';
+
+export type HolidayType =
+  | 'NATIONAL_HOLIDAY'
+  | 'SCHOOL_HOLIDAY'
+  | 'CUTI_BERSAMA'
+  | 'RAPAT'
+  | 'UJIAN'
+  | 'UPACARA'
+  | 'WORKSHOP'
+  | 'OTHER';
 
 export interface HolidayRecord {
   id: string;
   date: string; // YYYY-MM-DD
   name: string;
   type: HolidayType;
+  category_type?: CalendarCategoryType; // 'HOLIDAY' = Libur Resmi | 'SCHEDULE' = Agenda/Acara (Tetap Masuk)
+  is_holiday?: boolean; // TRUE: guru libur (presensi mati) | FALSE: pengingat acara (presensi aktif)
   description?: string;
   created_at: string;
 }
