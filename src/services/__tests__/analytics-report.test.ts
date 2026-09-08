@@ -316,7 +316,7 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
   );
 
   // Test 14: Monthly Payday Calendar & Notification Engine (Setiap Bulan Tanggal 10)
-  const { generatePaydayEventsForYear, isPaydayDate } = await import('../../utils/time.utils');
+  const { generatePaydayEventsForYear, isPaydayDate, getPaydayReminderInfo } = await import('../../utils/time.utils');
   const paydays2026 = generatePaydayEventsForYear(2026);
 
   assert(
@@ -341,6 +341,45 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
   assert(
     'Monthly Payday - Payday on working day (Senin 10 Agustus) is active working day (isOff is false)',
     paydayOffCheck.isOff === false
+  );
+
+  // Test 15: Monthly Payday Countdown Reminders (H-2, H-1, Hari H)
+  const reminderH2 = getPaydayReminderInfo('2026-09-08', 'Budi Santoso');
+  assert(
+    'Payday Reminder - H-2 (Tanggal 8) correctly identified with 2 days remaining',
+    reminderH2.isReminderActive === true &&
+      reminderH2.status === 'H-2' &&
+      reminderH2.daysRemaining === 2 &&
+      reminderH2.badgeLabel === 'PENGINGAT H-2 HARI GAJIAN' &&
+      reminderH2.message.includes('Budi Santoso')
+  );
+
+  const reminderH1 = getPaydayReminderInfo('2026-09-09');
+  assert(
+    'Payday Reminder - H-1 (Tanggal 9) correctly identified with 1 day remaining',
+    reminderH1.isReminderActive === true &&
+      reminderH1.status === 'H-1' &&
+      reminderH1.daysRemaining === 1 &&
+      reminderH1.badgeLabel === 'PENGINGAT H-1 HARI GAJIAN (BESOK)'
+  );
+
+  const reminderHariH = getPaydayReminderInfo('2026-09-10');
+  assert(
+    'Payday Reminder - Hari H (Tanggal 10) correctly identified with 0 days remaining',
+    reminderHariH.isReminderActive === true &&
+      reminderHariH.status === 'HARI_H' &&
+      reminderHariH.daysRemaining === 0 &&
+      reminderHariH.badgeLabel === 'HARI GAJIAN TELAH TIBA'
+  );
+
+  const reminderOff1 = getPaydayReminderInfo('2026-09-07');
+  const reminderOff2 = getPaydayReminderInfo('2026-09-11');
+  assert(
+    'Payday Reminder - Outside H-2..H (Tanggal 7 & 11) is inactive',
+    reminderOff1.isReminderActive === false &&
+      reminderOff1.status === null &&
+      reminderOff2.isReminderActive === false &&
+      reminderOff2.status === null
   );
 
   return { passed, failed, results };

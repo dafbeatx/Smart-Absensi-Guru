@@ -4,7 +4,7 @@ import { ProviderFactory } from '../../providers/provider-factory';
 import { SoundService } from '../../services/audio.service';
 import { NotificationService } from '../../services/notification-permission.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile } from '../../types/database.types';
-import { isDateOffDay, getTodayDateInJakarta, isPaydayDate } from '../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta, getPaydayReminderInfo } from '../../utils/time.utils';
 
 export interface DynamicNotificationItem {
   id: string;
@@ -193,16 +193,22 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         }
       }
 
-      // Payday Notification on the 10th of every month
-      if (isPaydayDate(new Date())) {
-        const paydayBellId = `notif_payday_bell_${user?.id || 'user'}_${todayIso}`;
+      // Payday Notification (H-2, H-1, dan Hari H Tanggal 10)
+      const paydayReminder = getPaydayReminderInfo(new Date(), user?.full_name);
+      if (paydayReminder.isReminderActive) {
+        const paydayBellId = `notif_payday_bell_${user?.id || 'user'}_${todayIso}_${paydayReminder.status}`;
         items.push({
           id: paydayBellId,
           category: 'SYSTEM_ALERT',
-          title: '💰 Hari Gajian Telah Tiba! (Tanggal 10)',
-          message: 'Hari ini adalah tanggal 10, jadwal penggajian bulanan untuk seluruh guru dan staf sekolah.',
-          time: 'Tanggal 10',
-          badgeType: 'SUCCESS',
+          title: paydayReminder.title,
+          message: paydayReminder.message,
+          time:
+            paydayReminder.status === 'HARI_H'
+              ? 'Hari Ini'
+              : paydayReminder.status === 'H-1'
+              ? 'Besok'
+              : '2 Hari Lagi',
+          badgeType: paydayReminder.status === 'HARI_H' ? 'SUCCESS' : 'INFO',
           isRead: currentReadSet.has(paydayBellId),
           actionType: 'NAVIGATE_TAB',
           actionDate: todayIso,

@@ -315,15 +315,26 @@ class NotificationPermissionService {
   }
 
   /**
-   * Helper: Trigger Notifikasi Hari Gajian Bulanan untuk Guru & Staf (Setiap Tanggal 10)
+   * Helper: Trigger Notifikasi Hari Gajian Bulanan untuk Guru & Staf (H-2, H-1, Hari H Tanggal 10)
    */
-  public notifyPayday(teacherName?: string, dateStr?: string, userId?: string) {
+  public notifyPayday(
+    teacherName?: string,
+    dateStr?: string,
+    userId?: string,
+    customTitle?: string,
+    customBody?: string,
+    reminderStatus?: string
+  ) {
     const targetDate = dateStr || new Date().toISOString().substring(0, 10);
     const greeting = teacherName ? `Bapak/Ibu ${teacherName}` : 'Bapak/Ibu Guru & Staf';
+    const notifId = reminderStatus
+      ? `notif_payday_${userId || 'all'}_${targetDate}_${reminderStatus}`
+      : `notif_payday_${userId || 'all'}_${targetDate}`;
+
     this.sendNativeNotification({
-      id: `notif_payday_${userId || 'all'}_${targetDate}`,
-      title: `💰 Hari Gajian Telah Tiba! (${targetDate})`,
-      body: `Selamat ${greeting}! Hari ini tanggal 10 adalah Hari Gajian. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang!`,
+      id: notifId,
+      title: customTitle || `💰 Hari Gajian Telah Tiba! (${targetDate})`,
+      body: customBody || `Selamat ${greeting}! Hari ini tanggal 10 adalah Hari Gajian. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang!`,
       type: 'EVENT',
       teacherName,
       userId,

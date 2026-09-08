@@ -365,6 +365,103 @@ export function isPaydayDate(targetDate: string | Date = new Date()): boolean {
   return !isNaN(d.getTime()) && d.getDate() === 10;
 }
 
+export interface PaydayReminderInfo {
+  isReminderActive: boolean;
+  status: 'H-2' | 'H-1' | 'HARI_H' | null;
+  daysRemaining: number;
+  badgeLabel: string;
+  title: string;
+  message: string;
+  targetPaydayDate: string;
+}
+
+/**
+ * Mendapatkan status pengingat Hari Gajian (H-2, H-1, dan Hari H tanggal 10).
+ */
+export function getPaydayReminderInfo(
+  targetDate: string | Date = new Date(),
+  teacherName?: string
+): PaydayReminderInfo {
+  let d: Date;
+  if (typeof targetDate === 'string') {
+    const parts = targetDate.split('-');
+    if (parts.length >= 3) {
+      d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    } else {
+      d = new Date(targetDate);
+    }
+  } else {
+    d = targetDate;
+  }
+
+  if (!d || isNaN(d.getTime())) {
+    return {
+      isReminderActive: false,
+      status: null,
+      daysRemaining: 0,
+      badgeLabel: '',
+      title: '',
+      message: '',
+      targetPaydayDate: '',
+    };
+  }
+
+  const dayNumber = d.getDate();
+  const year = d.getFullYear();
+  const monthPad = String(d.getMonth() + 1).padStart(2, '0');
+  const targetPaydayDate = `${year}-${monthPad}-10`;
+  const greeting = teacherName ? `Bapak/Ibu ${teacherName}` : 'Bapak/Ibu Guru & Staf';
+
+  // H-2 Pengingat: Tanggal 8
+  if (dayNumber === 8) {
+    return {
+      isReminderActive: true,
+      status: 'H-2',
+      daysRemaining: 2,
+      badgeLabel: 'PENGINGAT H-2 HARI GAJIAN',
+      title: '💰 Pengingat: 2 Hari Lagi Hari Gajian (Tanggal 10)',
+      message: `Halo ${greeting}! 2 hari lagi (tanggal 10) adalah Hari Gajian bulanan. Tetap semangat mengajar dan selalu lakukan presensi masuk & pulang.`,
+      targetPaydayDate,
+    };
+  }
+
+  // H-1 Pengingat: Tanggal 9
+  if (dayNumber === 9) {
+    return {
+      isReminderActive: true,
+      status: 'H-1',
+      daysRemaining: 1,
+      badgeLabel: 'PENGINGAT H-1 HARI GAJIAN (BESOK)',
+      title: '💰 Pengingat: Besok Hari Gajian! (Tanggal 10)',
+      message: `Halo ${greeting}! Besok (tanggal 10) adalah jadwal penggajian bulanan. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang.`,
+      targetPaydayDate,
+    };
+  }
+
+  // Hari H: Tanggal 10
+  if (dayNumber === 10) {
+    return {
+      isReminderActive: true,
+      status: 'HARI_H',
+      daysRemaining: 0,
+      badgeLabel: 'HARI GAJIAN TELAH TIBA',
+      title: '💰 Hari Gajian Telah Tiba! (Tanggal 10)',
+      message: `Selamat ${greeting}! Hari ini tanggal 10 adalah Hari Gajian Guru & Staf. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang.`,
+      targetPaydayDate,
+    };
+  }
+
+  return {
+    isReminderActive: false,
+    status: null,
+    daysRemaining: 0,
+    badgeLabel: '',
+    title: '',
+    message: '',
+    targetPaydayDate,
+  };
+}
+
 /**
  * Menghasilkan entri kalender Hari Gajian Guru & Staf (SCHEDULE, is_holiday: false)
  * untuk setiap bulan tanggal 10 pada tahun yang ditentukan.
