@@ -31,7 +31,7 @@ import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
 import { NotificationService } from '../services/notification-permission.service';
-import { getTodayDateInJakarta, getCurrentTimeInJakarta, timeToMinutes } from '../utils/time.utils';
+import { getTodayDateInJakarta, getCurrentTimeInJakarta, timeToMinutes, generatePaydayEventsForYear } from '../utils/time.utils';
 
 const memoryStore = new Map<string, string>();
 
@@ -1064,17 +1064,30 @@ export class MockProvider implements IDataProvider {
 
   // Academic Calendar & Holidays API Implementation
   public async getHolidays(_token?: string): Promise<HolidayRecord[]> {
+    const paydays2026 = generatePaydayEventsForYear(2026);
+
     const saved = safeGetStorage('smart_absensi_holidays');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const parsed: HolidayRecord[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Pastikan 12 Hari Gajian bulanan (setiap tanggal 10) tersinkronisasi
+          const missingPaydays = paydays2026.filter(
+            (p) => !parsed.some((item) => item.date === p.date && item.name.toLowerCase().includes('gajian'))
+          );
+          if (missingPaydays.length > 0) {
+            const merged = [...parsed, ...missingPaydays].sort((a, b) => a.date.localeCompare(b.date));
+            safeSetStorage('smart_absensi_holidays', JSON.stringify(merged));
+            return merged;
+          }
+          return parsed;
+        }
       } catch (e) {
         console.error('Failed to parse saved holidays:', e);
       }
     }
 
-    const defaultHolidays: HolidayRecord[] = [
+    const baseHolidays: HolidayRecord[] = [
       { id: 'hol_1001', date: '2026-01-01', name: 'Tahun Baru 2026 Masehi', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Nasional', created_at: new Date().toISOString() },
       { id: 'hol_1002', date: '2026-01-05', name: 'Rapat Dinas Awal Semester Genap', type: 'RAPAT', category_type: 'SCHEDULE', is_holiday: false, description: 'Rapat koordinasi guru dan wali kelas di aula utama (Tetap Presensi)', created_at: new Date().toISOString() },
       { id: 'hol_1003', date: '2026-01-16', name: 'Isra Mikraj Nabi Muhammad SAW', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
@@ -1100,6 +1113,10 @@ export class MockProvider implements IDataProvider {
       { id: 'hol_1023', date: '2026-12-25', name: 'Hari Raya Natal', type: 'NATIONAL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Keagamaan', created_at: new Date().toISOString() },
       { id: 'hol_1024', date: '2026-12-28', name: 'Libur Akhir Semester Ganjil T.A 2026/2027', type: 'SCHOOL_HOLIDAY', category_type: 'HOLIDAY', is_holiday: true, description: 'Libur Semester Sekolah', created_at: new Date().toISOString() },
     ];
+
+    const defaultHolidays: HolidayRecord[] = [...paydays2026, ...baseHolidays].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
 
     safeSetStorage('smart_absensi_holidays', JSON.stringify(defaultHolidays));
     return defaultHolidays;

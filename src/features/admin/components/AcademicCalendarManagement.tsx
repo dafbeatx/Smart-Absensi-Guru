@@ -192,6 +192,10 @@ export const AcademicCalendarManagement: React.FC = () => {
 
   // Helper formatting for holiday type badges
   const getTypeBadge = (item: HolidayRecord) => {
+    if (item.name.toLowerCase().includes('gajian') || item.name.toLowerCase().includes('gaji')) {
+      return <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-950 border border-emerald-300">💰 Hari Gajian</span>;
+    }
+
     const isSchedule =
       item.category_type === 'SCHEDULE' ||
       item.is_holiday === false ||

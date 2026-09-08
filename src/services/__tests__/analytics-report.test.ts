@@ -315,6 +315,34 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
     holidayCheckNew.isOff === true && holidayCheckNew.reason.includes('Hari Libur Khusus Yayasan')
   );
 
+  // Test 14: Monthly Payday Calendar & Notification Engine (Setiap Bulan Tanggal 10)
+  const { generatePaydayEventsForYear, isPaydayDate } = await import('../../utils/time.utils');
+  const paydays2026 = generatePaydayEventsForYear(2026);
+
+  assert(
+    'Monthly Payday - Generates exactly 12 payday events for the entire year 2026',
+    paydays2026.length === 12
+  );
+  assert(
+    'Monthly Payday - Every payday event is on the 10th of the month',
+    paydays2026.every((p) => p.date.endsWith('-10'))
+  );
+  assert(
+    'Monthly Payday - Configured as SCHEDULE with is_holiday false (tetap masuk & presensi)',
+    paydays2026.every((p) => p.category_type === 'SCHEDULE' && p.is_holiday === false)
+  );
+  assert(
+    'Monthly Payday - isPaydayDate helper detects 10th correctly',
+    isPaydayDate('2026-08-10') === true && isPaydayDate('2026-08-11') === false
+  );
+
+  // Payday on August 10, 2026 is a Monday (Senin) -> not an off day!
+  const paydayOffCheck = isDateOffDay('2026-08-10', { saturday_is_holiday: true, sunday_is_holiday: true }, paydays2026);
+  assert(
+    'Monthly Payday - Payday on working day (Senin 10 Agustus) is active working day (isOff is false)',
+    paydayOffCheck.isOff === false
+  );
+
   return { passed, failed, results };
 };
 

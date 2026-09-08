@@ -71,7 +71,7 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
-import { isDateOffDay, getTodayDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays } from '../../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays, isPaydayDate } from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
@@ -1037,6 +1037,48 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       } catch (err) {
         console.warn('Failed to detect unabsented working days for guru:', err);
       }
+
+      // 10. Automated Payday Detection & Notification Push (Setiap Bulan Tanggal 10)
+      try {
+        const todayDate = new Date();
+        const isPayday = isPaydayDate(todayDate);
+        const currentYearMonth = getTodayDateInJakarta().substring(0, 7);
+        const paydayDateStr = `${currentYearMonth}-10`;
+        const paydayNotifId = `notif_payday_${effectiveUser.id}_${paydayDateStr}`;
+        const isPaydayRead = NotificationService.isNotificationRead(effectiveUser.id, paydayNotifId);
+
+        if (isPayday) {
+          const paydayNotif: AppNotification = {
+            id: paydayNotifId,
+            user_id: effectiveUser.id,
+            title: '💰 Hari Gajian Telah Tiba! (Tanggal 10)',
+            message: `Selamat Bapak/Ibu ${effectiveUser.full_name || 'Guru'}! Hari ini tanggal 10 adalah Hari Gajian. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang.`,
+            type: 'SUCCESS',
+            is_read: isPaydayRead,
+            created_at: `${paydayDateStr}T07:00:00.000Z`,
+          };
+
+          setNotifications((prev) => {
+            const existingIdx = prev.findIndex(
+              (n) => n.id === paydayNotifId || (n.title.includes('Hari Gajian') && n.created_at.startsWith(currentYearMonth))
+            );
+            if (existingIdx !== -1) {
+              return prev.map((n, idx) =>
+                idx === existingIdx
+                  ? { ...n, is_read: Boolean(n.is_read) || isPaydayRead }
+                  : n
+              );
+            }
+            return [paydayNotif, ...prev];
+          });
+
+          if (!isPaydayRead) {
+            NotificationService.notifyPayday(effectiveUser.full_name, paydayDateStr, effectiveUser.id);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to process payday notification:', err);
+      }
     };
 
     loadAllData();
@@ -1672,6 +1714,36 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
           <>
+            {/* 💰 BANNER PENGINGAT HARI GAJIAN (SETIAP BULAN TANGGAL 10) */}
+            {isPaydayDate(new Date()) && (
+              <div
+                onClick={() => setIsEventsCalendarModalOpen(true)}
+                className="bg-linear-to-r from-emerald-800 via-teal-800 to-[#023246] rounded-3xl p-3.5 sm:p-4 text-white shadow-md border border-emerald-400/40 flex items-center justify-between gap-3 cursor-pointer hover:brightness-105 active:scale-[0.99] transition-all"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-xl shrink-0">
+                    💰
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 bg-amber-300 text-amber-950 text-[9.5px] font-black rounded-md tracking-wider uppercase shadow-2xs">
+                        HARI GAJIAN TELAH TIBA
+                      </span>
+                      <span className="text-[10.5px] text-emerald-200 font-bold">
+                        Setiap Tanggal 10
+                      </span>
+                    </div>
+                    <p className="text-xs font-black truncate leading-tight mt-1 text-white">
+                      Selamat menerima hak gaji bulanan Bapak/Ibu Guru &amp; Staf! Tetap lakukan presensi masuk &amp; pulang.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs text-amber-200 hover:text-white font-black shrink-0 hidden sm:inline-block">
+                  Lihat Kalender →
+                </span>
+              </div>
+            )}
+
             {/* 📢 BANNER PENGINGAT JADWAL AGENDA HARI INI (RAPAT / UTS / UAS / UPACARA) */}
             {todaySchedule && (
               <div

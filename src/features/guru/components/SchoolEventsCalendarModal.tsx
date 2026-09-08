@@ -193,6 +193,9 @@ export const SchoolEventsCalendarModal: React.FC<SchoolEventsCalendarModalProps>
   }, [holidays, selectedCategory, searchQuery, getEventCategory, isScheduleEvent]);
 
   const getCategoryBadge = (item: HolidayRecord) => {
+    if (item.name.toLowerCase().includes('gajian') || item.name.toLowerCase().includes('gaji')) {
+      return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-950 border border-emerald-300 text-[10px] font-black rounded-lg shrink-0">💰 Hari Gajian</span>;
+    }
     const cat = getEventCategory(item);
     switch (cat) {
       case 'RAPAT':

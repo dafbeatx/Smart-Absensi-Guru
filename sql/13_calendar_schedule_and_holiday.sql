@@ -32,3 +32,27 @@ ON public.holidays (date, category_type);
 
 -- 5. Muat ulang cache skema Supabase PostgREST
 NOTIFY pgrst, 'reload schema';
+
+-- 6. Insert Otomatis Jadwal Agenda Rutin: Hari Gajian Guru & Staf (Setiap Bulan Tanggal 10)
+-- Kategori: SCHEDULE, is_holiday: FALSE (Tetap Masuk & Presensi Normal)
+INSERT INTO public.holidays (id, date, name, type, category_type, is_holiday, description)
+VALUES
+  ('hol_payday_2026_01', '2026-01-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_02', '2026-02-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_03', '2026-03-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_04', '2026-04-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_05', '2026-05-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_06', '2026-06-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_07', '2026-07-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_08', '2026-08-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_09', '2026-09-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_10', '2026-10-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_11', '2026-11-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.'),
+  ('hol_payday_2026_12', '2026-12-10', 'Hari Gajian Guru & Staf', 'OTHER', 'SCHEDULE', FALSE, 'Penggajian bulanan guru dan staf sekolah. Tetap masuk & presensi.')
+ON CONFLICT (id) DO UPDATE SET 
+  name = EXCLUDED.name,
+  type = EXCLUDED.type,
+  category_type = EXCLUDED.category_type,
+  is_holiday = EXCLUDED.is_holiday,
+  description = EXCLUDED.description;
+

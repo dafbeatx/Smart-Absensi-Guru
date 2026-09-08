@@ -4,7 +4,7 @@ import { ProviderFactory } from '../../providers/provider-factory';
 import { SoundService } from '../../services/audio.service';
 import { NotificationService } from '../../services/notification-permission.service';
 import type { AttendanceRecord, LeaveRequest, UserProfile } from '../../types/database.types';
-import { isDateOffDay, getTodayDateInJakarta } from '../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta, isPaydayDate } from '../../utils/time.utils';
 
 export interface DynamicNotificationItem {
   id: string;
@@ -191,6 +191,22 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
             actionDate: todayIso,
           });
         }
+      }
+
+      // Payday Notification on the 10th of every month
+      if (isPaydayDate(new Date())) {
+        const paydayBellId = `notif_payday_bell_${user?.id || 'user'}_${todayIso}`;
+        items.push({
+          id: paydayBellId,
+          category: 'SYSTEM_ALERT',
+          title: '💰 Hari Gajian Telah Tiba! (Tanggal 10)',
+          message: 'Hari ini adalah tanggal 10, jadwal penggajian bulanan untuk seluruh guru dan staf sekolah.',
+          time: 'Tanggal 10',
+          badgeType: 'SUCCESS',
+          isRead: currentReadSet.has(paydayBellId),
+          actionType: 'NAVIGATE_TAB',
+          actionDate: todayIso,
+        });
       }
 
       // 4. Real-time Cached Events & System Notifications

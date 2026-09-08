@@ -315,6 +315,24 @@ class NotificationPermissionService {
   }
 
   /**
+   * Helper: Trigger Notifikasi Hari Gajian Bulanan untuk Guru & Staf (Setiap Tanggal 10)
+   */
+  public notifyPayday(teacherName?: string, dateStr?: string, userId?: string) {
+    const targetDate = dateStr || new Date().toISOString().substring(0, 10);
+    const greeting = teacherName ? `Bapak/Ibu ${teacherName}` : 'Bapak/Ibu Guru & Staf';
+    this.sendNativeNotification({
+      id: `notif_payday_${userId || 'all'}_${targetDate}`,
+      title: `💰 Hari Gajian Telah Tiba! (${targetDate})`,
+      body: `Selamat ${greeting}! Hari ini tanggal 10 adalah Hari Gajian. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang!`,
+      type: 'EVENT',
+      teacherName,
+      userId,
+      roleTarget: 'ALL',
+      actionDate: targetDate,
+    });
+  }
+
+  /**
    * Helper: Trigger Notifikasi Pengajuan Izin Baru untuk Admin / Kepsek
    */
   public notifyTeacherLeaveRequest(teacherName: string, leaveType: string, reason: string) {

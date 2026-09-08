@@ -1,4 +1,5 @@
 import { CONSTANTS } from '../config/constants';
+import type { HolidayRecord } from '../types/database.types';
 
 /**
  * Helper utility for formatting and sanitizing time values for HTML5 <input type="time">
@@ -347,6 +348,43 @@ export function getMonthWorkingDays(
     isFutureMonth,
     workingDates,
   };
+}
+
+/**
+ * Memeriksa apakah suatu tanggal merupakan Hari Gajian (setiap tanggal 10).
+ */
+export function isPaydayDate(targetDate: string | Date = new Date()): boolean {
+  if (!targetDate) return false;
+  if (typeof targetDate === 'string') {
+    const parts = targetDate.split('-');
+    if (parts.length >= 3) {
+      return parseInt(parts[2], 10) === 10;
+    }
+  }
+  const d = targetDate instanceof Date ? targetDate : new Date(targetDate);
+  return !isNaN(d.getTime()) && d.getDate() === 10;
+}
+
+/**
+ * Menghasilkan entri kalender Hari Gajian Guru & Staf (SCHEDULE, is_holiday: false)
+ * untuk setiap bulan tanggal 10 pada tahun yang ditentukan.
+ */
+export function generatePaydayEventsForYear(year: number = 2026): HolidayRecord[] {
+  const events: HolidayRecord[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const monthPad = String(m).padStart(2, '0');
+    events.push({
+      id: `hol_payday_${year}_${monthPad}`,
+      date: `${year}-${monthPad}-10`,
+      name: 'Hari Gajian Guru & Staf',
+      type: 'OTHER' as const,
+      category_type: 'SCHEDULE' as const,
+      is_holiday: false,
+      description: 'Penggajian bulanan dewan guru dan karyawan sekolah. Tetap masuk & presensi.',
+      created_at: new Date().toISOString(),
+    });
+  }
+  return events;
 }
 
 
