@@ -188,7 +188,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
 
       {/* Layer 1: Main Sheet / Mobile-Optimized Modal Container */}
       <div
-        className="relative w-full max-w-[500px] bg-[#F8FAFC] rounded-t-[30px] sm:rounded-[28px] shadow-2xl border-t sm:border border-slate-200/80 flex flex-col max-h-[92vh] sm:max-h-[88vh] z-10 overflow-hidden transition-all duration-300"
+        className="relative w-full max-w-125 bg-[#F8FAFC] rounded-t-[30px] sm:rounded-[28px] shadow-2xl border-t sm:border border-slate-200/80 flex flex-col max-h-[92vh] sm:max-h-[88vh] z-10 overflow-hidden transition-all duration-300"
         role="dialog"
         aria-modal="true"
         aria-labelledby="point-history-title"
@@ -202,7 +202,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
         <div className="px-4 sm:px-5 py-3 sm:py-3.5 bg-white border-b border-slate-200/80 shrink-0">
           <div className="flex items-center justify-between gap-2.5">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#023246] to-[#18536B] text-white flex items-center justify-center shadow-xs shrink-0 ring-2 ring-slate-100">
+              <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-[#023246] to-[#18536B] text-white flex items-center justify-center shadow-xs shrink-0 ring-2 ring-slate-100">
                 <Sparkles className="w-5 h-5 text-amber-300" />
               </div>
               <div className="min-w-0 flex-1">
@@ -232,7 +232,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
         {/* Scrollable Multi-Layer Content Stage */}
         <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3.5 overscroll-contain">
           {/* Layer 3: The Teacher Identity & Vault Hero Card (Multi-level Depth) */}
-          <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#023246] via-[#0A4158] to-[#012230] text-white p-4 sm:p-4.5 border border-[#18536B]/60 shadow-md relative overflow-hidden space-y-3.5">
+          <div className="rounded-2xl sm:rounded-3xl bg-linear-to-br from-[#023246] via-[#0A4158] to-[#012230] text-white p-4 sm:p-4.5 border border-[#18536B]/60 shadow-md relative overflow-hidden space-y-3.5">
             {/* Background Accent Lines */}
             <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/5 blur-2xl pointer-events-none" />
             <div className="absolute right-4 bottom-2 opacity-10 pointer-events-none text-white">
@@ -285,7 +285,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
                 <div className="flex items-center gap-2 mt-1.5">
                   <div className="flex-1 h-1.5 rounded-full bg-white/20 overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full transition-all duration-500"
+                      className="h-full bg-linear-to-r from-amber-400 to-amber-300 rounded-full transition-all duration-500"
                       style={{ width: `${levelProgress.percent}%` }}
                     />
                   </div>
