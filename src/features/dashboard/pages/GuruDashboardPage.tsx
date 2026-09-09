@@ -2576,17 +2576,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               }
 
               // 5. Poin Apresiasi Dedikasi
-              const appreciation = calculateTeacherAppreciationScore(
-                attendanceHistory,
-                _dutySchedules,
-                todayMood,
-                effectiveUser?.id
-              );
               items.push({
                 id: 'appreciation',
                 icon: <span className="text-base">⭐</span>,
-                title: `Poin Apresiasi: ${appreciation.totalPoints} Poin`,
-                description: `${appreciation.level} • Dedikasi pengajar bulan ini`,
+                title: `Poin Apresiasi: ${appreciationScore.totalPoints} Poin`,
+                description: `${appreciationScore.level} • Dedikasi pengajar bulan ini`,
                 action: () => setIsDisciplineBadgeModalOpen(true),
                 badge: 'Peringkat & Layer →',
                 badgeColor: 'text-amber-800 bg-amber-50 border-amber-300',
@@ -4220,8 +4214,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <TeacherPointHistoryModal
         isOpen={isPointHistoryModalOpen}
         onClose={() => setIsPointHistoryModalOpen(false)}
-        teacher={effectiveUser}
+        teacher={{
+          ...effectiveUser,
+          totalPoints: appreciationScore?.totalPoints ?? 0,
+        }}
         pointHistory={pointHistory}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
       />
 
       {/* 15. Modal Pop-up Apresiasi Kehormatan Juara 1, 2, dan 3 */}

@@ -48,9 +48,26 @@ export interface TeacherPointHistoryModalProps {
   } | UserProfile | null;
   pointHistory: TeacherPointLog[];
   isLoading?: boolean;
+  selectedMonth?: number;
+  selectedYear?: number;
 }
 
 type FilterType = 'ALL' | 'ON_TIME' | 'LATE' | 'CHECK_OUT' | 'DUTY' | 'OTHER';
+
+const MONTH_NAMES_ID: Record<string, string> = {
+  '01': 'Januari',
+  '02': 'Februari',
+  '03': 'Maret',
+  '04': 'April',
+  '05': 'Mei',
+  '06': 'Juni',
+  '07': 'Juli',
+  '08': 'Agustus',
+  '09': 'September',
+  '10': 'Oktober',
+  '11': 'November',
+  '12': 'Desember',
+};
 
 export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> = ({
   isOpen,
@@ -58,9 +75,44 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
   teacher,
   pointHistory = [],
   isLoading = false,
+  selectedMonth,
+  selectedYear,
 }) => {
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [isRulesExpanded, setIsRulesExpanded] = useState(false);
+
+  // Periode default: gunakan selectedYear-selectedMonth dari props, atau bulan berjalan saat ini
+  const defaultPeriodStr = useMemo(() => {
+    if (selectedYear && selectedMonth) {
+      return `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    }
+    const now = new Date();
+    const yr = now.getFullYear();
+    const mo = String(now.getMonth() + 1).padStart(2, '0');
+    return `${yr}-${mo}`;
+  }, [selectedYear, selectedMonth]);
+
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(defaultPeriodStr);
+
+  // Sinkronkan periode saat modal dibuka
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedPeriod(defaultPeriodStr);
+      setFilterType('ALL');
+    }
+  }, [isOpen, defaultPeriodStr]);
+
+  // Ekstraksi seluruh periode unik yang ada di riwayat poin + defaultPeriod
+  const availablePeriods = useMemo(() => {
+    const periodSet = new Set<string>();
+    periodSet.add(defaultPeriodStr);
+    (pointHistory || []).forEach((l) => {
+      if (l.date && l.date.length >= 7) {
+        periodSet.add(l.date.substring(0, 7));
+      }
+    });
+    return Array.from(periodSet).sort().reverse();
+  }, [pointHistory, defaultPeriodStr]);
 
   const teacherName = teacher?.full_name || (teacher as any)?.name || 'Guru Pendidik';
   const teacherNpp = teacher?.nip || null;
@@ -70,27 +122,53 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
       ? (teacher as any).totalPoints
       : 0;
 
+  // 1. Filter log berdasarkan periode bulan yang dipilih (reset awal bulan per tanggal 1)
+  const periodFilteredLogs = useMemo(() => {
+    let logs = pointHistory || [];
+    if (selectedPeriod !== 'ALL') {
+      logs = logs.filter((l) => l.date && l.date.startsWith(selectedPeriod));
+    }
+    // Urutkan strictly descending: tanggal terbaru di paling atas
+    return [...logs].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [pointHistory, selectedPeriod]);
+
+  // 2. Hitung total saldo poin untuk periode yang dipilih (reset ke 0 pada tanggal 1 awal bulan)
   const calculatedTotal = useMemo(() => {
-    if (pointHistory.length > 0) {
+    if (selectedPeriod === 'ALL') {
       return Math.max(0, pointHistory.reduce((sum, p) => sum + (p.points || 0), 0));
     }
-    return fallbackPoints;
-  }, [pointHistory, fallbackPoints]);
-
-  // Evaluasi Tier / Level Disiplin
-  const teacherLevel = useMemo(() => {
-    if (teacher && 'level' in teacher && teacher.level) {
-      return (teacher as any).level;
+    const currentLogs = pointHistory.filter((p) => p.date && p.date.startsWith(selectedPeriod));
+    if (currentLogs.length > 0) {
+      return Math.max(0, currentLogs.reduce((sum, p) => sum + (p.points || 0), 0));
     }
+    // Jika bulan berjalan belum ada log sama sekali (tanggal 1 awal bulan), poin mulai dari 0
+    if (selectedPeriod === defaultPeriodStr && fallbackPoints > 0 && pointHistory.length === 0) {
+      return fallbackPoints;
+    }
+    return 0;
+  }, [pointHistory, selectedPeriod, defaultPeriodStr, fallbackPoints]);
+
+  // Evaluasi Tier / Level Disiplin berdasarkan saldo periode terpilih
+  const teacherLevel = useMemo(() => {
+    if (calculatedTotal >= 80) return '🏆 Level 4: Pendidik Teladan Utama';
     if (calculatedTotal >= 65) return '🥇 Level 3: Pendidik Disiplin Emas';
     if (calculatedTotal >= 50) return '🥈 Level 2: Pendidik Berdedikasi';
-    return '🥉 Level 1: Pendidik Teladan Pemula';
-  }, [calculatedTotal, teacher]);
+    if (calculatedTotal > 0) return '🥉 Level 1: Pendidik Berkomitmen';
+    return '🌱 Level 0: Awal Periode (0 Poin)';
+  }, [calculatedTotal]);
 
   const levelProgress = useMemo(() => {
+    if (calculatedTotal >= 80) {
+      return { percent: 100, label: 'Level Teladan Maksimal' };
+    }
     if (calculatedTotal >= 65) {
       const progress = Math.min(100, Math.round(((calculatedTotal - 65) / 15) * 100));
-      return { percent: progress, label: 'Level Maksimal Tercapai' };
+      return { percent: progress, label: `${80 - calculatedTotal} poin lagi ke Teladan Utama` };
     }
     if (calculatedTotal >= 50) {
       const progress = Math.min(100, Math.round(((calculatedTotal - 50) / 15) * 100));
@@ -100,8 +178,9 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
     return { percent: progress, label: `${50 - calculatedTotal} poin lagi ke Level 2` };
   }, [calculatedTotal]);
 
+  // 3. Filter berdasarkan kategori aktivitas di dalam periode aktif
   const filteredLogs = useMemo(() => {
-    return pointHistory.filter((log) => {
+    return periodFilteredLogs.filter((log) => {
       if (filterType === 'ALL') return true;
       if (filterType === 'ON_TIME') return log.activity_type === 'CHECK_IN_ON_TIME';
       if (filterType === 'LATE') return log.activity_type === 'CHECK_IN_LATE';
@@ -117,21 +196,21 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
       }
       return true;
     });
-  }, [pointHistory, filterType]);
+  }, [periodFilteredLogs, filterType]);
 
-  // Statistik ringkasan
+  // 4. Statistik ringkasan periode aktif
   const stats = useMemo(() => {
-    const onTimeCount = pointHistory.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
-    const lateCount = pointHistory.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
-    const checkOutCount = pointHistory.filter((l) => l.activity_type === 'CHECK_OUT').length;
-    const dutyCount = pointHistory.filter((l) => l.activity_type === 'DUTY_PIKET').length;
+    const onTimeCount = periodFilteredLogs.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
+    const lateCount = periodFilteredLogs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
+    const checkOutCount = periodFilteredLogs.filter((l) => l.activity_type === 'CHECK_OUT').length;
+    const dutyCount = periodFilteredLogs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
     return {
       onTime: { count: onTimeCount, points: onTimeCount * 15 },
       late: { count: lateCount, points: lateCount * 5 },
       checkOut: { count: checkOutCount, points: checkOutCount * 10 },
       duty: { count: dutyCount, points: dutyCount * 10 },
     };
-  }, [pointHistory]);
+  }, [periodFilteredLogs]);
 
   if (!isOpen) return null;
 
@@ -320,6 +399,78 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
             </div>
           </div>
 
+          {/* Layer 3.5: Monthly Cycle Switcher & Reset Transparency Banner */}
+          <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center text-xs shrink-0">
+                  <Calendar className="w-4 h-4 text-amber-700" />
+                </div>
+                <div>
+                  <span className="text-xs font-black text-slate-900 block leading-tight">
+                    Periode Evaluasi Poin
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Siklus bulanan • Reset ke 0 tiap tgl 1
+                  </span>
+                </div>
+              </div>
+
+              {/* Segmented Period Tabs */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 overflow-x-auto scrollbar-none">
+                {availablePeriods.map((p) => {
+                  const [yr, mo] = p.split('-');
+                  const label = `${MONTH_NAMES_ID[mo] || mo} ${yr}`;
+                  const isCurrent = p === defaultPeriodStr;
+                  const isSelected = selectedPeriod === p;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPeriod(p);
+                        setFilterType('ALL');
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#023246] text-white shadow-xs font-black'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                      }`}
+                    >
+                      {label} {isCurrent && '🌟'}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPeriod('ALL');
+                    setFilterType('ALL');
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
+                    selectedPeriod === 'ALL'
+                      ? 'bg-[#023246] text-white shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                  }`}
+                >
+                  Semua
+                </button>
+              </div>
+            </div>
+
+            {/* Info Reset Tanggal 1 Awal Bulan */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60 text-[10.5px] text-emerald-900 font-medium">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>
+                {selectedPeriod === 'ALL'
+                  ? 'Menampilkan akumulasi seluruh riwayat sejak awal pendataan.'
+                  : selectedPeriod === defaultPeriodStr
+                  ? `Menampilkan poin berjalan periode ${MONTH_NAMES_ID[defaultPeriodStr.split('-')[1]]} ${defaultPeriodStr.split('-')[0]} (dimulai dari 0 pada 1 ${MONTH_NAMES_ID[defaultPeriodStr.split('-')[1]]}).`
+                  : `Menampilkan arsip riwayat poin periode ${MONTH_NAMES_ID[selectedPeriod.split('-')[1]] || ''} ${selectedPeriod.split('-')[0]}.`}
+              </span>
+            </div>
+          </div>
+
           {/* Layer 4: 4-Tier Multi-Depth Metric Inset Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
             {/* On-Time Tile */}
@@ -483,7 +634,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Semua ({pointHistory.length})
+              Semua ({periodFilteredLogs.length})
             </button>
             <button
               type="button"

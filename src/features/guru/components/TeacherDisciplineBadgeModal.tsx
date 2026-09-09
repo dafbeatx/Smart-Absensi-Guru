@@ -1029,6 +1029,8 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
         onClose={() => setIsPointHistoryModalOpen(false)}
         teacher={pointHistoryTeacher}
         pointHistory={teacherLogs}
+        selectedMonth={selectedPeriod === 'CURRENT_MONTH' ? 9 : 8}
+        selectedYear={2026}
       />
     </div>
   );

@@ -66,13 +66,23 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     };
   }, []);
 
+  const currentMonthPrefix = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }, []);
+
   const teacherPointsMap = useMemo(() => {
     const map: Record<string, number> = {};
     (allPointLogs || []).forEach((log) => {
-      map[log.user_id] = (map[log.user_id] || 0) + log.points;
+      // Siklus Poin Bulanan: Hanya hitung poin transaksi bulan berjalan (reset ke 0 pada tanggal 1 awal bulan)
+      if (log.date && log.date.startsWith(currentMonthPrefix)) {
+        map[log.user_id] = (map[log.user_id] || 0) + log.points;
+      }
     });
     return map;
-  }, [allPointLogs]);
+  }, [allPointLogs, currentMonthPrefix]);
 
   // Form states
   const [fullName, setFullName] = useState('');
@@ -1081,7 +1091,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
             setIsPointHistoryModalOpen(false);
             setSelectedTeacherForPoints(null);
           }}
-          teacher={selectedTeacherForPoints}
+          teacher={{
+            ...selectedTeacherForPoints,
+            totalPoints: teacherPointsMap[selectedTeacherForPoints.id] ?? 0,
+          }}
           pointHistory={allPointLogs.filter((l) => l.user_id === selectedTeacherForPoints.id)}
         />
       )}

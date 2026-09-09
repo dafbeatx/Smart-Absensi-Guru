@@ -47,10 +47,20 @@ export function calculateTeacherAppreciationScore(
     isUserDuty && rawHadirTepatWaktuCount + rawTerlambatCount > 0 ? 1 : 0
   );
 
-  // Sinkronkan hitungan dengan pointHistory ledger jika tersedia
-  const historyOnTimeCount = (pointHistory || []).filter((p) => p.activity_type === 'CHECK_IN_ON_TIME').length;
-  const historyLateCount = (pointHistory || []).filter((p) => p.activity_type === 'CHECK_IN_LATE').length;
-  const historyPiketCount = (pointHistory || []).filter((p) => p.activity_type === 'DUTY_PIKET').length;
+  // Isolasi per-bulan: ambil prefix bulan dari attendanceHistory (misal '2026-09') atau bulan berjalan
+  const targetMonthPrefix = (attendanceHistory && attendanceHistory.length > 0 && attendanceHistory[0]?.date)
+    ? attendanceHistory[0].date.substring(0, 7)
+    : new Date().toISOString().substring(0, 7);
+
+  // Filter buku besar poin agar HANYA menghitung transaksi di bulan terpilih (reset ke 0 setiap tanggal 1 awal bulan)
+  const monthlyPointLogs = (pointHistory || []).filter(
+    (p) => p.date && p.date.startsWith(targetMonthPrefix)
+  );
+
+  // Sinkronkan hitungan dengan monthlyPointLogs ledger jika tersedia
+  const historyOnTimeCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_ON_TIME').length;
+  const historyLateCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_LATE').length;
+  const historyPiketCount = monthlyPointLogs.filter((p) => p.activity_type === 'DUTY_PIKET').length;
 
   const hadirTepatWaktuCount = Math.max(rawHadirTepatWaktuCount, historyOnTimeCount);
   const terlambatCount = Math.max(rawTerlambatCount, historyLateCount);
@@ -67,9 +77,9 @@ export function calculateTeacherAppreciationScore(
   const alfaPenalty = alfaCount * 10;
   const calculatedPoints = Math.max(0, attendancePoints + dutyPoints - alfaPenalty);
 
-  // Jika riwayat transaksi poin tersedia, gunakan akumulasi ledger poin
-  const totalPoints = (pointHistory && pointHistory.length > 0)
-    ? Math.max(0, pointHistory.reduce((sum, p) => sum + (p.points || 0), 0))
+  // Jika riwayat transaksi poin bulanan tersedia, gunakan akumulasi ledger poin bulan berjalan
+  const totalPoints = (monthlyPointLogs.length > 0)
+    ? Math.max(0, monthlyPointLogs.reduce((sum, p) => sum + (p.points || 0), 0))
     : calculatedPoints;
 
   // Penentuan Level Apresiasi Berbasis Poin Kehadiran Riil
@@ -527,9 +537,13 @@ export function getTeacherDisciplineLeaderboard(
   let teachers = isCurrent ? [...currentMonthTeachers] : [...previousMonthTeachers];
 
   // Pembaruan dinamis skor dan perolehan poin seluruh guru jika allPointLogs tersedia
-  if (isCurrent && allPointLogs && allPointLogs.length > 0) {
+  // Wajib difilter per-bulan berjalan / per-bulan target agar tidak terjadi akumulasi lintas bulan
+  if (allPointLogs && allPointLogs.length > 0) {
+    const targetMonthPrefix = isCurrent ? '2026-09' : '2026-08';
     teachers = teachers.map((t) => {
-      const logs = allPointLogs.filter((l) => l.user_id === t.id);
+      const logs = allPointLogs.filter(
+        (l) => l.user_id === t.id && l.date && l.date.startsWith(targetMonthPrefix)
+      );
       if (logs.length === 0) return t;
 
       const pts = Math.max(0, logs.reduce((sum, l) => sum + (l.points || 0), 0));
