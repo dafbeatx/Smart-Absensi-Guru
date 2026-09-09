@@ -218,6 +218,7 @@ export interface TeacherBadge {
 export type TeacherPointActivityType =
   | 'CHECK_IN_ON_TIME'
   | 'CHECK_IN_LATE'
+  | 'CHECK_OUT'
   | 'DUTY_PIKET'
   | 'BONUS_DISCIPLINE'
   | 'PENALTY_ALFA'

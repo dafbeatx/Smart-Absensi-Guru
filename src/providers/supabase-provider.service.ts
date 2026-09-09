@@ -394,6 +394,27 @@ export class SupabaseProvider implements IDataProvider {
           throw new Error('Gagal mencatat absensi pulang: ' + updateErr.message);
         }
 
+        // AUTOMATIC TEACHER POINT RECORDING (Check-out Pulang Sekolah)
+        try {
+          const checkoutPts = isEarlyCheckout ? 5 : 10;
+          const checkoutTitle = isEarlyCheckout
+            ? 'Presensi Pulang Sekolah (Sebelum Jam Dinas)'
+            : 'Presensi Pulang Tuntas Bertugas';
+          const checkoutDesc = `Tercatat menyelesaikan dinas sekolah pada pukul ${timeStr} via ${vMethod || 'QR'}`;
+
+          await this.recordTeacherPoint({
+            user_id: userId,
+            teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
+            date: todayStr,
+            points: checkoutPts,
+            activity_type: 'CHECK_OUT',
+            title: checkoutTitle,
+            description: checkoutDesc,
+          });
+        } catch (ePoint) {
+          logger.warn('SupabaseProvider', 'Failed to auto-record teacher points on check-out:', ePoint);
+        }
+
         return {
           attendance_id: existing.id,
           status: (existing.status as AttendanceStatus) || status,
@@ -3128,7 +3149,14 @@ export class SupabaseProvider implements IDataProvider {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('smart_absensi_points_updated', {
-            detail: { userId: log.user_id, points: log.points, activity_type: log.activity_type },
+            detail: {
+              userId: log.user_id,
+              teacherName: log.teacher_name,
+              points: log.points,
+              activity_type: log.activity_type,
+              title: log.title,
+              description: log.description,
+            },
           })
         );
       }

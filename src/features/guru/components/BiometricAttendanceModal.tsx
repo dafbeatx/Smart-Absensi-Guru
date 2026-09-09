@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
-import { PointRewardCelebrationOverlay } from '../../../components/ui/PointRewardCelebrationOverlay';
 import type { PointRewardData } from '../../../components/ui/PointRewardCelebrationOverlay';
+import { usePointRewardStore } from '../../../store/usePointRewardStore';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { BiometricService } from '../../../services/biometric.service';
@@ -64,7 +64,6 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     status: string;
   } | null>(null);
   const [pointRewardData, setPointRewardData] = useState<PointRewardData | null>(null);
-  const [isPointCelebrationOpen, setIsPointCelebrationOpen] = useState(false);
 
   const effectiveAllowedRadius = getEffectiveAllowedRadius(settings.geofence_radius);
 
@@ -169,10 +168,12 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
 
       // Hitung perolehan poin kedisiplinan
       const isCheckIn = scanRes.attendance_action === 'CHECK_IN' || !scanRes.attendance_action;
+      const isCheckOut = scanRes.attendance_action === 'CHECK_OUT';
       const isLate = (scanRes.status || '').toUpperCase() === 'TERLAMBAT';
       let earnedPoints = 0;
       let pointReason = '';
       let attendancePoints = 0;
+      let checkoutPoints = 0;
 
       if (isCheckIn) {
         if (!isLate) {
@@ -183,22 +184,28 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
           pointReason = 'Kehadiran Masuk Sekolah (> 07:30 WIB)';
         }
         earnedPoints = attendancePoints;
+      } else if (isCheckOut) {
+        checkoutPoints = 10;
+        earnedPoints = 10;
+        pointReason = 'Presensi Pulang Sekolah (Tuntas Bertugas)';
+      } else {
+        // ALREADY_COMPLETED
+        earnedPoints = 10;
+        pointReason = 'Presensi Lengkap Hari Ini (Tuntas Bertugas)';
       }
 
-      if (earnedPoints > 0) {
-        setPointRewardData({
-          points: earnedPoints,
-          status: scanRes.status || 'HADIR',
-          reason: pointReason,
-          breakdown: {
-            attendance: attendancePoints,
-          },
-          teacherName: user.full_name,
-          timestamp: successData.timestamp,
-        });
-      } else {
-        setPointRewardData(null);
-      }
+      const rewardData: PointRewardData = {
+        points: earnedPoints,
+        status: scanRes.status || 'HADIR',
+        reason: pointReason,
+        breakdown: {
+          attendance: attendancePoints > 0 ? attendancePoints : undefined,
+          checkout: checkoutPoints > 0 ? checkoutPoints : undefined,
+        },
+        teacherName: user.full_name,
+        timestamp: successData.timestamp,
+      };
+      setPointRewardData(rewardData);
 
       setAttendanceSuccess(successData);
       onSuccess({
@@ -311,23 +318,16 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
   };
 
   const handleModalClose = () => {
-    if (attendanceSuccess && pointRewardData && pointRewardData.points > 0) {
-      setIsPointCelebrationOpen(true);
-    } else {
-      onClose();
+    if (pointRewardData && pointRewardData.points > 0) {
+      usePointRewardStore.getState().triggerCelebration(pointRewardData);
     }
-  };
-
-  const handleCelebrationClose = () => {
-    setIsPointCelebrationOpen(false);
-    setPointRewardData(null);
     onClose();
   };
 
   return (
     <>
       <Modal
-        isOpen={isOpen && !isPointCelebrationOpen}
+        isOpen={isOpen}
         onClose={handleModalClose}
         title="Presensi Sidik Jari HP"
         maxWidth="md"
@@ -561,13 +561,6 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         )}
         </div>
       </Modal>
-
-      {/* 🌟 Popup Apresiasi Poin Kedisiplinan (Tanpa Card) */}
-      <PointRewardCelebrationOverlay
-        isOpen={isPointCelebrationOpen}
-        onClose={handleCelebrationClose}
-        data={pointRewardData}
-      />
     </>
   );
 };

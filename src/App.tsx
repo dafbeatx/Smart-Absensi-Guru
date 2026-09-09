@@ -11,6 +11,8 @@ import { GPSService } from './services/gps.service';
 import { AuthRepository } from './repositories/AuthRepository';
 import { TelegramService } from './services/telegram.service';
 import { getTodayDateInJakarta } from './utils/time.utils';
+import { PointRewardCelebrationOverlay } from './components/ui/PointRewardCelebrationOverlay';
+import { usePointRewardStore } from './store/usePointRewardStore';
 
 // Helper: retry a dynamic import once by reloading the page when the chunk
 // is missing (stale deployment).  Uses sessionStorage to prevent infinite loops.
@@ -76,6 +78,53 @@ export const App: React.FC = () => {
   const userPhone = user?.phone_number;
   const userNip = user?.nip;
   const userRole = user?.role;
+
+  const isCelebrationOpen = usePointRewardStore((s) => s.isOpen);
+  const celebrationData = usePointRewardStore((s) => s.data);
+  const closeCelebration = usePointRewardStore((s) => s.closeCelebration);
+
+  // Global listener: Setiap kali memperoleh poin (Guru, Admin, Kepsek), selalu munculkan pop-up apresiasi cardless
+  useEffect(() => {
+    const handlePointsUpdated = (e: Event) => {
+      const customEvt = e as CustomEvent<{
+        userId?: string;
+        teacherName?: string;
+        points?: number;
+        activity_type?: string;
+        title?: string;
+        description?: string;
+      }>;
+      const detail = customEvt.detail;
+      if (!detail || !detail.points || detail.points <= 0) return;
+
+      const currentAuthUser = useAuthStore.getState().user;
+      if (!currentAuthUser) return;
+
+      // Filter hanya untuk pengguna yang sedang aktif login
+      if (detail.userId && detail.userId !== currentAuthUser.id) return;
+
+      const teacherName = detail.teacherName || currentAuthUser.full_name || 'Bapak/Ibu Guru';
+      const reason = detail.title || detail.description || 'Apresiasi Poin Kedisiplinan';
+
+      usePointRewardStore.getState().triggerCelebration({
+        points: detail.points,
+        status: 'HADIR',
+        reason: reason,
+        breakdown: {
+          attendance: detail.activity_type?.includes('CHECK_IN') ? detail.points : undefined,
+          checkout: detail.activity_type === 'CHECK_OUT' ? detail.points : undefined,
+          piket: detail.activity_type === 'DUTY_PIKET' ? detail.points : undefined,
+        },
+        teacherName: teacherName,
+        timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+      });
+    };
+
+    window.addEventListener('smart_absensi_points_updated', handlePointsUpdated);
+    return () => {
+      window.removeEventListener('smart_absensi_points_updated', handlePointsUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     // Start Telegram silent background listener for /start and admin Groq AI queries
@@ -296,6 +345,13 @@ export const App: React.FC = () => {
       <AIAssistantDrawer />
       <AppInstallModal />
       <ToastContainer />
+
+      {/* 🌟 Global Apresiasi Poin Kedisiplinan Guru, Admin & Kepsek (Floating Cardless Award) */}
+      <PointRewardCelebrationOverlay
+        isOpen={isCelebrationOpen}
+        onClose={closeCelebration}
+        data={celebrationData}
+      />
     </>
   );
 };

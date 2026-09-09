@@ -8,8 +8,9 @@ export interface PointRewardData {
   status: 'HADIR' | 'TERLAMBAT' | string;
   reason: string;
   breakdown?: {
-    attendance: number;
+    attendance?: number;
     piket?: number;
+    checkout?: number;
   };
   teacherName: string;
   timestamp?: string;
@@ -93,7 +94,9 @@ export const PointRewardCelebrationOverlay: React.FC<PointRewardCelebrationOverl
 
   const cleanName = data.teacherName.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\.|S\.E\.|G\.r/g, '').trim();
   const isOnTime = data.status === 'HADIR' || data.reason.includes('Tepat Waktu');
+  const isCheckout = data.reason.includes('Pulang') || (data.breakdown?.checkout ?? 0) > 0;
   const hasDutyBonus = (data.breakdown?.piket ?? 0) > 0;
+  const hasCheckoutBonus = (data.breakdown?.checkout ?? 0) > 0;
 
   return (
     <div
@@ -151,7 +154,7 @@ export const PointRewardCelebrationOverlay: React.FC<PointRewardCelebrationOverl
         {/* 2. Floating Tagline */}
         <div className="flex items-center gap-1.5 text-amber-300 text-xs sm:text-sm font-black uppercase tracking-widest drop-shadow-[0_2px_10px_rgba(251,191,36,0.7)] mt-1">
           <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-          <span>APRESIASI KEDISIPLINAN GURU</span>
+          <span>APRESIASI KEDISIPLINAN SEKOLAH</span>
           <Sparkles className="w-3.5 h-3.5 text-amber-300" />
         </div>
 
@@ -169,7 +172,7 @@ export const PointRewardCelebrationOverlay: React.FC<PointRewardCelebrationOverl
         <div className="mt-3 flex flex-col items-center gap-2 max-w-xs sm:max-w-sm">
           {/* Main Reason Pill */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-amber-300/40 text-amber-100 text-xs sm:text-sm font-bold shadow-lg">
-            {isOnTime ? (
+            {isOnTime || isCheckout ? (
               <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
             ) : (
               <Award className="w-4 h-4 text-amber-400 shrink-0" />
@@ -184,6 +187,14 @@ export const PointRewardCelebrationOverlay: React.FC<PointRewardCelebrationOverl
               <span>Termasuk Bonus Tugas Piket (+{data.breakdown?.piket} Poin)</span>
             </div>
           )}
+
+          {/* Checkout Pill if applicable */}
+          {hasCheckoutBonus && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/60 backdrop-blur-md border border-cyan-400/40 text-cyan-200 text-xs font-bold shadow-md">
+              <ShieldCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span>Tuntas Jam Dinas Sekolah (+{data.breakdown?.checkout} Poin)</span>
+            </div>
+          )}
         </div>
 
         {/* 5. Personal Congratulatory Message */}
@@ -192,9 +203,11 @@ export const PointRewardCelebrationOverlay: React.FC<PointRewardCelebrationOverl
             Selamat, {cleanName}!
           </h4>
           <p className="text-slate-200 text-xs sm:text-sm leading-relaxed drop-shadow-sm font-medium">
-            {isOnTime
+            {isCheckout
+              ? 'Terima kasih atas dedikasi dan pengabdian Anda bertugas di sekolah hari ini. Selamat beristirahat!'
+              : isOnTime
               ? 'Kehadiran tepat waktu Anda menjadi inspirasi dan keteladanan hidup bagi seluruh murid.'
-              : 'Terima kasih atas dedikasi dan komitmen Anda bertugas mendidik di sekolah hari ini.'}
+              : 'Terima kasih atas dedikasi dan komitmen Anda bertugas di sekolah hari ini.'}
           </p>
         </div>
 

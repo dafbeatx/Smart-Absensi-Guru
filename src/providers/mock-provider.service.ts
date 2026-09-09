@@ -402,6 +402,24 @@ export class MockProvider implements IDataProvider {
       } catch (e) {
         console.warn('Failed to auto-record teacher points on check-in:', e);
       }
+    } else if (action === 'CHECK_OUT') {
+      try {
+        const checkoutPts = 10;
+        const checkoutTitle = 'Presensi Pulang Tuntas Bertugas';
+        const checkoutDesc = `Tercatat menyelesaikan dinas sekolah pada pukul ${timeStr} via ${record.verification_method || 'QR'}`;
+
+        await this.recordTeacherPoint({
+          user_id: userId,
+          teacher_name: sessionUser?.full_name || undefined,
+          date: dateStr,
+          points: checkoutPts,
+          activity_type: 'CHECK_OUT',
+          title: checkoutTitle,
+          description: checkoutDesc,
+        });
+      } catch (ePoint) {
+        console.warn('Failed to auto-record teacher points on check-out:', ePoint);
+      }
     }
 
     return {
@@ -2079,7 +2097,14 @@ export class MockProvider implements IDataProvider {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('smart_absensi_points_updated', {
-          detail: { userId: log.user_id, points: log.points, activity_type: log.activity_type },
+          detail: {
+            userId: log.user_id,
+            teacherName: log.teacher_name,
+            points: log.points,
+            activity_type: log.activity_type,
+            title: log.title,
+            description: log.description,
+          },
         })
       );
     }

@@ -335,6 +335,8 @@ class VoiceAnnouncementService {
 
     if (isDutyToday && reasonText?.includes('Tepat Waktu')) {
       text = `Luar biasa ${cleanName}! Anda berhasil memperoleh ${pointsSpoken} poin disiplin, atas kehadiran tepat waktu dan tugas piket sekolah hari ini.`;
+    } else if (reasonText?.includes('Pulang')) {
+      text = `Terima kasih atas dedikasi dan pengabdian Anda hari ini, ${cleanName}. Anda memperoleh ${pointsSpoken} poin disiplin atas presensi pulang sekolah.`;
     } else if (reasonText?.includes('Tepat Waktu')) {
       text = `Selamat ${cleanName}! Anda berhasil memperoleh ${pointsSpoken} poin kedisiplinan, atas kehadiran tepat waktu hari ini. Pertahankan keteladanan Anda!`;
     } else if (reasonText?.includes('Terlambat') || reasonText?.includes('Masuk')) {
