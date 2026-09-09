@@ -100,6 +100,9 @@ import {
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHistoryModal';
 import { TopDisciplineCelebrationModal } from '../../guru/components/TopDisciplineCelebrationModal';
+import { TeacherDailyChallengeWidget } from '../../guru/components/TeacherDailyChallengeWidget';
+import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeModal';
+import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
 import { AttendancePolicyService } from '../../../services/attendance-policy.service';
@@ -345,6 +348,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [activeEmergencies, setActiveEmergencies] = useState<ClassroomEmergencyAlert[]>([]);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
+  const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // 8 Quick Icons Customization State
@@ -1281,6 +1285,49 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }
     }
   }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank]);
+
+  // ── Teacher Challenge & Streak Engine (Duolingo Style) ─────────────────
+  const streakInfo = useMemo(() => {
+    return TeacherChallengeService.calculateStreak(attendanceHistory, pointHistory);
+  }, [attendanceHistory, pointHistory]);
+
+  const dailyQuests = useMemo(() => {
+    return TeacherChallengeService.getDailyQuests(todayAttendance, isDutyTeacherToday);
+  }, [todayAttendance, isDutyTeacherToday]);
+
+  const nightlyMotivation = useMemo(() => {
+    const rival = disciplineLeaderboard.leaderboard.find((t) => t.rank === 1 && !t.isCurrentUser);
+    return TeacherChallengeService.generateNightlyMotivation(
+      effectiveUser,
+      streakInfo,
+      appreciationScore,
+      disciplineLeaderboard.currentUserRank,
+      rival?.name
+    );
+  }, [effectiveUser, streakInfo, appreciationScore, disciplineLeaderboard]);
+
+  // Evaluasi Pengiriman Notifikasi Malam Gaya Duolingo (Pukul 18:30 - 22:30 WIB)
+  useEffect(() => {
+    if (!effectiveUser?.id) return;
+    const rival = disciplineLeaderboard.leaderboard.find((t) => t.rank === 1 && !t.isCurrentUser);
+    TeacherChallengeService.evaluateNightlyChallengeNotification(
+      effectiveUser,
+      streakInfo,
+      appreciationScore,
+      disciplineLeaderboard.currentUserRank,
+      rival?.name
+    );
+  }, [effectiveUser?.id, streakInfo, appreciationScore, disciplineLeaderboard]);
+
+  // Auto-open modal jika dibuka dari link notifikasi PWA (openChallenge=true)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('openChallenge') === 'true') {
+        setIsChallengeModalOpen(true);
+      }
+    }
+  }, []);
 
   // Smart Class & Duty Alarm Evaluation (No AI Fake Data!)
   const smartAlarmStatus = evaluateSmartClassAlarm(
@@ -2486,6 +2533,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </section>
               );
             })()}
+
+            {/* 🌟 4.75 WIDGET TANTANGAN HARIAN & STREAK DUOLINGO STYLE ────────────── */}
+            <TeacherDailyChallengeWidget
+              streakInfo={streakInfo}
+              quests={dailyQuests}
+              nightlyMotivation={nightlyMotivation}
+              onOpenChallengeModal={() => setIsChallengeModalOpen(true)}
+              onOpenLeaderboard={() => setIsDisciplineBadgeModalOpen(true)}
+              userRank={disciplineLeaderboard.currentUserRank}
+              totalPoints={appreciationScore.totalPoints}
+            />
 
             {/* 🌟 5. CATATAN & AKTIVITAS UNTUK ANDA ──────────────────────────── */}
             {(() => {
@@ -4221,6 +4279,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         pointHistory={pointHistory}
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
+      />
+
+      {/* 14c. Modal Papan Tantangan & Rekor Disiplin Pendidik (Duolingo Style) */}
+      <TeacherChallengeModal
+        isOpen={isChallengeModalOpen}
+        onClose={() => setIsChallengeModalOpen(false)}
+        user={effectiveUser}
+        streakInfo={streakInfo}
+        quests={dailyQuests}
+        appreciationScore={appreciationScore}
+        userRank={disciplineLeaderboard.currentUserRank}
+        totalTeachers={disciplineLeaderboard.totalTeachers}
       />
 
       {/* 15. Modal Pop-up Apresiasi Kehormatan Juara 1, 2, dan 3 */}

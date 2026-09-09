@@ -6,6 +6,7 @@
 
 import { MockProvider } from '../../providers/mock-provider.service';
 import { TeacherPointReconciliationService } from '../teacher-point-reconciliation.service';
+import { TeacherChallengeService } from '../teacher-challenge.service';
 import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
@@ -377,6 +378,125 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     );
   } catch (err: unknown) {
     assert('Reconciliation Engine: Automatic reconciliation', false, String(err));
+  }
+
+  // 10. TeacherChallengeService - calculateStreak
+  try {
+    const makeAtt = (id: string, date: string, time: string): AttendanceRecord => ({
+      id,
+      user_id: testUserId,
+      date,
+      status: 'HADIR',
+      check_in_time: time,
+      check_out_time: '13:00:00',
+      check_in_lat: -6.6131,
+      check_in_lng: 106.8123,
+      check_in_distance_meters: 10,
+      verification_method: 'QR_GPS',
+      attendance_source: 'QR',
+      is_offline: false,
+      created_at: `${date}T${time}Z`,
+    });
+
+    const streakAttendances: AttendanceRecord[] = [
+      makeAtt('att-s1', '2026-09-09', '07:15:00'),
+      makeAtt('att-s2', '2026-09-08', '07:20:00'),
+      makeAtt('att-s3', '2026-09-07', '07:10:00'),
+    ];
+
+    const streakResult = TeacherChallengeService.calculateStreak(streakAttendances);
+
+    assert(
+      'Challenge Engine: calculateStreak correctly computes on-time streak',
+      streakResult.currentStreak >= 3 && streakResult.longestStreak >= 3,
+      `Got currentStreak: ${streakResult.currentStreak}, longestStreak: ${streakResult.longestStreak}`
+    );
+  } catch (err: unknown) {
+    assert('Challenge Engine: calculateStreak', false, String(err));
+  }
+
+  // 11. TeacherChallengeService - getDailyQuests
+  try {
+    const todayAtt: AttendanceRecord = {
+      id: 'att-today',
+      user_id: testUserId,
+      date: '2026-09-09',
+      status: 'HADIR',
+      check_in_time: '07:12:00',
+      check_out_time: '13:05:00',
+      check_in_lat: -6.6131,
+      check_in_lng: 106.8123,
+      check_in_distance_meters: 10,
+      verification_method: 'QR_GPS',
+      attendance_source: 'QR',
+      is_offline: false,
+      created_at: '2026-09-09T07:12:00Z',
+    };
+
+    const quests = TeacherChallengeService.getDailyQuests(todayAtt, true);
+    const morningQuest = quests.find((q) => q.id === 'quest_morning_on_time');
+    const checkoutQuest = quests.find((q) => q.id === 'quest_tuntas_bertugas');
+    const piketQuest = quests.find((q) => q.id === 'quest_piket_day');
+
+    assert(
+      'Challenge Engine: getDailyQuests marks completed morning, checkout, and piket quests',
+      morningQuest?.status === 'COMPLETED' &&
+        checkoutQuest?.status === 'COMPLETED' &&
+        piketQuest?.status === 'COMPLETED',
+      `morning: ${morningQuest?.status}, checkout: ${checkoutQuest?.status}, piket: ${piketQuest?.status}`
+    );
+  } catch (err: unknown) {
+    assert('Challenge Engine: getDailyQuests', false, String(err));
+  }
+
+  // 12. TeacherChallengeService - generateNightlyMotivation (Duolingo Style)
+  try {
+    const testUser: UserProfile = {
+      id: testUserId,
+      full_name: 'Dafa Maulana, S.Pd',
+      role: 'GURU',
+      position: 'Guru TI',
+      nip: '199001012015011001',
+      phone_number: '081234567890',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+    };
+
+    const testScore: TeacherAppreciationScore = {
+      totalPoints: 55,
+      level: '🥈 Level 2: Pendidik Berdedikasi',
+      nextLevelPoints: 65,
+      levelProgressPercent: 50,
+      hadirTepatWaktuCount: 3,
+      terlambatCount: 1,
+      piketCount: 1,
+      moodCheckinCount: 0,
+      badges: [],
+      pointHistory: [],
+    };
+
+    const motivation = TeacherChallengeService.generateNightlyMotivation(
+      testUser,
+      {
+        currentStreak: 5,
+        longestStreak: 5,
+        isStreakActiveToday: true,
+        streakDaysThisWeek: [],
+        streakStatusLabel: '🔥 Streak Mingguan Membara!',
+      },
+      testScore,
+      2,
+      'Widianingsih, S.Si'
+    );
+
+    assert(
+      'Challenge Engine: generateNightlyMotivation outputs compelling Duolingo-style streak message',
+      motivation.title.includes('🔥') && motivation.type === 'STREAK_PRESERVATION' && Boolean(motivation.callToAction),
+      `Generated: ${motivation.title} | CallToAction: ${motivation.callToAction}`
+    );
+  } catch (err: unknown) {
+    assert('Challenge Engine: generateNightlyMotivation', false, String(err));
   }
 
   return { passed, failed, results };
