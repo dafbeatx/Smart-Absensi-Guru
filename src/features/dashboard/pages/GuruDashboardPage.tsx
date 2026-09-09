@@ -2060,9 +2060,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               const alpaCount = attendanceHistory.filter((r) => r.status === 'ALFA').length;
 
               return (
-                <section className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm space-y-2.5">
+                <section className="bg-white rounded-3xl p-3.5 sm:p-4 border border-slate-200/90 shadow-xs space-y-3">
                   <div className="flex items-center justify-between px-0.5">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                       Rekap Kehadiran Bulan Ini
                     </span>
                     <button
@@ -2074,37 +2074,57 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {/* Hadir */}
-                    <div className="bg-slate-50 rounded-2xl p-2.5 border border-slate-100">
-                      <p className="text-lg sm:text-xl font-black text-[#023246]">{hadirCount}</p>
-                      <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider mt-0.5">
-                        Hadir
-                      </span>
+                    <div
+                      onClick={() => setIsRecapModalOpen(true)}
+                      className="bg-slate-50/90 hover:bg-emerald-50/50 p-3 rounded-2xl border border-slate-200/80 hover:border-emerald-300 transition-all cursor-pointer active:scale-[0.98] text-center"
+                    >
+                      <p className="text-2xl font-black text-[#023246] leading-none">{hadirCount}</p>
+                      <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="text-xs font-bold text-slate-700">Hadir</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Tepat waktu</span>
                     </div>
 
                     {/* Terlambat */}
-                    <div className="bg-slate-50 rounded-2xl p-2.5 border border-slate-100">
-                      <p className="text-lg sm:text-xl font-black text-amber-600">{terlambatCount}</p>
-                      <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider mt-0.5">
-                        Terlambat
-                      </span>
+                    <div
+                      onClick={() => setIsRecapModalOpen(true)}
+                      className="bg-slate-50/90 hover:bg-amber-50/50 p-3 rounded-2xl border border-slate-200/80 hover:border-amber-300 transition-all cursor-pointer active:scale-[0.98] text-center"
+                    >
+                      <p className="text-2xl font-black text-amber-600 leading-none">{terlambatCount}</p>
+                      <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                        <span className="text-xs font-bold text-slate-700">Terlambat</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium block mt-0.5">&gt; 07:30 WIB</span>
                     </div>
 
                     {/* Izin/Sakit */}
-                    <div className="bg-slate-50 rounded-2xl p-2.5 border border-slate-100">
-                      <p className="text-lg sm:text-xl font-black text-blue-600">{izinCount}</p>
-                      <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider mt-0.5">
-                        Izin/Sakit
-                      </span>
+                    <div
+                      onClick={() => setIsRecapModalOpen(true)}
+                      className="bg-slate-50/90 hover:bg-blue-50/50 p-3 rounded-2xl border border-slate-200/80 hover:border-blue-300 transition-all cursor-pointer active:scale-[0.98] text-center"
+                    >
+                      <p className="text-2xl font-black text-blue-600 leading-none">{izinCount}</p>
+                      <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                        <span className="text-xs font-bold text-slate-700">Izin / Sakit</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Surat resmi</span>
                     </div>
 
                     {/* Alpa */}
-                    <div className="bg-slate-50 rounded-2xl p-2.5 border border-slate-100">
-                      <p className="text-lg sm:text-xl font-black text-slate-600">{alpaCount}</p>
-                      <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider mt-0.5">
-                        Alpa
-                      </span>
+                    <div
+                      onClick={() => setIsRecapModalOpen(true)}
+                      className="bg-slate-50/90 hover:bg-rose-50/50 p-3 rounded-2xl border border-slate-200/80 hover:border-rose-300 transition-all cursor-pointer active:scale-[0.98] text-center"
+                    >
+                      <p className={`text-2xl font-black leading-none ${alpaCount > 0 ? 'text-rose-600' : 'text-slate-500'}`}>{alpaCount}</p>
+                      <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${alpaCount > 0 ? 'bg-rose-500' : 'bg-slate-300'}`} />
+                        <span className="text-xs font-bold text-slate-700">Alpa</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Tanpa ket.</span>
                     </div>
                   </div>
                 </section>
