@@ -28,22 +28,67 @@ export interface BiometricVerificationResult {
 
 const STORAGE_KEY_PREFIX = 'smart_absensi_biometric_cred_';
 
-function bufferToBase64(buffer: ArrayBuffer): string {
+/**
+ * Mengonversi ArrayBuffer ke Base64URL (URL-safe, tanpa padding '=' dan mengganti +/ dengan -_)
+ */
+export function bufferToBase64Url(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
-  return btoa(binary);
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
-function base64ToBuffer(base64: string): ArrayBuffer {
+/**
+ * Mengonversi Base64URL maupun standar Base64 kembali ke ArrayBuffer secara aman
+ */
+export function base64UrlToBuffer(base64Url: string): ArrayBuffer {
+  let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4 !== 0) {
+    base64 += '=';
+  }
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes.buffer as ArrayBuffer;
+}
+
+/**
+ * Konversi aman Base64URL ke ArrayBuffer tanpa melempar exception
+ */
+export function safeBase64UrlToBuffer(input: string): ArrayBuffer | null {
+  try {
+    return base64UrlToBuffer(input);
+  } catch {
+    return null;
+  }
+}
+
+// Backward-compatibility aliases
+export const bufferToBase64 = bufferToBase64Url;
+export const base64ToBuffer = base64UrlToBuffer;
+
+/**
+ * Mendapatkan RP ID yang valid sesuai spesifikasi WebAuthn W3C.
+ * Menghindari melempar SecurityError jika origin adalah alamat IP.
+ */
+function getValidRpId(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const hostname = window.location.hostname;
+  if (!hostname) return undefined;
+  // Sesuai WebAuthn spec: rpId TIDAK boleh berupa alamat IPv4 atau IPv6
+  const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+  const isIpv6 = hostname.includes(':');
+  if (isIpv4 || isIpv6) {
+    return undefined;
+  }
+  return hostname;
 }
 
 export class BiometricService {
@@ -58,6 +103,24 @@ export class BiometricService {
       typeof navigator.credentials.create === 'function' &&
       typeof navigator.credentials.get === 'function'
     );
+  }
+
+  /**
+   * Mengecek apakah lingkungan browser aman (HTTPS / localhost)
+   */
+  public static isSecureContext(): boolean {
+    if (typeof window === 'undefined') return false;
+    return Boolean(window.isSecureContext);
+  }
+
+  /**
+   * Mengecek apakah aplikasi dibuka di dalam in-app browser (WebView WhatsApp, Instagram, dll)
+   * di mana WebAuthn sering diblokir oleh container aplikasi
+   */
+  public static isWebViewOrInAppBrowser(): boolean {
+    if (typeof window === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    return /FBAN|FBAV|Instagram|WhatsApp|Line|Snapchat|MicroMessenger|musical_ly|BytedanceWebview/i.test(ua);
   }
 
   /**
@@ -146,14 +209,18 @@ export class BiometricService {
       }
 
       const userBytes = new TextEncoder().encode(userId);
-      const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      const rpId = getValidRpId();
+
+      const rpConfig: PublicKeyCredentialRpEntity = {
+        name: 'Smart Absensi Guru',
+      };
+      if (rpId) {
+        rpConfig.id = rpId;
+      }
 
       const creationOptions: CredentialCreationOptions = {
         publicKey: {
-          rp: {
-            name: 'Smart Absensi Guru',
-            id: host,
-          },
+          rp: rpConfig,
           user: {
             id: userBytes,
             name: userId,
@@ -166,7 +233,7 @@ export class BiometricService {
           ],
           authenticatorSelection: {
             authenticatorAttachment: 'platform',
-            userVerification: 'required',
+            userVerification: 'preferred', // 'preferred' lebih toleran terhadap berbagai varian Android OEM
             residentKey: 'preferred',
           },
           timeout: 60000,
@@ -183,7 +250,7 @@ export class BiometricService {
         };
       }
 
-      const rawId = credential.rawId ? bufferToBase64(credential.rawId) : credential.id;
+      const rawId = credential.rawId ? bufferToBase64Url(credential.rawId) : credential.id;
       localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}`, rawId);
 
       logger.info('BiometricService', 'Biometric credential registered successfully:', { rawId });
@@ -224,27 +291,28 @@ export class BiometricService {
         for (let i = 0; i < 32; i++) challenge[i] = Math.floor(Math.random() * 256);
       }
 
-      const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost';
+      const rpId = getValidRpId();
       const storedCredId = this.getEnrolledCredentialId(userId);
 
       const allowCredentials: PublicKeyCredentialDescriptor[] = [];
       if (storedCredId) {
-        try {
+        const credBuffer = safeBase64UrlToBuffer(storedCredId);
+        if (credBuffer) {
           allowCredentials.push({
-            id: base64ToBuffer(storedCredId),
+            id: credBuffer,
             type: 'public-key',
-            transports: ['internal'],
+            // PENTING: Jangan batasi transports ke ['internal'].
+            // Android modern (Chrome 108+ / Google Play Services Passkeys) mengekspos
+            // credential sebagai hybrid/internal. Membatasi transport menyebabkan NotAllowedError.
           });
-        } catch {
-          // If stored string is not valid base64, proceed without allowCredentials filter
         }
       }
 
       const requestOptions: CredentialRequestOptions = {
         publicKey: {
           challenge: challenge,
-          rpId: host,
-          userVerification: 'required',
+          ...(rpId ? { rpId } : {}),
+          userVerification: 'preferred',
           timeout: 60000,
           allowCredentials: allowCredentials.length > 0 ? allowCredentials : undefined,
         },
@@ -259,9 +327,9 @@ export class BiometricService {
         };
       }
 
-      const assertionId = assertion.rawId ? bufferToBase64(assertion.rawId) : assertion.id;
+      const assertionId = assertion.rawId ? bufferToBase64Url(assertion.rawId) : assertion.id;
 
-      // Update stored credential if user hadn't enrolled explicitly before
+      // Update stored credential jika belum tersimpan
       if (!storedCredId && assertionId) {
         localStorage.setItem(`${STORAGE_KEY_PREFIX}${userId}`, assertionId);
       }
@@ -296,6 +364,13 @@ export class BiometricService {
   }
 
   /**
+   * Mereset pendaftaran sidik jari agar guru dapat mendaftar ulang di HP ini
+   */
+  public static resetBiometricEnrollment(userId: string): void {
+    this.clearEnrollment(userId);
+  }
+
+  /**
    * Format pesan error WebAuthn menjadi bahasa Indonesia yang ramah pengguna
    */
   private static formatBiometricError(err: unknown, actionName: string): string {
@@ -303,21 +378,41 @@ export class BiometricService {
 
     const name = typeof err === 'object' && err !== null && 'name' in err ? String((err as { name: string }).name) : '';
     const message = typeof err === 'object' && err !== null && 'message' in err ? String((err as { message: string }).message) : String(err);
+    const lowerMessage = message.toLowerCase();
 
-    if (name === 'NotAllowedError' || message.includes('cancelled') || message.includes('canceled') || message.includes('NotAllowedError')) {
-      return `${actionName} sidik jari dibatalkan atau waktu tunggu habis. Silakan coba kembali.`;
+    if (
+      name === 'NotAllowedError' ||
+      lowerMessage.includes('cancelled') ||
+      lowerMessage.includes('canceled') ||
+      lowerMessage.includes('not allowed')
+    ) {
+      if (lowerMessage.includes('already in progress') || lowerMessage.includes('pending request')) {
+        return 'Sensor sidik jari sedang aktif memproses permintaan lain. Harap tunggu 1 detik lalu coba kembali.';
+      }
+      if (lowerMessage.includes('no eligible credentials') || lowerMessage.includes('not found') || lowerMessage.includes('credentials')) {
+        return 'Sidik jari tidak cocok dengan akun HP ini atau pengaturan kunci layar telah diubah. Silakan gunakan tombol "Daftar Ulang Sidik Jari" di bawah.';
+      }
+      return `${actionName} sidik jari dibatalkan, waktu tunggu habis, atau sidik jari tidak cocok. Silakan coba kembali.`;
     }
 
-    if (name === 'InvalidStateError' || message.includes('already registered')) {
-      return 'Sidik jari perangkat ini sudah terdaftar di sistem.';
+    if (name === 'InvalidStateError' || lowerMessage.includes('already registered')) {
+      return 'Sidik jari perangkat ini sudah terdaftar di sistem. Jika bermasalah, silakan klik Daftar Ulang.';
     }
 
-    if (name === 'NotSupportedError' || message.includes('not supported')) {
-      return 'Sensor sidik jari tidak didukung pada browser atau perangkat ini.';
+    if (name === 'NotSupportedError' || lowerMessage.includes('not supported')) {
+      return 'Sensor sidik jari / WebAuthn tidak didukung pada browser atau perangkat ini. Gunakan Google Chrome versi terbaru.';
     }
 
-    if (name === 'SecurityError' || message.includes('domain') || message.includes('security')) {
-      return 'Keamanan browser membatasi akses biometrik. Pastikan menggunakan domain atau HTTPS yang valid.';
+    if (name === 'SecurityError' || lowerMessage.includes('domain') || lowerMessage.includes('security') || lowerMessage.includes('insecure')) {
+      return 'Keamanan browser membatasi akses biometrik. Pastikan mengakses via domain resmi/HTTPS dan bukan dari browser internal WhatsApp.';
+    }
+
+    if (name === 'AbortError' || lowerMessage.includes('abort')) {
+      return 'Pemindaian sidik jari terputus. Silakan tekan tombol kembali untuk memindai.';
+    }
+
+    if (name === 'ConstraintError') {
+      return 'Konfigurasi biometrik HP belum memenuhi syarat autentikasi aman.';
     }
 
     return `${actionName} sidik jari gagal: ${message || 'Terjadi kendala sensor pada HP.'}`;

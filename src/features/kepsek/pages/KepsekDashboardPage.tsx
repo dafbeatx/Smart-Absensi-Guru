@@ -836,6 +836,10 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           onClose={() => setIsBiometricModalOpen(false)}
           settings={settings}
           user={user}
+          onSwitchToQR={() => {
+            setIsBiometricModalOpen(false);
+            onOpenScanner?.();
+          }}
           onSuccess={() => {
             fetchMyAttendance();
             handleManualRefresh();

@@ -4,7 +4,7 @@
  * Anti-Fake GPS, and Database Verification Method Consistency.
  */
 
-import { BiometricService } from '../biometric.service';
+import { BiometricService, bufferToBase64Url, base64UrlToBuffer, safeBase64UrlToBuffer } from '../biometric.service';
 import { GPSService } from '../gps.service';
 import type { GPSCoordinates } from '../gps.service';
 import { AttendanceEngine } from '../attendance-engine.service';
@@ -38,7 +38,27 @@ export async function runBiometricAttendanceTestSuite(): Promise<TestSuiteResult
     'isEnrolled' in availability
   );
 
-  // 2. Biometric Enrollment Local Storage Persistence
+  // 1b. Base64URL Conversion & Safety (WebAuthn Spec Compliance)
+  const testBuffer = new Uint8Array([251, 239, 190, 10, 20, 30]).buffer;
+  const base64UrlStr = bufferToBase64Url(testBuffer);
+  assert('Base64URL Encoding - Strips padding and avoids forbidden chars (+ and /)', 
+    !base64UrlStr.includes('+') && !base64UrlStr.includes('/') && !base64UrlStr.includes('=')
+  );
+
+  const decodedBuf = base64UrlToBuffer(base64UrlStr);
+  const decodedArr = new Uint8Array(decodedBuf);
+  assert('Base64URL Decoding - Accurately reconstructs original byte buffer',
+    decodedArr[0] === 251 && decodedArr[1] === 239 && decodedArr[2] === 190
+  );
+
+  const safeParsed = safeBase64UrlToBuffer('invalid---base64***!');
+  assert('Base64URL Safe Parsing - Returns valid buffer or null without throwing uncaught error', safeParsed !== undefined);
+
+  // 1c. Secure Context & In-App Browser (WebView) Safe Execution
+  assert('Biometric Security - isSecureContext returns boolean safely', typeof BiometricService.isSecureContext() === 'boolean');
+  assert('Biometric WebView Detection - isWebViewOrInAppBrowser returns boolean safely', typeof BiometricService.isWebViewOrInAppBrowser() === 'boolean');
+
+  // 2. Biometric Enrollment Local Storage Persistence & Re-enrollment Reset
   const testUserId = 'usr_bio_test_' + Date.now();
   assert('Biometric Enrollment - New user is initially not enrolled', BiometricService.isEnrolled(testUserId) === false);
 
@@ -47,8 +67,9 @@ export async function runBiometricAttendanceTestSuite(): Promise<TestSuiteResult
     assert('Biometric Enrollment - Recognizes enrolled credential from storage', BiometricService.isEnrolled(testUserId) === true);
     assert('Biometric Enrollment - Retrieves registered credential ID', BiometricService.getEnrolledCredentialId(testUserId) === 'MOCK_CREDENTIAL_BASE64_KEY_12345');
 
-    BiometricService.clearEnrollment(testUserId);
-    assert('Biometric Enrollment - Clears enrollment cleanly', BiometricService.isEnrolled(testUserId) === false);
+    // Test Self-Service Reset / Re-enrollment
+    BiometricService.resetBiometricEnrollment(testUserId);
+    assert('Biometric Enrollment - resetBiometricEnrollment resets user credential', BiometricService.isEnrolled(testUserId) === false);
   } else {
     assert('Biometric Enrollment - Skipped in non-storage env', true);
     assert('Biometric Enrollment - Skipped in non-storage env 2', true);
@@ -108,6 +129,24 @@ export async function runBiometricAttendanceTestSuite(): Promise<TestSuiteResult
 
   const geofenceCheckIn = GPSService.validateGeofenceRadius(insideSchoolCoords, 100);
   assert('Biometric Geofence - Accepts valid coordinates inside school radius (15m <= 100m)', geofenceCheckIn.isValid === true);
+
+  // 5b. Geofence Location Lock - Indoor Tolerance (50m - 100m accuracy)
+  const indoorCoords: GPSCoordinates = {
+    latitude: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+    longitude: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+    accuracy: 75, // Inside classroom/office satellite attenuation
+    distanceMeters: 20,
+  };
+
+  const defaultStrictCheck = GPSService.validateGeofenceRadius(indoorCoords, 100);
+  assert('Biometric Indoor GPS - Strict default checks reject >50m accuracy with GPS_004', 
+    defaultStrictCheck.isValid === false && defaultStrictCheck.error?.code === 'GPS_004'
+  );
+
+  const indoorTolerantCheck = GPSService.validateGeofenceRadius(indoorCoords, 100, { maxAllowedAccuracy: 100 });
+  assert('Biometric Indoor GPS - Accepts indoor signal when maxAllowedAccuracy is 100m', 
+    indoorTolerantCheck.isValid === true
+  );
 
   // 6. Provider Persistence - Records BIOMETRIC_GPS Verification Method for Check-In
   const mockProvider = new MockProvider();

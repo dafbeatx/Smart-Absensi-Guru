@@ -22,6 +22,7 @@ export interface BiometricAttendanceModalProps {
   onSuccess: (data: { timestamp: string; distance: number; status: string }) => void;
   settings: SystemSettings;
   user: UserProfile;
+  onSwitchToQR?: () => void;
 }
 
 const FingerprintIcon: React.FC<{ className?: string }> = ({ className = 'w-8 h-8' }) => (
@@ -41,6 +42,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
   onSuccess,
   settings,
   user,
+  onSwitchToQR,
 }) => {
   const { token, deviceUUID } = useAuthStore();
 
@@ -50,6 +52,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
   const [isInsideGeofence, setIsInsideGeofence] = useState<boolean | null>(null);
 
   const [isBiometricSupported, setIsBiometricSupported] = useState<boolean>(true);
+  const [isWebView, setIsWebView] = useState<boolean>(false);
   const [isEnrolled, setIsEnrolled] = useState<boolean>(false);
   const [isVerifyingBio, setIsVerifyingBio] = useState<boolean>(false);
   const [bioError, setBioError] = useState<string | null>(null);
@@ -65,7 +68,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
 
   const effectiveAllowedRadius = getEffectiveAllowedRadius(settings.geofence_radius);
 
-  // Ambil lokasi GPS fisik guru dan cocokkan dengan geofence sekolah
+  // Ambil lokasi GPS fisik guru dan cocokkan dengan geofence sekolah (Toleransi indoor hingga 100m)
   const checkGPSLocation = useCallback(async () => {
     setIsLoadingGPS(true);
     setGpsError(null);
@@ -74,7 +77,8 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
       const coords = await GPSService.getCurrentPosition(settings.geofence_lat, settings.geofence_lng);
       setGpsCoords(coords);
 
-      const validation = GPSService.validateGeofenceRadius(coords, effectiveAllowedRadius);
+      // Berikan toleransi akurasi 100m untuk satelit di dalam ruangan / ruang guru
+      const validation = GPSService.validateGeofenceRadius(coords, effectiveAllowedRadius, { maxAllowedAccuracy: 100 });
       setIsInsideGeofence(validation.isValid);
       if (!validation.isValid) {
         setGpsError(validation.error?.message || `Posisi Anda ${coords.distanceMeters}m dari sekolah (Maksimal ${effectiveAllowedRadius}m).`);
@@ -90,10 +94,11 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     }
   }, [settings.geofence_lat, settings.geofence_lng, effectiveAllowedRadius]);
 
-  // Cek kapabilitas sensor biometrik WebAuthn di HP
+  // Cek kapabilitas sensor biometrik WebAuthn & deteksi WebView di HP
   const checkBiometrics = useCallback(async () => {
     const supported = BiometricService.isSupported();
     setIsBiometricSupported(supported);
+    setIsWebView(BiometricService.isWebViewOrInAppBrowser());
     if (supported && user?.id) {
       const enrolled = BiometricService.isEnrolled(user.id);
       setIsEnrolled(enrolled);
@@ -109,56 +114,14 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     }
   }, [isOpen, checkBiometrics, checkGPSLocation]);
 
-  // Eksekusi Pendaftaran Sidik Jari HP jika belum terdaftar
-  const handleEnrollBiometric = async () => {
-    if (!user?.id) return;
-    setIsVerifyingBio(true);
-    setBioError(null);
-    try {
-      const res = await BiometricService.registerBiometric(user.id, user.full_name);
-      if (res.success) {
-        setIsEnrolled(true);
-        SoundService.play('SUCCESS');
-        // Langsung lanjutkan ke verifikasi absensi
-        await handleTriggerBiometricAttendance();
-      } else {
-        setBioError(res.error || 'Pendaftaran sidik jari belum berhasil.');
-        SoundService.play('ERROR');
-      }
-    } catch (err: unknown) {
-      const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : 'Gagal mendaftarkan sidik jari.';
-      setBioError(msg);
-      SoundService.play('ERROR');
-    } finally {
-      setIsVerifyingBio(false);
-    }
-  };
-
-  // Eksekusi Pemindaian Sidik Jari & Pencatatan Absensi
-  const handleTriggerBiometricAttendance = async () => {
-    if (!user?.id) return;
-
-    // Pastikan lokasi berada dalam radius geofence
-    if (!isInsideGeofence || !gpsCoords) {
-      setBioError(`Absensi ditolak! Posisi Anda terdeteksi berada di luar area sekolah (${gpsCoords?.distanceMeters || 0}m > ${effectiveAllowedRadius}m).`);
-      SoundService.play('ERROR');
-      return;
-    }
-
-    setIsVerifyingBio(true);
-    setBioError(null);
+  /**
+   * Helper inti untuk menyimpan transaksi absensi ke repository backend
+   * Digunakan baik setelah verifikasi maupun pendaftaran baru
+   */
+  const recordAttendance = async (credentialId: string) => {
+    if (!user?.id || !gpsCoords) return;
 
     try {
-      // 1. Panggil sensor sidik jari HP guru
-      const bioVerify = await BiometricService.verifyBiometric(user.id);
-      if (!bioVerify.success) {
-        setBioError(bioVerify.error || 'Verifikasi sidik jari dibatalkan atau tidak cocok.');
-        SoundService.play('ERROR');
-        setIsVerifyingBio(false);
-        return;
-      }
-
-      // 2. Simpan absensi via AttendanceRepository dengan auto-capture hening kamera depan
       const activeToken = token || `TOKEN_${user.id}_${Date.now()}`;
       const activeDeviceUUID = deviceUUID || 'web_mobile_device';
 
@@ -174,7 +137,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
 
       const scanRes = await AttendanceRepository.scanAttendance({
         token: activeToken,
-        qr_seed: 'BIOMETRIC_FINGERPRINT_OK',
+        qr_seed: `BIOMETRIC_FINGERPRINT_${credentialId ? 'CRED' : 'OK'}`,
         user_lat: gpsCoords.latitude,
         user_lng: gpsCoords.longitude,
         device_uuid: activeDeviceUUID,
@@ -186,7 +149,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         photoBlob: photoBlob,
       });
 
-      // 3. Audio & Voice Feedback
+      // Audio & Voice Feedback
       SoundService.play('SUCCESS');
       const actionType = scanRes.attendance_action === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN';
       SpeechService.speakAttendanceSuccess(user.full_name, actionType);
@@ -204,7 +167,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         status: scanRes.status || 'HADIR',
       };
 
-      // 🌟 Hitung perolehan poin kedisiplinan
+      // Hitung perolehan poin kedisiplinan
       const isCheckIn = scanRes.attendance_action === 'CHECK_IN' || !scanRes.attendance_action;
       const isLate = (scanRes.status || '').toUpperCase() === 'TERLAMBAT';
       let earnedPoints = 0;
@@ -261,6 +224,90 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     } finally {
       setIsVerifyingBio(false);
     }
+  };
+
+  /**
+   * Eksekusi Pendaftaran Sidik Jari HP jika belum terdaftar.
+   * BEBAS DOUBLE TRIGGER BUG: Saat registerBiometric sukses, user telah memvalidasi sidik jari di hardware HP,
+   * sehingga absensi langsung dicatat tanpa memanggil prompt kedua yang menyebabkan race condition OS.
+   */
+  const handleEnrollBiometric = async () => {
+    if (!user?.id) return;
+
+    if (!isInsideGeofence || !gpsCoords) {
+      setBioError(`Absensi ditolak! Posisi Anda terdeteksi berada di luar area sekolah (${gpsCoords?.distanceMeters || 0}m > ${effectiveAllowedRadius}m).`);
+      SoundService.play('ERROR');
+      return;
+    }
+
+    setIsVerifyingBio(true);
+    setBioError(null);
+
+    try {
+      const res = await BiometricService.registerBiometric(user.id, user.full_name);
+      if (res.success && res.credentialId) {
+        setIsEnrolled(true);
+        // Langsung simpan absensi dengan kredensial baru tanpa bentrok hardware sensor
+        await recordAttendance(res.credentialId);
+      } else {
+        setBioError(res.error || 'Pendaftaran sidik jari belum berhasil.');
+        SoundService.play('ERROR');
+        setIsVerifyingBio(false);
+      }
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : 'Gagal mendaftarkan sidik jari.';
+      setBioError(msg);
+      SoundService.play('ERROR');
+      setIsVerifyingBio(false);
+    }
+  };
+
+  /**
+   * Eksekusi Pemindaian Sidik Jari untuk guru yang sudah terdaftar
+   */
+  const handleTriggerBiometricAttendance = async () => {
+    if (!user?.id) return;
+
+    if (!isInsideGeofence || !gpsCoords) {
+      setBioError(`Absensi ditolak! Posisi Anda terdeteksi berada di luar area sekolah (${gpsCoords?.distanceMeters || 0}m > ${effectiveAllowedRadius}m).`);
+      SoundService.play('ERROR');
+      return;
+    }
+
+    setIsVerifyingBio(true);
+    setBioError(null);
+
+    try {
+      const bioVerify = await BiometricService.verifyBiometric(user.id);
+      if (!bioVerify.success) {
+        setBioError(bioVerify.error || 'Verifikasi sidik jari dibatalkan atau tidak cocok.');
+        SoundService.play('ERROR');
+        setIsVerifyingBio(false);
+        return;
+      }
+
+      await recordAttendance(bioVerify.credentialId || 'BIOMETRIC_VERIFIED');
+    } catch (err: unknown) {
+      logger.error('BiometricAttendanceModal', 'Error verifying biometric:', err);
+      const msg = err && typeof err === 'object' && 'message' in err
+        ? String((err as { message: string }).message)
+        : 'Gagal memverifikasi sidik jari. Silakan coba kembali.';
+      setBioError(msg);
+      SoundService.play('ERROR');
+      setIsVerifyingBio(false);
+    }
+  };
+
+  /**
+   * Solusi Pemulihan (Recovery Flow):
+   * Menghapus kredensial tersimpan yang korup atau tidak sinkron lalu mendaftarkan ulang
+   */
+  const handleResetAndReEnroll = async () => {
+    if (!user?.id) return;
+    BiometricService.resetBiometricEnrollment(user.id);
+    setIsEnrolled(false);
+    setBioError(null);
+    await handleEnrollBiometric();
   };
 
   const handleModalClose = () => {
@@ -330,6 +377,20 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
           </div>
         ) : (
           <>
+            {/* Banner WhatsApp / WebView In-App Browser Warning */}
+            {isWebView && (
+              <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs flex items-start gap-2.5">
+                <span className="text-base shrink-0 mt-0.5">⚠️</span>
+                <div className="space-y-1">
+                  <p className="font-bold text-amber-900">Perhatian: Browser Internal WhatsApp</p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Anda sedang membuka aplikasi di browser internal WhatsApp. Sensor sidik jari (WebAuthn) mungkin dibatasi oleh aplikasi.
+                    Jika gagal, silakan <strong>salin tautan dan buka di aplikasi Google Chrome</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* 1. KOTAK INFORMASI LOKASI GPS & RADIUS SEKOLAH */}
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
               <div className="flex items-center justify-between">
@@ -358,6 +419,11 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                     <p className="font-extrabold text-emerald-900">Lokasi Valid di Area Sekolah</p>
                     <p className="text-[11px] text-emerald-800">
                       Jarak: <strong>{gpsCoords?.distanceMeters}m</strong> (Batas Maksimal: {effectiveAllowedRadius}m)
+                      {gpsCoords && gpsCoords.accuracy > 50 && (
+                        <span className="block text-[10px] text-emerald-700 font-semibold mt-0.5">
+                          🏢 Sinyal GPS Dalam Gedung (Akurasi {gpsCoords.accuracy}m diterima)
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -411,10 +477,10 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                 </h4>
                 <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
                   {!isInsideGeofence
-                    ? 'Anda harus berada di dalam radius sekolah yang telah disetting oleh Admin untuk dapat melakukan absensi.'
+                    ? 'Anda harus berada di dalam radius sekolah yang telah ditentukan untuk dapat melakukan absensi.'
                     : isEnrolled
                     ? 'Sentuh ikon di atas lalu tempelkan jari Anda pada sensor sidik jari HP saat dialog sistem muncul.'
-                    : 'HP ini belum dikaitkan. Tekan tombol di atas untuk mengaktifkan sensor sidik jari akun Anda.'}
+                    : 'HP ini belum dikaitkan. Tekan tombol di atas untuk mendaftarkan dan mengaktifkan sidik jari akun Anda.'}
                 </p>
               </div>
             </div>
@@ -423,9 +489,9 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
             {bioError && (
               <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs flex items-start gap-2">
                 <span className="shrink-0 mt-0.5">⚠️</span>
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   <p className="font-bold text-amber-900">Perhatian:</p>
-                  <p className="text-[11px] text-amber-800">{bioError}</p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">{bioError}</p>
                 </div>
               </div>
             )}
@@ -435,7 +501,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
               <div className="p-3 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 text-xs text-center space-y-1">
                 <p className="font-bold">Browser Tidak Mendukung Biometrik</p>
                 <p className="text-[11px] text-slate-500">
-                  Gunakan Google Chrome Android versi terbaru atau gunakan metode Pindai QR Code.
+                  Gunakan Google Chrome Android versi terbaru atau gunakan metode Pindai QR Code di bawah.
                 </p>
               </div>
             )}
@@ -447,7 +513,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                 disabled={!isInsideGeofence || isVerifyingBio}
                 onClick={isEnrolled ? handleTriggerBiometricAttendance : handleEnrollBiometric}
                 leftIcon={<FingerprintIcon className="w-5 h-5 text-white shrink-0" />}
-                className="w-full py-3.5 text-xs font-black min-h-12 bg-[#0D7A5F] hover:bg-[#095744] shadow-md shadow-emerald-700/20"
+                className="w-full py-3.5 text-xs font-black min-h-12 bg-[#0D7A5F] hover:bg-[#095744] shadow-md shadow-emerald-700/20 cursor-pointer"
               >
                 {isVerifyingBio
                   ? 'MEMPROSES SENSOR...'
@@ -456,10 +522,37 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                   : 'DAFTARKAN & ABSEN SEKARANG'}
               </Button>
 
+              {/* Tombol Recovery: Daftar Ulang Sidik Jari jika sebelumnya gagal atau ganti PIN/perangkat */}
+              {(isEnrolled || bioError) && (
+                <button
+                  type="button"
+                  disabled={isVerifyingBio}
+                  onClick={handleResetAndReEnroll}
+                  className="w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50/70 hover:bg-amber-100 active:scale-98 text-amber-900 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-11"
+                  title="Gunakan ini jika sidik jari tidak merespons atau Anda baru mengubah kunci layar HP"
+                >
+                  <span>🔄</span>
+                  <span>Daftar Ulang Sidik Jari di HP Ini</span>
+                </button>
+              )}
+
+              {/* Fallback Instan: Pindai QR Code Sekolah */}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onSwitchToQR?.();
+                }}
+                className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-98 text-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer min-h-11 shadow-2xs"
+              >
+                <span>📷</span>
+                <span>Beralih ke Scan QR Code</span>
+              </button>
+
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer min-h-11"
+                className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer min-h-10"
               >
                 Batal
               </button>

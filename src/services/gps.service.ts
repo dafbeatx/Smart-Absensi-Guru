@@ -433,7 +433,8 @@ export class GPSService {
    */
   public static validateGeofenceRadius(
     coords: GPSCoordinates,
-    allowedRadiusMeters?: number
+    allowedRadiusMeters?: number,
+    options?: { maxAllowedAccuracy?: number }
   ): GPSValidationResult {
     // 1. Fake GPS / Mock Location Check
     if (coords.isMock) {
@@ -445,8 +446,8 @@ export class GPSService {
       };
     }
 
-    // 2. Signal Accuracy Limit Check (> 50 meters rejected)
-    const maxAllowedAccuracy = CONSTANTS.DEFAULTS.GPS_MAX_ALLOWED_ACCURACY_METERS || 50;
+    // 2. Signal Accuracy Limit Check (> 50 meters rejected by default, or custom limit e.g. 100m for indoor)
+    const maxAllowedAccuracy = options?.maxAllowedAccuracy ?? (CONSTANTS.DEFAULTS.GPS_MAX_ALLOWED_ACCURACY_METERS || 50);
     if (coords.accuracy > maxAllowedAccuracy) {
       logger.warn('GPSService', `Geofence validation failed: GPS accuracy too low (${coords.accuracy}m > ${maxAllowedAccuracy}m)`);
       return {

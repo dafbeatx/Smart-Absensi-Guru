@@ -771,6 +771,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           onClose={() => setIsBiometricModalOpen(false)}
           settings={settings}
           user={user}
+          onSwitchToQR={() => {
+            setIsBiometricModalOpen(false);
+            onOpenScanner?.();
+          }}
           onSuccess={() => {
             fetchMyAttendance();
             fetchAttendanceRecords(teachers);

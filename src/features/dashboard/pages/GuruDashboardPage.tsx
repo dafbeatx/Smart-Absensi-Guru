@@ -4101,6 +4101,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={() => setIsBiometricModalOpen(false)}
         settings={settings}
         user={effectiveUser}
+        onSwitchToQR={() => {
+          setIsBiometricModalOpen(false);
+          onOpenScanner?.();
+        }}
         onSuccess={() => {
           setIsBioEnrolled(true);
           loadAllDataRef.current?.();

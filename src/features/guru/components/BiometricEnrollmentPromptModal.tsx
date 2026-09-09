@@ -23,6 +23,7 @@ export const BiometricEnrollmentPromptModal: React.FC<BiometricEnrollmentPromptM
   const [isRegistering, setIsRegistering] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const isWebView = BiometricService.isWebViewOrInAppBrowser();
 
   const handleRegisterBiometric = async () => {
     if (!user?.id) return;
@@ -30,6 +31,9 @@ export const BiometricEnrollmentPromptModal: React.FC<BiometricEnrollmentPromptM
     setErrorMsg(null);
 
     try {
+      // Bersihkan credential lama jika ada agar registrasi bersih
+      BiometricService.resetBiometricEnrollment(user.id);
+
       const res = await BiometricService.registerBiometric(user.id, user.full_name);
       if (res.success) {
         setIsSuccess(true);
@@ -64,6 +68,20 @@ export const BiometricEnrollmentPromptModal: React.FC<BiometricEnrollmentPromptM
       maxWidth="md"
     >
       <div className="space-y-4 py-1">
+        {/* Banner WebView jika terdeteksi */}
+        {isWebView && (
+          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs flex items-start gap-2.5">
+            <span className="text-base shrink-0 mt-0.5">⚠️</span>
+            <div className="space-y-1">
+              <p className="font-bold text-amber-900">Perhatian: Browser Internal WhatsApp</p>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Anda membuka aplikasi melalui WhatsApp. Jika sensor sidik jari tidak merespons,
+                silakan buka tautan di aplikasi <strong>Google Chrome</strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Banner Ilustrasi Sensor Sidik Jari */}
         <div className="text-center space-y-2.5 p-4 rounded-3xl bg-linear-to-b from-[#18536B]/10 to-[#023246]/5 border border-cyan-200/60">
           <div className="relative w-16 h-16 mx-auto rounded-3xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-md ring-4 ring-cyan-50">

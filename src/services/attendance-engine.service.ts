@@ -209,7 +209,7 @@ export class AttendanceEngine {
         }
       }
 
-      const gpsResult = GPSService.validateGeofenceRadius(gpsCoords, geofenceSettings.radius);
+      const gpsResult = GPSService.validateGeofenceRadius(gpsCoords, geofenceSettings.radius, { maxAllowedAccuracy: 100 });
       if (!gpsResult.isValid) {
         notify('ERROR');
         return {
