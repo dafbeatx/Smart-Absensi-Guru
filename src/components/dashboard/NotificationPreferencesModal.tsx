@@ -184,7 +184,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                   <button
                     type="button"
                     onClick={handleRequestPush}
-                    className="w-full min-h-[44px] px-3.5 py-2 bg-[#0D7A5F] hover:bg-[#0b654f] text-white font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-95"
+                    className="w-full min-h-11 px-3.5 py-2 bg-[#0D7A5F] hover:bg-[#0b654f] text-white font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-95"
                   >
                     🔔 Sambungkan Web Push HP / Laptop
                   </button>
@@ -305,7 +305,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                         type="time"
                         value={formatTimeForInput(prefs.quiet_hours_start, '21:00')}
                         onChange={(e) => setPrefs((prev) => ({ ...prev, quiet_hours_start: e.target.value }))}
-                        className="w-full min-h-[44px] px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-xs"
+                        className="w-full min-h-11 px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-xs"
                       />
                     </div>
                     <div>
@@ -314,7 +314,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                         type="time"
                         value={formatTimeForInput(prefs.quiet_hours_end, '05:00')}
                         onChange={(e) => setPrefs((prev) => ({ ...prev, quiet_hours_end: e.target.value }))}
-                        className="w-full min-h-[44px] px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-xs"
+                        className="w-full min-h-11 px-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-xs"
                       />
                     </div>
                   </div>
@@ -330,7 +330,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="min-h-[44px] px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+            className="min-h-11 px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
           >
             Batal
           </button>
@@ -338,7 +338,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="min-h-[44px] px-5 py-2.5 text-xs font-extrabold text-white bg-[#0D7A5F] hover:bg-[#0b654f] rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+            className="min-h-11 px-5 py-2.5 text-xs font-extrabold text-white bg-[#0D7A5F] hover:bg-[#0b654f] rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
           >
             {saving ? 'Menyimpan...' : 'Simpan Preferensi'}
           </button>

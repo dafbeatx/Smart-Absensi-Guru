@@ -238,6 +238,9 @@ class VoiceAnnouncementService {
 
       if (voiceToUse) {
         utterance.voice = voiceToUse;
+        if (voiceToUse.lang) {
+          utterance.lang = voiceToUse.lang;
+        }
       }
 
       this.isSpeaking = true;

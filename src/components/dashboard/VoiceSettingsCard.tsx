@@ -313,7 +313,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
                   </span>
                   <span className="text-[10px] text-slate-400 font-medium">1-Tap Atur Suara</span>
                 </div>
-                <div className="grid grid-cols-2 xs:grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleApplyPreset(1.0, 0.95, 'Standard')}
@@ -326,7 +326,14 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
                     onClick={() => handleApplyPreset(1.25, 1.0, 'Wanita')}
                     className="p-1.5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg text-[10px] font-bold text-slate-700 hover:text-emerald-900 text-center transition-all cursor-pointer"
                   >
-                    👩 Wanita (Tinggi)
+                    👩 Wanita
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset(1.38, 1.05, 'Anime / Aksen Jepang')}
+                    className="p-1.5 bg-pink-50/80 hover:bg-pink-100 border border-pink-200 hover:border-pink-300 rounded-lg text-[10px] font-bold text-pink-700 hover:text-pink-900 text-center transition-all cursor-pointer col-span-2 sm:col-span-1 shadow-2xs"
+                  >
+                    🌸 Anime (Jepang)
                   </button>
                   <button
                     type="button"

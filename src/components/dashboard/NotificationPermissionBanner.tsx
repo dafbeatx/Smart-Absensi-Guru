@@ -115,7 +115,7 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
             type="button"
             onClick={handleRequestPermission}
             disabled={isSubscribing}
-            className="flex-1 md:flex-none min-h-[44px] px-4 py-2.5 bg-[#0D7A5F] hover:bg-[#0b654f] text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer border border-emerald-400/30 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="flex-1 md:flex-none min-h-11 px-4 py-2.5 bg-[#0D7A5F] hover:bg-[#0b654f] text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer border border-emerald-400/30 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <span>{isSubscribing ? 'Mengaktifkan...' : '🔔 Aktifkan Sekarang'}</span>
           </button>
@@ -123,7 +123,7 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
           <button
             type="button"
             onClick={handleRequestPermission}
-            className="flex-1 md:flex-none min-h-[44px] px-3.5 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-600"
+            className="flex-1 md:flex-none min-h-11 px-3.5 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-600"
           >
             Coba Cek Ulang
           </button>
@@ -133,7 +133,7 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
           <button
             type="button"
             onClick={onOpenPreferences}
-            className="min-h-[44px] px-3 py-2 text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer border border-white/10"
+            className="min-h-11 px-3 py-2 text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer border border-white/10"
             title="Pengaturan Notifikasi"
           >
             ⚙️ Atur
@@ -143,7 +143,7 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
         <button
           type="button"
           onClick={handleDismiss}
-          className="min-h-[44px] min-w-[44px] p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer text-xs flex items-center justify-center shrink-0"
+          className="min-h-11 min-w-11 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer text-xs flex items-center justify-center shrink-0"
           aria-label="Tutup banner notifikasi"
           title="Tutup banner"
         >
