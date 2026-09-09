@@ -172,8 +172,8 @@ export const AttendanceRecapModal: React.FC<AttendanceRecapModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      {/* Container dioptimalkan untuk mobile Infinix Note 8 (max-w-[480px], padding seimbang) */}
-      <div className="bg-white w-full max-w-[480px] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col h-[92vh] sm:h-auto sm:max-h-[90vh]">
+      {/* Container dioptimalkan untuk mobile Infinix Note 8 (max-w-120, padding seimbang) */}
+      <div className="bg-white w-full max-w-120 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col h-[92vh] sm:h-auto sm:max-h-[90vh]">
         
         {/* ── 1. HEADER MODAL (STICKY) ─────────────────────────────────────── */}
         <div className="bg-[#023246] text-white p-4 px-5 flex items-center justify-between shrink-0 shadow-xs">
@@ -557,7 +557,7 @@ export const AttendanceRecapModal: React.FC<AttendanceRecapModalProps> = ({
                     key={item.id}
                     type="button"
                     onClick={() => setFilterStatus(item.id)}
-                    className={`flex-1 min-w-[65px] py-1.5 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
+                    className={`flex-1 min-w-16.25 py-1.5 px-2 rounded-lg transition-all cursor-pointer whitespace-nowrap text-center ${
                       filterStatus === item.id
                         ? 'bg-white text-[#023246] shadow-xs font-black'
                         : 'text-slate-500 hover:text-slate-800'
