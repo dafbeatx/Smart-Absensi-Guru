@@ -100,6 +100,9 @@ import {
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHistoryModal';
 import { TopDisciplineCelebrationModal } from '../../guru/components/TopDisciplineCelebrationModal';
+import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
+import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
+import { AttendancePolicyService } from '../../../services/attendance-policy.service';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import type {
   AttendanceRecord,
@@ -340,6 +343,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [activeEmergencies, setActiveEmergencies] = useState<ClassroomEmergencyAlert[]>([]);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
+  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // 8 Quick Icons Customization State
@@ -907,6 +911,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         console.warn('Failed to load teacher point history:', err);
       }
 
+      // 7.7 Evaluasi Penalti TAP (Tidak Absen Pulang) jika Syarat & Ketentuan telah disetujui
+      try {
+        await AttendancePolicyService.evaluateUncheckedOutPenalties(
+          effectiveUser.id,
+          effectiveUser.full_name,
+          loadedHistory,
+          authToken
+        );
+      } catch (errPolicy) {
+        console.warn('Failed to evaluate attendance policy penalties:', errPolicy);
+      }
+
       // 8. Teacher Duty Schedule Check (Jadwal Piket Guru Senin - Jumat)
       try {
         const fetchedDuty = await DutyScheduleRepository.getDutySchedules(authToken);
@@ -1127,6 +1143,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     window.addEventListener('smart_absensi_teachers_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_holidays_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_policy_updated', handleScannedEvent);
     window.addEventListener('storage', handleScannedEvent);
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
@@ -1136,6 +1153,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       window.removeEventListener('smart_absensi_teachers_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_holidays_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_policy_updated', handleScannedEvent);
       window.removeEventListener('storage', handleScannedEvent);
     };
   }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);
@@ -1828,6 +1846,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </span>
               </div>
             )}
+
+            {/* 🌟 BANNER PENGINGAT JAM PULANG OTOMATIS (H-1 JAM & OVERDUE) */}
+            <CheckoutReminderBanner
+              todayAttendance={todayAttendance}
+              settings={settings}
+              isTodayOff={Boolean(isTodayOff?.isOff)}
+              userId={effectiveUser?.id}
+              onOpenBiometric={handleOpenBiometricModal}
+              onOpenScanner={handleOpenScannerClick}
+              onOpenPolicyModal={() => setIsPolicyModalOpen(true)}
+            />
 
             {/* 🌟 1. CARD LOG PRESENSI HARI INI (DEVICE LOG TODAY MODEL) ─────────── */}
             {(() => {
@@ -4181,6 +4210,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         totalPoints={appreciationScore?.totalPoints ?? 0}
         user={effectiveUser}
         teacherData={disciplineLeaderboard?.leaderboard?.find((t) => t.isCurrentUser)}
+      />
+
+      {/* 15b. Modal Syarat & Ketentuan Kebijakan Presensi Wajib Datang & Pulang */}
+      <AttendancePolicyAgreementModal
+        isOpen={isPolicyModalOpen}
+        onClose={() => setIsPolicyModalOpen(false)}
+        user={effectiveUser}
+        onAgreed={() => {
+          loadAllDataRef.current?.();
+          showToast('success', 'Pakta Integritas Disetujui', 'Kebijakan disiplin jam kepulangan resmi telah aktif.');
+        }}
       />
 
       {/* 16. Modal Pengaturan Notifikasi & Suara Mobile-first */}

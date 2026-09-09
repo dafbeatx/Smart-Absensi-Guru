@@ -427,5 +427,7 @@ export interface NotificationPreferences {
   attendance_alerts?: boolean;
   leave_alerts?: boolean;
   event_alerts?: boolean;
+  attendance_policy_agreed?: boolean;
+  attendance_policy_agreed_at?: string;
   updated_at?: string;
 }

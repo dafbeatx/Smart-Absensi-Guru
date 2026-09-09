@@ -73,6 +73,7 @@ const memoryReadStore: Map<string, Set<string>> = new Map();
 
 class NotificationPermissionService {
   private activeCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private activeEarlyCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Service constructor
@@ -761,14 +762,116 @@ class NotificationPermissionService {
   }
 
   /**
+   * Dapatkan Waktu Peringatan 1 Jam Sebelum Pulang (Senin-Kamis 12.00 WIB, Jumat 10.00 WIB)
+   */
+  public getEarlyCheckoutTargetTimeForDate(date: Date = new Date()): {
+    hours: number;
+    minutes: number;
+    departureLabel: string;
+    label: string;
+  } {
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 5) {
+      return {
+        hours: 10,
+        minutes: 0,
+        departureLabel: '11.00 WIB',
+        label: '10.00 WIB (1 Jam Menuju Kepulangan 11.00 WIB)',
+      };
+    }
+    return {
+      hours: 12,
+      minutes: 0,
+      departureLabel: '13.00 WIB',
+      label: '12.00 WIB (1 Jam Menuju Kepulangan 13.00 WIB)',
+    };
+  }
+
+  /**
+   * Cek apakah notifikasi H-1 jam kepulangan sudah pernah dikirimkan hari ini (Peringatan 1x)
+   */
+  public isEarlyCheckoutReminderFiredToday(userId?: string): boolean {
+    if (typeof window === 'undefined') return false;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const key = `smart_absensi_early_checkout_fired_${userId || 'guest'}_${todayStr}`;
+    return localStorage.getItem(key) === '1';
+  }
+
+  /**
    * Menjadwalkan Automatic Local Push Notification & PWA Alarm Presensi Pulang
-   * Dipanggil secara otomatis saat Guru berhasil melakukan Absen Masuk
+   * Termasuk:
+   * 1. Pengingat H-1 Jam (12.00 WIB Sen-Kam / 10.00 WIB Jum) - Peringatan 1x
+   * 2. Pengingat Tepat Jam Pulang (13.00 WIB Sen-Kam / 11.00 WIB Jum)
    */
   public scheduleCheckoutReminder(teacherName: string, userId?: string) {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const targetInfo = this.getCheckoutTargetTimeForDate(now);
+    const dayOfWeek = now.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return; // Akhir pekan libur
 
+    const todayStr = now.toISOString().split('T')[0];
+
+    // ──────── 1. PENGINGAT 1 JAM SEBELUM JAM PULANG (PERINGATAN 1X) ────────
+    const earlyInfo = this.getEarlyCheckoutTargetTimeForDate(now);
+    const earlyTargetTime = new Date();
+    earlyTargetTime.setHours(earlyInfo.hours, earlyInfo.minutes, 0, 0);
+
+    const earlyDelayMs = earlyTargetTime.getTime() - now.getTime();
+    const earlyStorageKey = `smart_absensi_early_checkout_fired_${userId || 'guest'}_${todayStr}`;
+    const alreadyFiredEarly = typeof window !== 'undefined' && localStorage.getItem(earlyStorageKey) === '1';
+
+    if (this.activeEarlyCheckoutTimer) {
+      clearTimeout(this.activeEarlyCheckoutTimer);
+      this.activeEarlyCheckoutTimer = null;
+    }
+
+    if (!alreadyFiredEarly) {
+      const fireEarlyReminder = () => {
+        const notifTitle = '⏰ Pengingat 1 Jam Menuju Waktu Pulang!';
+        const notifBody = `Bapak/Ibu ${teacherName}, 1 jam lagi jam kepulangan resmi (${earlyInfo.departureLabel}) tiba. Pastikan Anda tidak lupa melakukan presensi pulang sebelum meninggalkan sekolah.`;
+
+        this.sendNativeNotification({
+          title: notifTitle,
+          body: notifBody,
+          type: 'CHECK_OUT',
+          teacherName,
+          userId,
+          roleTarget: 'GURU',
+          actionUrl: '/?tab=BERANDA',
+        });
+
+        if (userId) {
+          this.triggerServerWebPush({
+            targetUserId: userId,
+            title: notifTitle,
+            body: notifBody,
+            tag: `early_checkout_${userId}_${todayStr}`,
+            url: '/?tab=BERANDA',
+          }).catch(() => {});
+        }
+
+        SoundService.playNotificationChime();
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(earlyStorageKey, '1');
+        }
+      };
+
+      if (earlyDelayMs <= 0) {
+        // Jika check-in dilakukan saat sudah memasuki window H-1 jam (misal jam 12:15 WIB), kirim peringatan 1x
+        const departureInfo = this.getCheckoutTargetTimeForDate(now);
+        const departureTime = new Date();
+        departureTime.setHours(departureInfo.hours, departureInfo.minutes, 0, 0);
+        if (now.getTime() < departureTime.getTime()) {
+          fireEarlyReminder();
+        }
+      } else {
+        this.activeEarlyCheckoutTimer = setTimeout(fireEarlyReminder, earlyDelayMs);
+      }
+    }
+
+    // ──────── 2. PENGINGAT TEPAT WAKTU PULANG (13.00 / 11.00 WIB) ────────
+    const targetInfo = this.getCheckoutTargetTimeForDate(now);
     const targetTime = new Date();
     targetTime.setHours(targetInfo.hours, targetInfo.minutes, 0, 0);
 
@@ -816,6 +919,10 @@ class NotificationPermissionService {
    * Membatalkan Alarm / Pengingat Pulang setelah Guru berhasil melakukan Absen Pulang
    */
   public cancelScheduledCheckoutReminder() {
+    if (this.activeEarlyCheckoutTimer) {
+      clearTimeout(this.activeEarlyCheckoutTimer);
+      this.activeEarlyCheckoutTimer = null;
+    }
     if (this.activeCheckoutTimer) {
       clearTimeout(this.activeCheckoutTimer);
       this.activeCheckoutTimer = null;
