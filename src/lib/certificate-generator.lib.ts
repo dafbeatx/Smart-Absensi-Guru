@@ -612,7 +612,16 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
           <!-- Kolom Barcode / Keabsahan Dokumen -->
           <div class="cert-security-col">
             <div class="qr-badge-wrapper">
-              <img src="/icons.svg" alt="QR Verifikasi" class="cert-qr" />
+              <svg class="cert-qr" viewBox="0 0 24 24" fill="none" stroke="#023246" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="6" height="6" x="3" y="3" rx="1" fill="#023246" fill-opacity="0.08"/>
+                <rect width="6" height="6" x="15" y="3" rx="1" fill="#023246" fill-opacity="0.08"/>
+                <rect width="6" height="6" x="3" y="15" rx="1" fill="#023246" fill-opacity="0.08"/>
+                <path d="M21 15h-3a2 2 0 0 0-2 2v4"/>
+                <path d="M21 21v.01"/>
+                <path d="M12 7v3a2 2 0 0 1-2 2H7"/>
+                <path d="M12 16v5"/>
+                <path d="M16 12h5"/>
+              </svg>
               <div class="security-meta">
                 <strong>Verifikasi Sistem:</strong><br />
                 Dokumen resmi terenkripsi QR &amp; GPS Presensi.<br />
