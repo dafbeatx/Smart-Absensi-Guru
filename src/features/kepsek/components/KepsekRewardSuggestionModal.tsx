@@ -222,7 +222,7 @@ export const KepsekRewardSuggestionModal: React.FC<KepsekRewardSuggestionModalPr
               value={rewardInput}
               onChange={(e) => setRewardInput(e.target.value)}
               placeholder="Contoh: Voucher blanja 300rb dan parcel buah segar..."
-              className="w-full p-3 rounded-2xl border border-slate-300 focus:border-[#18536B] focus:ring-2 focus:ring-[#18536B]/20 text-xs sm:text-sm font-medium text-slate-800 bg-white shadow-inner resize-none transition-all placeholder:text-slate-400"
+              className="w-full p-3 rounded-2xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#18536B]/40 text-xs sm:text-sm font-medium text-slate-800 bg-white shadow-inner resize-none transition-all"
             />
 
             {/* Tombol AI Refinement */}
@@ -235,7 +235,7 @@ export const KepsekRewardSuggestionModal: React.FC<KepsekRewardSuggestionModalPr
                 type="button"
                 onClick={handleRefineWithAI}
                 disabled={isRefining || !rewardInput.trim()}
-                className="px-3.5 py-2 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                className="px-3.5 py-2 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
               >
                 <Sparkles className={`w-3.5 h-3.5 text-amber-300 ${isRefining ? 'animate-spin' : ''}`} />
                 <span>{isRefining ? 'AI Memperbaiki...' : 'Sempurnakan dengan AI ✨'}</span>
