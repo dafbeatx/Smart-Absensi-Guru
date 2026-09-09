@@ -2348,7 +2348,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             {(() => {
               const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
               const todayDayName = dayNames[new Date().getDay()];
-              const todaySlots = teachingSlots.filter((s) => s && s.day === todayDayName);
+              const normalizeDay = (d?: string) => (d || '').toLowerCase().replace(/['`’]/g, '').trim();
+              const todayDayNorm = normalizeDay(todayDayName);
+              const todaySlots = teachingSlots.filter((s) => s && normalizeDay(s.day) === todayDayNorm);
 
               let activeOrNextSlot = todaySlots.find((s) => {
                 const status = getSlotLiveStatus(s.time, currentTime);
@@ -2373,6 +2375,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               const slotStatus = activeOrNextSlot ? getSlotLiveStatus(activeOrNextSlot.time, currentTime) : null;
 
               if (todaySlots.length === 0) {
+                const hasOtherDays = teachingSlots.length > 0;
+                const otherDaysList = [...new Set(teachingSlots.map((s) => s.day))].join(', ');
+
                 return (
                   <section className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -2383,7 +2388,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         <h4 className="text-xs font-bold text-slate-800 leading-tight">
                           Tidak Ada Jadwal Mengajar Hari Ini
                         </h4>
-                        <p className="text-[11px] text-slate-500 font-medium">Hari {todayDayName}</p>
+                        {hasOtherDays ? (
+                          <p className="text-[11px] text-emerald-700 font-semibold truncate">
+                            Tersedia {teachingSlots.length} jadwal di hari lain ({otherDaysList})
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 font-medium">
+                            Hari {todayDayName} (Belum ada jadwal terdaftar)
+                          </p>
+                        )}
                       </div>
                     </div>
                     <button
@@ -2391,7 +2404,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       onClick={() => setIsScheduleModalOpen(true)}
                       className="text-xs font-bold text-[#023246] hover:underline shrink-0 px-2 py-1 cursor-pointer"
                     >
-                      Jadwal Mingguan →
+                      {hasOtherDays ? 'Lihat Jadwal →' : 'Jadwal Mingguan →'}
                     </button>
                   </section>
                 );
@@ -3917,6 +3930,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <TeachingScheduleModal
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
+        schedule={teachingSlots}
+        user={effectiveUser}
       />
 
       {/* Terms & Conditions Modal */}

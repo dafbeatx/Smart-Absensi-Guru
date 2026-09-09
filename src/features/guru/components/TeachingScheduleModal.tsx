@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { TeachingSlot } from '../../../types/database.types';
+import type { TeachingSlot, UserProfile } from '../../../types/database.types';
 import { useAuthStore } from '../../../store/useAuthStore';
 import {
   TeachingScheduleRepository,
@@ -10,6 +10,7 @@ interface TeachingScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
   schedule?: TeachingSlot[];
+  user?: UserProfile;
 }
 
 export const defaultTeachingSchedule: TeachingSlot[] = [];
@@ -18,29 +19,31 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
   isOpen,
   onClose,
   schedule,
+  user: propUser,
 }) => {
-  const { user } = useAuthStore();
+  const { user: authUser } = useAuthStore();
+  const effectiveUser = propUser || authUser;
   const days = ['Semua', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
   const [selectedDay, setSelectedDay] = useState('Semua');
   const [activeSchedules, setActiveSchedules] = useState<TeachingSlot[]>([]);
 
   const loadSchedules = useCallback(async () => {
-    if (schedule && schedule.length > 0) {
+    if (schedule !== undefined) {
       setActiveSchedules(schedule);
       return;
     }
 
-    if (!user) {
+    if (!effectiveUser) {
       setActiveSchedules([]);
       return;
     }
 
     const userSlots = await TeachingScheduleRepository.getTeacherSchedules(
-      user.id,
-      user.full_name || undefined
+      effectiveUser.id,
+      effectiveUser.full_name || undefined
     );
     setActiveSchedules(userSlots);
-  }, [schedule, user]);
+  }, [schedule, effectiveUser]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,9 +58,12 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
 
   if (!isOpen) return null;
 
+  const normalizeDay = (d?: string) => (d || '').toLowerCase().replace(/['`’]/g, '').trim();
+  const selectedDayNorm = normalizeDay(selectedDay);
+
   const filteredSchedule = selectedDay === 'Semua' 
     ? activeSchedules 
-    : activeSchedules.filter(s => s.day === selectedDay);
+    : activeSchedules.filter(s => normalizeDay(s.day) === selectedDayNorm);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">

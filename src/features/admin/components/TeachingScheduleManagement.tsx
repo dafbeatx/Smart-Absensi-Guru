@@ -5,6 +5,7 @@ import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
 import { SearchableSelect, type SelectOption } from '../../../components/ui/SearchableSelect';
 import { useToastStore } from '../../../store/useToastStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 import { TeachingScheduleRepository } from '../../../repositories/TeachingScheduleRepository';
 import {
   SubjectManagementModal,
@@ -208,7 +209,8 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     }
 
     setSchedules(updatedSchedules);
-    TeachingScheduleRepository.saveSchedules(updatedSchedules);
+    const token = useAuthStore.getState().token || undefined;
+    TeachingScheduleRepository.saveSchedules(updatedSchedules, token);
     setIsModalOpen(false);
   };
 
@@ -216,7 +218,8 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     if (window.confirm('Apakah Anda yakin ingin menghapus jam mengajar ini?')) {
       const updatedSchedules = schedules.filter((s) => s.id !== id);
       setSchedules(updatedSchedules);
-      TeachingScheduleRepository.saveSchedules(updatedSchedules);
+      const token = useAuthStore.getState().token || undefined;
+      TeachingScheduleRepository.saveSchedules(updatedSchedules, token);
       showToast('success', 'Jadwal Dihapus', 'Jam mengajar berhasil dihapus.');
     }
   };

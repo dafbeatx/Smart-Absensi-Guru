@@ -5,6 +5,26 @@ import { logger } from '../utils/logger.utils';
 export const TEACHING_SCHEDULES_STORAGE_KEY = 'smart_absensi_teaching_schedules';
 export const TEACHING_SCHEDULES_UPDATED_EVENT = 'smart_absensi_schedules_updated';
 
+/**
+ * Normalizes a teacher's full name by removing common Indonesian academic titles,
+ * expanding abbreviations (e.g. M. -> Muhammad), and stripping punctuation for bulletproof matching.
+ */
+export function normalizeTeacherName(name?: string | null): string {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    // Remove common Indonesian academic titles & honorifics
+    .replace(/,\s*(s\.pd|m\.pd|s\.mat|s\.si|s\.e|s\.pd\.i|g\.r|m\.si|dr|drs|dra|h\.|hj\.)/gi, '')
+    .replace(/\b(s\.pd|m\.pd|s\.mat|s\.si|s\.e|s\.pd\.i|g\.r|m\.si|dr|drs|dra|h\.|hj\.)\b/gi, '')
+    // Normalize "m." to "muhammad"
+    .replace(/\bm\.\s*/gi, 'muhammad ')
+    // Strip non-alphanumeric except spaces
+    .replace(/[^a-z0-9\s]/gi, '')
+    // Collapse spaces
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export class TeachingScheduleRepository {
   /**
    * Retrieves all teaching schedules from the active provider with local caching & fallback.
@@ -40,16 +60,49 @@ export class TeachingScheduleRepository {
   }
 
   /**
-   * Retrieves teaching schedules for a specific teacher.
+   * Retrieves teaching schedules for a specific teacher with intelligent multi-factor matching:
+   * 1. Exact User ID match (case-insensitive)
+   * 2. Normalized Teacher Name match (ignoring titles like S.Pd, S.Mat, abbreviations M. vs Muhammad)
+   * 3. Name containment and multi-word token overlap
    */
-  public static async getTeacherSchedules(userId: string, teacherName?: string, token?: string): Promise<TeachingSlot[]> {
+  public static async getTeacherSchedules(
+    userId: string,
+    teacherName?: string,
+    token?: string
+  ): Promise<TeachingSlot[]> {
     const allSchedules = await this.getSchedules(token);
-    return allSchedules.filter(
-      (s) =>
-        s &&
-        (s.user_id === userId ||
-          (teacherName && s.teacher_name && s.teacher_name.toLowerCase() === teacherName.toLowerCase()))
-    );
+    const targetNorm = normalizeTeacherName(teacherName);
+
+    return allSchedules.filter((s) => {
+      if (!s) return false;
+
+      // 1. Direct User ID match
+      if (s.user_id && userId && s.user_id.toLowerCase() === userId.toLowerCase()) {
+        return true;
+      }
+
+      // 2. Normalized Teacher Name matching
+      if (targetNorm && s.teacher_name) {
+        const slotNorm = normalizeTeacherName(s.teacher_name);
+        if (slotNorm && targetNorm) {
+          // Exact normalized match
+          if (slotNorm === targetNorm) return true;
+
+          // One contains the other
+          if (slotNorm.includes(targetNorm) || targetNorm.includes(slotNorm)) return true;
+
+          // Word tokens overlap (at least 2 words match)
+          const targetWords = targetNorm.split(' ').filter((w) => w.length > 2);
+          const slotWords = slotNorm.split(' ').filter((w) => w.length > 2);
+          const matchCount = targetWords.filter((tw) => slotWords.includes(tw)).length;
+          if (matchCount >= 2 || (targetWords.length === 1 && matchCount === 1)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    });
   }
 
   /**

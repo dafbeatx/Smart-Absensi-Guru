@@ -6,7 +6,7 @@
 
 CREATE TABLE IF NOT EXISTS public.teaching_schedules (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL,
   teacher_name  TEXT NOT NULL,
   day           TEXT NOT NULL, -- 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
   time          TEXT NOT NULL, -- e.g. '07:30 - 08:50'
