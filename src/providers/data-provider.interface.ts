@@ -20,6 +20,7 @@ import type {
   StudentBehaviorLog,
   RecordStudentBehaviorParams,
   PushSubscriptionPayload,
+  NotificationPreferences,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -53,6 +54,13 @@ export interface IDataProvider {
   // Notification API
   getNotifications(userId: string, token: string): Promise<AppNotification[]>;
   markNotificationAsRead(notificationId: string, token: string): Promise<boolean>;
+  markNotificationsAsRead(userIdOrIds: string | string[], idsOrToken?: string[] | string, token?: string): Promise<boolean>;
+  getNotificationPreferences(userId: string, token?: string): Promise<NotificationPreferences | null>;
+  saveNotificationPreferences(
+    userIdOrPrefs: string | Partial<NotificationPreferences>,
+    prefsOrToken?: Partial<NotificationPreferences> | string,
+    token?: string
+  ): Promise<any>;
 
   // Settings API
   getSettings(): Promise<SystemSettings>;

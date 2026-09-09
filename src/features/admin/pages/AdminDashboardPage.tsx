@@ -34,6 +34,8 @@ import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import { CONSTANTS } from '../../../config/constants';
 import { useToastStore } from '../../../store/useToastStore';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
+import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
+import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -54,6 +56,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
+  const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
 
   // Settings for Geofence & Work Hours
   const [settings, setSettings] = useState<SystemSettings>({
@@ -507,11 +510,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             setIsCorrectionModalOpen(true);
           }}
           onNavigateTab={(tab) => setActiveTab(tab as any)}
+          onOpenPreferences={() => setIsPreferencesModalOpen(true)}
           onLogout={logout}
         />
 
         {/* Main Content Viewport */}
         <main className="flex-1 p-3.5 sm:p-6 pb-6 sm:pb-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
+          <NotificationPermissionBanner
+            user={user || undefined}
+            onOpenPreferences={() => setIsPreferencesModalOpen(true)}
+          />
           <QueueMonitor />
 
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
@@ -782,6 +790,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           }}
         />
       )}
+
+      {/* Modal Pengaturan Notifikasi & Suara Mobile-first */}
+      <NotificationPreferencesModal
+        isOpen={isPreferencesModalOpen}
+        onClose={() => setIsPreferencesModalOpen(false)}
+      />
     </div>
   );
 };

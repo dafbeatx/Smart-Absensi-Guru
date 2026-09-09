@@ -27,6 +27,7 @@ import type {
   VerificationMethod,
   AttendanceSource,
   PushSubscriptionPayload,
+  NotificationPreferences,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -1411,6 +1412,7 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getNotifications(userId: string, _token: string): Promise<any[]> {
     try {
+      // Query notifications targeted to user or broadcast
       const { data, error } = await this.client
         .from('notifications')
         .select('*')
@@ -1422,15 +1424,32 @@ export class SupabaseProvider implements IDataProvider {
         return [];
       }
 
+      // Fetch per-user read IDs from notification_reads table if it exists
+      let dbReadIds = new Set<string>();
+      try {
+        const { data: readsData } = await this.client
+          .from('notification_reads')
+          .select('notification_id')
+          .eq('user_id', userId);
+        if (readsData && readsData.length > 0) {
+          readsData.forEach((r: { notification_id: string }) => dbReadIds.add(r.notification_id));
+        }
+      } catch {
+        // notification_reads table may not be migrated yet
+      }
+
       if (data && data.length > 0) {
-        const readIds = NotificationService.getReadNotificationIds(userId);
+        const localReadIds = NotificationService.getReadNotificationIds(userId);
         return data.map((n) => ({
           id: n.id,
           user_id: n.user_id,
+          audience_role: n.audience_role,
           title: n.title,
           message: n.message,
           type: n.type || 'INFO',
-          is_read: Boolean(n.is_read) || readIds.has(n.id),
+          severity: n.severity || 'INFO',
+          action_url: n.action_url,
+          is_read: Boolean(n.is_read) || dbReadIds.has(n.id) || localReadIds.has(n.id),
           created_at: n.created_at,
         }));
       }
@@ -1444,21 +1463,174 @@ export class SupabaseProvider implements IDataProvider {
 
   public async markNotificationAsRead(notificationId: string, _token: string): Promise<boolean> {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notificationId);
+    const sessionUser = useAuthStore.getState().user;
+    const userId = sessionUser?.id || '';
+
+    if (userId) {
+      NotificationService.markIdAsRead(userId, notificationId);
+    }
+
     if (!isUuid) {
       logger.info('SupabaseProvider', 'Skipping DB update for synthetic/local notification ID:', notificationId);
       return true;
     }
 
-    const { error } = await this.client
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
+    try {
+      // 1. Update directly if owned by user
+      await this.client
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
 
-    if (error) {
-      logger.error('SupabaseProvider', 'markNotificationAsRead error:', error.message);
-      throw new Error(`Gagal memperbarui status notifikasi di backend: ${error.message}`);
+      // 2. Also record in notification_reads for per-user isolation
+      if (userId) {
+        await this.client
+          .from('notification_reads')
+          .upsert({
+            notification_id: notificationId,
+            user_id: userId,
+            read_at: new Date().toISOString(),
+          }, { onConflict: 'notification_id,user_id' });
+      }
+    } catch (error: any) {
+      logger.warn('SupabaseProvider', 'markNotificationAsRead partial warning:', error.message);
     }
     return true;
+  }
+
+  public async markNotificationsAsRead(
+    userIdOrIds: string | string[],
+    idsOrToken?: string[] | string,
+    _token?: string
+  ): Promise<boolean> {
+    let effectiveUserId: string;
+    let notificationIds: string[];
+
+    if (Array.isArray(userIdOrIds)) {
+      notificationIds = userIdOrIds;
+      effectiveUserId =
+        typeof idsOrToken === 'string' &&
+        !idsOrToken.startsWith('Bearer ') &&
+        idsOrToken
+          ? idsOrToken
+          : useAuthStore.getState().user?.id || '';
+    } else {
+      effectiveUserId = userIdOrIds || useAuthStore.getState().user?.id || '';
+      notificationIds = Array.isArray(idsOrToken) ? idsOrToken : [];
+    }
+
+    if (!effectiveUserId || notificationIds.length === 0) return true;
+    NotificationService.markAllIdsAsRead(effectiveUserId, notificationIds);
+
+    const uuidIds = notificationIds.filter((id) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    );
+
+    if (uuidIds.length === 0) return true;
+
+    try {
+      const records = uuidIds.map((id) => ({
+        notification_id: id,
+        user_id: effectiveUserId,
+        read_at: new Date().toISOString(),
+      }));
+
+      await this.client
+        .from('notification_reads')
+        .upsert(records, { onConflict: 'notification_id,user_id' });
+    } catch (err: any) {
+      logger.warn('SupabaseProvider', 'markNotificationsAsRead error:', err.message);
+    }
+    return true;
+  }
+
+  public async getNotificationPreferences(userId: string, _token?: string): Promise<NotificationPreferences | null> {
+    const defaultPrefs: NotificationPreferences = {
+      user_id: userId,
+      push_enabled: true,
+      attendance_enabled: true,
+      leave_enabled: true,
+      schedule_enabled: true,
+      announcement_enabled: true,
+      critical_enabled: true,
+      voice_enabled: true,
+      sound_enabled: true,
+      attendance_sound_enabled: true,
+      chime_enabled: true,
+      auto_greeting_enabled: false,
+      quiet_hours_start: null,
+      quiet_hours_end: null,
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { data, error } = await this.client
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getNotificationPreferences fallback to defaults:', error.message);
+        return defaultPrefs;
+      }
+
+      if (data) {
+        return {
+          user_id: data.user_id,
+          push_enabled: data.push_enabled ?? true,
+          attendance_enabled: data.attendance_enabled ?? true,
+          leave_enabled: data.leave_enabled ?? true,
+          schedule_enabled: data.schedule_enabled ?? true,
+          announcement_enabled: data.announcement_enabled ?? true,
+          critical_enabled: data.critical_enabled ?? true,
+          voice_enabled: data.voice_enabled ?? true,
+          sound_enabled: data.sound_enabled ?? true,
+          attendance_sound_enabled: data.attendance_sound_enabled ?? true,
+          chime_enabled: data.chime_enabled ?? true,
+          auto_greeting_enabled: data.auto_greeting_enabled ?? false,
+          quiet_hours_start: data.quiet_hours_start ?? null,
+          quiet_hours_end: data.quiet_hours_end ?? null,
+          updated_at: data.updated_at,
+        };
+      }
+
+      return defaultPrefs;
+    } catch (err: any) {
+      logger.warn('SupabaseProvider', 'getNotificationPreferences exception:', err.message);
+      return defaultPrefs;
+    }
+  }
+
+  public async saveNotificationPreferences(
+    userIdOrPrefs: string | Partial<NotificationPreferences>,
+    prefsOrToken?: Partial<NotificationPreferences> | string,
+    _token?: string
+  ): Promise<boolean> {
+    try {
+      const prefs: Partial<NotificationPreferences> =
+        typeof userIdOrPrefs === 'string'
+          ? ((prefsOrToken as Partial<NotificationPreferences>) || {})
+          : userIdOrPrefs;
+      const userId = prefs?.user_id || (typeof userIdOrPrefs === 'string' ? userIdOrPrefs : undefined);
+      const toSave = {
+        ...prefs,
+        ...(userId ? { user_id: userId } : {}),
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await this.client
+        .from('notification_preferences')
+        .upsert(toSave, { onConflict: 'user_id' });
+
+      if (error) {
+        logger.error('SupabaseProvider', 'saveNotificationPreferences error:', error.message);
+        return false;
+      }
+      return true;
+    } catch (err: any) {
+      logger.error('SupabaseProvider', 'saveNotificationPreferences exception:', err.message);
+      return false;
+    }
   }
 
   // ─── TEACHER WELL-BEING & MOOD API ───────────────────────────────────────

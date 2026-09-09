@@ -54,21 +54,33 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
 
-  const targetUrl = (event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+  let targetUrl =
+    (event.notification.data && (event.notification.data.action_url || event.notification.data.url)) || '/';
+
+  if (event.action === 'open_leaves') {
+    targetUrl = '/?tab=LEAVES';
+  } else if (event.action === 'open_attendance') {
+    targetUrl = '/?tab=TEACHERS';
+  } else if (event.action === 'checkout_now') {
+    targetUrl = '/?action=checkout';
+  }
+
+  const sanitizedUrl = targetUrl.startsWith('/') ? targetUrl : `/${targetUrl.replace(/^https?:\/\/[^/]+/, '')}`;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Focus existing open window if available
+      // Focus and navigate existing open window if available
       for (const client of clientList) {
         if ('focus' in client) {
-          if (client.url.includes(targetUrl) || targetUrl === '/') {
-            return client.focus();
+          if ('navigate' in client && client.url !== sanitizedUrl) {
+            client.navigate(sanitizedUrl);
           }
+          return client.focus();
         }
       }
       // Open new window if app was closed
       if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl);
+        return self.clients.openWindow(sanitizedUrl);
       }
     })
   );

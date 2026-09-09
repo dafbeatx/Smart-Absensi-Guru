@@ -15,6 +15,7 @@ import { runMobileUIE2ETestSuite } from './__tests__/mobile-ui-e2e.test';
 import { runGeocodingTestSuite } from './__tests__/geocoding.test';
 import { runBiometricAttendanceTestSuite } from './__tests__/biometric-attendance.test';
 import { runPermissionGuardTestSuite } from './__tests__/permission-guard.test';
+import { runNotificationVoiceOverhaulTestSuite } from './__tests__/notification-voice-overhaul.test';
 
 export interface TestResultItem {
   testName: string;
@@ -67,6 +68,7 @@ export class MasterTestRunner {
       { name: 'Reverse Geocoding & OpenStreetMap Engine', fn: runGeocodingTestSuite },
       { name: 'Geofenced Biometric Fingerprint Attendance Engine', fn: runBiometricAttendanceTestSuite },
       { name: 'Permission Guard & Attendance Blocking Engine', fn: runPermissionGuardTestSuite },
+      { name: 'Notification & Voice Overhaul System', fn: runNotificationVoiceOverhaulTestSuite },
     ];
 
     let totalPassed = 0;

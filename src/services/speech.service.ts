@@ -1,9 +1,19 @@
 /**
- * Smart Absensi Guru — AI Voice Announcement & Customization Service
+ * Smart Absensi Guru — Pengumuman Suara (Text-to-Speech) Service
  * Memutar dan mengonfigurasi pesan suara Bahasa Indonesia (Text-to-Speech)
- * dengan dukungan berbagai model suara (Pria/Wanita/Indonesian Voices),
- * nada suara (pitch), kecepatan (rate), dan kustomisasi teks sapaan guru.
+ * dengan prioritas pesan berjenjang (CRITICAL > ATTENDANCE_SUCCESS > GREETING > INFO),
+ * pembatasan laju ucapan (rate limiting), isolasi konfigurasi per-user,
+ * serta dukungan jam hening (quiet hours).
  */
+
+export type SpeechPriority = 'CRITICAL' | 'ATTENDANCE_SUCCESS' | 'GREETING' | 'INFO';
+
+export const PRIORITY_LEVELS: Record<SpeechPriority, number> = {
+  CRITICAL: 1,
+  ATTENDANCE_SUCCESS: 2,
+  GREETING: 3,
+  INFO: 4,
+};
 
 export interface VoiceConfig {
   isEnabled: boolean;
@@ -28,6 +38,10 @@ export const DEFAULT_VOICE_CONFIG: VoiceConfig = {
 class VoiceAnnouncementService {
   private config: VoiceConfig = { ...DEFAULT_VOICE_CONFIG };
   private voicesList: SpeechSynthesisVoice[] = [];
+  private currentUserId?: string;
+  private currentPriority: SpeechPriority | null = null;
+  private isSpeaking: boolean = false;
+  private lastSpokenTime: number = 0;
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -39,9 +53,48 @@ class VoiceAnnouncementService {
     }
   }
 
-  private loadConfig() {
+  /**
+   * Mengatur identitas pengguna aktif dan memuat preferensi suara terisolasi
+   */
+  public setUser(userId?: string) {
+    this.currentUserId = userId;
+    this.loadConfig();
+  }
+
+  /**
+   * Helper penentuan jam hening (quiet hours)
+   */
+  public isWithinQuietHours(start = '21:00', end = '05:00', date: Date = new Date()): boolean {
     try {
-      const saved = localStorage.getItem('smart_absensi_voice_config');
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+
+      const currentMinutes = date.getHours() * 60 + date.getMinutes();
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+
+      if (startMinutes <= endMinutes) {
+        return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+      } else {
+        return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  private loadConfig() {
+    if (typeof window === 'undefined') return;
+    try {
+      const userKey = this.currentUserId
+        ? `smart_absensi_voice_config_${this.currentUserId}`
+        : null;
+
+      let saved = userKey ? localStorage.getItem(userKey) : null;
+      if (!saved) {
+        saved = localStorage.getItem('smart_absensi_voice_config');
+      }
+
       if (saved) {
         const parsed = JSON.parse(saved);
         this.config = { ...DEFAULT_VOICE_CONFIG, ...parsed };
@@ -84,7 +137,11 @@ class VoiceAnnouncementService {
     this.config = { ...this.config, ...newConfig };
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('smart_absensi_voice_config', JSON.stringify(this.config));
+        const serialized = JSON.stringify(this.config);
+        localStorage.setItem('smart_absensi_voice_config', serialized);
+        if (this.currentUserId) {
+          localStorage.setItem(`smart_absensi_voice_config_${this.currentUserId}`, serialized);
+        }
         localStorage.setItem('smart_absensi_voice_enabled', JSON.stringify(this.config.isEnabled));
       } catch (e) {
         console.warn('Failed to save voice config to localStorage:', e);
@@ -112,18 +169,52 @@ class VoiceAnnouncementService {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    this.isSpeaking = false;
+    this.currentPriority = null;
   }
 
   /**
-   * Memutar kalimat ucapan dengan model suara, pitch, dan rate terpilih
+   * Memutar kalimat ucapan dengan antrean prioritas dan kontrol jam hening
    */
-  public speak(text: string, customVoiceURI?: string, customPitch?: number, customRate?: number) {
+  public speak(
+    text: string,
+    customVoiceURI?: string,
+    customPitch?: number,
+    customRate?: number,
+    priority: SpeechPriority = 'INFO'
+  ) {
     if (!this.config.isEnabled && !customVoiceURI) return;
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
-    try {
-      this.cancel(); // Cancel any ongoing speech
+    // 1. Cek Jam Hening (Quiet Hours) - hanya CRITICAL yang dapat berbunyi saat jam hening
+    if (this.isWithinQuietHours() && priority !== 'CRITICAL') {
+      return;
+    }
 
+    const now = Date.now();
+
+    // 2. Anti-spam Debounce untuk ucapan non-kritis (GREETING & INFO)
+    if (priority === 'GREETING' || priority === 'INFO') {
+      if (now - this.lastSpokenTime < 2500) {
+        return;
+      }
+    }
+
+    // 3. Evaluasi Prioritas Antrean Suara
+    if (this.isSpeaking && this.currentPriority) {
+      const incomingLevel = PRIORITY_LEVELS[priority];
+      const activeLevel = PRIORITY_LEVELS[this.currentPriority];
+
+      if (incomingLevel < activeLevel) {
+        // Prioritas lebih tinggi (misal CRITICAL > ATTENDANCE_SUCCESS > GREETING): Batalkan ucapan saat ini
+        this.cancel();
+      } else {
+        // Ucapan aktif memiliki prioritas lebih tinggi atau sama: abaikan ucapan berprioritas lebih rendah
+        return;
+      }
+    }
+
+    try {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'id-ID';
       utterance.pitch = customPitch !== undefined ? customPitch : this.config.pitch;
@@ -138,7 +229,7 @@ class VoiceAnnouncementService {
         voiceToUse = voices.find((v) => v.voiceURI === targetURI);
       }
 
-      // Fallback if target voice not found on current device (e.g. switching between HP and Laptop)
+      // Fallback if target voice not found on current device
       if (!voiceToUse) {
         voiceToUse = voices.find(
           (v) => v.lang.includes('id') || v.lang.includes('ID') || v.name.toLowerCase().includes('indonesia')
@@ -149,14 +240,37 @@ class VoiceAnnouncementService {
         utterance.voice = voiceToUse;
       }
 
+      this.isSpeaking = true;
+      this.currentPriority = priority;
+      this.lastSpokenTime = now;
+
+      utterance.onend = () => {
+        this.isSpeaking = false;
+        this.currentPriority = null;
+      };
+
+      utterance.onerror = () => {
+        this.isSpeaking = false;
+        this.currentPriority = null;
+      };
+
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.warn('Speech synthesis error:', err);
+      this.isSpeaking = false;
+      this.currentPriority = null;
     }
   }
 
   /**
-   * Ucapan Selamat Datang untuk Guru saat masuk Dashboard (menggunakan template kustom)
+   * Ucapan Darurat / Peringatan Kritis (Priority: CRITICAL)
+   */
+  public speakCritical(text: string) {
+    this.speak(text, undefined, undefined, undefined, 'CRITICAL');
+  }
+
+  /**
+   * Ucapan Selamat Datang untuk Guru saat masuk Dashboard (Priority: GREETING)
    */
   public speakWelcomeGreeting(teacherName: string, institutionName?: string) {
     const hour = new Date().getHours();
@@ -173,11 +287,11 @@ class VoiceAnnouncementService {
       .replace('{nama}', cleanName)
       .replace('{sekolah}', instText);
 
-    this.speak(text);
+    this.speak(text, undefined, undefined, undefined, 'GREETING');
   }
 
   /**
-   * Ucapan Konfirmasi saat Presensi Berhasil Disimpan (menggunakan template kustom)
+   * Ucapan Konfirmasi saat Presensi Berhasil Disimpan (Priority: ATTENDANCE_SUCCESS)
    */
   public speakAttendanceSuccess(teacherName: string, actionType: 'CHECK_IN' | 'CHECK_OUT' = 'CHECK_IN') {
     const cleanName = teacherName.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\./g, '').trim();
@@ -185,29 +299,29 @@ class VoiceAnnouncementService {
     if (actionType === 'CHECK_OUT') {
       const text = (this.config.checkOutTemplate || DEFAULT_VOICE_CONFIG.checkOutTemplate)
         .replace('{nama}', cleanName);
-      this.speak(text);
+      this.speak(text, undefined, undefined, undefined, 'ATTENDANCE_SUCCESS');
     } else {
       const text = (this.config.checkInTemplate || DEFAULT_VOICE_CONFIG.checkInTemplate)
         .replace('{nama}', cleanName);
-      this.speak(text);
+      this.speak(text, undefined, undefined, undefined, 'ATTENDANCE_SUCCESS');
     }
   }
 
   /**
-   * Ucapan Konfirmasi Sukses Spesial khusus Presensi Guru Piket Hari Ini
+   * Ucapan Konfirmasi Sukses Spesial khusus Presensi Guru Piket Hari Ini (Priority: ATTENDANCE_SUCCESS)
    */
   public speakDutyTeacherSuccess(teacherName: string) {
     const cleanName = teacherName.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\./g, '').trim();
     const text = `Selamat bertugas menjadi Guru Piket hari ini, ${cleanName}! Semoga amanah dan diberikan kelancaran serta keberkahan dalam bertugas.`;
-    this.speak(text);
+    this.speak(text, undefined, undefined, undefined, 'ATTENDANCE_SUCCESS');
   }
 
   /**
-   * Ucapan Apresiasi Perolehan Poin Kedisiplinan Guru
+   * Ucapan Apresiasi Perolehan Poin Kedisiplinan Guru (Priority: ATTENDANCE_SUCCESS)
    */
   public speakPointReward(points: number, teacherName: string, reasonText?: string, isDutyToday?: boolean) {
     const cleanName = teacherName.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\.|S\.E\.|G\.r/g, '').trim();
-    
+
     let pointsSpoken = `${points}`;
     if (points === 15) pointsSpoken = 'lima belas';
     else if (points === 25) pointsSpoken = 'dua puluh lima';
@@ -224,9 +338,8 @@ class VoiceAnnouncementService {
       text = `Terima kasih atas kehadiran Anda, ${cleanName}. Anda memperoleh ${pointsSpoken} poin disiplin hari ini.`;
     }
 
-    this.speak(text);
+    this.speak(text, undefined, undefined, undefined, 'ATTENDANCE_SUCCESS');
   }
 }
 
 export const SpeechService = new VoiceAnnouncementService();
-

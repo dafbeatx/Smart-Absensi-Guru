@@ -50,17 +50,30 @@ export interface AttendanceNotificationPayload {
   teacherName?: string;
   time?: string;
   userId?: string;
-  roleTarget?: 'ALL' | 'ADMIN' | 'GURU' | 'KEPSEK';
+  roleTarget?: 'ALL' | 'ADMIN' | 'GURU' | 'KEPSEK' | 'OPERATOR';
   actionType?: 'CORRECTION' | 'NAVIGATE_TAB' | 'INFO';
   actionDate?: string;
   actionTargetId?: string;
+  actionUrl?: string;
+  severity?: 'CRITICAL' | 'WARNING' | 'INFO';
   createdAt?: string;
   isRead?: boolean;
 }
 
-const memoryNotificationCache: AttendanceNotificationPayload[] = [];
+export type DetailedPermissionStatus =
+  | 'unsupported'
+  | 'default'
+  | 'granted'
+  | 'denied'
+  | 'subscribed'
+  | 'subscription_failed';
+
+const memoryNotificationList: AttendanceNotificationPayload[] = [];
+const memoryReadStore: Map<string, Set<string>> = new Map();
 
 class NotificationPermissionService {
+  private activeCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
     // Service constructor
   }
@@ -82,6 +95,67 @@ class NotificationPermissionService {
   }
 
   /**
+   * Dapatkan status mendalam (unsupported, default, granted, denied, subscribed, subscription_failed)
+   */
+  public async getDetailedStatus(_userId?: string): Promise<DetailedPermissionStatus> {
+    if (
+      typeof window === 'undefined' ||
+      !('Notification' in window) ||
+      !('serviceWorker' in navigator)
+    ) {
+      return 'unsupported';
+    }
+
+    const permission = Notification.permission;
+    if (permission === 'denied') return 'denied';
+    if (permission === 'default') return 'default';
+
+    // permission is 'granted', check push subscription
+    try {
+      if (!('PushManager' in window)) {
+        return 'granted';
+      }
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        return 'subscribed';
+      }
+      return 'granted';
+    } catch {
+      return 'subscription_failed';
+    }
+  }
+
+  /**
+   * Helper penentuan jam hening (quiet hours)
+   * Mengembalikan true jika waktu saat ini berada di antara start (default 21:00) dan end (default 05:00)
+   */
+  public isWithinQuietHours(start = '21:00', end = '05:00', date: Date = new Date()): boolean {
+    try {
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+
+      const currentMinutes = date.getHours() * 60 + date.getMinutes();
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+
+      if (startMinutes <= endMinutes) {
+        // Rentang waktu dalam 1 hari (misal 13:00 s.d 15:00)
+        return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+      } else {
+        // Rentang waktu melewati tengah malam (misal 21:00 s.d 05:00)
+        return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  private getReadKey(userId?: string): string {
+    return userId ? `smart_absensi_reads_${userId}` : 'smart_absensi_reads_guest';
+  }
+
+  /**
    * Minta Perizinan Notifikasi Browser ke Pengguna (Admin / Kepsek / Guru)
    * dan otomatis mendaftarkan Web Push Subscription ke Supabase
    */
@@ -93,18 +167,21 @@ class NotificationPermissionService {
 
     try {
       const permission = await Notification.requestPermission();
-      
+
       if (permission === 'granted') {
         // Otomatis daftarkan Web Push Subscription ke Google FCM / Supabase di background
-        this.subscribeUserToPush(userId).catch((err) =>
+        const effectiveUserId = userId || useAuthStore.getState().user?.id;
+        this.subscribeUserToPush(effectiveUserId).catch((err) =>
           console.warn('Silent failure subscribing user to push:', err)
         );
 
         // Kirim konfirmasi notifikasi selamat datang
         this.sendNativeNotification({
           title: '🔔 Notifikasi Real-time Aktif!',
-          body: 'Anda akan menerima pemberitahuan langsung saat guru absen masuk, keluar, atau pengumuman event sekolah.',
+          body: 'Anda akan menerima pemberitahuan langsung saat guru absen masuk, keluar, atau pengumuman agenda sekolah.',
           type: 'SYSTEM',
+          userId: effectiveUserId,
+          roleTarget: 'ALL',
         });
         return true;
       }
@@ -116,7 +193,7 @@ class NotificationPermissionService {
   }
 
   /**
-   * Simpan notifikasi ke local storage cache untuk ditampilkan di in-app notification bell
+   * Simpan notifikasi ke local storage cache yang terisolasi per user
    */
   private saveToCache(payload: AttendanceNotificationPayload) {
     const newNotif: AttendanceNotificationPayload = {
@@ -131,20 +208,20 @@ class NotificationPermissionService {
       actionType: payload.actionType,
       actionDate: payload.actionDate,
       actionTargetId: payload.actionTargetId,
+      actionUrl: payload.actionUrl,
+      severity: payload.severity || 'INFO',
       createdAt: payload.createdAt || new Date().toISOString(),
       isRead: false,
     };
 
-    memoryNotificationCache.unshift(newNotif);
-    if (memoryNotificationCache.length > 50) {
-      memoryNotificationCache.length = 50;
-    }
+    memoryNotificationList.unshift(newNotif);
+    if (memoryNotificationList.length > 50) memoryNotificationList.length = 50;
 
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== 'undefined') {
       try {
         const saved = localStorage.getItem('smart_absensi_notifications_cache');
         const existing: AttendanceNotificationPayload[] = saved ? JSON.parse(saved) : [];
-        const updated = [newNotif, ...existing].slice(0, 50);
+        const updated = [newNotif, ...existing.filter((item) => item.id !== newNotif.id)].slice(0, 50);
         localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(updated));
       } catch (e) {
         console.warn('Failed to save notification to cache:', e);
@@ -153,56 +230,91 @@ class NotificationPermissionService {
   }
 
   /**
-   * Ambill daftar notifikasi tersimpan dari local cache
+   * Ambil daftar notifikasi tersimpan dari local cache terisolasi per user
+   * dan disaring berdasarkan target peran pengguna (Role Target Filtering)
    */
-  public getCachedNotifications(userId?: string): AttendanceNotificationPayload[] {
-    let list = [...memoryNotificationCache];
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+  public getCachedNotifications(userId?: string, userRole?: string): AttendanceNotificationPayload[] {
+    let list: AttendanceNotificationPayload[] = [...memoryNotificationList];
+
+    if (typeof localStorage !== 'undefined') {
       try {
         const saved = localStorage.getItem('smart_absensi_notifications_cache');
         if (saved) {
-          list = JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const seen = new Set(list.map((x) => x.id));
+            for (const item of parsed) {
+              if (!seen.has(item.id)) {
+                list.push(item);
+                seen.add(item.id);
+              }
+            }
+          }
         }
-      } catch (e) {
-        // use memory list
+      } catch {
+        // fallback to memory list
       }
     }
-    if (!userId) return list;
-    return list.filter((n) => !n.userId || n.userId === userId || n.roleTarget === 'ALL');
+
+    // Role-based Audience Isolation Filter:
+    return list.filter((n) => {
+      // 1. Direct user recipient
+      if (n.userId) {
+        if (userId && n.userId === userId) return true;
+        if (!userId && !userRole) return true; // unscoped test check
+        return false; // private notification for another user
+      }
+
+      // 2. Broadcast or role-targeted notification (no specific userId)
+      const targetRole = n.roleTarget || 'ALL';
+      if (targetRole === 'ALL') return true;
+
+      if (userRole) {
+        if (targetRole === userRole) return true;
+        // Operator gets Admin level alerts
+        if (userRole === 'OPERATOR' && targetRole === 'ADMIN') return true;
+        return false;
+      }
+
+      // If userRole not provided (unscoped test check)
+      return true;
+    });
   }
 
   /**
-   * Tandai semua notifikasi di cache sebagai sudah dibaca
+   * Tandai semua notifikasi di cache sebagai sudah dibaca untuk user tertentu
    */
-  public markAllAsRead() {
-    if (typeof window === 'undefined') return;
-    try {
-      const saved = localStorage.getItem('smart_absensi_notifications_cache');
-      if (!saved) return;
-      const parsed: AttendanceNotificationPayload[] = JSON.parse(saved);
-      const updated = parsed.map((n) => ({ ...n, isRead: true }));
-      localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(updated));
-    } catch (e) {
-      console.warn('Failed to mark notifications read:', e);
+  public markAllAsRead(_userId?: string) {
+    memoryNotificationList.forEach((n) => {
+      n.isRead = true;
+    });
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_notifications_cache');
+        if (saved) {
+          const parsed: AttendanceNotificationPayload[] = JSON.parse(saved);
+          const updated = parsed.map((n) => ({ ...n, isRead: true }));
+          localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(updated));
+        }
+      } catch (e) {
+        console.warn('Failed to mark notifications read:', e);
+      }
     }
   }
 
   /**
-   * Ambil Set ID notifikasi yang sudah dibaca oleh user tertentu / global dari LocalStorage
+   * Ambil Set ID notifikasi yang sudah dibaca oleh user tertentu dari LocalStorage yang terisolasi
    */
   public getReadNotificationIds(userId?: string): Set<string> {
-    if (typeof window === 'undefined') return new Set();
-    const readSet = new Set<string>();
+    const effectiveUserId = userId || useAuthStore.getState().user?.id || 'guest';
+    const memSet = memoryReadStore.get(effectiveUserId) || new Set<string>();
+    const readSet = new Set<string>(memSet);
 
-    const readKeys = [
-      userId ? `smart_absensi_read_notifications_${userId}` : null,
-      'smart_absensi_read_notifications_global',
-      'smart_absensi_read_notifications_all',
-    ].filter(Boolean) as string[];
-
-    for (const key of readKeys) {
+    if (typeof localStorage !== 'undefined') {
       try {
-        const saved = localStorage.getItem(key);
+        const readKey = this.getReadKey(effectiveUserId);
+        const saved = localStorage.getItem(readKey);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
@@ -213,50 +325,59 @@ class NotificationPermissionService {
         console.warn('Failed to parse read notification IDs:', e);
       }
     }
+
     return readSet;
   }
 
   /**
-   * Tandai ID notifikasi tertentu sebagai sudah dibaca untuk user tertentu & global
+   * Tandai ID notifikasi tertentu sebagai sudah dibaca untuk user tertentu (namespaced)
    */
   public markIdAsRead(userId: string | undefined, notificationId: string) {
-    if (typeof window === 'undefined') return;
-    try {
-      const readSet = this.getReadNotificationIds(userId);
-      readSet.add(notificationId);
-      const arr = Array.from(readSet);
+    const effectiveUserId = userId || useAuthStore.getState().user?.id || 'guest';
+    const readSet = this.getReadNotificationIds(effectiveUserId);
+    readSet.add(notificationId);
 
-      if (userId) {
-        localStorage.setItem(`smart_absensi_read_notifications_${userId}`, JSON.stringify(arr));
+    memoryReadStore.set(effectiveUserId, readSet);
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const readKey = this.getReadKey(effectiveUserId);
+        localStorage.setItem(readKey, JSON.stringify(Array.from(readSet)));
+      } catch (e) {
+        console.warn('Failed to mark notification ID read:', e);
       }
-      localStorage.setItem('smart_absensi_read_notifications_global', JSON.stringify(arr));
-      this.markAllAsRead();
+    }
 
-      window.dispatchEvent(new CustomEvent('smart_absensi_notifications_read_updated', { detail: { notificationId } }));
-    } catch (e) {
-      console.warn('Failed to mark notification ID read:', e);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_notifications_read_updated', {
+          detail: { notificationId },
+        })
+      );
     }
   }
 
   /**
-   * Tandai seluruh daftar ID notifikasi sebagai sudah dibaca untuk user tertentu & global
+   * Tandai seluruh daftar ID notifikasi sebagai sudah dibaca untuk user tertentu (namespaced)
    */
   public markAllIdsAsRead(userId: string | undefined, notificationIds: string[]) {
-    if (typeof window === 'undefined') return;
-    try {
-      const readSet = this.getReadNotificationIds(userId);
-      notificationIds.forEach((id) => readSet.add(id));
-      const arr = Array.from(readSet);
+    const effectiveUserId = userId || useAuthStore.getState().user?.id || 'guest';
+    const readSet = this.getReadNotificationIds(effectiveUserId);
+    notificationIds.forEach((id) => readSet.add(id));
 
-      if (userId) {
-        localStorage.setItem(`smart_absensi_read_notifications_${userId}`, JSON.stringify(arr));
+    memoryReadStore.set(effectiveUserId, readSet);
+
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const readKey = this.getReadKey(effectiveUserId);
+        localStorage.setItem(readKey, JSON.stringify(Array.from(readSet)));
+      } catch (e) {
+        console.warn('Failed to mark all notification IDs read:', e);
       }
-      localStorage.setItem('smart_absensi_read_notifications_global', JSON.stringify(arr));
-      this.markAllAsRead();
+    }
 
+    if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('smart_absensi_notifications_read_updated'));
-    } catch (e) {
-      console.warn('Failed to mark all notification IDs read:', e);
     }
   }
 
@@ -272,14 +393,17 @@ class NotificationPermissionService {
    * Kirim Notifikasi Native Browser (OS Desktop / HP) + Suara Chime + Cache
    */
   public sendNativeNotification(payload: AttendanceNotificationPayload) {
-    // 1. Save to local cache feed
+    // 1. Save to local namespaced cache feed
     this.saveToCache(payload);
 
-    // 2. Play Audio Sound Effect
-    if (payload.type === 'LEAVE_REQUEST') {
-      SoundService.play('WARNING');
-    } else {
-      SoundService.playSuccess();
+    // 2. Play Audio Sound Effect (respecting quiet hours unless critical)
+    const inQuietHours = this.isWithinQuietHours();
+    if (!inQuietHours || payload.severity === 'CRITICAL') {
+      if (payload.type === 'LEAVE_REQUEST') {
+        SoundService.play('WARNING');
+      } else {
+        SoundService.playNotificationChime();
+      }
     }
 
     // 3. Kirim Native OS Browser Notification via Service Worker (Android & PWA Safe) dengan Fallback
@@ -290,7 +414,13 @@ class NotificationPermissionService {
         icon: iconPath,
         badge: iconPath,
         tag: payload.id || `sag-notif-${Date.now()}`,
-        requireInteraction: false,
+        requireInteraction: payload.severity === 'CRITICAL',
+        data: {
+          url: payload.actionUrl || '/?tab=BERANDA',
+          actionUrl: payload.actionUrl || '/?tab=BERANDA',
+          actionType: payload.actionType,
+          actionDate: payload.actionDate,
+        },
       };
 
       if ('serviceWorker' in navigator) {
@@ -303,6 +433,9 @@ class NotificationPermissionService {
               const notification = new Notification(payload.title, notificationOptions);
               notification.onclick = () => {
                 window.focus();
+                if (payload.actionUrl) {
+                  window.location.href = payload.actionUrl;
+                }
                 notification.close();
               };
             } catch (e) {
@@ -314,6 +447,9 @@ class NotificationPermissionService {
           const notification = new Notification(payload.title, notificationOptions);
           notification.onclick = () => {
             window.focus();
+            if (payload.actionUrl) {
+              window.location.href = payload.actionUrl;
+            }
             notification.close();
           };
         } catch (e) {
@@ -330,7 +466,7 @@ class NotificationPermissionService {
 
   /**
    * Daftarkan PushSubscription ke Google FCM / Apple APNs via ServiceWorker PushManager
-   * dan simpan endpoint ke Supabase Database
+   * dan simpan endpoint ke Supabase Database dengan user_id yang tepat
    */
   public async subscribeUserToPush(userId?: string): Promise<boolean> {
     if (
@@ -379,7 +515,7 @@ class NotificationPermissionService {
         user_agent: navigator.userAgent,
       });
 
-      console.info('[PushManager] Web Push Subscription berhasil tersimpan ke Supabase.');
+      console.info('[PushManager] Web Push Subscription berhasil tersimpan ke database untuk user:', effectiveUserId);
       return true;
     } catch (error) {
       console.warn('[PushManager] Error mendaftarkan push subscription:', error);
@@ -397,14 +533,20 @@ class NotificationPermissionService {
     title: string;
     body: string;
     url?: string;
+    actionUrl?: string;
     tag?: string;
+    severity?: 'CRITICAL' | 'WARNING' | 'INFO';
+    dedupeKey?: string;
   }): Promise<boolean> {
     if (typeof window === 'undefined') return false;
     try {
       const res = await fetch('/api/send-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+        body: JSON.stringify({
+          ...params,
+          url: params.actionUrl || params.url,
+        }),
       });
       return res.ok;
     } catch {
@@ -426,6 +568,7 @@ class NotificationPermissionService {
       time: timeStr,
       userId,
       roleTarget: 'ALL',
+      actionUrl: '/?tab=TEACHERS',
     });
 
     // Otomatis kirimkan Web Push ke HP Admin & Kepsek di latar belakang
@@ -433,7 +576,7 @@ class NotificationPermissionService {
       targetRoles: ['ADMIN', 'KEPSEK'],
       title: `🟢 Presensi Masuk: ${teacherName}`,
       body: `Bapak/Ibu ${teacherName} telah melakukan presensi masuk pada pukul ${timeStr} WIB.`,
-      tag: `in_${userId || 'guru'}_${Date.now()}`,
+      tag: `in_${userId || 'guru'}_${todayIso}`,
       url: '/?tab=TEACHERS',
     }).catch(() => {});
   }
@@ -452,6 +595,7 @@ class NotificationPermissionService {
       time: timeStr,
       userId,
       roleTarget: 'ALL',
+      actionUrl: '/?tab=TEACHERS',
     });
 
     // Otomatis kirimkan Web Push ke HP Admin & Kepsek di latar belakang
@@ -459,7 +603,7 @@ class NotificationPermissionService {
       targetRoles: ['ADMIN', 'KEPSEK'],
       title: `🔵 Presensi Pulang: ${teacherName}`,
       body: `Bapak/Ibu ${teacherName} telah melakukan presensi pulang pada pukul ${timeStr} WIB.`,
-      tag: `out_${userId || 'guru'}_${Date.now()}`,
+      tag: `out_${userId || 'guru'}_${todayIso}`,
       url: '/?tab=TEACHERS',
     }).catch(() => {});
   }
@@ -468,13 +612,24 @@ class NotificationPermissionService {
    * Helper: Trigger Notifikasi Event / Agenda Sekolah Baru
    */
   public notifySchoolEvent(eventTitle: string, eventDate: string, description?: string) {
+    const todayIso = new Date().toISOString().substring(0, 10);
     this.sendNativeNotification({
       id: `notif_event_${eventDate}_${eventTitle.replace(/\s+/g, '_').substring(0, 20)}`,
       title: `📅 Agenda Sekolah: ${eventTitle}`,
       body: `${eventTitle} (${eventDate})${description ? ' - ' + description : ''}.`,
       type: 'EVENT',
       roleTarget: 'ALL',
+      actionUrl: '/?tab=BERANDA',
     });
+
+    // Kirimkan Web Push ke seluruh guru dan pimpinan di latar belakang
+    this.triggerServerWebPush({
+      targetRoles: ['GURU', 'ADMIN', 'KEPSEK'],
+      title: `📅 Agenda Sekolah: ${eventTitle}`,
+      body: `${eventTitle} (${eventDate})${description ? ' - ' + description : ''}.`,
+      tag: `event_${eventDate}_${todayIso}`,
+      url: '/?tab=BERANDA',
+    }).catch(() => {});
   }
 
   /**
@@ -503,6 +658,7 @@ class NotificationPermissionService {
       userId,
       roleTarget: 'ALL',
       actionDate: targetDate,
+      actionUrl: '/?tab=BERANDA',
     });
 
     // Otomatis kirimkan Web Push ke HP Guru, Admin & Kepsek di latar belakang
@@ -527,6 +683,7 @@ class NotificationPermissionService {
       type: 'LEAVE_REQUEST',
       teacherName,
       roleTarget: 'ADMIN',
+      actionUrl: '/?tab=LEAVES',
     });
 
     // Otomatis kirimkan Web Push ke HP Admin & Kepsek di latar belakang
@@ -554,7 +711,18 @@ class NotificationPermissionService {
       actionType: 'CORRECTION',
       actionDate: dateStr,
       actionTargetId: userId,
+      actionUrl: '/?tab=BERANDA&openCorrection=true',
     });
+
+    if (userId) {
+      this.triggerServerWebPush({
+        targetUserId: userId,
+        title: `⚠️ Presensi Belum Tercatat: ${dateStr}`,
+        body: `Bapak/Ibu ${teacherName}, Anda belum tercatat presensi pada tanggal ${dateStr}. Segera ajukan Koreksi Absen.`,
+        tag: `missing_att_${userId}_${dateStr}`,
+        url: '/?tab=BERANDA&openCorrection=true',
+      }).catch(() => {});
+    }
   }
 
   /**
@@ -569,10 +737,17 @@ class NotificationPermissionService {
       roleTarget: 'ADMIN',
       actionType: 'NAVIGATE_TAB',
       actionDate: dateStr,
+      actionUrl: '/?tab=ATTENDANCE_TRACKING',
     });
-  }
 
-  private activeCheckoutTimer: any = null;
+    this.triggerServerWebPush({
+      targetRoles: ['ADMIN', 'KEPSEK'],
+      title: `⚠️ ${unabsentedCount} Guru Belum Presensi: ${dateStr}`,
+      body: `Terdapat ${unabsentedCount} guru yang belum tercatat presensi pada ${dateStr}.`,
+      tag: `unabsented_summary_${dateStr}`,
+      url: '/?tab=ATTENDANCE_TRACKING',
+    }).catch(() => {});
+  }
 
   /**
    * Dapatkan Jam Target Pulang berdasarkan hari (Senin-Kamis 13.00, Jumat 11.00)
@@ -618,6 +793,7 @@ class NotificationPermissionService {
         teacherName,
         userId,
         roleTarget: 'GURU',
+        actionUrl: '/?tab=BERANDA',
       });
       this.saveCheckoutReminderState({ teacherName, userId, dateStr: todayStr, isFired: true });
     };
@@ -673,7 +849,18 @@ class NotificationPermissionService {
       teacherName,
       userId,
       roleTarget: 'GURU',
+      actionUrl: '/?tab=LEAVES',
     });
+
+    if (userId) {
+      this.triggerServerWebPush({
+        targetUserId: userId,
+        title: isApproved ? `✅ Pengajuan ${leaveType} Disetujui` : `❌ Pengajuan ${leaveType} Ditolak`,
+        body: `Permohonan ${leaveType} Anda telah ${isApproved ? 'disetujui' : 'ditolak'} oleh Kepsek/Admin.`,
+        tag: `leave_decision_${userId}_${Date.now()}`,
+        url: '/?tab=LEAVES',
+      }).catch(() => {});
+    }
   }
 }
 

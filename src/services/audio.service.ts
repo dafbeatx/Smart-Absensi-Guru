@@ -7,15 +7,53 @@ export type SoundType = 'SUCCESS' | 'ERROR' | 'BEEP' | 'WARNING';
 
 class SoundEffectsService {
   private isMuted: boolean = false;
+  private isChimeMuted: boolean = false;
+  private isAttendanceSoundMuted: boolean = false;
   private audioCache: Map<string, HTMLAudioElement> = new Map();
 
   constructor() {
-    // Preload audio files
+    // Load persisted mute states
     if (typeof window !== 'undefined') {
+      try {
+        const savedMuted = localStorage.getItem('smart_absensi_sound_muted');
+        if (savedMuted !== null) this.isMuted = JSON.parse(savedMuted);
+
+        const savedChimeMuted = localStorage.getItem('smart_absensi_chime_muted');
+        if (savedChimeMuted !== null) this.isChimeMuted = JSON.parse(savedChimeMuted);
+
+        const savedAttMuted = localStorage.getItem('smart_absensi_attendance_sound_muted');
+        if (savedAttMuted !== null) this.isAttendanceSoundMuted = JSON.parse(savedAttMuted);
+      } catch (e) {
+        console.warn('Failed to load sound preferences from localStorage:', e);
+      }
+
+      // Preload audio files
       this.preloadAudio('/audio/success.mp3');
       this.preloadAudio('/audio/terimakasih.mp3');
       this.preloadAudio('/audio/error.mp3');
       this.preloadAudio('/audio/beep.mp3');
+    }
+  }
+
+  /**
+   * Helper penentuan jam hening (quiet hours)
+   */
+  public isWithinQuietHours(start = '21:00', end = '05:00', date: Date = new Date()): boolean {
+    try {
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+
+      const currentMinutes = date.getHours() * 60 + date.getMinutes();
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+
+      if (startMinutes <= endMinutes) {
+        return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+      } else {
+        return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+      }
+    } catch {
+      return false;
     }
   }
 
@@ -38,6 +76,7 @@ class SoundEffectsService {
    */
   public play(type: SoundType) {
     if (this.isMuted) return;
+    if (type === 'SUCCESS' && this.isAttendanceSoundMuted) return;
     if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
 
     let soundUrl = '/audio/success.mp3';
@@ -79,7 +118,7 @@ class SoundEffectsService {
    * Memutar /audio/success.mp3 terlebih dahulu, lalu disusul /audio/terimakasih.mp3!
    */
   public playAttendanceSuccess() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.isAttendanceSoundMuted) return;
     if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
 
     try {
@@ -119,7 +158,7 @@ class SoundEffectsService {
    * Memutar efek nada audio khas piket guru (dengan nada fanfare sukacita C5->E5->G5->C6)
    */
   public playPiketGuruSuccess() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.isAttendanceSoundMuted) return;
     if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
 
     try {
@@ -182,7 +221,7 @@ class SoundEffectsService {
    * Arpeggio Chime Emas Menanjak: G4 -> C5 -> E5 -> G5 -> B5 -> C6
    */
   public playPointRewardSound() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.isAttendanceSoundMuted) return;
     if (typeof window === 'undefined') return;
 
     try {
@@ -232,7 +271,7 @@ class SoundEffectsService {
    * Suara Dering Notifikasi Masuk (Chime Ding-Dong Dual Tone)
    */
   public playNotificationChime() {
-    if (this.isMuted) return;
+    if (this.isMuted || this.isChimeMuted || this.isWithinQuietHours()) return;
     if (typeof window === 'undefined') return;
 
     try {
@@ -348,10 +387,47 @@ class SoundEffectsService {
 
   public setMuted(muted: boolean) {
     this.isMuted = muted;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('smart_absensi_sound_muted', JSON.stringify(muted));
+      } catch (e) {
+        console.warn('Failed to save sound muted state:', e);
+      }
+    }
   }
 
   public getIsMuted(): boolean {
     return this.isMuted;
+  }
+
+  public setChimeMuted(muted: boolean) {
+    this.isChimeMuted = muted;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('smart_absensi_chime_muted', JSON.stringify(muted));
+      } catch (e) {
+        console.warn('Failed to save chime muted state:', e);
+      }
+    }
+  }
+
+  public getIsChimeMuted(): boolean {
+    return this.isChimeMuted;
+  }
+
+  public setAttendanceSoundMuted(muted: boolean) {
+    this.isAttendanceSoundMuted = muted;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('smart_absensi_attendance_sound_muted', JSON.stringify(muted));
+      } catch (e) {
+        console.warn('Failed to save attendance sound muted state:', e);
+      }
+    }
+  }
+
+  public getIsAttendanceSoundMuted(): boolean {
+    return this.isAttendanceSoundMuted;
   }
 }
 

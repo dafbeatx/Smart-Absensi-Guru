@@ -98,6 +98,7 @@ self.addEventListener('push', (event) => {
     body: 'Pemberitahuan presensi baru tersedia.',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
+    url: '/',
   };
 
   if (event.data) {
@@ -108,14 +109,19 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  const targetUrl = payload.action_url || payload.url || '/';
+
   const options = {
     body: payload.body,
     icon: payload.icon || '/pwa-192x192.png',
     badge: payload.badge || '/pwa-192x192.png',
     vibrate: [100, 50, 100],
+    tag: payload.tag || `sag_push_${Date.now()}`,
     data: {
+      url: targetUrl,
+      action_url: targetUrl,
+      notificationId: payload.id,
       dateOfArrival: Date.now(),
-      primaryKey: '1',
     },
     actions: [
       { action: 'open_app', title: '📱 Buka Aplikasi' },
@@ -126,31 +132,53 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(payload.title, options));
 });
 
-// Notification Click Event - Focus or Open Window
+// Notification Click Event - Contextual Navigation to targetUrl
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   if (event.action === 'close') return;
 
+  let targetUrl =
+    (event.notification.data && (event.notification.data.action_url || event.notification.data.url)) || '/';
+
+  // Handle contextual action buttons
+  if (event.action === 'open_leaves') {
+    targetUrl = '/?tab=LEAVES';
+  } else if (event.action === 'open_attendance') {
+    targetUrl = '/?tab=TEACHERS';
+  } else if (event.action === 'checkout_now') {
+    targetUrl = '/?action=checkout';
+  }
+
+  // Ensure internal route
+  const sanitizedUrl = targetUrl.startsWith('/') ? targetUrl : `/${targetUrl.replace(/^https?:\/\/[^/]+/, '')}`;
+
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If a tab is already open, navigate and focus it
       for (const client of clientList) {
-        if (client.url === '/' && 'focus' in client) {
+        if ('focus' in client) {
+          if ('navigate' in client && client.url !== sanitizedUrl) {
+            client.navigate(sanitizedUrl);
+          }
           return client.focus();
         }
       }
+      // Otherwise open a new window
       if (self.clients.openWindow) {
-        return self.clients.openWindow('/');
+        return self.clients.openWindow(sanitizedUrl);
       }
     })
   );
 });
 
-// Message Event from Client (Scheduled Attendance Alarm Trigger)
+// Message Event from Client
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SCHEDULE_ATTENDANCE_REMINDER') {
     const { title, body, delayMs, tag } = event.data;
-    setTimeout(() => {
+    // Note: Long setTimeout (>30s) in dormant Service Worker can be terminated by OS.
+    // For immediate or short alarms, trigger notification directly.
+    if (!delayMs || delayMs <= 1000) {
       self.registration.showNotification(title || '🔔 Waktu Pulang Sekolah Tiba!', {
         body: body || 'Jangan lupa scan QR / Absen Pulang sebelum meninggalkan area sekolah.',
         icon: '/pwa-192x192.png',
@@ -158,11 +186,12 @@ self.addEventListener('message', (event) => {
         vibrate: [200, 100, 200, 100, 200],
         tag: tag || 'checkout-reminder',
         requireInteraction: true,
+        data: { url: '/?action=checkout' },
         actions: [
-          { action: 'open_app', title: '📱 Absen Pulang Sekarang' },
+          { action: 'checkout_now', title: '📱 Absen Pulang Sekarang' },
           { action: 'close', title: 'Tutup' },
         ],
       });
-    }, delayMs || 0);
+    }
   }
 });

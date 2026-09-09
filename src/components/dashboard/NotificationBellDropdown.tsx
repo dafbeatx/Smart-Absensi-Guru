@@ -23,12 +23,14 @@ export interface NotificationBellDropdownProps {
   className?: string;
   onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
   onNavigateTab?: (tabId: string) => void;
+  onOpenPreferences?: () => void;
 }
 
 export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> = ({
   className = '',
   onOpenCorrectionModal,
   onNavigateTab,
+  onOpenPreferences,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'MY_STATUS' | 'TEACHER_SCAN' | 'LEAVES'>('ALL');
@@ -216,7 +218,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       }
 
       // 4. Real-time Cached Events & System Notifications
-      const cachedNotifs = NotificationService.getCachedNotifications(user.id);
+      const cachedNotifs = NotificationService.getCachedNotifications(user.id, user.role);
       cachedNotifs.forEach((cn) => {
         const cnId =
           cn.id ||
@@ -288,6 +290,23 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           seenIds.add(item.id);
           uniqueItems.push(item);
         }
+      });
+
+      // Priority Sort: Unread first, then severity (ALERT > WARNING > LEAVES > INFO > SUCCESS)
+      uniqueItems.sort((a, b) => {
+        const aUnread = !a.isRead && !currentReadSet.has(a.id) ? 1 : 0;
+        const bUnread = !b.isRead && !currentReadSet.has(b.id) ? 1 : 0;
+        if (aUnread !== bUnread) return bUnread - aUnread;
+
+        const getScore = (item: DynamicNotificationItem) => {
+          if (item.badgeType === 'ALERT') return 50;
+          if (item.category === 'LEAVE_REQUEST') return 40;
+          if (item.badgeType === 'WARNING') return 30;
+          if (item.badgeType === 'INFO') return 20;
+          return 10;
+        };
+
+        return getScore(b) - getScore(a);
       });
 
       setNotifications(uniqueItems);
@@ -404,12 +423,10 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
     // 2. Persist to service & localStorage
     NotificationService.markAllIdsAsRead(user?.id, allIds);
 
-    // 3. Persist to backend provider
+    // 3. Persist to backend provider via batch markNotificationsAsRead
     const provider = ProviderFactory.getProvider();
     const authToken = token || 'MOCK_TOKEN';
-    allIds.forEach((id) => {
-      provider.markNotificationAsRead(id, authToken).catch(() => {});
-    });
+    provider.markNotificationsAsRead(allIds, authToken).catch(() => {});
   }, [notifications, user?.id, token]);
 
   const handleNotificationClick = (item: DynamicNotificationItem) => {
@@ -481,12 +498,12 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-fade-in text-slate-800">
           {/* Header */}
-          <div className="bg-[#023246] text-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🔔</span>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h3 className="font-extrabold text-sm tracking-tight">Notifikasi Presensi</h3>
+          <div className="bg-[#023246] text-white p-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg shrink-0">🔔</span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="font-extrabold text-sm tracking-tight truncate">Notifikasi Presensi</h3>
                   {unreadCount > 0 ? (
                     <span className="px-1.5 py-0.2 bg-red-500 text-white text-[9px] font-black rounded-full">
                       {unreadCount} Baru
@@ -497,18 +514,35 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-300">Update Aktivitas &amp; Status Presensi Realtime</p>
+                <p className="text-[10px] text-slate-300 truncate">Update Aktivitas &amp; Status Presensi Realtime</p>
               </div>
             </div>
 
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllAsRead}
-                className="text-[10px] bg-white/10 hover:bg-white/20 text-emerald-300 font-extrabold px-2.5 py-1 rounded-lg transition-all cursor-pointer border border-emerald-400/40 active:scale-95 shadow-2xs shrink-0"
-              >
-                ✓ Tandai Dibaca
-              </button>
-            )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMarkAllAsRead}
+                  className="text-[10px] bg-white/10 hover:bg-white/20 text-emerald-300 font-extrabold px-2.5 py-1 rounded-lg transition-all cursor-pointer border border-emerald-400/40 active:scale-95 shadow-2xs"
+                >
+                  ✓ Dibaca
+                </button>
+              )}
+              {onOpenPreferences && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenPreferences();
+                  }}
+                  className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-xs"
+                  title="Pengaturan Notifikasi &amp; Suara"
+                  aria-label="Buka Pengaturan Notifikasi &amp; Suara"
+                >
+                  ⚙️
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Filter Bar */}

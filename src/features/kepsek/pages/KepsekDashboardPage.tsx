@@ -22,6 +22,8 @@ import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import { CONSTANTS } from '../../../config/constants';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
+import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
+import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -35,6 +37,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
+  const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [pendingComplaintsCount, setPendingComplaintsCount] = useState<number>(0);
@@ -459,11 +462,17 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         <TopDashboardNavbar
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onNavigateTab={(tab) => setActiveTab(tab as any)}
+          onOpenPreferences={() => setIsPreferencesModalOpen(true)}
           onLogout={logout}
         />
 
         {/* Main Content Viewport */}
         <main className="flex-1 p-3.5 sm:p-6 pb-28 sm:pb-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
+          <NotificationPermissionBanner
+            user={user || undefined}
+            onOpenPreferences={() => setIsPreferencesModalOpen(true)}
+          />
+
           {/* Data Source Sync Status Indicator Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2.5 p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2.5">
@@ -847,6 +856,12 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           }}
         />
       )}
+
+      {/* Modal Pengaturan Notifikasi & Suara Mobile-first */}
+      <NotificationPreferencesModal
+        isOpen={isPreferencesModalOpen}
+        onClose={() => setIsPreferencesModalOpen(false)}
+      />
     </div>
   );
 };

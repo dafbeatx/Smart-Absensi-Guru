@@ -78,6 +78,7 @@ import { SoundService } from '../../../services/audio.service';
 import { SpeechService } from '../../../services/speech.service';
 import { VoiceSettingsCard } from '../../../components/dashboard/VoiceSettingsCard';
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
+import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
 import { PWAInstallPrompt } from '../../../components/ui/PWAInstallPrompt';
 import { NotificationService } from '../../../services/notification-permission.service';
 import { SyncEngine } from '../../../services/sync-engine.service';
@@ -333,6 +334,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [activeEmergencies, setActiveEmergencies] = useState<ClassroomEmergencyAlert[]>([]);
+  const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // 8 Quick Icons Customization State
@@ -493,18 +495,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const hasGreetedRef = React.useRef<boolean>(false);
 
   useEffect(() => {
+    if (effectiveUser?.id) {
+      SpeechService.setUser(effectiveUser.id);
+    }
     if (!hasGreetedRef.current && effectiveUser?.full_name) {
       hasGreetedRef.current = true;
       setTimeout(() => {
-        if (isTodayOff.isOff) {
-          const cleanName = effectiveUser.full_name.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\./g, '').trim();
-          SpeechService.speak(`Assalamu'alaikum ${cleanName}. Selamat hari libur, selamat beristirahat.`);
-        } else {
-          SpeechService.speakWelcomeGreeting(effectiveUser.full_name, settings.institution_name);
+        if (SpeechService.getIsEnabled() && !SpeechService.isWithinQuietHours()) {
+          if (isTodayOff.isOff) {
+            const cleanName = effectiveUser.full_name.replace(/S\.Pd\.|M\.Pd\.|Drs\.|Dra\.|H\.|Hj\./g, '').trim();
+            SpeechService.speak(`Assalamu'alaikum ${cleanName}. Selamat hari libur, selamat beristirahat.`, undefined, undefined, undefined, 'GREETING');
+          } else {
+            SpeechService.speakWelcomeGreeting(effectiveUser.full_name, settings.institution_name);
+          }
         }
-      }, 800);
+      }, 1000);
     }
-  }, [effectiveUser?.full_name, isTodayOff.isOff, settings.institution_name]);
+  }, [effectiveUser?.id, effectiveUser?.full_name, isTodayOff.isOff, settings.institution_name]);
 
   const loadUserLeaves = async () => {
     if (!effectiveUser) return;
@@ -1675,7 +1682,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       </header>
 
       <main className="px-4 -mt-3.5 pb-24 space-y-3.5 w-full max-w-120 mx-auto">
-        <NotificationPermissionBanner />
+        <NotificationPermissionBanner
+          user={effectiveUser}
+          onOpenPreferences={() => setIsPreferencesModalOpen(true)}
+        />
         <PWAInstallPrompt />
 
         {/* 🚨 CLASSROOM EMERGENCY ALERT BANNER (High-Priority Realtime Alert for Piket & Teachers) */}
@@ -4132,6 +4142,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         totalPoints={appreciationScore?.totalPoints ?? 0}
         user={effectiveUser}
         teacherData={disciplineLeaderboard?.leaderboard?.find((t) => t.isCurrentUser)}
+      />
+
+      {/* 16. Modal Pengaturan Notifikasi & Suara Mobile-first */}
+      <NotificationPreferencesModal
+        isOpen={isPreferencesModalOpen}
+        onClose={() => setIsPreferencesModalOpen(false)}
       />
     </div>
   );

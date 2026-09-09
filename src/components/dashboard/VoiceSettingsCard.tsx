@@ -15,9 +15,12 @@ import {
   Sliders,
   Sparkles,
   Zap,
+  Bell,
 } from 'lucide-react';
 import { SpeechService, DEFAULT_VOICE_CONFIG } from '../../services/speech.service';
 import type { VoiceConfig } from '../../services/speech.service';
+import { SoundService } from '../../services/audio.service';
+import { useAuthStore } from '../../store/useAuthStore';
 import { useToastStore } from '../../store/useToastStore';
 
 export interface VoiceSettingsCardProps {
@@ -29,6 +32,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
   teacherName = 'Guru',
   institutionName = 'SMP Terpadu Al-Ittihadiyah',
 }) => {
+  const { user } = useAuthStore();
   const { showToast } = useToastStore();
   const [config, setConfig] = useState<VoiceConfig>(SpeechService.getConfig());
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -36,10 +40,17 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [activeTestType, setActiveTestType] = useState<'WELCOME' | 'CHECK_IN' | 'CHECK_OUT' | null>(null);
 
+  // Sound effect mute states
+  const [chimeMuted, setChimeMutedState] = useState<boolean>(() => SoundService.getIsChimeMuted());
+  const [attendanceSoundMuted, setAttendanceSoundMutedState] = useState<boolean>(() => SoundService.getIsAttendanceSoundMuted());
+
   // Track currently active text input for inserting placeholder tags on tap
   const [lastFocusedField, setLastFocusedField] = useState<'welcomeTemplate' | 'checkInTemplate' | 'checkOutTemplate'>('welcomeTemplate');
 
   useEffect(() => {
+    SpeechService.setUser(user?.id);
+    setConfig(SpeechService.getConfig());
+
     const loadVoices = () => {
       const voices = SpeechService.getAvailableVoices();
       setAvailableVoices(voices);
@@ -49,19 +60,33 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.onvoiceschanged = loadVoices;
     }
-  }, []);
+  }, [user?.id]);
 
   const handleToggle = () => {
     const nextEnabled = !config.isEnabled;
     const updated = SpeechService.updateConfig({ isEnabled: nextEnabled });
     setConfig(updated);
     if (nextEnabled) {
-      SpeechService.speak(`Asisten suara AI Bahasa Indonesia diaktifkan.`);
-      showToast('info', 'Asisten Suara Aktif', 'Suara AI Bahasa Indonesia siap mengucapkan sapaan & presensi.');
+      SpeechService.speak(`Pengumuman suara Bahasa Indonesia diaktifkan.`);
+      showToast('info', 'Pengumuman Suara Aktif', 'Pengumuman suara siap membacakan sapaan & konfirmasi presensi.');
     } else {
       SpeechService.cancel();
-      showToast('info', 'Asisten Suara Nonaktif', 'Notifikasi suara otomatis dimatikan.');
+      showToast('info', 'Pengumuman Suara Nonaktif', 'Pengumuman suara otomatis dimatikan.');
     }
+  };
+
+  const handleToggleChime = () => {
+    const next = !chimeMuted;
+    SoundService.setChimeMuted(next);
+    setChimeMutedState(next);
+    showToast('info', next ? 'Nada Chime Dimatikan' : 'Nada Chime Diaktifkan', next ? 'Dering notifikasi dibisukan.' : 'Dering notifikasi berbunyi saat ada pesan baru.');
+  };
+
+  const handleToggleAttendanceSound = () => {
+    const next = !attendanceSoundMuted;
+    SoundService.setAttendanceSoundMuted(next);
+    setAttendanceSoundMutedState(next);
+    showToast('info', next ? 'Suara Presensi Dimatikan' : 'Suara Presensi Diaktifkan', next ? 'Efek nada sukses presensi dibisukan.' : 'Efek nada sukses presensi berbunyi saat scan.');
   };
 
   const handleChange = (key: keyof VoiceConfig, value: unknown) => {
@@ -122,14 +147,14 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
           <div className="space-y-0.5 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <h3 className="font-black text-[#023246] text-xs sm:text-sm tracking-tight leading-none">
-                Asisten Suara AI
+                Pengumuman Suara
               </h3>
               <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-extrabold bg-emerald-100 text-emerald-800 rounded-md border border-emerald-300/60 leading-none">
                 🇮🇩 Indonesia
               </span>
             </div>
             <p className="text-[10px] sm:text-xs text-slate-600 font-medium leading-tight sm:leading-relaxed truncate sm:whitespace-normal">
-              Sapaan nama guru & konfirmasi presensi otomatis.
+              Sapaan nama guru &amp; konfirmasi presensi bersuara.
             </p>
           </div>
         </div>
@@ -137,7 +162,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
         <button
           type="button"
           onClick={handleToggle}
-          aria-label={config.isEnabled ? 'Matikan Asisten Suara' : 'Aktifkan Asisten Suara'}
+          aria-label={config.isEnabled ? 'Matikan Pengumuman Suara' : 'Aktifkan Pengumuman Suara'}
           className={`h-10 px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl font-black text-xs transition-all shrink-0 cursor-pointer shadow-xs flex items-center gap-1.5 border active:scale-95 ${
             config.isEnabled
               ? 'bg-emerald-700 hover:bg-emerald-800 text-white border-emerald-800 shadow-emerald-700/20 ring-2 ring-emerald-500/20'
@@ -151,6 +176,33 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
 
       {config.isEnabled && (
         <div className="pt-2.5 border-t border-emerald-200/70 space-y-3">
+          {/* Audio Chimes Quick Bar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleToggleChime}
+              className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                !chimeMuted
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : 'bg-slate-100 text-slate-500 border-slate-200'
+              }`}
+            >
+              <Bell className="w-3.5 h-3.5" />
+              <span>Dering Notifikasi: {!chimeMuted ? 'Aktif' : 'Bisu'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleAttendanceSound}
+              className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                !attendanceSoundMuted
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : 'bg-slate-100 text-slate-500 border-slate-200'
+              }`}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Efek Presensi: {!attendanceSoundMuted ? 'Aktif' : 'Bisu'}</span>
+            </button>
+          </div>
           {/* Sub-header & Expand Drawer Bar */}
           <div className="flex items-center justify-between text-xs gap-2">
             <span className="font-bold text-[#023246] flex items-center gap-1.5 text-[11px] sm:text-xs">
@@ -351,7 +403,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between flex-wrap gap-1">
                     <span className="font-extrabold text-xs text-[#023246]">
-                      ✍️ Kustomisasi Teks Ucapan Suara AI:
+                      ✍️ Kustomisasi Teks Pengumuman Suara:
                     </span>
                     <span className="text-[10px] text-slate-500 font-medium">
                       Ketuk chip untuk menyisipkan variabel:
@@ -445,7 +497,7 @@ export const VoiceSettingsCard: React.FC<VoiceSettingsCardProps> = ({
                   type="button"
                   onClick={() => {
                     handleTestVoice('WELCOME');
-                    showToast('success', 'Pengaturan Disimpan', 'Model & teks suara AI berhasil diperbarui.');
+                    showToast('success', 'Pengaturan Disimpan', 'Pengaturan teks & model pengumuman suara berhasil diperbarui.');
                   }}
                   className="w-full xs:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                 >

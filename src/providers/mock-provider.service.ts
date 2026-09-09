@@ -25,6 +25,7 @@ import type {
   VerificationMethod,
   AttendanceSource,
   PushSubscriptionPayload,
+  NotificationPreferences,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -39,7 +40,8 @@ const memoryStore = new Map<string, string>();
 function safeGetStorage(key: string): string | null {
   try {
     if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {
-      return localStorage.getItem(key);
+      const val = localStorage.getItem(key);
+      if (val !== null) return val;
     }
   } catch {
     // Memory fallback
@@ -48,15 +50,14 @@ function safeGetStorage(key: string): string | null {
 }
 
 function safeSetStorage(key: string, val: string): void {
+  memoryStore.set(key, val);
   try {
     if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.setItem === 'function') {
       localStorage.setItem(key, val);
-      return;
     }
   } catch {
     // Memory fallback
   }
-  memoryStore.set(key, val);
 }
 
 export class MockProvider implements IDataProvider {
@@ -933,6 +934,130 @@ export class MockProvider implements IDataProvider {
     const updated = notifications.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n));
     safeSetStorage(key, JSON.stringify(updated));
     return true;
+  }
+
+  public async markNotificationsAsRead(
+    userIdOrIds: string | string[],
+    idsOrToken?: string[] | string,
+    _token?: string
+  ): Promise<boolean> {
+    let effectiveUserId: string;
+    let notificationIds: string[];
+
+    if (Array.isArray(userIdOrIds)) {
+      notificationIds = userIdOrIds;
+      effectiveUserId =
+        typeof idsOrToken === 'string' &&
+        !idsOrToken.startsWith('mock-jwt-') &&
+        !idsOrToken.startsWith('MOCK_') &&
+        idsOrToken
+          ? idsOrToken
+          : useAuthStore.getState().user?.id || 'usr_uuid_1001';
+    } else {
+      effectiveUserId = userIdOrIds || useAuthStore.getState().user?.id || 'usr_uuid_1001';
+      notificationIds = Array.isArray(idsOrToken) ? idsOrToken : [];
+    }
+
+    NotificationService.markAllIdsAsRead(effectiveUserId, notificationIds);
+
+    const key = `smart_absensi_notifications_${effectiveUserId}`;
+    const notifications = await this.getNotifications(effectiveUserId, _token || '');
+    const idSet = new Set(notificationIds);
+    const updated = notifications.map((n) => (idSet.has(n.id) ? { ...n, is_read: true } : n));
+    safeSetStorage(key, JSON.stringify(updated));
+    return true;
+  }
+
+  public async getNotificationPreferences(userId: string, _token?: string): Promise<NotificationPreferences | null> {
+    const effectiveUserId = userId || useAuthStore.getState().user?.id || 'usr_uuid_1001';
+    const key = `smart_absensi_notif_prefs_${effectiveUserId}`;
+    const saved = safeGetStorage(key);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          user_id: effectiveUserId,
+          push_enabled: parsed.push_enabled ?? true,
+          attendance_enabled: parsed.attendance_enabled ?? parsed.attendance_alerts ?? true,
+          leave_enabled: parsed.leave_enabled ?? parsed.leave_alerts ?? true,
+          schedule_enabled: parsed.schedule_enabled ?? parsed.event_alerts ?? true,
+          announcement_enabled: parsed.announcement_enabled ?? true,
+          critical_enabled: parsed.critical_enabled ?? true,
+          voice_enabled: parsed.voice_enabled ?? true,
+          sound_enabled: parsed.sound_enabled ?? true,
+          attendance_sound_enabled: parsed.attendance_sound_enabled ?? true,
+          chime_enabled: parsed.chime_enabled ?? true,
+          auto_greeting_enabled: parsed.auto_greeting_enabled ?? false,
+          quiet_hours_enabled: parsed.quiet_hours_enabled ?? false,
+          quiet_hours_start: parsed.quiet_hours_start ?? '21:00',
+          quiet_hours_end: parsed.quiet_hours_end ?? '05:00',
+          attendance_alerts: parsed.attendance_alerts ?? parsed.attendance_enabled ?? true,
+          leave_alerts: parsed.leave_alerts ?? parsed.leave_enabled ?? true,
+          event_alerts: parsed.event_alerts ?? parsed.schedule_enabled ?? true,
+          ...parsed,
+        };
+      } catch (e) {
+        console.error('Failed to parse notification preferences:', e);
+      }
+    }
+    return {
+      user_id: effectiveUserId,
+      push_enabled: true,
+      attendance_enabled: true,
+      leave_enabled: true,
+      schedule_enabled: true,
+      announcement_enabled: true,
+      critical_enabled: true,
+      voice_enabled: true,
+      sound_enabled: true,
+      attendance_sound_enabled: true,
+      chime_enabled: true,
+      auto_greeting_enabled: false,
+      quiet_hours_enabled: false,
+      quiet_hours_start: '21:00',
+      quiet_hours_end: '05:00',
+      attendance_alerts: true,
+      leave_alerts: true,
+      event_alerts: true,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  public async saveNotificationPreferences(
+    userIdOrPrefs: string | Partial<NotificationPreferences>,
+    prefsOrToken?: Partial<NotificationPreferences> | string,
+    _token?: string
+  ): Promise<NotificationPreferences> {
+    const prefs: Partial<NotificationPreferences> =
+      typeof userIdOrPrefs === 'string'
+        ? ((prefsOrToken as Partial<NotificationPreferences>) || {})
+        : userIdOrPrefs;
+    const userId = prefs?.user_id || (typeof userIdOrPrefs === 'string' ? userIdOrPrefs : 'unknown');
+    const key = `smart_absensi_notif_prefs_${userId}`;
+    const toSave: NotificationPreferences = {
+      ...prefs,
+      user_id: userId,
+      push_enabled: prefs?.push_enabled ?? true,
+      attendance_enabled: prefs?.attendance_alerts ?? prefs?.attendance_enabled ?? true,
+      leave_enabled: prefs?.leave_alerts ?? prefs?.leave_enabled ?? true,
+      schedule_enabled: prefs?.event_alerts ?? prefs?.schedule_enabled ?? true,
+      announcement_enabled: prefs?.announcement_enabled ?? true,
+      critical_enabled: prefs?.critical_enabled ?? true,
+      voice_enabled: prefs?.voice_enabled ?? true,
+      sound_enabled: prefs?.sound_enabled ?? true,
+      attendance_sound_enabled: prefs?.attendance_sound_enabled ?? true,
+      chime_enabled: prefs?.chime_enabled ?? true,
+      auto_greeting_enabled: prefs?.auto_greeting_enabled ?? false,
+      quiet_hours_enabled: prefs?.quiet_hours_enabled ?? false,
+      quiet_hours_start: prefs?.quiet_hours_start ?? '21:00',
+      quiet_hours_end: prefs?.quiet_hours_end ?? '05:00',
+      attendance_alerts: prefs?.attendance_alerts ?? prefs?.attendance_enabled ?? true,
+      leave_alerts: prefs?.leave_alerts ?? prefs?.leave_enabled ?? true,
+      event_alerts: prefs?.event_alerts ?? prefs?.schedule_enabled ?? true,
+      updated_at: new Date().toISOString(),
+    };
+    safeSetStorage(key, JSON.stringify(toSave));
+    return toSave;
   }
 
   public async getSettings(): Promise<SystemSettings> {

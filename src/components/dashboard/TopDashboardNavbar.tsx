@@ -7,6 +7,7 @@ export interface TopDashboardNavbarProps {
   onOpenCommandPalette?: () => void;
   onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
   onNavigateTab?: (tabId: string) => void;
+  onOpenPreferences?: () => void;
   onLogout: () => void;
 }
 
@@ -16,6 +17,7 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
   onOpenCommandPalette,
   onOpenCorrectionModal,
   onNavigateTab,
+  onOpenPreferences,
   onLogout,
 }) => {
   return (
@@ -94,6 +96,7 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
           <NotificationBellDropdown
             onOpenCorrectionModal={onOpenCorrectionModal}
             onNavigateTab={onNavigateTab}
+            onOpenPreferences={onOpenPreferences}
           />
 
           {/* Logout button on desktop */}

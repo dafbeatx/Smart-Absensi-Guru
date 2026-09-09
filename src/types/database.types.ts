@@ -33,16 +33,24 @@ export interface DeviceBindingCheckResult {
   registered_uuid?: string;
 }
 
+export type NotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'CRITICAL';
+export type NotificationAudience = 'ALL' | 'ADMIN' | 'KEPSEK' | 'GURU' | 'OPERATOR';
+
 export interface AppNotification {
   id: string;
-  user_id: string;
+  user_id?: string;
+  audience_role?: NotificationAudience;
   title: string;
   message: string;
   type: NotificationType;
+  severity?: NotificationSeverity;
   is_read: boolean;
+  read_at?: string | null;
+  action_url?: string;
   action_type?: 'CORRECTION' | 'NAVIGATE_TAB' | 'INFO';
   action_date?: string;
   action_target_id?: string;
+  dedupe_key?: string;
   created_at: string;
 }
 
@@ -374,4 +382,28 @@ export interface PushSubscriptionRecord extends PushSubscriptionPayload {
   id: string;
   created_at: string;
   updated_at: string;
+}
+
+// Notification & Audio Preferences per User
+export interface NotificationPreferences {
+  user_id: string;
+  push_enabled?: boolean;
+  attendance_enabled?: boolean;
+  leave_enabled?: boolean;
+  schedule_enabled?: boolean;
+  announcement_enabled?: boolean;
+  critical_enabled?: boolean;
+  voice_enabled?: boolean;
+  sound_enabled?: boolean;
+  attendance_sound_enabled?: boolean;
+  chime_enabled?: boolean;
+  auto_greeting_enabled?: boolean;
+  quiet_hours_start?: string | null; // e.g. '21:00'
+  quiet_hours_end?: string | null;   // e.g. '05:00'
+  quiet_hours_enabled?: boolean;
+  // Aliases for test & legacy compatibility
+  attendance_alerts?: boolean;
+  leave_alerts?: boolean;
+  event_alerts?: boolean;
+  updated_at?: string;
 }
