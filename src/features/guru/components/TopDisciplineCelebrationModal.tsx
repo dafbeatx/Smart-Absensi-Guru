@@ -182,8 +182,8 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
 
         {/* Action Buttons */}
         <div className="space-y-2 pt-1 relative z-10">
-          {/* Tombol Khusus Juara 1: Buka & Cetak Piagam Resmi */}
-          {isRank1 && (
+          {/* Tombol Piagam Penghargaan Resmi Juara 1, 2, dan 3 */}
+          {rank <= 3 && (
             <button
               type="button"
               onClick={() => {
@@ -193,10 +193,18 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
                   setIsCertificateOpen(true);
                 }
               }}
-              className="w-full h-11 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-[0.98] text-slate-950 text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+              className={`w-full h-11 rounded-2xl active:scale-[0.98] text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+                isRank1
+                  ? 'bg-amber-400 hover:bg-amber-500 text-slate-950'
+                  : isRank2
+                  ? 'bg-slate-200 hover:bg-slate-300 text-slate-900 border border-slate-300'
+                  : 'bg-amber-600 hover:bg-amber-700 text-white'
+              }`}
             >
-              <Printer className="w-4 h-4 text-slate-950" />
-              <span>🥇 Lihat &amp; Cetak Piagam Resmi (PDF)</span>
+              <Printer className="w-4 h-4" />
+              <span>
+                {rankBadgeEmoji} Lihat &amp; Cetak Piagam Juara {rank} (PDF)
+              </span>
             </button>
           )}
 

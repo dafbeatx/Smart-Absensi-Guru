@@ -24,6 +24,13 @@ import { BiometricAttendanceModal } from '../../guru/components/BiometricAttenda
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
 import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
+import { KepsekRewardSuggestionModal } from '../components/KepsekRewardSuggestionModal';
+import { TeacherExcellenceCertificateModal } from '../../guru/components/TeacherExcellenceCertificateModal';
+import {
+  getTeacherDisciplineLeaderboard,
+  type TeacherLeaderboardItem,
+} from '../../../utils/teacher-appreciation.utils';
+import type { TeacherPointLog } from '../../../types/database.types';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -45,6 +52,13 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   // Status absensi pribadi Kepala Sekolah hari ini
   const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
   const [isLoadingMyAttendance, setIsLoadingMyAttendance] = useState(false);
+
+  // Leaderboard Poin & Juara 1 Apresiasi States (Hak Prerogatif Kepala Sekolah)
+  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>([]);
+  const [championTeacher, setChampionTeacher] = useState<TeacherLeaderboardItem | null>(null);
+  const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
+  const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
+  const [savedChampionReward, setSavedChampionReward] = useState<string | null>(null);
 
   // Settings for Geofence & Work Hours
   const [settings, setSettings] = useState<SystemSettings>({
@@ -74,6 +88,67 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     window.addEventListener('smart_absensi_settings_updated', loadSettings);
     return () => window.removeEventListener('smart_absensi_settings_updated', loadSettings);
   }, []);
+
+  // Memuat Buku Besar Poin Guru & Menentukan Juara 1 Bulan Ini
+  useEffect(() => {
+    const fetchPointLogs = async () => {
+      try {
+        const provider = ProviderFactory.getProvider();
+        const logs = await provider.getTeacherPointHistory('ALL');
+        setAllTeacherPointLogs(logs || []);
+      } catch (err) {
+        console.warn('Gagal memuat buku besar poin guru:', err);
+      }
+    };
+    fetchPointLogs();
+    window.addEventListener('smart_absensi_points_updated', fetchPointLogs);
+    return () => window.removeEventListener('smart_absensi_points_updated', fetchPointLogs);
+  }, []);
+
+  // Evaluasi Juara 1 & Popup Otomatis ke Kepala Sekolah
+  useEffect(() => {
+    const res = getTeacherDisciplineLeaderboard(
+      null,
+      {
+        totalPoints: 0,
+        level: '',
+        nextLevelPoints: 0,
+        levelProgressPercent: 0,
+        hadirTepatWaktuCount: 0,
+        terlambatCount: 0,
+        piketCount: 0,
+        moodCheckinCount: 0,
+        badges: [],
+        pointHistory: [],
+      },
+      'CURRENT_MONTH',
+      allTeacherPointLogs
+    );
+
+    const top1 = res.leaderboard?.[0] || null;
+    setChampionTeacher(top1);
+
+    // Cek Hadiah Tersimpan
+    const periodKey = 'September_2026';
+    const storageKey = `smart_absensi_kepsek_reward_champion_${periodKey}`;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.rewardText) setSavedChampionReward(parsed.rewardText);
+      } else if (top1) {
+        // Otomatis munculkan popup saran hadiah ke Kepala Sekolah saat login jika belum ditentukan
+        const popupSessionKey = `smart_absensi_kepsek_popup_shown_${periodKey}`;
+        const hasShown = sessionStorage.getItem(popupSessionKey);
+        if (!hasShown) {
+          setIsRewardModalOpen(true);
+          sessionStorage.setItem(popupSessionKey, 'true');
+        }
+      }
+    } catch {
+      // Ignored
+    }
+  }, [allTeacherPointLogs]);
 
   const fetchMyAttendance = useCallback(async () => {
     if (!user) return;
@@ -535,6 +610,56 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             </div>
           )}
 
+          {/* BANNER APRESIASI RESMI JUARA 1 DISIPLIN GURU (HAK KEPALA SEKOLAH) */}
+          {championTeacher && (
+            <div className="p-4 rounded-3xl bg-linear-to-r from-[#023246] via-[#0A4158] to-[#18536B] text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3 border border-amber-400/40 animate-fade-in">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                  🥇
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider">
+                      Juara 1 Disiplin Bulan Ini
+                    </span>
+                    <span className="text-xs text-amber-200 font-bold">
+                      {championTeacher.totalPoints} PTS
+                    </span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-white truncate mt-0.5">
+                    {championTeacher.name}
+                  </h3>
+                  <p className="text-xs text-slate-300 truncate">
+                    {savedChampionReward
+                      ? `🎁 Hadiah: ${savedChampionReward}`
+                      : '⚠️ Hadiah khusus dari Kepala Sekolah belum ditentukan.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 pt-1 md:pt-0">
+                <button
+                  type="button"
+                  onClick={() => setIsRewardModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-950 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                >
+                  <span>🎁</span>
+                  <span>{savedChampionReward ? 'Ubah Hadiah (AI ✨)' : 'Tetapkan Hadiah (AI ✨)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCertificateModalOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white border border-white/20 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Lihat Piagam Penghargaan Juara 1"
+                >
+                  <span>📜</span>
+                  <span>Cetak Piagam</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
           {(activeTab === 'DASHBOARD' || activeTab === 'OVERVIEW') && (
             <ExecutiveDashboardOverview
@@ -862,6 +987,37 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         isOpen={isPreferencesModalOpen}
         onClose={() => setIsPreferencesModalOpen(false)}
       />
+
+      {/* Modal Penetapan Hadiah Juara 1 Apresiasi Kepala Sekolah (Dengan AI) */}
+      <KepsekRewardSuggestionModal
+        isOpen={isRewardModalOpen}
+        onClose={() => setIsRewardModalOpen(false)}
+        championTeacher={championTeacher}
+        periodMonthYear="September 2026"
+        onRewardSaved={(rewardText) => setSavedChampionReward(rewardText)}
+      />
+
+      {/* Modal Pratinjau & Cetak Piagam Resmi Juara 1 */}
+      {championTeacher && (
+        <TeacherExcellenceCertificateModal
+          isOpen={isCertificateModalOpen}
+          onClose={() => setIsCertificateModalOpen(false)}
+          user={{
+            id: championTeacher.id,
+            full_name: championTeacher.name,
+            nip: championTeacher.nip || null,
+            position: championTeacher.position || 'Pendidik Profesional',
+            role: 'GURU',
+            phone_number: '',
+            avatar_url: null,
+            is_active: true,
+            created_at: '',
+          }}
+          periodMonthYear="September 2026"
+          totalPoints={championTeacher.totalPoints}
+          rank={1}
+        />
+      )}
     </div>
   );
 };

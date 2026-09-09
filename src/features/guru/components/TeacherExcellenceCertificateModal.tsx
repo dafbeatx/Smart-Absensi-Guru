@@ -32,26 +32,41 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
   user,
   periodMonthYear = 'September 2026',
   totalPoints = 55,
-  rank = 1,
+  rank: initialRank = 1,
 }) => {
   const { showToast } = useToastStore();
   const [isCopied, setIsCopied] = useState(false);
+  const [activeRank, setActiveRank] = useState<number>(initialRank || 1);
 
   if (!isOpen) return null;
 
-  const recipientName = user?.full_name || 'Dafa Maulana, S.Pd';
-  const recipientNip = user?.nip || '199001012015011001';
-  const certNumber = `001/SMART-ABS/DISIPLIN/09/2026`;
+  const recipientName = user?.full_name || 'Bapak/Ibu Guru Teladan';
+  const rawNip = (user?.nip || '').trim();
+  // Sesuai aturan pengguna: jika tidak ada data NPP/NIP jangan dipakai, pakai - saja
+  const recipientNip = rawNip ? rawNip : '-';
+
+  const isRank1 = activeRank === 1;
+  const isRank2 = activeRank === 2;
+
+  const rankEmoji = isRank1 ? '🥇' : isRank2 ? '🥈' : '🥉';
+  const rankBadgeText = isRank1 ? 'Top #1' : isRank2 ? 'Top #2' : 'Top #3';
+  const rankTitle = isRank1
+    ? 'Juara 1 Disiplin (Pendidik Teladan Utama)'
+    : isRank2
+    ? 'Juara 2 Disiplin (Pendidik Emas)'
+    : 'Juara 3 Disiplin (Pendidik Perak)';
+
+  const certNumber = `00${activeRank}/SMART-ABS/DISIPLIN/TOP${activeRank}/09/2026`;
   const dateIssued = 'Bogor, 30 September 2026';
 
   const certificatePayload = {
     recipientName,
-    recipientNipOrNpp: recipientNip,
+    recipientNipOrNpp: recipientNip === '-' ? undefined : recipientNip,
     recipientPosition: user?.position || 'Guru Mata Pelajaran',
     periodMonthYear,
-    awardTitle: 'Juara 1 Disiplin (Pendidik Teladan Utama)',
-    rank,
-    rankText: `Top #${rank}`,
+    awardTitle: rankTitle,
+    rank: activeRank,
+    rankText: rankBadgeText,
     certificateNumber: certNumber,
     dateIssued,
     totalPoints,
@@ -70,16 +85,14 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
 
   const handleShare = async () => {
     const shareText = `🏆 *PIAGAM PENGHARGAAN RESMI KEPALA SEKOLAH*\n\n` +
-      `Alhamdulillah, anugerah *Juara 1 Disiplin (Pendidik Teladan Utama) - Top #1* Periode ${periodMonthYear} berhasil diraih oleh *${recipientName}* (${totalPoints} Poin).\n\n` +
-      `📜 Piagam Penghargaan Resmi bertanda tangan Kepala Sekolah.\n` +
-      `🖼️ Foto Profil dipajang di Papan Mading Digital Sekolah.\n` +
-      `⭐ Hak Istimewa: Prioritas pemilihan jadwal piket semester depan.\n\n` +
-      `Terima kasih atas keteladanan dan integritas waktu di ${APP_CONFIG.INSTITUTION_NAME}!`;
+      `Alhamdulillah, anugerah *${rankTitle} (${rankBadgeText})* Periode ${periodMonthYear} diraih oleh *${recipientName}* (${totalPoints} Poin).\n\n` +
+      `📜 Piagam Penghargaan Resmi bertanda tangan Kepala Sekolah: ${SIGNATORY_OFFICIALS.KEPSEK_NAME}.\n\n` +
+      `Terima kasih atas keteladanan dan integritas disiplin waktu di ${APP_CONFIG.INSTITUTION_NAME}!`;
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Piagam Penghargaan Juara 1 Disiplin',
+          title: `Piagam Penghargaan ${rankTitle}`,
           text: shareText,
         });
         return;
@@ -109,26 +122,62 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
         <div className="p-3.5 sm:p-4 bg-linear-to-r from-[#023246] via-[#0A4158] to-[#18536B] text-white flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-lg shrink-0">
-              🥇
+              {rankEmoji}
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 block">
                 Template Piagam Resmi Sekolah
               </span>
               <h3 className="text-xs sm:text-sm font-black text-white truncate leading-tight">
-                Juara 1 Disiplin (Pendidik Teladan Utama) - Top #1
+                {rankTitle}
               </h3>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            aria-label="Tutup"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {/* Quick Rank Switcher: Juara 1, 2, 3 */}
+            <div className="bg-white/10 p-0.5 rounded-xl flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setActiveRank(1)}
+                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeRank === 1 ? 'bg-amber-400 text-slate-950 font-black' : 'text-white/80 hover:text-white'
+                }`}
+                title="Lihat Piagam Juara 1"
+              >
+                🥇 #1
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveRank(2)}
+                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeRank === 2 ? 'bg-slate-200 text-slate-900 font-black' : 'text-white/80 hover:text-white'
+                }`}
+                title="Lihat Piagam Juara 2"
+              >
+                🥈 #2
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveRank(3)}
+                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeRank === 3 ? 'bg-amber-600 text-white font-black' : 'text-white/80 hover:text-white'
+                }`}
+                title="Lihat Piagam Juara 3"
+              >
+                🥉 #3
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              aria-label="Tutup"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body - Scrollable Certificate Preview */}
@@ -148,13 +197,10 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
                 <span className="text-8xl">👑</span>
               </div>
 
-              {/* Header Lembaga */}
+              {/* Header Lembaga: CUKUP SMP TERPADU AL-ITTIHADIYAH & SMA TERPADU AS SALAAM */}
               <div className="space-y-0.5 border-b border-amber-300/40 pb-2 mb-2 relative z-10">
-                <p className="text-[9px] sm:text-[10px] font-black tracking-widest text-[#18536B] uppercase">
-                  YAYASAN AS SALAAM &amp; AL-ITTIHADIYAH BOGOR
-                </p>
                 <h4 className="text-xs sm:text-base font-black text-[#023246] uppercase leading-tight">
-                  {APP_CONFIG.INSTITUTION_NAME}
+                  SMP TERPADU AL-ITTIHADIYAH &amp; SMA TERPADU AS SALAAM
                 </h4>
                 <p className="text-[8.5px] sm:text-[9.5px] text-slate-500 font-medium">
                   Sistem Keteladanan Pendidik Terintegrasi ({APP_CONFIG.APP_NAME})
@@ -164,8 +210,8 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
               {/* Judul Piagam */}
               <div className="space-y-0.5 relative z-10 pt-1">
                 <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-amber-100/80 border border-amber-300 text-amber-900 text-[10px] font-black uppercase tracking-wider mb-1">
-                  <span>🥇</span>
-                  <span>Top #1 Bulan {periodMonthYear}</span>
+                  <span>{rankEmoji}</span>
+                  <span>{rankBadgeText} Bulan {periodMonthYear}</span>
                 </div>
                 <h2 className="text-base sm:text-2xl font-black text-[#023246] tracking-wider uppercase">
                   PIAGAM PENGHARGAAN
@@ -181,7 +227,7 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
               {/* Identitas Penerima */}
               <div className="py-2.5 sm:py-3 space-y-1 relative z-10">
                 <p className="text-[10.5px] text-slate-500 font-medium">
-                  Dengan penuh rasa bangga dan apresiasi tertinggi, dianugerahkan kepada:
+                  Dengan penuh rasa bangga dan apresiasi setinggi-tingginya, dianugerahkan kepada:
                 </p>
                 <h3 className="text-sm sm:text-xl font-black text-[#023246] underline decoration-amber-400 underline-offset-4 font-serif">
                   {recipientName}
@@ -193,35 +239,15 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
 
               {/* Predikat Penghargaan */}
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-linear-to-r from-amber-200/50 via-amber-100 to-amber-200/50 border border-amber-400 text-amber-950 font-black text-xs sm:text-sm my-1 relative z-10 shadow-2xs">
-                <span>🥇</span>
-                <span>Juara 1 Disiplin (Pendidik Teladan Utama)</span>
+                <span>{rankEmoji}</span>
+                <span>{rankTitle}</span>
               </div>
 
-              {/* TIGA HAK ISTIMEWA RESMI (SESUAI INSTRUKSI SPESIFIK USER) */}
-              <div className="mt-3 p-2.5 sm:p-3 bg-white/95 rounded-xl border border-amber-300/60 shadow-2xs text-left relative z-10 space-y-1.5">
-                <span className="text-[9.5px] sm:text-[10.5px] font-black text-[#023246] uppercase tracking-wider block border-b border-amber-100 pb-1">
-                  Hak Istimewa &amp; Pengakuan Resmi:
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px] sm:text-[10.5px] text-slate-700">
-                  <div className="flex items-start gap-1.5 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    <span className="text-base shrink-0 leading-none">📜</span>
-                    <span className="font-semibold leading-snug">
-                      Piagam Penghargaan Resmi bertanda tangan Kepala Sekolah.
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-1.5 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                    <span className="text-base shrink-0 leading-none">🖼️</span>
-                    <span className="font-semibold leading-snug">
-                      Foto Profil dipajang di Papan Mading Digital Sekolah.
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-1.5 bg-amber-50/70 p-2 rounded-lg border border-amber-200/70">
-                    <span className="text-base shrink-0 leading-none">⭐</span>
-                    <span className="font-bold text-amber-900 leading-snug">
-                      Hak Istimewa: Prioritas pemilihan jadwal piket semester depan.
-                    </span>
-                  </div>
-                </div>
+              {/* Kutipan Apresiasi Resmi (Hak Istimewa Telah Dihapus) */}
+              <div className="mt-3 p-3 bg-white/95 rounded-xl border border-amber-200/70 shadow-2xs text-center relative z-10">
+                <p className="text-[11px] sm:text-xs text-slate-600 italic leading-relaxed">
+                  &ldquo;Atas dedikasi luar biasa, ketepatan waktu sempurna, dan keteladanan integritas tanpa kompromi dalam menjalankan amanah mulia kependidikan.&rdquo;
+                </p>
               </div>
 
               {/* Tanda Tangan & Pengesahan Kepala Sekolah */}

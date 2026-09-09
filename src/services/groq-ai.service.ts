@@ -261,6 +261,76 @@ Berikan respon dalam bahasa Indonesia yang ringkas, menyemangati, dan menyoroti 
   }
 
   /**
+   * Refines raw reward description input by Kepala Sekolah for Juara 1 teacher.
+   * Fixes typos, grammar, and formats into professional executive Indonesian appreciation text.
+   */
+  public static async refinePrincipalRewardProposal(params: {
+    rawRewardText: string;
+    teacherName: string;
+    totalPoints: number;
+    monthName?: string;
+  }): Promise<{ polishedText: string; summary: string }> {
+    const raw = params.rawRewardText.trim();
+    if (!raw) {
+      return {
+        polishedText: '',
+        summary: 'Teks hadiah belum diisi.',
+      };
+    }
+
+    const prompt = `Anda adalah "AI Editor Eksekutif Kepala Sekolah" di SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam.
+Kepala Sekolah (Farhan Sopian Sahid, S.Pd.I) sedang menentukan hadiah khusus untuk guru yang meraih JUARA 1 DISIPLIN BULANAN (Poin Terbanyak: ${params.totalPoints} PTS):
+Nama Guru Juara 1: ${params.teacherName}
+Catatan Hadiah Mentah dari Kepala Sekolah (mungkin ada salah ketik/typo, bahasa santai, atau singkatan):
+"${raw}"
+
+Tugas Anda:
+1. Koreksi seluruh salah ketik (typo), singkatan, dan ejaan.
+2. Sempurnakan susunan kalimat menjadi bahasa apresiasi resmi kepala sekolah yang elegan, berwibawa, penuh penghargaan, namun tetap mempertahankan hadiah riil apa yang dimaksud (jangan ubah jenis hadiahnya).
+3. Berikan respon HANYA dalam format JSON berikut (tanpa markdown backtick):
+{
+  "polishedText": "kalimat apresiasi hadiah yang disempurnakan",
+  "summary": "ringkasan jenis hadiah (1 baris)"
+}`;
+
+    const apiOutput = await this.callGroqAPI([
+      { role: 'system', content: 'Anda adalah AI Editor Eksekutif Kepala Sekolah yang membalas HANYA dalam format JSON valid.' },
+      { role: 'user', content: prompt },
+    ]);
+
+    if (apiOutput) {
+      try {
+        const cleaned = apiOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        return {
+          polishedText: parsed.polishedText || raw,
+          summary: parsed.summary || 'Hadiah Juara 1 Disiplin',
+        };
+      } catch (err) {
+        logger.warn('GroqAIService', 'Failed to parse Groq AI reward JSON, fallback to smart heuristic', err);
+      }
+    }
+
+    // Smart Local Heuristic Fallback (typo correction + official phrasing)
+    let cleanedText = raw
+      .replace(/\bblanja\b/gi, 'belanja')
+      .replace(/\bkluarga\b/gi, 'keluarga')
+      .replace(/\bbngkisan\b/gi, 'bingkisan')
+      .replace(/\brp\s*([0-9.]+)/gi, 'Rp $1,-')
+      .replace(/\byg\b/gi, 'yang')
+      .replace(/\bdg\b/gi, 'dengan')
+      .replace(/\bdan\b/gi, 'serta');
+
+    cleanedText = cleanedText.charAt(0).toUpperCase() + cleanedText.slice(1);
+    const polished = `Sebagai wujud apresiasi istimewa atas kedisiplinan tertinggi, Kepala Sekolah menganugerahkan ${cleanedText} kepada ${params.teacherName} atas keteladanan paripurna bulan ini.`;
+
+    return {
+      polishedText: polished,
+      summary: `Apresiasi Kehormatan Juara 1: ${cleanedText}`,
+    };
+  }
+
+  /**
    * Smart Assistant Chatbot Endpoint for user Q&A
    */
   public static async askSmartAssistant(question: string, userRole: string = 'GURU'): Promise<string> {

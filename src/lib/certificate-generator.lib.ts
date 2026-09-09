@@ -1,6 +1,7 @@
 /**
  * SMART ABSENSI GURU - CERTIFICATE GENERATOR ENGINE
  * Generates official Indonesian school certificates for teacher discipline awards.
+ * Supports Rank 1 (🥇), Rank 2 (🥈), and Rank 3 (🥉).
  */
 
 import { APP_CONFIG } from '../config/app.config';
@@ -8,7 +9,7 @@ import { SIGNATORY_OFFICIALS } from './excel-generator.lib';
 
 export interface CertificatePayload {
   recipientName: string;
-  recipientNipOrNpp?: string;
+  recipientNipOrNpp?: string | null;
   recipientPosition?: string;
   periodMonthYear: string; // e.g., "September 2026"
   awardTitle?: string;
@@ -21,17 +22,57 @@ export interface CertificatePayload {
 
 export const generateExcellenceCertificateHTML = (payload: CertificatePayload): string => {
   const recipientName = payload.recipientName || 'Bapak/Ibu Guru Teladan';
-  const nipOrNpp = payload.recipientNipOrNpp ? `NPP/NIP: ${payload.recipientNipOrNpp}` : 'Pendidik Profesional';
+  const rawNip = (payload.recipientNipOrNpp || '').trim();
+  // Aturan pengguna: Jika tidak ada data NPP/NIP jangan dipakai, pakai - saja
+  const nipOrNpp = rawNip ? `NPP/NIP: ${rawNip}` : '-';
   const position = payload.recipientPosition || 'Pendidik SMP & SMA Terpadu As Salaam';
   const period = payload.periodMonthYear || 'September 2026';
-  const certNumber = payload.certificateNumber || `001/SMART-ABS/DISIPLIN/${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
+
+  const rank = payload.rank || 1;
+  const isRank1 = rank === 1;
+  const isRank2 = rank === 2;
+
+  const rankEmoji = isRank1 ? '🥇' : isRank2 ? '🥈' : '🥉';
+  const rankBadgeText = isRank1 ? 'TOP #1' : isRank2 ? 'TOP #2' : 'TOP #3';
+  const rankTitle = payload.awardTitle || (
+    isRank1
+      ? 'Juara 1 Disiplin (Pendidik Teladan Utama)'
+      : isRank2
+      ? 'Juara 2 Disiplin (Pendidik Emas)'
+      : 'Juara 3 Disiplin (Pendidik Perak)'
+  );
+
+  const certNumber = payload.certificateNumber || `00${rank}/SMART-ABS/DISIPLIN/TOP${rank}/09/2026`;
   const dateIssued = payload.dateIssued || 'Bogor, 30 September 2026';
+
+  // Tema Medali & Aksen Warna Sesuai Juara 1, 2, atau 3
+  const medalGradient = isRank1
+    ? 'linear-gradient(135deg, #fef08a, #d4af37, #b45309)'
+    : isRank2
+    ? 'linear-gradient(135deg, #f8fafc, #94a3b8, #475569)'
+    : 'linear-gradient(135deg, #fef3c7, #d97706, #78350f)';
+
+  const medalShadow = isRank1
+    ? '0 6px 16px rgba(212, 175, 55, 0.35)'
+    : isRank2
+    ? '0 6px 16px rgba(148, 163, 184, 0.35)'
+    : '0 6px 16px rgba(217, 119, 6, 0.35)';
+
+  const predicateBg = isRank1
+    ? 'linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(254, 240, 138, 0.3))'
+    : isRank2
+    ? 'linear-gradient(135deg, rgba(148, 163, 184, 0.18), rgba(241, 245, 249, 0.4))'
+    : 'linear-gradient(135deg, rgba(217, 119, 6, 0.15), rgba(254, 243, 199, 0.3))';
+
+  const predicateBorder = isRank1 ? '#d4af37' : isRank2 ? '#94a3b8' : '#d97706';
+  const predicateColor = isRank1 ? '#78350f' : isRank2 ? '#1e293b' : '#7c2d12';
+  const rankPillBg = isRank1 ? '#b45309' : isRank2 ? '#475569' : '#9a3412';
 
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Piagam Penghargaan - Juara 1 Disiplin - ${recipientName}</title>
+  <title>Piagam Penghargaan - ${rankTitle} - ${recipientName}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;1,400;1,700&display=swap');
 
@@ -136,7 +177,7 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
       border: 1.5px solid #d4af37;
       border-radius: 6px;
       height: 100%;
-      padding: 16px 36px;
+      padding: 18px 40px;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -170,7 +211,7 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
       z-index: 1;
     }
 
-    /* ── HEADER KOP ────────────────────────────────────────────────────────── */
+    /* ── HEADER KOP (HANYA NAMA SMP & SMA TERPADU) ────────────────────────── */
     .cert-header {
       position: relative;
       z-index: 2;
@@ -178,8 +219,8 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
       align-items: center;
       justify-content: space-between;
       border-bottom: 2px solid rgba(212, 175, 55, 0.4);
-      padding-bottom: 10px;
-      margin-bottom: 8px;
+      padding-bottom: 12px;
+      margin-bottom: 6px;
     }
 
     .cert-logo {
@@ -194,52 +235,43 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
       padding: 0 16px;
     }
 
-    .inst-yayasan {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #18536B;
-      margin: 0;
-    }
-
     .inst-school {
-      font-size: 17px;
-      font-weight: 800;
+      font-size: 18px;
+      font-weight: 900;
       letter-spacing: 0.5px;
       text-transform: uppercase;
       color: #023246;
-      margin: 2px 0;
+      margin: 0;
     }
 
     .inst-sub {
       font-size: 10px;
       color: #64748b;
-      margin: 0;
-      font-weight: 500;
+      margin: 4px 0 0 0;
+      font-weight: 600;
     }
 
-    .cert-gold-medal {
+    .cert-medal-badge {
       width: 68px;
       height: 68px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #fef08a, #d4af37, #b45309);
+      background: ${medalGradient};
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 6px 16px rgba(212, 175, 55, 0.35);
+      box-shadow: ${medalShadow};
       border: 2px solid #ffffff;
-      color: #451a03;
+      color: #1e293b;
       font-weight: 900;
       line-height: 1;
     }
 
-    .cert-gold-medal .medal-icon {
+    .cert-medal-badge .medal-icon {
       font-size: 24px;
     }
 
-    .cert-gold-medal .medal-text {
+    .cert-medal-badge .medal-text {
       font-size: 8.5px;
       letter-spacing: 0.5px;
       font-weight: 800;
@@ -290,7 +322,7 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
     .cert-body {
       position: relative;
       z-index: 2;
-      margin: 10px 0;
+      margin: 12px 0;
     }
 
     .cert-present-text {
@@ -302,10 +334,10 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
 
     .cert-recipient-name {
       font-family: 'Playfair Display', serif;
-      font-size: 27px;
+      font-size: 28px;
       font-weight: 700;
       color: #023246;
-      margin: 6px 0 2px 0;
+      margin: 6px 0 3px 0;
       letter-spacing: 0.5px;
       border-bottom: 2px solid #d4af37;
       display: inline-block;
@@ -313,89 +345,57 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
     }
 
     .cert-recipient-role {
-      font-size: 11.5px;
+      font-size: 12px;
       font-weight: 600;
       color: #1e293b;
-      margin: 2px 0 0 0;
+      margin: 3px 0 0 0;
     }
 
     .cert-award-predicate {
-      margin-top: 10px;
+      margin-top: 12px;
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(254, 240, 138, 0.25));
-      border: 1.5px solid #d4af37;
-      padding: 6px 20px;
+      background: ${predicateBg};
+      border: 1.5px solid ${predicateBorder};
+      padding: 7px 22px;
       border-radius: 50px;
     }
 
     .predicate-badge {
-      font-size: 18px;
+      font-size: 19px;
     }
 
     .predicate-title {
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 800;
-      color: #78350f;
+      color: ${predicateColor};
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
 
     .predicate-rank {
-      background: #b45309;
+      background: ${rankPillBg};
       color: #ffffff;
       font-size: 10px;
       font-weight: 800;
-      padding: 2px 8px;
+      padding: 2.5px 9px;
       border-radius: 12px;
       letter-spacing: 0.5px;
     }
 
-    /* ── TIGA HAK ISTIMEWA RESMI (SESUAI INSTRUKSI) ────────────────────────── */
-    .cert-privileges-box {
-      margin: 10px auto 0 auto;
-      max-width: 760px;
-      background: #ffffff;
-      border: 1px solid rgba(212, 175, 55, 0.4);
-      border-radius: 10px;
-      padding: 8px 16px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    /* Kalimat Apresiasi Resmi (Tanpa Blok Hak Istimewa) */
+    .cert-citation-box {
+      margin: 14px auto 0 auto;
+      max-width: 740px;
     }
 
-    .privileges-heading {
-      font-size: 10px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #023246;
-      margin: 0 0 4px 0;
-    }
-
-    .privileges-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      text-align: left;
-    }
-
-    .privilege-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-      font-size: 10px;
-      line-height: 1.35;
-      color: #334155;
-    }
-
-    .privilege-icon {
-      font-size: 13px;
-      shrink: 0;
-      line-height: 1;
-    }
-
-    .privilege-text {
-      font-weight: 600;
+    .cert-citation-text {
+      font-size: 11.5px;
+      line-height: 1.6;
+      color: #475569;
+      margin: 0;
+      font-style: italic;
     }
 
     /* ── FOOTER & SIGNATURES ───────────────────────────────────────────────── */
@@ -565,19 +565,18 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
           <polygon points="50,15 61,38 86,41 67,59 72,84 50,71 28,84 33,59 14,41 39,38" />
         </svg>
 
-        <!-- 1. KOP SURAT INSTITUSI -->
+        <!-- 1. KOP SURAT INSTITUSI: CUKUP SMP TERPADU AL-ITTIHADIYAH & SMA TERPADU AS SALAAM -->
         <div class="cert-header">
           <img src="/school-logo.png" alt="Logo Sekolah" class="cert-logo" onerror="this.style.display='none'" />
 
           <div class="cert-institution-meta">
-            <p class="inst-yayasan">YAYASAN AS SALAAM & AL-ITTIHADIYAH BOGOR</p>
-            <h1 class="inst-school">${APP_CONFIG.INSTITUTION_NAME}</h1>
+            <h1 class="inst-school">SMP TERPADU AL-ITTIHADIYAH &amp; SMA TERPADU AS SALAAM</h1>
             <p class="inst-sub">Sistem Manajemen Presensi &amp; Keteladanan Pendidik Terintegrasi (${APP_CONFIG.APP_NAME})</p>
           </div>
 
-          <div class="cert-gold-medal">
-            <span class="medal-icon">🥇</span>
-            <span class="medal-text">TOP #1</span>
+          <div class="cert-medal-badge">
+            <span class="medal-icon">${rankEmoji}</span>
+            <span class="medal-text">${rankBadgeText}</span>
           </div>
         </div>
 
@@ -595,28 +594,16 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
           <p class="cert-recipient-role">${nipOrNpp} • ${position}</p>
 
           <div class="cert-award-predicate">
-            <span class="predicate-badge">🥇</span>
-            <span class="predicate-title">Juara 1 Disiplin (Pendidik Teladan Utama)</span>
-            <span class="predicate-rank">TOP #1 BULAN ${period.toUpperCase()}</span>
+            <span class="predicate-badge">${rankEmoji}</span>
+            <span class="predicate-title">${rankTitle}</span>
+            <span class="predicate-rank">${rankBadgeText} BULAN ${period.toUpperCase()}</span>
           </div>
 
-          <!-- TIGA HAK ISTIMEWA RESMI (PERSIS DENGAN INSTRUKSI USER) -->
-          <div class="cert-privileges-box">
-            <div class="privileges-heading">Penghargaan Resmi &amp; Hak Istimewa yang Diberikan:</div>
-            <div class="privileges-grid">
-              <div class="privilege-item">
-                <span class="privilege-icon">📜</span>
-                <span class="privilege-text">Piagam Penghargaan Resmi bertanda tangan Kepala Sekolah.</span>
-              </div>
-              <div class="privilege-item">
-                <span class="privilege-icon">🖼️</span>
-                <span class="privilege-text">Foto Profil dipajang di Papan Mading Digital Sekolah.</span>
-              </div>
-              <div class="privilege-item">
-                <span class="privilege-icon">⭐</span>
-                <span class="privilege-text">Hak Istimewa: Prioritas pemilihan jadwal piket semester depan.</span>
-              </div>
-            </div>
+          <!-- KUTIPAN KETELADANAN RESMI (HAK ISTIMEWA TELAH DIHAPUS) -->
+          <div class="cert-citation-box">
+            <p class="cert-citation-text">
+              &ldquo;Atas dedikasi luar biasa, ketepatan waktu sempurna, dan keteladanan integritas tanpa kompromi dalam menjalankan amanah mulia kependidikan.&rdquo;
+            </p>
           </div>
         </div>
 

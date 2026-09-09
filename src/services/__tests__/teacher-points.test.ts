@@ -11,6 +11,8 @@ import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
 } from '../../utils/teacher-appreciation.utils';
+import { generateExcellenceCertificateHTML } from '../../lib/certificate-generator.lib';
+import { GroqAIService } from '../groq-ai.service';
 import type {
   UserProfile,
   AttendanceRecord,
@@ -497,6 +499,61 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     );
   } catch (err: unknown) {
     assert('Challenge Engine: generateNightlyMotivation', false, String(err));
+  }
+
+  // 13. Certificate Template Specification Guard
+  try {
+    const certHtmlRank1 = generateExcellenceCertificateHTML({
+      recipientName: 'Dafa Maulana, S.Pd',
+      recipientNipOrNpp: '', // Empty: must fallback to '-'
+      recipientPosition: 'Guru TI',
+      periodMonthYear: 'September 2026',
+      rank: 1,
+    });
+
+    const certHtmlRank2 = generateExcellenceCertificateHTML({
+      recipientName: 'Widianingsih, S.Si',
+      recipientNipOrNpp: '199203112020022006',
+      recipientPosition: 'Guru Mapel IPA',
+      periodMonthYear: 'September 2026',
+      rank: 2,
+    });
+
+    const hasNoYayasan = !certHtmlRank1.includes('YAYASAN AS SALAAM & AL-ITTIHADIYAH');
+    const hasCorrectSchool = certHtmlRank1.includes('SMP TERPADU AL-ITTIHADIYAH &amp; SMA TERPADU AS SALAAM');
+    const hasHyphenForMissingNip = certHtmlRank1.includes('>- •') || certHtmlRank1.includes('>-<') || certHtmlRank1.includes('- • Guru TI');
+    const hasNoPrivileges = !certHtmlRank1.includes('Prioritas pemilihan jadwal piket');
+    const hasRank2Silver = certHtmlRank2.includes('TOP #2') && certHtmlRank2.includes('Juara 2 Disiplin');
+
+    assert(
+      'Certificate Engine: Correct school header, NPP fallback to -, no privileges, and supports Ranks 1-3',
+      hasNoYayasan && hasCorrectSchool && hasHyphenForMissingNip && hasNoPrivileges && hasRank2Silver,
+      `noYayasan: ${hasNoYayasan}, correctSchool: ${hasCorrectSchool}, hyphenNip: ${hasHyphenForMissingNip}, noPrivileges: ${hasNoPrivileges}, rank2: ${hasRank2Silver}`
+    );
+  } catch (err: unknown) {
+    assert('Certificate Engine: Specification Guard', false, String(err));
+  }
+
+  // 14. GroqAIService - refinePrincipalRewardProposal
+  try {
+    const rawInput = 'voucher blanja 300rb dan bngkisan kluarga';
+    const result = await GroqAIService.refinePrincipalRewardProposal({
+      rawRewardText: rawInput,
+      teacherName: 'Dafa Maulana, S.Pd',
+      totalPoints: 85,
+      monthName: 'September 2026',
+    });
+
+    const hasPolished = Boolean(result.polishedText) && result.polishedText.length > rawInput.length;
+    const fixedTypo = result.polishedText.toLowerCase().includes('belanja') && result.polishedText.toLowerCase().includes('keluarga');
+
+    assert(
+      'AI Reward Engine: refinePrincipalRewardProposal fixes typos and polishes executive phrasing',
+      hasPolished && fixedTypo,
+      `Polished: ${result.polishedText} | Summary: ${result.summary}`
+    );
+  } catch (err: unknown) {
+    assert('AI Reward Engine: refinePrincipalRewardProposal', false, String(err));
   }
 
   return { passed, failed, results };

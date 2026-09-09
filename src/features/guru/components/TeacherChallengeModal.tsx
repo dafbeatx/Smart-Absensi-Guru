@@ -29,7 +29,22 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'QUESTS' | 'REWARDS' | 'RULES'>('QUESTS');
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
+  const [selectedCertificateRank, setSelectedCertificateRank] = useState(1);
+  const [kepsekReward, setKepsekReward] = useState<string | null>(null);
   const { showToast } = useToastStore();
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const stored = localStorage.getItem('smart_absensi_kepsek_reward_champion_September_2026');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.rewardText) setKepsekReward(parsed.rewardText);
+      }
+    } catch {
+      // Ignored
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -259,13 +274,12 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: TEMPLATE PIAGAM PENGHARGAAN RESMI (JUARA 1 TELADAN UTAMA - TOP #1) */}
+          {/* TAB 2: PIAGAM PENGHARGAAN RESMI JUARA 1, 2, DAN 3 */}
           {activeTab === 'REWARDS' && (
             <div className="space-y-3">
-              {/* Highlight Card Juara 1 Sesuai Spesifikasi Persis User */}
-              <div className="p-4 rounded-2xl bg-linear-to-b from-[#fffefc] to-[#faf7ee] border-2 border-amber-300 shadow-sm relative overflow-hidden space-y-3">
-                {/* Header Juara 1 & Predikat */}
-                <div className="flex items-start justify-between gap-2 border-b border-amber-200/80 pb-2.5">
+              {/* Card Juara 1 (Pendidik Teladan Utama) + Hadiah Kepala Sekolah */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-linear-to-b from-[#fffefc] to-[#faf7ee] border-2 border-amber-300 shadow-sm relative overflow-hidden space-y-2.5">
+                <div className="flex items-start justify-between gap-2 border-b border-amber-200/80 pb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">🥇</span>
                     <div>
@@ -273,7 +287,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                         Juara 1 Disiplin (Pendidik Teladan Utama)
                       </h4>
                       <p className="text-[10.5px] text-amber-900 font-bold">
-                        Apresiasi Kehormatan Tertinggi Guru &amp; Tenaga Kependidikan
+                        Piagam Resmi &amp; Hadiah Khusus Kepala Sekolah
                       </p>
                     </div>
                   </div>
@@ -282,45 +296,33 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                   </span>
                 </div>
 
-                {/* 3 Hak Istimewa Resmi yang Diminta User */}
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2 text-xs text-slate-700 bg-white p-2.5 rounded-xl border border-amber-200/70 shadow-2xs">
-                    <span className="text-base shrink-0">📜</span>
-                    <span className="font-semibold leading-relaxed">
-                      Piagam Penghargaan Resmi bertanda tangan Kepala Sekolah.
-                    </span>
+                {/* Hadiah Khusus yang Ditetapkan Kepala Sekolah */}
+                <div className="p-2.5 rounded-xl bg-amber-100/70 border border-amber-300/80 text-xs text-amber-950 space-y-1">
+                  <div className="flex items-center gap-1.5 font-extrabold text-[11px] text-amber-900 uppercase">
+                    <span>🎁</span>
+                    <span>Hadiah Apresiasi dari Kepala Sekolah:</span>
                   </div>
-
-                  <div className="flex items-start gap-2 text-xs text-slate-700 bg-white p-2.5 rounded-xl border border-amber-200/70 shadow-2xs">
-                    <span className="text-base shrink-0">🖼️</span>
-                    <span className="font-semibold leading-relaxed">
-                      Foto Profil dipajang di Papan Mading Digital Sekolah.
-                    </span>
-                  </div>
-
-                  <div className="flex items-start gap-2 text-xs text-amber-950 bg-amber-100/60 p-2.5 rounded-xl border border-amber-300/80 shadow-2xs">
-                    <span className="text-base shrink-0">⭐</span>
-                    <span className="font-bold leading-relaxed">
-                      Hak Istimewa: Prioritas pemilihan jadwal piket semester depan.
-                    </span>
-                  </div>
+                  <p className="text-xs font-semibold leading-relaxed">
+                    {kepsekReward || 'Sedang dirumuskan langsung oleh Kepala Sekolah Farhan Sopian Sahid, S.Pd.I.'}
+                  </p>
                 </div>
 
-                {/* Info Tanda Tangan & Stempel */}
-                <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-amber-200/60">
-                  <span className="italic">Tertanda: Farhan Sopian Sahid, S.Pd.I</span>
-                  <span className="font-bold text-amber-800">Format Resmi A4</span>
-                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed italic">
+                  &ldquo;Mendapatkan Piagam Penghargaan Resmi A4 bertanda tangan Kepala Sekolah &amp; Stempel Digital Sah.&rdquo;
+                </p>
 
-                {/* Action Buttons: Cetak & Pratinjau */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
+                {/* Tombol Cetak / Lihat Piagam Juara 1 */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
                   <button
                     type="button"
-                    onClick={() => setIsCertificateModalOpen(true)}
-                    className="min-h-11 px-3 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 active:scale-95 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    onClick={() => {
+                      setSelectedCertificateRank(1);
+                      setIsCertificateModalOpen(true);
+                    }}
+                    className="min-h-10 px-3 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 active:scale-95 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
-                    <span>Lihat Template</span>
+                    <span>Lihat Piagam 🥇</span>
                   </button>
 
                   <button
@@ -328,17 +330,74 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                     onClick={() => {
                       openPrintableCertificate({
                         recipientName: teacherName,
-                        recipientNipOrNpp: user?.nip || '199001012015011001',
+                        recipientNipOrNpp: user?.nip || undefined,
                         recipientPosition: user?.position || 'Guru Mata Pelajaran',
                         periodMonthYear: 'September 2026',
                         totalPoints,
-                        rank: userRank,
+                        rank: 1,
                       });
                     }}
-                    className="min-h-11 px-3 rounded-xl bg-[#023246] hover:bg-[#03445e] active:scale-95 text-white text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+                    className="min-h-10 px-3 rounded-xl bg-[#023246] hover:bg-[#03445e] active:scale-95 text-white text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
                   >
                     <Printer className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Cetak Piagam (PDF)</span>
+                    <span>Cetak PDF 🥇</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card Juara 2 & 3 (Pendidik Emas & Perak) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Juara 2 */}
+                <div className="p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                      <span>🥈</span>
+                      <span>Juara 2 Disiplin</span>
+                    </span>
+                    <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                      Top #2
+                    </span>
+                  </div>
+                  <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                    Piagam Penghargaan Resmi (Pendidik Emas) bertanda tangan Kepala Sekolah.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCertificateRank(2);
+                      setIsCertificateModalOpen(true);
+                    }}
+                    className="w-full py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all"
+                  >
+                    <ExternalLink className="w-3 h-3 text-slate-600" />
+                    <span>Lihat Piagam 🥈</span>
+                  </button>
+                </div>
+
+                {/* Juara 3 */}
+                <div className="p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                      <span>🥉</span>
+                      <span>Juara 3 Disiplin</span>
+                    </span>
+                    <span className="text-[10px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
+                      Top #3
+                    </span>
+                  </div>
+                  <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                    Piagam Penghargaan Resmi (Pendidik Perak) bertanda tangan Kepala Sekolah.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCertificateRank(3);
+                      setIsCertificateModalOpen(true);
+                    }}
+                    className="w-full py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all"
+                  >
+                    <ExternalLink className="w-3 h-3 text-slate-600" />
+                    <span>Lihat Piagam 🥉</span>
                   </button>
                 </div>
               </div>
@@ -402,7 +461,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
         user={user}
         periodMonthYear="September 2026"
         totalPoints={totalPoints}
-        rank={userRank}
+        rank={selectedCertificateRank}
       />
     </div>
   );
