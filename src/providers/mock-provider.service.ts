@@ -372,6 +372,20 @@ export class MockProvider implements IDataProvider {
           description: attendanceDesc,
         });
 
+        // 🌅 Bonus Teladan Fajar (Early Bird ≤ 07:00 WIB)
+        const checkInTimeClean = (timeStr || '').replace(/[^0-9:]/g, '').slice(0, 5);
+        if (!isLate && checkInTimeClean && checkInTimeClean <= '07:00') {
+          await this.recordTeacherPoint({
+            user_id: userId,
+            teacher_name: sessionUser?.full_name || undefined,
+            date: dateStr,
+            points: 5,
+            activity_type: 'EARLY_BIRD_BONUS',
+            title: '🌅 Teladan Fajar (Early Bird ≤ 07:00 WIB)',
+            description: `Hadir sangat awal pukul ${timeStr}, keteladanan menyambut siswa di gerbang`,
+          });
+        }
+
         // Cek apakah guru terjadwal piket hari ini
         try {
           const dutySchedules = await this.getDutySchedules();
@@ -2140,9 +2154,12 @@ export class MockProvider implements IDataProvider {
       { id: 'pt_iqbal_07', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-08', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:30 WIB di gerbang sekolah', created_at: '2026-09-08T07:30:29.000Z' },
       { id: 'pt_iqbal_08', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-08', points: 10, activity_type: 'CHECK_OUT', title: 'Presensi Pulang Tuntas Bertugas', description: 'Tercatat menyelesaikan dinas sekolah pada pukul 10:40 WIB via QR', created_at: '2026-09-08T10:40:53.000Z' },
       { id: 'pt_iqbal_09', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-09', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 06:56 WIB di gerbang sekolah', created_at: '2026-09-09T06:56:34.000Z' },
+      { id: 'pt_iqbal_eb1', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-09', points: 5, activity_type: 'EARLY_BIRD_BONUS', title: '🌅 Teladan Fajar (Early Bird ≤ 07:00 WIB)', description: 'Tercatat hadir pukul 06:56 WIB di gerbang sekolah menyambut siswa', created_at: '2026-09-09T06:56:40.000Z' },
+      { id: 'pt_iqbal_sm1', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-07', points: 10, activity_type: 'STREAK_MILESTONE', title: '🔥 Bonus Konsistensi Streak 5 Hari', description: 'Menuntaskan 5 hari kerja berturut-turut hadir tepat waktu', created_at: '2026-09-07T07:10:00.000Z' },
       { id: 'pt_iqbal_10', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-09', points: 10, activity_type: 'CHECK_OUT', title: 'Presensi Pulang Tuntas Bertugas', description: 'Tercatat menyelesaikan dinas sekolah pada pukul 12:59 WIB via QR', created_at: '2026-09-09T12:59:37.000Z' },
 
       // Widianingsih (usr_guru_009)
+      { id: 'pt_widia_sm1', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-07', points: 10, activity_type: 'STREAK_MILESTONE', title: '🔥 Bonus Konsistensi Streak 5 Hari', description: 'Menuntaskan 5 hari kerja berturut-turut hadir tepat waktu', created_at: '2026-09-07T07:15:00.000Z' },
       { id: 'pt_widia_01', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-01', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:14 WIB di gerbang sekolah', created_at: '2026-09-01T07:14:00.000Z' },
       { id: 'pt_widia_02', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-02', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:11 WIB di gerbang sekolah', created_at: '2026-09-02T07:11:00.000Z' },
       { id: 'pt_widia_03', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-03', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:09 WIB di gerbang sekolah', created_at: '2026-09-03T07:09:00.000Z' },
@@ -2155,6 +2172,7 @@ export class MockProvider implements IDataProvider {
       { id: 'pt_widia_10', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-09', points: 10, activity_type: 'CHECK_OUT', title: 'Presensi Pulang Tuntas Bertugas', description: 'Tercatat menyelesaikan dinas sekolah pada pukul 13:01 WIB via QR', created_at: '2026-09-09T13:01:09.000Z' },
 
       // Septi Nur Aeni (usr_guru_007)
+      { id: 'pt_septi_sm1', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-07', points: 10, activity_type: 'STREAK_MILESTONE', title: '🔥 Bonus Konsistensi Streak 5 Hari', description: 'Menuntaskan 5 hari kerja berturut-turut hadir tepat waktu', created_at: '2026-09-07T07:20:00.000Z' },
       { id: 'pt_septi_01', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-01', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:09 WIB di gerbang sekolah', created_at: '2026-09-01T07:09:00.000Z' },
       { id: 'pt_septi_02', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-02', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:13 WIB di gerbang sekolah', created_at: '2026-09-02T07:13:00.000Z' },
       { id: 'pt_septi_03', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-03', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:10 WIB di gerbang sekolah', created_at: '2026-09-03T07:10:00.000Z' },
@@ -2176,6 +2194,7 @@ export class MockProvider implements IDataProvider {
       { id: 'pt_mira_07', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-08', points: 5, activity_type: 'CHECK_IN_LATE', title: 'Presensi Masuk Sekolah (> 07:30 WIB)', description: 'Tercatat hadir pukul 07:38 WIB di gerbang sekolah', created_at: '2026-09-08T07:38:35.000Z' },
       { id: 'pt_mira_08', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-08', points: 10, activity_type: 'CHECK_OUT', title: 'Presensi Pulang Tuntas Bertugas', description: 'Tercatat menyelesaikan dinas sekolah pada pukul 10:39 WIB via QR', created_at: '2026-09-08T10:39:06.000Z' },
       { id: 'pt_mira_09', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-09', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:00 WIB di gerbang sekolah', created_at: '2026-09-09T07:00:36.000Z' },
+      { id: 'pt_mira_eb1', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-09', points: 5, activity_type: 'EARLY_BIRD_BONUS', title: '🌅 Teladan Fajar (Early Bird ≤ 07:00 WIB)', description: 'Tercatat hadir pukul 07:00 WIB di gerbang sekolah menyambut siswa', created_at: '2026-09-09T07:00:40.000Z' },
       { id: 'pt_mira_10', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-09', points: 10, activity_type: 'CHECK_OUT', title: 'Presensi Pulang Tuntas Bertugas', description: 'Tercatat menyelesaikan dinas sekolah pada pukul 13:10 WIB via QR', created_at: '2026-09-09T13:10:53.000Z' },
       { id: 'pt_mira_11', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-09', points: 10, activity_type: 'DUTY_PIKET', title: 'Tugas Piket Harian Sekolah', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah', created_at: '2026-09-09T07:30:00.000Z' },
 
@@ -2208,6 +2227,7 @@ export class MockProvider implements IDataProvider {
       { id: 'pt_fitri_01', user_id: 'usr_guru_005', teacher_name: 'Fitri Ani Rahayu, S.Mat', date: '2026-09-08', points: 5, activity_type: 'CHECK_IN_LATE', title: 'Presensi Masuk Sekolah (> 07:30 WIB)', description: 'Tercatat hadir pukul 07:31 WIB di gerbang sekolah', created_at: '2026-09-08T07:31:39.000Z' },
       { id: 'pt_fitri_02', user_id: 'usr_guru_005', teacher_name: 'Fitri Ani Rahayu, S.Mat', date: '2026-09-08', points: 10, activity_type: 'CHECK_OUT', title: 'Presensi Pulang Tuntas Bertugas', description: 'Tercatat menyelesaikan dinas sekolah pada pukul 10:43 WIB via QR', created_at: '2026-09-08T10:43:31.000Z' },
       { id: 'pt_fitri_03', user_id: 'usr_guru_005', teacher_name: 'Fitri Ani Rahayu, S.Mat', date: '2026-09-09', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 06:51 WIB di gerbang sekolah', created_at: '2026-09-09T06:51:25.000Z' },
+      { id: 'pt_fitri_eb1', user_id: 'usr_guru_005', teacher_name: 'Fitri Ani Rahayu, S.Mat', date: '2026-09-09', points: 5, activity_type: 'EARLY_BIRD_BONUS', title: '🌅 Teladan Fajar (Early Bird ≤ 07:00 WIB)', description: 'Tercatat hadir pukul 06:51 WIB di gerbang sekolah menyambut siswa', created_at: '2026-09-09T06:51:30.000Z' },
       { id: 'pt_fitri_04', user_id: 'usr_guru_005', teacher_name: 'Fitri Ani Rahayu, S.Mat', date: '2026-09-09', points: 10, activity_type: 'CHECK_OUT', title: 'Presensi Pulang Tuntas Bertugas', description: 'Tercatat menyelesaikan dinas sekolah pada pukul 13:12 WIB via QR', created_at: '2026-09-09T13:12:05.000Z' },
       { id: 'pt_fitri_05', user_id: 'usr_guru_005', teacher_name: 'Fitri Ani Rahayu, S.Mat', date: '2026-09-09', points: 10, activity_type: 'DUTY_PIKET', title: 'Tugas Piket Harian Sekolah', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah', created_at: '2026-09-09T07:30:00.000Z' },
 
@@ -2234,6 +2254,7 @@ export class MockProvider implements IDataProvider {
 
       // Farhan Sopian Sahid, S.Pd.I (usr_kepsek_002)
       { id: 'pt_kepsek_01', user_id: 'usr_kepsek_002', teacher_name: 'Farhan Sopian Sahid, S.Pd.I', date: '2026-09-09', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 06:48 WIB di gerbang sekolah', created_at: '2026-09-09T06:48:47.000Z' },
+      { id: 'pt_kepsek_eb1', user_id: 'usr_kepsek_002', teacher_name: 'Farhan Sopian Sahid, S.Pd.I', date: '2026-09-09', points: 5, activity_type: 'EARLY_BIRD_BONUS', title: '🌅 Teladan Fajar (Early Bird ≤ 07:00 WIB)', description: 'Tercatat hadir pukul 06:48 WIB di gerbang sekolah menyambut siswa', created_at: '2026-09-09T06:48:55.000Z' },
       { id: 'pt_kepsek_02', user_id: 'usr_kepsek_002', teacher_name: 'Farhan Sopian Sahid, S.Pd.I', date: '2026-09-09', points: 10, activity_type: 'CHECK_OUT', title: 'Presensi Pulang Tuntas Bertugas', description: 'Tercatat menyelesaikan dinas sekolah pada pukul 13:21 WIB via QR', created_at: '2026-09-09T13:21:42.000Z' },
 
       // Qodiatul Asrof Ramadhoni (usr_op_002)

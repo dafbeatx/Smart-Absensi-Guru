@@ -557,5 +557,72 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     assert('AI Reward Engine: refinePrincipalRewardProposal', false, String(err));
   }
 
+  // 15. Early Bird (≤ 07:00 WIB), Streak Bonus, and 5-Tier Deterministic Tie-Breaker Guard
+  try {
+    const userA: UserProfile = {
+      id: 'usr_tie_a',
+      full_name: 'Guru A Tie Test',
+      role: 'GURU',
+      position: 'Guru Fisika',
+      nip: '198501012010011010',
+      phone_number: '081234567891',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+    };
+
+    // User A and User B both have 100 points, both have 5 on-time check-ins, 0 late.
+    // But User A has 1 Early Bird (≤ 07:00) bonus, User B has 0 Early Bird.
+    // Tie-breaker rule 3 must rank User A above User B!
+    const tieLogs: TeacherPointLog[] = [
+      // User A (100 pts)
+      { id: 't-a1', user_id: 'usr_tie_a', activity_type: 'CHECK_IN_ON_TIME', points: 75, date: '2026-09-09', created_at: '2026-09-09T07:00:00Z' },
+      { id: 't-a2', user_id: 'usr_tie_a', activity_type: 'CHECK_IN_ON_TIME', points: 0, date: '2026-09-08', created_at: '2026-09-08T07:00:00Z' },
+      { id: 't-a3', user_id: 'usr_tie_a', activity_type: 'CHECK_IN_ON_TIME', points: 0, date: '2026-09-07', created_at: '2026-09-07T07:00:00Z' },
+      { id: 't-a4', user_id: 'usr_tie_a', activity_type: 'CHECK_IN_ON_TIME', points: 0, date: '2026-09-04', created_at: '2026-09-04T07:00:00Z' },
+      { id: 't-a5', user_id: 'usr_tie_a', activity_type: 'CHECK_IN_ON_TIME', points: 0, date: '2026-09-03', created_at: '2026-09-03T07:00:00Z' },
+      { id: 't-a6', user_id: 'usr_tie_a', activity_type: 'EARLY_BIRD_BONUS', points: 5, date: '2026-09-09', created_at: '2026-09-09T06:55:00Z' },
+      { id: 't-a7', user_id: 'usr_tie_a', activity_type: 'CHECK_OUT', points: 20, date: '2026-09-09', created_at: '2026-09-09T13:00:00Z' },
+
+      // User B (usr_guru_009 / Widia - 100 pts, but 0 Early Bird bonus)
+      { id: 't-b1', user_id: 'usr_guru_009', activity_type: 'CHECK_IN_ON_TIME', points: 75, date: '2026-09-09', created_at: '2026-09-09T07:15:00Z' },
+      { id: 't-b2', user_id: 'usr_guru_009', activity_type: 'CHECK_IN_ON_TIME', points: 0, date: '2026-09-08', created_at: '2026-09-08T07:15:00Z' },
+      { id: 't-b3', user_id: 'usr_guru_009', activity_type: 'CHECK_IN_ON_TIME', points: 0, date: '2026-09-07', created_at: '2026-09-07T07:15:00Z' },
+      { id: 't-b4', user_id: 'usr_guru_009', activity_type: 'CHECK_IN_ON_TIME', points: 0, date: '2026-09-04', created_at: '2026-09-04T07:15:00Z' },
+      { id: 't-b5', user_id: 'usr_guru_009', activity_type: 'CHECK_IN_ON_TIME', points: 0, date: '2026-09-03', created_at: '2026-09-03T07:15:00Z' },
+      { id: 't-b6', user_id: 'usr_guru_009', activity_type: 'CHECK_OUT', points: 25, date: '2026-09-09', created_at: '2026-09-09T13:00:00Z' },
+    ];
+
+    const scoreA: TeacherAppreciationScore = {
+      totalPoints: 100,
+      level: '🏆 Pendidik Teladan Utama',
+      nextLevelPoints: 150,
+      levelProgressPercent: 100,
+      hadirTepatWaktuCount: 5,
+      terlambatCount: 0,
+      piketCount: 0,
+      earlyBirdCount: 1,
+      streakCount: 0,
+      moodCheckinCount: 0,
+      badges: [],
+      pointHistory: [],
+    };
+
+    const boardResult = getTeacherDisciplineLeaderboard(userA, scoreA, 'CURRENT_MONTH', tieLogs);
+
+    const rankUserA = boardResult.leaderboard.find((t) => t.id === 'usr_tie_a')?.rank;
+    const rankUserB = boardResult.leaderboard.find((t) => t.id === 'usr_guru_009')?.rank;
+
+    const tieBreakerPassed = Boolean(rankUserA && rankUserB && rankUserA < rankUserB);
+
+    assert(
+      'Tie-Breaker Engine: Equal points resolved by Early Bird bonus count (rankUserA < rankUserB)',
+      tieBreakerPassed,
+      `User A (1 Early Bird) Rank: ${rankUserA}, User B (0 Early Bird) Rank: ${rankUserB}`
+    );
+  } catch (err: unknown) {
+    assert('Tie-Breaker Engine: Guard', false, String(err));
+  }
+
   return { passed, failed, results };
 };

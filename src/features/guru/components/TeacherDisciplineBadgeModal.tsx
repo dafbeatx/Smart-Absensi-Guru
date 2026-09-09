@@ -503,6 +503,14 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     </button>
                   </div>
 
+                  {/* Info Tie-Breaker Fair Ranking */}
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[10px] text-amber-900 font-medium">
+                    <span className="text-xs shrink-0">⚖️</span>
+                    <span>
+                      <strong>Tie-Breaker:</strong> Jika poin sama, peringkat ditentukan oleh On-Time terbanyak, bonus 🌅 Teladan Fajar (≤ 07:00), dan minimnya terlambat.
+                    </span>
+                  </div>
+
                   {/* 👑 HERO CARD: JUARA 1 POIN TERBANYAK (DAPAT DIKLIK) */}
                   <div
                     onClick={() => topTeacher && setSelectedTeacher(topTeacher)}
@@ -674,6 +682,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                 <p className="text-[9.5px] text-slate-500 truncate mt-0.5">
                                   {teacher.position}
                                   {teacher.hadirTepatWaktuCount > 0 ? ` • ${teacher.hadirTepatWaktuCount} On-Time` : ''}
+                                  {teacher.earlyBirdCount && teacher.earlyBirdCount > 0 ? ` • 🌅 ${teacher.earlyBirdCount} Fajar` : ''}
                                 </p>
                               </div>
                             </div>

@@ -105,6 +105,36 @@ export class TeacherPointReconciliationService {
             logger.warn('TeacherPointReconciliationService', `Gagal merekonsiliasi check-in ${dateStr}:`, eRec);
           }
         }
+
+        // 1.5. Rekonsiliasi EARLY_BIRD_BONUS (Datang Lebih Awal ≤ 07:00 WIB)
+        const rawCheckInTime = (att.check_in_time || '').replace(/[^0-9:]/g, '').slice(0, 5);
+        if (!isLate && rawCheckInTime && rawCheckInTime <= '07:00') {
+          const hasEarlyBirdPoint = updatedLogs.some(
+            (l) => l.user_id === userId && l.date === dateStr && l.activity_type === 'EARLY_BIRD_BONUS'
+          );
+
+          if (!hasEarlyBirdPoint) {
+            try {
+              const newLog = await provider.recordTeacherPoint(
+                {
+                  user_id: userId,
+                  teacher_name: teacherName,
+                  date: dateStr,
+                  points: 5,
+                  activity_type: 'EARLY_BIRD_BONUS',
+                  title: '🌅 Teladan Fajar (Early Bird ≤ 07:00 WIB)',
+                  description: `Hadir lebih awal pukul ${att.check_in_time || rawCheckInTime}, keteladanan menyambut siswa di gerbang`,
+                },
+                token
+              );
+              updatedLogs.unshift(newLog);
+              hasChanges = true;
+              logger.info('TeacherPointReconciliationService', `Reconciled early bird bonus for ${dateStr}: +5`);
+            } catch (eEb) {
+              logger.warn('TeacherPointReconciliationService', `Gagal merekonsiliasi early bird ${dateStr}:`, eEb);
+            }
+          }
+        }
       }
 
       // 2. Rekonsiliasi CHECK_OUT (Presensi Pulang)

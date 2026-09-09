@@ -97,3 +97,22 @@ INNER JOIN public.teacher_duty_schedules tds
   AND tds.day_of_week = EXTRACT(DOW FROM a.date::date)
 WHERE a.status IN ('HADIR', 'TERLAMBAT')
 ON CONFLICT (user_id, date, activity_type) DO NOTHING;
+
+-- 4. Backfill Teladan Fajar (Early Bird ≤ 07:00 WIB: +5 Poin)
+INSERT INTO public.teacher_point_history (user_id, teacher_name, date, points, activity_type, title, description, created_at)
+SELECT 
+  a.user_id,
+  u.full_name as teacher_name,
+  a.date::date,
+  5 as points,
+  'EARLY_BIRD_BONUS' as activity_type,
+  '🌅 Teladan Fajar (Early Bird ≤ 07:00 WIB)' as title,
+  'Tercatat hadir sangat awal pukul ' || COALESCE(a.check_in_time::text, '06:50') || ' WIB menyambut siswa' as description,
+  (a.date::text || ' ' || COALESCE(a.check_in_time::text, '06:50:00'))::timestamptz as created_at
+FROM public.attendance a
+LEFT JOIN public.users u ON u.id = a.user_id
+WHERE a.status = 'HADIR' 
+  AND a.check_in_time IS NOT NULL 
+  AND a.check_in_time::time <= '07:00:00'::time
+ON CONFLICT (user_id, date, activity_type) DO NOTHING;
+

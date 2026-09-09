@@ -220,6 +220,8 @@ export type TeacherPointActivityType =
   | 'CHECK_IN_LATE'
   | 'CHECK_OUT'
   | 'DUTY_PIKET'
+  | 'EARLY_BIRD_BONUS'
+  | 'STREAK_MILESTONE'
   | 'BONUS_DISCIPLINE'
   | 'PENALTY_ALFA'
   | 'MANUAL_ADJUSTMENT';
@@ -244,6 +246,8 @@ export interface TeacherAppreciationScore {
   hadirTepatWaktuCount: number;
   terlambatCount: number;
   piketCount: number;
+  earlyBirdCount?: number;
+  streakCount?: number;
   moodCheckinCount: number;
   badges: TeacherBadge[];
   pointHistory?: TeacherPointLog[];

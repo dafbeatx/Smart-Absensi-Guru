@@ -61,21 +61,34 @@ export function calculateTeacherAppreciationScore(
   const historyOnTimeCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_ON_TIME').length;
   const historyLateCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_LATE').length;
   const historyPiketCount = monthlyPointLogs.filter((p) => p.activity_type === 'DUTY_PIKET').length;
+  const historyEarlyBirdCount = monthlyPointLogs.filter((p) => p.activity_type === 'EARLY_BIRD_BONUS').length;
+  const historyStreakCount = monthlyPointLogs.filter((p) => p.activity_type === 'STREAK_MILESTONE').length;
+
+  const rawEarlyBirdCount = attendanceHistory.filter((r) => {
+    if (r.status !== 'HADIR' && (r.status as string) !== 'HADIR_TEPAT_WAKTU') return false;
+    const timeClean = (r.check_in_time || '').replace(/[^0-9:]/g, '').slice(0, 5);
+    return Boolean(timeClean && timeClean <= '07:00');
+  }).length;
 
   const hadirTepatWaktuCount = Math.max(rawHadirTepatWaktuCount, historyOnTimeCount);
   const terlambatCount = Math.max(rawTerlambatCount, historyLateCount);
   const piketCount = Math.max(rawPiketCount, historyPiketCount);
+  const earlyBirdCount = Math.max(rawEarlyBirdCount, historyEarlyBirdCount);
+  const streakCount = historyStreakCount;
   const totalMasukFisik = hadirTepatWaktuCount + terlambatCount;
 
-  // Points Formula: Murni kehadiran fisik nyata
+  // Points Formula: Murni kehadiran fisik nyata + bonus kedisiplinan
   // - Hadir Tepat Waktu: +15 Poin
   // - Hadir Terlambat: +5 Poin
   // - Tugas Piket: +10 Poin per hari tugas piket
+  // - Teladan Fajar (≤ 07:00 WIB): +5 Poin
+  // - Bonus Konsistensi Streak 5 Hari: +10 Poin
   // - Penalti ALFA: -10 Poin per kejadian
   const attendancePoints = hadirTepatWaktuCount * 15 + terlambatCount * 5;
   const dutyPoints = piketCount * 10;
+  const bonusPoints = earlyBirdCount * 5 + streakCount * 10;
   const alfaPenalty = alfaCount * 10;
-  const calculatedPoints = Math.max(0, attendancePoints + dutyPoints - alfaPenalty);
+  const calculatedPoints = Math.max(0, attendancePoints + dutyPoints + bonusPoints - alfaPenalty);
 
   // Jika riwayat transaksi poin bulanan tersedia, gunakan akumulasi ledger poin bulan berjalan
   const totalPoints = (monthlyPointLogs.length > 0)
@@ -159,6 +172,8 @@ export function calculateTeacherAppreciationScore(
     hadirTepatWaktuCount,
     terlambatCount,
     piketCount,
+    earlyBirdCount,
+    streakCount,
     moodCheckinCount: 0,
     badges,
     pointHistory,
@@ -177,6 +192,8 @@ export interface TeacherLeaderboardItem {
   hadirTepatWaktuCount: number;
   terlambatCount: number;
   piketCount: number;
+  earlyBirdCount?: number;
+  streakCount?: number;
   topBadge: {
     icon: string;
     title: string;
@@ -213,19 +230,21 @@ export function getTeacherDisciplineLeaderboard(
   const isCurrent = period === 'CURRENT_MONTH';
 
   // 1. Data Riil Bulan Berjalan (September 2026, s/d Hari ke-7 • 5 Hari Kerja Efektif)
-  //    Formula: Hadir=15, Telat=5, Piket=10, Sakit/Izin/Cuti=0, Alfa=-10. Tanpa modal bonus awal cuma-cuma.
+  //    Formula: Hadir=15, Telat=5, Piket=10, EarlyBird(≤07:00)=5, Streak=10, Sakit/Izin/Cuti=0, Alfa=-10.
   const currentMonthTeachers: TeacherLeaderboardItem[] = [
     {
       id: 'usr_guru_002',
       name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
       nip: '19880512 201503 1 002',
       position: 'Wakasek Sarana dan Prasarana',
-      totalPoints: 85, // 5 Hadir (75) + 1 Piket (10)
+      totalPoints: 100, // 5 Hadir (75) + 1 Piket (10) + 1 Early Bird (5) + 1 Streak (10)
       level: '🏆 Pendidik Teladan Utama',
       rank: 1,
       hadirTepatWaktuCount: 5,
       terlambatCount: 0,
       piketCount: 1,
+      earlyBirdCount: 1,
+      streakCount: 1,
       topBadge: { icon: '🏆', title: 'Pendidik Teladan Utama Kepsek' },
     },
     {
@@ -233,12 +252,14 @@ export function getTeacherDisciplineLeaderboard(
       name: 'Widianingsih, S.Si., G.r',
       nip: '19920311 202002 2 006',
       position: 'Guru Mapel IPA',
-      totalPoints: 85, // 5 Hadir (75) + 1 Piket (10)
+      totalPoints: 95, // 5 Hadir (75) + 1 Piket (10) + 1 Streak (10)
       level: '🏆 Pendidik Teladan Utama',
       rank: 2,
       hadirTepatWaktuCount: 5,
       terlambatCount: 0,
       piketCount: 1,
+      earlyBirdCount: 0,
+      streakCount: 1,
       topBadge: { icon: '🌟', title: '100% Kehadiran Sempurna' },
     },
     {
@@ -246,12 +267,14 @@ export function getTeacherDisciplineLeaderboard(
       name: 'Septi Nur Aeni, S.E',
       nip: '19921105 202102 2 009',
       position: 'Guru Mapel B. Indonesia',
-      totalPoints: 85, // 5 Hadir (75) + 1 Piket (10)
+      totalPoints: 95, // 5 Hadir (75) + 1 Piket (10) + 1 Streak (10)
       level: '🏆 Pendidik Teladan Utama',
       rank: 3,
       hadirTepatWaktuCount: 5,
       terlambatCount: 0,
       piketCount: 1,
+      earlyBirdCount: 0,
+      streakCount: 1,
       topBadge: { icon: '🌟', title: '100% Kehadiran Sempurna' },
     },
     {
@@ -259,12 +282,14 @@ export function getTeacherDisciplineLeaderboard(
       name: 'Mira Nurdianti, S.Pd',
       nip: '19950117 202303 2 010',
       position: 'Tata Usaha (TU)',
-      totalPoints: 75, // 4 Hadir (60) + 1 Telat (5) + 1 Piket (10)
+      totalPoints: 80, // 4 Hadir (60) + 1 Telat (5) + 1 Piket (10) + 1 Early Bird (5)
       level: '🥇 Pendidik Disiplin Emas',
       rank: 4,
       hadirTepatWaktuCount: 4,
       terlambatCount: 1,
       piketCount: 1,
+      earlyBirdCount: 1,
+      streakCount: 0,
       topBadge: { icon: '🛡️', title: 'Piket Responsif & Teladan' },
     },
     {
@@ -550,6 +575,8 @@ export function getTeacherDisciplineLeaderboard(
       const onTime = logs.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
       const late = logs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
       const piket = logs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
+      const earlyBird = logs.filter((l) => l.activity_type === 'EARLY_BIRD_BONUS').length;
+      const streak = logs.filter((l) => l.activity_type === 'STREAK_MILESTONE').length;
 
       let lvl = t.level;
       if (pts >= 80) lvl = '🏆 Pendidik Teladan Utama';
@@ -563,6 +590,8 @@ export function getTeacherDisciplineLeaderboard(
         hadirTepatWaktuCount: onTime,
         terlambatCount: late,
         piketCount: piket,
+        earlyBirdCount: earlyBird,
+        streakCount: streak,
         level: lvl,
       };
     });
@@ -591,6 +620,8 @@ export function getTeacherDisciplineLeaderboard(
           hadirTepatWaktuCount: currentUserScore?.hadirTepatWaktuCount ?? 0,
           terlambatCount: currentUserScore?.terlambatCount ?? 0,
           piketCount: currentUserScore?.piketCount ?? 0,
+          earlyBirdCount: currentUserScore?.earlyBirdCount ?? teachers[matchedIdx].earlyBirdCount ?? 0,
+          streakCount: currentUserScore?.streakCount ?? teachers[matchedIdx].streakCount ?? 0,
           topBadge: { icon: activeBadge.icon, title: activeBadge.title },
           avatar_url: currentUser.avatar_url || teachers[matchedIdx].avatar_url,
           isCurrentUser: true,
@@ -615,14 +646,40 @@ export function getTeacherDisciplineLeaderboard(
         hadirTepatWaktuCount: isCurrent ? (currentUserScore?.hadirTepatWaktuCount ?? 0) : 17,
         terlambatCount: isCurrent ? (currentUserScore?.terlambatCount ?? 0) : 1,
         piketCount: isCurrent ? (currentUserScore?.piketCount ?? 0) : 2,
+        earlyBirdCount: currentUserScore?.earlyBirdCount ?? 0,
+        streakCount: currentUserScore?.streakCount ?? 0,
         topBadge: { icon: activeBadge.icon, title: activeBadge.title },
         isCurrentUser: true,
       });
     }
   }
 
-  // Urutkan berdasarkan totalPoints terbesar secara deterministik
-  teachers.sort((a, b) => b.totalPoints - a.totalPoints);
+  // 5-Level Deterministic Tie-Breaker Ranking Engine:
+  // 1. totalPoints terbesar
+  // 2. hadirTepatWaktuCount terbanyak
+  // 3. earlyBirdCount (Teladan Fajar ≤ 07:00 WIB) terbanyak
+  // 4. terlambatCount paling sedikit
+  // 5. Urutan rank bawaan / alfabetis nama (stabil & konsisten)
+  teachers.sort((a, b) => {
+    if (b.totalPoints !== a.totalPoints) {
+      return b.totalPoints - a.totalPoints;
+    }
+    if (b.hadirTepatWaktuCount !== a.hadirTepatWaktuCount) {
+      return b.hadirTepatWaktuCount - a.hadirTepatWaktuCount;
+    }
+    const aEarly = a.earlyBirdCount || 0;
+    const bEarly = b.earlyBirdCount || 0;
+    if (bEarly !== aEarly) {
+      return bEarly - aEarly;
+    }
+    if (a.terlambatCount !== b.terlambatCount) {
+      return a.terlambatCount - b.terlambatCount;
+    }
+    if (a.rank && b.rank && a.rank !== b.rank) {
+      return a.rank - b.rank;
+    }
+    return a.name.localeCompare(b.name);
+  });
 
   // Update peringkat rank
   teachers = teachers.map((t, idx) => ({

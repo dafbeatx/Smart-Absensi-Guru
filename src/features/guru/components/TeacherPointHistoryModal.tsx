@@ -12,6 +12,8 @@ import {
   Award,
   CheckCircle2,
   Calendar,
+  Sunrise,
+  Flame,
 } from 'lucide-react';
 
 function parseDateParts(dateStr: string): { dayName: string; dayNum: string; monthShort: string; fullYear: string } {
@@ -251,6 +253,24 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
           badgeClass: 'bg-cyan-50 text-[#18536B] border-cyan-200/80',
           pointsText: `+${points} Poin`,
           pointsClass: 'bg-cyan-50 text-[#023246] border-cyan-300 ring-1 ring-cyan-400/30',
+        };
+      case 'EARLY_BIRD_BONUS':
+        return {
+          icon: <Sunrise className="w-3.5 h-3.5 text-amber-500" />,
+          categoryLabel: '🌅 Teladan Fajar',
+          defaultTitle: 'Hadir Sangat Awal (≤ 07:00 WIB)',
+          badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
+          pointsText: `+${points} Poin`,
+          pointsClass: 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-400/30',
+        };
+      case 'STREAK_MILESTONE':
+        return {
+          icon: <Flame className="w-3.5 h-3.5 text-orange-600" />,
+          categoryLabel: '🔥 Rekor 5 Hari',
+          defaultTitle: 'Bonus Konsistensi Kehadiran',
+          badgeClass: 'bg-orange-50 text-orange-800 border-orange-200/80',
+          pointsText: `+${points} Poin`,
+          pointsClass: 'bg-orange-50 text-orange-900 border-orange-300 ring-1 ring-orange-400/30',
         };
       case 'PENALTY_ALFA':
         return {
@@ -609,12 +629,39 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
                       </span>
                     </div>
                   </div>
+                  <div className="p-2 rounded-xl bg-white border border-slate-200 flex items-start gap-2">
+                    <span className="text-base">🌅</span>
+                    <div>
+                      <strong className="text-slate-800 block">Teladan Fajar (+5 Poin)</strong>
+                      <span className="text-[10px] text-slate-500">
+                        Scan QR masuk sebelum/pada 07:00 WIB menyambut siswa di gerbang.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white border border-slate-200 flex items-start gap-2">
+                    <span className="text-base">🔥</span>
+                    <div>
+                      <strong className="text-slate-800 block">Konsistensi Streak (+10 Poin)</strong>
+                      <span className="text-[10px] text-slate-500">
+                        Bonus tiap 5 hari berturut-turut hadir tepat waktu.
+                      </span>
+                    </div>
+                  </div>
                   <div className="p-2 rounded-xl bg-white border border-slate-200 flex items-start gap-2 sm:col-span-2">
                     <span className="text-base">🚫</span>
                     <div>
                       <strong className="text-slate-800 block">Penalti Kelalaian Pulang / ALFA (-10 Poin)</strong>
                       <span className="text-[10px] text-slate-500">
                         Tidak absen pulang (TAP) atau tidak hadir tanpa surat izin/sakit yang sah.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 flex items-start gap-2 sm:col-span-2 text-amber-950">
+                    <span className="text-base">⚖️</span>
+                    <div>
+                      <strong className="text-amber-900 block text-[11px]">Sistem Adil Penentu Peringkat (Tie-Breaker)</strong>
+                      <span className="text-[10px] text-amber-800 leading-relaxed block mt-0.5">
+                        Jika terdapat guru dengan total poin sama, peringkat ditentukan secara objektif: (1) Total poin tertinggi, (2) Hadir tepat waktu terbanyak, (3) Teladan Fajar (≤ 07:00) terbanyak, (4) Pelanggaran terlambat terminim, (5) Urutan alfabetis nama.
                       </span>
                     </div>
                   </div>
