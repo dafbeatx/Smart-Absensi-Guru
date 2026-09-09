@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import type { TeacherStreakInfo, TeacherDailyQuest } from '../../../services/teacher-challenge.service';
 import type { UserProfile, TeacherAppreciationScore } from '../../../types/database.types';
-import { X, HelpCircle, Share2 } from 'lucide-react';
+import { X, HelpCircle, Share2, Printer, ExternalLink } from 'lucide-react';
 import { useToastStore } from '../../../store/useToastStore';
+import { TeacherExcellenceCertificateModal } from './TeacherExcellenceCertificateModal';
+import { openPrintableCertificate } from '../../../lib/certificate-generator.lib';
 
 interface TeacherChallengeModalProps {
   isOpen: boolean;
@@ -26,6 +28,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
   totalTeachers = 12,
 }) => {
   const [activeTab, setActiveTab] = useState<'QUESTS' | 'REWARDS' | 'RULES'>('QUESTS');
+  const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const { showToast } = useToastStore();
 
   if (!isOpen) return null;
@@ -256,69 +259,87 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: REWARDS & PRIVILEGES */}
+          {/* TAB 2: TEMPLATE PIAGAM PENGHARGAAN RESMI (JUARA 1 TELADAN UTAMA - TOP #1) */}
           {activeTab === 'REWARDS' && (
-            <div className="space-y-2.5">
-              <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center text-xl shrink-0">
-                  🏆
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h5 className="text-xs font-black text-amber-950">Apresiasi Resmi Sekolah</h5>
-                  <p className="text-[10.5px] text-amber-800 leading-relaxed font-medium">
-                    Hasil kedisiplinan guru direkap dan disahkan setiap tanggal 1 awal bulan oleh Kepala Sekolah.
-                  </p>
-                </div>
-              </div>
-
-              {/* Reward Tiers */}
-              <div className="space-y-2">
-                <div className="p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <span>🥇</span>
-                      <span>Juara 1 Disiplin (Pendidik Teladan Utama)</span>
-                    </span>
-                    <span className="text-[10px] font-black text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded">
-                      Top #1
-                    </span>
+            <div className="space-y-3">
+              {/* Highlight Card Juara 1 Sesuai Spesifikasi Persis User */}
+              <div className="p-4 rounded-2xl bg-linear-to-b from-[#fffefc] to-[#faf7ee] border-2 border-amber-300 shadow-sm relative overflow-hidden space-y-3">
+                {/* Header Juara 1 & Predikat */}
+                <div className="flex items-start justify-between gap-2 border-b border-amber-200/80 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">🥇</span>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
+                        Juara 1 Disiplin (Pendidik Teladan Utama)
+                      </h4>
+                      <p className="text-[10.5px] text-amber-900 font-bold">
+                        Apresiasi Kehormatan Tertinggi Guru &amp; Tenaga Kependidikan
+                      </p>
+                    </div>
                   </div>
-                  <ul className="text-[11px] text-slate-600 space-y-1 pt-1 list-disc list-inside">
-                    <li>Piagam Penghargaan Resmi bertanda tangan Kepala Sekolah.</li>
-                    <li>Foto Profil dipajang di Papan Mading Digital Sekolah.</li>
-                    <li>Hak Istimewa: Prioritas pemilihan jadwal piket semester depan.</li>
-                  </ul>
+                  <span className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs shadow-2xs shrink-0">
+                    Top #1
+                  </span>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <span>🥈</span>
-                      <span>Juara 2 &amp; 3 Disiplin (Pendidik Emas)</span>
-                    </span>
-                    <span className="text-[10px] font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                      Top 2 - 3
+                {/* 3 Hak Istimewa Resmi yang Diminta User */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 text-xs text-slate-700 bg-white p-2.5 rounded-xl border border-amber-200/70 shadow-2xs">
+                    <span className="text-base shrink-0">📜</span>
+                    <span className="font-semibold leading-relaxed">
+                      Piagam Penghargaan Resmi bertanda tangan Kepala Sekolah.
                     </span>
                   </div>
-                  <ul className="text-[11px] text-slate-600 space-y-1 pt-1 list-disc list-inside">
-                    <li>Sertifikat Digital Apresiasi Prestasi Disiplin Bulanan.</li>
-                    <li>Pengumuman kehormatan pada rapat dinas guru.</li>
-                  </ul>
+
+                  <div className="flex items-start gap-2 text-xs text-slate-700 bg-white p-2.5 rounded-xl border border-amber-200/70 shadow-2xs">
+                    <span className="text-base shrink-0">🖼️</span>
+                    <span className="font-semibold leading-relaxed">
+                      Foto Profil dipajang di Papan Mading Digital Sekolah.
+                    </span>
+                  </div>
+
+                  <div className="flex items-start gap-2 text-xs text-amber-950 bg-amber-100/60 p-2.5 rounded-xl border border-amber-300/80 shadow-2xs">
+                    <span className="text-base shrink-0">⭐</span>
+                    <span className="font-bold leading-relaxed">
+                      Hak Istimewa: Prioritas pemilihan jadwal piket semester depan.
+                    </span>
+                  </div>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <span>🛡️</span>
-                      <span>Streak Master 10 Hari Beruntun</span>
-                    </span>
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
-                      Rekor Khusus
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Mendapatkan 1x Tiket Toleransi Darurat (Pemberitahuan resmi jika terjadi kendala jalan tanpa pengurangan poin).
-                  </p>
+                {/* Info Tanda Tangan & Stempel */}
+                <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-amber-200/60">
+                  <span className="italic">Tertanda: Farhan Sopian Sahid, S.Pd.I</span>
+                  <span className="font-bold text-amber-800">Format Resmi A4</span>
+                </div>
+
+                {/* Action Buttons: Cetak & Pratinjau */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsCertificateModalOpen(true)}
+                    className="min-h-11 px-3 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 active:scale-95 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Lihat Template</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openPrintableCertificate({
+                        recipientName: teacherName,
+                        recipientNipOrNpp: user?.nip || '199001012015011001',
+                        recipientPosition: user?.position || 'Guru Mata Pelajaran',
+                        periodMonthYear: 'September 2026',
+                        totalPoints,
+                        rank: userRank,
+                      });
+                    }}
+                    className="min-h-11 px-3 rounded-xl bg-[#023246] hover:bg-[#03445e] active:scale-95 text-white text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Cetak Piagam (PDF)</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -373,6 +394,16 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Modal Pratinjau Piagam Penghargaan Resmi Juara 1 Disiplin */}
+      <TeacherExcellenceCertificateModal
+        isOpen={isCertificateModalOpen}
+        onClose={() => setIsCertificateModalOpen(false)}
+        user={user}
+        periodMonthYear="September 2026"
+        totalPoints={totalPoints}
+        rank={userRank}
+      />
     </div>
   );
 };

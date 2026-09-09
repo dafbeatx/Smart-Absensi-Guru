@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import type { UserProfile } from '../../../types/database.types';
 import type { TeacherLeaderboardItem } from '../../../utils/teacher-appreciation.utils';
 import {
@@ -7,7 +8,9 @@ import {
   ArrowRight,
   ShieldCheck,
   X,
+  Printer,
 } from 'lucide-react';
+import { TeacherExcellenceCertificateModal } from './TeacherExcellenceCertificateModal';
 
 interface TopDisciplineCelebrationModalProps {
   isOpen: boolean;
@@ -17,6 +20,7 @@ interface TopDisciplineCelebrationModalProps {
   totalPoints: number;
   user: UserProfile | null;
   teacherData?: TeacherLeaderboardItem | null;
+  onOpenCertificate?: () => void;
 }
 
 export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationModalProps> = ({
@@ -27,7 +31,9 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
   totalPoints,
   user,
   teacherData,
+  onOpenCertificate,
 }) => {
+  const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   if (!isOpen) return null;
 
   const isRank1 = rank === 1;
@@ -176,13 +182,31 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
 
         {/* Action Buttons */}
         <div className="space-y-2 pt-1 relative z-10">
+          {/* Tombol Khusus Juara 1: Buka & Cetak Piagam Resmi */}
+          {isRank1 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenCertificate) {
+                  onOpenCertificate();
+                } else {
+                  setIsCertificateOpen(true);
+                }
+              }}
+              className="w-full h-11 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-[0.98] text-slate-950 text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+            >
+              <Printer className="w-4 h-4 text-slate-950" />
+              <span>🥇 Lihat &amp; Cetak Piagam Resmi (PDF)</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => {
               onClose();
               onOpenLeaderboard();
             }}
-            className="w-full h-12 rounded-2xl bg-[#023246] hover:bg-[#034560] active:scale-[0.98] text-white text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+            className="w-full h-11 rounded-2xl bg-[#023246] hover:bg-[#034560] active:scale-[0.98] text-white text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
           >
             <span>Buka Layer Penjelasan &amp; Peringkat</span>
             <ArrowRight className="w-4 h-4 text-cyan-300" />
@@ -191,7 +215,7 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
           >
             Terima Kasih, Lanjut ke Beranda
           </button>
@@ -203,6 +227,16 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
           <span>Terverifikasi Otomatis oleh Sistem Keamanan Absensi</span>
         </div>
       </div>
+
+      {/* Modal Pratinjau Piagam Penghargaan Resmi */}
+      <TeacherExcellenceCertificateModal
+        isOpen={isCertificateOpen}
+        onClose={() => setIsCertificateOpen(false)}
+        user={user}
+        periodMonthYear="September 2026"
+        totalPoints={totalPoints}
+        rank={rank}
+      />
     </div>
   );
 };
