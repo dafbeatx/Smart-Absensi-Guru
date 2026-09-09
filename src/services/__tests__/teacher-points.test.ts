@@ -5,6 +5,7 @@
  */
 
 import { MockProvider } from '../../providers/mock-provider.service';
+import { TeacherPointReconciliationService } from '../teacher-point-reconciliation.service';
 import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
@@ -14,6 +15,7 @@ import type {
   AttendanceRecord,
   TeacherPointLog,
   TeacherAppreciationScore,
+  TeacherDutySchedule,
 } from '../../types/database.types';
 
 export const runTeacherPointsTestSuite = async (): Promise<{
@@ -287,6 +289,94 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     );
   } catch (err: unknown) {
     assert('Leaderboard Engine: Dynamic ranking', false, String(err));
+  }
+
+  // 8. TeacherPointReconciliationService: Reconcile attendance on 8 & 9 Sep into point history
+  const reconUserId = 'usr-recon-teacher-test';
+  try {
+    const rawAttendances: AttendanceRecord[] = [
+      {
+        id: 'att-recon-1',
+        user_id: reconUserId,
+        date: '2026-09-08',
+        status: 'HADIR',
+        check_in_time: '07:15',
+        check_out_time: '10:40',
+        check_in_lat: -6.6131,
+        check_in_lng: 106.8123,
+        check_in_distance_meters: 10,
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        is_offline: false,
+        created_at: '2026-09-08T07:15:00Z',
+      },
+      {
+        id: 'att-recon-2',
+        user_id: reconUserId,
+        date: '2026-09-09',
+        status: 'TERLAMBAT',
+        check_in_time: '07:45',
+        check_out_time: '13:00',
+        check_in_lat: -6.6131,
+        check_in_lng: 106.8123,
+        check_in_distance_meters: 10,
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        is_offline: false,
+        created_at: '2026-09-09T07:45:00Z',
+      },
+    ];
+
+    const duties: TeacherDutySchedule[] = [
+      {
+        id: 'duty-tuesday',
+        day_of_week: 2, // Tuesday = 2026-09-08
+        teacher_id: reconUserId,
+        teacher_name: 'Guru Recon',
+        created_at: '2026-09-01T00:00:00Z',
+      },
+    ];
+
+    const initialLogs: TeacherPointLog[] = [];
+
+    const reconciledLogs = await TeacherPointReconciliationService.reconcilePoints(
+      reconUserId,
+      'Guru Recon',
+      rawAttendances,
+      initialLogs,
+      duties
+    );
+
+    const hasOnTime08 = reconciledLogs.some((l) => l.date === '2026-09-08' && l.activity_type === 'CHECK_IN_ON_TIME');
+    const hasCheckOut08 = reconciledLogs.some((l) => l.date === '2026-09-08' && l.activity_type === 'CHECK_OUT');
+    const hasDuty08 = reconciledLogs.some((l) => l.date === '2026-09-08' && l.activity_type === 'DUTY_PIKET');
+    const hasLate09 = reconciledLogs.some((l) => l.date === '2026-09-09' && l.activity_type === 'CHECK_IN_LATE');
+    const hasCheckOut09 = reconciledLogs.some((l) => l.date === '2026-09-09' && l.activity_type === 'CHECK_OUT');
+
+    const totalReconPoints = reconciledLogs.reduce((sum, l) => sum + l.points, 0);
+
+    assert(
+      'Reconciliation Engine: Automatically creates point logs for 8-9 September (On-Time, Late, Check-Out, Piket)',
+      hasOnTime08 && hasCheckOut08 && hasDuty08 && hasLate09 && hasCheckOut09 && totalReconPoints === 50,
+      `Reconciled ${reconciledLogs.length} logs with ${totalReconPoints} pts (expected 50 pts: 15+10+10 + 5+10)`
+    );
+
+    // 9. Idempotency test: Re-running reconciliation does NOT duplicate records
+    const secondPassLogs = await TeacherPointReconciliationService.reconcilePoints(
+      reconUserId,
+      'Guru Recon',
+      rawAttendances,
+      reconciledLogs,
+      duties
+    );
+
+    assert(
+      'Reconciliation Engine: Re-running reconciliation is idempotent and produces zero duplicate entries',
+      secondPassLogs.length === reconciledLogs.length,
+      `Pass 1: ${reconciledLogs.length} logs, Pass 2: ${secondPassLogs.length} logs`
+    );
+  } catch (err: unknown) {
+    assert('Reconciliation Engine: Automatic reconciliation', false, String(err));
   }
 
   return { passed, failed, results };

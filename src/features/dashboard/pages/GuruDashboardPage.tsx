@@ -103,6 +103,7 @@ import { TopDisciplineCelebrationModal } from '../../guru/components/TopDiscipli
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
 import { AttendancePolicyService } from '../../../services/attendance-policy.service';
+import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import type {
   AttendanceRecord,
@@ -900,15 +901,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setTeachingSlots([]);
       }
 
-      // 7.6 Load Teacher Point History & Ledger
+      // 7.6 Load Teacher Point History & Ledger with Auto-Reconciliation
       try {
-        const myPointLogs = await provider.getTeacherPointHistory(effectiveUser.id, authToken);
+        let myPointLogs = await provider.getTeacherPointHistory(effectiveUser.id, authToken);
+
+        // Auto-reconcile points from loadedHistory (termasuk tanggal 8 & 9 September 2026)
+        myPointLogs = await TeacherPointReconciliationService.reconcilePoints(
+          effectiveUser.id,
+          effectiveUser.full_name,
+          loadedHistory,
+          myPointLogs || [],
+          undefined,
+          authToken
+        );
         setPointHistory(myPointLogs || []);
 
         const allLogs = await provider.getTeacherPointHistory('ALL', authToken);
         setAllTeacherPointLogs(allLogs || []);
       } catch (err) {
-        console.warn('Failed to load teacher point history:', err);
+        console.warn('Failed to load/reconcile teacher point history:', err);
       }
 
       // 7.7 Evaluasi Penalti TAP (Tidak Absen Pulang) jika Syarat & Ketentuan telah disetujui

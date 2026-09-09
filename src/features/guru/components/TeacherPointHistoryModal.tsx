@@ -50,7 +50,7 @@ export interface TeacherPointHistoryModalProps {
   isLoading?: boolean;
 }
 
-type FilterType = 'ALL' | 'ON_TIME' | 'LATE' | 'DUTY' | 'OTHER';
+type FilterType = 'ALL' | 'ON_TIME' | 'LATE' | 'CHECK_OUT' | 'DUTY' | 'OTHER';
 
 export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> = ({
   isOpen,
@@ -105,11 +105,13 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
       if (filterType === 'ALL') return true;
       if (filterType === 'ON_TIME') return log.activity_type === 'CHECK_IN_ON_TIME';
       if (filterType === 'LATE') return log.activity_type === 'CHECK_IN_LATE';
+      if (filterType === 'CHECK_OUT') return log.activity_type === 'CHECK_OUT';
       if (filterType === 'DUTY') return log.activity_type === 'DUTY_PIKET';
       if (filterType === 'OTHER') {
         return (
           log.activity_type !== 'CHECK_IN_ON_TIME' &&
           log.activity_type !== 'CHECK_IN_LATE' &&
+          log.activity_type !== 'CHECK_OUT' &&
           log.activity_type !== 'DUTY_PIKET'
         );
       }
@@ -121,10 +123,12 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
   const stats = useMemo(() => {
     const onTimeCount = pointHistory.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
     const lateCount = pointHistory.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
+    const checkOutCount = pointHistory.filter((l) => l.activity_type === 'CHECK_OUT').length;
     const dutyCount = pointHistory.filter((l) => l.activity_type === 'DUTY_PIKET').length;
     return {
       onTime: { count: onTimeCount, points: onTimeCount * 15 },
       late: { count: lateCount, points: lateCount * 5 },
+      checkOut: { count: checkOutCount, points: checkOutCount * 10 },
       duty: { count: dutyCount, points: dutyCount * 10 },
     };
   }, [pointHistory]);
@@ -150,6 +154,15 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
           badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
           pointsText: `+${points} Poin`,
           pointsClass: 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-400/30',
+        };
+      case 'CHECK_OUT':
+        return {
+          icon: <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />,
+          categoryLabel: 'Presensi Pulang',
+          defaultTitle: 'Presensi Pulang Tuntas Bertugas',
+          badgeClass: 'bg-blue-50 text-blue-800 border-blue-200/80',
+          pointsText: `+${points} Poin`,
+          pointsClass: 'bg-blue-50 text-blue-900 border-blue-300 ring-1 ring-blue-400/30',
         };
       case 'DUTY_PIKET':
         return {
@@ -307,8 +320,8 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
             </div>
           </div>
 
-          {/* Layer 4: 3-Tier Multi-Depth Metric Inset Cards */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+          {/* Layer 4: 4-Tier Multi-Depth Metric Inset Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
             {/* On-Time Tile */}
             <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-emerald-200/90 shadow-2xs flex flex-col justify-between space-y-1">
               <div className="flex items-center justify-between">
@@ -344,6 +357,25 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
               </div>
               <span className="text-[9.5px] font-bold text-amber-700">
                 +{stats.late.points} Poin
+              </span>
+            </div>
+
+            {/* Check-Out Pulang Tile */}
+            <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-blue-200/90 shadow-2xs flex flex-col justify-between space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[9.5px] font-black uppercase text-blue-800 tracking-wide">
+                  Pulang
+                </span>
+                <span className="px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-900 text-[9px] font-black">
+                  +10
+                </span>
+              </div>
+              <div className="text-base sm:text-lg font-black text-slate-900 leading-tight pt-0.5">
+                {stats.checkOut.count}
+                <span className="text-[10px] font-bold text-slate-500 ml-0.5">x</span>
+              </div>
+              <span className="text-[9.5px] font-bold text-blue-700">
+                +{stats.checkOut.points} Poin
               </span>
             </div>
 
@@ -409,6 +441,15 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
                     </div>
                   </div>
                   <div className="p-2 rounded-xl bg-white border border-slate-200 flex items-start gap-2">
+                    <span className="text-base">🚪</span>
+                    <div>
+                      <strong className="text-slate-800 block">Presensi Pulang (+10 Poin)</strong>
+                      <span className="text-[10px] text-slate-500">
+                        Scan QR kepulangan sesuai jam dinas untuk kepatuhan tuntas jam kerja.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white border border-slate-200 flex items-start gap-2">
                     <span className="text-base">🛡️</span>
                     <div>
                       <strong className="text-slate-800 block">Tugas Piket Harian (+10 Poin)</strong>
@@ -417,12 +458,12 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
                       </span>
                     </div>
                   </div>
-                  <div className="p-2 rounded-xl bg-white border border-slate-200 flex items-start gap-2">
+                  <div className="p-2 rounded-xl bg-white border border-slate-200 flex items-start gap-2 sm:col-span-2">
                     <span className="text-base">🚫</span>
                     <div>
-                      <strong className="text-slate-800 block">Penalti ALFA (-10 Poin)</strong>
+                      <strong className="text-slate-800 block">Penalti Kelalaian Pulang / ALFA (-10 Poin)</strong>
                       <span className="text-[10px] text-slate-500">
-                        Tidak hadir tanpa surat izin/sakit yang sah.
+                        Tidak absen pulang (TAP) atau tidak hadir tanpa surat izin/sakit yang sah.
                       </span>
                     </div>
                   </div>
@@ -468,6 +509,17 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
             </button>
             <button
               type="button"
+              onClick={() => setFilterType('CHECK_OUT')}
+              className={`px-3 py-1.5 rounded-xl text-[10.5px] sm:text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
+                filterType === 'CHECK_OUT'
+                  ? 'bg-blue-600 text-white shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Pulang ({stats.checkOut.count})
+            </button>
+            <button
+              type="button"
               onClick={() => setFilterType('DUTY')}
               className={`px-3 py-1.5 rounded-xl text-[10.5px] sm:text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
                 filterType === 'DUTY'
@@ -478,6 +530,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
               Piket ({stats.duty.count})
             </button>
           </div>
+
 
           {/* Layer 7: The Ledger Transaction Feed (Multi-Tier Individual Cards) */}
           <div className="space-y-2">
