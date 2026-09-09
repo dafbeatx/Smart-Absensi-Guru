@@ -524,11 +524,12 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     const hasHyphenForMissingNip = certHtmlRank1.includes('>- •') || certHtmlRank1.includes('>-<') || certHtmlRank1.includes('- • Guru TI');
     const hasNoPrivileges = !certHtmlRank1.includes('Prioritas pemilihan jadwal piket');
     const hasRank2Silver = certHtmlRank2.includes('TOP #2') && certHtmlRank2.includes('Juara 2 Disiplin');
+    const hasNoAutoSignature = !certHtmlRank1.includes('digital-stamp') && !certHtmlRank1.includes('sig-handwritten');
 
     assert(
-      'Certificate Engine: Correct school header, NPP fallback to -, no privileges, and supports Ranks 1-3',
-      hasNoYayasan && hasCorrectSchool && hasHyphenForMissingNip && hasNoPrivileges && hasRank2Silver,
-      `noYayasan: ${hasNoYayasan}, correctSchool: ${hasCorrectSchool}, hyphenNip: ${hasHyphenForMissingNip}, noPrivileges: ${hasNoPrivileges}, rank2: ${hasRank2Silver}`
+      'Certificate Engine: Correct school header, NPP fallback to -, no privileges, empty sig-space for wet signature, and supports Ranks 1-3',
+      hasNoYayasan && hasCorrectSchool && hasHyphenForMissingNip && hasNoPrivileges && hasRank2Silver && hasNoAutoSignature,
+      `noYayasan: ${hasNoYayasan}, correctSchool: ${hasCorrectSchool}, hyphenNip: ${hasHyphenForMissingNip}, noPrivileges: ${hasNoPrivileges}, rank2: ${hasRank2Silver}, noAutoSig: ${hasNoAutoSignature}`
     );
   } catch (err: unknown) {
     assert('Certificate Engine: Specification Guard', false, String(err));

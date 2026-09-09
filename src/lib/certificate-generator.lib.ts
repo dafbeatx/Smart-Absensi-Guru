@@ -459,45 +459,8 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
     }
 
     .sig-space {
-      height: 52px;
+      height: 70px;
       position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .digital-stamp {
-      position: absolute;
-      left: 15px;
-      top: -6px;
-      width: 68px;
-      height: 68px;
-      border: 2px dashed #1e3a8a;
-      border-radius: 50%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #1e3a8a;
-      font-size: 7px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      opacity: 0.78;
-      transform: rotate(-12deg);
-      pointer-events: none;
-      box-shadow: 0 0 0 1px rgba(30, 58, 138, 0.2);
-    }
-
-    .sig-handwritten {
-      font-family: 'Playfair Display', cursive;
-      font-size: 20px;
-      color: #023246;
-      font-weight: 700;
-      font-style: italic;
-      letter-spacing: 1px;
-      position: relative;
-      z-index: 2;
     }
 
     .sig-name {
@@ -635,14 +598,7 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
             <p class="sig-date">${dateIssued}</p>
             <p class="sig-role">${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</p>
             <div class="sig-space">
-              <!-- Stempel Basah Digital Resmi -->
-              <div class="digital-stamp">
-                <span>★ RESMI ★</span>
-                <span>SEKOLAH</span>
-                <span>TERPADU</span>
-              </div>
-              <!-- Tanda Tangan Kepala Sekolah -->
-              <span class="sig-handwritten">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</span>
+              <!-- Dikosongkan untuk tanda tangan basah & stempel fisik resmi Kepala Sekolah -->
             </div>
             <p class="sig-name">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</p>
             <p class="sig-title">NIP. 197805122005011004</p>
