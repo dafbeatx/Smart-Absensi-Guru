@@ -484,4 +484,71 @@ export function generatePaydayEventsForYear(year: number = 2026): HolidayRecord[
   return events;
 }
 
+export interface DisciplinePeriodTiming {
+  isEndOfMonth: boolean;
+  isNaturalEndOfMonth: boolean;
+  currentDay: number;
+  totalDaysInMonth: number;
+  daysRemainingInMonth: number;
+  periodLabel: string;
+  monthName: string;
+  year: number;
+  isPastMonth: boolean;
+}
+
+/**
+ * Mengevaluasi apakah siklus disiplin bulanan telah mencapai akhir bulan
+ * (piagam & penetapan juara resmi baru diterbitkan pada akhir bulan).
+ */
+export function evaluateDisciplinePeriodTiming(
+  referenceDate: Date = new Date(),
+  targetYear: number = 2026,
+  targetMonth: number = 9
+): DisciplinePeriodTiming {
+  const currentYear = referenceDate.getFullYear();
+  const currentMonth = referenceDate.getMonth() + 1;
+  const currentDay = referenceDate.getDate();
+
+  const totalDaysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+  const isPastMonth =
+    targetYear < currentYear || (targetYear === currentYear && targetMonth < currentMonth);
+
+  // Jika melihat bulan lampau yang sudah selesai, otomatis akhir bulan
+  // Jika bulan berjalan, akhir bulan adalah 3 hari terakhir (misal tgl 28 s/d 30/31)
+  const isNaturalEndOfMonth = isPastMonth || currentDay >= totalDaysInMonth - 2;
+
+  // Support parameter simulasi URL ?endOfMonth=true atau localStorage
+  let isSimulated = false;
+  if (typeof window !== 'undefined') {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('endOfMonth') === 'true') isSimulated = true;
+      if (localStorage.getItem('smart_absensi_simulate_end_of_month') === 'true') isSimulated = true;
+    } catch {
+      // Ignored
+    }
+  }
+
+  const isEndOfMonth = isNaturalEndOfMonth || isSimulated;
+  const daysRemainingInMonth = Math.max(0, totalDaysInMonth - currentDay);
+
+  const monthNames = [
+    '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+
+  return {
+    isEndOfMonth,
+    isNaturalEndOfMonth,
+    currentDay,
+    totalDaysInMonth,
+    daysRemainingInMonth,
+    periodLabel: `${monthNames[targetMonth] || 'September'} ${targetYear}`,
+    monthName: monthNames[targetMonth] || 'September',
+    year: targetYear,
+    isPastMonth,
+  };
+}
+
+
 

@@ -71,7 +71,7 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
-import { isDateOffDay, getTodayDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays, getPaydayReminderInfo } from '../../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays, getPaydayReminderInfo, evaluateDisciplinePeriodTiming } from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
@@ -1268,10 +1268,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [effectiveUser, appreciationScore, allTeacherPointLogs]);
 
   // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
+  // Piagam resmi dan selebrasi penghargaan hanya aktif jika telah memasuki akhir bulan
   useEffect(() => {
     if (!effectiveUser?.id) return;
     const rank = disciplineLeaderboard.currentUserRank;
     if (rank >= 1 && rank <= 3) {
+      const timing = evaluateDisciplinePeriodTiming(currentDate, selectedYear, selectedMonth);
+      if (!timing.isEndOfMonth) return;
+
       const todayStr = getTodayDateInJakarta();
       const storageKey = `smart_absensi_celebrated_top3_${effectiveUser.id}_${todayStr}`;
       const alreadyCelebrated = sessionStorage.getItem(storageKey);
@@ -1284,7 +1288,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         return () => clearTimeout(timer);
       }
     }
-  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank]);
+  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank, selectedYear, selectedMonth]);
 
   // ── Teacher Challenge & Streak Engine (Duolingo Style) ─────────────────
   const streakInfo = useMemo(() => {
@@ -4311,6 +4315,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         appreciationScore={appreciationScore}
         userRank={disciplineLeaderboard.currentUserRank}
         totalTeachers={disciplineLeaderboard.totalTeachers}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
       />
 
       {/* 15. Modal Pop-up Apresiasi Kehormatan Juara 1, 2, dan 3 */}

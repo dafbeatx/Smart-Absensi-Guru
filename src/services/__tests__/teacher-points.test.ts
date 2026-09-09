@@ -11,6 +11,7 @@ import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
 } from '../../utils/teacher-appreciation.utils';
+import { evaluateDisciplinePeriodTiming } from '../../utils/time.utils';
 import { generateExcellenceCertificateHTML } from '../../lib/certificate-generator.lib';
 import { GroqAIService } from '../groq-ai.service';
 import type {
@@ -622,6 +623,66 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     );
   } catch (err: unknown) {
     assert('Tie-Breaker Engine: Guard', false, String(err));
+  }
+
+  // 16. Discipline Period Timing & End-of-Month Certificate Visibility Protocol
+  try {
+    // A. Tengah bulan (9 September 2026): Piagam belum boleh terbit
+    const midMonthDate = new Date(2026, 8, 9, 10, 0, 0); // 9 Sep 2026 (0-indexed month 8 = Sep)
+    const midMonthTiming = evaluateDisciplinePeriodTiming(midMonthDate, 2026, 9);
+
+    assert(
+      'Discipline Period Timing: Mid-month date (9 Sep) correctly evaluated as NOT end of month',
+      midMonthTiming.isEndOfMonth === false &&
+        midMonthTiming.currentDay === 9 &&
+        midMonthTiming.totalDaysInMonth === 30 &&
+        midMonthTiming.daysRemainingInMonth === 21,
+      `isEndOfMonth: ${midMonthTiming.isEndOfMonth}, day: ${midMonthTiming.currentDay}, remaining: ${midMonthTiming.daysRemainingInMonth}`
+    );
+
+    // B. Akhir bulan berjalan (29 September 2026): Piagam boleh terbit
+    const endMonthDate = new Date(2026, 8, 29, 10, 0, 0); // 29 Sep 2026
+    const endMonthTiming = evaluateDisciplinePeriodTiming(endMonthDate, 2026, 9);
+
+    assert(
+      'Discipline Period Timing: End-of-month date (29 Sep) correctly evaluated as end of month',
+      endMonthTiming.isEndOfMonth === true && endMonthTiming.isNaturalEndOfMonth === true,
+      `isEndOfMonth: ${endMonthTiming.isEndOfMonth}, isNatural: ${endMonthTiming.isNaturalEndOfMonth}`
+    );
+
+    // C. Bulan lampau yang sudah selesai (Agustus 2026 dilihat saat 9 Sep 2026)
+    const pastMonthTiming = evaluateDisciplinePeriodTiming(midMonthDate, 2026, 8);
+
+    assert(
+      'Discipline Period Timing: Past month (August) automatically treated as completed end-of-month',
+      pastMonthTiming.isEndOfMonth === true && pastMonthTiming.isPastMonth === true,
+      `isEndOfMonth: ${pastMonthTiming.isEndOfMonth}, isPastMonth: ${pastMonthTiming.isPastMonth}`
+    );
+
+    // D. Business Rule: Piagam HANYA boleh ditampilkan jika isEndOfMonth && (rank 1 s/d 3)
+    // Non-podium (rank 4 ke bawah) TIDAK mendapatkan piagam, melainkan apresiasi & semangat.
+    const canShowCertificate = (rank: number, isEndOfMonth: boolean) => {
+      return isEndOfMonth && rank >= 1 && rank <= 3;
+    };
+
+    const midMonthRank1 = canShowCertificate(1, midMonthTiming.isEndOfMonth);
+    const endMonthRank1 = canShowCertificate(1, endMonthTiming.isEndOfMonth);
+    const endMonthRank3 = canShowCertificate(3, endMonthTiming.isEndOfMonth);
+    const endMonthRank4 = canShowCertificate(4, endMonthTiming.isEndOfMonth);
+
+    assert(
+      'Certificate Visibility Rule: Mid-month Rank 1 cannot see certificate (hidden until end of month)',
+      midMonthRank1 === false,
+      `midMonthRank1: ${midMonthRank1}`
+    );
+
+    assert(
+      'Certificate Visibility Rule: End-of-month Top 3 can see certificate, while Rank 4+ receives encouragement only',
+      endMonthRank1 === true && endMonthRank3 === true && endMonthRank4 === false,
+      `endMonthRank1: ${endMonthRank1}, endMonthRank3: ${endMonthRank3}, endMonthRank4: ${endMonthRank4}`
+    );
+  } catch (err: unknown) {
+    assert('Discipline Period Timing: Guard', false, String(err));
   }
 
   return { passed, failed, results };
