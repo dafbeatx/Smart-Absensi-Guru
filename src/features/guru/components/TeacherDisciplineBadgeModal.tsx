@@ -766,50 +766,63 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     }
                     return (
                       <div className="space-y-2">
-                        {myLogs.map((log) => (
-                          <div
-                            key={log.id}
-                            className="p-3 rounded-2xl bg-white border border-slate-200/85 shadow-2xs space-y-1"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <span className="text-sm">
-                                  {log.activity_type === 'CHECK_IN_ON_TIME'
-                                    ? '⏰'
-                                    : log.activity_type === 'DUTY_PIKET'
-                                    ? '🛡️'
-                                    : log.activity_type === 'CHECK_IN_LATE'
-                                    ? '⚠️'
-                                    : '⭐'}
+                        {myLogs.map((log) => {
+                          const dateParts = (() => {
+                            try {
+                              const p = log.date.split('-');
+                              if (p.length === 3) {
+                                const d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+                                return {
+                                  day: String(parseInt(p[2], 10)).padStart(2, '0'),
+                                  month: d.toLocaleDateString('id-ID', { month: 'short' }),
+                                };
+                              }
+                            } catch {
+                              // fallback
+                            }
+                            return { day: '01', month: 'Bln' };
+                          })();
+
+                          return (
+                            <div
+                              key={log.id}
+                              className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex items-center justify-between gap-3"
+                            >
+                              {/* Left Calendar Tile */}
+                              <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center shrink-0">
+                                <span className="text-[7.5px] font-extrabold text-slate-400 uppercase leading-none">
+                                  {dateParts.month}
                                 </span>
-                                <div className="min-w-0 flex-1">
-                                  <h6 className="text-xs font-black text-slate-800 truncate">
-                                    {log.title}
-                                  </h6>
-                                  <span className="text-[9.5px] text-slate-400">
-                                    {log.date}
-                                  </span>
-                                </div>
+                                <span className="text-sm font-black text-slate-900 leading-tight">
+                                  {dateParts.day}
+                                </span>
                               </div>
+
+                              {/* Center Content */}
+                              <div className="min-w-0 flex-1 space-y-0.5">
+                                <h6 className="text-xs font-black text-slate-900 truncate leading-tight">
+                                  {log.title}
+                                </h6>
+                                <p className="text-[10px] text-slate-500 truncate">
+                                  {log.description || `${log.points > 0 ? '+' : ''}${log.points} poin dicatat`}
+                                </p>
+                              </div>
+
+                              {/* Right Point Chip */}
                               <span
-                                className={`px-2 py-0.5 rounded-lg text-[10px] font-black border shrink-0 ${
+                                className={`px-2.5 py-1 rounded-xl text-xs font-black border shrink-0 shadow-2xs ${
                                   log.points >= 15
-                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
                                     : log.points >= 10
-                                    ? 'bg-cyan-100 text-cyan-900 border-cyan-300'
-                                    : 'bg-amber-100 text-amber-900 border-amber-300'
+                                    ? 'bg-cyan-50 text-[#18536B] border-cyan-300'
+                                    : 'bg-amber-50 text-amber-900 border-amber-300'
                                 }`}
                               >
                                 +{log.points} Poin
                               </span>
                             </div>
-                            {log.description && (
-                              <p className="text-[10px] text-slate-500 pl-6 leading-relaxed">
-                                {log.description}
-                              </p>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     );
                   })()}
