@@ -16,6 +16,7 @@ import { runGeocodingTestSuite } from './__tests__/geocoding.test';
 import { runBiometricAttendanceTestSuite } from './__tests__/biometric-attendance.test';
 import { runPermissionGuardTestSuite } from './__tests__/permission-guard.test';
 import { runNotificationVoiceOverhaulTestSuite } from './__tests__/notification-voice-overhaul.test';
+import { runTeacherPointsTestSuite } from './__tests__/teacher-points.test';
 
 export interface TestResultItem {
   testName: string;
@@ -69,6 +70,7 @@ export class MasterTestRunner {
       { name: 'Geofenced Biometric Fingerprint Attendance Engine', fn: runBiometricAttendanceTestSuite },
       { name: 'Permission Guard & Attendance Blocking Engine', fn: runPermissionGuardTestSuite },
       { name: 'Notification & Voice Overhaul System', fn: runNotificationVoiceOverhaulTestSuite },
+      { name: 'Teacher Points & Gamification Ledger Engine', fn: runTeacherPointsTestSuite },
     ];
 
     let totalPassed = 0;

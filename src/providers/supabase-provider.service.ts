@@ -28,6 +28,8 @@ import type {
   AttendanceSource,
   PushSubscriptionPayload,
   NotificationPreferences,
+  TeacherPointLog,
+  TeacherPointActivityType,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -435,6 +437,57 @@ export class SupabaseProvider implements IDataProvider {
 
     if (error) {
       throw new Error('Gagal menyimpan data absensi ke Supabase: ' + error.message);
+    }
+
+    // AUTOMATIC TEACHER POINT RECORDING (Check-in On-Time / Late & Duty Piket)
+    try {
+      const isLate = status === 'TERLAMBAT';
+      const attendancePts = isLate ? 5 : 15;
+      const attendanceType: TeacherPointActivityType = isLate ? 'CHECK_IN_LATE' : 'CHECK_IN_ON_TIME';
+      const attendanceTitle = isLate
+        ? 'Presensi Masuk Sekolah (> 07:30 WIB)'
+        : 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)';
+      const attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'}`;
+
+      await this.recordTeacherPoint({
+        user_id: userId,
+        teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
+        date: todayStr,
+        points: attendancePts,
+        activity_type: attendanceType,
+        title: attendanceTitle,
+        description: attendanceDesc,
+      });
+
+      // Cek apakah guru terjadwal piket hari ini
+      try {
+        const dutySchedules = await this.getDutySchedules();
+        const todayDayOfWeek = new Date().getDay();
+        const isDutyToday = (dutySchedules || []).some(
+          (s) =>
+            s.day_of_week === todayDayOfWeek &&
+            (s.teacher_id === userId ||
+              (sessionUser?.full_name &&
+                s.teacher_name &&
+                s.teacher_name.toLowerCase().includes(sessionUser.full_name.toLowerCase())))
+        );
+
+        if (isDutyToday) {
+          await this.recordTeacherPoint({
+            user_id: userId,
+            teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
+            date: todayStr,
+            points: 10,
+            activity_type: 'DUTY_PIKET',
+            title: 'Tugas Piket Harian Sekolah',
+            description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah',
+          });
+        }
+      } catch (eDuty) {
+        logger.warn('SupabaseProvider', 'Failed to verify duty schedule for points:', eDuty);
+      }
+    } catch (ePoint) {
+      logger.warn('SupabaseProvider', 'Failed to auto-record teacher points on check-in:', ePoint);
     }
 
     return {
@@ -2998,6 +3051,103 @@ export class SupabaseProvider implements IDataProvider {
     } catch (err) {
       logger.error('SupabaseProvider', 'deletePushSubscription exception:', err);
       return false;
+    }
+  }
+
+  // TEACHER DISCIPLINE POINT HISTORY API
+  public async getTeacherPointHistory(userId: string, _token?: string): Promise<TeacherPointLog[]> {
+    try {
+      let query = this.client
+        .from('teacher_point_history')
+        .select('*')
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (userId !== 'ALL') {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getTeacherPointHistory Supabase error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getTeacherPointHistory(userId);
+      }
+
+      if (data && data.length > 0) {
+        return data.map((row: any) => ({
+          id: row.id,
+          user_id: row.user_id,
+          teacher_name: row.teacher_name || undefined,
+          date: row.date,
+          points: row.points,
+          activity_type: row.activity_type as TeacherPointActivityType,
+          title: row.title,
+          description: row.description || undefined,
+          created_at: row.created_at,
+        }));
+      }
+
+      // If database returned 0 rows, check fallback seed in mock provider
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getTeacherPointHistory(userId);
+    } catch (err) {
+      logger.error('SupabaseProvider', 'getTeacherPointHistory exception:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getTeacherPointHistory(userId);
+    }
+  }
+
+  public async recordTeacherPoint(
+    log: Omit<TeacherPointLog, 'id' | 'created_at'>,
+    _token?: string
+  ): Promise<TeacherPointLog> {
+    const payload = {
+      user_id: log.user_id,
+      date: log.date,
+      points: log.points,
+      activity_type: log.activity_type,
+      title: log.title,
+      description: log.description || null,
+    };
+
+    try {
+      const { data, error } = await this.client
+        .from('teacher_point_history')
+        .upsert(payload, { onConflict: 'user_id,date,activity_type' })
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'recordTeacherPoint Supabase error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.recordTeacherPoint(log);
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('smart_absensi_points_updated', {
+            detail: { userId: log.user_id, points: log.points, activity_type: log.activity_type },
+          })
+        );
+      }
+
+      return {
+        id: data?.id || 'pt_' + Date.now(),
+        user_id: log.user_id,
+        teacher_name: log.teacher_name,
+        date: log.date,
+        points: log.points,
+        activity_type: log.activity_type,
+        title: log.title,
+        description: log.description,
+        created_at: data?.created_at || new Date().toISOString(),
+      };
+    } catch (err) {
+      logger.error('SupabaseProvider', 'recordTeacherPoint exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.recordTeacherPoint(log);
     }
   }
 }

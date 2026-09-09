@@ -21,6 +21,7 @@ import type {
   RecordStudentBehaviorParams,
   PushSubscriptionPayload,
   NotificationPreferences,
+  TeacherPointLog,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -127,6 +128,13 @@ export interface IDataProvider {
   // Web Push Subscriptions API (VAPID)
   savePushSubscription(subscription: PushSubscriptionPayload, token?: string): Promise<boolean>;
   deletePushSubscription(endpoint: string, token?: string): Promise<boolean>;
+
+  // Teacher Discipline Point History API
+  getTeacherPointHistory(userId: string, token?: string): Promise<TeacherPointLog[]>;
+  recordTeacherPoint(
+    log: Omit<TeacherPointLog, 'id' | 'created_at'>,
+    token?: string
+  ): Promise<TeacherPointLog>;
 }
 
 

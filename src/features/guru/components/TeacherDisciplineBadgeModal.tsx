@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import type { TeacherAppreciationScore, UserProfile } from '../../../types/database.types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { TeacherAppreciationScore, UserProfile, TeacherPointLog } from '../../../types/database.types';
+import { ProviderFactory } from '../../../providers/provider-factory';
+import { TeacherPointHistoryModal } from './TeacherPointHistoryModal';
 import {
   getTeacherDisciplineLeaderboard,
   formatShortTeacherName,
@@ -25,7 +27,7 @@ interface TeacherDisciplineBadgeModalProps {
   currentUserScore: TeacherAppreciationScore;
 }
 
-type TabKey = 'LEADERBOARD' | 'RULES' | 'BADGES' | 'MESSAGE';
+type TabKey = 'LEADERBOARD' | 'HISTORY' | 'RULES' | 'BADGES' | 'MESSAGE';
 
 /**
  * Calculates deterministic weekly consistency rates for teacher performance graphs.
@@ -69,14 +71,50 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   // Layer detail state: when teacher card is clicked, open clear detail chart view!
   const [selectedTeacher, setSelectedTeacher] = useState<TeacherLeaderboardItem | null>(null);
 
+  // Point history modal state
+  const [allPointLogs, setAllPointLogs] = useState<TeacherPointLog[]>([]);
+  const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
+  const [pointHistoryTeacher, setPointHistoryTeacher] = useState<any>(null);
+  const [teacherLogs, setTeacherLogs] = useState<TeacherPointLog[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchPoints = async () => {
+      try {
+        const provider = ProviderFactory.getProvider();
+        const logs = await provider.getTeacherPointHistory('ALL');
+        setAllPointLogs(logs || []);
+      } catch (e) {
+        console.warn('Failed to load point logs in modal:', e);
+      }
+    };
+    fetchPoints();
+
+    const handleUpdate = () => fetchPoints();
+    window.addEventListener('smart_absensi_points_updated', handleUpdate);
+    return () => window.removeEventListener('smart_absensi_points_updated', handleUpdate);
+  }, [isOpen]);
+
+  const handleOpenPointHistory = async (t: any) => {
+    setPointHistoryTeacher(t);
+    const provider = ProviderFactory.getProvider();
+    try {
+      const logs = await provider.getTeacherPointHistory(t.id);
+      setTeacherLogs(logs || []);
+    } catch {
+      setTeacherLogs(allPointLogs.filter((l) => l.user_id === t.id));
+    }
+    setIsPointHistoryModalOpen(true);
+  };
+
   const {
     leaderboard,
     topTeacher,
     currentUserRank,
     totalTeachers,
   } = useMemo(() => {
-    return getTeacherDisciplineLeaderboard(currentUser, currentUserScore, selectedPeriod);
-  }, [currentUser, currentUserScore, selectedPeriod]);
+    return getTeacherDisciplineLeaderboard(currentUser, currentUserScore, selectedPeriod, allPointLogs);
+  }, [currentUser, currentUserScore, selectedPeriod, allPointLogs]);
 
   if (!isOpen) return null;
 
@@ -136,11 +174,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
           {/* Sub-Tab Navigation: Only show when not in single teacher detail view */}
           {!selectedTeacher && (
-            <div className="grid grid-cols-4 gap-1 mt-2.5 p-1 bg-slate-100 rounded-xl border border-slate-200/70">
+            <div className="grid grid-cols-5 gap-1 mt-2.5 p-1 bg-slate-100 rounded-xl border border-slate-200/70">
               <button
                 type="button"
                 onClick={() => setActiveTab('LEADERBOARD')}
-                className={`py-1.5 text-center rounded-lg text-[10px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                className={`py-1.5 text-center rounded-lg text-[9.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-0.5 sm:gap-1 ${
                   activeTab === 'LEADERBOARD'
                     ? 'bg-white text-[#023246] shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -151,20 +189,32 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab('HISTORY')}
+                className={`py-1.5 text-center rounded-lg text-[9.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-0.5 sm:gap-1 ${
+                  activeTab === 'HISTORY'
+                    ? 'bg-white text-[#023246] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>⭐</span>
+                <span className="truncate">Riwayat</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab('RULES')}
-                className={`py-1.5 text-center rounded-lg text-[10px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                className={`py-1.5 text-center rounded-lg text-[9.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-0.5 sm:gap-1 ${
                   activeTab === 'RULES'
                     ? 'bg-white text-[#023246] shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <span>📊</span>
-                <span className="truncate">Sistem Poin</span>
+                <span className="truncate">Sistem</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('BADGES')}
-                className={`py-1.5 text-center rounded-lg text-[10px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                className={`py-1.5 text-center rounded-lg text-[9.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-0.5 sm:gap-1 ${
                   activeTab === 'BADGES'
                     ? 'bg-white text-[#023246] shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -176,7 +226,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               <button
                 type="button"
                 onClick={() => setActiveTab('MESSAGE')}
-                className={`py-1.5 text-center rounded-lg text-[10px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                className={`py-1.5 text-center rounded-lg text-[9.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-0.5 sm:gap-1 ${
                   activeTab === 'MESSAGE'
                     ? 'bg-white text-[#023246] shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -332,6 +382,15 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     </span>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenPointHistory(selectedTeacher)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 active:scale-98 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                >
+                  <Award className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Lihat Riwayat Pendapatan Poin Guru Ini</span>
+                </button>
               </div>
 
               {/* 📊 GRAFIK 2: GRAFIK BATANG KONSISTENSI MINGGUAN */}
@@ -665,6 +724,107 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 </div>
               )}
 
+              {/* TAB: HISTORY / RIWAYAT TRANSAKSI POIN GURU */}
+              {activeTab === 'HISTORY' && (
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-2xl bg-linear-to-br from-[#023246] to-[#0A455E] text-white border border-[#023246]/40 shadow-sm flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] text-cyan-200 uppercase tracking-wider font-extrabold block">
+                        Buku Catatan Poin Disiplin
+                      </span>
+                      <h4 className="text-xs sm:text-sm font-black text-white truncate mt-0.5">
+                        {currentUser?.full_name || 'Profil Anda'}
+                      </h4>
+                      <p className="text-[10px] text-slate-300 font-medium">
+                        Akumulasi perolehan poin kehadiran &amp; piket
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-xs flex items-center gap-1 justify-end">
+                        <span>⭐</span>
+                        <span>{currentUserScore?.totalPoints ?? 0} Poin</span>
+                      </div>
+                      <span className="text-[9px] font-bold text-amber-300 block mt-1">
+                        Total Poin Aktif
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* List Riwayat Transaksi Poin Guru Login */}
+                  {(() => {
+                    const myLogs = allPointLogs.filter((l) => l.user_id === currentUser?.id);
+                    if (myLogs.length === 0) {
+                      return (
+                        <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                          <div className="text-2xl">📋</div>
+                          <h5 className="text-xs font-bold text-slate-700">Belum Ada Transaksi Poin</h5>
+                          <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                            Poin akan otomatis tercatat setiap kali presensi masuk (tepat waktu +15, telat +5) atau bertugas piket (+10).
+                          </p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
+                        {myLogs.map((log) => (
+                          <div
+                            key={log.id}
+                            className="p-3 rounded-2xl bg-white border border-slate-200/85 shadow-2xs space-y-1"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <span className="text-sm">
+                                  {log.activity_type === 'CHECK_IN_ON_TIME'
+                                    ? '⏰'
+                                    : log.activity_type === 'DUTY_PIKET'
+                                    ? '🛡️'
+                                    : log.activity_type === 'CHECK_IN_LATE'
+                                    ? '⚠️'
+                                    : '⭐'}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <h6 className="text-xs font-black text-slate-800 truncate">
+                                    {log.title}
+                                  </h6>
+                                  <span className="text-[9.5px] text-slate-400">
+                                    {log.date}
+                                  </span>
+                                </div>
+                              </div>
+                              <span
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-black border shrink-0 ${
+                                  log.points >= 15
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                    : log.points >= 10
+                                    ? 'bg-cyan-100 text-cyan-900 border-cyan-300'
+                                    : 'bg-amber-100 text-amber-900 border-amber-300'
+                                }`}
+                              >
+                                +{log.points} Poin
+                              </span>
+                            </div>
+                            {log.description && (
+                              <p className="text-[10px] text-slate-500 pl-6 leading-relaxed">
+                                {log.description}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPointHistory(currentUser)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-98 text-[#023246] text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
+                  >
+                    <span>Buka Rincian Lengkap &amp; Filter Riwayat Poin</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              )}
+
               {/* TAB 2: RULES / SISTEM PERHITUNGAN POIN */}
               {activeTab === 'RULES' && (
                 <div className="space-y-3">
@@ -832,6 +992,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     Juara 1: <strong>{formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}</strong> ({topTeacher?.totalPoints ?? 0} Poin)
                   </span>
                 )}
+                {activeTab === 'HISTORY' && <span className="truncate block">Buku Catatan Riwayat Transaksi Poin Guru</span>}
                 {activeTab === 'RULES' && <span className="truncate block">Hadir: +15 • Telat: +5 • Piket: +10</span>}
                 {activeTab === 'BADGES' && <span className="truncate block">Sistem Apresiasi Berkelanjutan</span>}
                 {activeTab === 'MESSAGE' && <span className="truncate block">Amanat Resmi Kepala Sekolah</span>}
@@ -848,6 +1009,14 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
           )}
         </div>
       </div>
+
+      {/* Modal Riwayat Pendapatan Poin Khusus */}
+      <TeacherPointHistoryModal
+        isOpen={isPointHistoryModalOpen}
+        onClose={() => setIsPointHistoryModalOpen(false)}
+        teacher={pointHistoryTeacher}
+        pointHistory={teacherLogs}
+      />
     </div>
   );
 };

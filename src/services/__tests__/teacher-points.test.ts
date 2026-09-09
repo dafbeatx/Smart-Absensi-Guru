@@ -1,0 +1,293 @@
+/**
+ * SMART ABSENSI GURU - TEACHER POINT & GAMIFICATION ENGINE TEST SUITE
+ * Unit tests verifying point recording, idempotency, history retrieval,
+ * appreciation score accumulation, and dynamic discipline leaderboard ranking.
+ */
+
+import { MockProvider } from '../../providers/mock-provider.service';
+import {
+  calculateTeacherAppreciationScore,
+  getTeacherDisciplineLeaderboard,
+} from '../../utils/teacher-appreciation.utils';
+import type {
+  UserProfile,
+  AttendanceRecord,
+  TeacherPointLog,
+  TeacherAppreciationScore,
+} from '../../types/database.types';
+
+export const runTeacherPointsTestSuite = async (): Promise<{
+  passed: number;
+  failed: number;
+  results: Array<{ testName: string; status: 'PASS' | 'FAIL'; details?: string }>;
+}> => {
+  const results: Array<{ testName: string; status: 'PASS' | 'FAIL'; details?: string }> = [];
+  let passed = 0;
+  let failed = 0;
+
+  const assert = (testName: string, condition: boolean, details?: string) => {
+    if (condition) {
+      passed++;
+      results.push({ testName, status: 'PASS', details });
+    } else {
+      failed++;
+      results.push({ testName, status: 'FAIL', details: details || 'Assertion failed' });
+    }
+  };
+
+  const provider = new MockProvider();
+  const testUserId = 'usr-guru-test-points-1';
+  const testDate = '2026-09-09';
+
+  // 1. Record on-time attendance point (+15)
+  try {
+    const onTimeLog = await provider.recordTeacherPoint({
+      user_id: testUserId,
+      activity_type: 'CHECK_IN_ON_TIME',
+      points: 15,
+      title: 'Presensi Masuk Tepat Waktu',
+      description: 'Presensi Masuk Tepat Waktu (+15 Poin)',
+      date: testDate,
+    });
+
+    assert(
+      'Point Engine: Record CHECK_IN_ON_TIME awards 15 points',
+      onTimeLog !== null && onTimeLog.points === 15 && onTimeLog.activity_type === 'CHECK_IN_ON_TIME',
+      `Got points: ${onTimeLog?.points}`
+    );
+  } catch (err: unknown) {
+    assert('Point Engine: Record CHECK_IN_ON_TIME awards 15 points', false, String(err));
+  }
+
+  // 2. Idempotency check: Duplicate entry for the same user, date, activity should not duplicate
+  try {
+    const duplicateLog = await provider.recordTeacherPoint({
+      user_id: testUserId,
+      activity_type: 'CHECK_IN_ON_TIME',
+      points: 15,
+      title: 'Presensi Masuk Tepat Waktu',
+      description: 'Presensi Masuk Tepat Waktu (Duplicate)',
+      date: testDate,
+    });
+
+    const userHistory = await provider.getTeacherPointHistory(testUserId);
+    const onTimeEntries = userHistory.filter(
+      (l) => l.date === testDate && l.activity_type === 'CHECK_IN_ON_TIME'
+    );
+
+    assert(
+      'Point Engine: Duplicate prevention (idempotency) ensures single entry per activity per day',
+      duplicateLog !== null && onTimeEntries.length === 1,
+      `Found ${onTimeEntries.length} on-time entries for ${testDate}`
+    );
+  } catch (err: unknown) {
+    assert('Point Engine: Duplicate prevention', false, String(err));
+  }
+
+  // 3. Record duty piket point (+10) on the same day
+  try {
+    const piketLog = await provider.recordTeacherPoint({
+      user_id: testUserId,
+      activity_type: 'DUTY_PIKET',
+      points: 10,
+      title: 'Tugas Piket Harian',
+      description: 'Tugas Piket Sekolah Terlaksana (+10 Poin)',
+      date: testDate,
+    });
+
+    assert(
+      'Point Engine: Record DUTY_PIKET awards 10 points',
+      piketLog !== null && piketLog.points === 10 && piketLog.activity_type === 'DUTY_PIKET',
+      `Got points: ${piketLog?.points}`
+    );
+  } catch (err: unknown) {
+    assert('Point Engine: Record DUTY_PIKET awards 10 points', false, String(err));
+  }
+
+  // 4. Point history retrieval for specific user
+  try {
+    const userHistory = await provider.getTeacherPointHistory(testUserId);
+    const totalUserPoints = userHistory.reduce((sum, l) => sum + l.points, 0);
+
+    assert(
+      'Point Engine: getTeacherPointHistory returns correct user logs and accumulated total',
+      userHistory.length === 2 && totalUserPoints === 25,
+      `Logs count: ${userHistory.length}, Total points: ${totalUserPoints}`
+    );
+  } catch (err: unknown) {
+    assert('Point Engine: getTeacherPointHistory for specific user', false, String(err));
+  }
+
+  // 5. Point history retrieval for ALL users
+  try {
+    const allLogs = await provider.getTeacherPointHistory('ALL');
+    const hasTestUserLogs = allLogs.some((l) => l.user_id === testUserId);
+
+    assert(
+      "Point Engine: getTeacherPointHistory('ALL') returns aggregated logs across all teachers",
+      allLogs.length >= 2 && hasTestUserLogs,
+      `Total all logs: ${allLogs.length}`
+    );
+  } catch (err: unknown) {
+    assert("Point Engine: getTeacherPointHistory('ALL')", false, String(err));
+  }
+
+  // 6. calculateTeacherAppreciationScore with real pointHistory
+  try {
+    const sampleHistory: AttendanceRecord[] = [
+      {
+        id: 'att-1',
+        user_id: testUserId,
+        date: '2026-09-08',
+        check_in_time: '06:45',
+        check_out_time: null,
+        status: 'HADIR',
+        check_in_lat: -6.6131,
+        check_in_lng: 106.8123,
+        check_in_distance_meters: 10,
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        is_offline: false,
+        created_at: '2026-09-08T06:45:00Z',
+      },
+      {
+        id: 'att-2',
+        user_id: testUserId,
+        date: '2026-09-09',
+        check_in_time: '07:05',
+        check_out_time: null,
+        status: 'TERLAMBAT',
+        check_in_lat: -6.6131,
+        check_in_lng: 106.8123,
+        check_in_distance_meters: 10,
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        is_offline: false,
+        created_at: '2026-09-09T07:05:00Z',
+      },
+    ];
+
+    const samplePointLogs: TeacherPointLog[] = [
+      {
+        id: 'log-1',
+        user_id: testUserId,
+        activity_type: 'CHECK_IN_ON_TIME',
+        points: 15,
+        title: 'Tepat Waktu',
+        description: 'Tepat Waktu',
+        date: '2026-09-08',
+        created_at: '2026-09-08T06:45:00Z',
+      },
+      {
+        id: 'log-2',
+        user_id: testUserId,
+        activity_type: 'CHECK_IN_LATE',
+        points: 5,
+        title: 'Terlambat',
+        description: 'Terlambat',
+        date: '2026-09-09',
+        created_at: '2026-09-09T07:05:00Z',
+      },
+      {
+        id: 'log-3',
+        user_id: testUserId,
+        activity_type: 'DUTY_PIKET',
+        points: 10,
+        title: 'Piket',
+        description: 'Piket',
+        date: '2026-09-09',
+        created_at: '2026-09-09T12:00:00Z',
+      },
+    ];
+
+    const score = calculateTeacherAppreciationScore(
+      sampleHistory,
+      [],
+      null,
+      testUserId,
+      samplePointLogs
+    );
+
+    assert(
+      'Score Calculation: calculateTeacherAppreciationScore uses pointHistory logs for points and breakdowns',
+      score.totalPoints === 30 &&
+        score.hadirTepatWaktuCount === 1 &&
+        score.terlambatCount === 1 &&
+        score.piketCount === 1,
+      `Calculated total: ${score.totalPoints}, onTimeCount: ${score.hadirTepatWaktuCount}, lateCount: ${score.terlambatCount}, piketCount: ${score.piketCount}`
+    );
+  } catch (err: unknown) {
+    assert('Score Calculation: calculateTeacherAppreciationScore', false, String(err));
+  }
+
+  // 7. getTeacherDisciplineLeaderboard dynamic point aggregation
+  try {
+    const currentUser: UserProfile = {
+      id: testUserId,
+      full_name: 'Guru Penguji Teladan',
+      role: 'GURU',
+      position: 'Guru Matematika',
+      nip: '198501012010011001',
+      phone_number: '081234567890',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+    };
+
+    const mockScore: TeacherAppreciationScore = {
+      totalPoints: 120,
+      level: '🥇 Pendidik Disiplin Emas (Level 3)',
+      nextLevelPoints: 150,
+      levelProgressPercent: 80,
+      hadirTepatWaktuCount: 6,
+      terlambatCount: 2,
+      piketCount: 2,
+      moodCheckinCount: 0,
+      badges: [],
+      pointHistory: [],
+    };
+
+    const logsForLeaderboard: TeacherPointLog[] = [
+      {
+        id: 'l-1',
+        user_id: testUserId,
+        activity_type: 'CHECK_IN_ON_TIME',
+        points: 120,
+        title: 'On-time total',
+        description: 'On-time total',
+        date: '2026-09-09',
+        created_at: '2026-09-09T07:00:00Z',
+      },
+      {
+        id: 'l-2',
+        user_id: 'usr-guru-2',
+        activity_type: 'CHECK_IN_ON_TIME',
+        points: 80,
+        title: 'Other teacher',
+        description: 'Other teacher',
+        date: '2026-09-09',
+        created_at: '2026-09-09T07:00:00Z',
+      },
+    ];
+
+    const leaderboard = getTeacherDisciplineLeaderboard(
+      currentUser,
+      mockScore,
+      'CURRENT_MONTH',
+      logsForLeaderboard
+    );
+
+    assert(
+      'Leaderboard Engine: Aggregates points dynamically and ranks top teacher correctly',
+      leaderboard.leaderboard.length > 0 &&
+        leaderboard.currentUserRank === 1 &&
+        leaderboard.topTeacher?.id === testUserId &&
+        leaderboard.topTeacher?.totalPoints === 120,
+      `Rank: ${leaderboard.currentUserRank}, Top: ${leaderboard.topTeacher?.name} (${leaderboard.topTeacher?.totalPoints} pts)`
+    );
+  } catch (err: unknown) {
+    assert('Leaderboard Engine: Dynamic ranking', false, String(err));
+  }
+
+  return { passed, failed, results };
+};

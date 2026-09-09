@@ -26,6 +26,8 @@ import type {
   AttendanceSource,
   PushSubscriptionPayload,
   NotificationPreferences,
+  TeacherPointLog,
+  TeacherPointActivityType,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -347,6 +349,59 @@ export class MockProvider implements IDataProvider {
       safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
     } catch (e) {
       console.error('Failed to save to all attendance history:', e);
+    }
+
+    // AUTOMATIC TEACHER POINT RECORDING (Check-in On-Time / Late & Duty Piket)
+    if (action === 'CHECK_IN') {
+      try {
+        const isLate = record.status === 'TERLAMBAT';
+        const attendancePts = isLate ? 5 : 15;
+        const attendanceType: TeacherPointActivityType = isLate ? 'CHECK_IN_LATE' : 'CHECK_IN_ON_TIME';
+        const attendanceTitle = isLate
+          ? 'Presensi Masuk Sekolah (> 07:30 WIB)'
+          : 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)';
+        const attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${record.verification_method || 'QR'}`;
+
+        await this.recordTeacherPoint({
+          user_id: userId,
+          teacher_name: sessionUser?.full_name || undefined,
+          date: dateStr,
+          points: attendancePts,
+          activity_type: attendanceType,
+          title: attendanceTitle,
+          description: attendanceDesc,
+        });
+
+        // Cek apakah guru terjadwal piket hari ini
+        try {
+          const dutySchedules = await this.getDutySchedules();
+          const todayDayOfWeek = new Date().getDay();
+          const isDutyToday = (dutySchedules || []).some(
+            (s) =>
+              s.day_of_week === todayDayOfWeek &&
+              (s.teacher_id === userId ||
+                (sessionUser?.full_name &&
+                  s.teacher_name &&
+                  s.teacher_name.toLowerCase().includes(sessionUser.full_name.toLowerCase())))
+          );
+
+          if (isDutyToday) {
+            await this.recordTeacherPoint({
+              user_id: userId,
+              teacher_name: sessionUser?.full_name || undefined,
+              date: dateStr,
+              points: 10,
+              activity_type: 'DUTY_PIKET',
+              title: 'Tugas Piket Harian Sekolah',
+              description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah',
+            });
+          }
+        } catch (eDuty) {
+          console.warn('Failed to verify duty schedule for points:', eDuty);
+        }
+      } catch (e) {
+        console.warn('Failed to auto-record teacher points on check-in:', e);
+      }
     }
 
     return {
@@ -1965,6 +2020,124 @@ export class MockProvider implements IDataProvider {
     } catch {
       return false;
     }
+  }
+
+  // TEACHER DISCIPLINE POINT HISTORY API (Mock Provider / LocalStorage)
+  public async getTeacherPointHistory(userId: string, _token?: string): Promise<TeacherPointLog[]> {
+    const KEY = 'smart_absensi_teacher_point_history';
+    let allLogs: TeacherPointLog[] = [];
+    try {
+      const saved = safeGetStorage(KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          allLogs = parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse teacher point history:', e);
+    }
+
+    if (allLogs.length === 0) {
+      allLogs = this.generateSeedTeacherPointLogs();
+      safeSetStorage(KEY, JSON.stringify(allLogs));
+    }
+
+    if (userId === 'ALL') {
+      return [...allLogs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
+    return allLogs
+      .filter((l) => l.user_id === userId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  public async recordTeacherPoint(
+    log: Omit<TeacherPointLog, 'id' | 'created_at'>,
+    _token?: string
+  ): Promise<TeacherPointLog> {
+    const KEY = 'smart_absensi_teacher_point_history';
+    const allLogs = await this.getTeacherPointHistory('ALL');
+
+    // Idempotency check: prevent duplicate point for the exact same user, date, and activity_type
+    const existing = allLogs.find(
+      (l) => l.user_id === log.user_id && l.date === log.date && l.activity_type === log.activity_type
+    );
+    if (existing) {
+      return existing;
+    }
+
+    const newLog: TeacherPointLog = {
+      ...log,
+      id: 'pt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      created_at: new Date().toISOString(),
+    };
+
+    allLogs.unshift(newLog);
+    safeSetStorage(KEY, JSON.stringify(allLogs));
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_points_updated', {
+          detail: { userId: log.user_id, points: log.points, activity_type: log.activity_type },
+        })
+      );
+    }
+
+    return newLog;
+  }
+
+  private generateSeedTeacherPointLogs(): TeacherPointLog[] {
+    const seeds: TeacherPointLog[] = [
+      // Muhammad Iqbal Gustiawan (usr_guru_002) - 85 Pts
+      { id: 'pt_iqbal_01', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-01', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:10 WIB di gerbang sekolah (Radius 8m)', created_at: '2026-09-01T07:10:00.000Z' },
+      { id: 'pt_iqbal_02', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-02', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:12 WIB di gerbang sekolah (Radius 9m)', created_at: '2026-09-02T07:12:00.000Z' },
+      { id: 'pt_iqbal_03', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-03', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:08 WIB di gerbang sekolah (Radius 11m)', created_at: '2026-09-03T07:08:00.000Z' },
+      { id: 'pt_iqbal_04', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-04', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:15 WIB di gerbang sekolah (Radius 7m)', created_at: '2026-09-04T07:15:00.000Z' },
+      { id: 'pt_iqbal_05', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-07', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:05 WIB di gerbang sekolah (Radius 6m)', created_at: '2026-09-07T07:05:00.000Z' },
+      { id: 'pt_iqbal_06', user_id: 'usr_guru_002', teacher_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', date: '2026-09-07', points: 10, activity_type: 'DUTY_PIKET', title: 'Tugas Piket Harian Sekolah', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah', created_at: '2026-09-07T07:30:00.000Z' },
+
+      // Widianingsih (usr_guru_009) - 85 Pts
+      { id: 'pt_widia_01', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-01', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:14 WIB di gerbang sekolah', created_at: '2026-09-01T07:14:00.000Z' },
+      { id: 'pt_widia_02', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-02', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:11 WIB di gerbang sekolah', created_at: '2026-09-02T07:11:00.000Z' },
+      { id: 'pt_widia_03', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-03', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:09 WIB di gerbang sekolah', created_at: '2026-09-03T07:09:00.000Z' },
+      { id: 'pt_widia_04', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-04', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:16 WIB di gerbang sekolah', created_at: '2026-09-04T07:16:00.000Z' },
+      { id: 'pt_widia_05', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-07', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:07 WIB di gerbang sekolah', created_at: '2026-09-07T07:07:00.000Z' },
+      { id: 'pt_widia_06', user_id: 'usr_guru_009', teacher_name: 'Widianingsih, S.Si., G.r', date: '2026-09-07', points: 10, activity_type: 'DUTY_PIKET', title: 'Tugas Piket Harian Sekolah', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah', created_at: '2026-09-07T07:30:00.000Z' },
+
+      // Septi Nur Aeni (usr_guru_007) - 85 Pts
+      { id: 'pt_septi_01', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-01', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:09 WIB di gerbang sekolah', created_at: '2026-09-01T07:09:00.000Z' },
+      { id: 'pt_septi_02', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-02', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:13 WIB di gerbang sekolah', created_at: '2026-09-02T07:13:00.000Z' },
+      { id: 'pt_septi_03', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-03', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:10 WIB di gerbang sekolah', created_at: '2026-09-03T07:10:00.000Z' },
+      { id: 'pt_septi_04', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-04', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:18 WIB di gerbang sekolah', created_at: '2026-09-04T07:18:00.000Z' },
+      { id: 'pt_septi_05', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-07', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:06 WIB di gerbang sekolah', created_at: '2026-09-07T07:06:00.000Z' },
+      { id: 'pt_septi_06', user_id: 'usr_guru_007', teacher_name: 'Septi Nur Aeni, S.E', date: '2026-09-07', points: 10, activity_type: 'DUTY_PIKET', title: 'Tugas Piket Harian Sekolah', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah', created_at: '2026-09-07T07:30:00.000Z' },
+
+      // Mira Nurdianti (usr_guru_004) - 75 Pts
+      { id: 'pt_mira_01', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-01', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:15 WIB di gerbang sekolah', created_at: '2026-09-01T07:15:00.000Z' },
+      { id: 'pt_mira_02', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-02', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:20 WIB di gerbang sekolah', created_at: '2026-09-02T07:20:00.000Z' },
+      { id: 'pt_mira_03', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-03', points: 5, activity_type: 'CHECK_IN_LATE', title: 'Presensi Masuk Sekolah (> 07:30 WIB)', description: 'Tercatat hadir pukul 07:38 WIB di gerbang sekolah', created_at: '2026-09-03T07:38:00.000Z' },
+      { id: 'pt_mira_04', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-04', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:11 WIB di gerbang sekolah', created_at: '2026-09-04T07:11:00.000Z' },
+      { id: 'pt_mira_05', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-07', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:10 WIB di gerbang sekolah', created_at: '2026-09-07T07:10:00.000Z' },
+      { id: 'pt_mira_06', user_id: 'usr_guru_004', teacher_name: 'Mira Nurdianti, S.Pd', date: '2026-09-07', points: 10, activity_type: 'DUTY_PIKET', title: 'Tugas Piket Harian Sekolah', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah', created_at: '2026-09-07T07:30:00.000Z' },
+
+      // Adi Prasetyo (usr_guru_003) - 70 Pts
+      { id: 'pt_adi_01', user_id: 'usr_guru_003', teacher_name: 'Adi Prasetyo, S.Pd., G.r', date: '2026-09-01', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:12 WIB di gerbang sekolah', created_at: '2026-09-01T07:12:00.000Z' },
+      { id: 'pt_adi_02', user_id: 'usr_guru_003', teacher_name: 'Adi Prasetyo, S.Pd., G.r', date: '2026-09-02', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:08 WIB di gerbang sekolah', created_at: '2026-09-02T07:08:00.000Z' },
+      { id: 'pt_adi_03', user_id: 'usr_guru_003', teacher_name: 'Adi Prasetyo, S.Pd., G.r', date: '2026-09-04', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:14 WIB di gerbang sekolah', created_at: '2026-09-04T07:14:00.000Z' },
+      { id: 'pt_adi_04', user_id: 'usr_guru_003', teacher_name: 'Adi Prasetyo, S.Pd., G.r', date: '2026-09-07', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:05 WIB di gerbang sekolah', created_at: '2026-09-07T07:05:00.000Z' },
+      { id: 'pt_adi_05', user_id: 'usr_guru_003', teacher_name: 'Adi Prasetyo, S.Pd., G.r', date: '2026-09-07', points: 10, activity_type: 'DUTY_PIKET', title: 'Tugas Piket Harian Sekolah', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah', created_at: '2026-09-07T07:30:00.000Z' },
+
+      // Dafa Maulana (usr_admin_001) - 55 Pts
+      { id: 'pt_dafa_01', user_id: 'usr_admin_001', teacher_name: 'Dafa Maulana, S.Pd', date: '2026-09-01', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:16 WIB di gerbang sekolah', created_at: '2026-09-01T07:16:00.000Z' },
+      { id: 'pt_dafa_02', user_id: 'usr_admin_001', teacher_name: 'Dafa Maulana, S.Pd', date: '2026-09-02', points: 15, activity_type: 'CHECK_IN_ON_TIME', title: 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)', description: 'Tercatat hadir pukul 07:18 WIB di gerbang sekolah', created_at: '2026-09-02T07:18:00.000Z' },
+      { id: 'pt_dafa_03', user_id: 'usr_admin_001', teacher_name: 'Dafa Maulana, S.Pd', date: '2026-09-03', points: 5, activity_type: 'CHECK_IN_LATE', title: 'Presensi Masuk Sekolah (> 07:30 WIB)', description: 'Tercatat hadir pukul 07:42 WIB di gerbang sekolah', created_at: '2026-09-03T07:42:00.000Z' },
+      { id: 'pt_dafa_04', user_id: 'usr_admin_001', teacher_name: 'Dafa Maulana, S.Pd', date: '2026-09-04', points: 5, activity_type: 'CHECK_IN_LATE', title: 'Presensi Masuk Sekolah (> 07:30 WIB)', description: 'Tercatat hadir pukul 07:35 WIB di gerbang sekolah', created_at: '2026-09-04T07:35:00.000Z' },
+      { id: 'pt_dafa_05', user_id: 'usr_admin_001', teacher_name: 'Dafa Maulana, S.Pd', date: '2026-09-07', points: 5, activity_type: 'CHECK_IN_LATE', title: 'Presensi Masuk Sekolah (> 07:30 WIB)', description: 'Tercatat hadir pukul 07:39 WIB di gerbang sekolah', created_at: '2026-09-07T07:39:00.000Z' },
+      { id: 'pt_dafa_06', user_id: 'usr_admin_001', teacher_name: 'Dafa Maulana, S.Pd', date: '2026-09-07', points: 10, activity_type: 'DUTY_PIKET', title: 'Tugas Piket Harian Sekolah', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah', created_at: '2026-09-07T07:30:00.000Z' },
+    ];
+
+    return seeds;
   }
 }
 

@@ -4,36 +4,73 @@ import type {
   TeacherMoodLog,
   TeacherBadge,
   TeacherAppreciationScore,
+  TeacherPointLog,
 } from '../types/database.types';
 
 export function calculateTeacherAppreciationScore(
   attendanceHistory: AttendanceRecord[] = [],
   dutySchedules: TeacherDutySchedule[] = [],
   _todayMood: TeacherMoodLog | null = null,
-  userId?: string
+  userId?: string,
+  pointHistory?: TeacherPointLog[]
 ): TeacherAppreciationScore {
-  const hadirTepatWaktuCount = attendanceHistory.filter((r) => r.status === 'HADIR').length;
-  const terlambatCount = attendanceHistory.filter((r) => r.status === 'TERLAMBAT').length;
+  const rawHadirTepatWaktuCount = attendanceHistory.filter(
+    (r) => r.status === 'HADIR' || (r.status as string) === 'HADIR_TEPAT_WAKTU'
+  ).length;
+  const rawTerlambatCount = attendanceHistory.filter((r) => r.status === 'TERLAMBAT').length;
   const alfaCount = attendanceHistory.filter((r) => r.status === 'ALFA').length;
-  const totalMasukFisik = hadirTepatWaktuCount + terlambatCount;
 
   // Cek apakah guru bertugas piket dan hadir di sekolah
   const isUserDuty = dutySchedules.some(
     (d) => d && (d.teacher_id === userId || (userId && d.teacher_id?.includes(userId)))
   );
-  const piketCount = isUserDuty && totalMasukFisik > 0 ? 1 : 0;
 
-  // Points Formula: Murni kehadiran fisik nyata (Hanya yang masuk & hadir yang dapat poin)
+  // Hitung jumlah riil hari kehadiran piket
+  const userDutyDays = new Set(
+    dutySchedules
+      .filter((d) => d && (d.teacher_id === userId || (userId && d.teacher_id?.includes(userId))))
+      .map((d) => d.day_of_week)
+  );
+
+  let realPiketCount = 0;
+  attendanceHistory.forEach((r) => {
+    if (r.status === 'HADIR' || (r.status as string) === 'HADIR_TEPAT_WAKTU' || r.status === 'TERLAMBAT') {
+      const recordDay = new Date(r.date).getDay();
+      if (userDutyDays.has(recordDay)) {
+        realPiketCount += 1;
+      }
+    }
+  });
+
+  const rawPiketCount = Math.max(
+    realPiketCount,
+    isUserDuty && rawHadirTepatWaktuCount + rawTerlambatCount > 0 ? 1 : 0
+  );
+
+  // Sinkronkan hitungan dengan pointHistory ledger jika tersedia
+  const historyOnTimeCount = (pointHistory || []).filter((p) => p.activity_type === 'CHECK_IN_ON_TIME').length;
+  const historyLateCount = (pointHistory || []).filter((p) => p.activity_type === 'CHECK_IN_LATE').length;
+  const historyPiketCount = (pointHistory || []).filter((p) => p.activity_type === 'DUTY_PIKET').length;
+
+  const hadirTepatWaktuCount = Math.max(rawHadirTepatWaktuCount, historyOnTimeCount);
+  const terlambatCount = Math.max(rawTerlambatCount, historyLateCount);
+  const piketCount = Math.max(rawPiketCount, historyPiketCount);
+  const totalMasukFisik = hadirTepatWaktuCount + terlambatCount;
+
+  // Points Formula: Murni kehadiran fisik nyata
   // - Hadir Tepat Waktu: +15 Poin
-  // - Hadir Terlambat: +5 Poin (Tetap masuk mengajar)
-  // - Tugas Piket: +10 Poin (Hanya jika masuk & hadir bertugas)
-  // - Sakit, Izin, Cuti, Belum Absen: 0 Poin (Tidak ada poin kehadiran maupun modal cuma-cuma)
-  // - Penalti ALFA (Disetel Admin jika mangkir tanpa kabar): -10 Poin per kejadian
+  // - Hadir Terlambat: +5 Poin
+  // - Tugas Piket: +10 Poin per hari tugas piket
+  // - Penalti ALFA: -10 Poin per kejadian
   const attendancePoints = hadirTepatWaktuCount * 15 + terlambatCount * 5;
   const dutyPoints = piketCount * 10;
   const alfaPenalty = alfaCount * 10;
+  const calculatedPoints = Math.max(0, attendancePoints + dutyPoints - alfaPenalty);
 
-  const totalPoints = Math.max(0, attendancePoints + dutyPoints - alfaPenalty);
+  // Jika riwayat transaksi poin tersedia, gunakan akumulasi ledger poin
+  const totalPoints = (pointHistory && pointHistory.length > 0)
+    ? Math.max(0, pointHistory.reduce((sum, p) => sum + (p.points || 0), 0))
+    : calculatedPoints;
 
   // Penentuan Level Apresiasi Berbasis Poin Kehadiran Riil
   let level = '🥉 Pendidik Berkomitmen (Level 1)';
@@ -114,6 +151,7 @@ export function calculateTeacherAppreciationScore(
     piketCount,
     moodCheckinCount: 0,
     badges,
+    pointHistory,
   };
 }
 
@@ -159,7 +197,8 @@ export interface TeacherDisciplineLeaderboardResult {
 export function getTeacherDisciplineLeaderboard(
   currentUser: { id?: string; full_name?: string; nip?: string | null; position?: string; avatar_url?: string | null; phone_number?: string } | null,
   currentUserScore: TeacherAppreciationScore,
-  period: DisciplinePeriodType = 'CURRENT_MONTH'
+  period: DisciplinePeriodType = 'CURRENT_MONTH',
+  allPointLogs?: TeacherPointLog[]
 ): TeacherDisciplineLeaderboardResult {
   const isCurrent = period === 'CURRENT_MONTH';
 
@@ -486,6 +525,34 @@ export function getTeacherDisciplineLeaderboard(
   ];
 
   let teachers = isCurrent ? [...currentMonthTeachers] : [...previousMonthTeachers];
+
+  // Pembaruan dinamis skor dan perolehan poin seluruh guru jika allPointLogs tersedia
+  if (isCurrent && allPointLogs && allPointLogs.length > 0) {
+    teachers = teachers.map((t) => {
+      const logs = allPointLogs.filter((l) => l.user_id === t.id);
+      if (logs.length === 0) return t;
+
+      const pts = Math.max(0, logs.reduce((sum, l) => sum + (l.points || 0), 0));
+      const onTime = logs.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
+      const late = logs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
+      const piket = logs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
+
+      let lvl = t.level;
+      if (pts >= 80) lvl = '🏆 Pendidik Teladan Utama';
+      else if (pts >= 65) lvl = '🥇 Pendidik Disiplin Emas';
+      else if (pts >= 50) lvl = '🥈 Pendidik Berdedikasi';
+      else if (pts > 0) lvl = '🥉 Pendidik Berkomitmen';
+
+      return {
+        ...t,
+        totalPoints: pts,
+        hadirTepatWaktuCount: onTime,
+        terlambatCount: late,
+        piketCount: piket,
+        level: lvl,
+      };
+    });
+  }
 
   if (currentUser) {
     const activeBadge = currentUserScore?.badges?.find((b) => b.isUnlocked) || {

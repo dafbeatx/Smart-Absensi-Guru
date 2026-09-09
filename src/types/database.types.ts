@@ -215,6 +215,26 @@ export interface TeacherBadge {
   unlockedAt?: string;
 }
 
+export type TeacherPointActivityType =
+  | 'CHECK_IN_ON_TIME'
+  | 'CHECK_IN_LATE'
+  | 'DUTY_PIKET'
+  | 'BONUS_DISCIPLINE'
+  | 'PENALTY_ALFA'
+  | 'MANUAL_ADJUSTMENT';
+
+export interface TeacherPointLog {
+  id: string;
+  user_id: string;
+  teacher_name?: string;
+  date: string; // YYYY-MM-DD
+  points: number; // e.g. +15, +5, +10, -10
+  activity_type: TeacherPointActivityType;
+  title?: string;
+  description?: string;
+  created_at: string;
+}
+
 export interface TeacherAppreciationScore {
   totalPoints: number;
   level: string; // e.g. "Pendidik Teladan Platinum", "Pendidik Disiplin Emas"
@@ -225,6 +245,7 @@ export interface TeacherAppreciationScore {
   piketCount: number;
   moodCheckinCount: number;
   badges: TeacherBadge[];
+  pointHistory?: TeacherPointLog[];
 }
 
 export type ComplaintCategory =

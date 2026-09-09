@@ -98,6 +98,7 @@ import {
   formatShortTeacherName,
 } from '../../../utils/teacher-appreciation.utils';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
+import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHistoryModal';
 import { TopDisciplineCelebrationModal } from '../../guru/components/TopDisciplineCelebrationModal';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import type {
@@ -113,6 +114,7 @@ import type {
   TeachingSlot,
   TeacherComplaint,
   ClassroomEmergencyAlert,
+  TeacherPointLog,
 } from '../../../types/database.types';
 
 export interface GuruDashboardPageProps {
@@ -330,6 +332,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [permissionBlockedRequiresCamera, setPermissionBlockedRequiresCamera] = useState(false);
   const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
+  const [pointHistory, setPointHistory] = useState<TeacherPointLog[]>([]);
+  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>([]);
+  const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [isStudentBehaviorModalOpen, setIsStudentBehaviorModalOpen] = useState(false);
   const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
@@ -891,6 +896,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setTeachingSlots([]);
       }
 
+      // 7.6 Load Teacher Point History & Ledger
+      try {
+        const myPointLogs = await provider.getTeacherPointHistory(effectiveUser.id, authToken);
+        setPointHistory(myPointLogs || []);
+
+        const allLogs = await provider.getTeacherPointHistory('ALL', authToken);
+        setAllTeacherPointLogs(allLogs || []);
+      } catch (err) {
+        console.warn('Failed to load teacher point history:', err);
+      }
+
       // 8. Teacher Duty Schedule Check (Jadwal Piket Guru Senin - Jumat)
       try {
         const fetchedDuty = await DutyScheduleRepository.getDutySchedules(authToken);
@@ -1106,6 +1122,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_points_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
     window.addEventListener('smart_absensi_teachers_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_holidays_updated', handleScannedEvent);
@@ -1114,6 +1131,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_points_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
       window.removeEventListener('smart_absensi_teachers_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_holidays_updated', handleScannedEvent);
@@ -1207,13 +1225,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     attendanceHistory,
     _dutySchedules,
     todayMood,
-    effectiveUser?.id
+    effectiveUser?.id,
+    pointHistory
   );
 
   // Teacher Discipline Leaderboard & Top Teacher Recognition
   const disciplineLeaderboard = useMemo(() => {
-    return getTeacherDisciplineLeaderboard(effectiveUser, appreciationScore);
-  }, [effectiveUser, appreciationScore]);
+    return getTeacherDisciplineLeaderboard(effectiveUser, appreciationScore, 'CURRENT_MONTH', allTeacherPointLogs);
+  }, [effectiveUser, appreciationScore, allTeacherPointLogs]);
 
   // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
   useEffect(() => {
@@ -2097,14 +2116,26 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                  className="h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-[10.5px] sm:text-[11px] font-bold text-[#023246] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
-                >
-                  <span>Layer Penjelasan</span>
-                  <span className="text-cyan-800">→</span>
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsPointHistoryModalOpen(true)}
+                    className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-amber-50 hover:bg-amber-100 active:scale-[0.98] border border-amber-200/80 text-[10.5px] sm:text-[11px] font-bold text-amber-950 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                    title="Lihat rincian riwayat perolehan poin Anda"
+                  >
+                    <span>⭐</span>
+                    <span>Riwayat Poin</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsDisciplineBadgeModalOpen(true)}
+                    className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200/80 text-[10.5px] sm:text-[11px] font-bold text-[#023246] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <span>Layer Penjelasan</span>
+                    <span className="text-cyan-800">→</span>
+                  </button>
+                </div>
               </div>
             </section>
 
@@ -4128,6 +4159,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={() => setIsDisciplineBadgeModalOpen(false)}
         currentUser={effectiveUser}
         currentUserScore={appreciationScore}
+      />
+
+      {/* 14b. Modal Riwayat Pendapatan Poin Transparan Disiplin Guru */}
+      <TeacherPointHistoryModal
+        isOpen={isPointHistoryModalOpen}
+        onClose={() => setIsPointHistoryModalOpen(false)}
+        teacher={effectiveUser}
+        pointHistory={pointHistory}
       />
 
       {/* 15. Modal Pop-up Apresiasi Kehormatan Juara 1, 2, dan 3 */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
@@ -6,7 +6,8 @@ import { AuditLogger } from '../../../services/audit-logger.service';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
-import type { UserProfile, RoleCode } from '../../../types/database.types';
+import type { UserProfile, RoleCode, TeacherPointLog } from '../../../types/database.types';
+import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHistoryModal';
 import { convertToWebP } from '../../../utils/image.utils';
 import { handleAppError } from '../../../utils/error.utils';
 
@@ -36,6 +37,42 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<UserProfile | null>(null);
+  const [selectedTeacherForPoints, setSelectedTeacherForPoints] = useState<UserProfile | null>(null);
+  const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
+  const [allPointLogs, setAllPointLogs] = useState<TeacherPointLog[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadPoints = async () => {
+      try {
+        const provider = ProviderFactory.getProvider();
+        const logs = await provider.getTeacherPointHistory('ALL');
+        if (isMounted) {
+          setAllPointLogs(logs || []);
+        }
+      } catch (err) {
+        console.warn('Failed to load teacher point history in TeacherManagementTable:', err);
+      }
+    };
+    loadPoints();
+
+    const handlePointsUpdated = () => {
+      loadPoints();
+    };
+    window.addEventListener('smart_absensi_points_updated', handlePointsUpdated);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('smart_absensi_points_updated', handlePointsUpdated);
+    };
+  }, []);
+
+  const teacherPointsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    (allPointLogs || []).forEach((log) => {
+      map[log.user_id] = (map[log.user_id] || 0) + log.points;
+    });
+    return map;
+  }, [allPointLogs]);
 
   // Form states
   const [fullName, setFullName] = useState('');
@@ -539,6 +576,24 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                 <span className="text-[11px] font-mono font-medium text-slate-500">💬 {t.phone_number || '-'}</span>
               </div>
 
+              {/* Point Discipline Badge & History Trigger */}
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
+                <span className="text-[10px] font-bold text-slate-500">Poin Disiplin:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTeacherForPoints(t);
+                    setIsPointHistoryModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-950 font-black text-[11px] transition-all active:scale-95 shadow-2xs cursor-pointer"
+                  title="Lihat riwayat perolehan poin guru ini"
+                >
+                  <span>⭐</span>
+                  <span>{teacherPointsMap[t.id] ?? 0} Poin</span>
+                  <span className="text-[9.5px] text-amber-700 font-bold underline ml-0.5">Riwayat →</span>
+                </button>
+              </div>
+
               {/* Action Buttons Grid (Touch-friendly 44px min-target) */}
               {!effectiveReadOnly ? (
                 <div className="grid grid-cols-4 gap-1.5 pt-1">
@@ -588,7 +643,17 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="pt-1.5 border-t border-slate-100 flex justify-end">
+                <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTeacherForPoints(t);
+                      setIsPointHistoryModalOpen(true);
+                    }}
+                    className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-extrabold text-[10px] rounded-xl border border-amber-200 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    ⭐ Riwayat Poin
+                  </button>
                   <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
                     👁️ Akses Lihat (Read-Only)
                   </span>
@@ -608,6 +673,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               <th className="p-3">Role & Jabatan</th>
               <th className="p-3">Kontak WA</th>
               <th className="p-3">Status</th>
+              <th className="p-3 text-center">Poin Disiplin</th>
               <th className="p-3 text-right">{effectiveReadOnly ? 'Akses' : 'Aksi Admin Website'}</th>
             </tr>
           </thead>
@@ -645,9 +711,33 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                     {t.is_active ? 'Aktif' : 'Non-Aktif'}
                   </span>
                 </td>
+                <td className="p-3 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTeacherForPoints(t);
+                      setIsPointHistoryModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-950 font-black text-xs transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    title="Klik untuk melihat riwayat rincian poin guru ini"
+                  >
+                    <span>⭐</span>
+                    <span>{teacherPointsMap[t.id] ?? 0} Poin</span>
+                  </button>
+                </td>
                 <td className="p-3 text-right">
                   {!effectiveReadOnly ? (
                     <div className="space-x-1.5 inline-block">
+                      <button
+                        onClick={() => {
+                          setSelectedTeacherForPoints(t);
+                          setIsPointHistoryModalOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-amber-50 text-amber-900 hover:bg-amber-100 font-bold rounded-lg transition-colors border border-amber-200"
+                        title="Lihat riwayat perolehan poin"
+                      >
+                        ⭐ Poin
+                      </button>
                       <button
                         onClick={() => handleOpenEditModal(t)}
                         className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold rounded-lg transition-colors"
@@ -694,9 +784,22 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                       </button>
                     </div>
                   ) : (
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-                      👁️ Read-Only
-                    </span>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTeacherForPoints(t);
+                          setIsPointHistoryModalOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-lg transition-colors border border-amber-200 cursor-pointer shadow-2xs"
+                        title="Lihat riwayat perolehan poin"
+                      >
+                        ⭐ Riwayat Poin
+                      </button>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+                        👁️ Read-Only
+                      </span>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -969,6 +1072,19 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           </div>
         )}
       </Modal>
+
+      {/* Modal Riwayat Pendapatan Poin Transparan Guru */}
+      {selectedTeacherForPoints && (
+        <TeacherPointHistoryModal
+          isOpen={isPointHistoryModalOpen}
+          onClose={() => {
+            setIsPointHistoryModalOpen(false);
+            setSelectedTeacherForPoints(null);
+          }}
+          teacher={selectedTeacherForPoints}
+          pointHistory={allPointLogs.filter((l) => l.user_id === selectedTeacherForPoints.id)}
+        />
+      )}
     </div>
   );
 };
