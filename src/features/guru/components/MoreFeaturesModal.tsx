@@ -6,6 +6,10 @@ interface MoreFeaturesModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile;
+  hasFilledMoodToday?: boolean;
+  hasSubmittedComplaintToday?: boolean;
+  hasAwardedMeritToday?: boolean;
+  hasRecordedDemeritToday?: boolean;
   onOpenComplaintModal: () => void;
   onOpenMoodModal: () => void;
   onOpenVoiceSettings: () => void;
@@ -28,6 +32,10 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   isOpen,
   onClose,
   user,
+  hasFilledMoodToday = false,
+  hasSubmittedComplaintToday = false,
+  hasAwardedMeritToday = false,
+  hasRecordedDemeritToday = false,
   onOpenComplaintModal,
   onOpenMoodModal,
   onOpenVoiceSettings,
@@ -52,6 +60,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
     title: string;
     subtitle: string;
     icon: string;
+    badge?: string;
+    badgeDone?: boolean;
     action: () => void;
   }
 
@@ -81,6 +91,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 title: 'Poin Kebaikan Siswa',
                 subtitle: 'Apresiasi sikap, kebersihan, dan keaktifan siswa (Sinkron)',
                 icon: '🌟',
+                badge: hasAwardedMeritToday ? '✓ +5 Pts' : '+5 Poin',
+                badgeDone: hasAwardedMeritToday,
                 action: () => {
                   onClose();
                   onOpenStudentBehaviorModal('KEBAIKAN');
@@ -91,6 +103,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 title: 'Poin Kedisiplinan Siswa',
                 subtitle: 'Catatan pelanggaran tata tertib & pengurangan poin',
                 icon: '⚠️',
+                badge: hasRecordedDemeritToday ? '✓ +5 Pts' : '+5 Poin',
+                badgeDone: hasRecordedDemeritToday,
                 action: () => {
                   onClose();
                   onOpenStudentBehaviorModal('KEDISIPLINAN');
@@ -249,6 +263,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           title: 'Kotak Aspirasi Guru',
           subtitle: 'Sampaikan aspirasi & masukan secara anonim ke Kepala Sekolah',
           icon: '💬',
+          badge: hasSubmittedComplaintToday ? '✓ +5 Pts' : '+5 Poin',
+          badgeDone: hasSubmittedComplaintToday,
           action: () => {
             onClose();
             onOpenComplaintModal();
@@ -259,6 +275,8 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           title: 'Mood & Kesiapan Harian',
           subtitle: 'Catat kesiapan mental dan suasana hati harian guru',
           icon: '😊',
+          badge: hasFilledMoodToday ? '✓ +5 Pts' : '+5 Poin',
+          badgeDone: hasFilledMoodToday,
           action: () => {
             onClose();
             onOpenMoodModal();
@@ -345,10 +363,23 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                         <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-base shrink-0 shadow-2xs">
                           {item.icon}
                         </div>
-                        <div className="min-w-0">
-                          <h5 className="font-bold text-xs text-[#023246] leading-tight truncate">
-                            {item.title}
-                          </h5>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h5 className="font-bold text-xs text-[#023246] leading-tight truncate">
+                              {item.title}
+                            </h5>
+                            {item.badge && (
+                              <span
+                                className={`px-1.5 py-0.2 text-[8.5px] font-black rounded-md border shrink-0 ${
+                                  item.badgeDone
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    : 'bg-amber-100 text-amber-900 border-amber-300'
+                                }`}
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
                             {item.subtitle}
                           </p>

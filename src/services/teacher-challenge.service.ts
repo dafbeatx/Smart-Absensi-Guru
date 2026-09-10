@@ -22,8 +22,9 @@ export interface TeacherDailyQuest {
   rewardPoints: number;
   icon: string;
   status: 'COMPLETED' | 'PENDING' | 'FAILED';
+  category: 'CHECK_IN' | 'CHECK_OUT' | 'DUTY' | 'STREAK' | 'ENGAGEMENT';
   completedAt?: string;
-  category: 'CHECK_IN' | 'CHECK_OUT' | 'DUTY' | 'STREAK';
+  actionType?: 'MOOD' | 'COMPLAINT' | 'MERIT' | 'DEMERIT';
 }
 
 export interface NightlyMotivationMessage {
@@ -168,7 +169,17 @@ export class TeacherChallengeService {
    */
   public static getDailyQuests(
     todayRecord?: AttendanceRecord | null,
-    isScheduledPiketToday = false
+    isScheduledPiketToday = false,
+    engagement?: {
+      hasFilledMood?: boolean;
+      hasSubmittedComplaint?: boolean;
+      hasAwardedMerit?: boolean;
+      hasRecordedDemerit?: boolean;
+      moodCompletedAt?: string;
+      complaintCompletedAt?: string;
+      meritCompletedAt?: string;
+      demeritCompletedAt?: string;
+    }
   ): TeacherDailyQuest[] {
     const isCheckInOnTime =
       Boolean(todayRecord) &&
@@ -214,6 +225,54 @@ export class TeacherChallengeService {
         category: 'DUTY',
       });
     }
+
+    // ── Misi Pemanfaatan Fitur Aplikasi & Pembinaan Siswa ──────────────────
+    quests.push(
+      {
+        id: 'quest_mood_checkin',
+        title: 'Refleksi Mood Harian',
+        description: 'Isi jurnal suasana hati dan kesiapan energi mengajar hari ini.',
+        rewardPoints: 5,
+        icon: '😊',
+        status: engagement?.hasFilledMood ? 'COMPLETED' : 'PENDING',
+        completedAt: engagement?.moodCompletedAt || (engagement?.hasFilledMood ? 'Tercatat' : undefined),
+        category: 'ENGAGEMENT',
+        actionType: 'MOOD',
+      },
+      {
+        id: 'quest_complaint_feedback',
+        title: 'Kotak Aspirasi & Saran',
+        description: 'Sampaikan saran, kritik, atau ide kemajuan sekolah secara anonim.',
+        rewardPoints: 5,
+        icon: '💡',
+        status: engagement?.hasSubmittedComplaint ? 'COMPLETED' : 'PENDING',
+        completedAt: engagement?.complaintCompletedAt || (engagement?.hasSubmittedComplaint ? 'Tercatat' : undefined),
+        category: 'ENGAGEMENT',
+        actionType: 'COMPLAINT',
+      },
+      {
+        id: 'quest_student_merit',
+        title: 'Apresiasi Kebaikan Siswa',
+        description: 'Catat poin kebaikan atau perilaku terpuji siswa di kelas.',
+        rewardPoints: 5,
+        icon: '✨',
+        status: engagement?.hasAwardedMerit ? 'COMPLETED' : 'PENDING',
+        completedAt: engagement?.meritCompletedAt || (engagement?.hasAwardedMerit ? 'Tercatat' : undefined),
+        category: 'ENGAGEMENT',
+        actionType: 'MERIT',
+      },
+      {
+        id: 'quest_student_demerit',
+        title: 'Pembinaan Karakter Siswa',
+        description: 'Catat evaluasi ketertiban atau pembinaan kedisiplinan siswa.',
+        rewardPoints: 5,
+        icon: '🛡️',
+        status: engagement?.hasRecordedDemerit ? 'COMPLETED' : 'PENDING',
+        completedAt: engagement?.demeritCompletedAt || (engagement?.hasRecordedDemerit ? 'Tercatat' : undefined),
+        category: 'ENGAGEMENT',
+        actionType: 'DEMERIT',
+      }
+    );
 
     return quests;
   }

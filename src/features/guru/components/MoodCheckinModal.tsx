@@ -110,10 +110,35 @@ export const MoodCheckinModal: React.FC<MoodCheckinModalProps> = ({
       );
 
       const chosenOption = MOOD_OPTIONS.find((m) => m.type === selectedMood);
+
+      // Award +5 Engagement Points for Daily Quest
+      try {
+        await provider.recordTeacherPoint(
+          {
+            user_id: user.id,
+            teacher_name: user.full_name,
+            date: todayStr,
+            points: 5,
+            activity_type: 'MOOD_CHECKIN',
+            title: 'Misi Refleksi: Jurnal Mood Harian',
+            description: 'Refleksi suasana hati dan kesiapan mengajar (+5 Poin)',
+          },
+          token || undefined
+        );
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(`smart_absensi_quest_mood_${user.id}_${todayStr}`, '1');
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('smart_absensi_points_updated'));
+        }
+      } catch (ptErr) {
+        console.warn('Mood check-in point award note:', ptErr);
+      }
+
       showToast(
         'success',
-        'Mood Check-in Tersimpan! ✨',
-        chosenOption ? chosenOption.quote : 'Mood berhasil disimpan! Terima kasih.'
+        'Mood Check-in Tersimpan (+5 Poin)! ✨',
+        chosenOption ? `${chosenOption.quote} Anda memperoleh +5 Poin Kedisiplinan & Keterlibatan.` : 'Mood berhasil disimpan! Anda memperoleh +5 Poin.'
       );
 
       logger.info('MoodCheckinModal', 'Teacher mood saved successfully', { mood: selectedMood });

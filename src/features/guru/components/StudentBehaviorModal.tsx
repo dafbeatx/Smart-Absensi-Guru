@@ -10,6 +10,8 @@ import {
   GRADEMASTER_KEBAIKAN_PRESETS,
   GRADEMASTER_PELANGGARAN_PRESETS,
 } from '../../../repositories/StudentBehaviorRepository';
+import { ProviderFactory } from '../../../providers/provider-factory';
+import { useAuthStore } from '../../../store/useAuthStore';
 import {
   Sparkles,
   AlertTriangle,
@@ -241,13 +243,52 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
       });
 
       if (result.success) {
+        // Award +5 Engagement Points for Teacher Daily Quest
+        const authUser = useAuthStore.getState().user;
+        const currentToken = useAuthStore.getState().token;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const isKebaikan = activeTab === 'KEBAIKAN';
+
+        if (authUser?.id) {
+          try {
+            const prov = ProviderFactory.getProvider();
+            await prov.recordTeacherPoint(
+              {
+                user_id: authUser.id,
+                teacher_name: currentTeacherName,
+                date: todayStr,
+                points: 5,
+                activity_type: isKebaikan ? 'STUDENT_MERIT' : 'STUDENT_DEMERIT',
+                title: isKebaikan ? 'Misi Apresiasi: Poin Kebaikan Siswa' : 'Misi Pembinaan: Karakter Siswa',
+                description: isKebaikan
+                  ? `Mencatat apresiasi kebaikan siswa (${selectedStudent.student_name}) (+5 Poin)`
+                  : `Mencatat kedisiplinan & evaluasi karakter siswa (${selectedStudent.student_name}) (+5 Poin)`,
+              },
+              currentToken || undefined
+            );
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(
+                isKebaikan
+                  ? `smart_absensi_quest_merit_${authUser.id}_${todayStr}`
+                  : `smart_absensi_quest_demerit_${authUser.id}_${todayStr}`,
+                '1'
+              );
+            }
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('smart_absensi_points_updated'));
+            }
+          } catch (ptErr) {
+            console.warn('Student behavior teacher point award note:', ptErr);
+          }
+        }
+
         if (activeTab === 'KEBAIKAN') {
           setSuccessMessage(
-            `Sukses! +${finalPoints} Poin Kebaikan berhasil dicatat untuk ${selectedStudent.student_name}.`
+            `Sukses! +${finalPoints} Poin Kebaikan dicatat untuk ${selectedStudent.student_name} (Anda meraih +5 Poin Pendidik ✨).`
           );
         } else {
           setSuccessMessage(
-            `Sukses! Catatan pelanggaran (+${finalPoints} Pts) berhasil dicatat untuk ${selectedStudent.student_name}.`
+            `Sukses! Catatan pelanggaran (+${finalPoints} Pts) dicatat untuk ${selectedStudent.student_name} (Anda meraih +5 Poin Pendidik ✨).`
           );
         }
 

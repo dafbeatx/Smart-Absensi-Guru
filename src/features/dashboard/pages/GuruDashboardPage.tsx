@@ -1324,9 +1324,75 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     return TeacherChallengeService.calculateStreak(attendanceHistory, pointHistory);
   }, [attendanceHistory, pointHistory]);
 
+  const todayDateStr = useMemo(() => getTodayDateInJakarta(), []);
+
+  const hasFilledMoodToday = useMemo(() => {
+    if (todayMood) return true;
+    if (pointHistory.some((p) => p.date === todayDateStr && p.activity_type === 'MOOD_CHECKIN')) return true;
+    try {
+      return localStorage.getItem(`smart_absensi_quest_mood_${effectiveUser?.id}_${todayDateStr}`) === 'true';
+    } catch {
+      return false;
+    }
+  }, [todayMood, pointHistory, effectiveUser?.id, todayDateStr]);
+
+  const hasSubmittedComplaintToday = useMemo(() => {
+    if (pointHistory.some((p) => p.date === todayDateStr && p.activity_type === 'COMPLAINT_SUBMIT')) return true;
+    if (userComplaints.some((c) => c.created_at && getTodayDateInJakarta(c.created_at) === todayDateStr)) return true;
+    try {
+      return localStorage.getItem(`smart_absensi_quest_complaint_${effectiveUser?.id}_${todayDateStr}`) === 'true';
+    } catch {
+      return false;
+    }
+  }, [pointHistory, userComplaints, effectiveUser?.id, todayDateStr]);
+
+  const hasAwardedMeritToday = useMemo(() => {
+    if (pointHistory.some((p) => p.date === todayDateStr && p.activity_type === 'STUDENT_MERIT')) return true;
+    try {
+      return localStorage.getItem(`smart_absensi_quest_merit_${effectiveUser?.id}_${todayDateStr}`) === 'true';
+    } catch {
+      return false;
+    }
+  }, [pointHistory, effectiveUser?.id, todayDateStr]);
+
+  const hasRecordedDemeritToday = useMemo(() => {
+    if (pointHistory.some((p) => p.date === todayDateStr && p.activity_type === 'STUDENT_DEMERIT')) return true;
+    try {
+      return localStorage.getItem(`smart_absensi_quest_demerit_${effectiveUser?.id}_${todayDateStr}`) === 'true';
+    } catch {
+      return false;
+    }
+  }, [pointHistory, effectiveUser?.id, todayDateStr]);
+
   const dailyQuests = useMemo(() => {
-    return TeacherChallengeService.getDailyQuests(todayAttendance, isDutyTeacherToday);
-  }, [todayAttendance, isDutyTeacherToday]);
+    return TeacherChallengeService.getDailyQuests(todayAttendance, isDutyTeacherToday, {
+      hasFilledMood: hasFilledMoodToday,
+      hasSubmittedComplaint: hasSubmittedComplaintToday,
+      hasAwardedMerit: hasAwardedMeritToday,
+      hasRecordedDemerit: hasRecordedDemeritToday,
+    });
+  }, [
+    todayAttendance,
+    isDutyTeacherToday,
+    hasFilledMoodToday,
+    hasSubmittedComplaintToday,
+    hasAwardedMeritToday,
+    hasRecordedDemeritToday,
+  ]);
+
+  const handleOpenQuestAction = useCallback((actionType: 'MOOD' | 'COMPLAINT' | 'MERIT' | 'DEMERIT') => {
+    if (actionType === 'MOOD') {
+      setIsMoodModalOpen(true);
+    } else if (actionType === 'COMPLAINT') {
+      setIsComplaintModalOpen(true);
+    } else if (actionType === 'MERIT') {
+      setStudentBehaviorInitialTab('KEBAIKAN');
+      setIsStudentBehaviorModalOpen(true);
+    } else if (actionType === 'DEMERIT') {
+      setStudentBehaviorInitialTab('KEDISIPLINAN');
+      setIsStudentBehaviorModalOpen(true);
+    }
+  }, []);
 
   const nightlyMotivation = useMemo(() => {
     const rival = disciplineLeaderboard.leaderboard.find((t) => t.rank === 1 && !t.isCurrentUser);
@@ -2261,6 +2327,31 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   const IconComponent = item.icon;
                   const isExternal = item.id === 'koreksi_soal';
 
+                  // Engagement quest badge (+5 Poin / ✓ 5p)
+                  const questBadge = (() => {
+                    if (item.id === 'mood') {
+                      return hasFilledMoodToday
+                        ? { text: '✓ 5p', isDone: true }
+                        : { text: '+5 Poin', isDone: false };
+                    }
+                    if (item.id === 'complaint') {
+                      return hasSubmittedComplaintToday
+                        ? { text: '✓ 5p', isDone: true }
+                        : { text: '+5 Poin', isDone: false };
+                    }
+                    if (item.id === 'student_good') {
+                      return hasAwardedMeritToday
+                        ? { text: '✓ 5p', isDone: true }
+                        : { text: '+5 Poin', isDone: false };
+                    }
+                    if (item.id === 'student_discipline') {
+                      return hasRecordedDemeritToday
+                        ? { text: '✓ 5p', isDone: true }
+                        : { text: '+5 Poin', isDone: false };
+                    }
+                    return null;
+                  })();
+
                   return (
                     <button
                       key={item.id}
@@ -2280,6 +2371,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         )}
                         {item.id === 'emergency' && activeEmergencies.length > 0 && (
                           <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-600 rounded-full animate-ping ring-2 ring-white" />
+                        )}
+                        {questBadge && (
+                          <span
+                            className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                              questBadge.isDone
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-amber-400 text-slate-950'
+                            }`}
+                          >
+                            {questBadge.text}
+                          </span>
                         )}
                       </div>
                       <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
@@ -2318,11 +2420,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
                       <Sparkles className="w-4 h-4 text-amber-300" />
                     </div>
-                    <div className="text-left min-w-0">
-                      <p className="text-[11px] sm:text-xs font-black text-emerald-950 truncate leading-tight">
-                        + Poin Kebaikan
-                      </p>
-                      <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-700/90 truncate">
+                    <div className="text-left min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-[11px] sm:text-xs font-black text-emerald-950 truncate leading-tight">
+                          + Poin Kebaikan
+                        </p>
+                        <span
+                          className={`px-1.5 py-0.2 text-[8.5px] font-black rounded-md border shrink-0 ${
+                            hasAwardedMeritToday
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'bg-amber-100 text-amber-900 border-amber-300'
+                          }`}
+                        >
+                          {hasAwardedMeritToday ? '✓ +5 Pts' : '+5 Poin'}
+                        </span>
+                      </div>
+                      <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-700/90 truncate mt-0.5">
                         Apresiasi &amp; Prestasi
                       </p>
                     </div>
@@ -2339,11 +2452,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
                       <AlertTriangle className="w-4 h-4 text-amber-200" />
                     </div>
-                    <div className="text-left min-w-0">
-                      <p className="text-[11px] sm:text-xs font-black text-rose-950 truncate leading-tight">
-                        - Kedisiplinan
-                      </p>
-                      <p className="text-[9px] sm:text-[10px] font-semibold text-rose-700/90 truncate">
+                    <div className="text-left min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-[11px] sm:text-xs font-black text-rose-950 truncate leading-tight">
+                          - Kedisiplinan
+                        </p>
+                        <span
+                          className={`px-1.5 py-0.2 text-[8.5px] font-black rounded-md border shrink-0 ${
+                            hasRecordedDemeritToday
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'bg-amber-100 text-amber-900 border-amber-300'
+                          }`}
+                        >
+                          {hasRecordedDemeritToday ? '✓ +5 Pts' : '+5 Poin'}
+                        </span>
+                      </div>
+                      <p className="text-[9px] sm:text-[10px] font-semibold text-rose-700/90 truncate mt-0.5">
                         Pelanggaran Disiplin
                       </p>
                     </div>
@@ -2547,6 +2671,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               nightlyMotivation={nightlyMotivation}
               onOpenChallengeModal={() => setIsChallengeModalOpen(true)}
               onOpenLeaderboard={() => setIsDisciplineBadgeModalOpen(true)}
+              onOpenQuestAction={handleOpenQuestAction}
               userRank={disciplineLeaderboard.currentUserRank}
               totalPoints={appreciationScore.totalPoints}
             />
@@ -2978,8 +3103,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     }}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
                       <Sparkles className="w-6 h-6 stroke-[1.8] text-amber-300" />
+                      <span
+                        className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                          hasAwardedMeritToday
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-400 text-slate-950'
+                        }`}
+                      >
+                        {hasAwardedMeritToday ? '✓ 5p' : '+5 Poin'}
+                      </span>
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-emerald-700 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                       Poin Kebaikan
@@ -2995,8 +3129,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     }}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-rose-600 to-red-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-rose-600 to-red-700 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
                       <AlertTriangle className="w-6 h-6 stroke-[1.8] text-amber-200" />
+                      <span
+                        className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                          hasRecordedDemeritToday
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-400 text-slate-950'
+                        }`}
+                      >
+                        {hasRecordedDemeritToday ? '✓ 5p' : '+5 Poin'}
+                      </span>
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-rose-700 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                       Kedisiplinan
@@ -3071,8 +3214,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     onClick={() => setIsComplaintModalOpen(true)}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
                       <MessageSquare className="w-6 h-6 stroke-[1.8]" />
+                      <span
+                        className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                          hasSubmittedComplaintToday
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-400 text-slate-950'
+                        }`}
+                      >
+                        {hasSubmittedComplaintToday ? '✓ 5p' : '+5 Poin'}
+                      </span>
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                       Aspirasi
@@ -3085,8 +3237,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     onClick={() => setIsMoodModalOpen(true)}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
                       <Smile className="w-6 h-6 stroke-[1.8]" />
+                      <span
+                        className={`absolute -top-1.5 -right-1.5 px-1 py-0.2 text-[8px] font-black rounded-full ring-1.5 ring-white shadow-2xs whitespace-nowrap ${
+                          hasFilledMoodToday
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-400 text-slate-950'
+                        }`}
+                      >
+                        {hasFilledMoodToday ? '✓ 5p' : '+5 Poin'}
+                      </span>
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                       Mood
@@ -4168,6 +4329,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         isOpen={isMoreFeaturesModalOpen}
         onClose={() => setIsMoreFeaturesModalOpen(false)}
         user={effectiveUser}
+        hasFilledMoodToday={hasFilledMoodToday}
+        hasSubmittedComplaintToday={hasSubmittedComplaintToday}
+        hasAwardedMeritToday={hasAwardedMeritToday}
+        hasRecordedDemeritToday={hasRecordedDemeritToday}
         onOpenComplaintModal={() => setIsComplaintModalOpen(true)}
         onOpenMoodModal={() => setIsMoodModalOpen(true)}
         onOpenVoiceSettings={() => setActiveTab('PROFIL')}
@@ -4304,6 +4469,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         streakInfo={streakInfo}
         quests={dailyQuests}
         appreciationScore={appreciationScore}
+        onOpenQuestAction={handleOpenQuestAction}
         userRank={disciplineLeaderboard.currentUserRank}
         totalTeachers={disciplineLeaderboard.totalTeachers}
         selectedMonth={selectedMonth}

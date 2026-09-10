@@ -8,6 +8,7 @@ interface TeacherDailyChallengeWidgetProps {
   nightlyMotivation?: NightlyMotivationMessage;
   onOpenChallengeModal: () => void;
   onOpenLeaderboard: () => void;
+  onOpenQuestAction?: (actionType: 'MOOD' | 'COMPLAINT' | 'MERIT' | 'DEMERIT') => void;
   userRank?: number;
   totalPoints?: number;
 }
@@ -18,6 +19,7 @@ export const TeacherDailyChallengeWidget: React.FC<TeacherDailyChallengeWidgetPr
   nightlyMotivation,
   onOpenChallengeModal,
   onOpenLeaderboard,
+  onOpenQuestAction,
   userRank = 1,
   totalPoints = 0,
 }) => {
@@ -173,8 +175,17 @@ export const TeacherDailyChallengeWidget: React.FC<TeacherDailyChallengeWidgetPr
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-xs font-black truncate">{quest.title}</span>
+                      {quest.category === 'ENGAGEMENT' ? (
+                        <span className="text-[9px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-1 rounded">
+                          Aktivitas
+                        </span>
+                      ) : quest.category === 'DUTY' ? (
+                        <span className="text-[9px] font-bold text-purple-800 bg-purple-50 border border-purple-200 px-1 rounded">
+                          Piket
+                        </span>
+                      ) : null}
                       {quest.completedAt && (
                         <span className="text-[9.5px] font-mono text-emerald-700 bg-emerald-100/70 px-1 rounded">
                           {quest.completedAt}
@@ -187,7 +198,7 @@ export const TeacherDailyChallengeWidget: React.FC<TeacherDailyChallengeWidgetPr
                   </div>
                 </div>
 
-                <div className="shrink-0 text-right">
+                <div className="shrink-0 flex items-center gap-1.5">
                   <span
                     className={`px-2 py-0.5 rounded-md text-[10px] font-black border ${
                       isDone
@@ -199,6 +210,18 @@ export const TeacherDailyChallengeWidget: React.FC<TeacherDailyChallengeWidgetPr
                   >
                     +{quest.rewardPoints} PTS
                   </span>
+                  {!isDone && quest.actionType && onOpenQuestAction && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenQuestAction(quest.actionType!);
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-[#023246] hover:bg-[#034560] active:scale-95 text-white text-[10px] font-bold cursor-pointer transition-all shadow-2xs"
+                    >
+                      Mulai ›
+                    </button>
+                  )}
                 </div>
               </div>
             );

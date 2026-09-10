@@ -440,13 +440,42 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     const morningQuest = quests.find((q) => q.id === 'quest_morning_on_time');
     const checkoutQuest = quests.find((q) => q.id === 'quest_tuntas_bertugas');
     const piketQuest = quests.find((q) => q.id === 'quest_piket_day');
+    const defaultMoodQuest = quests.find((q) => q.id === 'quest_mood_checkin');
+    const defaultComplaintQuest = quests.find((q) => q.id === 'quest_complaint_feedback');
 
     assert(
       'Challenge Engine: getDailyQuests marks completed morning, checkout, and piket quests',
       morningQuest?.status === 'COMPLETED' &&
         checkoutQuest?.status === 'COMPLETED' &&
-        piketQuest?.status === 'COMPLETED',
-      `morning: ${morningQuest?.status}, checkout: ${checkoutQuest?.status}, piket: ${piketQuest?.status}`
+        piketQuest?.status === 'COMPLETED' &&
+        defaultMoodQuest?.status === 'PENDING' &&
+        defaultComplaintQuest?.status === 'PENDING',
+      `morning: ${morningQuest?.status}, checkout: ${checkoutQuest?.status}, piket: ${piketQuest?.status}, mood: ${defaultMoodQuest?.status}`
+    );
+
+    // Test with engagement completed
+    const engagementQuests = TeacherChallengeService.getDailyQuests(todayAtt, true, {
+      hasFilledMood: true,
+      hasSubmittedComplaint: true,
+      hasAwardedMerit: true,
+      hasRecordedDemerit: true,
+    });
+    const completedMood = engagementQuests.find((q) => q.id === 'quest_mood_checkin');
+    const completedComplaint = engagementQuests.find((q) => q.id === 'quest_complaint_feedback');
+    const completedMerit = engagementQuests.find((q) => q.id === 'quest_student_merit');
+    const completedDemerit = engagementQuests.find((q) => q.id === 'quest_student_demerit');
+
+    assert(
+      'Challenge Engine: Engagement quests reward 5 PTS each and mark completed when active',
+      completedMood?.status === 'COMPLETED' &&
+        completedMood?.rewardPoints === 5 &&
+        completedComplaint?.status === 'COMPLETED' &&
+        completedComplaint?.rewardPoints === 5 &&
+        completedMerit?.status === 'COMPLETED' &&
+        completedMerit?.rewardPoints === 5 &&
+        completedDemerit?.status === 'COMPLETED' &&
+        completedDemerit?.rewardPoints === 5,
+      `mood: ${completedMood?.status} (${completedMood?.rewardPoints}), merit: ${completedMerit?.status}`
     );
   } catch (err: unknown) {
     assert('Challenge Engine: getDailyQuests', false, String(err));

@@ -24,6 +24,7 @@ interface TeacherChallengeModalProps {
   streakInfo: TeacherStreakInfo;
   quests: TeacherDailyQuest[];
   appreciationScore: TeacherAppreciationScore;
+  onOpenQuestAction?: (actionType: 'MOOD' | 'COMPLAINT' | 'MERIT' | 'DEMERIT') => void;
   userRank?: number;
   totalTeachers?: number;
   selectedMonth?: number;
@@ -37,6 +38,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
   streakInfo,
   quests,
   appreciationScore,
+  onOpenQuestAction,
   userRank = 1,
   totalTeachers = 12,
   selectedMonth,
@@ -271,6 +273,15 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                         <h5 className="text-xs font-extrabold text-slate-900 truncate">
                           {q.title}
                         </h5>
+                        {q.category === 'ENGAGEMENT' ? (
+                          <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-800 border border-teal-200 text-[9px] font-bold">
+                            Aktivitas
+                          </span>
+                        ) : q.category === 'DUTY' ? (
+                          <span className="px-1.5 py-0.2 rounded bg-purple-50 text-purple-800 border border-purple-200 text-[9px] font-bold">
+                            Piket
+                          </span>
+                        ) : null}
                         {isDone && (
                           <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9.5px] font-black">
                             Tuntas ✓
@@ -282,10 +293,23 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                       </p>
                     </div>
 
-                    <div className="shrink-0 text-right">
+                    <div className="shrink-0 flex items-center gap-2">
                       <span className="px-2 py-1 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 font-black text-xs block">
                         +{q.rewardPoints} PTS
                       </span>
+                      {!isDone && q.actionType && onOpenQuestAction && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onOpenQuestAction(q.actionType!);
+                          }}
+                          className="px-2.5 py-1 rounded-xl bg-[#023246] hover:bg-[#034560] active:scale-95 text-white text-xs font-black transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+                        >
+                          <span>Mulai</span>
+                          <span>›</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

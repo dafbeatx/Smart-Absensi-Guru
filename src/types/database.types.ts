@@ -224,7 +224,11 @@ export type TeacherPointActivityType =
   | 'STREAK_MILESTONE'
   | 'BONUS_DISCIPLINE'
   | 'PENALTY_ALFA'
-  | 'MANUAL_ADJUSTMENT';
+  | 'MANUAL_ADJUSTMENT'
+  | 'MOOD_CHECKIN'
+  | 'COMPLAINT_SUBMIT'
+  | 'STUDENT_MERIT'
+  | 'STUDENT_DEMERIT';
 
 export interface TeacherPointLog {
   id: string;

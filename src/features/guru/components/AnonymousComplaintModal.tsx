@@ -5,6 +5,8 @@ import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { logger } from '../../../utils/logger.utils';
+import { ProviderFactory } from '../../../providers/provider-factory';
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { ComplaintCategory } from '../../../types/database.types';
 
 export interface AnonymousComplaintModalProps {
@@ -126,10 +128,36 @@ export const AnonymousComplaintModal: React.FC<AnonymousComplaintModalProps> = (
         token || undefined
       );
 
+      // Award +5 Engagement Points for Daily Quest
+      try {
+        const prov = ProviderFactory.getProvider();
+        const todayStr = getTodayDateInJakarta();
+        await prov.recordTeacherPoint(
+          {
+            user_id: user.id,
+            teacher_name: user.full_name,
+            date: todayStr,
+            points: 5,
+            activity_type: 'COMPLAINT_SUBMIT',
+            title: 'Misi Partisipasi: Aspirasi Sekolah',
+            description: 'Menyampaikan saran dan masukan konstruktif untuk sekolah (+5 Poin)',
+          },
+          token || undefined
+        );
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(`smart_absensi_quest_complaint_${user.id}_${todayStr}`, '1');
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('smart_absensi_points_updated'));
+        }
+      } catch (ptErr) {
+        console.warn('Complaint submission point award note:', ptErr);
+      }
+
       showToast(
         'success',
-        'Catatan Anonim Terkirim! 🔒',
-        'Aspirasi Anda telah diteruskan ke Dashboard Admin & Kepsek secara 100% anonim.'
+        'Catatan Anonim Terkirim (+5 Poin)! 🔒',
+        'Aspirasi Anda telah diteruskan secara 100% anonim dan Anda memperoleh +5 Poin.'
       );
 
       logger.info('AnonymousComplaintModal', 'Teacher complaint submitted anonymously', {
