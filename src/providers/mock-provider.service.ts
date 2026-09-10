@@ -28,6 +28,9 @@ import type {
   NotificationPreferences,
   TeacherPointLog,
   TeacherPointActivityType,
+  InventorySarprasItem,
+  CreateInventorySarprasDTO,
+  UpdateInventorySarprasDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -2262,7 +2265,204 @@ export class MockProvider implements IDataProvider {
     ];
 
     return seeds;
+  }
 
+  // ============================================================================
+  // SARANA DAN PRASARANA (SARPRAS) INVENTORY ENGINE
+  // ============================================================================
+  private getInitialSarprasSeeds(): InventorySarprasItem[] {
+    return [
+      {
+        id: 'sarpras_001',
+        ruangan: 'Lab Komputer',
+        nama_barang: 'Komputer PC Client Core i5',
+        jumlah_total: 25,
+        merek: 'Lenovo ThinkCentre',
+        tahun_perolehan: 2023,
+        kondisi: 'LAYAK',
+        yang_harus_dibeli: '5 unit PC baru untuk cadangan ujian ANBK',
+        sumber_dana: 'BOS Kinerja 2023',
+        keterangan: 'Semua PC terpasang OS Windows 11 & aplikasi ujian ANBK/CBT. Kondisi prima terawat.',
+        created_by: 'usr_guru_002',
+        created_by_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+        created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+        updated_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+      },
+      {
+        id: 'sarpras_002',
+        ruangan: 'Lab Komputer',
+        nama_barang: 'Proyektor LCD Digital',
+        jumlah_total: 2,
+        merek: 'Epson EB-X500',
+        tahun_perolehan: 2022,
+        kondisi: 'LAYAK',
+        yang_harus_dibeli: '0',
+        sumber_dana: 'BOS Reguler 2022',
+        keterangan: 'Terpasang di bracket plafon Lab Komputer 1 & 2. Lampu proyektor masih terang.',
+        created_by: 'usr_guru_002',
+        created_by_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+        created_at: new Date(Date.now() - 25 * 86400000).toISOString(),
+        updated_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+      },
+      {
+        id: 'sarpras_003',
+        ruangan: 'Ruang Guru',
+        nama_barang: 'AC Split 1.5 PK',
+        jumlah_total: 2,
+        merek: 'Daikin Inverter',
+        tahun_perolehan: 2021,
+        kondisi: 'RUSAK',
+        yang_harus_dibeli: '1 unit AC baru pengganti unit barat yang kompresornya mati',
+        sumber_dana: 'Yayasan / Komite',
+        keterangan: 'Unit timur berfungsi normal (dingin). Unit barat kompresor macet, perlu penggantian unit.',
+        created_by: 'usr_guru_002',
+        created_by_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+        created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
+        updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+      },
+      {
+        id: 'sarpras_004',
+        ruangan: 'Ruang Guru',
+        nama_barang: 'Meja Kerja Guru Kayu Jati',
+        jumlah_total: 30,
+        merek: 'Custom Jepara',
+        tahun_perolehan: 2020,
+        kondisi: 'LAYAK',
+        yang_harus_dibeli: '0',
+        sumber_dana: 'Bantuan Pemerintah (DAK)',
+        keterangan: 'Kondisi kayu sangat kokoh, laci meja lengkap dengan kunci masing-masing.',
+        created_by: 'usr_guru_002',
+        created_by_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+        created_at: new Date(Date.now() - 18 * 86400000).toISOString(),
+        updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+      },
+      {
+        id: 'sarpras_005',
+        ruangan: 'Ruang Kelas 7A',
+        nama_barang: 'Papan Tulis Whiteboard Magnetik',
+        jumlah_total: 1,
+        merek: 'Sakana 120x240 cm',
+        tahun_perolehan: 2024,
+        kondisi: 'LAYAK',
+        yang_harus_dibeli: '0',
+        sumber_dana: 'BOS Reguler 2024',
+        keterangan: 'Permukaan bersih, tray spidol dan penghapus dalam kondisi bagus.',
+        created_by: 'usr_guru_002',
+        created_by_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+        created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'sarpras_006',
+        ruangan: 'Ruang Kelas 8B',
+        nama_barang: 'Kipas Angin Dinding (Wall Fan)',
+        jumlah_total: 4,
+        merek: 'Maspion 16 Inch',
+        tahun_perolehan: 2021,
+        kondisi: 'RUSAK',
+        yang_harus_dibeli: '2 unit kipas angin dinding baru',
+        sumber_dana: 'Dana BOS Reguler',
+        keterangan: '2 unit berputar normal, 2 unit dinamo mati / bunyi mendengung keras.',
+        created_by: 'usr_guru_002',
+        created_by_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+        created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+        updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+      },
+      {
+        id: 'sarpras_007',
+        ruangan: 'Perpustakaan',
+        nama_barang: 'Rak Buku Besi 5 Tingkat',
+        jumlah_total: 6,
+        merek: 'Lion Metal Works',
+        tahun_perolehan: 2022,
+        kondisi: 'LAYAK',
+        yang_harus_dibeli: '0',
+        sumber_dana: 'Bantuan Hibah Alumni',
+        keterangan: 'Kapasitas total memuat ~1.800 buku. Cat masih mulus tanpa karat.',
+        created_by: 'usr_guru_002',
+        created_by_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+        created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ];
+  }
+
+  public async getInventorySarpras(_token?: string): Promise<InventorySarprasItem[]> {
+    const raw = safeGetStorage('smart_absensi_sarpras_inventory');
+    if (!raw) {
+      const initial = this.getInitialSarprasSeeds();
+      safeSetStorage('smart_absensi_sarpras_inventory', JSON.stringify(initial));
+      return initial;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Fallback
+    }
+    const initial = this.getInitialSarprasSeeds();
+    safeSetStorage('smart_absensi_sarpras_inventory', JSON.stringify(initial));
+    return initial;
+  }
+
+  public async createInventorySarpras(dto: CreateInventorySarprasDTO, _token?: string): Promise<InventorySarprasItem> {
+    const list = await this.getInventorySarpras();
+    const activeUser = useAuthStore.getState().user;
+
+    const newItem: InventorySarprasItem = {
+      id: 'sarpras_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      ruangan: dto.ruangan.trim(),
+      nama_barang: dto.nama_barang.trim(),
+      jumlah_total: Number(dto.jumlah_total) || 1,
+      merek: dto.merek.trim(),
+      tahun_perolehan: Number(dto.tahun_perolehan) || new Date().getFullYear(),
+      kondisi: dto.kondisi,
+      yang_harus_dibeli: String(dto.yang_harus_dibeli ?? '0').trim(),
+      sumber_dana: dto.sumber_dana.trim(),
+      keterangan: dto.keterangan ? dto.keterangan.trim() : undefined,
+      created_by: dto.created_by || activeUser?.id || 'usr_guru_002',
+      created_by_name: dto.created_by_name || activeUser?.full_name || 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const updated = [newItem, ...list];
+    safeSetStorage('smart_absensi_sarpras_inventory', JSON.stringify(updated));
+    return newItem;
+  }
+
+  public async updateInventorySarpras(id: string, dto: UpdateInventorySarprasDTO, _token?: string): Promise<boolean> {
+    const list = await this.getInventorySarpras();
+    const index = list.findIndex((item) => item.id === id);
+    if (index === -1) return false;
+
+    const target = list[index];
+    list[index] = {
+      ...target,
+      ruangan: dto.ruangan !== undefined ? dto.ruangan.trim() : target.ruangan,
+      nama_barang: dto.nama_barang !== undefined ? dto.nama_barang.trim() : target.nama_barang,
+      jumlah_total: dto.jumlah_total !== undefined ? Number(dto.jumlah_total) : target.jumlah_total,
+      merek: dto.merek !== undefined ? dto.merek.trim() : target.merek,
+      tahun_perolehan: dto.tahun_perolehan !== undefined ? Number(dto.tahun_perolehan) : target.tahun_perolehan,
+      kondisi: dto.kondisi !== undefined ? dto.kondisi : target.kondisi,
+      yang_harus_dibeli: dto.yang_harus_dibeli !== undefined ? String(dto.yang_harus_dibeli).trim() : target.yang_harus_dibeli,
+      sumber_dana: dto.sumber_dana !== undefined ? dto.sumber_dana.trim() : target.sumber_dana,
+      keterangan: dto.keterangan !== undefined ? dto.keterangan.trim() : target.keterangan,
+      updated_at: new Date().toISOString(),
+    };
+
+    safeSetStorage('smart_absensi_sarpras_inventory', JSON.stringify(list));
+    return true;
+  }
+
+  public async deleteInventorySarpras(id: string, _token?: string): Promise<boolean> {
+    const list = await this.getInventorySarpras();
+    const filtered = list.filter((item) => item.id !== id);
+    if (filtered.length === list.length) return false;
+
+    safeSetStorage('smart_absensi_sarpras_inventory', JSON.stringify(filtered));
+    return true;
   }
 }
+
 

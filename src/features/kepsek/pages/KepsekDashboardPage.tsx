@@ -26,6 +26,7 @@ import { NotificationPermissionBanner } from '../../../components/dashboard/Noti
 import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
 import { KepsekRewardSuggestionModal } from '../components/KepsekRewardSuggestionModal';
 import { TeacherExcellenceCertificateModal } from '../../guru/components/TeacherExcellenceCertificateModal';
+import { SarprasExecutiveView } from '../../sarpras/components/SarprasExecutiveView';
 import {
   getTeacherDisciplineLeaderboard,
   type TeacherLeaderboardItem,
@@ -510,6 +511,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       badge: unabsentedTeachers.length > 0 ? unabsentedTeachers.length : undefined,
       badgeVariant: 'RED',
     },
+    {
+      id: 'SARPRAS',
+      label: 'Inventaris Sarpras',
+      icon: '📦',
+    },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 
@@ -890,6 +896,14 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                 </div>
               )}
             </div>
+          )}
+
+          {/* TAB: INVENTARIS SARANA DAN PRASARANA (SARPRAS) */}
+          {activeTab === 'SARPRAS' && (
+            <SarprasExecutiveView
+              currentUser={user}
+              onBackToDashboard={() => setActiveTab('DASHBOARD')}
+            />
           )}
 
           {/* TAB 5: DEV TEST MODE */}

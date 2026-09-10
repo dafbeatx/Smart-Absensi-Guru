@@ -30,6 +30,9 @@ import type {
   NotificationPreferences,
   TeacherPointLog,
   TeacherPointActivityType,
+  InventorySarprasItem,
+  CreateInventorySarprasDTO,
+  UpdateInventorySarprasDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -3178,5 +3181,125 @@ export class SupabaseProvider implements IDataProvider {
       return mockProv.recordTeacherPoint(log);
     }
   }
+
+  // ============================================================================
+  // SARANA DAN PRASARANA (SARPRAS) INVENTORY API
+  // ============================================================================
+  public async getInventorySarpras(_token?: string): Promise<InventorySarprasItem[]> {
+    try {
+      const { data, error } = await this.client
+        .from('inventory_sarpras')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getInventorySarpras error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getInventorySarpras();
+      }
+
+      if (data && Array.isArray(data)) {
+        return data as InventorySarprasItem[];
+      }
+      return [];
+    } catch (err) {
+      logger.error('SupabaseProvider', 'getInventorySarpras exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getInventorySarpras();
+    }
+  }
+
+  public async createInventorySarpras(dto: CreateInventorySarprasDTO, _token?: string): Promise<InventorySarprasItem> {
+    try {
+      const activeUser = useAuthStore.getState().user;
+      const payload = {
+        ruangan: dto.ruangan.trim(),
+        nama_barang: dto.nama_barang.trim(),
+        jumlah_total: Number(dto.jumlah_total) || 1,
+        merek: dto.merek.trim(),
+        tahun_perolehan: Number(dto.tahun_perolehan) || new Date().getFullYear(),
+        kondisi: dto.kondisi,
+        yang_harus_dibeli: String(dto.yang_harus_dibeli ?? '0').trim(),
+        sumber_dana: dto.sumber_dana.trim(),
+        keterangan: dto.keterangan ? dto.keterangan.trim() : null,
+        created_by: dto.created_by || activeUser?.id || null,
+        created_by_name: dto.created_by_name || activeUser?.full_name || null,
+      };
+
+      const { data, error } = await this.client
+        .from('inventory_sarpras')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'createInventorySarpras error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.createInventorySarpras(dto);
+      }
+
+      return data as InventorySarprasItem;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'createInventorySarpras exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.createInventorySarpras(dto);
+    }
+  }
+
+  public async updateInventorySarpras(id: string, dto: UpdateInventorySarprasDTO, _token?: string): Promise<boolean> {
+    try {
+      const payload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (dto.ruangan !== undefined) payload.ruangan = dto.ruangan.trim();
+      if (dto.nama_barang !== undefined) payload.nama_barang = dto.nama_barang.trim();
+      if (dto.jumlah_total !== undefined) payload.jumlah_total = Number(dto.jumlah_total);
+      if (dto.merek !== undefined) payload.merek = dto.merek.trim();
+      if (dto.tahun_perolehan !== undefined) payload.tahun_perolehan = Number(dto.tahun_perolehan);
+      if (dto.kondisi !== undefined) payload.kondisi = dto.kondisi;
+      if (dto.yang_harus_dibeli !== undefined) payload.yang_harus_dibeli = String(dto.yang_harus_dibeli).trim();
+      if (dto.sumber_dana !== undefined) payload.sumber_dana = dto.sumber_dana.trim();
+      if (dto.keterangan !== undefined) payload.keterangan = dto.keterangan ? dto.keterangan.trim() : null;
+
+      const { error } = await this.client
+        .from('inventory_sarpras')
+        .update(payload)
+        .eq('id', id);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'updateInventorySarpras error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.updateInventorySarpras(id, dto);
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'updateInventorySarpras exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.updateInventorySarpras(id, dto);
+    }
+  }
+
+  public async deleteInventorySarpras(id: string, _token?: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('inventory_sarpras')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'deleteInventorySarpras error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.deleteInventorySarpras(id);
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'deleteInventorySarpras exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.deleteInventorySarpras(id);
+    }
+  }
 }
+
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { UserProfile } from '../../../types/database.types';
+import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 
 interface MoreFeaturesModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface MoreFeaturesModalProps {
   onOpenEventsCalendarModal?: () => void;
   onOpenStudentBehaviorModal?: (tab?: 'KEBAIKAN' | 'KEDISIPLINAN') => void;
   onOpenEmergencyModal?: () => void;
+  onOpenSarprasModal?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -41,6 +43,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenEventsCalendarModal,
   onOpenStudentBehaviorModal,
   onOpenEmergencyModal,
+  onOpenSarprasModal,
 }) => {
   if (!isOpen) return null;
 
@@ -200,6 +203,25 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           : []),
       ],
     },
+    ...(isUserSarprasOfficer(user) && onOpenSarprasModal
+      ? [
+          {
+            category: 'Sarana & Prasarana (Wakasek)',
+            items: [
+              {
+                id: 'sarpras_inventory',
+                title: 'Inventaris Sarana & Prasarana',
+                subtitle: 'Pencatatan aset barang, kondisi, dan kebutuhan pengadaan sekolah',
+                icon: '📦',
+                action: () => {
+                  onClose();
+                  onOpenSarprasModal();
+                },
+              },
+            ],
+          },
+        ]
+      : []),
     {
       category: 'Bantuan & Tanggap Darurat',
       items: [

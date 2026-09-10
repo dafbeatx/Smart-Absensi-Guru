@@ -27,6 +27,7 @@ import { AnonymousComplaintManagement } from '../components/AnonymousComplaintMa
 import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
 import { AnalyticsService } from '../../../services/analytics.service';
 import { DevTestPage } from './DevTestPage';
+import { SarprasExecutiveView } from '../../sarpras/components/SarprasExecutiveView';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord, SystemSettings } from '../../../types/database.types';
@@ -454,6 +455,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'CORRECTION', label: 'Koreksi Manual', icon: '✏️' },
     { id: 'EXPORT', label: 'Laporan', icon: '📊', hasDropdown: true },
     { id: 'SETTINGS', label: 'Pengaturan', icon: '⚙️', hasDropdown: true },
+    { id: 'SARPRAS', label: 'Inventaris Sarpras', icon: '📦' },
     { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
     { id: 'TESTS', label: 'Tests / Diagnostik', icon: '🧪' },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
@@ -705,6 +707,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 </Button>
               </div>
             </div>
+          )}
+
+          {/* TAB: INVENTARIS SARANA DAN PRASARANA (SARPRAS) */}
+          {activeTab === 'SARPRAS' && (
+            <SarprasExecutiveView
+              currentUser={user}
+              onBackToDashboard={() => setActiveTab('DASHBOARD')}
+            />
           )}
 
           {/* TAB: DEVELOPER TEST MODE */}

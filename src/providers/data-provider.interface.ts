@@ -22,6 +22,9 @@ import type {
   PushSubscriptionPayload,
   NotificationPreferences,
   TeacherPointLog,
+  InventorySarprasItem,
+  CreateInventorySarprasDTO,
+  UpdateInventorySarprasDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -135,6 +138,12 @@ export interface IDataProvider {
     log: Omit<TeacherPointLog, 'id' | 'created_at'>,
     token?: string
   ): Promise<TeacherPointLog>;
+
+  // Sarana dan Prasarana (Sarpras) Inventory API
+  getInventorySarpras(token?: string): Promise<InventorySarprasItem[]>;
+  createInventorySarpras(dto: CreateInventorySarprasDTO, token?: string): Promise<InventorySarprasItem>;
+  updateInventorySarpras(id: string, dto: UpdateInventorySarprasDTO, token?: string): Promise<boolean>;
+  deleteInventorySarpras(id: string, token?: string): Promise<boolean>;
 }
 
 

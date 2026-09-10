@@ -31,6 +31,8 @@ import {
   ALL_QUICK_ICONS,
   DEFAULT_8_QUICK_ICONS,
 } from '../../guru/components/CustomizeQuickIconsModal';
+import { SarprasInventoryModal } from '../../sarpras/components/SarprasInventoryModal';
+import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
   Radio,
@@ -351,25 +353,40 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
-  // 8 Quick Icons Customization State
+  // 8 Quick Icons Customization State & Hak Akses Wakasek Sarpras (M. Iqbal Gustiawan)
+  const isSarprasOfficer = isUserSarprasOfficer(effectiveUser);
+  const [isSarprasModalOpen, setIsSarprasModalOpen] = useState(false);
   const [isCustomizeIconsModalOpen, setIsCustomizeIconsModalOpen] = useState(false);
   const [quickIconIds, setQuickIconIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(`smart_absensi_quick_icons_${effectiveUser?.id || 'default'}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length === 8) return parsed;
+        if (Array.isArray(parsed) && parsed.length === 8) {
+          if (!isUserSarprasOfficer(effectiveUser)) {
+            // Guru lain tidak boleh memiliki icon sarpras_inventory
+            return parsed.map((id) => (id === 'sarpras_inventory' ? 'kalender' : id));
+          }
+          return parsed;
+        }
       }
     } catch {
       // ignore
+    }
+    if (isUserSarprasOfficer(effectiveUser)) {
+      return ['presensi', 'izin_cuti', 'jadwal', 'rekap', 'koreksi', 'sarpras_inventory', 'direktori_siswa', 'kalender'];
     }
     return DEFAULT_8_QUICK_ICONS;
   });
 
   const handleSaveQuickIcons = (newIds: string[]) => {
-    setQuickIconIds(newIds);
+    // Sanitasi untuk non-officer
+    const sanitized = isSarprasOfficer
+      ? newIds
+      : newIds.map((id) => (id === 'sarpras_inventory' ? 'kalender' : id));
+    setQuickIconIds(sanitized);
     try {
-      localStorage.setItem(`smart_absensi_quick_icons_${effectiveUser?.id || 'default'}`, JSON.stringify(newIds));
+      localStorage.setItem(`smart_absensi_quick_icons_${effectiveUser?.id || 'default'}`, JSON.stringify(sanitized));
     } catch {
       // ignore
     }
@@ -378,6 +395,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const handleQuickIconClick = (iconId: string) => {
     switch (iconId) {
+      case 'sarpras_inventory':
+        if (isSarprasOfficer) {
+          setIsSarprasModalOpen(true);
+        } else {
+          showToast('warning', 'Akses Terbatas', 'Menu ini hanya dapat diakses oleh Wakasek Sarpras.');
+        }
+        break;
       case 'presensi':
         handleOpenAttendanceChoice();
         break;
@@ -2275,6 +2299,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               {/* 8 Icon Grid: 2 Baris x 4 Kolom */}
               <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
                 {quickIconIds.map((iconId) => {
+                  if (iconId === 'sarpras_inventory' && !isSarprasOfficer) return null;
                   const item = ALL_QUICK_ICONS.find((i) => i.id === iconId) || ALL_QUICK_ICONS[0];
                   const IconComponent = item.icon;
                   const isExternal = item.id === 'koreksi_soal';
@@ -4204,6 +4229,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           setIsStudentBehaviorModalOpen(true);
         }}
         onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
+        onOpenSarprasModal={() => setIsSarprasModalOpen(true)}
       />
 
       {/* ⚙️ Modal Kustomisasi 8 Ikon Menu Utama Guru */}
@@ -4212,6 +4238,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={() => setIsCustomizeIconsModalOpen(false)}
         currentIconIds={quickIconIds}
         onSave={handleSaveQuickIcons}
+        currentUser={effectiveUser}
+      />
+
+      {/* 📦 Modal Inventaris Sarana & Prasarana (Khusus Wakasek Sarpras M. Iqbal Gustiawan) */}
+      <SarprasInventoryModal
+        isOpen={isSarprasModalOpen}
+        onClose={() => setIsSarprasModalOpen(false)}
+        currentUser={effectiveUser}
       />
 
       {/* 🚨 Panggilan Bantuan Darurat Kelas (SOS UKS / Piket) */}

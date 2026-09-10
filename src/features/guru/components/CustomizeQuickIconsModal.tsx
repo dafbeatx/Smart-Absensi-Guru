@@ -25,7 +25,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
+  Boxes,
 } from 'lucide-react';
+import type { UserProfile } from '../../../types/database.types';
+import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 
 export interface QuickIconItem {
   id: string;
@@ -173,6 +176,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     icon: Smile,
     colorClass: 'from-amber-600 to-yellow-800',
   },
+  {
+    id: 'sarpras_inventory',
+    title: 'Sarpras',
+    category: 'Presensi & Waktu',
+    description: 'Inventaris sarana & prasarana sekolah (Wakasek Sarpras)',
+    icon: Boxes,
+    colorClass: 'from-[#023246] to-[#18536B]',
+  },
 ];
 
 export const DEFAULT_8_QUICK_ICONS = [
@@ -185,6 +196,12 @@ export const DEFAULT_8_QUICK_ICONS = [
   'direktori_siswa',
   'kalender',
 ];
+
+export function getEffectiveQuickIcons(currentUser?: UserProfile | null): QuickIconItem[] {
+  const isOfficer = isUserSarprasOfficer(currentUser);
+  if (isOfficer) return ALL_QUICK_ICONS;
+  return ALL_QUICK_ICONS.filter((icon) => icon.id !== 'sarpras_inventory');
+}
 
 /**
  * 5 Grup Terstruktur (Masing-masing 3 atau 4 Card):
@@ -206,9 +223,9 @@ export const QUICK_ICON_STEPS: QuickIconStep[] = [
   },
   {
     id: 2,
-    title: 'Presensi & Lokasi',
+    title: 'Presensi & Fasilitas',
     category: 'Presensi & Waktu',
-    itemIds: ['koreksi', 'location', 'kalender'], // 3 items
+    itemIds: ['koreksi', 'location', 'kalender', 'sarpras_inventory'], // sarpras_inventory hanya muncul untuk Wakasek Sarpras
   },
   {
     id: 3,
@@ -230,11 +247,20 @@ export const QUICK_ICON_STEPS: QuickIconStep[] = [
   },
 ];
 
+export function getEffectiveQuickIconSteps(currentUser?: UserProfile | null): QuickIconStep[] {
+  const isOfficer = isUserSarprasOfficer(currentUser);
+  return QUICK_ICON_STEPS.map((step) => ({
+    ...step,
+    itemIds: isOfficer ? step.itemIds : step.itemIds.filter((id) => id !== 'sarpras_inventory'),
+  }));
+}
+
 interface CustomizeQuickIconsModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentIconIds: string[];
   onSave: (newIconIds: string[]) => void;
+  currentUser?: UserProfile | null;
 }
 
 export const CustomizeQuickIconsModal: React.FC<CustomizeQuickIconsModalProps> = ({
@@ -242,7 +268,17 @@ export const CustomizeQuickIconsModal: React.FC<CustomizeQuickIconsModalProps> =
   onClose,
   currentIconIds,
   onSave,
+  currentUser,
 }) => {
+  const isOfficer = isUserSarprasOfficer(currentUser);
+  const allowedIcons = ALL_QUICK_ICONS.filter(
+    (icon) => icon.id !== 'sarpras_inventory' || isOfficer
+  );
+
+  const effectiveSteps = QUICK_ICON_STEPS.map((step) => ({
+    ...step,
+    itemIds: isOfficer ? step.itemIds : step.itemIds.filter((id) => id !== 'sarpras_inventory'),
+  }));
   const [selectedIds, setSelectedIds] = useState<string[]>(
     currentIconIds.length === 8 ? currentIconIds : DEFAULT_8_QUICK_ICONS
   );
@@ -250,12 +286,16 @@ export const CustomizeQuickIconsModal: React.FC<CustomizeQuickIconsModalProps> =
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedIds(currentIconIds.length === 8 ? currentIconIds : DEFAULT_8_QUICK_ICONS);
+      const sanitized = (currentIconIds.length === 8 ? currentIconIds : DEFAULT_8_QUICK_ICONS).filter(
+        (id) => id !== 'sarpras_inventory' || isOfficer
+      );
+      setSelectedIds(sanitized.length === 8 ? sanitized : DEFAULT_8_QUICK_ICONS);
       setCurrentStepIndex(0);
     }
-  }, [isOpen, currentIconIds]);
+  }, [isOpen, currentIconIds, isOfficer]);
 
   const handleToggle = (id: string) => {
+    if (id === 'sarpras_inventory' && !isOfficer) return;
     if (selectedIds.includes(id)) {
       if (selectedIds.length <= 1) return; // minimal 1 item
       setSelectedIds(selectedIds.filter((item) => item !== id));
@@ -295,12 +335,12 @@ export const CustomizeQuickIconsModal: React.FC<CustomizeQuickIconsModalProps> =
 
   if (!isOpen) return null;
 
-  const currentStep = QUICK_ICON_STEPS[currentStepIndex];
+  const currentStep = effectiveSteps[currentStepIndex] || effectiveSteps[0];
   const currentStepItems = currentStep.itemIds
-    .map((id) => ALL_QUICK_ICONS.find((icon) => icon.id === id))
+    .map((id) => allowedIcons.find((icon) => icon.id === id))
     .filter((item): item is QuickIconItem => item !== undefined);
 
-  const totalSteps = QUICK_ICON_STEPS.length;
+  const totalSteps = effectiveSteps.length;
   const isLastStep = currentStepIndex === totalSteps - 1;
 
   return (
@@ -376,7 +416,7 @@ export const CustomizeQuickIconsModal: React.FC<CustomizeQuickIconsModalProps> =
             <div className="p-2.5 bg-slate-50/90 rounded-2xl border border-slate-200/90 grid grid-cols-4 gap-1.5">
               {Array.from({ length: 8 }).map((_, index) => {
                 const iconId = selectedIds[index];
-                const item = ALL_QUICK_ICONS.find((i) => i.id === iconId);
+                const item = allowedIcons.find((i) => i.id === iconId);
 
                 if (!item) {
                   return (

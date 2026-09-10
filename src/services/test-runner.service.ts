@@ -17,6 +17,7 @@ import { runBiometricAttendanceTestSuite } from './__tests__/biometric-attendanc
 import { runPermissionGuardTestSuite } from './__tests__/permission-guard.test';
 import { runNotificationVoiceOverhaulTestSuite } from './__tests__/notification-voice-overhaul.test';
 import { runTeacherPointsTestSuite } from './__tests__/teacher-points.test';
+import { runSarprasInventoryTestSuite } from './__tests__/sarpras-inventory.test';
 
 export interface TestResultItem {
   testName: string;
@@ -71,6 +72,7 @@ export class MasterTestRunner {
       { name: 'Permission Guard & Attendance Blocking Engine', fn: runPermissionGuardTestSuite },
       { name: 'Notification & Voice Overhaul System', fn: runNotificationVoiceOverhaulTestSuite },
       { name: 'Teacher Points & Gamification Ledger Engine', fn: runTeacherPointsTestSuite },
+      { name: 'Sarana & Prasarana (Sarpras) Inventory System', fn: runSarprasInventoryTestSuite },
     ];
 
     let totalPassed = 0;

@@ -435,3 +435,50 @@ export interface NotificationPreferences {
   attendance_policy_agreed_at?: string;
   updated_at?: string;
 }
+
+// Sarana dan Prasarana (Sarpras) Inventory
+export type SarprasCondition = 'LAYAK' | 'RUSAK';
+
+export interface InventorySarprasItem {
+  id: string;
+  ruangan: string;
+  nama_barang: string;
+  jumlah_total: number;
+  merek: string;
+  tahun_perolehan: number;
+  kondisi: SarprasCondition;
+  yang_harus_dibeli: string;
+  sumber_dana: string;
+  keterangan?: string;
+  created_by?: string;
+  created_by_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateInventorySarprasDTO {
+  ruangan: string;
+  nama_barang: string;
+  jumlah_total: number;
+  merek: string;
+  tahun_perolehan: number;
+  kondisi: SarprasCondition;
+  yang_harus_dibeli: string;
+  sumber_dana: string;
+  keterangan?: string;
+  created_by?: string;
+  created_by_name?: string;
+}
+
+export interface UpdateInventorySarprasDTO {
+  ruangan?: string;
+  nama_barang?: string;
+  jumlah_total?: number;
+  merek?: string;
+  tahun_perolehan?: number;
+  kondisi?: SarprasCondition;
+  yang_harus_dibeli?: string;
+  sumber_dana?: string;
+  keterangan?: string;
+}
+
