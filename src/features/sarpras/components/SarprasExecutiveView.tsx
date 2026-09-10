@@ -21,7 +21,10 @@ import {
   Trash2,
   Save,
   Building2,
+  Calendar,
+  Coins,
 } from 'lucide-react';
+import { ModernSarprasSelect } from './ModernSarprasSelect';
 
 interface SarprasExecutiveViewProps {
   currentUser?: UserProfile | null;
@@ -188,6 +191,49 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
     const list = Array.from(new Set(items.map((i) => i.sumber_dana.trim()))).filter(Boolean);
     return list.sort();
   }, [items]);
+
+  const filterRoomOptions = useMemo(() => {
+    const opts = [{ value: 'ALL', label: `Semua Ruangan (${uniqueRooms.length})` }];
+    uniqueRooms.forEach((r) => opts.push({ value: r, label: r }));
+    return opts;
+  }, [uniqueRooms]);
+
+  const filterConditionOptions = [
+    { value: 'ALL', label: 'Semua Kondisi' },
+    { value: 'LAYAK', label: '✅ Layak Pakai' },
+    { value: 'RUSAK', label: '⚠️ Rusak' },
+  ];
+
+  const filterFundingOptions = useMemo(() => {
+    const opts = [{ value: 'ALL', label: 'Semua Sumber Dana' }];
+    uniqueFundingSources.forEach((f) => opts.push({ value: f, label: f }));
+    return opts;
+  }, [uniqueFundingSources]);
+
+  const editRoomOptions = useMemo(() => {
+    const opts = InventorySarprasRepository.COMMON_ROOMS.map((r) => ({
+      value: r,
+      label: r,
+    }));
+    opts.push({ value: 'LAINNYA', label: '➕ Ruangan Lainnya (Ketik Manual)...' });
+    return opts;
+  }, []);
+
+  const editFundingOptions = useMemo(() => {
+    const opts = InventorySarprasRepository.COMMON_FUNDING_SOURCES.map((f) => ({
+      value: f,
+      label: f,
+    }));
+    opts.push({ value: 'LAINNYA', label: '➕ Sumber Dana Lainnya (Ketik Manual)...' });
+    return opts;
+  }, []);
+
+  const yearOptions = useMemo(() => {
+    return Array.from({ length: 15 }, (_, i) => {
+      const y = new Date().getFullYear() - i;
+      return { value: String(y), label: `Tahun ${y}` };
+    });
+  }, []);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -486,45 +532,35 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto">
             {/* Filter Ruangan */}
-            <select
+            <ModernSarprasSelect
+              compact
+              placeholder="Filter Ruangan..."
+              options={filterRoomOptions}
               value={selectedRoomFilter}
-              onChange={(e) => setSelectedRoomFilter(e.target.value)}
-              className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
-            >
-              <option value="ALL">Semua Ruangan ({uniqueRooms.length})</option>
-              {uniqueRooms.map((room) => (
-                <option key={room} value={room}>
-                  {room}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedRoomFilter(val)}
+              searchable
+            />
 
             {/* Filter Kondisi */}
-            <select
+            <ModernSarprasSelect
+              compact
+              placeholder="Filter Kondisi..."
+              options={filterConditionOptions}
               value={selectedConditionFilter}
-              onChange={(e) => setSelectedConditionFilter(e.target.value as any)}
-              className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
-            >
-              <option value="ALL">Semua Kondisi</option>
-              <option value="LAYAK">✅ Layak Pakai</option>
-              <option value="RUSAK">⚠️ Rusak</option>
-            </select>
+              onChange={(val) => setSelectedConditionFilter(val as any)}
+            />
 
             {/* Filter Sumber Dana */}
-            <select
+            <ModernSarprasSelect
+              compact
+              placeholder="Filter Sumber Dana..."
+              options={filterFundingOptions}
               value={selectedFundingFilter}
-              onChange={(e) => setSelectedFundingFilter(e.target.value)}
-              className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
-            >
-              <option value="ALL">Semua Sumber Dana</option>
-              {uniqueFundingSources.map((src) => (
-                <option key={src} value={src}>
-                  {src}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedFundingFilter(val)}
+              searchable
+            />
           </div>
         </div>
 
@@ -910,35 +946,20 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Ruangan */}
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="font-extrabold text-[#023246] flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-[#18536B]" />
-                    <span>Ruangan Mana? <span className="text-rose-500">*</span></span>
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <select
-                      value={editRuanganPreset}
-                      onChange={(e) => setEditRuanganPreset(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
-                    >
-                      {InventorySarprasRepository.COMMON_ROOMS.map((room) => (
-                        <option key={room} value={room}>
-                          {room}
-                        </option>
-                      ))}
-                      <option value="LAINNYA">Ruangan Lainnya (Ketik Manual)...</option>
-                    </select>
-
-                    {editRuanganPreset === 'LAINNYA' && (
-                      <input
-                        type="text"
-                        placeholder="Nama ruangan..."
-                        value={editRuanganCustom}
-                        onChange={(e) => setEditRuanganCustom(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
-                        required
-                      />
-                    )}
-                  </div>
+                  <ModernSarprasSelect
+                    label="Ruangan Mana?"
+                    required
+                    icon={<Building2 className="w-3.5 h-3.5" />}
+                    placeholder="Pilih Ruangan..."
+                    options={editRoomOptions}
+                    value={editRuanganPreset}
+                    onChange={(val) => setEditRuanganPreset(val)}
+                    allowCustomInput
+                    customValue={editRuanganCustom}
+                    onCustomChange={(val) => setEditRuanganCustom(val)}
+                    customPlaceholder="Ketik nama ruangan baru..."
+                    searchable
+                  />
                 </div>
 
                 {/* Nama Barang */}
@@ -986,20 +1007,15 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
 
                 {/* Tahun Perolehan */}
                 <div className="space-y-1">
-                  <label className="font-extrabold text-[#023246]">
-                    Tahun Perolehan <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={editTahunPerolehan}
-                    onChange={(e) => setEditTahunPerolehan(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
-                  >
-                    {Array.from({ length: 15 }, (_, i) => new Date().getFullYear() - i).map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
-                    ))}
-                  </select>
+                  <ModernSarprasSelect
+                    label="Tahun Perolehan"
+                    required
+                    icon={<Calendar className="w-3.5 h-3.5" />}
+                    placeholder="Pilih Tahun..."
+                    options={yearOptions}
+                    value={String(editTahunPerolehan)}
+                    onChange={(val) => setEditTahunPerolehan(Number(val))}
+                  />
                 </div>
 
                 {/* Kondisi */}
@@ -1051,34 +1067,20 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
 
                 {/* Sumber Dana */}
                 <div className="space-y-1 sm:col-span-2">
-                  <label className="font-extrabold text-[#023246]">
-                    Sumber Dana <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <select
-                      value={editSumberDanaPreset}
-                      onChange={(e) => setEditSumberDanaPreset(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
-                    >
-                      {InventorySarprasRepository.COMMON_FUNDING_SOURCES.map((src) => (
-                        <option key={src} value={src}>
-                          {src}
-                        </option>
-                      ))}
-                      <option value="LAINNYA">Sumber Dana Lainnya (Ketik Manual)...</option>
-                    </select>
-
-                    {editSumberDanaPreset === 'LAINNYA' && (
-                      <input
-                        type="text"
-                        placeholder="Nama sumber dana..."
-                        value={editSumberDanaCustom}
-                        onChange={(e) => setEditSumberDanaCustom(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
-                        required
-                      />
-                    )}
-                  </div>
+                  <ModernSarprasSelect
+                    label="Sumber Dana"
+                    required
+                    icon={<Coins className="w-3.5 h-3.5" />}
+                    placeholder="Pilih Sumber Dana..."
+                    options={editFundingOptions}
+                    value={editSumberDanaPreset}
+                    onChange={(val) => setEditSumberDanaPreset(val)}
+                    allowCustomInput
+                    customValue={editSumberDanaCustom}
+                    onCustomChange={(val) => setEditSumberDanaCustom(val)}
+                    customPlaceholder="Ketik sumber dana lain..."
+                    searchable
+                  />
                 </div>
 
                 {/* Keterangan */}
