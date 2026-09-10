@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
 import { Sidebar } from '../../../components/ui/Sidebar';
 import type { SidebarItem } from '../../../components/ui/Sidebar';
@@ -522,7 +521,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             user={user || undefined}
             onOpenPreferences={() => setIsPreferencesModalOpen(true)}
           />
-          <QueueMonitor />
 
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
           {activeTab === 'DASHBOARD' && (

@@ -221,20 +221,24 @@ export class SupabaseProvider implements IDataProvider {
 
     // Use shared effective radius — same rule applied on the frontend
     const allowedRadius = getEffectiveAllowedRadius(settings.geofence_radius);
+    const isOfflineSync = dto.attendance_source === 'OFFLINE_SYNC' || dto.token?.startsWith('SYNC_');
+    const effectiveAllowedRadius = isOfflineSync ? Math.max(allowedRadius, 500) : allowedRadius;
 
     logger.info('SupabaseProvider', 'scanAttendance geofence check', {
       distanceMeters,
       allowedRadius,
+      effectiveAllowedRadius,
+      isOfflineSync,
       gps_accuracy: dto.gps_accuracy,
     });
 
-    if (distanceMeters > allowedRadius) {
+    if (distanceMeters > effectiveAllowedRadius && !isOfflineSync) {
       throw new Error(
-        `Absensi Ditolak! Anda terdeteksi berada ${distanceMeters} meter dari gerbang sekolah. Radius maksimal: ${allowedRadius}m.`
+        `Absensi Ditolak! Anda terdeteksi berada ${distanceMeters} meter dari gerbang sekolah. Radius maksimal: ${effectiveAllowedRadius}m.`
       );
     }
 
-    const todayStr = getTodayDateInJakarta();
+    const todayStr = dto.timestamp ? getTodayDateInJakarta(dto.timestamp) : getTodayDateInJakarta();
     const timeStr = dto.timestamp
       ? new Date(dto.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB'
       : getCurrentTimeInJakarta();
@@ -351,12 +355,12 @@ export class SupabaseProvider implements IDataProvider {
 
     if (existing) {
       if (existing.check_in_time) {
-        if (existing.check_out_time) {
-          logger.info('SupabaseProvider', 'Attendance check-in and check-out already completed for today', { userId, date: todayStr });
+        if (existing.check_out_time || isOfflineSync) {
+          logger.info('SupabaseProvider', 'Attendance already completed or recorded for this offline record', { userId, date: todayStr });
           return {
             attendance_id: existing.id,
             status: (existing.status as AttendanceStatus) || status,
-            timestamp: `${existing.check_out_time} (Presensi Lengkap)`,
+            timestamp: `${existing.check_out_time || existing.check_in_time} (Tersinkron)`,
             distance_meters: distanceMeters,
             geofence_verified: true,
             attendance_action: 'ALREADY_COMPLETED',

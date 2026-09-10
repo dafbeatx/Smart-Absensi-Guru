@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { QueueMonitor } from '../../../components/ui/QueueMonitor';
 import { Button } from '../../../components/ui/Button';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { TeachingScheduleManagement } from '../../admin/components/TeachingScheduleManagement';
@@ -146,7 +145,6 @@ export const OperatorDashboardPage: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="max-w-5xl mx-auto px-5 -mt-8 space-y-5">
-        <QueueMonitor />
 
         {activeTab === 'TEACHERS' && (
           <TeacherManagementTable teachers={teachers} onTeachersChange={setTeachers} />
