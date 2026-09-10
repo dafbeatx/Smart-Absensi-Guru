@@ -54,6 +54,7 @@ import {
   FileText,
   ArrowLeft,
   ArrowRight,
+  ChevronRight,
   LayoutGrid,
   FileSpreadsheet,
   ClipboardCheck,
@@ -260,7 +261,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     : (authUser || fallbackUser);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE'>('HOME');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [correctionInitialDate, setCorrectionInitialDate] = useState<string | undefined>(undefined);
@@ -1967,6 +1968,56 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               onOpenPolicyModal={() => setIsPolicyModalOpen(true)}
             />
 
+            {/* 🌟 BANNER TANTANGAN DISIPLIN (COMPACT - KLIK UNTUK PINDAH LAYER LENGKAP) ─── */}
+            <div
+              onClick={() => {
+                setBerandaLayer('CHALLENGE');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="bg-linear-to-r from-[#023246] via-[#0A4158] to-[#18536B] rounded-2xl p-2.5 sm:p-3 text-white shadow-xs border border-cyan-900/30 flex items-center justify-between gap-2.5 cursor-pointer hover:brightness-105 active:scale-[0.99] transition-all group"
+              role="button"
+              tabIndex={0}
+              title="Klik untuk membuka Layer Tantangan Disiplin & Misi Lengkap"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+                  <span className="animate-pulse">🔥</span>
+                  {streakInfo.currentStreak > 0 && (
+                    <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black text-[8.5px] leading-tight shadow-xs">
+                      {streakInfo.currentStreak}d
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 leading-none">
+                    <span className="text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
+                      Tantangan Disiplin
+                    </span>
+                    <span className="text-[9px] font-mono text-cyan-200">• Bulan Berjalan</span>
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-black text-white truncate leading-tight mt-1">
+                    {streakInfo.currentStreak > 0
+                      ? `${streakInfo.currentStreak} Hari Beruntun Tepat Waktu!`
+                      : 'Mulai Nyalakan Api Rekor!'}
+                  </h4>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <div className="text-right">
+                  <span className="px-2 py-0.5 rounded-lg bg-white/10 border border-white/15 text-[10px] sm:text-[10.5px] font-black text-amber-200 block">
+                    {dailyQuests.filter((q) => q.status === 'COMPLETED').length}/{dailyQuests.length} Misi
+                  </span>
+                  <span className="text-[8.5px] text-cyan-200/80 font-mono block mt-0.5">
+                    #{disciplineLeaderboard.currentUserRank} • {appreciationScore.totalPoints} PTS
+                  </span>
+                </div>
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 group-hover:bg-white/20 text-white flex items-center justify-center transition-all">
+                  <ChevronRight className="w-3.5 h-3.5 text-cyan-200 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </div>
+            </div>
+
             {/* 🌟 1. CARD LOG PRESENSI HARI INI (DEVICE LOG TODAY MODEL) ─────────── */}
             {(() => {
               const isFriday = new Date().getDay() === 5;
@@ -2664,17 +2715,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               );
             })()}
 
-            {/* 🌟 4.75 WIDGET TANTANGAN HARIAN & STREAK DUOLINGO STYLE ────────────── */}
-            <TeacherDailyChallengeWidget
-              streakInfo={streakInfo}
-              quests={dailyQuests}
-              nightlyMotivation={nightlyMotivation}
-              onOpenChallengeModal={() => setIsChallengeModalOpen(true)}
-              onOpenLeaderboard={() => setIsDisciplineBadgeModalOpen(true)}
-              onOpenQuestAction={handleOpenQuestAction}
-              userRank={disciplineLeaderboard.currentUserRank}
-              totalPoints={appreciationScore.totalPoints}
-            />
+
 
             {/* 🌟 5. CATATAN & AKTIVITAS UNTUK ANDA ──────────────────────────── */}
             {(() => {
@@ -3300,6 +3341,96 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             </div>
 
             {/* Tombol Kembali di Bawah */}
+            <button
+              type="button"
+              onClick={() => {
+                setBerandaLayer('HOME');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 active:scale-98 border border-slate-200/90 shadow-xs text-xs font-bold text-[#023246] flex items-center justify-center gap-2 transition-all cursor-pointer min-h-12"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Kembali ke Beranda Utama</span>
+            </button>
+          </section>
+        )}
+
+        {/* ── LAYER: TANTANGAN DISIPLIN & MISI LENGKAP (PINDAH LAYER BESAR & LENGKAP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'CHALLENGE' && (
+          <section className="space-y-3.5 animate-fadeIn">
+            {/* Top Navigation Bar: Tombol Kembali ke Beranda */}
+            <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setBerandaLayer('HOME');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200 text-xs font-bold text-[#023246] transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Kembali ke Beranda</span>
+              </button>
+              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                Layer Papan Tantangan
+              </span>
+            </div>
+
+            {/* Banner Header Layer */}
+            <div className="bg-linear-to-r from-[#023246] to-[#18536B] rounded-3xl p-4 sm:p-5 text-white shadow-sm flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm sm:text-base font-black flex items-center gap-2">
+                  <span>🔥</span>
+                  <span>Tantangan Disiplin &amp; Misi Pendidik</span>
+                </h2>
+                <p className="text-[11px] sm:text-xs text-cyan-100/90 mt-0.5 font-medium">
+                  Bangun konsistensi rekor kehadiran on-time dan maksimalkan pemanfaatan fitur absensi
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white shrink-0 text-xl">
+                🏆
+              </div>
+            </div>
+
+            {/* Widget Tantangan Harian & Streak Duolingo Style (Versi Besar & Lengkap) */}
+            <TeacherDailyChallengeWidget
+              streakInfo={streakInfo}
+              quests={dailyQuests}
+              nightlyMotivation={nightlyMotivation}
+              onOpenChallengeModal={() => setIsChallengeModalOpen(true)}
+              onOpenLeaderboard={() => setIsDisciplineBadgeModalOpen(true)}
+              onOpenQuestAction={handleOpenQuestAction}
+              userRank={disciplineLeaderboard.currentUserRank}
+              totalPoints={appreciationScore.totalPoints}
+            />
+
+            {/* Shortcut Kartu Piagam & Peringkat Guru */}
+            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-base shrink-0">
+                    ⭐
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-900 leading-tight">
+                      Peringkat &amp; Piagam Penghargaan
+                    </h3>
+                    <p className="text-[10.5px] text-slate-500 font-medium">
+                      Peringkat #{disciplineLeaderboard.currentUserRank} dari {disciplineLeaderboard.totalTeachers} Guru ({appreciationScore.totalPoints} PTS)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDisciplineBadgeModalOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                >
+                  Klasemen →
+                </button>
+              </div>
+            </div>
+
+            {/* Tombol Kembali di Bawah Layer */}
             <button
               type="button"
               onClick={() => {
