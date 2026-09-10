@@ -262,9 +262,9 @@ export async function runSarprasInventoryTestSuite(): Promise<{
   // ── TEST 4: Provider CRUD Operations ────────────────────────────────────
   const initialItems = await InventorySarprasRepository.getAll();
   assert(
-    'CRUD Engine: Memuat data awal inventaris sarpras sekolah',
-    initialItems.length > 0,
-    `Loaded: ${initialItems.length} items`
+    'CRUD Engine: Memuat inventaris sarpras sekolah (default bersih dan kosong)',
+    Array.isArray(initialItems) && initialItems.length === 0,
+    `Loaded: ${initialItems.length} items (Awal kosong)`
   );
 
   // Tambah item baru

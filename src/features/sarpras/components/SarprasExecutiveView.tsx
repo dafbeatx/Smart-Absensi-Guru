@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventorySarprasRepository } from '../../../repositories/InventorySarprasRepository';
+import { useToastStore } from '../../../store/useToastStore';
 import type {
   InventorySarprasItem,
   UserProfile,
+  SarprasCondition,
+  UpdateInventorySarprasDTO,
 } from '../../../types/database.types';
 import {
   Boxes,
@@ -14,6 +17,10 @@ import {
   X,
   Info,
   ArrowLeft,
+  Edit2,
+  Trash2,
+  Save,
+  Building2,
 } from 'lucide-react';
 
 interface SarprasExecutiveViewProps {
@@ -25,6 +32,7 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
   currentUser: _currentUser,
   onBackToDashboard,
 }) => {
+  const { showToast } = useToastStore();
   const [items, setItems] = useState<InventorySarprasItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,6 +42,25 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
 
   // Modal Detail Item
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventorySarprasItem | null>(null);
+
+  // Modal Delete State
+  const [deletingItem, setDeletingItem] = useState<InventorySarprasItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Modal Edit State
+  const [editingItem, setEditingItem] = useState<InventorySarprasItem | null>(null);
+  const [editRuanganPreset, setEditRuanganPreset] = useState<string>(InventorySarprasRepository.COMMON_ROOMS[0]);
+  const [editRuanganCustom, setEditRuanganCustom] = useState('');
+  const [editNamaBarang, setEditNamaBarang] = useState('');
+  const [editJumlahTotal, setEditJumlahTotal] = useState<number | string>(1);
+  const [editMerek, setEditMerek] = useState('');
+  const [editTahunPerolehan, setEditTahunPerolehan] = useState<number>(new Date().getFullYear());
+  const [editKondisi, setEditKondisi] = useState<SarprasCondition>('LAYAK');
+  const [editYangHarusDibeli, setEditYangHarusDibeli] = useState('0');
+  const [editSumberDanaPreset, setEditSumberDanaPreset] = useState<string>(InventorySarprasRepository.COMMON_FUNDING_SOURCES[0]);
+  const [editSumberDanaCustom, setEditSumberDanaCustom] = useState('');
+  const [editKeterangan, setEditKeterangan] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -50,6 +77,105 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleStartEdit = (item: InventorySarprasItem) => {
+    setEditingItem(item);
+    if (InventorySarprasRepository.COMMON_ROOMS.includes(item.ruangan)) {
+      setEditRuanganPreset(item.ruangan);
+      setEditRuanganCustom('');
+    } else {
+      setEditRuanganPreset('LAINNYA');
+      setEditRuanganCustom(item.ruangan);
+    }
+    setEditNamaBarang(item.nama_barang);
+    setEditJumlahTotal(item.jumlah_total);
+    setEditMerek(item.merek);
+    setEditTahunPerolehan(item.tahun_perolehan);
+    setEditKondisi(item.kondisi);
+    setEditYangHarusDibeli(item.yang_harus_dibeli || '0');
+    if (InventorySarprasRepository.COMMON_FUNDING_SOURCES.includes(item.sumber_dana)) {
+      setEditSumberDanaPreset(item.sumber_dana);
+      setEditSumberDanaCustom('');
+    } else {
+      setEditSumberDanaPreset('LAINNYA');
+      setEditSumberDanaCustom(item.sumber_dana);
+    }
+    setEditKeterangan(item.keterangan || '');
+    if (selectedItemDetail?.id === item.id) {
+      setSelectedItemDetail(null);
+    }
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    const finalRuangan = editRuanganPreset === 'LAINNYA' ? editRuanganCustom.trim() : editRuanganPreset;
+    const finalSumberDana = editSumberDanaPreset === 'LAINNYA' ? editSumberDanaCustom.trim() : editSumberDanaPreset;
+
+    if (!finalRuangan) {
+      showToast('warning', 'Validasi Form', 'Silakan pilih atau isi nama ruangan.');
+      return;
+    }
+    if (!editNamaBarang.trim()) {
+      showToast('warning', 'Validasi Form', 'Nama barang wajib diisi.');
+      return;
+    }
+    if (!editMerek.trim()) {
+      showToast('warning', 'Validasi Form', 'Merek barang wajib diisi.');
+      return;
+    }
+    if (!editJumlahTotal || Number(editJumlahTotal) <= 0) {
+      showToast('warning', 'Validasi Form', 'Jumlah total barang minimal 1 unit.');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const dto: UpdateInventorySarprasDTO = {
+        ruangan: finalRuangan,
+        nama_barang: editNamaBarang.trim(),
+        jumlah_total: Number(editJumlahTotal),
+        merek: editMerek.trim(),
+        tahun_perolehan: Number(editTahunPerolehan),
+        kondisi: editKondisi,
+        yang_harus_dibeli: editYangHarusDibeli.trim() || '0',
+        sumber_dana: finalSumberDana,
+        keterangan: editKeterangan.trim() || undefined,
+      };
+
+      await InventorySarprasRepository.update(editingItem.id, dto);
+      setItems((prev) =>
+        prev.map((i) => (i.id === editingItem.id ? { ...i, ...dto, updated_at: new Date().toISOString() } : i))
+      );
+      showToast('success', 'Pembaruan Berhasil', `Data inventaris ${editNamaBarang} berhasil diperbarui.`);
+      setEditingItem(null);
+    } catch (err) {
+      console.warn('Gagal memperbarui sarpras:', err);
+      showToast('error', 'Gagal Memperbarui', 'Terjadi kesalahan saat memperbarui data inventaris.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deletingItem) return;
+    setIsDeleting(true);
+    try {
+      await InventorySarprasRepository.delete(deletingItem.id);
+      setItems((prev) => prev.filter((i) => i.id !== deletingItem.id));
+      if (selectedItemDetail?.id === deletingItem.id) {
+        setSelectedItemDetail(null);
+      }
+      showToast('success', 'Barang Dihapus', `${deletingItem.nama_barang} telah dihapus dari inventaris.`);
+      setDeletingItem(null);
+    } catch (err) {
+      console.warn('Gagal menghapus sarpras:', err);
+      showToast('error', 'Gagal Menghapus', 'Tidak dapat menghapus item inventaris.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const stats = useMemo(() => InventorySarprasRepository.calculateStatistics(items), [items]);
 
@@ -409,13 +535,19 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
             <p className="text-xs font-bold text-slate-500">Memuat data inventaris sekolah...</p>
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="py-16 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6 space-y-3">
-            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto text-xl shadow-2xs">
+          <div className="py-16 text-center bg-white rounded-2xl border border-dashed border-slate-200 p-6 space-y-3">
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-xl shadow-2xs">
               📦
             </div>
-            <h4 className="font-extrabold text-slate-800 text-sm">Data Inventaris Tidak Ditemukan</h4>
+            <h4 className="font-extrabold text-slate-800 text-sm">
+              {searchQuery || selectedRoomFilter !== 'ALL' || selectedConditionFilter !== 'ALL' || selectedFundingFilter !== 'ALL'
+                ? 'Data Inventaris Tidak Ditemukan'
+                : 'Belum Ada Data Inventaris'}
+            </h4>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Tidak ada aset yang sesuai dengan kriteria pencarian atau filter yang dipilih.
+              {searchQuery || selectedRoomFilter !== 'ALL' || selectedConditionFilter !== 'ALL' || selectedFundingFilter !== 'ALL'
+                ? 'Tidak ada aset yang sesuai dengan kriteria pencarian atau filter yang dipilih.'
+                : 'Daftar inventaris sarana dan prasarana masih kosong. Formulir input akan diisi oleh Wakasek Sarpras (M. Iqbal Gustiawan).'}
             </p>
           </div>
         ) : (
@@ -490,16 +622,41 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
                         </td>
                         <td className="py-3 px-3.5 text-slate-600">{item.sumber_dana}</td>
                         <td className="py-3 px-3.5 text-center">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedItemDetail(item);
-                            }}
-                            className="px-2 py-1 text-[11px] font-bold text-[#18536B] hover:bg-[#18536B]/10 rounded-lg transition-colors cursor-pointer"
-                          >
-                            Rincian
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedItemDetail(item);
+                              }}
+                              className="px-2 py-1 text-[11px] font-bold text-[#18536B] hover:bg-[#18536B]/10 rounded-lg transition-colors cursor-pointer"
+                              title="Lihat Rincian"
+                            >
+                              Rincian
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartEdit(item);
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-[#023246] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                              title="Edit Aset"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingItem(item);
+                              }}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Hapus Aset"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -558,9 +715,33 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60">
                       <span>Sumber: {item.sumber_dana}</span>
-                      <span className="text-[#18536B] font-bold">Lihat Detail →</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartEdit(item);
+                          }}
+                          className="p-1 text-slate-500 hover:text-[#023246] hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Aset"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingItem(item);
+                          }}
+                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-100/60 rounded-lg transition-colors cursor-pointer"
+                          title="Hapus Aset"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-[#18536B] font-bold">Rincian →</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -651,19 +832,325 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
               </p>
             </div>
 
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+            <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <span>
                 Diinput oleh:{' '}
                 <strong className="text-slate-800">
                   {selectedItemDetail.created_by_name || 'M. Iqbal Gustiawan'}
                 </strong>
               </span>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = selectedItemDetail;
+                    setSelectedItemDetail(null);
+                    handleStartEdit(item);
+                  }}
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-[#023246] font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-[#18536B]" />
+                  <span>Edit Data</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = selectedItemDetail;
+                    setSelectedItemDetail(null);
+                    setDeletingItem(item);
+                  }}
+                  className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Hapus</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedItemDetail(null)}
+                  className="px-4 py-2 bg-[#023246] hover:bg-[#18536B] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EDIT ITEM SARPRAS (EKSEKUTIF) ─────────────────────────── */}
+      {editingItem && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setEditingItem(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 sm:p-6 max-w-xl w-full space-y-4 shadow-2xl my-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-[#18536B]/10 text-[#18536B] rounded-xl">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-[#023246]">Edit Data Inventaris Sarpras</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">Perbarui rincian aset atau kebutuhan pengadaan</p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setSelectedItemDetail(null)}
-                className="px-4 py-2 bg-[#023246] hover:bg-[#18536B] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                onClick={() => setEditingItem(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 cursor-pointer"
               >
-                Tutup
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Ruangan */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="font-extrabold text-[#023246] flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-[#18536B]" />
+                    <span>Ruangan Mana? <span className="text-rose-500">*</span></span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select
+                      value={editRuanganPreset}
+                      onChange={(e) => setEditRuanganPreset(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                    >
+                      {InventorySarprasRepository.COMMON_ROOMS.map((room) => (
+                        <option key={room} value={room}>
+                          {room}
+                        </option>
+                      ))}
+                      <option value="LAINNYA">Ruangan Lainnya (Ketik Manual)...</option>
+                    </select>
+
+                    {editRuanganPreset === 'LAINNYA' && (
+                      <input
+                        type="text"
+                        placeholder="Nama ruangan..."
+                        value={editRuanganCustom}
+                        onChange={(e) => setEditRuanganCustom(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                        required
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Nama Barang */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="font-extrabold text-[#023246]">
+                    Nama Barang <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editNamaBarang}
+                    onChange={(e) => setEditNamaBarang(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                    required
+                  />
+                </div>
+
+                {/* Merek */}
+                <div className="space-y-1">
+                  <label className="font-extrabold text-[#023246]">
+                    Merek <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editMerek}
+                    onChange={(e) => setEditMerek(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                    required
+                  />
+                </div>
+
+                {/* Jumlah Total */}
+                <div className="space-y-1">
+                  <label className="font-extrabold text-[#023246]">
+                    Jumlah Total (Unit) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editJumlahTotal}
+                    onChange={(e) => setEditJumlahTotal(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                    required
+                  />
+                </div>
+
+                {/* Tahun Perolehan */}
+                <div className="space-y-1">
+                  <label className="font-extrabold text-[#023246]">
+                    Tahun Perolehan <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={editTahunPerolehan}
+                    onChange={(e) => setEditTahunPerolehan(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                  >
+                    {Array.from({ length: 15 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Kondisi */}
+                <div className="space-y-1">
+                  <label className="font-extrabold text-[#023246]">
+                    Kondisi Aset <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditKondisi('LAYAK')}
+                      className={`p-2 rounded-xl border font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        editKondisi === 'LAYAK'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                          : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Layak</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditKondisi('RUSAK')}
+                      className={`p-2 rounded-xl border font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        editKondisi === 'RUSAK'
+                          ? 'border-rose-500 bg-rose-50 text-rose-800'
+                          : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Rusak</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Yang Harus Dibeli */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="font-extrabold text-[#023246] flex items-center justify-between">
+                    <span>Yang Harus Dibeli (Pengadaan / Penggantian)</span>
+                    <span className="text-[10px] font-normal text-slate-400">Isi '0' jika tidak ada</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editYangHarusDibeli}
+                    onChange={(e) => setEditYangHarusDibeli(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                  />
+                </div>
+
+                {/* Sumber Dana */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="font-extrabold text-[#023246]">
+                    Sumber Dana <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select
+                      value={editSumberDanaPreset}
+                      onChange={(e) => setEditSumberDanaPreset(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                    >
+                      {InventorySarprasRepository.COMMON_FUNDING_SOURCES.map((src) => (
+                        <option key={src} value={src}>
+                          {src}
+                        </option>
+                      ))}
+                      <option value="LAINNYA">Sumber Dana Lainnya (Ketik Manual)...</option>
+                    </select>
+
+                    {editSumberDanaPreset === 'LAINNYA' && (
+                      <input
+                        type="text"
+                        placeholder="Nama sumber dana..."
+                        value={editSumberDanaCustom}
+                        onChange={(e) => setEditSumberDanaCustom(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                        required
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Keterangan */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="font-extrabold text-[#023246]">Keterangan Tambahan</label>
+                  <textarea
+                    rows={2}
+                    value={editKeterangan}
+                    onChange={(e) => setEditKeterangan(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-medium text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                  disabled={isUpdating}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#023246] hover:bg-[#18536B] text-white rounded-xl font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  disabled={isUpdating}
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL KONFIRMASI HAPUS ──────────────────────────────────────── */}
+      {deletingItem && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setDeletingItem(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">Hapus Barang Dari Inventaris?</h3>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                Aset <strong>{deletingItem.nama_barang}</strong> ({deletingItem.ruangan}) akan dihapus secara permanen dari daftar inventaris sarpras sekolah.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingItem(null)}
+                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+                disabled={isDeleting}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteItem}
+                className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Menghapus...' : 'Ya, Hapus Aset'}
               </button>
             </div>
           </div>
