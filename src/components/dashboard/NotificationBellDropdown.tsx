@@ -209,7 +209,9 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
               ? 'Hari Ini'
               : paydayReminder.status === 'H-1'
               ? 'Besok'
-              : '2 Hari Lagi',
+              : paydayReminder.status === 'H-2'
+              ? '2 Hari Lagi'
+              : '3 Hari Lagi',
           badgeType: paydayReminder.status === 'HARI_H' ? 'SUCCESS' : 'INFO',
           isRead: currentReadSet.has(paydayBellId),
           actionType: 'NAVIGATE_TAB',

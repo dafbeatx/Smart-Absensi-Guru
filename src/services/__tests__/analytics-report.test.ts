@@ -372,10 +372,19 @@ export const runAnalyticsReportTestSuite = async (): Promise<{
       reminderHariH.badgeLabel === 'HARI GAJIAN TELAH TIBA'
   );
 
-  const reminderOff1 = getPaydayReminderInfo('2026-09-07');
+  const reminderH3 = getPaydayReminderInfo('2026-09-07');
+  assert(
+    'Payday Reminder - H-3 (Tanggal 7) correctly identified with 3 days remaining',
+    reminderH3.isReminderActive === true &&
+      reminderH3.status === 'H-3' &&
+      reminderH3.daysRemaining === 3 &&
+      reminderH3.badgeLabel === 'PENGINGAT H-3 HARI GAJIAN'
+  );
+
+  const reminderOff1 = getPaydayReminderInfo('2026-09-06');
   const reminderOff2 = getPaydayReminderInfo('2026-09-11');
   assert(
-    'Payday Reminder - Outside H-2..H (Tanggal 7 & 11) is inactive',
+    'Payday Reminder - Outside H-3..H (Tanggal 6 & 11) is inactive',
     reminderOff1.isReminderActive === false &&
       reminderOff1.status === null &&
       reminderOff2.isReminderActive === false &&

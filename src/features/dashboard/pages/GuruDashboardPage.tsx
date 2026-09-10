@@ -1169,6 +1169,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     loadAllData();
     loadAllDataRef.current = loadAllData;
 
+    // Auto-ensure Web Push registration to cloud if permission is already granted
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      NotificationService.subscribeUserToPush(effectiveUser.id).catch(() => {});
+    }
+
     const handleScannedEvent = () => loadAllData();
     const handleNotificationPushed = () => {
       loadAllData();
@@ -1854,54 +1859,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
           <>
-            {/* 💰 BANNER PENGINGAT HARI GAJIAN (H-2, H-1, HARI H TANGGAL 10) */}
-            {(() => {
-              const paydayInfo = getPaydayReminderInfo(new Date(), effectiveUser.full_name);
-              if (!paydayInfo.isReminderActive) return null;
-
-              const isHariH = paydayInfo.status === 'HARI_H';
-              const gradientClass = isHariH
-                ? 'bg-linear-to-r from-emerald-800 via-teal-800 to-[#023246] border-emerald-400/40'
-                : paydayInfo.status === 'H-1'
-                ? 'bg-linear-to-r from-amber-700 via-amber-800 to-[#023246] border-amber-400/40'
-                : 'bg-linear-to-r from-[#023246] via-teal-900 to-emerald-900 border-teal-400/40';
-
-              const badgeColorClass = isHariH
-                ? 'bg-amber-300 text-amber-950'
-                : paydayInfo.status === 'H-1'
-                ? 'bg-amber-400 text-amber-950 font-black'
-                : 'bg-teal-300 text-teal-950';
-
-              return (
-                <div
-                  onClick={() => setIsEventsCalendarModalOpen(true)}
-                  className={`${gradientClass} rounded-3xl p-3.5 sm:p-4 text-white shadow-md border flex items-center justify-between gap-3 cursor-pointer hover:brightness-105 active:scale-[0.99] transition-all`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-xl shrink-0">
-                      💰
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`px-2 py-0.5 ${badgeColorClass} text-[9.5px] font-black rounded-md tracking-wider uppercase shadow-2xs`}>
-                          {paydayInfo.badgeLabel}
-                        </span>
-                        <span className="text-[10.5px] text-emerald-200 font-bold">
-                          {isHariH ? 'Hari Ini Tanggal 10' : paydayInfo.status === 'H-1' ? 'Besok Tanggal 10' : '2 Hari Lagi (Tgl 10)'}
-                        </span>
-                      </div>
-                      <p className="text-xs font-black truncate leading-tight mt-1 text-white">
-                        {paydayInfo.message}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs text-amber-200 hover:text-white font-black shrink-0 hidden sm:inline-block">
-                    Lihat Kalender →
-                  </span>
-                </div>
-              );
-            })()}
-
             {/* 📢 BANNER PENGINGAT JADWAL AGENDA HARI INI (RAPAT / UTS / UAS / UPACARA) */}
             {todaySchedule && (
               <div

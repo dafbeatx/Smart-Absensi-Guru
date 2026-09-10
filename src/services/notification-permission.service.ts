@@ -541,9 +541,14 @@ class NotificationPermissionService {
   }): Promise<boolean> {
     if (typeof window === 'undefined') return false;
     try {
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const res = await fetch('/api/send-push', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           ...params,
           url: params.actionUrl || params.url,
@@ -558,75 +563,54 @@ class NotificationPermissionService {
   /**
    * Helper: Trigger Notifikasi Guru Absen Masuk (Check-In)
    */
-  public notifyTeacherCheckIn(teacherName: string, timeStr: string, userId?: string) {
-    const todayIso = new Date().toISOString().substring(0, 10);
+  public notifyTeacherCheckIn(teacherName: string, time: string, userId?: string) {
     this.sendNativeNotification({
-      id: `notif_in_${userId || teacherName.replace(/\s+/g, '_')}_${todayIso}_${timeStr.replace(':', '')}`,
-      title: `🟢 Presensi Masuk: ${teacherName}`,
-      body: `Bapak/Ibu ${teacherName} telah melakukan presensi masuk pada pukul ${timeStr} WIB.`,
+      title: '✅ Presensi Masuk Berhasil',
+      body: `Bapak/Ibu ${teacherName} berhasil presensi masuk pada pukul ${time} WIB.`,
       type: 'CHECK_IN',
       teacherName,
-      time: timeStr,
+      time,
       userId,
-      roleTarget: 'ALL',
-      actionUrl: '/?tab=TEACHERS',
+      roleTarget: 'GURU',
+      actionUrl: '/?tab=BERANDA',
     });
-
-    // Otomatis kirimkan Web Push ke HP Admin & Kepsek di latar belakang
-    this.triggerServerWebPush({
-      targetRoles: ['ADMIN', 'KEPSEK'],
-      title: `🟢 Presensi Masuk: ${teacherName}`,
-      body: `Bapak/Ibu ${teacherName} telah melakukan presensi masuk pada pukul ${timeStr} WIB.`,
-      tag: `in_${userId || 'guru'}_${todayIso}`,
-      url: '/?tab=TEACHERS',
-    }).catch(() => {});
   }
 
   /**
-   * Helper: Trigger Notifikasi Guru Absen Keluar (Check-Out)
+   * Helper: Trigger Notifikasi Guru Absen Pulang (Check-Out)
    */
-  public notifyTeacherCheckOut(teacherName: string, timeStr: string, userId?: string) {
-    const todayIso = new Date().toISOString().substring(0, 10);
+  public notifyTeacherCheckOut(teacherName: string, time: string, userId?: string) {
+    this.cancelScheduledCheckoutReminder();
     this.sendNativeNotification({
-      id: `notif_out_${userId || teacherName.replace(/\s+/g, '_')}_${todayIso}_${timeStr.replace(':', '')}`,
-      title: `🔵 Presensi Pulang: ${teacherName}`,
-      body: `Bapak/Ibu ${teacherName} telah melakukan presensi pulang pada pukul ${timeStr} WIB.`,
+      title: '👋 Presensi Pulang Berhasil',
+      body: `Bapak/Ibu ${teacherName} telah menyelesaikan presensi pulang pada pukul ${time} WIB. Hati-hati di jalan!`,
       type: 'CHECK_OUT',
       teacherName,
-      time: timeStr,
+      time,
       userId,
-      roleTarget: 'ALL',
-      actionUrl: '/?tab=TEACHERS',
+      roleTarget: 'GURU',
+      actionUrl: '/?tab=BERANDA',
     });
-
-    // Otomatis kirimkan Web Push ke HP Admin & Kepsek di latar belakang
-    this.triggerServerWebPush({
-      targetRoles: ['ADMIN', 'KEPSEK'],
-      title: `🔵 Presensi Pulang: ${teacherName}`,
-      body: `Bapak/Ibu ${teacherName} telah melakukan presensi pulang pada pukul ${timeStr} WIB.`,
-      tag: `out_${userId || 'guru'}_${todayIso}`,
-      url: '/?tab=TEACHERS',
-    }).catch(() => {});
   }
 
   /**
-   * Helper: Trigger Notifikasi Event / Agenda Sekolah Baru
+   * Helper: Trigger Notifikasi Pengumuman / Agenda Sekolah
    */
   public notifySchoolEvent(eventTitle: string, eventDate: string, description?: string) {
     const todayIso = new Date().toISOString().substring(0, 10);
     this.sendNativeNotification({
-      id: `notif_event_${eventDate}_${eventTitle.replace(/\s+/g, '_').substring(0, 20)}`,
-      title: `📅 Agenda Sekolah: ${eventTitle}`,
-      body: `${eventTitle} (${eventDate})${description ? ' - ' + description : ''}.`,
+      id: `notif_event_${eventDate}_${todayIso}`,
+      title: `📢 Agenda Sekolah: ${eventTitle}`,
+      body: `${eventTitle} dijadwalkan pada ${eventDate}${description ? ' - ' + description : ''}.`,
       type: 'EVENT',
       roleTarget: 'ALL',
+      actionDate: eventDate,
       actionUrl: '/?tab=BERANDA',
     });
 
-    // Kirimkan Web Push ke seluruh guru dan pimpinan di latar belakang
     this.triggerServerWebPush({
       targetRoles: ['GURU', 'ADMIN', 'KEPSEK'],
-      title: `📅 Agenda Sekolah: ${eventTitle}`,
+      title: `📢 Agenda Sekolah: ${eventTitle}`,
       body: `${eventTitle} (${eventDate})${description ? ' - ' + description : ''}.`,
       tag: `event_${eventDate}_${todayIso}`,
       url: '/?tab=BERANDA',
@@ -634,7 +618,7 @@ class NotificationPermissionService {
   }
 
   /**
-   * Helper: Trigger Notifikasi Hari Gajian Bulanan untuk Guru & Staf (H-2, H-1, Hari H Tanggal 10)
+   * Helper: Trigger Notifikasi Hari Gajian Bulanan untuk Guru & Staf (H-3, H-2, H-1, Hari H Tanggal 10)
    */
   public notifyPayday(
     teacherName?: string,

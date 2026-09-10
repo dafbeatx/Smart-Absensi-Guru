@@ -45,5 +45,15 @@
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron-attendance-alerts?type=morning",
+      "schedule": "30 23 * * *"
+    },
+    {
+      "path": "/api/cron-attendance-alerts?type=checkout",
+      "schedule": "0 6 * * *"
+    }
   ]
 }

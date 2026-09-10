@@ -384,7 +384,7 @@ export function isPaydayDate(targetDate: string | Date = new Date()): boolean {
 
 export interface PaydayReminderInfo {
   isReminderActive: boolean;
-  status: 'H-2' | 'H-1' | 'HARI_H' | null;
+  status: 'H-3' | 'H-2' | 'H-1' | 'HARI_H' | null;
   daysRemaining: number;
   badgeLabel: string;
   title: string;
@@ -393,7 +393,7 @@ export interface PaydayReminderInfo {
 }
 
 /**
- * Mendapatkan status pengingat Hari Gajian (H-2, H-1, dan Hari H tanggal 10).
+ * Mendapatkan status pengingat Hari Gajian (H-3, H-2, H-1, dan Hari H tanggal 10).
  */
 export function getPaydayReminderInfo(
   targetDate: string | Date = new Date(),
@@ -428,6 +428,19 @@ export function getPaydayReminderInfo(
   const monthPad = String(d.getMonth() + 1).padStart(2, '0');
   const targetPaydayDate = `${year}-${monthPad}-10`;
   const greeting = teacherName ? `Bapak/Ibu ${teacherName}` : 'Bapak/Ibu Guru & Staf';
+
+  // H-3 Pengingat: Tanggal 7
+  if (dayNumber === 7) {
+    return {
+      isReminderActive: true,
+      status: 'H-3',
+      daysRemaining: 3,
+      badgeLabel: 'PENGINGAT H-3 HARI GAJIAN',
+      title: '💰 Pengingat: 3 Hari Lagi Hari Gajian (Tanggal 10)',
+      message: `Halo ${greeting}! 3 hari lagi (tanggal 10) adalah Hari Gajian bulanan. Tetap semangat mengajar dan selalu lakukan presensi masuk & pulang.`,
+      targetPaydayDate,
+    };
+  }
 
   // H-2 Pengingat: Tanggal 8
   if (dayNumber === 8) {

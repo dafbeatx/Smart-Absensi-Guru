@@ -47,10 +47,22 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
   const [chimeMuted, setChimeMuted] = useState<boolean>(() => SoundService.getIsChimeMuted());
   const [attendanceSoundMuted, setAttendanceSoundMuted] = useState<boolean>(() => SoundService.getIsAttendanceSoundMuted());
 
+  const [testing, setTesting] = useState(false);
+
   useEffect(() => {
     if (!isOpen || !user) return;
 
-    NotificationService.getDetailedStatus(user.id).then(setDetailedStatus);
+    NotificationService.getDetailedStatus(user.id).then(async (status) => {
+      setDetailedStatus(status);
+      if (status === 'granted') {
+        // Auto attempt to subscribe to push so device is connected to cloud
+        const subscribed = await NotificationService.subscribeUserToPush(user.id);
+        if (subscribed) {
+          const updated = await NotificationService.getDetailedStatus(user.id);
+          setDetailedStatus(updated);
+        }
+      }
+    });
 
     setChimeMuted(SoundService.getIsChimeMuted());
     setAttendanceSoundMuted(SoundService.getIsAttendanceSoundMuted());
@@ -117,6 +129,26 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
     }
   };
 
+  const handleTestNotification = () => {
+    if (!user) return;
+    setTesting(true);
+    try {
+      NotificationService.sendNativeNotification({
+        title: '🔔 Uji Notifikasi Berhasil!',
+        body: `Halo ${user.full_name || 'Guru'}, notifikasi Smart Absensi aktif & siap berdering di perangkat ini.`,
+        type: 'SYSTEM',
+        userId: user.id,
+        roleTarget: 'ALL',
+        actionUrl: '/?tab=BERANDA',
+      });
+      showToast('success', 'Uji Notifikasi Terkirim', 'Periksa bilah notifikasi atas HP Anda sekarang.');
+    } catch {
+      showToast('error', 'Gagal Mengirim', 'Pastikan izin notifikasi browser sudah diizinkan.');
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <div
       role="dialog"
@@ -157,13 +189,13 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
           ) : (
             <>
               {/* Push Permission Status Card */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-[#023246] flex items-center gap-1.5">
                     <span>📡 Status Izin Browser:</span>
                   </span>
                   <span
-                    className={`px-2 py-0.5 rounded-full font-black text-[10px] ${
+                    className={`px-2.5 py-0.5 rounded-full font-black text-[10px] ${
                       detailedStatus === 'subscribed'
                         ? 'bg-emerald-100 text-emerald-800'
                         : detailedStatus === 'denied'
@@ -180,15 +212,43 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                       : 'Belum Aktif'}
                   </span>
                 </div>
-                {detailedStatus !== 'subscribed' && (
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {detailedStatus !== 'subscribed' && (
+                    <button
+                      type="button"
+                      onClick={handleRequestPush}
+                      className="flex-1 min-h-11 px-3.5 py-2 bg-[#0D7A5F] hover:bg-[#0b654f] text-white font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-95"
+                    >
+                      🔔 Sambungkan Web Push Cloud
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={handleRequestPush}
-                    className="w-full min-h-11 px-3.5 py-2 bg-[#0D7A5F] hover:bg-[#0b654f] text-white font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-95"
+                    onClick={handleTestNotification}
+                    disabled={testing}
+                    className="min-h-11 px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                   >
-                    🔔 Sambungkan Web Push HP / Laptop
+                    <span>🧪</span>
+                    <span>Uji Bunyi Notifikasi</span>
                   </button>
-                )}
+                </div>
+              </div>
+
+              {/* Infinix & Android OS Optimization Tips Card */}
+              <div className="p-3.5 bg-amber-50/60 rounded-2xl border border-amber-200/80 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[11px]">
+                  <span>💡</span>
+                  <span>Tips HP Infinix &amp; Android (Saat Web Ditutup):</span>
+                </div>
+                <ul className="text-[10.5px] text-amber-950/80 space-y-1 list-disc list-inside leading-relaxed">
+                  <li>
+                    <strong>Pasang ke Layar Utama:</strong> Ketuk menu titik 3 browser Chrome → <em>Tambahkan ke Layar Utama</em> (PWA).
+                  </li>
+                  <li>
+                    <strong>Hemat Daya XOS Infinix:</strong> Buka <em>Pengaturan HP → Manajemen Aplikasi → Chrome/Web Absensi → Baterai → Izinkan Aktivitas Latar Belakang</em> agar OS tidak membekukan notifikasi saat layar mati.
+                  </li>
+                </ul>
               </div>
 
               {/* Notification Toggles */}
@@ -231,7 +291,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                   <div className="space-y-0.5 pr-2">
                     <span className="font-bold text-slate-800 block">Agenda Sekolah &amp; Peringatan Gajian</span>
                     <span className="text-[11px] text-slate-500 block">
-                      Pengumuman agenda penting sekolah dan pengingat gajian H-2 s.d Hari H.
+                      Pengumuman agenda penting sekolah dan pengingat gajian H-3 s.d Hari H (Tanggal 10).
                     </span>
                   </div>
                   <input
