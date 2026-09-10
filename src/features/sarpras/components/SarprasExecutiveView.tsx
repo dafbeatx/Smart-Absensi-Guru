@@ -347,7 +347,7 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
               placeholder="Cari berdasarkan nama barang, merek, ruangan, atau keterangan..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold text-[#023246] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
             />
             {searchQuery && (
               <button
@@ -365,7 +365,7 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
             <select
               value={selectedRoomFilter}
               onChange={(e) => setSelectedRoomFilter(e.target.value)}
-              className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:bg-white focus:outline-none"
+              className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
             >
               <option value="ALL">Semua Ruangan ({uniqueRooms.length})</option>
               {uniqueRooms.map((room) => (
@@ -379,7 +379,7 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
             <select
               value={selectedConditionFilter}
               onChange={(e) => setSelectedConditionFilter(e.target.value as any)}
-              className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:bg-white focus:outline-none"
+              className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
             >
               <option value="ALL">Semua Kondisi</option>
               <option value="LAYAK">✅ Layak Pakai</option>
@@ -390,7 +390,7 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
             <select
               value={selectedFundingFilter}
               onChange={(e) => setSelectedFundingFilter(e.target.value)}
-              className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:bg-white focus:outline-none"
+              className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
             >
               <option value="ALL">Semua Sumber Dana</option>
               {uniqueFundingSources.map((src) => (

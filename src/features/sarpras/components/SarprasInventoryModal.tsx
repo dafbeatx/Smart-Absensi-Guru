@@ -379,7 +379,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                   <select
                     value={ruanganPreset}
                     onChange={(e) => setRuanganPreset(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                   >
                     {InventorySarprasRepository.COMMON_ROOMS.map((room) => (
                       <option key={room} value={room}>
@@ -395,7 +395,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                       placeholder="Masukkan nama ruangan spesifik..."
                       value={ruanganCustom}
                       onChange={(e) => setRuanganCustom(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                       required
                     />
                   )}
@@ -412,7 +412,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                   placeholder="Contoh: Proyektor LCD, Laptop Core i5, Meja Guru..."
                   value={namaBarang}
                   onChange={(e) => setNamaBarang(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                   required
                 />
               </div>
@@ -427,7 +427,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                   placeholder="Contoh: Epson, Asus, Daikin, Olympic..."
                   value={merek}
                   onChange={(e) => setMerek(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                   required
                 />
               </div>
@@ -443,7 +443,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                   placeholder="Contoh: 1, 20, 30..."
                   value={jumlahTotal}
                   onChange={(e) => setJumlahTotal(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                   required
                 />
               </div>
@@ -456,7 +456,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                 <select
                   value={tahunPerolehan}
                   onChange={(e) => setTahunPerolehan(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                 >
                   {Array.from({ length: 15 }, (_, i) => new Date().getFullYear() - i).map((y) => (
                     <option key={y} value={y}>
@@ -510,7 +510,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                   placeholder="Contoh: 2 unit pengganti yang rusak / 0 jika cukup..."
                   value={yangHarusDibeli}
                   onChange={(e) => setYangHarusDibeli(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                 />
               </div>
 
@@ -523,7 +523,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                   <select
                     value={sumberDanaPreset}
                     onChange={(e) => setSumberDanaPreset(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                   >
                     {InventorySarprasRepository.COMMON_FUNDING_SOURCES.map((src) => (
                       <option key={src} value={src}>
@@ -539,7 +539,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                       placeholder="Masukkan sumber dana..."
                       value={sumberDanaCustom}
                       onChange={(e) => setSumberDanaCustom(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                       required
                     />
                   )}
@@ -556,7 +556,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                   placeholder="Catatan kondisi spesifik, letak bracket, nomor seri, kelengkapan kabel..."
                   value={keterangan}
                   onChange={(e) => setKeterangan(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30 focus:border-[#18536B]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-[#023246] focus:outline-none focus:ring-2 focus:ring-[#18536B]/30"
                 />
               </div>
             </div>
