@@ -1970,11 +1970,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
             {/* 🌟 BANNER TANTANGAN DISIPLIN (COMPACT - KLIK UNTUK PINDAH LAYER LENGKAP) ─── */}
             <div
+              id="compact-challenge-banner"
               onClick={() => {
                 setBerandaLayer('CHALLENGE');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="bg-linear-to-r from-[#023246] via-[#0A4158] to-[#18536B] rounded-2xl p-2.5 sm:p-3 text-white shadow-xs border border-cyan-900/30 flex items-center justify-between gap-2.5 cursor-pointer hover:brightness-105 active:scale-[0.99] transition-all group"
+              className="bg-linear-to-r from-[#023246] via-[#0A4158] to-[#18536B] rounded-2xl p-3 sm:p-3.5 text-white shadow-md border border-cyan-700/40 flex items-center justify-between gap-2.5 cursor-pointer hover:brightness-110 active:scale-[0.99] transition-all group"
               role="button"
               tabIndex={0}
               title="Klik untuk membuka Layer Tantangan Disiplin & Misi Lengkap"
@@ -1982,7 +1983,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-lg sm:text-xl shrink-0 shadow-inner group-hover:scale-105 transition-transform">
                   <span className="animate-pulse">🔥</span>
-                  {streakInfo.currentStreak > 0 && (
+                  {(streakInfo?.currentStreak ?? 0) > 0 && (
                     <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black text-[8.5px] leading-tight shadow-xs">
                       {streakInfo.currentStreak}d
                     </span>
@@ -1996,7 +1997,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <span className="text-[9px] font-mono text-cyan-200">• Bulan Berjalan</span>
                   </div>
                   <h4 className="text-xs sm:text-sm font-black text-white truncate leading-tight mt-1">
-                    {streakInfo.currentStreak > 0
+                    {(streakInfo?.currentStreak ?? 0) > 0
                       ? `${streakInfo.currentStreak} Hari Beruntun Tepat Waktu!`
                       : 'Mulai Nyalakan Api Rekor!'}
                   </h4>
@@ -2006,10 +2007,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <div className="text-right">
                   <span className="px-2 py-0.5 rounded-lg bg-white/10 border border-white/15 text-[10px] sm:text-[10.5px] font-black text-amber-200 block">
-                    {dailyQuests.filter((q) => q.status === 'COMPLETED').length}/{dailyQuests.length} Misi
+                    {(dailyQuests || []).filter((q) => q?.status === 'COMPLETED').length}/{(dailyQuests || []).length} Misi
                   </span>
                   <span className="text-[8.5px] text-cyan-200/80 font-mono block mt-0.5">
-                    #{disciplineLeaderboard.currentUserRank} • {appreciationScore.totalPoints} PTS
+                    #{(disciplineLeaderboard?.currentUserRank) ?? 1} • {(appreciationScore?.totalPoints) ?? 0} PTS
                   </span>
                 </div>
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 group-hover:bg-white/20 text-white flex items-center justify-center transition-all">
@@ -3400,8 +3401,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               onOpenChallengeModal={() => setIsChallengeModalOpen(true)}
               onOpenLeaderboard={() => setIsDisciplineBadgeModalOpen(true)}
               onOpenQuestAction={handleOpenQuestAction}
-              userRank={disciplineLeaderboard.currentUserRank}
-              totalPoints={appreciationScore.totalPoints}
+              userRank={(disciplineLeaderboard?.currentUserRank) ?? 1}
+              totalPoints={(appreciationScore?.totalPoints) ?? 0}
             />
 
             {/* Shortcut Kartu Piagam & Peringkat Guru */}
@@ -3416,7 +3417,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Peringkat &amp; Piagam Penghargaan
                     </h3>
                     <p className="text-[10.5px] text-slate-500 font-medium">
-                      Peringkat #{disciplineLeaderboard.currentUserRank} dari {disciplineLeaderboard.totalTeachers} Guru ({appreciationScore.totalPoints} PTS)
+                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({(appreciationScore?.totalPoints) ?? 0} PTS)
                     </p>
                   </div>
                 </div>

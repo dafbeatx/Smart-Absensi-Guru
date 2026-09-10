@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/update-version.cjs && tsc -b && vite build",
     "lint": "oxlint",
     "test": "tsx scripts/run-tests.ts",
     "test:e2e": "npm test",

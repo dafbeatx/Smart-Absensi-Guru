@@ -12,16 +12,16 @@ export class AutoUpdateService {
   public static initAutoUpdateEngine(): void {
     if (typeof window === 'undefined') return;
 
-    // 1. Initial check after 3 seconds on app launch
+    // 1. Initial check after 1 second on app launch
     setTimeout(() => {
       this.checkForUpdates();
-    }, 3000);
+    }, 1000);
 
-    // 2. Periodic background polling every 30 seconds
+    // 2. Periodic background polling every 15 seconds
     if (!this.checkIntervalTimer) {
       this.checkIntervalTimer = setInterval(() => {
         this.checkForUpdates();
-      }, 30000);
+      }, 15000);
     }
 
     // 3. Waking up screen / switching tabs on HP Mobile

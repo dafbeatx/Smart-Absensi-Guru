@@ -11,7 +11,6 @@ const STATIC_ASSETS = [
   '/favicon.png',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
-  '/version.json',
 ];
 
 // Install Event - Pre-cache core static shell
@@ -45,8 +44,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests and Supabase REST API calls from Cache
-  if (request.method !== 'GET' || url.pathname.includes('/rest/v1/') || url.hostname.includes('supabase.co')) {
+  // Skip non-GET requests, Supabase REST API calls, and version.json from Cache
+  if (
+    request.method !== 'GET' ||
+    url.pathname.includes('/rest/v1/') ||
+    url.hostname.includes('supabase.co') ||
+    url.pathname.includes('version.json')
+  ) {
     return;
   }
 
