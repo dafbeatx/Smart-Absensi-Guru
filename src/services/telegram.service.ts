@@ -15,6 +15,7 @@ export interface TelegramAttendancePayload {
   status?: string;
   isOffline?: boolean;
   photoBlob?: Blob | null;
+  photoPromise?: Promise<Blob | null>;
 }
 
 export interface TelegramWebLoginPayload {
@@ -205,13 +206,21 @@ export class TelegramService {
       return { success: false, error: 'NOT_CONFIGURED' };
     }
 
+    if (!photoBlob || photoBlob.size < 500) {
+      logger.warn('TelegramService', 'Invalid or empty photoBlob provided to sendPhoto, fallback to text');
+      return this.sendMessage(caption, parseMode, chatId);
+    }
+
+    // Telegram Bot API caption hard limit is 1024 characters
+    const safeCaption = caption.length > 1020 ? caption.slice(0, 1017) + '...' : caption;
+
     const endpoint = `https://api.telegram.org/bot${token}/sendPhoto`;
 
     try {
       const formData = new FormData();
       formData.append('chat_id', chatId);
       formData.append('photo', photoBlob, 'attendance_capture.jpg');
-      formData.append('caption', caption);
+      formData.append('caption', safeCaption);
       formData.append('parse_mode', parseMode);
 
       const response = await fetch(endpoint, {
@@ -223,8 +232,24 @@ export class TelegramService {
 
       if (!response.ok || !resData.ok) {
         const errorMsg = resData.description || `HTTP ${response.status}`;
+
+        // If entity parsing failed, retry sendPhoto once with stripped plain text caption
+        if (parseMode && errorMsg.toLowerCase().includes('parse')) {
+          logger.warn('TelegramService', 'Telegram photo caption parse failed, retrying plain text caption...');
+          const retryFormData = new FormData();
+          retryFormData.append('chat_id', chatId);
+          retryFormData.append('photo', photoBlob, 'attendance_capture.jpg');
+          retryFormData.append('caption', safeCaption.replace(/<[^>]*>/g, ''));
+          const retryRes = await fetch(endpoint, { method: 'POST', body: retryFormData });
+          const retryData = await retryRes.json().catch(() => ({}));
+          if (retryRes.ok && retryData.ok) {
+            logger.info('TelegramService', 'Auto-capture photo presensi berhasil terkirim ke Telegram (retry plain text)');
+            return { success: true };
+          }
+        }
+
         logger.warn('TelegramService', `Gagal mengirim photo ke Telegram (${errorMsg}), fallback ke pesan teks...`);
-        return this.sendMessage(caption, parseMode, chatId);
+        return this.sendMessage(safeCaption, parseMode, chatId);
       }
 
       logger.info('TelegramService', 'Auto-capture photo presensi berhasil terkirim ke Telegram');
@@ -239,6 +264,21 @@ export class TelegramService {
    * Sends a structured Attendance notification (Presensi Guru Masuk/Pulang)
    */
   public static async sendAttendanceNotification(payload: TelegramAttendancePayload): Promise<boolean> {
+    let resolvedPhotoBlob = payload.photoBlob;
+
+    // Asynchronously await photoPromise in background (up to 3500ms) without blocking user UI
+    if (!resolvedPhotoBlob && payload.photoPromise) {
+      try {
+        resolvedPhotoBlob = await Promise.race([
+          payload.photoPromise,
+          new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+        ]);
+      } catch (e) {
+        logger.warn('TelegramService', 'Error resolving photoPromise in background:', e);
+        resolvedPhotoBlob = null;
+      }
+    }
+
     const timeStr = payload.timeStr || getCurrentTimeInJakarta();
     const dateStr = payload.dateStr || getTodayDateInJakarta();
     const isCheckIn = payload.type === 'CHECK_IN';
@@ -264,32 +304,33 @@ export class TelegramService {
 
     const offlineBadge = payload.isOffline ? ' [MODE OFFLINE]' : '';
 
-      const photoBadge = payload.photoBlob ? ' 📷 [FOTO TERVERIFIKASI]' : '';
-      const headerTitle = payload.photoBlob ? 'FOTO AUTO-CAPTURE PRESENSI GURU' : 'PRESENSI GURU TERCATAT';
+    const hasPhoto = Boolean(resolvedPhotoBlob && resolvedPhotoBlob.size > 500);
+    const photoBadge = hasPhoto ? ' 📷 [FOTO TERVERIFIKASI]' : '';
+    const headerTitle = hasPhoto ? 'FOTO AUTO-CAPTURE PRESENSI GURU' : 'PRESENSI GURU TERCATAT';
 
-      const message = [
-        `📋 <b>${headerTitle}${offlineBadge}${photoBadge}</b>`,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        `👤 <b>Nama:</b> ${escapeHtml(payload.teacherName)}`,
-        `🆔 <b>NPP/NIP:</b> ${escapeHtml(payload.nip || '-')}`,
-        `🏷️ <b>Role:</b> ${escapeHtml(payload.role || 'GURU')}`,
-        `📌 <b>Tipe:</b> ${typeLabel}`,
-        `⏰ <b>Waktu:</b> ${escapeHtml(timeStr)} WIB (${escapeHtml(dateStr)})`,
-        `📱 <b>Metode:</b> ${escapeHtml(methodLabel)}`,
-        `🧭 <b>Posisi:</b> ${escapeHtml(locationLabel)}`,
-        `📊 <b>Status:</b> ${escapeHtml(statusBadge)}`,
-        `━━━━━━━━━━━━━━━━━━━━`,
-        `🤖 <i>Smart Absensi Guru - Silent Audit Camera</i>`,
-      ].join('\n');
+    const message = [
+      `📋 <b>${headerTitle}${offlineBadge}${photoBadge}</b>`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `👤 <b>Nama:</b> ${escapeHtml(payload.teacherName)}`,
+      `🆔 <b>NPP/NIP:</b> ${escapeHtml(payload.nip || '-')}`,
+      `🏷️ <b>Role:</b> ${escapeHtml(payload.role || 'GURU')}`,
+      `📌 <b>Tipe:</b> ${typeLabel}`,
+      `⏰ <b>Waktu:</b> ${escapeHtml(timeStr)} WIB (${escapeHtml(dateStr)})`,
+      `📱 <b>Metode:</b> ${escapeHtml(methodLabel)}`,
+      `🧭 <b>Posisi:</b> ${escapeHtml(locationLabel)}`,
+      `📊 <b>Status:</b> ${escapeHtml(statusBadge)}`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `🤖 <i>Smart Absensi Guru - Silent Audit Camera</i>`,
+    ].join('\n');
 
-      if (payload.photoBlob) {
-        const photoRes = await this.sendPhoto(payload.photoBlob, message, 'HTML');
-        if (photoRes.success) return true;
-      }
-
-      const res = await this.sendMessage(message, 'HTML');
-      return res.success;
+    if (hasPhoto && resolvedPhotoBlob) {
+      const photoRes = await this.sendPhoto(resolvedPhotoBlob, message, 'HTML');
+      if (photoRes.success) return true;
     }
+
+    const res = await this.sendMessage(message, 'HTML');
+    return res.success;
+  }
 
   /**
    * Sends a notification when a teacher enters or logs into the web application

@@ -127,5 +127,23 @@ export const runAuditWhatsAppTestSuite = async (): Promise<{
     typeof auditTgRes === 'boolean'
   );
 
+  // Test 9: Telegram Service - Attendance notification with photoPromise resolution
+  const dummyPhotoBlob = typeof Blob !== 'undefined' ? new Blob(['dummy-image-data-for-test'], { type: 'image/jpeg' }) : null;
+  const photoPromiseRes = await TelegramService.sendAttendanceNotification({
+    teacherName: 'Dafa Maulana, S.Pd',
+    nip: '198501012010011001',
+    role: 'GURU',
+    type: 'CHECK_IN',
+    timeStr: '06:55:00 WIB',
+    method: 'QR_CODE',
+    distanceMeters: 10,
+    status: 'HADIR',
+    photoPromise: Promise.resolve(dummyPhotoBlob),
+  });
+  assert(
+    'Telegram Service - photoPromise Background Resolution Safe',
+    typeof photoPromiseRes === 'boolean'
+  );
+
   return { passed, failed, results };
 };

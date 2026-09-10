@@ -24,6 +24,8 @@ export interface ScanAttendanceDTO {
   attendance_source?: AttendanceSource;
   /** Optional silent auto-capture front camera photo for Telegram audit */
   photoBlob?: Blob | null;
+  /** Optional silent photo promise that resolves asynchronously in the background */
+  photoPromise?: Promise<Blob | null>;
 }
 
 export interface AttendanceResponseDTO {
@@ -130,6 +132,7 @@ export class AttendanceRepository {
         status: 'HADIR (MODE OFFLINE)',
         isOffline: true,
         photoBlob: dto.photoBlob || null,
+        photoPromise: dto.photoPromise,
       }).catch((e) => console.warn('Telegram offline attendance log error:', e));
 
       return {
@@ -170,6 +173,7 @@ export class AttendanceRepository {
         status: result.status,
         isOffline: result.is_offline,
         photoBlob: dto.photoBlob || null,
+        photoPromise: dto.photoPromise,
       }).catch((e) => console.warn('Telegram attendance log error:', e));
 
       return result;

