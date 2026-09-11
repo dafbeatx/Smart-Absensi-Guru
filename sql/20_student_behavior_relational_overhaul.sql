@@ -127,9 +127,15 @@ CREATE POLICY "Staff can void behavior logs with reason"
   ON public.student_behavior_logs FOR UPDATE
   TO authenticated
   USING (
-    -- Hanya pencatat asli atau admin/kepsek yang dapat membatalkan
+    -- Hanya pencatat asli atau admin/kepsek/operator yang dapat membatalkan
     recorded_by_user_id = auth.uid()::text
-    OR (auth.jwt() -> 'user_metadata' ->> 'role') IN ('ADMIN', 'KEPSEK')
+    OR EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid()::text
+        AND u.role IN ('ADMIN', 'KEPSEK', 'OPERATOR')
+    )
+    OR (auth.jwt() -> 'app_metadata' ->> 'role') IN ('ADMIN', 'KEPSEK', 'OPERATOR')
+    OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
   )
   WITH CHECK (
     -- Larang modifikasi field inti; hanya kolom void dan updated_at yang boleh diubah
