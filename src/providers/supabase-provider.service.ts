@@ -387,12 +387,26 @@ export class SupabaseProvider implements IDataProvider {
 
     if (existing) {
       if (existing.check_in_time) {
-        if (existing.check_out_time || isOfflineSync) {
-          logger.info('SupabaseProvider', 'Attendance already completed or recorded for this offline record', { userId, date: todayStr });
+        // If check-out is already recorded, return ALREADY_COMPLETED
+        if (existing.check_out_time) {
+          logger.info('SupabaseProvider', 'Attendance already completed for today', { userId, date: todayStr });
           return {
             attendance_id: existing.id,
             status: (existing.status as AttendanceStatus) || status,
-            timestamp: `${existing.check_out_time || existing.check_in_time} (Tersinkron)`,
+            timestamp: `${existing.check_out_time} (Tersinkron)`,
+            distance_meters: distanceMeters,
+            geofence_verified: true,
+            attendance_action: 'ALREADY_COMPLETED',
+          };
+        }
+
+        // If this is an offline sync but it was just a duplicate check-in, don't overwrite
+        if (isOfflineSync && dto.attempt_action === 'CHECK_IN' && !dto.qr_seed?.includes('CHECK_OUT') && !dto.verification_method?.includes('PULANG')) {
+          logger.info('SupabaseProvider', 'Check-in already recorded online, skipping offline check-in replay', { userId, date: todayStr });
+          return {
+            attendance_id: existing.id,
+            status: (existing.status as AttendanceStatus) || status,
+            timestamp: `${existing.check_in_time} (Check-in Tersinkron)`,
             distance_meters: distanceMeters,
             geofence_verified: true,
             attendance_action: 'ALREADY_COMPLETED',
@@ -454,25 +468,29 @@ export class SupabaseProvider implements IDataProvider {
           throw new Error('Gagal mencatat absensi pulang: ' + updateErr.message);
         }
 
-        // AUTOMATIC TEACHER POINT RECORDING (Check-out Pulang Sekolah)
-        try {
-          const checkoutPts = isEarlyCheckout ? 5 : 10;
-          const checkoutTitle = isEarlyCheckout
-            ? 'Presensi Pulang Sekolah (Sebelum Jam Dinas)'
-            : 'Presensi Pulang Tuntas Bertugas';
-          const checkoutDesc = `Tercatat menyelesaikan dinas sekolah pada pukul ${displayTime} WIB via ${vMethod || 'QR'}`;
+        // AUTOMATIC TEACHER POINT RECORDING (Check-out Pulang Sekolah) — Non-blocking async
+        const checkoutPts = isEarlyCheckout ? 5 : 10;
+        const checkoutTitle = isEarlyCheckout
+          ? 'Presensi Pulang Sekolah (Sebelum Jam Dinas)'
+          : 'Presensi Pulang Tuntas Bertugas';
+        const checkoutDesc = `Tercatat menyelesaikan dinas sekolah pada pukul ${displayTime} WIB via ${vMethod || 'QR'}`;
 
-          await this.recordTeacherPoint({
-            user_id: userId,
-            teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
-            date: todayStr,
-            points: checkoutPts,
-            activity_type: 'CHECK_OUT',
-            title: checkoutTitle,
-            description: checkoutDesc,
-          });
-        } catch (ePoint) {
+        this.recordTeacherPoint({
+          user_id: userId,
+          teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
+          date: todayStr,
+          points: checkoutPts,
+          activity_type: 'CHECK_OUT',
+          title: checkoutTitle,
+          description: checkoutDesc,
+        }).catch((ePoint) => {
           logger.warn('SupabaseProvider', 'Failed to auto-record teacher points on check-out:', ePoint);
+        });
+
+        // Dispatch real-time UI refresh events for same-device dashboard sync
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('smart_absensi_scanned'));
+          window.dispatchEvent(new Event('smart_absensi_records_updated'));
         }
 
         return {
@@ -520,55 +538,63 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error('Gagal menyimpan data absensi ke Supabase: ' + error.message);
     }
 
-    // AUTOMATIC TEACHER POINT RECORDING (Check-in On-Time / Late & Duty Piket)
-    try {
-      const isLate = status === 'TERLAMBAT';
-      const attendancePts = isLate ? 5 : 15;
-      const attendanceType: TeacherPointActivityType = isLate ? 'CHECK_IN_LATE' : 'CHECK_IN_ON_TIME';
-      const attendanceTitle = isLate
-        ? 'Presensi Masuk Sekolah (> 07:30 WIB)'
-        : 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)';
-      const attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'}`;
-
-      await this.recordTeacherPoint({
-        user_id: userId,
-        teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
-        date: todayStr,
-        points: attendancePts,
-        activity_type: attendanceType,
-        title: attendanceTitle,
-        description: attendanceDesc,
-      });
-
-      // Cek apakah guru terjadwal piket hari ini
+    // AUTOMATIC TEACHER POINT RECORDING (Check-in On-Time / Late & Duty Piket) — Non-blocking async
+    (async () => {
       try {
-        const dutySchedules = await this.getDutySchedules();
-        const todayDayOfWeek = new Date().getDay();
-        const isDutyToday = (dutySchedules || []).some(
-          (s) =>
-            s.day_of_week === todayDayOfWeek &&
-            (s.teacher_id === userId ||
-              (sessionUser?.full_name &&
-                s.teacher_name &&
-                s.teacher_name.toLowerCase().includes(sessionUser.full_name.toLowerCase())))
-        );
+        const isLate = status === 'TERLAMBAT';
+        const attendancePts = isLate ? 5 : 15;
+        const attendanceType: TeacherPointActivityType = isLate ? 'CHECK_IN_LATE' : 'CHECK_IN_ON_TIME';
+        const attendanceTitle = isLate
+          ? 'Presensi Masuk Sekolah (> 07:30 WIB)'
+          : 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)';
+        const attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'}`;
 
-        if (isDutyToday) {
-          await this.recordTeacherPoint({
-            user_id: userId,
-            teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
-            date: todayStr,
-            points: 10,
-            activity_type: 'DUTY_PIKET',
-            title: 'Tugas Piket Harian Sekolah',
-            description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah',
-          });
+        await this.recordTeacherPoint({
+          user_id: userId,
+          teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
+          date: todayStr,
+          points: attendancePts,
+          activity_type: attendanceType,
+          title: attendanceTitle,
+          description: attendanceDesc,
+        });
+
+        // Cek apakah guru terjadwal piket hari ini
+        try {
+          const dutySchedules = await this.getDutySchedules();
+          const todayDayOfWeek = new Date().getDay();
+          const isDutyToday = (dutySchedules || []).some(
+            (s) =>
+              s.day_of_week === todayDayOfWeek &&
+              (s.teacher_id === userId ||
+                (sessionUser?.full_name &&
+                  s.teacher_name &&
+                  s.teacher_name.toLowerCase().includes(sessionUser.full_name.toLowerCase())))
+          );
+
+          if (isDutyToday) {
+            await this.recordTeacherPoint({
+              user_id: userId,
+              teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
+              date: todayStr,
+              points: 10,
+              activity_type: 'DUTY_PIKET',
+              title: 'Tugas Piket Harian Sekolah',
+              description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah',
+            });
+          }
+        } catch (eDuty) {
+          logger.warn('SupabaseProvider', 'Failed to verify duty schedule for points:', eDuty);
         }
-      } catch (eDuty) {
-        logger.warn('SupabaseProvider', 'Failed to verify duty schedule for points:', eDuty);
+      } catch (ePoint) {
+        logger.warn('SupabaseProvider', 'Failed to auto-record teacher points on check-in:', ePoint);
       }
-    } catch (ePoint) {
-      logger.warn('SupabaseProvider', 'Failed to auto-record teacher points on check-in:', ePoint);
+    })().catch(() => {});
+
+    // Dispatch real-time UI refresh events for same-device dashboard sync
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_scanned'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
     }
 
     return {
@@ -801,6 +827,48 @@ export class SupabaseProvider implements IDataProvider {
       logger.warn('SupabaseProvider', 'updateAttendanceNote exception:', err);
     }
     return true;
+  }
+
+  public subscribeToAttendanceUpdates(
+    callback: (event: { table: string; eventType: string }) => void
+  ): () => void {
+    const channelId = `realtime_live_tracking_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const channel = this.client
+      .channel(channelId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'attendance' },
+        (payload) => {
+          logger.info('SupabaseProvider', 'Realtime change detected in attendance table:', payload.eventType);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('smart_absensi_records_updated'));
+          }
+          callback({ table: 'attendance', eventType: payload.eventType });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leaves' },
+        (payload) => {
+          logger.info('SupabaseProvider', 'Realtime change detected in leaves table:', payload.eventType);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
+            window.dispatchEvent(new Event('smart_absensi_records_updated'));
+          }
+          callback({ table: 'leaves', eventType: payload.eventType });
+        }
+      )
+      .subscribe((status) => {
+        logger.info('SupabaseProvider', `Realtime channel [${channelId}] status:`, status);
+      });
+
+    return () => {
+      try {
+        this.client.removeChannel(channel);
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'Error removing realtime channel:', err);
+      }
+    };
   }
 
   // ─── LEAVE & APPROVAL API ─────────────────────────────────────────────────

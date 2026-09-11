@@ -74,7 +74,7 @@ export function isNetworkOrTimeoutError(err: unknown): boolean {
     lower.includes('networkerror') ||
     lower.includes('koneksi internet') ||
     lower.includes('sinyal lemah') ||
-    lower.includes('timeout 2.5s') ||
+    lower.includes('timeout') ||
     (lower.includes('network') && !lower.includes('social network'));
 
   if (isExplicitNetworkMessage) return true;
@@ -149,9 +149,9 @@ export class AttendanceRepository {
     }
 
     try {
-      // Race online provider scan vs 2500ms timeout for weak/slow 2G/3G/4G connections
+      // Race online provider scan vs 8000ms timeout for weak/slow 2G/3G/4G connections
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Koneksi internet lambat / sinyal lemah (Timeout 2.5s). Mengalihkan ke simpan offline...')), 2500)
+        setTimeout(() => reject(new Error('Koneksi internet lambat / sinyal lemah (Timeout 8s). Mengalihkan ke simpan offline...')), 8000)
       );
 
       const result = await Promise.race([
@@ -180,6 +180,20 @@ export class AttendanceRepository {
 
       return result;
     } catch (err: unknown) {
+      const isCheckoutAttempt = dto.attempt_action === 'CHECK_OUT' ||
+        dto.verification_method?.includes('PULANG') ||
+        dto.qr_seed?.includes('CHECK_OUT') ||
+        (() => {
+          try {
+            const raw = localStorage.getItem('smart_absensi_today_record') || localStorage.getItem('smart_absensi_my_today_record');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed?.check_in_time && !parsed?.check_out_time) return true;
+            }
+          } catch {}
+          return false;
+        })();
+
       if (!isNetworkOrTimeoutError(err)) {
         logger.warn('AttendanceRepository', 'scanAttendance rejected by backend/validation, rethrowing error to UI:', err);
         
@@ -188,20 +202,6 @@ export class AttendanceRepository {
         const errMsg = err && typeof err === 'object' && 'message' in err
           ? String((err as { message: string }).message)
           : String(err);
-        
-        const isCheckoutAttempt = dto.attempt_action === 'CHECK_OUT' ||
-          dto.verification_method?.includes('PULANG') ||
-          dto.qr_seed?.includes('CHECK_OUT') ||
-          (() => {
-            try {
-              const raw = localStorage.getItem('smart_absensi_today_record') || localStorage.getItem('smart_absensi_my_today_record');
-              if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed?.check_in_time && !parsed?.check_out_time) return true;
-              }
-            } catch {}
-            return false;
-          })();
 
         TelegramService.sendAttendanceFailureNotification({
           teacherName: currentUser?.full_name || dto.user_id || 'Guru',
@@ -221,6 +221,10 @@ export class AttendanceRepository {
       // If network fetch fails or times out, fallback to IndexedDB Queue
       const userId = useAuthStore.getState().user?.id || 'usr_offline';
       const recordId = 'att_offline_' + Date.now();
+      const currentUser = useAuthStore.getState().user;
+      const offlineTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+      const effAction = isCheckoutAttempt ? 'CHECK_OUT' : 'CHECK_IN';
+      const effStatus = isCheckoutAttempt ? 'PULANG (MODE OFFLINE)' : 'HADIR (MODE OFFLINE)';
 
       try {
         await indexedDBService.enqueue({
@@ -234,18 +238,35 @@ export class AttendanceRepository {
           timestamp: new Date().toISOString(),
           sync_status: 'PENDING',
           retry_count: 0,
+          attempt_action: effAction,
         });
 
         const pendingItems = await indexedDBService.getPendingQueue();
         useSyncQueueStore.getState().setPendingItems(pendingItems);
 
+        // Always log offline attendance to Telegram so admin/kepsek are aware
+        TelegramService.sendAttendanceNotification({
+          teacherName: currentUser?.full_name || dto.user_id || 'Guru',
+          nip: currentUser?.nip || undefined,
+          role: currentUser?.role || 'GURU',
+          type: effAction,
+          timeStr: offlineTime,
+          dateStr: getTodayDateInJakarta(),
+          method: dto.verification_method || 'QR_CODE',
+          distanceMeters: effectiveDistance,
+          status: effStatus,
+          isOffline: true,
+          photoBlob: dto.photoBlob || null,
+          photoPromise: dto.photoPromise,
+        }).catch((e) => console.warn('Telegram offline attendance log error:', e));
+
         return {
           attendance_id: recordId,
-          status: 'HADIR (MODE OFFLINE)',
-          timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+          status: effStatus,
+          timestamp: offlineTime,
           distance_meters: effectiveDistance,
           geofence_verified: true,
-          attendance_action: 'CHECK_IN',
+          attendance_action: effAction,
           is_offline: true,
         };
       } catch {

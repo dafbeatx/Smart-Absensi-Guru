@@ -143,6 +143,7 @@ export class SyncEngine {
             gps_accuracy: item.gps_accuracy,
             distance_meters: item.distance_meters || 10,
             attendance_source: 'OFFLINE_SYNC',
+            attempt_action: item.attempt_action || (item.qr_seed?.includes('CHECK_OUT') ? 'CHECK_OUT' : undefined),
           });
 
           // Hapus item yang berhasil dari IndexedDB

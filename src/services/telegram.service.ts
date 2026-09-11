@@ -22,12 +22,14 @@ export interface TelegramAttendanceFailurePayload {
   teacherName: string;
   nip?: string;
   role?: string;
-  attemptType: 'CHECK_IN' | 'CHECK_OUT' | string;
+  attemptType?: 'CHECK_IN' | 'CHECK_OUT' | string;
+  type?: 'CHECK_IN' | 'CHECK_OUT' | string;
   timeStr?: string;
   dateStr?: string;
   method?: string;
   distanceMeters?: number;
-  errorMessage: string;
+  errorMessage?: string;
+  reason?: string;
   errorCode?: string;
 }
 
@@ -351,7 +353,8 @@ export class TelegramService {
   public static async sendAttendanceFailureNotification(payload: TelegramAttendanceFailurePayload): Promise<boolean> {
     const timeStr = payload.timeStr || getCurrentTimeInJakarta();
     const dateStr = payload.dateStr || getTodayDateInJakarta();
-    const isCheckIn = payload.attemptType === 'CHECK_IN';
+    const effAttempt = payload.attemptType || payload.type || 'CHECK_IN';
+    const isCheckIn = effAttempt === 'CHECK_IN';
     const typeLabel = isCheckIn ? '🟡 MASUK (Check-In Gagal)' : '🔴 PULANG (Check-Out Gagal)';
 
     let methodLabel = '📷 Scan QR Code';
@@ -366,6 +369,8 @@ export class TelegramService {
       locationLabel = `📍 Radius ${Math.round(payload.distanceMeters)}m dari gerbang`;
     }
 
+    const failureReason = payload.errorMessage || payload.reason || 'Kendala koneksi atau validasi sistem';
+
     const message = [
       `⚠️ <b>PERINGATAN KENDALA PRESENSI GURU</b>`,
       `━━━━━━━━━━━━━━━━━━━━`,
@@ -377,7 +382,7 @@ export class TelegramService {
       `📱 <b>Metode:</b> ${escapeHtml(methodLabel)}`,
       `🧭 <b>Posisi:</b> ${escapeHtml(locationLabel)}`,
       `❌ <b>Keterangan Masalah:</b>`,
-      `<code>${escapeHtml(payload.errorMessage)}</code>`,
+      `<code>${escapeHtml(failureReason)}</code>`,
       `━━━━━━━━━━━━━━━━━━━━`,
       `<i>Sistem mencatat laporan kendala ini secara otomatis untuk investigasi admin.</i>`,
     ].join('\n');

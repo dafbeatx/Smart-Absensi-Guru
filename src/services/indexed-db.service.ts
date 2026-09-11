@@ -14,6 +14,7 @@ export interface OfflineAttendanceRecord {
   timestamp: string;
   sync_status: 'PENDING' | 'SYNCING' | 'FAILED';
   retry_count: number;
+  attempt_action?: 'CHECK_IN' | 'CHECK_OUT';
 }
 
 const DB_NAME = 'SmartAbsensiOfflineDB';

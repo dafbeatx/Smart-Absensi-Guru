@@ -712,6 +712,13 @@ export class MockProvider implements IDataProvider {
     return [];
   }
 
+  public subscribeToAttendanceUpdates(
+    _callback: (event: { table: string; eventType: string }) => void
+  ): () => void {
+    // MockProvider no-op unsubscribe
+    return () => {};
+  }
+
   public async submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest> {
     const activeUser = useAuthStore.getState().user;
     if (!activeUser || !activeUser.id) {

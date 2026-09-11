@@ -47,6 +47,7 @@ export interface IDataProvider {
   resetAttendance(targetUserId: string, date: string, adminPasswordInput: string, token: string): Promise<boolean>;
   getDailyAttendance(date: string, token: string): Promise<AttendanceRecord[]>;
   updateAttendanceNote(userId: string, date: string, note: string, token: string): Promise<boolean>;
+  subscribeToAttendanceUpdates?(callback: (event: { table: string; eventType: string }) => void): () => void;
 
   // Leave & Approval API
   submitLeave(dto: SubmitLeaveDTO): Promise<LeaveRequest>;

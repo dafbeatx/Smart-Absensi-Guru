@@ -31,6 +31,7 @@ import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord, SystemSettings } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
+import { useLiveAttendanceSync } from '../../../hooks/useLiveAttendanceSync';
 import { CONSTANTS } from '../../../config/constants';
 import { useToastStore } from '../../../store/useToastStore';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
@@ -183,20 +184,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     }
   };
 
-  const fetchAttendanceRecords = async (targetTeachers?: UserProfile[]) => {
+  const fetchAttendanceRecords = async (_targetTeachers?: UserProfile[]) => {
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
       const yearStr = new Date().getFullYear().toString();
       const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
-      const allRecs: AttendanceRecord[] = [];
 
-      const listToFetch = targetTeachers && targetTeachers.length > 0 ? targetTeachers : teachers;
-
-      for (const t of listToFetch) {
-        const recs = await provider.getMonthlyAttendance(t.id, monthStr, yearStr, token);
-        allRecs.push(...recs);
-      }
+      // Single query for ALL users instead of N+1 loop per teacher
+      const allRecs = await provider.getMonthlyAttendance('ALL', monthStr, yearStr, token);
       setAttendanceRecords(allRecs);
     } catch (err) {
       console.warn('Gagal memuat rekap absensi bulanan:', err);
@@ -322,6 +318,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
+    window.addEventListener('smart_absensi_leaves_updated', handleLeaveUpdated);
     window.addEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
     window.addEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
     window.addEventListener('storage', handleComplaintsUpdated);
@@ -340,6 +337,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
+      window.removeEventListener('smart_absensi_leaves_updated', handleLeaveUpdated);
       window.removeEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
       window.removeEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
       window.removeEventListener('storage', handleComplaintsUpdated);
@@ -358,6 +356,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   useCrossDeviceSync({
     onSync: handleCrossDeviceSync,
     cooldownMs: 30000,
+    enabled: !!user?.id,
+  });
+
+  // Real-time Supabase channel & heartbeat live tracking sync
+  const handleLiveAttendanceSync = useCallback(() => {
+    fetchAttendanceRecords();
+    fetchPendingRequests();
+    fetchComplaintsCount();
+  }, []);
+
+  useLiveAttendanceSync({
+    onSync: handleLiveAttendanceSync,
+    heartbeatIntervalMs: 30000,
     enabled: !!user?.id,
   });
 

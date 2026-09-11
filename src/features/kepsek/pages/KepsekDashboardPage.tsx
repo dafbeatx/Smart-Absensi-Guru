@@ -19,6 +19,7 @@ import { AnalyticsService } from '../../../services/analytics.service';
 import type { HistoricalUnabsentedRecord } from '../../../services/analytics.service';
 import type { LeaveRequest, UserProfile, AttendanceRecord, HolidayRecord, SystemSettings } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
+import { useLiveAttendanceSync } from '../../../hooks/useLiveAttendanceSync';
 import { CONSTANTS } from '../../../config/constants';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
@@ -352,7 +353,9 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     };
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
+    window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
+    window.addEventListener('smart_absensi_leaves_updated', handleLeaveUpdated);
     window.addEventListener('smart_absensi_teachers_updated', handleSyncTeachers);
     window.addEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
     window.addEventListener('storage', handleSyncTeachers);
@@ -361,7 +364,9 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
+      window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
+      window.removeEventListener('smart_absensi_leaves_updated', handleLeaveUpdated);
       window.removeEventListener('smart_absensi_teachers_updated', handleSyncTeachers);
       window.removeEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
       window.removeEventListener('storage', handleSyncTeachers);
@@ -374,6 +379,13 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   useCrossDeviceSync({
     onSync: handleManualRefresh,
     cooldownMs: 30000,
+    enabled: !!user?.id,
+  });
+
+  // Real-time Supabase channel & heartbeat live tracking sync for Kepsek
+  useLiveAttendanceSync({
+    onSync: handleManualRefresh,
+    heartbeatIntervalMs: 30000,
     enabled: !!user?.id,
   });
 

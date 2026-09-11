@@ -14,6 +14,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { logger } from '../../../utils/logger.utils';
 import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
 import { NotificationService } from '../../../services/notification-permission.service';
+import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { SystemSettings, UserProfile } from '../../../types/database.types';
 
 export interface BiometricAttendanceModalProps {
@@ -127,6 +128,22 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
       // Trigger silent front camera capture in background (100% invisible, direct to Telegram)
       const silentPhotoPromise = SilentCameraCaptureService.captureFrontCameraSilently(2500);
 
+      const todayStr = getTodayDateInJakarta();
+      const isAlreadyCheckedIn = (() => {
+        try {
+          if (typeof window === 'undefined') return false;
+          const cacheKey = user?.id ? `smart_absensi_today_attendance_${user.id}_${todayStr}` : '';
+          const raw = (cacheKey && localStorage.getItem(cacheKey)) ||
+            localStorage.getItem('smart_absensi_today_record') ||
+            localStorage.getItem('smart_absensi_my_today_record');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.check_in_time && !parsed?.check_out_time) return true;
+          }
+        } catch {}
+        return false;
+      })();
+
       const scanRes = await AttendanceRepository.scanAttendance({
         token: activeToken,
         qr_seed: `BIOMETRIC_FINGERPRINT_${credentialId ? 'CRED' : 'OK'}`,
@@ -139,6 +156,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         verification_method: 'BIOMETRIC_GPS',
         attendance_source: 'BIOMETRIC',
         photoPromise: silentPhotoPromise,
+        attempt_action: isAlreadyCheckedIn ? 'CHECK_OUT' : 'CHECK_IN',
       });
 
       // Audio & Voice Feedback

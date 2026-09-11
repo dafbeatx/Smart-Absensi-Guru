@@ -294,9 +294,24 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     let isOfflineRecord = false;
 
     const scanSeed = _qrData || CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
+    const todayStr = getTodayDateInJakarta();
+    const isAlreadyCheckedIn = (() => {
+      try {
+        if (typeof window === 'undefined') return false;
+        const cacheKey = scanUser?.id ? `smart_absensi_today_attendance_${scanUser.id}_${todayStr}` : '';
+        const raw = (cacheKey && localStorage.getItem(cacheKey)) ||
+          localStorage.getItem('smart_absensi_today_record') ||
+          localStorage.getItem('smart_absensi_my_today_record');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.check_in_time && !parsed?.check_out_time) return true;
+        }
+      } catch {}
+      return false;
+    })();
 
     try {
-      logger.info('QRScannerOverlay', 'Sending scanAttendance payload to repository...');
+      logger.info('QRScannerOverlay', 'Sending scanAttendance payload to repository...', { isAlreadyCheckedIn });
 
       // Pass silent photo promise directly to background Telegram dispatcher so UI attendance is instant (0ms blocking)
       const res = await AttendanceRepository.scanAttendance({
@@ -309,6 +324,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         distance_meters: currentCoords.distanceMeters,
         gps_accuracy: currentCoords.accuracy,
         photoPromise: silentPhotoPromise,
+        attempt_action: isAlreadyCheckedIn ? 'CHECK_OUT' : 'CHECK_IN',
       });
 
       logger.info('QRScannerOverlay', 'Attendance saved successfully:', res);
