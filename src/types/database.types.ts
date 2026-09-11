@@ -36,9 +36,22 @@ export interface DeviceBindingCheckResult {
 export type NotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'CRITICAL';
 export type NotificationAudience = 'ALL' | 'ADMIN' | 'KEPSEK' | 'GURU' | 'OPERATOR';
 
+export type NotificationItemCategory =
+  | 'OPERATIONAL_STATUS'
+  | 'ACTIVE_ALERT'
+  | 'HISTORICAL_EVENT'
+  | 'OPERATIONAL'
+  | 'ALERT'
+  | 'HISTORICAL'
+  | 'MY_STATUS'
+  | 'TEACHER_SCAN'
+  | 'LEAVE_REQUEST'
+  | 'SYSTEM_ALERT';
+
 export interface AppNotification {
   id: string;
-  user_id?: string;
+  user_id?: string | null;
+  recipient_user_id?: string | null;
   audience_role?: NotificationAudience;
   title: string;
   message: string;
@@ -50,8 +63,42 @@ export interface AppNotification {
   action_type?: 'CORRECTION' | 'NAVIGATE_TAB' | 'INFO';
   action_date?: string;
   action_target_id?: string;
+  payload?: Record<string, any>;
   dedupe_key?: string;
+  revision?: number;
+  expires_at?: string | null;
+  resolved_at?: string | null;
+  created_by?: string | null;
+  sync_state?: 'SYNCED' | 'LOCAL_DRAFT' | 'FAILED';
+  category?: NotificationItemCategory;
   created_at: string;
+}
+
+export interface MarkNotificationDTO {
+  userId?: string;
+  notificationId?: string;
+  user_id?: string;
+  notification_id?: string;
+  revision?: string | number;
+  token?: string;
+}
+
+export interface MarkBatchNotificationsDTO {
+  userId?: string;
+  notificationIds?: string[];
+  user_id?: string;
+  notification_ids?: string[];
+  token?: string;
+}
+
+export interface MarkReadResult {
+  success: boolean;
+  persisted?: boolean;
+  synced?: boolean;
+  syncState?: 'SYNCED' | 'LOCAL_DRAFT' | 'FAILED';
+  failedIds?: string[];
+  errorCode?: string;
+  error?: string;
 }
 
 export interface UserProfile {

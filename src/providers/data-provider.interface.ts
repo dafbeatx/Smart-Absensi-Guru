@@ -5,6 +5,9 @@ import type {
   SystemSettings,
   HolidayRecord,
   AppNotification,
+  MarkNotificationDTO,
+  MarkBatchNotificationsDTO,
+  MarkReadResult,
   DeviceBindingCheckResult,
   TeacherMoodType,
   TeacherMoodLog,
@@ -62,15 +65,27 @@ export interface IDataProvider {
   getUserLeaves(userId: string, token: string): Promise<LeaveRequest[]>;
 
   // Notification API
-  getNotifications(userId: string, token: string): Promise<AppNotification[]>;
-  markNotificationAsRead(notificationId: string, token: string): Promise<boolean>;
-  markNotificationsAsRead(userIdOrIds: string | string[], idsOrToken?: string[] | string, token?: string): Promise<boolean>;
+  getNotifications(userId: string, token: string, userRole?: string): Promise<AppNotification[]>;
+  getNotificationReads(userId: string, token?: string): Promise<Set<string>>;
+  markNotificationAsRead(
+    dtoOrId: MarkNotificationDTO | string,
+    token?: string
+  ): Promise<MarkReadResult | boolean>;
+  markNotificationsAsRead(
+    dtoOrIds: MarkBatchNotificationsDTO | string[] | string,
+    idsOrToken?: string[] | string,
+    token?: string
+  ): Promise<MarkReadResult | boolean>;
   getNotificationPreferences(userId: string, token?: string): Promise<NotificationPreferences | null>;
   saveNotificationPreferences(
     userIdOrPrefs: string | Partial<NotificationPreferences>,
     prefsOrToken?: Partial<NotificationPreferences> | string,
     token?: string
   ): Promise<any>;
+  subscribeToNotificationUpdates?(
+    userId: string,
+    callback: (event: { table: string; eventType: string; payload?: any }) => void
+  ): () => void;
 
   // Settings API
   getSettings(): Promise<SystemSettings>;

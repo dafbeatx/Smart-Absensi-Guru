@@ -838,7 +838,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }
 
         // 5.2 Merge with Realtime Cached Notifications
-        const cachedNotifs = NotificationService.getCachedNotifications(effectiveUser.id);
+        const cachedNotifs = NotificationService.getCachedNotifications(effectiveUser.id, effectiveUser.role);
         if (Array.isArray(cachedNotifs) && cachedNotifs.length > 0) {
           cachedNotifs.forEach((cn) => {
             const cnId = cn.id || `cn_${cn.title}_${cn.time}`;

@@ -70,13 +70,21 @@ export type DetailedPermissionStatus =
 
 const memoryNotificationList: AttendanceNotificationPayload[] = [];
 const memoryReadStore: Map<string, Set<string>> = new Map();
+const memoryPendingReads: Map<string, string[]> = new Map();
 
 class NotificationPermissionService {
   private activeCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
   private activeEarlyCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    // Service constructor
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        const userId = useAuthStore.getState().user?.id;
+        if (userId) {
+          this.syncPendingReads(userId).catch(() => {});
+        }
+      });
+    }
   }
 
   /**
@@ -193,6 +201,13 @@ class NotificationPermissionService {
     }
   }
 
+  private getCacheKey(userId?: string, userRole?: string): string {
+    if (userId && userRole) {
+      return `smart_absensi_notifications_cache:${userId}:${userRole}:v2`;
+    }
+    return 'smart_absensi_notifications_cache';
+  }
+
   /**
    * Simpan notifikasi ke local storage cache yang terisolasi per user
    */
@@ -224,6 +239,18 @@ class NotificationPermissionService {
         const existing: AttendanceNotificationPayload[] = saved ? JSON.parse(saved) : [];
         const updated = [newNotif, ...existing.filter((item) => item.id !== newNotif.id)].slice(0, 50);
         localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(updated));
+
+        // Also save to namespaced cache if user / role available
+        const sessionUser = useAuthStore.getState().user;
+        const uId = payload.userId || sessionUser?.id;
+        const uRole = sessionUser?.role;
+        if (uId && uRole) {
+          const namespacedKey = this.getCacheKey(uId, uRole);
+          const nsSaved = localStorage.getItem(namespacedKey);
+          const nsExisting: AttendanceNotificationPayload[] = nsSaved ? JSON.parse(nsSaved) : [];
+          const nsUpdated = [newNotif, ...nsExisting.filter((item) => item.id !== newNotif.id)].slice(0, 50);
+          localStorage.setItem(namespacedKey, JSON.stringify(nsUpdated));
+        }
       } catch (e) {
         console.warn('Failed to save notification to cache:', e);
       }
@@ -239,7 +266,13 @@ class NotificationPermissionService {
 
     if (typeof localStorage !== 'undefined') {
       try {
-        const saved = localStorage.getItem('smart_absensi_notifications_cache');
+        let saved: string | null = null;
+        if (userId && userRole) {
+          saved = localStorage.getItem(this.getCacheKey(userId, userRole));
+        }
+        if (!saved) {
+          saved = localStorage.getItem('smart_absensi_notifications_cache');
+        }
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
@@ -257,6 +290,8 @@ class NotificationPermissionService {
       }
     }
 
+    const readIds = this.getReadNotificationIds(userId);
+
     // Role-based Audience Isolation Filter:
     return list.filter((n) => {
       // 1. Direct user recipient
@@ -267,25 +302,29 @@ class NotificationPermissionService {
       }
 
       // 2. Broadcast or role-targeted notification (no specific userId)
-      const targetRole = n.roleTarget || 'ALL';
+      const targetRole = (n.roleTarget || 'ALL').toUpperCase().trim();
       if (targetRole === 'ALL') return true;
 
       if (userRole) {
-        if (targetRole === userRole) return true;
+        const currentRole = userRole.toUpperCase().trim();
+        if (targetRole === currentRole) return true;
         // Operator gets Admin level alerts
-        if (userRole === 'OPERATOR' && targetRole === 'ADMIN') return true;
+        if (currentRole === 'OPERATOR' && targetRole === 'ADMIN') return true;
         return false;
       }
 
       // If userRole not provided (unscoped test check)
       return true;
-    });
+    }).map((n) => ({
+      ...n,
+      isRead: Boolean(n.isRead) || (n.id ? readIds.has(n.id) : false),
+    }));
   }
 
   /**
    * Tandai semua notifikasi di cache sebagai sudah dibaca untuk user tertentu
    */
-  public markAllAsRead(_userId?: string) {
+  public markAllAsRead(userId?: string, userRole?: string) {
     memoryNotificationList.forEach((n) => {
       n.isRead = true;
     });
@@ -297,6 +336,16 @@ class NotificationPermissionService {
           const parsed: AttendanceNotificationPayload[] = JSON.parse(saved);
           const updated = parsed.map((n) => ({ ...n, isRead: true }));
           localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(updated));
+        }
+
+        if (userId && userRole) {
+          const nsKey = this.getCacheKey(userId, userRole);
+          const nsSaved = localStorage.getItem(nsKey);
+          if (nsSaved) {
+            const parsed: AttendanceNotificationPayload[] = JSON.parse(nsSaved);
+            const updated = parsed.map((n) => ({ ...n, isRead: true }));
+            localStorage.setItem(nsKey, JSON.stringify(updated));
+          }
         }
       } catch (e) {
         console.warn('Failed to mark notifications read:', e);
@@ -352,7 +401,7 @@ class NotificationPermissionService {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('smart_absensi_notifications_read_updated', {
-          detail: { notificationId },
+          detail: { notificationId, userId: effectiveUserId },
         })
       );
     }
@@ -378,7 +427,11 @@ class NotificationPermissionService {
     }
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('smart_absensi_notifications_read_updated'));
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_notifications_read_updated', {
+          detail: { notificationIds, userId: effectiveUserId },
+        })
+      );
     }
   }
 
@@ -388,6 +441,92 @@ class NotificationPermissionService {
   public isNotificationRead(userId: string | undefined, notificationId: string): boolean {
     const readSet = this.getReadNotificationIds(userId);
     return readSet.has(notificationId);
+  }
+
+  /**
+   * Antrekan pending read untuk offline sync
+   */
+  public queuePendingRead(userId: string, notificationId: string) {
+    if (!userId || !notificationId) return;
+    const memList = memoryPendingReads.get(userId) || [];
+    if (!memList.includes(notificationId)) {
+      memList.push(notificationId);
+      memoryPendingReads.set(userId, memList);
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const key = `smart_absensi_pending_reads_${userId}`;
+        const saved = localStorage.getItem(key);
+        const list: string[] = saved ? JSON.parse(saved) : [];
+        if (!list.includes(notificationId)) {
+          list.push(notificationId);
+          localStorage.setItem(key, JSON.stringify(list));
+        }
+      } catch (e) {
+        console.warn('Failed to queue pending read:', e);
+      }
+    }
+  }
+
+  /**
+   * Ambil daftar pending read yang belum tersinkron
+   */
+  public getPendingReads(userId: string): string[] {
+    const mem = memoryPendingReads.get(userId) || [];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(`smart_absensi_pending_reads_${userId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return mem;
+  }
+
+  /**
+   * Sinkronisasikan antrean pending read ke server
+   */
+  public async syncPendingReads(userId: string): Promise<void> {
+    if (!userId) return;
+    let list: string[] = [...(memoryPendingReads.get(userId) || [])];
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const key = `smart_absensi_pending_reads_${userId}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) list = parsed;
+        }
+      } catch (e) {
+        console.warn('Failed to parse pending reads:', e);
+      }
+    }
+    if (!list || list.length === 0) return;
+
+    const provider = ProviderFactory.getProvider();
+    const res = await provider.markNotificationsAsRead(list, userId);
+    const isSuccess = typeof res === 'object' ? res.synced || res.success : Boolean(res);
+    if (isSuccess) {
+      memoryPendingReads.delete(userId);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(`smart_absensi_pending_reads_${userId}`);
+      }
+    }
+  }
+
+  /**
+   * Berlangganan event Realtime notifications dan notification_reads
+   */
+  public subscribeRealtime(userId: string, callback: (event?: any) => void): () => void {
+    const provider = ProviderFactory.getProvider();
+    if (typeof provider.subscribeToNotificationUpdates === 'function') {
+      return provider.subscribeToNotificationUpdates(userId, (event) => {
+        callback(event);
+      });
+    }
+    return () => {};
   }
 
   /**

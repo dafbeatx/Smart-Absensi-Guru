@@ -7,6 +7,10 @@ import type {
   LeaveRequest,
   SystemSettings,
   HolidayRecord,
+  AppNotification,
+  MarkNotificationDTO,
+  MarkBatchNotificationsDTO,
+  MarkReadResult,
   AttendanceStatus,
   LeaveType,
   ApprovalStatus,
@@ -1727,138 +1731,304 @@ export class SupabaseProvider implements IDataProvider {
     }
   }
 
-  public async getNotifications(userId: string, _token: string): Promise<any[]> {
+  public async getNotificationReads(userId: string, _token?: string): Promise<Set<string>> {
+    const readsSet = new Set<string>();
+    if (!userId) return readsSet;
     try {
-      // Query notifications targeted to user or broadcast
       const { data, error } = await this.client
-        .from('notifications')
-        .select('*')
-        .or(`user_id.eq.${userId},user_id.is.null`)
-        .order('created_at', { ascending: false });
+        .from('notification_reads')
+        .select('notification_id')
+        .eq('user_id', userId);
 
       if (error) {
-        logger.warn('SupabaseProvider', 'notifications query error (tabel mungkin belum dibuat):', error.message);
-        return [];
+        logger.warn('SupabaseProvider', 'getNotificationReads query error:', error.message);
+        return readsSet;
       }
-
-      // Fetch per-user read IDs from notification_reads table if it exists
-      let dbReadIds = new Set<string>();
-      try {
-        const { data: readsData } = await this.client
-          .from('notification_reads')
-          .select('notification_id')
-          .eq('user_id', userId);
-        if (readsData && readsData.length > 0) {
-          readsData.forEach((r: { notification_id: string }) => dbReadIds.add(r.notification_id));
-        }
-      } catch {
-        // notification_reads table may not be migrated yet
-      }
-
       if (data && data.length > 0) {
-        const localReadIds = NotificationService.getReadNotificationIds(userId);
-        return data.map((n) => ({
-          id: n.id,
-          user_id: n.user_id,
-          audience_role: n.audience_role,
-          title: n.title,
-          message: n.message,
-          type: n.type || 'INFO',
-          severity: n.severity || 'INFO',
-          action_url: n.action_url,
-          is_read: Boolean(n.is_read) || dbReadIds.has(n.id) || localReadIds.has(n.id),
-          created_at: n.created_at,
-        }));
+        data.forEach((r: { notification_id: string }) => {
+          if (r.notification_id) readsSet.add(r.notification_id);
+        });
+      }
+    } catch (err: any) {
+      logger.warn('SupabaseProvider', 'getNotificationReads exception:', err?.message || err);
+    }
+    return readsSet;
+  }
+
+  public async getNotifications(userId: string, token: string, userRole?: string): Promise<AppNotification[]> {
+    try {
+      // Query notifications targeted to user or broadcast
+      let query = this.client
+        .from('notifications')
+        .select('*');
+
+      try {
+        query = query.or(`recipient_user_id.eq.${userId},user_id.eq.${userId},recipient_user_id.is.null,user_id.is.null`);
+      } catch {
+        query = query.or(`user_id.eq.${userId},user_id.is.null`);
       }
 
-      return [];
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        // Fallback for older schemas where recipient_user_id might not exist
+        const fallback = await this.client
+          .from('notifications')
+          .select('*')
+          .or(`user_id.eq.${userId},user_id.is.null`)
+          .order('created_at', { ascending: false });
+
+        if (fallback.error) {
+          logger.warn('SupabaseProvider', 'notifications query error:', fallback.error.message);
+          return [];
+        }
+        return await this.processRawNotifications(fallback.data || [], userId, token, userRole);
+      }
+
+      return await this.processRawNotifications(data || [], userId, token, userRole);
     } catch (err) {
       logger.error('SupabaseProvider', 'getNotifications exception:', err);
       return [];
     }
   }
 
-  public async markNotificationAsRead(notificationId: string, _token: string): Promise<boolean> {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(notificationId);
-    const sessionUser = useAuthStore.getState().user;
-    const userId = sessionUser?.id || '';
+  private async processRawNotifications(
+    data: any[],
+    userId: string,
+    token: string,
+    userRole?: string
+  ): Promise<AppNotification[]> {
+    if (!data || data.length === 0) return [];
 
-    if (userId) {
-      NotificationService.markIdAsRead(userId, notificationId);
+    // Fetch per-user read IDs strictly from notification_reads
+    const dbReadIds = await this.getNotificationReads(userId, token);
+    const localReadIds = NotificationService.getReadNotificationIds(userId);
+    const now = Date.now();
+
+    const result: AppNotification[] = [];
+
+    for (const n of data) {
+      // 1. Exclude expired notifications
+      if (n.expires_at && new Date(n.expires_at).getTime() < now) {
+        continue;
+      }
+
+      // 2. Strict Role/Audience filter
+      if (n.audience_role && n.audience_role !== 'ALL' && userRole) {
+        const targetRole = String(n.audience_role).toUpperCase().trim();
+        const currentRole = String(userRole).toUpperCase().trim();
+        if (targetRole !== currentRole) {
+          continue;
+        }
+      }
+
+      // 3. Status baca murni per-user:
+      // Hanya cek dbReadIds dan localReadIds. Untuk notifikasi broadcast, TIDAK BOLEH mengecek n.is_read!
+      const isPersonal = Boolean((n.recipient_user_id && n.recipient_user_id === userId) || (n.user_id && n.user_id === userId));
+      const isRead = dbReadIds.has(n.id) || localReadIds.has(n.id) || (isPersonal && Boolean(n.is_read));
+
+      // Category derivation
+      let category = n.category;
+      if (!category) {
+        if (n.action_type === 'ATTENDANCE_STATUS' || n.type === 'ATTENDANCE') {
+          category = 'OPERATIONAL';
+        } else if (n.severity === 'WARNING' || n.severity === 'DANGER' || n.type === 'ALERT') {
+          category = 'ALERT';
+        } else {
+          category = 'HISTORICAL';
+        }
+      }
+
+      result.push({
+        id: n.id,
+        user_id: n.user_id,
+        recipient_user_id: n.recipient_user_id || n.user_id,
+        audience_role: n.audience_role,
+        title: n.title,
+        message: n.message,
+        type: n.type || 'INFO',
+        severity: n.severity || 'INFO',
+        category: category,
+        action_url: n.action_url,
+        action_type: n.action_type,
+        action_date: n.action_date,
+        action_target_id: n.action_target_id,
+        payload: n.payload,
+        dedupe_key: n.dedupe_key,
+        revision: n.revision,
+        is_read: isRead,
+        read_at: dbReadIds.has(n.id) ? new Date().toISOString() : undefined,
+        sync_state: 'SYNCED',
+        expires_at: n.expires_at,
+        resolved_at: n.resolved_at,
+        created_by: n.created_by,
+        created_at: n.created_at,
+      });
     }
 
-    if (!isUuid) {
-      logger.info('SupabaseProvider', 'Skipping DB update for synthetic/local notification ID:', notificationId);
-      return true;
+    return result;
+  }
+
+  public async markNotificationAsRead(
+    dtoOrId: MarkNotificationDTO | string,
+    _token?: string
+  ): Promise<MarkReadResult | boolean> {
+    const isLegacyCall = typeof dtoOrId === 'string';
+    let notificationId = '';
+    let effectiveUserId = '';
+
+    if (typeof dtoOrId === 'object' && dtoOrId !== null) {
+      notificationId = dtoOrId.notification_id || dtoOrId.notificationId || '';
+      effectiveUserId = dtoOrId.user_id || dtoOrId.userId || '';
+    } else {
+      notificationId = dtoOrId;
+      effectiveUserId = useAuthStore.getState().user?.id || '';
+    }
+
+    if (!effectiveUserId) {
+      effectiveUserId = useAuthStore.getState().user?.id || '';
+    }
+
+    if (!notificationId) {
+      return isLegacyCall ? false : { success: false, synced: false, persisted: false, syncState: 'FAILED', error: 'Notification ID required' };
+    }
+
+    // Always update local persistent storage immediately for optimistic UI
+    if (effectiveUserId) {
+      NotificationService.markIdAsRead(effectiveUserId, notificationId);
+    }
+
+    if (!effectiveUserId) {
+      return isLegacyCall ? true : { success: true, synced: false, persisted: false, syncState: 'LOCAL_DRAFT', error: 'No user ID for cloud sync' };
     }
 
     try {
-      // 1. Update directly if owned by user
-      await this.client
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId);
+      // Upsert into notification_reads (supports both UUID and synthetic IDs)
+      const { error } = await this.client
+        .from('notification_reads')
+        .upsert({
+          notification_id: notificationId,
+          user_id: effectiveUserId,
+          read_at: new Date().toISOString(),
+        }, { onConflict: 'notification_id,user_id' });
 
-      // 2. Also record in notification_reads for per-user isolation
-      if (userId) {
-        await this.client
-          .from('notification_reads')
-          .upsert({
-            notification_id: notificationId,
-            user_id: userId,
-            read_at: new Date().toISOString(),
-          }, { onConflict: 'notification_id,user_id' });
+      if (error) {
+        logger.warn('SupabaseProvider', 'markNotificationAsRead DB error:', error.message);
+        return isLegacyCall ? false : { success: false, synced: false, persisted: false, syncState: 'FAILED', error: error.message };
       }
+
+      return isLegacyCall ? true : { success: true, synced: true, persisted: true, syncState: 'SYNCED' };
     } catch (error: any) {
-      logger.warn('SupabaseProvider', 'markNotificationAsRead partial warning:', error.message);
+      logger.warn('SupabaseProvider', 'markNotificationAsRead exception:', error?.message || error);
+      return isLegacyCall ? false : { success: false, synced: false, persisted: false, syncState: 'FAILED', error: error?.message || 'Network error' };
     }
-    return true;
   }
 
   public async markNotificationsAsRead(
-    userIdOrIds: string | string[],
+    dtoOrIds: MarkBatchNotificationsDTO | string | string[],
     idsOrToken?: string[] | string,
     _token?: string
-  ): Promise<boolean> {
-    let effectiveUserId: string;
-    let notificationIds: string[];
+  ): Promise<MarkReadResult | boolean> {
+    const isLegacyCall = Array.isArray(dtoOrIds) || typeof dtoOrIds === 'string';
+    let effectiveUserId: string = '';
+    let notificationIds: string[] = [];
 
-    if (Array.isArray(userIdOrIds)) {
-      notificationIds = userIdOrIds;
-      effectiveUserId =
+    if (typeof dtoOrIds === 'object' && !Array.isArray(dtoOrIds) && dtoOrIds !== null) {
+      effectiveUserId = dtoOrIds.user_id || dtoOrIds.userId || '';
+      notificationIds = dtoOrIds.notification_ids || dtoOrIds.notificationIds || [];
+    } else if (Array.isArray(dtoOrIds)) {
+      notificationIds = dtoOrIds;
+      // Periksa apakah idsOrToken adalah userId (bukan JWT token atau Bearer)
+      if (
         typeof idsOrToken === 'string' &&
+        idsOrToken &&
         !idsOrToken.startsWith('Bearer ') &&
-        idsOrToken
-          ? idsOrToken
-          : useAuthStore.getState().user?.id || '';
+        !idsOrToken.startsWith('ey') &&
+        idsOrToken !== 'MOCK_TOKEN'
+      ) {
+        effectiveUserId = idsOrToken;
+      } else {
+        effectiveUserId = useAuthStore.getState().user?.id || '';
+      }
     } else {
-      effectiveUserId = userIdOrIds || useAuthStore.getState().user?.id || '';
+      effectiveUserId = dtoOrIds || useAuthStore.getState().user?.id || '';
       notificationIds = Array.isArray(idsOrToken) ? idsOrToken : [];
     }
 
-    if (!effectiveUserId || notificationIds.length === 0) return true;
+    if (!effectiveUserId) {
+      effectiveUserId = useAuthStore.getState().user?.id || '';
+    }
+
+    if (!effectiveUserId || notificationIds.length === 0) {
+      return isLegacyCall ? true : { success: true, synced: true, persisted: true, syncState: 'SYNCED' };
+    }
+
+    // Optimistically update local persistent storage
     NotificationService.markAllIdsAsRead(effectiveUserId, notificationIds);
 
-    const uuidIds = notificationIds.filter((id) =>
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-    );
-
-    if (uuidIds.length === 0) return true;
-
     try {
-      const records = uuidIds.map((id) => ({
+      const records = notificationIds.map((id) => ({
         notification_id: id,
         user_id: effectiveUserId,
         read_at: new Date().toISOString(),
       }));
 
-      await this.client
+      const { error } = await this.client
         .from('notification_reads')
         .upsert(records, { onConflict: 'notification_id,user_id' });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'markNotificationsAsRead error:', error.message);
+        return isLegacyCall ? false : { success: false, synced: false, persisted: false, syncState: 'FAILED', error: error.message };
+      }
+
+      return isLegacyCall ? true : { success: true, synced: true, persisted: true, syncState: 'SYNCED' };
     } catch (err: any) {
-      logger.warn('SupabaseProvider', 'markNotificationsAsRead error:', err.message);
+      logger.warn('SupabaseProvider', 'markNotificationsAsRead exception:', err?.message || err);
+      return isLegacyCall ? false : { success: false, synced: false, persisted: false, syncState: 'FAILED', error: err?.message || 'Network error' };
     }
-    return true;
+  }
+
+  public subscribeToNotificationUpdates(
+    userId: string,
+    callback: (event: { table: string; eventType: string; payload?: any }) => void
+  ): () => void {
+    const channelId = `realtime_notifications_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const channel = this.client
+      .channel(channelId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications' },
+        (payload) => {
+          logger.info('SupabaseProvider', 'Realtime change in notifications table:', payload.eventType);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('smart_absensi_notifications_updated', { detail: payload }));
+          }
+          callback({ table: 'notifications', eventType: payload.eventType, payload });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notification_reads' },
+        (payload) => {
+          logger.info('SupabaseProvider', 'Realtime change in notification_reads table:', payload.eventType);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('smart_absensi_notifications_read_updated', { detail: payload }));
+          }
+          callback({ table: 'notification_reads', eventType: payload.eventType, payload });
+        }
+      )
+      .subscribe((status) => {
+        logger.info('SupabaseProvider', `Realtime notifications channel [${channelId}] status:`, status);
+      });
+
+    return () => {
+      try {
+        this.client.removeChannel(channel);
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'Error removing realtime notifications channel:', err);
+      }
+    };
   }
 
   public async getNotificationPreferences(userId: string, _token?: string): Promise<NotificationPreferences | null> {

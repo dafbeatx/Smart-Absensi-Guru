@@ -33,9 +33,11 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   onOpenPreferences,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'MY_STATUS' | 'TEACHER_SCAN' | 'LEAVES'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'MY_STATUS' | 'TEACHER_SCAN' | 'ALERTS' | 'HISTORY'>('ALL');
   const [notifications, setNotifications] = useState<DynamicNotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
 
   const { user, token } = useAuthStore();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -83,7 +85,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       const currentReadSet = NotificationService.getReadNotificationIds(user.id);
       const todayIso = getTodayDateInJakarta();
 
-      // 1. STATUS ABSEN SAYA (ADMIN / GURU / KEPSEK)
+      // 1. STATUS ABSEN SAYA (OPERATIONAL)
       const myTodayAtt = await provider.getTodayAttendance(user.id, authToken).catch(() => null);
       if (!myTodayAtt) {
         const notifId = `notif_my_status_pending_${user.id}_${todayIso}`;
@@ -115,7 +117,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         });
       }
 
-      // 2. PRESENSI GURU TERKINI (FOR ADMIN / KEPSEK / OPERATOR)
+      // 2. PRESENSI GURU TERKINI & ACTIVE ALERTS (FOR ADMIN / KEPSEK / OPERATOR)
       if (user.role === 'ADMIN' || user.role === 'OPERATOR' || user.role === 'KEPSEK') {
         const allTeachers: UserProfile[] = await provider.getAllUsers(authToken).catch(() => []);
         const todayAttendanceList: AttendanceRecord[] = await provider
@@ -144,7 +146,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           });
         });
 
-        // Add alert if teachers haven't absented yet (Skip on Off-Days / Weekends)
+        // Add active alert if teachers haven't absented yet (Skip on Off-Days / Weekends)
         const sysSettings = await provider.getSettings().catch(() => null);
         const offCheck = isDateOffDay(new Date(), sysSettings);
 
@@ -157,7 +159,15 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           : activeGuruTeachers.filter((t) => !absentedUserIds.has(t.id)).length;
 
         if (!offCheck.isOff && unabsentedCount > 0) {
-          const unabsentNotifId = `notif_unabsented_summary_${todayIso}`;
+          // Dynamic Revision Key based on count & teacher ids hash
+          const unabsentedHash = activeGuruTeachers
+            .filter((t) => !absentedUserIds.has(t.id))
+            .map((t) => t.id)
+            .sort()
+            .join('')
+            .slice(0, 12);
+          const unabsentNotifId = `alert_unabsented_${todayIso}_${unabsentedCount}_${unabsentedHash}`;
+
           items.push({
             id: unabsentNotifId,
             category: 'SYSTEM_ALERT',
@@ -180,7 +190,8 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         );
 
         if (activePendingLeaves.length > 0) {
-          const pendingNotifId = `notif_pending_leaves_summary_${todayIso}`;
+          const pendingHash = activePendingLeaves.map((l) => l.id).sort().join('').slice(0, 12);
+          const pendingNotifId = `alert_pending_leaves_${todayIso}_${activePendingLeaves.length}_${pendingHash}`;
           items.push({
             id: pendingNotifId,
             category: 'LEAVE_REQUEST',
@@ -252,8 +263,8 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         });
       });
 
-      // 5. DB System Notifications from Provider
-      const dbNotifs = await provider.getNotifications(user.id, authToken).catch(() => []);
+      // 5. DB System Notifications from Provider (Cloud)
+      const dbNotifs = await provider.getNotifications(user.id, authToken, user.role).catch(() => []);
       if (Array.isArray(dbNotifs)) {
         dbNotifs.forEach((dbItem) => {
           if (!dbItem || !dbItem.id) return;
@@ -343,7 +354,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   // Setup periodic polling & real-time event listeners
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(loadNotifications, 20000); // refresh every 20s
+    const interval = setInterval(loadNotifications, 20000); // polling refresh every 20s
 
     const handleRealtimeUpdate = () => {
       loadNotifications();
@@ -355,21 +366,30 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       }
     };
 
+    // Supabase Realtime subscription via service
+    let unsubRealtime = () => {};
+    if (user?.id) {
+      unsubRealtime = NotificationService.subscribeRealtime(user.id, handleRealtimeUpdate);
+    }
+
     window.addEventListener('smart_absensi_scanned', handleRealtimeUpdate);
     window.addEventListener('smart_absensi_records_updated', handleRealtimeUpdate);
     window.addEventListener('smart_absensi_leave_updated', handleRealtimeUpdate);
     window.addEventListener('smart_absensi_notification_pushed', handleRealtimeUpdate);
+    window.addEventListener('smart_absensi_notifications_updated', handleRealtimeUpdate);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
+      unsubRealtime();
       window.removeEventListener('smart_absensi_scanned', handleRealtimeUpdate);
       window.removeEventListener('smart_absensi_records_updated', handleRealtimeUpdate);
       window.removeEventListener('smart_absensi_leave_updated', handleRealtimeUpdate);
       window.removeEventListener('smart_absensi_notification_pushed', handleRealtimeUpdate);
+      window.removeEventListener('smart_absensi_notifications_updated', handleRealtimeUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [loadNotifications]);
+  }, [loadNotifications, user?.id]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -392,44 +412,118 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
 
   const unreadCount = notifications.filter((n) => !n.isRead && !readIds.has(n.id)).length;
 
-  const markItemAsRead = useCallback((id: string, e?: React.MouseEvent) => {
+  const markItemAsRead = useCallback(async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!user) return;
 
-    // 1. Immediately update local state
+    // 1. Immediately update local state optimistically
     setReadIds((prev) => new Set([...prev, id]));
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
 
     // 2. Persist to service & localStorage
-    NotificationService.markIdAsRead(user?.id, id);
+    NotificationService.markIdAsRead(user.id, id);
 
-    // 3. Persist to backend provider
-    const provider = ProviderFactory.getProvider();
-    const authToken = token || 'MOCK_TOKEN';
-    provider.markNotificationAsRead(id, authToken).catch(() => {});
-  }, [user?.id, token]);
+    // 3. Mark syncing state
+    setSyncingIds((prev) => new Set([...prev, id]));
+    setFailedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
 
-  const handleMarkAllAsRead = useCallback(() => {
-    const allIds = notifications.map((n) => n.id);
+    try {
+      const provider = ProviderFactory.getProvider();
+      const authToken = token || 'MOCK_TOKEN';
+      const res = await provider.markNotificationAsRead({
+        notification_id: id,
+        user_id: user.id,
+      }, authToken);
 
-    // 1. Immediately update local state
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+
+      const isSynced = typeof res === 'object' ? res.synced : Boolean(res);
+      if (!isSynced) {
+        NotificationService.queuePendingRead(user.id, id);
+        setFailedIds((prev) => new Set([...prev, id]));
+      }
+    } catch {
+      NotificationService.queuePendingRead(user.id, id);
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      setFailedIds((prev) => new Set([...prev, id]));
+    }
+  }, [user, token]);
+
+  const handleMarkAllAsRead = useCallback(async () => {
+    if (!user) return;
+    const allUnreadIds = notifications
+      .filter((n) => !n.isRead && !readIds.has(n.id))
+      .map((n) => n.id);
+
+    if (allUnreadIds.length === 0) return;
+
+    // 1. Immediately update local state optimistically
     setReadIds((prev) => {
       const updated = new Set(prev);
-      allIds.forEach((id) => updated.add(id));
+      allUnreadIds.forEach((id) => updated.add(id));
       return updated;
     });
 
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
 
     // 2. Persist to service & localStorage
-    NotificationService.markAllIdsAsRead(user?.id, allIds);
+    NotificationService.markAllIdsAsRead(user.id, allUnreadIds);
 
-    // 3. Persist to backend provider via batch markNotificationsAsRead
-    const provider = ProviderFactory.getProvider();
-    const authToken = token || 'MOCK_TOKEN';
-    provider.markNotificationsAsRead(allIds, authToken).catch(() => {});
-  }, [notifications, user?.id, token]);
+    allUnreadIds.forEach((id) => {
+      setSyncingIds((prev) => new Set([...prev, id]));
+    });
+
+    try {
+      const provider = ProviderFactory.getProvider();
+      const authToken = token || 'MOCK_TOKEN';
+      const res = await provider.markNotificationsAsRead({
+        notification_ids: allUnreadIds,
+        user_id: user.id,
+      }, authToken);
+
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        allUnreadIds.forEach((id) => next.delete(id));
+        return next;
+      });
+
+      const isSynced = typeof res === 'object' ? res.synced : Boolean(res);
+      if (!isSynced) {
+        allUnreadIds.forEach((id) => NotificationService.queuePendingRead(user.id, id));
+        setFailedIds((prev) => {
+          const next = new Set(prev);
+          allUnreadIds.forEach((id) => next.add(id));
+          return next;
+        });
+      }
+    } catch {
+      allUnreadIds.forEach((id) => NotificationService.queuePendingRead(user.id, id));
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        allUnreadIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      setFailedIds((prev) => {
+        const next = new Set(prev);
+        allUnreadIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  }, [notifications, readIds, user, token]);
 
   const handleNotificationClick = (item: DynamicNotificationItem) => {
     markItemAsRead(item.id);
@@ -462,9 +556,11 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   };
 
   const filteredNotifications = notifications.filter((n) => {
+    const isRead = n.isRead || readIds.has(n.id);
+    if (activeFilter === 'HISTORY') return isRead;
     if (activeFilter === 'MY_STATUS') return n.category === 'MY_STATUS';
     if (activeFilter === 'TEACHER_SCAN') return n.category === 'TEACHER_SCAN';
-    if (activeFilter === 'LEAVES') return n.category === 'LEAVE_REQUEST' || n.category === 'SYSTEM_ALERT';
+    if (activeFilter === 'ALERTS') return n.category === 'LEAVE_REQUEST' || n.category === 'SYSTEM_ALERT';
     return true;
   });
 
@@ -547,7 +643,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
             </div>
           </div>
 
-          {/* Filter Bar */}
+          {/* Filter Bar with Lifecycle Segregation */}
           <div className="bg-slate-50 border-b border-slate-200 p-2 flex gap-1 overflow-x-auto text-[11px] no-scrollbar">
             <button
               onClick={() => setActiveFilter('ALL')}
@@ -567,7 +663,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
                   : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
               }`}
             >
-              Status Saya
+              Status Operasional
             </button>
             {(user?.role === 'ADMIN' || user?.role === 'OPERATOR' || user?.role === 'KEPSEK') && (
               <>
@@ -582,17 +678,27 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
                   Presensi Guru
                 </button>
                 <button
-                  onClick={() => setActiveFilter('LEAVES')}
+                  onClick={() => setActiveFilter('ALERTS')}
                   className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    activeFilter === 'LEAVES'
+                    activeFilter === 'ALERTS'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                   }`}
                 >
-                  Izin &amp; Alert
+                  Alert Aktif
                 </button>
               </>
             )}
+            <button
+              onClick={() => setActiveFilter('HISTORY')}
+              className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer whitespace-nowrap ${
+                activeFilter === 'HISTORY'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              Riwayat (Dibaca)
+            </button>
           </div>
 
           {/* Notification List Body */}
@@ -605,11 +711,18 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
               <div className="p-6 text-center text-xs text-slate-400 space-y-1">
                 <span className="text-2xl block">🔕</span>
                 <p className="font-bold text-slate-600">Belum Ada Notifikasi</p>
-                <p className="text-[11px]">Seluruh update absensi akan tampil di sini.</p>
+                <p className="text-[11px]">
+                  {activeFilter === 'HISTORY'
+                    ? 'Belum ada notifikasi yang telah Anda baca.'
+                    : 'Seluruh update absensi akan tampil di sini.'}
+                </p>
               </div>
             ) : (
               filteredNotifications.map((n) => {
                 const isRead = n.isRead || readIds.has(n.id);
+                const isSyncing = syncingIds.has(n.id);
+                const isFailed = failedIds.has(n.id);
+
                 return (
                   <div
                     key={n.id}
@@ -662,8 +775,21 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
                       </p>
 
                       <div className="pt-1 flex items-center justify-between gap-2">
-                        {/* Status Label (Baru vs Dibaca) */}
-                        {isRead ? (
+                        {/* Honest Status Label (Menyinkronkan... vs Sudah Dibaca vs Tandai Dibaca vs Coba Lagi) */}
+                        {isSyncing ? (
+                          <span className="text-[10px] text-blue-600 font-semibold animate-pulse flex items-center gap-1">
+                            <span>⏳ Menyinkronkan...</span>
+                          </span>
+                        ) : isFailed ? (
+                          <button
+                            type="button"
+                            onClick={(e) => markItemAsRead(n.id, e)}
+                            className="text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-lg border border-amber-300 transition-all cursor-pointer flex items-center gap-1"
+                            title="Gagal sinkron ke cloud. Ketuk untuk mencoba lagi."
+                          >
+                            <span>⚠️ Belum tersinkron (Coba lagi)</span>
+                          </button>
+                        ) : isRead ? (
                           <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
                             <span>✓ Sudah Dibaca</span>
                           </span>

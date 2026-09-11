@@ -7,6 +7,9 @@ import type {
   HolidayRecord,
   AttendanceStatus,
   AppNotification,
+  MarkNotificationDTO,
+  MarkBatchNotificationsDTO,
+  MarkReadResult,
   DeviceBindingCheckResult,
   AttendanceAction,
   TeacherMoodType,
@@ -1041,8 +1044,29 @@ export class MockProvider implements IDataProvider {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  public async getNotifications(userId: string, _token: string): Promise<AppNotification[]> {
-    const key = `smart_absensi_notifications_${userId}`;
+  public async getNotificationReads(userId: string, _token?: string): Promise<Set<string>> {
+    const effectiveUserId = userId || useAuthStore.getState().user?.id || 'usr_uuid_1001';
+    const key = `smart_absensi_reads_${effectiveUserId}`;
+    const saved = safeGetStorage(key);
+    const readsSet = new Set<string>();
+    if (saved) {
+      try {
+        const arr = JSON.parse(saved);
+        if (Array.isArray(arr)) {
+          arr.forEach((id: string) => readsSet.add(id));
+        }
+      } catch (e) {
+        console.error('Failed to parse reads:', e);
+      }
+    }
+    const localReads = NotificationService.getReadNotificationIds(effectiveUserId);
+    localReads.forEach((id) => readsSet.add(id));
+    return readsSet;
+  }
+
+  public async getNotifications(userId: string, _token: string, userRole?: string): Promise<AppNotification[]> {
+    const effectiveUserId = userId || useAuthStore.getState().user?.id || 'usr_uuid_1001';
+    const key = `smart_absensi_notifications_${effectiveUserId}`;
     const saved = safeGetStorage(key);
     let items: AppNotification[] = [];
 
@@ -1058,28 +1082,31 @@ export class MockProvider implements IDataProvider {
       items = [
         {
           id: 'n1',
-          user_id: userId,
+          user_id: effectiveUserId,
           title: '☀️ Selalu Absen Masuk Tepat Waktu',
           message: 'Batas toleransi absen masuk adalah sesuai jam operasional sekolah. Gunakan QR Code resmi di sekolah.',
           type: 'INFO',
+          category: 'OPERATIONAL',
           is_read: false,
           created_at: new Date().toISOString(),
         },
         {
           id: 'n2',
-          user_id: userId,
+          user_id: effectiveUserId,
           title: '🔒 Keamanan Perangkat (Device Binding)',
           message: 'Akun Anda terikat pada HP aktif. Pembatasan 1 akun 1 HP aktif.',
           type: 'SUCCESS',
+          category: 'HISTORICAL',
           is_read: false,
           created_at: new Date().toISOString(),
         },
         {
           id: 'n3',
-          user_id: userId,
+          user_id: effectiveUserId,
           title: '🔑 Pengingat PIN Kemanan',
           message: 'Apabila Anda masih menggunakan PIN default 123456, segera ubah PIN melalui tab Profil.',
           type: 'WARNING',
+          category: 'ALERT',
           is_read: true,
           created_at: new Date().toISOString(),
         },
@@ -1087,55 +1114,115 @@ export class MockProvider implements IDataProvider {
       safeSetStorage(key, JSON.stringify(items));
     }
 
-    const readIds = NotificationService.getReadNotificationIds(userId);
-    return items.map((n) => ({
-      ...n,
-      is_read: Boolean(n.is_read) || readIds.has(n.id),
-    }));
+    const readIds = await this.getNotificationReads(effectiveUserId);
+    const now = Date.now();
+
+    return items
+      .filter((n) => {
+        if (n.expires_at && new Date(n.expires_at).getTime() < now) return false;
+        if (n.audience_role && n.audience_role !== 'ALL' && userRole) {
+          return n.audience_role.toUpperCase().trim() === userRole.toUpperCase().trim();
+        }
+        return true;
+      })
+      .map((n) => ({
+        ...n,
+        is_read: readIds.has(n.id) || Boolean(n.is_read && n.user_id === effectiveUserId),
+        sync_state: 'SYNCED',
+      }));
   }
 
-  public async markNotificationAsRead(notificationId: string, token: string): Promise<boolean> {
-    const sessionUser = useAuthStore.getState().user;
-    const userId = sessionUser?.id || 'usr_uuid_1001';
-    NotificationService.markIdAsRead(userId, notificationId);
-
+  public setMockNotifications(userId: string, items: AppNotification[]): void {
     const key = `smart_absensi_notifications_${userId}`;
-    const notifications = await this.getNotifications(userId, token);
-    const updated = notifications.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n));
-    safeSetStorage(key, JSON.stringify(updated));
-    return true;
+    safeSetStorage(key, JSON.stringify(items));
+  }
+
+  public async markNotificationAsRead(
+    dtoOrId: MarkNotificationDTO | string,
+    _token?: string
+  ): Promise<MarkReadResult | boolean> {
+    const isLegacyCall = typeof dtoOrId === 'string';
+    let notificationId = '';
+    let effectiveUserId = '';
+
+    if (typeof dtoOrId === 'object' && dtoOrId !== null) {
+      notificationId = dtoOrId.notification_id || dtoOrId.notificationId || '';
+      effectiveUserId = dtoOrId.user_id || dtoOrId.userId || '';
+    } else {
+      notificationId = dtoOrId || '';
+      effectiveUserId = useAuthStore.getState().user?.id || 'usr_uuid_1001';
+    }
+
+    if (!effectiveUserId) {
+      effectiveUserId = useAuthStore.getState().user?.id || 'usr_uuid_1001';
+    }
+
+    if (!notificationId) {
+      return isLegacyCall ? false : { success: false, synced: false, error: 'Notification ID required' };
+    }
+
+    NotificationService.markIdAsRead(effectiveUserId, notificationId);
+
+    const readsKey = `smart_absensi_reads_${effectiveUserId}`;
+    const reads = await this.getNotificationReads(effectiveUserId);
+    reads.add(notificationId);
+    safeSetStorage(readsKey, JSON.stringify(Array.from(reads)));
+
+    return isLegacyCall ? true : { success: true, synced: true };
   }
 
   public async markNotificationsAsRead(
-    userIdOrIds: string | string[],
+    dtoOrIds: MarkBatchNotificationsDTO | string | string[],
     idsOrToken?: string[] | string,
     _token?: string
-  ): Promise<boolean> {
-    let effectiveUserId: string;
-    let notificationIds: string[];
+  ): Promise<MarkReadResult | boolean> {
+    const isLegacyCall = Array.isArray(dtoOrIds) || typeof dtoOrIds === 'string';
+    let effectiveUserId: string = '';
+    let notificationIds: string[] = [];
 
-    if (Array.isArray(userIdOrIds)) {
-      notificationIds = userIdOrIds;
-      effectiveUserId =
+    if (typeof dtoOrIds === 'object' && !Array.isArray(dtoOrIds) && dtoOrIds !== null) {
+      effectiveUserId = dtoOrIds.user_id || dtoOrIds.userId || '';
+      notificationIds = dtoOrIds.notification_ids || dtoOrIds.notificationIds || [];
+    } else if (Array.isArray(dtoOrIds)) {
+      notificationIds = dtoOrIds;
+      if (
         typeof idsOrToken === 'string' &&
         !idsOrToken.startsWith('mock-jwt-') &&
         !idsOrToken.startsWith('MOCK_') &&
         idsOrToken
-          ? idsOrToken
-          : useAuthStore.getState().user?.id || 'usr_uuid_1001';
+      ) {
+        effectiveUserId = idsOrToken;
+      } else {
+        effectiveUserId = useAuthStore.getState().user?.id || 'usr_uuid_1001';
+      }
     } else {
-      effectiveUserId = userIdOrIds || useAuthStore.getState().user?.id || 'usr_uuid_1001';
+      effectiveUserId = dtoOrIds || useAuthStore.getState().user?.id || 'usr_uuid_1001';
       notificationIds = Array.isArray(idsOrToken) ? idsOrToken : [];
+    }
+
+    if (!effectiveUserId) {
+      effectiveUserId = useAuthStore.getState().user?.id || 'usr_uuid_1001';
+    }
+
+    if (notificationIds.length === 0) {
+      return isLegacyCall ? true : { success: true, synced: true };
     }
 
     NotificationService.markAllIdsAsRead(effectiveUserId, notificationIds);
 
-    const key = `smart_absensi_notifications_${effectiveUserId}`;
-    const notifications = await this.getNotifications(effectiveUserId, _token || '');
-    const idSet = new Set(notificationIds);
-    const updated = notifications.map((n) => (idSet.has(n.id) ? { ...n, is_read: true } : n));
-    safeSetStorage(key, JSON.stringify(updated));
-    return true;
+    const readsKey = `smart_absensi_reads_${effectiveUserId}`;
+    const reads = await this.getNotificationReads(effectiveUserId);
+    notificationIds.forEach((id) => reads.add(id));
+    safeSetStorage(readsKey, JSON.stringify(Array.from(reads)));
+
+    return isLegacyCall ? true : { success: true, synced: true };
+  }
+
+  public subscribeToNotificationUpdates(
+    _userId: string,
+    _callback: (event: { table: string; eventType: string; payload?: any }) => void
+  ): () => void {
+    return () => {};
   }
 
   public async getNotificationPreferences(userId: string, _token?: string): Promise<NotificationPreferences | null> {
