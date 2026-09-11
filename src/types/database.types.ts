@@ -105,6 +105,7 @@ export interface LeaveRequest {
   reason: string;
   attachment_url: string | null;
   approval_status: ApprovalStatus;
+  status?: string | null;
   approval_deadline: string;
   approved_by?: string | null;
   approval_notes?: string | null;

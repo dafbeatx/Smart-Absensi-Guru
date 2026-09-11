@@ -797,6 +797,7 @@ export class MockProvider implements IDataProvider {
       leaves[targetIdx] = {
         ...leaves[targetIdx],
         approval_status: decision,
+        status: decision,
         approval_notes: notes,
         approved_by: activeUser?.full_name || 'Kepala Sekolah',
       };
@@ -811,6 +812,7 @@ export class MockProvider implements IDataProvider {
         end_date: new Date().toISOString().substring(0, 10),
         reason: 'Pengajuan Izin Presensi Guru',
         approval_status: decision,
+        status: decision,
         approval_notes: notes,
         approved_by: activeUser?.full_name || 'Kepala Sekolah',
         attachment_url: null,
@@ -898,7 +900,25 @@ export class MockProvider implements IDataProvider {
           allRecords.push(newRec);
         }
 
-        safeSetStorage(`smart_absensi_daily_attendance_${dateStr}`, JSON.stringify([newRec]));
+        const dayKey = `smart_absensi_daily_attendance_${dateStr}`;
+        let dayRecords: AttendanceRecord[] = [];
+        try {
+          const savedDay = safeGetStorage(dayKey);
+          if (savedDay) {
+            dayRecords = JSON.parse(savedDay);
+            if (!Array.isArray(dayRecords)) dayRecords = [];
+          }
+        } catch (e) {
+          dayRecords = [];
+        }
+        const dayIdx = dayRecords.findIndex((r) => r.user_id === targetLeave.user_id);
+        if (dayIdx !== -1) {
+          dayRecords[dayIdx] = newRec;
+        } else {
+          dayRecords.push(newRec);
+        }
+        safeSetStorage(dayKey, JSON.stringify(dayRecords));
+
         if (dateStr === todayStr) {
           safeSetStorage(`smart_absensi_today_attendance_${targetLeave.user_id}_${todayStr}`, JSON.stringify(newRec));
         }

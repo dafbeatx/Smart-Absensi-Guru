@@ -5,6 +5,13 @@ import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 import { EarlyWarningSystemWidget } from './EarlyWarningSystemWidget';
 import { BurnoutEarlyWarningWidget } from '../../features/kepsek/components/BurnoutEarlyWarningWidget';
 import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay } from '../../utils/time.utils';
+import {
+  isTeacherLeaveMatch,
+  isTeacherRecordMatch,
+  normalizeDateToJakarta,
+  isLeaveApprovedStatus,
+  isLeavePendingStatus,
+} from '../../services/analytics.service';
 import { CONSTANTS } from '../../config/constants';
 import { ProviderFactory } from '../../providers/provider-factory';
 
@@ -59,6 +66,22 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
     return () => window.removeEventListener('smart_absensi_settings_updated', loadSettings);
   }, []);
 
+  // Listen for real-time leave events to update metrics cards immediately
+  const [leaveSyncKey, setLeaveSyncKey] = useState(0);
+  useEffect(() => {
+    const handleSync = () => setLeaveSyncKey((k) => k + 1);
+    window.addEventListener('smart_absensi_leave_updated', handleSync);
+    window.addEventListener('smart_absensi_leaves_updated', handleSync);
+    window.addEventListener('smart_absensi_records_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('smart_absensi_leave_updated', handleSync);
+      window.removeEventListener('smart_absensi_leaves_updated', handleSync);
+      window.removeEventListener('smart_absensi_records_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   const totalGuruCount = useMemo(() => (teachers || []).filter((t) => t.is_active !== false).length, [teachers]);
 
   const [lastUpdatedTime, setLastUpdatedTime] = React.useState<string>(() => {
@@ -109,41 +132,79 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
     }
 
     // Merge approved leaves for today into todayUserMap if teacher has no explicit attendance record yet
-    const leavesToEvaluate: LeaveRequest[] = [...allLeaves, ...pendingRequests];
+    const leavesMap = new Map<string, LeaveRequest>();
+    for (const l of [...allLeaves, ...pendingRequests]) {
+      if (l && l.id) leavesMap.set(l.id, l);
+    }
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('smart_absensi_leaves');
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) leavesToEvaluate.push(...parsed);
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              if (item && item.id) {
+                const existing = leavesMap.get(item.id);
+                if (!existing || isLeaveApprovedStatus(item) || (!isLeaveApprovedStatus(existing) && isLeavePendingStatus(item))) {
+                  leavesMap.set(item.id, item);
+                }
+              }
+            }
+          }
         }
       } catch (e) {}
     }
+    const leavesToEvaluate = Array.from(leavesMap.values());
 
-    for (const leave of leavesToEvaluate) {
-      if (leave.approval_status === 'APPROVED') {
-        if (leave.start_date <= todayStr && leave.end_date >= todayStr) {
-          if (!todayUserMap.has(leave.user_id)) {
-            const leaveStatus: AttendanceStatus =
-              leave.leave_type === 'SAKIT' ? 'SAKIT' : leave.leave_type === 'DINAS_LUAR' ? 'DINAS_LUAR' : 'IZIN';
-            todayUserMap.set(leave.user_id, {
-              id: 'rec_leave_' + leave.id,
-              user_id: leave.user_id,
-              date: todayStr,
-              check_in_time: null,
-              check_out_time: null,
-              status: leaveStatus,
-              check_in_lat: null,
-              check_in_lng: null,
-              check_in_distance_meters: null,
-              verification_method: 'MANUAL_OPERATOR',
-              attendance_source: 'MANUAL',
-              is_offline: false,
-              notes: leave.reason,
-              created_at: leave.created_at,
-            });
+    const activeEligible = (teachers || []).filter((t) => t.is_active !== false);
+
+    for (const teacher of activeEligible) {
+      // If teacher already has an explicit attendance record for today, skip
+      const hasRecord = attendanceRecords.some((r) => r.date === todayStr && isTeacherRecordMatch(teacher, r));
+      if (hasRecord) continue;
+
+      const approvedLeave = leavesToEvaluate.find((leave) => {
+        if (!isLeaveApprovedStatus(leave)) return false;
+        if (!isTeacherLeaveMatch(teacher, leave)) return false;
+        const startStr = normalizeDateToJakarta(leave.start_date);
+        const endStr = normalizeDateToJakarta(leave.end_date);
+        return startStr <= todayStr && todayStr <= endStr;
+      });
+
+      if (approvedLeave && !todayUserMap.has(teacher.id)) {
+        let leaveStatus: AttendanceStatus = 'IZIN';
+        if (approvedLeave.leave_type === 'SAKIT') {
+          leaveStatus = 'SAKIT';
+        } else if (approvedLeave.leave_type === 'DINAS_LUAR') {
+          leaveStatus = 'DINAS_LUAR';
+        } else if (approvedLeave.leave_type === 'KOREKSI_ABSEN') {
+          const reasonText = approvedLeave.reason || '';
+          if (reasonText.includes('menjadi HADIR') || reasonText.includes('Target Koreksi') || !reasonText.includes('menjadi ')) {
+            leaveStatus = 'HADIR';
+          } else if (reasonText.includes('menjadi SAKIT')) {
+            leaveStatus = 'SAKIT';
+          } else if (reasonText.includes('menjadi DINAS_LUAR')) {
+            leaveStatus = 'DINAS_LUAR';
+          } else if (reasonText.includes('menjadi ALFA')) {
+            leaveStatus = 'ALFA';
           }
         }
+        todayUserMap.set(teacher.id, {
+          id: 'rec_leave_' + approvedLeave.id,
+          user_id: teacher.id,
+          date: todayStr,
+          check_in_time: null,
+          check_out_time: null,
+          status: leaveStatus,
+          check_in_lat: null,
+          check_in_lng: null,
+          check_in_distance_meters: null,
+          verification_method: 'MANUAL_OPERATOR',
+          attendance_source: 'MANUAL',
+          is_offline: false,
+          notes: approvedLeave.reason,
+          created_at: approvedLeave.created_at,
+        });
       }
     }
 
@@ -174,7 +235,7 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       completeCheckOutCount: completeCheckOut,
       pendingCheckOutCount: pendingCheckOut,
     };
-  }, [attendanceRecords, allLeaves, pendingRequests, totalGuruCount, todayStr, checkinEnd]);
+  }, [attendanceRecords, allLeaves, pendingRequests, teachers, totalGuruCount, todayStr, checkinEnd, leaveSyncKey]);
 
   // Full 100% requires both check-in AND check-out. Check-in only gets 50% weight.
   const weightedScore = (completeCheckOutCount + izinCount) + (pendingCheckOutCount * 0.5);

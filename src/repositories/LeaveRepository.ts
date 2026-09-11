@@ -49,6 +49,33 @@ export class LeaveRepository {
     const activeUser = useAuthStore.getState().user;
     const res = await ProviderFactory.getProvider().approveLeave(leaveId, decision, notes, token);
 
+    // Synchronize local storage cache immediately so UI reflects decision instantly
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_leaves');
+        if (saved) {
+          const list: LeaveRequest[] = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            const updated = list.map((item) => {
+              if (item.id === leaveId) {
+                return {
+                  ...item,
+                  approval_status: decision,
+                  status: decision,
+                  approval_notes: notes || item.approval_notes,
+                  approved_at: new Date().toISOString(),
+                };
+              }
+              return item;
+            });
+            localStorage.setItem('smart_absensi_leaves', JSON.stringify(updated));
+          }
+        }
+      } catch (e) {
+        logger.warn('LeaveRepository', 'Failed to update local leave cache:', e);
+      }
+    }
+
     await AuditLogger.log({
       actorId: activeUser?.id || 'usr_kepsek_1',
       actorRole: activeUser?.role || 'KEPSEK',
@@ -64,6 +91,7 @@ export class LeaveRepository {
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('smart_absensi_leave_updated'));
+      window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
       window.dispatchEvent(new Event('smart_absensi_records_updated'));
     }
     return res;
@@ -102,6 +130,11 @@ export class LeaveRepository {
     try {
       const leaves = await ProviderFactory.getProvider().getAllLeaves(token);
       if (Array.isArray(leaves)) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('smart_absensi_leaves', JSON.stringify(leaves));
+          } catch (e) {}
+        }
         return leaves.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       }
     } catch (err) {

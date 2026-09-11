@@ -481,7 +481,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                   >
                     <div className="flex items-center justify-center gap-1">
                       {isPassed ? (
-                        <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                        <Check className="w-3 h-3 text-emerald-600 stroke-3" />
                       ) : (
                         <span className={`text-[10px] font-black ${isCurrent ? 'text-white' : 'text-slate-400'}`}>
                           {s.num}
@@ -561,7 +561,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                     type="button"
                     variant="primary"
                     onClick={handleNextStep}
-                    className="w-full sm:w-auto bg-[#023246] hover:bg-[#18536B] min-h-[46px] flex items-center justify-center gap-1.5"
+                    className="w-full sm:w-auto bg-[#023246] hover:bg-[#18536B] min-h-11.5 flex items-center justify-center gap-1.5"
                   >
                     <span>Lanjutkan: Jumlah &amp; Kondisi</span>
                     <ArrowRight className="w-4 h-4" />
@@ -685,7 +685,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                     type="button"
                     variant="outline"
                     onClick={handlePrevStep}
-                    className="min-h-[46px] px-3.5"
+                    className="min-h-11.5 px-3.5"
                   >
                     <ArrowLeft className="w-4 h-4 mr-1" />
                     <span>Kembali</span>
@@ -694,7 +694,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                     type="button"
                     variant="primary"
                     onClick={handleNextStep}
-                    className="bg-[#023246] hover:bg-[#18536B] min-h-[46px] flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
+                    className="bg-[#023246] hover:bg-[#18536B] min-h-11.5 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
                   >
                     <span>Lanjutkan: Anggaran</span>
                     <ArrowRight className="w-4 h-4" />
@@ -789,7 +789,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                     type="button"
                     variant="outline"
                     onClick={handlePrevStep}
-                    className="min-h-[46px] px-3.5"
+                    className="min-h-11.5 px-3.5"
                   >
                     <ArrowLeft className="w-4 h-4 mr-1" />
                     <span>Kembali</span>
@@ -798,7 +798,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                     type="button"
                     variant="primary"
                     onClick={handleNextStep}
-                    className="bg-[#023246] hover:bg-[#18536B] min-h-[46px] flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
+                    className="bg-[#023246] hover:bg-[#18536B] min-h-11.5 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center"
                   >
                     <span>Lanjutkan: Pratinjau</span>
                     <ArrowRight className="w-4 h-4" />
@@ -894,7 +894,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                     variant="outline"
                     onClick={handlePrevStep}
                     disabled={isSubmitting}
-                    className="min-h-[46px] px-3.5"
+                    className="min-h-11.5 px-3.5"
                   >
                     <ArrowLeft className="w-4 h-4 mr-1" />
                     <span>Ubah Data</span>
@@ -904,7 +904,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                     variant="primary"
                     onClick={() => handleSubmitForm()}
                     isLoading={isSubmitting}
-                    className="bg-emerald-600 hover:bg-emerald-700 min-h-[46px] flex items-center gap-1.5 flex-1 sm:flex-initial justify-center font-black"
+                    className="bg-emerald-600 hover:bg-emerald-700 min-h-11.5 flex items-center gap-1.5 flex-1 sm:flex-initial justify-center font-black"
                   >
                     <Save className="w-4 h-4 mr-1" />
                     <span>{viewMode === 'CREATE' ? 'Simpan ke Inventaris' : 'Simpan Perubahan'}</span>
@@ -1028,7 +1028,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                       : 'Belum ada data inventaris sarpras yang dicatat.'}
                   </p>
                 </div>
-                <Button onClick={handleStartCreate} variant="primary" className="text-xs min-h-[44px]">
+                <Button onClick={handleStartCreate} variant="primary" className="text-xs min-h-11">
                   <Plus className="w-3.5 h-3.5 mr-1" />
                   <span>Tambah Barang Sekarang</span>
                 </Button>
@@ -1099,7 +1099,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleStartEdit(item)}
-                          className="p-2 text-slate-600 hover:text-[#023246] hover:bg-slate-100 rounded-xl transition-all cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center active:scale-95"
+                          className="p-2 text-slate-600 hover:text-[#023246] hover:bg-slate-100 rounded-xl transition-all cursor-pointer min-h-10 min-w-10 flex items-center justify-center active:scale-95"
                           title="Edit Barang"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -1107,7 +1107,7 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                         <button
                           type="button"
                           onClick={() => setDeletingItem(item)}
-                          className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center active:scale-95"
+                          className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer min-h-10 min-w-10 flex items-center justify-center active:scale-95"
                           title="Hapus Barang"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1133,13 +1133,13 @@ export const SarprasInventoryModal: React.FC<SarprasInventoryModalProps> = ({
                 Apakah Anda yakin ingin menghapus <span className="font-bold text-slate-900">"{deletingItem.nama_barang}"</span> ({deletingItem.ruangan})? Tindakan ini tidak dapat dibatalkan.
               </p>
               <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button variant="outline" onClick={() => setDeletingItem(null)} className="min-h-[44px]">
+                <Button variant="outline" onClick={() => setDeletingItem(null)} className="min-h-11">
                   Batal
                 </Button>
                 <Button
                   variant="primary"
                   onClick={handleDeleteItem}
-                  className="bg-rose-600 hover:bg-rose-700 min-h-[44px]"
+                  className="bg-rose-600 hover:bg-rose-700 min-h-11"
                 >
                   Ya, Hapus
                 </Button>

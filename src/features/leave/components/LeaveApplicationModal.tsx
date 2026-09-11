@@ -7,6 +7,7 @@ import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { NotificationService } from '../../../services/notification-permission.service';
+import { getTodayDateInJakarta } from '../../../services/analytics.service';
 import type { LeaveType } from '../../../types/database.types';
 
 export interface LeaveApplicationModalProps {
@@ -25,8 +26,8 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [leaveType, setLeaveType] = useState<LeaveType>('SAKIT');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(() => getTodayDateInJakarta());
+  const [endDate, setEndDate] = useState(() => getTodayDateInJakarta());
   const [reason, setReason] = useState('');
   const [attachmentBase64, setAttachmentBase64] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');

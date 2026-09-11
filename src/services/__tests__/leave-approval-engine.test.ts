@@ -110,5 +110,65 @@ export const runLeaveApprovalTestSuite = async (): Promise<{
     invalidRejection.success === false && invalidRejection.error?.code === 'LEV_004'
   );
 
+  // Test 6: Live Tracking Contract - Admin Approved Leave is recognized in Daily Summary (not ALFA/Belum Absen)
+  const adminUser = {
+    id: 'usr_admin_1001',
+    nip: '198501012010012001',
+    full_name: 'Rina Fitriani, S.Kom.',
+    phone_number: '0895351251395',
+    role: 'ADMIN' as const,
+    position: 'Admin Website & IT Sekolah',
+    avatar_url: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+
+  const approvedAdminLeave: LeaveRequest = {
+    id: 'leave_admin_999',
+    user_id: 'usr_admin_1001',
+    leave_type: 'SAKIT',
+    start_date: '2026-09-11',
+    end_date: '2026-09-11',
+    reason: 'Sakit demam dan istirahat dokter',
+    attachment_url: null,
+    approval_status: 'APPROVED',
+    approval_notes: 'Disetujui Kepsek',
+    approved_by: 'Drs. H. M. Yusuf, M.Pd.',
+    approval_deadline: '2026-09-13T00:00:00Z',
+    created_at: new Date().toISOString(),
+  };
+
+  const { AnalyticsService, isTeacherLeaveMatch } = await import('../analytics.service');
+
+  assert(
+    'Live Tracking Matcher - Admin is matched to approved leave by ID and phone',
+    isTeacherLeaveMatch(adminUser, approvedAdminLeave)
+  );
+
+  const summary = AnalyticsService.calculateDailySummary(
+    '2026-09-11',
+    [adminUser],
+    [], // No check-in record
+    [approvedAdminLeave]
+  );
+
+  assert(
+    'Live Tracking Contract - Admin with approved leave is recorded as totalSick and 0 unabsented',
+    summary.totalSick === 1 && summary.totalUnabsented === 0
+  );
+
+  // Test 7: Unabsented Teachers Filter - Personnel with approved leave is NOT marked Tanpa Keterangan
+  const unabsented = AnalyticsService.getUnabsentedTeachers(
+    '2026-09-11',
+    [adminUser],
+    [], // No attendance record
+    [approvedAdminLeave]
+  );
+
+  assert(
+    'Unabsented Tracker Contract - Personnel with approved leave is excluded from unabsented list',
+    unabsented.length === 0
+  );
+
   return { passed, failed, results };
 };

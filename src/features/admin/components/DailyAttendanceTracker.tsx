@@ -1,6 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { UserProfile, AttendanceRecord, LeaveRequest, AttendanceStatus, SystemSettings, RoleCode, HolidayRecord } from '../../../types/database.types';
-import { AnalyticsService } from '../../../services/analytics.service';
+import {
+  AnalyticsService,
+  isTeacherLeaveMatch,
+  isTeacherRecordMatch,
+  normalizeDateToJakarta,
+  isLeaveApprovedStatus,
+  isLeavePendingStatus,
+  getTodayDateInJakarta,
+} from '../../../services/analytics.service';
 import { FeatureGate } from '../../../components/ui/FeatureGate';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
@@ -32,7 +40,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   const { token } = useAuthStore();
   const { showToast } = useToastStore();
 
-  const todayStr = useMemo(() => new Date().toISOString().substring(0, 10), []);
+  const todayStr = useMemo(() => getTodayDateInJakarta(), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
@@ -87,32 +95,57 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
   const checkinEnd = systemSettings?.work_checkin_end ? systemSettings.work_checkin_end.slice(0, 5) : CONSTANTS.DEFAULTS.WORK_CHECKIN_END;
 
+  // Listen for real-time leave updates from approval modals or background sync
+  const [leaveSyncKey, setLeaveSyncKey] = useState(0);
+  useEffect(() => {
+    const handleLeaveSync = () => setLeaveSyncKey((k) => k + 1);
+    window.addEventListener('smart_absensi_leave_updated', handleLeaveSync);
+    window.addEventListener('smart_absensi_leaves_updated', handleLeaveSync);
+    window.addEventListener('smart_absensi_records_updated', handleLeaveSync);
+    window.addEventListener('storage', handleLeaveSync);
+    return () => {
+      window.removeEventListener('smart_absensi_leave_updated', handleLeaveSync);
+      window.removeEventListener('smart_absensi_leaves_updated', handleLeaveSync);
+      window.removeEventListener('smart_absensi_records_updated', handleLeaveSync);
+      window.removeEventListener('storage', handleLeaveSync);
+    };
+  }, []);
+
   // Filter active eligible personnel (Guru, Kepsek, Admin) expected to take daily attendance
   const activeEligiblePersonnel = useMemo(() => {
     return AnalyticsService.getAttendanceEligibleUsers(teachers);
   }, [teachers]);
 
-  // Gather all leave requests from props & localStorage
+  // Gather all leave requests from props & localStorage with smart deduplication favoring APPROVED status
   const allLeavesToEvaluate = useMemo(() => {
-    const list = [...leaveRequests];
+    const map = new Map<string, LeaveRequest>();
+    for (const l of leaveRequests) {
+      if (l && l.id) map.set(l.id, l);
+    }
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('smart_absensi_leaves');
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            // Deduplicate by ID
             for (const item of parsed) {
-              if (!list.some((existing) => existing.id === item.id)) {
-                list.push(item);
+              if (item && item.id) {
+                const existing = map.get(item.id);
+                if (
+                  !existing ||
+                  isLeaveApprovedStatus(item) ||
+                  (!isLeaveApprovedStatus(existing) && isLeavePendingStatus(item))
+                ) {
+                  map.set(item.id, item);
+                }
               }
             }
           }
         }
       } catch (e) {}
     }
-    return list;
-  }, [leaveRequests]);
+    return Array.from(map.values());
+  }, [leaveRequests, leaveSyncKey]);
 
   // Check if selectedDate is weekend or holiday
   const isOffDayCheck = useMemo(() => {
@@ -159,44 +192,22 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       attachmentUrl?: string | null;
     }>();
 
-    // Helper to match personnel with leave request
-    const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest) => {
-      if (leave.user_id === t.id || (t.nip && leave.user_id === t.nip) || leave.user_id === t.full_name) return true;
-      if (leave.user_name && (leave.user_name === t.full_name || leave.user_name === t.id)) return true;
-      if (leave.teacher_name && (leave.teacher_name === t.full_name || leave.teacher_name === t.id)) return true;
-      if (leave.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
-      return false;
-    };
-
-    const isTeacherRecordMatch = (t: UserProfile, rec: AttendanceRecord) => {
-      if (rec.user_id === t.id || (t.nip && rec.user_id === t.nip) || rec.user_id === t.full_name) return true;
-      if (rec.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
-      return false;
-    };
-
     for (const teacher of activeEligiblePersonnel) {
       // 1. Check if personnel has an APPROVED leave for selectedDate (High Priority)
       const approvedLeave = allLeavesToEvaluate.find((l) => {
-        const isApproved =
-          l.approval_status === 'APPROVED' || (l as any).status === 'APPROVED';
-        if (!isApproved) return false;
+        if (!isLeaveApprovedStatus(l)) return false;
         if (!isTeacherLeaveMatch(teacher, l)) return false;
-        const startStr = (l.start_date || '').substring(0, 10);
-        const endStr = (l.end_date || '').substring(0, 10);
+        const startStr = normalizeDateToJakarta(l.start_date);
+        const endStr = normalizeDateToJakarta(l.end_date);
         return startStr <= selectedDate && selectedDate <= endStr;
       });
 
       // 2. Check if personnel has a PENDING leave application for selectedDate
       const pendingLeave = allLeavesToEvaluate.find((l) => {
-        const isPending =
-          l.approval_status === 'PENDING' ||
-          l.approval_status === 'SUBMITTED' ||
-          l.approval_status === 'UNDER_REVIEW' ||
-          !l.approval_status;
-        if (!isPending) return false;
+        if (!isLeavePendingStatus(l)) return false;
         if (!isTeacherLeaveMatch(teacher, l)) return false;
-        const startStr = (l.start_date || '').substring(0, 10);
-        const endStr = (l.end_date || '').substring(0, 10);
+        const startStr = normalizeDateToJakarta(l.start_date);
+        const endStr = normalizeDateToJakarta(l.end_date);
         return startStr <= selectedDate && selectedDate <= endStr;
       });
 

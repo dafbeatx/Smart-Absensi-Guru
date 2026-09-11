@@ -25,20 +25,9 @@ export interface MultiSheetReportPayload {
   holidays?: HolidayRecord[];
 }
 
-// Helpers to match teacher profiles with attendance records and leave applications
-export const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest): boolean => {
-  if (leave.user_id === t.id || (t.nip && leave.user_id === t.nip) || leave.user_id === t.full_name) return true;
-  if (leave.user_name && (leave.user_name === t.full_name || leave.user_name === t.id)) return true;
-  if (leave.teacher_name && (leave.teacher_name === t.full_name || leave.teacher_name === t.id)) return true;
-  if (leave.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
-  return false;
-};
-
-export const isTeacherRecordMatch = (t: UserProfile, rec: AttendanceRecord): boolean => {
-  if (rec.user_id === t.id || (t.nip && rec.user_id === t.nip) || rec.user_id === t.full_name) return true;
-  if (rec.user_id === 'usr_guru_010' && (t.full_name.includes('Mawar') || t.id.includes('1001'))) return true;
-  return false;
-};
+// Re-export robust matching helpers from analytics.service
+import { isTeacherLeaveMatch, isTeacherRecordMatch } from '../services/analytics.service';
+export { isTeacherLeaveMatch, isTeacherRecordMatch };
 
 export class ExcelReportGenerator {
   /**

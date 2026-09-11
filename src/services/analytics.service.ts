@@ -42,32 +42,149 @@ export interface HistoricalUnabsentedRecord {
   record?: AttendanceRecord;
 }
 
-// Helper to match personnel with leave request
-const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest): boolean => {
+// Helper to normalize strings for robust comparison (strips titles, punctuation, extra spaces)
+export const normalizePersonName = (name?: string | null): string => {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/(s\.pd\.i|s\.pd|m\.pd|s\.kom|s\.e|s\.si|m\.m|m\.si|drs|dr|dra|g\.r|ir|h\.)/gi, '')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+export const normalizePhoneNumber = (phone?: string | null): string => {
+  if (!phone) return '';
+  return phone.replace(/[^0-9]/g, '').replace(/^62/, '0');
+};
+
+export { getTodayDateInJakarta };
+
+export const normalizeDateToJakarta = (dateStr?: string | null): string => {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return getTodayDateInJakarta(trimmed);
+};
+
+export const isLeaveApprovedStatus = (statusOrLeave?: string | LeaveRequest | null): boolean => {
+  if (!statusOrLeave) return false;
+  const status = typeof statusOrLeave === 'string'
+    ? statusOrLeave
+    : (statusOrLeave.approval_status || statusOrLeave.status);
+  if (!status) return false;
+  const s = String(status).toUpperCase().trim();
+  return s === 'APPROVED' || s === 'DISETUJUI';
+};
+
+export const isLeavePendingStatus = (statusOrLeave?: string | LeaveRequest | null): boolean => {
+  if (!statusOrLeave) return true;
+  const status = typeof statusOrLeave === 'string'
+    ? statusOrLeave
+    : (statusOrLeave.approval_status || statusOrLeave.status);
+  if (!status) return true;
+  const s = String(status).toUpperCase().trim();
+  return s === 'PENDING' || s === 'SUBMITTED' || s === 'UNDER_REVIEW';
+};
+
+// Robust Helper to match personnel with leave request
+export const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest): boolean => {
   if (!t || !leave) return false;
-  const tName = t.full_name || '';
-  const tId = t.id || '';
-  if (leave.user_id === t.id || (t.nip && leave.user_id === t.nip) || (tName && leave.user_id === tName)) return true;
-  if (leave.user_name && (leave.user_name === tName || leave.user_name === tId)) return true;
-  if (leave.teacher_name && (leave.teacher_name === tName || leave.teacher_name === tId)) return true;
-  if (leave.user_id === 'usr_guru_010' && (tName.includes('Mawar') || tId.includes('1001'))) return true;
+  const tId = (t.id || '').trim();
+  const tNip = (t.nip || '').trim();
+  const tName = (t.full_name || '').trim();
+  const tPhone = normalizePhoneNumber(t.phone_number);
+  const tNormName = normalizePersonName(tName);
+
+  const lUserId = (leave.user_id || '').trim();
+  const lUserName = (leave.user_name || '').trim();
+  const lTeacherName = (leave.teacher_name || '').trim();
+  const lPhone = normalizePhoneNumber((leave as any).phone_number || (lUserId.startsWith('08') ? lUserId : ''));
+
+  // 1. Direct ID match
+  if (lUserId && tId && lUserId === tId) return true;
+
+  // 2. NIP / NPP match
+  if (tNip && lUserId && (lUserId === tNip || (leave as any).nip === tNip)) return true;
+
+  // 3. Phone number match
+  if (tPhone && lPhone && tPhone === lPhone) return true;
+  if (tPhone && lUserId && normalizePhoneNumber(lUserId) === tPhone) return true;
+
+  // 4. Full Name match (exact or normalized)
+  if (tName && (lUserId === tName || lUserName === tName || lTeacherName === tName)) return true;
+  if (tNormName && tNormName.length >= 3) {
+    if (normalizePersonName(lUserId) === tNormName) return true;
+    if (normalizePersonName(lUserName) === tNormName) return true;
+    if (normalizePersonName(lTeacherName) === tNormName) return true;
+  }
+
+  // 5. Admin / Operator Role cross-link (usr_admin_1001 <-> usr_op_002 <-> Admin Website / Operator Sekolah)
+  const isTargetAdmin = t.role === 'ADMIN' || t.role === 'OPERATOR';
+  const isAdminLeave =
+    lUserId === 'usr_admin_1001' ||
+    lUserId === 'usr_op_002' ||
+    lUserId.toLowerCase().includes('admin') ||
+    lUserId.toLowerCase().includes('operator') ||
+    (tNormName.includes('rina') && (lUserId.includes('op_002') || lUserId.includes('admin'))) ||
+    (tNormName.includes('qodiatul') && (lUserId.includes('admin') || lUserId.includes('op_002')));
+  if (isTargetAdmin && isAdminLeave) return true;
+
+  // 6. Compatibility rule for Mawar Andinia
+  if (lUserId === 'usr_guru_010' && (tName.includes('Mawar') || tId.includes('1001'))) return true;
+
   return false;
 };
 
-// Helper to match personnel with attendance record
-const isTeacherRecordMatch = (t: UserProfile, rec: AttendanceRecord): boolean => {
+// Robust Helper to match personnel with attendance record
+export const isTeacherRecordMatch = (t: UserProfile, rec: AttendanceRecord): boolean => {
   if (!t || !rec) return false;
-  const tName = t.full_name || '';
-  const tId = t.id || '';
-  if (rec.user_id === t.id || (t.nip && rec.user_id === t.nip) || (tName && rec.user_id === tName)) return true;
-  if (rec.user_id === 'usr_guru_010' && (tName.includes('Mawar') || tId.includes('1001'))) return true;
+  const tId = (t.id || '').trim();
+  const tNip = (t.nip || '').trim();
+  const tName = (t.full_name || '').trim();
+  const tPhone = normalizePhoneNumber(t.phone_number);
+  const tNormName = normalizePersonName(tName);
+
+  const rUserId = (rec.user_id || '').trim();
+  const rPhone = normalizePhoneNumber((rec as any).phone_number || (rUserId.startsWith('08') ? rUserId : ''));
+
+  // 1. Direct ID match
+  if (rUserId && tId && rUserId === tId) return true;
+
+  // 2. NIP match
+  if (tNip && rUserId && (rUserId === tNip || (rec as any).nip === tNip)) return true;
+
+  // 3. Phone number match
+  if (tPhone && rPhone && tPhone === rPhone) return true;
+  if (tPhone && rUserId && normalizePhoneNumber(rUserId) === tPhone) return true;
+
+  // 4. Name match
+  if (tName && (rUserId === tName || (rec as any).teacher_name === tName)) return true;
+  if (tNormName && tNormName.length >= 3 && normalizePersonName(rUserId) === tNormName) return true;
+
+  // 5. Admin / Operator Role cross-link
+  const isTargetAdmin = t.role === 'ADMIN' || t.role === 'OPERATOR';
+  const isAdminRecord =
+    rUserId === 'usr_admin_1001' ||
+    rUserId === 'usr_op_002' ||
+    rUserId.toLowerCase().includes('admin') ||
+    rUserId.toLowerCase().includes('operator') ||
+    (tNormName.includes('rina') && (rUserId.includes('op_002') || rUserId.includes('admin'))) ||
+    (tNormName.includes('qodiatul') && (rUserId.includes('admin') || rUserId.includes('op_002')));
+  if (isTargetAdmin && isAdminRecord) return true;
+
+  // 6. Compatibility rule for Mawar Andinia
+  if (rUserId === 'usr_guru_010' && (tName.includes('Mawar') || tId.includes('1001'))) return true;
+
   return false;
 };
 
 export class AnalyticsService {
   /**
    * Helper to filter active users expected to take daily attendance
-   * (is_active !== false && (role === 'GURU' || role === 'KEPSEK' || role === 'ADMIN' || !role))
+   * (is_active !== false && (role === 'GURU' || role === 'KEPSEK' || role === 'ADMIN' || role === 'OPERATOR' || !role))
    */
   public static getAttendanceEligibleUsers(allTeachers: UserProfile[]): UserProfile[] {
     return (allTeachers || []).filter(
@@ -109,20 +226,20 @@ export class AnalyticsService {
 
     // 1. Process Approved & Pending Leaves FIRST (Highest Priority for accounting)
     for (const leave of leaveRequests) {
-      const startStr = (leave.start_date || '').substring(0, 10);
-      const endStr = (leave.end_date || '').substring(0, 10);
+      const startStr = normalizeDateToJakarta(leave.start_date);
+      const endStr = normalizeDateToJakarta(leave.end_date);
 
       if (startStr && endStr && startStr <= dateStr && dateStr <= endStr) {
-        const isApproved =
-          leave.approval_status === 'APPROVED' || (leave as any).status === 'APPROVED';
-        const isPending =
-          leave.approval_status === 'PENDING' ||
-          leave.approval_status === 'SUBMITTED' ||
-          leave.approval_status === 'UNDER_REVIEW' ||
-          !leave.approval_status;
+        const isApproved = isLeaveApprovedStatus(leave.approval_status || (leave as any).status);
+        const isPending = isLeavePendingStatus(leave.approval_status || (leave as any).status);
 
         if (isApproved) {
+          const matchedTeacher = activeTeachers.find((t) => isTeacherLeaveMatch(t, leave));
+          if (matchedTeacher) {
+            accountedUserIds.add(matchedTeacher.id);
+          }
           accountedUserIds.add(leave.user_id);
+
           if (leave.leave_type === 'SAKIT') {
             totalSick++;
           } else if (leave.leave_type === 'DINAS_LUAR') {
@@ -144,8 +261,13 @@ export class AnalyticsService {
             totalLeave++;
           }
         } else if (isPending) {
+          const matchedTeacher = activeTeachers.find((t) => isTeacherLeaveMatch(t, leave));
+          if (matchedTeacher) {
+            accountedUserIds.add(matchedTeacher.id);
+          }
           accountedUserIds.add(leave.user_id);
           totalPendingLeave++;
+
           // Also classify pending into respective category for comprehensive view
           if (leave.leave_type === 'SAKIT') {
             totalSick++;
@@ -256,17 +378,13 @@ export class AnalyticsService {
       // 1. Account for Approved & Pending Leaves
       const hasLeave = leaveRequests.some((l) => {
         const isApprovedOrPending =
-          l.approval_status === 'APPROVED' ||
-          (l as any).status === 'APPROVED' ||
-          l.approval_status === 'PENDING' ||
-          l.approval_status === 'SUBMITTED' ||
-          l.approval_status === 'UNDER_REVIEW' ||
-          !l.approval_status;
+          isLeaveApprovedStatus(l.approval_status || (l as any).status) ||
+          isLeavePendingStatus(l.approval_status || (l as any).status);
 
         if (!isApprovedOrPending) return false;
         if (!isTeacherLeaveMatch(t, l)) return false;
-        const startStr = (l.start_date || '').substring(0, 10);
-        const endStr = (l.end_date || '').substring(0, 10);
+        const startStr = normalizeDateToJakarta(l.start_date);
+        const endStr = normalizeDateToJakarta(l.end_date);
         return startStr <= dateStr && dateStr <= endStr;
       });
 

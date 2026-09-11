@@ -966,6 +966,35 @@ export class SupabaseProvider implements IDataProvider {
       }
     }
 
+    // Synchronize local client cache and notify components
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_leaves');
+        if (saved) {
+          const list: LeaveRequest[] = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            const updated = list.map((item) => {
+              if (item.id === leaveId) {
+                return {
+                  ...item,
+                  approval_status: decision,
+                  status: decision,
+                  approval_notes: notes || item.approval_notes,
+                  approved_at: new Date().toISOString(),
+                };
+              }
+              return item;
+            });
+            localStorage.setItem('smart_absensi_leaves', JSON.stringify(updated));
+          }
+        }
+      } catch (e) {}
+
+      window.dispatchEvent(new Event('smart_absensi_leave_updated'));
+      window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
+      window.dispatchEvent(new Event('smart_absensi_records_updated'));
+    }
+
     return true;
   }
 
