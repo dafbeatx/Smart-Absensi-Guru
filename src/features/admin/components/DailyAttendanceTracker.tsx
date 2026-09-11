@@ -26,6 +26,7 @@ export interface DailyAttendanceTrackerProps {
   attendanceRecords?: AttendanceRecord[];
   leaveRequests?: LeaveRequest[];
   onOpenCorrectionModal?: (teacher?: UserProfile, date?: string) => void;
+  onRefreshAttendance?: () => Promise<void> | void;
 }
 
 type StatusFilter = 'ALL' | 'HADIR' | 'TERLAMBAT' | 'IZIN_SAKIT' | 'PENDING_APPROVAL' | 'ALFA' | 'BELUM_ABSEN';
@@ -36,6 +37,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   attendanceRecords = [],
   leaveRequests = [],
   onOpenCorrectionModal,
+  onRefreshAttendance,
 }) => {
   const { token } = useAuthStore();
   const { showToast } = useToastStore();
@@ -50,6 +52,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
 
   const [resetModalTeacher, setResetModalTeacher] = useState<UserProfile | null>(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetKeys, setResetKeys] = useState<Set<string>>(new Set());
 
   // Quick Review & Decision Modal for Pending Leave Requests
   const [selectedReviewLeave, setSelectedReviewLeave] = useState<LeaveRequest | null>(null);
@@ -152,17 +155,56 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     return isDateOffDay(selectedDate, systemSettings, holidays);
   }, [selectedDate, systemSettings, holidays]);
 
+  // Helper to check if a teacher profile was marked as reset on date d
+  const isTeacherReset = (t: UserProfile, d: string) => {
+    return (
+      resetKeys.has(`${t.id}_${d}`) ||
+      (t.nip ? resetKeys.has(`${t.nip}_${d}`) : false) ||
+      (t.full_name ? resetKeys.has(`${t.full_name}_${d}`) : false) ||
+      (t.phone_number ? resetKeys.has(`${t.phone_number}_${d}`) : false)
+    );
+  };
+
+  // Optimistically filtered leaves excluding reset targets for immediate 0ms UI feedback
+  const effectiveLeaves = useMemo(() => {
+    if (resetKeys.size === 0) return allLeavesToEvaluate;
+    return allLeavesToEvaluate.filter((l) => {
+      const startStr = normalizeDateToJakarta(l.start_date);
+      const endStr = normalizeDateToJakarta(l.end_date);
+      if (startStr <= selectedDate && selectedDate <= endStr) {
+        const isReset =
+          resetKeys.has(`${l.user_id}_${selectedDate}`) ||
+          (l.user_name ? resetKeys.has(`${l.user_name}_${selectedDate}`) : false) ||
+          teachers.some((t) => isTeacherLeaveMatch(t, l) && isTeacherReset(t, selectedDate));
+        if (isReset) return false;
+      }
+      return true;
+    });
+  }, [allLeavesToEvaluate, resetKeys, selectedDate, teachers]);
+
+  // Optimistically filtered attendance records excluding reset targets
+  const effectiveAttendanceRecords = useMemo(() => {
+    if (resetKeys.size === 0) return attendanceRecords;
+    return attendanceRecords.filter((r) => {
+      const recDate = r.date;
+      const isReset =
+        resetKeys.has(`${r.user_id}_${recDate}`) ||
+        teachers.some((t) => isTeacherRecordMatch(t, r) && isTeacherReset(t, recDate));
+      return !isReset;
+    });
+  }, [attendanceRecords, resetKeys, teachers]);
+
   // 1. Calculate Daily Analytics Stats (100% Synchronized with holidays)
   const summary = useMemo(() => {
     return AnalyticsService.calculateDailySummary(
       selectedDate,
       activeEligiblePersonnel,
-      attendanceRecords,
-      allLeavesToEvaluate,
+      effectiveAttendanceRecords,
+      effectiveLeaves,
       systemSettings,
       holidays
     );
-  }, [selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, systemSettings, holidays]);
+  }, [selectedDate, activeEligiblePersonnel, effectiveAttendanceRecords, effectiveLeaves, systemSettings, holidays]);
 
   const [unabsentedScope, setUnabsentedScope] = useState<'FULL_MONTH' | 7 | 14 | 30>('FULL_MONTH');
 
@@ -170,14 +212,14 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
   const historicalUnabsented = useMemo(() => {
     return AnalyticsService.getHistoricalUnabsentedTeachers(
       teachers,
-      attendanceRecords,
-      allLeavesToEvaluate,
+      effectiveAttendanceRecords,
+      effectiveLeaves,
       systemSettings,
       holidays,
       unabsentedScope,
       selectedDate
     );
-  }, [teachers, attendanceRecords, allLeavesToEvaluate, systemSettings, holidays, unabsentedScope, selectedDate]);
+  }, [teachers, effectiveAttendanceRecords, effectiveLeaves, systemSettings, holidays, unabsentedScope, selectedDate]);
 
   // 2. Identify attendance state map for each personnel for selectedDate
   const teacherAttendanceMap = useMemo(() => {
@@ -193,8 +235,25 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     }>();
 
     for (const teacher of activeEligiblePersonnel) {
+      // 0. Check if this teacher was explicitly reset for selectedDate
+      const isExplicitlyReset =
+        resetKeys.has(`${teacher.id}_${selectedDate}`) ||
+        (teacher.nip ? resetKeys.has(`${teacher.nip}_${selectedDate}`) : false) ||
+        (teacher.full_name ? resetKeys.has(`${teacher.full_name}_${selectedDate}`) : false) ||
+        (teacher.phone_number ? resetKeys.has(`${teacher.phone_number}_${selectedDate}`) : false);
+
+      if (isExplicitlyReset) {
+        map.set(teacher.id, {
+          status: 'BELUM_ABSEN',
+          checkInTime: undefined,
+          checkOutTime: undefined,
+          notes: 'Presensi belum tercatat / telah di-reset oleh Admin',
+        });
+        continue;
+      }
+
       // 1. Check if personnel has an APPROVED leave for selectedDate (High Priority)
-      const approvedLeave = allLeavesToEvaluate.find((l) => {
+      const approvedLeave = effectiveLeaves.find((l) => {
         if (!isLeaveApprovedStatus(l)) return false;
         if (!isTeacherLeaveMatch(teacher, l)) return false;
         const startStr = normalizeDateToJakarta(l.start_date);
@@ -203,7 +262,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       });
 
       // 2. Check if personnel has a PENDING leave application for selectedDate
-      const pendingLeave = allLeavesToEvaluate.find((l) => {
+      const pendingLeave = effectiveLeaves.find((l) => {
         if (!isLeavePendingStatus(l)) return false;
         if (!isTeacherLeaveMatch(teacher, l)) return false;
         const startStr = normalizeDateToJakarta(l.start_date);
@@ -212,7 +271,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
       });
 
       // 3. Check if personnel has explicit attendance record for selectedDate
-      const record = attendanceRecords.find(
+      const record = effectiveAttendanceRecords.find(
         (r) => r.date === selectedDate && isTeacherRecordMatch(teacher, r)
       );
 
@@ -313,7 +372,7 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
     }
 
     return map;
-  }, [selectedDate, activeEligiblePersonnel, attendanceRecords, allLeavesToEvaluate, checkinEnd]);
+  }, [selectedDate, activeEligiblePersonnel, effectiveAttendanceRecords, effectiveLeaves, checkinEnd, resetKeys]);
 
   // 3. Filtered & Priority-Sorted list of personnel based on search, status filter, and role filter
   const filteredTeachers = useMemo(() => {
@@ -1189,9 +1248,32 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
         teachers={teachers}
         selectedTeacherId={resetModalTeacher?.id}
         selectedDate={selectedDate}
-        onSuccess={() => {
+        onSuccess={(resetUserId, resetDate) => {
+          const uid = resetUserId || resetModalTeacher?.id || '';
+          const d = resetDate || selectedDate;
+          if (uid) {
+            const matchingTeacher = teachers.find(
+              (t) => t.id === uid || t.nip === uid || t.full_name === uid || t.phone_number === uid
+            );
+            setResetKeys((prev) => {
+              const next = new Set(prev);
+              next.add(`${uid}_${d}`);
+              if (matchingTeacher) {
+                if (matchingTeacher.id) next.add(`${matchingTeacher.id}_${d}`);
+                if (matchingTeacher.nip) next.add(`${matchingTeacher.nip}_${d}`);
+                if (matchingTeacher.full_name) next.add(`${matchingTeacher.full_name}_${d}`);
+                if (matchingTeacher.phone_number) next.add(`${matchingTeacher.phone_number}_${d}`);
+              }
+              return next;
+            });
+          }
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new Event('smart_absensi_records_updated'));
+            window.dispatchEvent(new Event('smart_absensi_leave_updated'));
+            window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
+          }
+          if (onRefreshAttendance) {
+            onRefreshAttendance();
           }
         }}
       />

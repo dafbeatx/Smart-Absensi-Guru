@@ -67,6 +67,17 @@ function safeSetStorage(key: string, val: string): void {
   }
 }
 
+function safeRemoveStorage(key: string): void {
+  memoryStore.delete(key);
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.removeItem === 'function') {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Memory fallback
+  }
+}
+
 export class MockProvider implements IDataProvider {
   public async login(dto: LoginDTO): Promise<LoginResponseDTO> {
     await new Promise((r) => setTimeout(r, 300));
@@ -611,42 +622,71 @@ export class MockProvider implements IDataProvider {
       throw new Error('Password Reset Absensi Admin Salah! Silakan periksa kembali password reset yang Anda masukkan.');
     }
 
+    // Resolve all user aliases (id, nip, full_name, phone_number)
+    const idSet = new Set<string>([targetUserId]);
+    try {
+      const users = await this.getAllUsers(_token || 'MOCK_TOKEN');
+      const matched = users.find(
+        (u) => u.id === targetUserId || u.nip === targetUserId || u.full_name === targetUserId
+      );
+      if (matched) {
+        if (matched.id) idSet.add(matched.id);
+        if (matched.nip) idSet.add(matched.nip);
+        if (matched.full_name) idSet.add(matched.full_name);
+        if (matched.phone_number) idSet.add(matched.phone_number);
+      }
+    } catch (e) {}
+    const idList = Array.from(idSet);
+
     // 2. Remove record from global history storage
     const ALL_KEY = 'smart_absensi_all_attendance_history';
     try {
       const savedAll = safeGetStorage(ALL_KEY);
       let allRecords: AttendanceRecord[] = savedAll ? JSON.parse(savedAll) : [];
       if (Array.isArray(allRecords)) {
-        allRecords = allRecords.filter((r) => !(r.user_id === targetUserId && r.date === date));
+        allRecords = allRecords.filter((r) => !(idList.includes(r.user_id) && r.date === date));
         safeSetStorage(ALL_KEY, JSON.stringify(allRecords));
       }
     } catch (e) {
       console.error('Failed to reset attendance from all history:', e);
     }
 
-    // 3. Clean local storage for target user's today attendance if date matches today
+    // 3. Clean today attendance from both memoryStore and localStorage
     const todayStr = getTodayDateInJakarta();
-    if (date === todayStr) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(`smart_absensi_today_attendance_${targetUserId}_${todayStr}`);
+    idList.forEach((id) => {
+      safeRemoveStorage(`smart_absensi_today_attendance_${id}_${date}`);
+      safeRemoveStorage(`smart_absensi_today_attendance_${id}_${todayStr}`);
+    });
 
-        // Also check if global smart_absensi_today_attendance matches this user
-        const globalSaved = safeGetStorage('smart_absensi_today_attendance');
-        if (globalSaved) {
-          try {
-            const parsed: AttendanceRecord = JSON.parse(globalSaved);
-            if (parsed.user_id === targetUserId && parsed.date === todayStr) {
-              localStorage.removeItem('smart_absensi_today_attendance');
-            }
-          } catch (e) {}
+    const globalSaved = safeGetStorage('smart_absensi_today_attendance');
+    if (globalSaved) {
+      try {
+        const parsed: AttendanceRecord = JSON.parse(globalSaved);
+        if (idList.includes(parsed.user_id) && (parsed.date === date || parsed.date === todayStr)) {
+          safeRemoveStorage('smart_absensi_today_attendance');
         }
-      }
+      } catch (e) {}
     }
 
-    // 4. Trigger real-time UI refresh events
+    // 4. Remove any approved leave / koreksi for this user on this date
+    try {
+      const savedLeaves = safeGetStorage('smart_absensi_leaves');
+      if (savedLeaves) {
+        let leavesList: LeaveRequest[] = JSON.parse(savedLeaves);
+        if (Array.isArray(leavesList)) {
+          leavesList = leavesList.filter(
+            (l) => !(idList.includes(l.user_id) && l.start_date <= date && date <= l.end_date)
+          );
+          safeSetStorage('smart_absensi_leaves', JSON.stringify(leavesList));
+        }
+      }
+    } catch (e) {}
+
+    // 5. Trigger real-time UI refresh events
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('smart_absensi_scanned'));
       window.dispatchEvent(new Event('smart_absensi_records_updated'));
+      window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
     }
 
     return true;

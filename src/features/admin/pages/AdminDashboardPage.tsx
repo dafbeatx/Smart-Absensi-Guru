@@ -288,6 +288,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
     const handleScannedEvent = () => {
       fetchAttendanceRecords();
+      fetchPendingRequests();
       fetchMyAttendance();
       fetchComplaintsCount();
     };
@@ -562,6 +563,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                   setSelectedCorrectionTeacher(teacher);
                   setSelectedCorrectionDate(date);
                   setIsCorrectionModalOpen(true);
+                }}
+                onRefreshAttendance={async () => {
+                  await fetchAttendanceRecords();
+                  await fetchPendingRequests();
                 }}
               />
               <div className="bg-white p-6 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-3">

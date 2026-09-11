@@ -16,7 +16,7 @@ export interface AttendanceResetModalProps {
   teachers: UserProfile[];
   selectedTeacherId?: string;
   selectedDate?: string;
-  onSuccess?: () => void;
+  onSuccess?: (targetUserId?: string, date?: string) => void;
 }
 
 export const AttendanceResetModal: React.FC<AttendanceResetModalProps> = ({
@@ -129,7 +129,7 @@ export const AttendanceResetModal: React.FC<AttendanceResetModalProps> = ({
         `Data presensi ${selectedTeacher?.full_name || 'personel'} tanggal ${date} telah di-reset. Status kembali menjadi Belum Absen.`
       );
 
-      if (onSuccess) onSuccess();
+      if (onSuccess) onSuccess(selectedUserId, date);
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal melakukan reset presensi harian';

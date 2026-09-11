@@ -753,11 +753,31 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error('Password Reset Absensi Admin Salah! Silakan periksa kembali password reset yang Anda masukkan.');
     }
 
+    // Resolve all possible user aliases (id, nip, full_name, phone_number)
+    const userIdsToDelete = new Set<string>([targetUserId]);
+    try {
+      const { data: userData } = await this.client
+        .from('users')
+        .select('id, nip, full_name, phone_number')
+        .or(`id.eq.${targetUserId},nip.eq.${targetUserId}`)
+        .maybeSingle();
+
+      if (userData) {
+        if (userData.id) userIdsToDelete.add(userData.id);
+        if (userData.nip) userIdsToDelete.add(userData.nip);
+        if (userData.full_name) userIdsToDelete.add(userData.full_name);
+        if (userData.phone_number) userIdsToDelete.add(userData.phone_number);
+      }
+    } catch (e) {
+      logger.warn('SupabaseProvider', 'Failed to resolve user aliases for reset:', e);
+    }
+    const idList = Array.from(userIdsToDelete);
+
     // 2. Delete attendance record from Supabase table
     const { error } = await this.client
       .from('attendance')
       .delete()
-      .eq('user_id', targetUserId)
+      .in('user_id', idList)
       .eq('date', date);
 
     if (error) {
@@ -765,25 +785,70 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error('Gagal menghapus presensi di database: ' + error.message);
     }
 
-    // 3. Clear local storage cache if resetting today's attendance
+    // Also delete any specific att_ id patterns
+    const attIdsToDelete = idList.map((id) => `att_${id}_${date}`);
+    try {
+      await this.client
+        .from('attendance')
+        .delete()
+        .in('id', attIdsToDelete);
+    } catch (e) {}
+
+    // Also cancel/delete any approved leave / koreksi absen for this teacher on this date
+    try {
+      await this.client
+        .from('leaves')
+        .delete()
+        .in('user_id', idList)
+        .lte('start_date', date)
+        .gte('end_date', date);
+    } catch (e) {}
+
+    try {
+      await this.client
+        .from('leave_requests')
+        .delete()
+        .in('user_id', idList)
+        .lte('start_date', date)
+        .gte('end_date', date);
+    } catch (e) {}
+
+    // 3. Clear local storage cache for all aliases
     const todayStr = getTodayDateInJakarta();
-    if (date === todayStr && typeof window !== 'undefined') {
-      localStorage.removeItem(`smart_absensi_today_attendance_${targetUserId}_${todayStr}`);
+    if (typeof window !== 'undefined') {
+      idList.forEach((id) => {
+        localStorage.removeItem(`smart_absensi_today_attendance_${id}_${date}`);
+        localStorage.removeItem(`smart_absensi_today_attendance_${id}_${todayStr}`);
+      });
+
       const globalSaved = localStorage.getItem('smart_absensi_today_attendance');
       if (globalSaved) {
         try {
           const parsed = JSON.parse(globalSaved);
-          if (parsed.user_id === targetUserId && parsed.date === todayStr) {
+          if (idList.includes(parsed.user_id) && (parsed.date === date || parsed.date === todayStr)) {
             localStorage.removeItem('smart_absensi_today_attendance');
           }
         } catch (e) {}
       }
-    }
 
-    // 4. Trigger real-time UI refresh events
-    if (typeof window !== 'undefined') {
+      // Also clean smart_absensi_leaves from localStorage
+      try {
+        const savedLeaves = localStorage.getItem('smart_absensi_leaves');
+        if (savedLeaves) {
+          const parsed = JSON.parse(savedLeaves);
+          if (Array.isArray(parsed)) {
+            const filtered = parsed.filter(
+              (l) => !(idList.includes(l.user_id) && l.start_date <= date && date <= l.end_date)
+            );
+            localStorage.setItem('smart_absensi_leaves', JSON.stringify(filtered));
+          }
+        }
+      } catch (e) {}
+
+      // 4. Trigger real-time UI refresh events
       window.dispatchEvent(new Event('smart_absensi_scanned'));
       window.dispatchEvent(new Event('smart_absensi_records_updated'));
+      window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
     }
 
     return true;
