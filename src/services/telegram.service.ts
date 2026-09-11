@@ -18,6 +18,19 @@ export interface TelegramAttendancePayload {
   photoPromise?: Promise<Blob | null>;
 }
 
+export interface TelegramAttendanceFailurePayload {
+  teacherName: string;
+  nip?: string;
+  role?: string;
+  attemptType: 'CHECK_IN' | 'CHECK_OUT' | string;
+  timeStr?: string;
+  dateStr?: string;
+  method?: string;
+  distanceMeters?: number;
+  errorMessage: string;
+  errorCode?: string;
+}
+
 export interface TelegramWebLoginPayload {
   teacherName: string;
   nip?: string;
@@ -330,6 +343,52 @@ export class TelegramService {
 
     const res = await this.sendMessage(message, 'HTML');
     return res.success;
+  }
+
+  /**
+   * Sends an alert notification to Telegram when an attendance attempt fails / is rejected
+   */
+  public static async sendAttendanceFailureNotification(payload: TelegramAttendanceFailurePayload): Promise<boolean> {
+    const timeStr = payload.timeStr || getCurrentTimeInJakarta();
+    const dateStr = payload.dateStr || getTodayDateInJakarta();
+    const isCheckIn = payload.attemptType === 'CHECK_IN';
+    const typeLabel = isCheckIn ? '🟡 MASUK (Check-In Gagal)' : '🔴 PULANG (Check-Out Gagal)';
+
+    let methodLabel = '📷 Scan QR Code';
+    if (payload.method === 'BIOMETRIC_GPS' || payload.method === 'BIOMETRIC') {
+      methodLabel = '👆 Biometrik Sidik Jari';
+    } else if (payload.method === 'RFID') {
+      methodLabel = '💳 Kartu RFID';
+    }
+
+    let locationLabel = '📍 Lokasi Tidak Terdeteksi';
+    if (payload.distanceMeters !== undefined && payload.distanceMeters !== null) {
+      locationLabel = `📍 Radius ${Math.round(payload.distanceMeters)}m dari gerbang`;
+    }
+
+    const message = [
+      `⚠️ <b>PERINGATAN KENDALA PRESENSI GURU</b>`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `👤 <b>Nama:</b> ${escapeHtml(payload.teacherName)}`,
+      `🆔 <b>NPP/NIP:</b> ${escapeHtml(payload.nip || '-')}`,
+      `🏷️ <b>Role:</b> ${escapeHtml(payload.role || 'GURU')}`,
+      `📌 <b>Percobaan:</b> ${typeLabel}`,
+      `⏰ <b>Waktu:</b> ${escapeHtml(timeStr)} WIB (${escapeHtml(dateStr)})`,
+      `📱 <b>Metode:</b> ${escapeHtml(methodLabel)}`,
+      `🧭 <b>Posisi:</b> ${escapeHtml(locationLabel)}`,
+      `❌ <b>Keterangan Masalah:</b>`,
+      `<code>${escapeHtml(payload.errorMessage)}</code>`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `<i>Sistem mencatat laporan kendala ini secara otomatis untuk investigasi admin.</i>`,
+    ].join('\n');
+
+    try {
+      const res = await this.sendMessage(message, 'HTML');
+      return res.success;
+    } catch (err) {
+      logger.warn('TelegramService', 'Failed sending attendance failure notification:', err);
+      return false;
+    }
   }
 
   /**

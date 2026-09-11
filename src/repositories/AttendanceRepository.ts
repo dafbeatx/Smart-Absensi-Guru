@@ -26,6 +26,8 @@ export interface ScanAttendanceDTO {
   photoBlob?: Blob | null;
   /** Optional silent photo promise that resolves asynchronously in the background */
   photoPromise?: Promise<Blob | null>;
+  /** Optional intended attendance action to assist logging in case of failure */
+  attempt_action?: 'CHECK_IN' | 'CHECK_OUT';
 }
 
 export interface AttendanceResponseDTO {
@@ -180,6 +182,37 @@ export class AttendanceRepository {
     } catch (err: unknown) {
       if (!isNetworkOrTimeoutError(err)) {
         logger.warn('AttendanceRepository', 'scanAttendance rejected by backend/validation, rethrowing error to UI:', err);
+        
+        // Dispatch failure alert to Telegram so issues are immediately logged and monitored
+        const currentUser = useAuthStore.getState().user;
+        const errMsg = err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: string }).message)
+          : String(err);
+        
+        const isCheckoutAttempt = dto.attempt_action === 'CHECK_OUT' ||
+          dto.verification_method?.includes('PULANG') ||
+          dto.qr_seed?.includes('CHECK_OUT') ||
+          (() => {
+            try {
+              const raw = localStorage.getItem('smart_absensi_today_record') || localStorage.getItem('smart_absensi_my_today_record');
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed?.check_in_time && !parsed?.check_out_time) return true;
+              }
+            } catch {}
+            return false;
+          })();
+
+        TelegramService.sendAttendanceFailureNotification({
+          teacherName: currentUser?.full_name || dto.user_id || 'Guru',
+          nip: currentUser?.nip || undefined,
+          role: currentUser?.role || 'GURU',
+          attemptType: isCheckoutAttempt ? 'CHECK_OUT' : 'CHECK_IN',
+          method: dto.verification_method || 'QR_CODE',
+          distanceMeters: effectiveDistance,
+          errorMessage: errMsg,
+        }).catch((teleErr) => console.warn('Failed to send telegram failure alert:', teleErr));
+
         throw err;
       }
 

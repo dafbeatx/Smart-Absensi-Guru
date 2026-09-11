@@ -145,5 +145,37 @@ export const runAuditWhatsAppTestSuite = async (): Promise<{
     typeof photoPromiseRes === 'boolean'
   );
 
+  // Test 10: Telegram Service - Check-Out notification execution
+  const checkOutRes = await TelegramService.sendAttendanceNotification({
+    teacherName: 'Widianingsih, S.Si., G.r',
+    nip: undefined,
+    role: 'GURU',
+    type: 'CHECK_OUT',
+    timeStr: '13:05:00 WIB',
+    method: 'QR_CODE',
+    distanceMeters: 45,
+    status: 'HADIR',
+  });
+  assert(
+    'Telegram Service - Check-Out Notification Execution Safe',
+    typeof checkOutRes === 'boolean'
+  );
+
+  // Test 11: Telegram Service - Attendance Failure / Error alert notification execution
+  const failureRes = await TelegramService.sendAttendanceFailureNotification({
+    teacherName: 'Widianingsih, S.Si., G.r',
+    nip: undefined,
+    role: 'GURU',
+    attemptType: 'CHECK_OUT',
+    method: 'QR_CODE',
+    distanceMeters: 120,
+    errorMessage: 'Gagal mencatat absensi pulang: new row violates row-level security policy for table attendance',
+  });
+  assert(
+    'Telegram Service - Attendance Failure Alert Notification Safe',
+    typeof failureRes === 'boolean'
+  );
+
   return { passed, failed, results };
 };
+
