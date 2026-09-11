@@ -22,6 +22,8 @@ import type {
   StudentBehaviorRecord,
   StudentBehaviorLog,
   RecordStudentBehaviorParams,
+  RecordStudentBehaviorResult,
+  StudentCharacterSummary,
   VerificationMethod,
   AttendanceSource,
   PushSubscriptionPayload,
@@ -1883,6 +1885,10 @@ export class MockProvider implements IDataProvider {
   // STUDENT BEHAVIOR & POINTS API (Mock Provider / LocalStorage)
   // ==============================================================================
 
+  public setMockStudentBehaviors(list: StudentBehaviorRecord[]): void {
+    safeSetStorage('smart_absensi_gm_behaviors', JSON.stringify(list));
+  }
+
   public async getStudentBehaviors(
     className?: string,
     academicYear = '2026/2027',
@@ -1903,14 +1909,17 @@ export class MockProvider implements IDataProvider {
     if (list.length === 0) {
       const students = await this.getStudents();
       list = students.map((s) => ({
-        id: `gm_beh_${s.id}`,
+        id: s.id,
+        student_id: s.id,
         student_name: s.fullName,
         class_name: s.className,
         academic_year: s.academicYear || academicYear,
-        total_points: 10,
+        total_points: 0,
         merits_points: 0,
         demerits_points: 0,
+        net_points: 0,
         behavior_logs: [],
+        sync_status: 'LOCAL_DRAFT' as const,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
@@ -1923,6 +1932,7 @@ export class MockProvider implements IDataProvider {
       let demerits = 0;
       if (Array.isArray(record.behavior_logs)) {
         record.behavior_logs.forEach((log) => {
+          if (log.voided_at) return; // Skip voided logs
           const pts = Math.abs(log.points || 0);
           if (log.type === 'GOOD') {
             merits += pts;
@@ -1931,15 +1941,19 @@ export class MockProvider implements IDataProvider {
           }
         });
       }
+      const net = merits - demerits;
       return {
         ...record,
         merits_points: merits,
         demerits_points: demerits,
+        net_points: net,
+        total_points: net,
+        sync_status: (record.sync_status || 'LOCAL_DRAFT') as 'SYNCED' | 'PENDING_SYNC' | 'FAILED_SYNC' | 'LOCAL_DRAFT',
       };
     });
 
     return computedList.filter((b) => {
-      const matchYear = !b.academic_year || b.academic_year === academicYear;
+      const matchYear = !academicYear || academicYear === 'ALL' || !b.academic_year || b.academic_year === academicYear;
       const matchClass = !className || className === 'ALL' || b.class_name === className;
       return matchYear && matchClass;
     });
@@ -1948,95 +1962,267 @@ export class MockProvider implements IDataProvider {
   public async recordStudentBehavior(
     params: RecordStudentBehaviorParams,
     _token?: string
-  ): Promise<{
-    success: boolean;
-    newTotal: number;
-    record?: StudentBehaviorRecord;
-    message: string;
-  }> {
-    const list = await this.getStudentBehaviors('ALL', params.academicYear || '2026/2027');
-    const cleanName = params.studentName.trim().toUpperCase();
-    const cleanClass = params.className.trim().toUpperCase();
+  ): Promise<RecordStudentBehaviorResult> {
+    const cleanName = (params.studentName || '').trim().toUpperCase();
+    const cleanClass = (params.className || '').trim().toUpperCase();
     const academicYear = params.academicYear || '2026/2027';
     const violationDate = params.violationDate || new Date().toISOString();
-    const pointsAbs = Math.abs(params.points);
 
-    let idx = list.findIndex(
-      (b) => b.student_name.toUpperCase() === cleanName && b.academic_year === academicYear
-    );
+    // 1. Validasi Input Server-like
+    if (!cleanName) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'LOCAL_DRAFT',
+        message: 'Nama siswa wajib diisi.',
+      };
+    }
 
+    if (!params.type || !['GOOD', 'BAD'].includes(params.type)) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'LOCAL_DRAFT',
+        message: 'Tipe catatan karakter harus GOOD atau BAD.',
+      };
+    }
+
+    if (
+      typeof params.points !== 'number' ||
+      isNaN(params.points) ||
+      params.points <= 0 ||
+      params.points > 100 ||
+      !Number.isInteger(params.points)
+    ) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'LOCAL_DRAFT',
+        message: 'Bobot poin harus bernilai bulat antara 1 dan 100.',
+      };
+    }
+
+    if (!params.reason || params.reason.trim().length < 3 || params.reason.trim().length > 500) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'LOCAL_DRAFT',
+        message: 'Alasan pemberian poin wajib diisi (minimal 3 karakter, maksimal 500 karakter).',
+      };
+    }
+
+    if (params.academicYear && !/^\d{4}\/\d{4}$/.test(params.academicYear)) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'LOCAL_DRAFT',
+        message: 'Format tahun ajaran tidak valid (contoh: 2026/2027).',
+      };
+    }
+
+    const pointsAbs = params.points;
+    const list = await this.getStudentBehaviors('ALL', 'ALL');
+
+    // 2. Idempotency Check
+    if (params.idempotencyKey) {
+      for (const rec of list) {
+        if (Array.isArray(rec.behavior_logs)) {
+          const matchedLog = rec.behavior_logs.find((l) => l.idempotency_key === params.idempotencyKey);
+          if (matchedLog) {
+            return {
+              success: true,
+              newTotal: rec.net_points ?? (rec.merits_points || 0) - (rec.demerits_points || 0),
+              merits_points: rec.merits_points,
+              demerits_points: rec.demerits_points,
+              net_points: rec.net_points,
+              record: rec,
+              logId: matchedLog.id,
+              isDuplicate: true,
+              syncStatus: 'LOCAL_DRAFT',
+              message: 'Catatan ini sudah pernah tersimpan sebelumnya (idempoten).',
+            };
+          }
+        }
+      }
+    }
+
+    // 3. Pencarian Siswa Berdasarkan StudentId (Prioritas) atau (Nama + Kelas + Tahun)
+    let idx = -1;
+    if (params.studentId) {
+      idx = list.findIndex(
+        (b) => (b.id === params.studentId || b.student_id === params.studentId) && b.academic_year === academicYear
+      );
+    }
+
+    if (idx === -1) {
+      idx = list.findIndex(
+        (b) =>
+          b.student_name.toUpperCase() === cleanName &&
+          b.class_name.toUpperCase() === cleanClass &&
+          b.academic_year === academicYear
+      );
+    }
+
+    // Jika siswa tidak ditemukan pada master data, jangan insert sembarangan!
+    if (idx === -1) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'LOCAL_DRAFT',
+        message: `Siswa "${params.studentName}" tidak ditemukan pada kelas ${params.className} dan tahun ajaran ${academicYear}.`,
+      };
+    }
+
+    const existing = list[idx];
+    const logId = 'beh_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
     const newLog: StudentBehaviorLog = {
+      id: logId,
+      student_id: existing.student_id || existing.id,
       type: params.type,
       points: pointsAbs,
       reason: params.reason.trim(),
+      reason_code: params.reasonCode,
       timestamp: violationDate,
       violation_date: violationDate,
+      occurred_at: violationDate,
+      timezone: params.timezone || 'Asia/Jakarta',
       recordedBy: params.teacherName || 'Guru',
+      recorded_by_user_id: params.recordedByUserId || useAuthStore.getState().user?.id || 'usr_mock_actor',
+      recorded_by_name: params.teacherName || 'Guru',
+      idempotency_key: params.idempotencyKey,
+      sync_status: 'LOCAL_DRAFT',
     };
 
-    let targetRecord: StudentBehaviorRecord;
+    const updatedLogs = [newLog, ...(existing.behavior_logs || [])];
 
-    // Handle legacy point calculation for test compatibility
-    const pointDelta = params.points !== 0 ? (params.type === 'GOOD' ? pointsAbs : -pointsAbs) : 0;
+    let merits = 0;
+    let demerits = 0;
+    updatedLogs.forEach((l) => {
+      if (l.voided_at) return;
+      const p = Math.abs(l.points || 0);
+      if (l.type === 'GOOD') merits += p;
+      else demerits += p;
+    });
 
-    if (idx !== -1) {
-      const existing = list[idx];
-      const currentTotal = typeof existing.total_points === 'number' ? existing.total_points : 10;
-      const newTotal = currentTotal + pointDelta;
-      const updatedLogs = [newLog, ...(existing.behavior_logs || [])];
-
-      let merits = 0;
-      let demerits = 0;
-      updatedLogs.forEach((l) => {
-        const p = Math.abs(l.points || 0);
-        if (l.type === 'GOOD') merits += p;
-        else demerits += p;
-      });
-
-      targetRecord = {
-        ...existing,
-        total_points: newTotal,
-        merits_points: merits,
-        demerits_points: demerits,
-        behavior_logs: updatedLogs,
-        updated_at: new Date().toISOString(),
-      };
-      list[idx] = targetRecord;
-    } else {
-      const startingTotal = 10 + pointDelta;
-      targetRecord = {
-        id: `gm_beh_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        student_name: cleanName,
-        class_name: cleanClass,
-        academic_year: academicYear,
-        total_points: startingTotal,
-        merits_points: params.type === 'GOOD' ? pointsAbs : 0,
-        demerits_points: params.type === 'BAD' ? pointsAbs : 0,
-        behavior_logs: [newLog],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      list.unshift(targetRecord);
-    }
+    const net = merits - demerits;
+    const targetRecord: StudentBehaviorRecord = {
+      ...existing,
+      student_id: existing.student_id || existing.id,
+      total_points: net,
+      merits_points: merits,
+      demerits_points: demerits,
+      net_points: net,
+      behavior_logs: updatedLogs,
+      sync_status: 'LOCAL_DRAFT',
+      updated_at: new Date().toISOString(),
+    };
+    list[idx] = targetRecord;
 
     safeSetStorage('smart_absensi_gm_behaviors', JSON.stringify(list));
 
     return {
       success: true,
-      newTotal: targetRecord.total_points,
+      newTotal: net,
+      merits_points: merits,
+      demerits_points: demerits,
+      net_points: net,
       record: targetRecord,
-      message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (+${pointsAbs}) berhasil dicatat untuk ${cleanName}. Total: ${targetRecord.total_points} poin.`,
+      logId: newLog.id,
+      isDuplicate: false,
+      syncStatus: 'LOCAL_DRAFT',
+      message: `Poin ${params.type === 'GOOD' ? 'kebaikan' : 'kedisiplinan'} (+${pointsAbs}) berhasil dicatat untuk ${cleanName}. Total bersih: ${net} poin.`,
+    };
+  }
+
+  public async voidStudentBehavior(
+    logId: string,
+    voidReason: string,
+    _token?: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    summary?: StudentCharacterSummary;
+  }> {
+    if (!logId) {
+      return { success: false, message: 'ID log wajib disertakan.' };
+    }
+    if (!voidReason || voidReason.trim().length < 3) {
+      return { success: false, message: 'Alasan pembatalan minimal 3 karakter.' };
+    }
+
+    const list = await this.getStudentBehaviors('ALL', 'ALL');
+    let targetRecord: StudentBehaviorRecord | null = null;
+    let targetLog: StudentBehaviorLog | null = null;
+
+    for (const rec of list) {
+      if (Array.isArray(rec.behavior_logs)) {
+        const found = rec.behavior_logs.find((l) => l.id === logId);
+        if (found) {
+          targetRecord = rec;
+          targetLog = found;
+          break;
+        }
+      }
+    }
+
+    if (!targetRecord || !targetLog) {
+      return { success: false, message: 'Catatan poin tidak ditemukan.' };
+    }
+
+    if (targetLog.voided_at) {
+      return { success: false, message: 'Catatan ini sudah pernah dibatalkan sebelumnya.' };
+    }
+
+    targetLog.voided_at = new Date().toISOString();
+    targetLog.void_reason = voidReason.trim();
+    targetLog.voided_by_user_id = useAuthStore.getState().user?.id || 'usr_mock_actor';
+
+    let merits = 0;
+    let demerits = 0;
+    targetRecord.behavior_logs.forEach((l) => {
+      if (l.voided_at) return;
+      const p = Math.abs(l.points || 0);
+      if (l.type === 'GOOD') merits += p;
+      else demerits += p;
+    });
+
+    const net = merits - demerits;
+    targetRecord.merits_points = merits;
+    targetRecord.demerits_points = demerits;
+    targetRecord.net_points = net;
+    targetRecord.total_points = net;
+    targetRecord.updated_at = new Date().toISOString();
+
+    safeSetStorage('smart_absensi_gm_behaviors', JSON.stringify(list));
+
+    return {
+      success: true,
+      message: 'Catatan berhasil dibatalkan dan saldo poin siswa telah diperbarui.',
+      summary: {
+        student_id: targetRecord.student_id || targetRecord.id,
+        academic_year: targetRecord.academic_year,
+        merits_points: merits,
+        demerits_points: demerits,
+        net_points: net,
+        updated_at: targetRecord.updated_at,
+      },
     };
   }
 
   public async getStudentBehaviorHistory(
     studentName: string,
-    _className: string,
+    className: string,
     _token?: string
   ): Promise<StudentBehaviorLog[]> {
     const list = await this.getStudentBehaviors('ALL');
-    const cleanName = studentName.trim().toUpperCase();
-    const record = list.find((b) => b.student_name.toUpperCase() === cleanName);
+    const cleanName = (studentName || '').trim().toUpperCase();
+    const cleanClass = (className || '').trim().toUpperCase();
+
+    const record = list.find(
+      (b) =>
+        b.student_name.toUpperCase() === cleanName &&
+        (!cleanClass || cleanClass === 'ALL' || b.class_name.toUpperCase() === cleanClass)
+    );
     if (!record || !Array.isArray(record.behavior_logs)) return [];
     return [...record.behavior_logs].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()

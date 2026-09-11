@@ -26,7 +26,13 @@ import {
   Star,
   Award,
   Calendar,
+  Undo2,
 } from 'lucide-react';
+import {
+  toJakartaIsoString,
+  formatJakartaDateTime,
+  getTodayDateInJakarta,
+} from '../../../utils/time.utils';
 
 export type BehaviorModalTab = 'KEBAIKAN' | 'KEDISIPLINAN' | 'RIWAYAT';
 
@@ -80,6 +86,21 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
   const [customPointsInput, setCustomPointsInput] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastSyncStatus, setLastSyncStatus] = useState<'SYNCED' | 'PENDING_SYNC' | 'FAILED_SYNC' | 'LOCAL_DRAFT' | null>(null);
+
+  // Void/Pembatalan State
+  const [voidTargetLog, setVoidTargetLog] = useState<{ id: string; studentName: string; reason: string; points: number } | null>(null);
+  const [voidReasonText, setVoidReasonText] = useState<string>('');
+  const [isVoiding, setIsVoiding] = useState<boolean>(false);
+
+  const isCloud = useMemo(() => {
+    try {
+      const p = ProviderFactory.getProvider();
+      return p.constructor.name === 'SupabaseProvider' || Boolean((p as any).isSupabase);
+    } catch {
+      return false;
+    }
+  }, []);
 
   // Load official GradeMaster OS categories
   const loadCategories = useCallback(async () => {
@@ -119,6 +140,9 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
       setPointsAmount(5);
       setCustomPointsInput('');
       setViolationDate(getLocalDateTimeForInput());
+      setLastSyncStatus(null);
+      setVoidTargetLog(null);
+      setVoidReasonText('');
     }
   }, [isOpen, initialTab, academicYear, loadBehaviors, loadCategories]);
 
@@ -174,6 +198,8 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
         s.behavior_logs.forEach((log) => {
           logs.push({
             ...log,
+            id: log.id,
+            student_id: s.student_id || s.id,
             student_name: s.student_name,
             class_name: s.class_name,
             academic_year: s.academic_year || academicYear,
@@ -183,7 +209,9 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
     });
 
     const sorted = logs.sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      (a, b) =>
+        new Date(b.occurred_at || b.violation_date || b.timestamp || 0).getTime() -
+        new Date(a.occurred_at || a.violation_date || a.timestamp || 0).getTime()
     );
 
     if (historyFilter === 'GOOD') {
@@ -226,30 +254,40 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const isoViolationDate = violationDate
-      ? new Date(violationDate).toISOString()
-      : new Date().toISOString();
+    const isoViolationDate = toJakartaIsoString(violationDate);
+    const idempotencyKey = 'beh_req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    const authUser = useAuthStore.getState().user;
 
     try {
       const result = await StudentBehaviorRepository.recordBehavior({
+        studentId: selectedStudent.student_id || selectedStudent.id,
         studentName: selectedStudent.student_name,
         className: selectedStudent.class_name,
         type: activeTab === 'KEBAIKAN' ? 'GOOD' : 'BAD',
         points: finalPoints,
         reason: finalReason,
         teacherName: currentTeacherName,
+        recordedByUserId: authUser?.id,
         academicYear: selectedStudent.academic_year || academicYear,
         violationDate: isoViolationDate,
+        timezone: 'Asia/Jakarta',
+        idempotencyKey,
       });
 
-      if (result.success) {
-        // Award +5 Engagement Points for Teacher Daily Quest
-        const authUser = useAuthStore.getState().user;
-        const currentToken = useAuthStore.getState().token;
-        const todayStr = new Date().toISOString().split('T')[0];
-        const isKebaikan = activeTab === 'KEBAIKAN';
+      setLastSyncStatus(result.syncStatus || (result.success ? 'SYNCED' : 'FAILED_SYNC'));
 
-        if (authUser?.id) {
+      if (result.success) {
+        // Award +5 Engagement Points for Teacher Daily Quest ONLY IF not claimed today
+        const currentToken = useAuthStore.getState().token;
+        const todayStr = getTodayDateInJakarta();
+        const isKebaikan = activeTab === 'KEBAIKAN';
+        const questStorageKey = isKebaikan
+          ? `smart_absensi_quest_merit_${authUser?.id}_${todayStr}`
+          : `smart_absensi_quest_demerit_${authUser?.id}_${todayStr}`;
+        const alreadyClaimed = typeof localStorage !== 'undefined' && localStorage.getItem(questStorageKey) === '1';
+
+        let teacherAwardMsg = '';
+        if (authUser?.id && !alreadyClaimed) {
           try {
             const prov = ProviderFactory.getProvider();
             await prov.recordTeacherPoint(
@@ -267,28 +305,28 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
               currentToken || undefined
             );
             if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(
-                isKebaikan
-                  ? `smart_absensi_quest_merit_${authUser.id}_${todayStr}`
-                  : `smart_absensi_quest_demerit_${authUser.id}_${todayStr}`,
-                '1'
-              );
+              localStorage.setItem(questStorageKey, '1');
             }
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('smart_absensi_points_updated'));
             }
+            teacherAwardMsg = ' (Anda meraih +5 Poin Pendidik ✨)';
           } catch (ptErr) {
             console.warn('Student behavior teacher point award note:', ptErr);
           }
         }
 
+        const syncNotice = result.syncStatus === 'SYNCED'
+          ? 'Tersinkron ke GradeMaster OS'
+          : 'Tersimpan lokal (offline)';
+
         if (activeTab === 'KEBAIKAN') {
           setSuccessMessage(
-            `Sukses! +${finalPoints} Poin Kebaikan dicatat untuk ${selectedStudent.student_name} (Anda meraih +5 Poin Pendidik ✨).`
+            `Sukses! +${finalPoints} Poin Kebaikan dicatat untuk ${selectedStudent.student_name}.${teacherAwardMsg} [${syncNotice}]`
           );
         } else {
           setSuccessMessage(
-            `Sukses! Catatan pelanggaran (+${finalPoints} Pts) dicatat untuk ${selectedStudent.student_name} (Anda meraih +5 Poin Pendidik ✨).`
+            `Sukses! Catatan pelanggaran (+${finalPoints} Pts) dicatat untuk ${selectedStudent.student_name}.${teacherAwardMsg} [${syncNotice}]`
           );
         }
 
@@ -309,19 +347,15 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
         // Update selected student point balance in local view
         setSelectedStudent((prev) => {
           if (!prev) return null;
-          if (activeTab === 'KEBAIKAN') {
-            return {
-              ...prev,
-              total_points: result.newTotal,
-              merits_points: (prev.merits_points || 0) + finalPoints,
-            };
-          } else {
-            return {
-              ...prev,
-              total_points: result.newTotal,
-              demerits_points: (prev.demerits_points || 0) + finalPoints,
-            };
-          }
+          const newMerits = activeTab === 'KEBAIKAN' ? (prev.merits_points || 0) + finalPoints : (prev.merits_points || 0);
+          const newDemerits = activeTab === 'KEDISIPLINAN' ? (prev.demerits_points || 0) + finalPoints : (prev.demerits_points || 0);
+          return {
+            ...prev,
+            total_points: newMerits - newDemerits,
+            merits_points: newMerits,
+            demerits_points: newDemerits,
+            net_points: newMerits - newDemerits,
+          };
         });
 
         // Reset inputs
@@ -336,6 +370,36 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
       setErrorMessage(err?.message || 'Terjadi kesalahan sistem.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Void/Pembatalan Log Handler
+  const handleConfirmVoid = async () => {
+    if (!voidTargetLog) return;
+    if (!voidReasonText || voidReasonText.trim().length < 3) {
+      setErrorMessage('Alasan pembatalan minimal 3 karakter.');
+      return;
+    }
+    setIsVoiding(true);
+    setErrorMessage(null);
+    try {
+      const result = await StudentBehaviorRepository.voidBehavior(
+        voidTargetLog.id,
+        voidReasonText.trim(),
+        academicYear
+      );
+      if (result.success) {
+        setSuccessMessage('Catatan berhasil dibatalkan dan saldo poin siswa telah direkalkulasi.');
+        setVoidTargetLog(null);
+        setVoidReasonText('');
+        await loadBehaviors(academicYear);
+      } else {
+        setErrorMessage(result.message || 'Gagal membatalkan catatan.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Gagal membatalkan catatan.');
+    } finally {
+      setIsVoiding(false);
     }
   };
 
@@ -373,9 +437,13 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                   : 'Riwayat Log Poin Siswa'}
               </h2>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isCloud ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                  }`}
+                ></span>
                 <p className="text-[11px] text-cyan-200/90 font-medium truncate">
-                  Sinkron Real-Time ke GradeMaster OS
+                  {isCloud ? 'Sinkron Cloud & GradeMaster OS' : 'Mode Offline / Lokal'}
                 </p>
               </div>
             </div>
@@ -440,14 +508,20 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p>{successMessage}</p>
-                <a
-                  href="https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-emerald-700 font-bold underline mt-1 text-[11px] hover:text-emerald-900"
-                >
-                  Lihat update di GradeMaster OS <ExternalLink className="w-3 h-3" />
-                </a>
+                {lastSyncStatus === 'SYNCED' ? (
+                  <a
+                    href="https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-emerald-700 font-bold underline mt-1 text-[11px] hover:text-emerald-900"
+                  >
+                    Lihat update di GradeMaster OS <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <p className="text-[11px] text-amber-800 font-medium mt-1">
+                    Catatan tersimpan di memori/storage lokal (offline).
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -929,28 +1003,31 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                 <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
                   {allLogs.map((log, idx) => {
                     const isGood = log.type === 'GOOD';
-                    const targetDate = log.violation_date || log.timestamp;
-                    const dateFormatted = new Date(targetDate).toLocaleDateString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
+                    const targetDate = log.occurred_at || log.violation_date || log.timestamp;
+                    const dateFormatted = formatJakartaDateTime(targetDate);
+                    const isVoided = Boolean(log.voided_at);
 
                     return (
                       <div
-                        key={`${log.student_name}-${log.timestamp}-${idx}`}
-                        className="bg-slate-50 hover:bg-slate-100/80 p-3 rounded-2xl border border-slate-200/80 flex items-start justify-between gap-2.5 transition-colors"
+                        key={log.id || `${log.student_name}-${log.timestamp}-${idx}`}
+                        className={`p-3 rounded-2xl border flex items-start justify-between gap-2.5 transition-colors ${
+                          isVoided
+                            ? 'bg-slate-100/70 border-slate-200 opacity-60'
+                            : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200/80'
+                        }`}
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
                               className={`px-1.5 py-0.5 text-[9px] font-black rounded-md ${
-                                isGood ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                isVoided
+                                  ? 'bg-slate-200 text-slate-600'
+                                  : isGood
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-rose-100 text-rose-800'
                               }`}
                             >
-                              {isGood ? 'KEBAIKAN' : 'PELANGGARAN'}
+                              {isVoided ? 'DIBATALKAN' : isGood ? 'KEBAIKAN' : 'PELANGGARAN'}
                             </span>
                             <span className="text-[10px] font-bold text-slate-500">
                               Kelas {log.class_name}
@@ -962,24 +1039,48 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                           <h4 className="text-xs font-extrabold text-slate-900 mt-0.5 truncate">
                             {log.student_name}
                           </h4>
-                          <p className="text-xs text-slate-700 font-medium mt-1 leading-snug">
+                          <p className={`text-xs font-medium mt-1 leading-snug ${isVoided ? 'line-through text-slate-500' : 'text-slate-700'}`}>
                             {log.reason}
                           </p>
-                          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400 font-medium">
+                          {isVoided && (
+                            <p className="text-[10px] text-rose-600 font-semibold mt-0.5">
+                              Alasan dibatalkan: {log.void_reason || 'Dibatalkan oleh staf'}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400 font-medium flex-wrap">
                             <span>Waktu: {dateFormatted}</span>
                             {log.recordedBy && <span>• Oleh: {log.recordedBy}</span>}
+                            {!isVoided && log.id && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setVoidTargetLog({
+                                    id: log.id!,
+                                    studentName: log.student_name,
+                                    reason: log.reason,
+                                    points: log.points,
+                                  })
+                                }
+                                className="text-rose-600 hover:text-rose-800 font-bold ml-auto flex items-center gap-0.5 cursor-pointer hover:underline"
+                              >
+                                <Undo2 className="w-3 h-3" />
+                                Batalkan
+                              </button>
+                            )}
                           </div>
                         </div>
 
                         <div className="text-right shrink-0">
                           <span
                             className={`text-xs sm:text-sm font-black px-2 py-1 rounded-xl block ${
-                              isGood
+                              isVoided
+                                ? 'line-through text-slate-400 bg-slate-200/50 border border-slate-300'
+                                : isGood
                                 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200'
                                 : 'bg-rose-500/10 text-rose-700 border border-rose-200'
                             }`}
                           >
-                            +{Math.abs(log.points)} Pts
+                            {isVoided ? '0 Pts' : `+${Math.abs(log.points)} Pts`}
                           </span>
                         </div>
                       </div>
@@ -991,11 +1092,72 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
           )}
         </div>
 
+        {/* Modal Konfirmasi Pembatalan (Void) */}
+        {voidTargetLog && (
+          <div className="fixed inset-0 z-60 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white w-full max-w-sm rounded-2xl p-4 shadow-xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <Undo2 className="w-4 h-4 text-rose-600" />
+                  Batalkan Catatan Poin
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVoidTargetLog(null);
+                    setVoidReasonText('');
+                  }}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Anda akan membatalkan catatan untuk <strong>{voidTargetLog.studentName}</strong> ({voidTargetLog.reason}, {voidTargetLog.points} poin). Saldo poin siswa akan otomatis direkalkulasi.
+              </p>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                  Alasan Pembatalan (Wajib Audit):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Salah pilih nama siswa / kekeliruan guru"
+                  value={voidReasonText}
+                  onChange={(e) => setVoidReasonText(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVoidTargetLog(null);
+                    setVoidReasonText('');
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  disabled={isVoiding || voidReasonText.trim().length < 3}
+                  onClick={handleConfirmVoid}
+                  className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-xl cursor-pointer shadow-xs"
+                >
+                  {isVoiding ? 'Memproses...' : 'Konfirmasi Batalkan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footer Info Sync */}
         <div className="p-3 bg-slate-50 border-t border-slate-200 text-center shrink-0">
           <p className="text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            Tersinkronisasi 100% dua arah dengan tabel <code className="text-[#023246] font-mono">public.gm_behaviors</code>
+            <span className={`w-2 h-2 rounded-full ${isCloud ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+            {isCloud
+              ? 'Tersinkronisasi Relasional dengan public.student_behavior_logs & GradeMaster OS'
+              : 'Mode Offline / Lokal (Belum Tersinkron ke Cloud)'}
           </p>
         </div>
       </div>

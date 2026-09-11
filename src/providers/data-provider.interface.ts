@@ -19,6 +19,8 @@ import type {
   StudentBehaviorRecord,
   StudentBehaviorLog,
   RecordStudentBehaviorParams,
+  RecordStudentBehaviorResult,
+  StudentCharacterSummary,
   PushSubscriptionPayload,
   NotificationPreferences,
   TeacherPointLog,
@@ -121,11 +123,11 @@ export interface IDataProvider {
 
   // Student Behavior & Disciplinary / Kindness Points API (Poin Siswa - Sinkron gm_behaviors)
   getStudentBehaviors(className?: string, academicYear?: string, token?: string): Promise<StudentBehaviorRecord[]>;
-  recordStudentBehavior(params: RecordStudentBehaviorParams, token?: string): Promise<{
+  recordStudentBehavior(params: RecordStudentBehaviorParams, token?: string): Promise<RecordStudentBehaviorResult>;
+  voidStudentBehavior(logId: string, voidReason: string, token?: string): Promise<{
     success: boolean;
-    newTotal: number;
-    record?: StudentBehaviorRecord;
     message: string;
+    summary?: StudentCharacterSummary;
   }>;
   getStudentBehaviorHistory(studentName: string, className: string, token?: string): Promise<StudentBehaviorLog[]>;
 

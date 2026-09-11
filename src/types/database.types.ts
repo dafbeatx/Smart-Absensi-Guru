@@ -330,23 +330,38 @@ export interface StudentAttendanceRecord {
 }
 
 export interface StudentBehaviorLog {
+  id?: string;
+  student_id?: string;
   type: 'GOOD' | 'BAD';
   points: number;
   reason: string;
+  reason_code?: string;
   timestamp: string;
-  recordedBy?: string;
   violation_date?: string;
+  occurred_at?: string;
+  timezone?: string;
+  recordedBy?: string;
+  recorded_by_user_id?: string;
+  recorded_by_name?: string;
+  idempotency_key?: string;
+  voided_at?: string | null;
+  voided_by_user_id?: string | null;
+  void_reason?: string | null;
+  sync_status?: 'SYNCED' | 'PENDING_SYNC' | 'FAILED_SYNC' | 'LOCAL_DRAFT';
 }
 
 export interface StudentBehaviorRecord {
   id: string;
+  student_id?: string;
   student_name: string;
   class_name: string;
   academic_year: string;
   total_points: number;
-  merits_points?: number; // Akumulasi Poin Kebaikan Siswa
-  demerits_points?: number; // Akumulasi Poin Pelanggaran / Kedisiplinan Siswa
+  merits_points?: number; // Akumulasi Poin Kebaikan Siswa (GOOD >= 0)
+  demerits_points?: number; // Akumulasi Poin Pelanggaran / Kedisiplinan Siswa (BAD >= 0)
+  net_points?: number; // merits_points - demerits_points
   behavior_logs: StudentBehaviorLog[];
+  sync_status?: 'SYNCED' | 'PENDING_SYNC' | 'FAILED_SYNC' | 'LOCAL_DRAFT';
   avatar_url?: string | null;
   points_used_today?: number;
   points_date?: string | null;
@@ -355,14 +370,43 @@ export interface StudentBehaviorRecord {
 }
 
 export interface RecordStudentBehaviorParams {
+  studentId?: string; // ID relasional dari public.students
   studentName: string;
   className: string;
   type: 'GOOD' | 'BAD';
   points: number;
   reason: string;
+  reasonCode?: string;
   teacherName?: string;
+  recordedByUserId?: string;
   academicYear?: string;
-  violationDate?: string; // Tanggal & waktu kejadian (ISO string)
+  violationDate?: string; // Tanggal & waktu kejadian (ISO string dengan timezone offset)
+  occurredAt?: string;
+  timezone?: string;
+  idempotencyKey?: string;
+}
+
+export interface StudentCharacterSummary {
+  student_id: string;
+  academic_year: string;
+  merits_points: number;
+  demerits_points: number;
+  net_points: number;
+  last_activity_at?: string;
+  updated_at?: string;
+}
+
+export interface RecordStudentBehaviorResult {
+  success: boolean;
+  newTotal: number;
+  merits_points?: number;
+  demerits_points?: number;
+  net_points?: number;
+  record?: StudentBehaviorRecord;
+  logId?: string;
+  isDuplicate?: boolean;
+  syncStatus?: 'SYNCED' | 'PENDING_SYNC' | 'FAILED_SYNC' | 'LOCAL_DRAFT';
+  message: string;
 }
 
 export interface GradeMasterBehaviorCategory {

@@ -83,6 +83,80 @@ export function formatTimeForInput(value: unknown, defaultValue: string = ''): s
   return defaultValue;
 }
 
+export function toJakartaIsoString(dateOrStr?: string | Date): string {
+  if (!dateOrStr) {
+    const now = new Date();
+    const jakartaDate = getTodayDateInJakarta(now);
+    const jakartaTime = getCurrentTimeInJakarta('Asia/Jakarta');
+    return `${jakartaDate}T${jakartaTime}+07:00`;
+  }
+
+  if (typeof dateOrStr === 'string') {
+    const clean = dateOrStr.trim();
+    if (clean.includes('+') || clean.endsWith('Z')) {
+      return clean;
+    }
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(clean)) {
+      return `${clean}:00+07:00`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(clean)) {
+      return `${clean}+07:00`;
+    }
+    const d = new Date(clean);
+    if (!isNaN(d.getTime())) {
+      const jakartaDate = getTodayDateInJakarta(d);
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Jakarta',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }).format(d);
+      return `${jakartaDate}T${parts}+07:00`;
+    }
+    return clean;
+  }
+
+  if (dateOrStr instanceof Date) {
+    const jakartaDate = getTodayDateInJakarta(dateOrStr);
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(dateOrStr);
+    return `${jakartaDate}T${parts}+07:00`;
+  }
+
+  return new Date().toISOString();
+}
+
+/**
+ * Formats any ISO/Date into a clean Indonesian date-time string strictly in Asia/Jakarta (WIB).
+ * e.g. "11 Sep 2026, 00:30 WIB"
+ */
+export function formatJakartaDateTime(dateOrStr?: string | Date | null): string {
+  if (!dateOrStr) return '-';
+  try {
+    const d = typeof dateOrStr === 'string' ? new Date(dateOrStr) : dateOrStr;
+    if (isNaN(d.getTime())) return String(dateOrStr);
+    return (
+      new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(d) + ' WIB'
+    );
+  } catch {
+    return String(dateOrStr);
+  }
+}
+
 /**
  * Returns today's date string formatted as "YYYY-MM-DD" strictly in Asia/Jakarta timezone (WIB/GMT+7).
  * Avoids the bug where Date.prototype.toISOString().split('T')[0] yields yesterday's date between 00:00 - 06:59 WIB.

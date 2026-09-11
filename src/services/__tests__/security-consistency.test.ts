@@ -6,6 +6,7 @@
 import { GPSService } from '../gps.service';
 import { hashPin } from '../../utils/hash.utils';
 import { SupabaseProvider } from '../../providers/supabase-provider.service';
+import { MockProvider } from '../../providers/mock-provider.service';
 import { QRValidationService } from '../qr-validation.service';
 import { CONSTANTS } from '../../config/constants';
 import { sanitizeMeta } from '../../utils/logger.utils';
@@ -835,6 +836,46 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
     );
 
     // Student Behavior & Disciplinary / Kindness Points Tests
+    const ahmadStd = await StudentRepository.createStudent({
+      nisn: '0087654399',
+      fullName: 'Ahmad Fauzi',
+      className: '8A',
+      gender: 'L',
+      academicYear: '2026/2027',
+    });
+
+    new MockProvider().setMockStudentBehaviors([
+      {
+        id: ahmadStd.id,
+        student_id: ahmadStd.id,
+        student_name: 'Ahmad Fauzi',
+        class_name: '8A',
+        academic_year: '2026/2027',
+        total_points: 10,
+        merits_points: 10,
+        demerits_points: 0,
+        net_points: 10,
+        behavior_logs: [
+          {
+            id: 'init_log_ahmad',
+            student_id: ahmadStd.id,
+            type: 'GOOD',
+            points: 10,
+            reason: 'Poin Awal Siswa',
+            timestamp: new Date().toISOString(),
+            violation_date: new Date().toISOString(),
+            occurred_at: new Date().toISOString(),
+            timezone: 'Asia/Jakarta',
+            recordedBy: 'Sistem',
+            recorded_by_user_id: 'system',
+            recorded_by_name: 'Sistem',
+            sync_status: 'LOCAL_DRAFT',
+          },
+        ],
+        sync_status: 'LOCAL_DRAFT',
+      },
+    ]);
+
     const initialBehaviors = await StudentBehaviorRepository.getBehaviors('ALL', '2026/2027');
     assert(
       'Student Behavior - Repository returns list of student behaviors',
@@ -843,6 +884,7 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
 
     // Guru awards +10 points for good deed (Kebaikan)
     const goodResult = await StudentBehaviorRepository.recordBehavior({
+      studentId: ahmadStd.id,
       studentName: 'Ahmad Fauzi',
       className: '8A',
       type: 'GOOD',
@@ -856,12 +898,13 @@ export const runSecurityConsistencyTestSuite = async (): Promise<{
       goodResult.success === true && goodResult.newTotal >= 20
     );
 
-    // Guru records -10 points for infraction (Pelanggaran)
+    // Guru records 10 points for infraction (Pelanggaran)
     const badResult = await StudentBehaviorRepository.recordBehavior({
+      studentId: ahmadStd.id,
       studentName: 'Ahmad Fauzi',
       className: '8A',
       type: 'BAD',
-      points: -10,
+      points: 10,
       reason: 'Terlambat Masuk Kelas',
       teacherName: 'Budi Santoso, S.Pd',
       academicYear: '2026/2027',

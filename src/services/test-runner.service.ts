@@ -18,6 +18,7 @@ import { runPermissionGuardTestSuite } from './__tests__/permission-guard.test';
 import { runNotificationVoiceOverhaulTestSuite } from './__tests__/notification-voice-overhaul.test';
 import { runTeacherPointsTestSuite } from './__tests__/teacher-points.test';
 import { runSarprasInventoryTestSuite } from './__tests__/sarpras-inventory.test';
+import { runStudentBehaviorIntegrityTestSuite } from './__tests__/student-behavior-integrity.test';
 
 export interface TestResultItem {
   testName: string;
@@ -73,6 +74,7 @@ export class MasterTestRunner {
       { name: 'Notification & Voice Overhaul System', fn: runNotificationVoiceOverhaulTestSuite },
       { name: 'Teacher Points & Gamification Ledger Engine', fn: runTeacherPointsTestSuite },
       { name: 'Sarana & Prasarana (Sarpras) Inventory System', fn: runSarprasInventoryTestSuite },
+      { name: 'Student Behavior & Character Points Integrity Engine', fn: runStudentBehaviorIntegrityTestSuite },
     ];
 
     let totalPassed = 0;

@@ -3,12 +3,15 @@ import type {
   StudentBehaviorRecord,
   StudentBehaviorLog,
   RecordStudentBehaviorParams,
+  RecordStudentBehaviorResult,
+  StudentCharacterSummary,
   GradeMasterBehaviorCategory,
 } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
 
 export const BEHAVIORS_STORAGE_KEY = 'smart_absensi_gm_behaviors';
-export const BEHAVIORS_CATEGORIES_KEY = 'smart_absensi_gm_categories';
+export const BEHAVIORS_CATEGORIES_KEY = 'smart_absensi_gm_categories_v2';
+export const BEHAVIORS_CATEGORIES_TTL_MS = 24 * 60 * 60 * 1000; // 24 Hours
 export const BEHAVIORS_UPDATED_EVENT = 'smart_absensi_behaviors_updated';
 
 // ==============================================================================
@@ -102,20 +105,19 @@ export class StudentBehaviorRepository {
 
   /**
    * Records student good deed (kebaikan) or discipline infraction (pelanggaran).
-   * Atomically updates points & behavior_logs on Supabase and dispatches cross-component event.
+   * Atomically updates points & behavior_logs and dispatches cross-component event.
    */
   public static async recordBehavior(
     params: RecordStudentBehaviorParams,
     token?: string
-  ): Promise<{
-    success: boolean;
-    newTotal: number;
-    record?: StudentBehaviorRecord;
-    message: string;
-  }> {
+  ): Promise<RecordStudentBehaviorResult> {
     try {
+      const sanitizedParams: RecordStudentBehaviorParams = {
+        ...params,
+        points: typeof params.points === 'number' && !isNaN(params.points) ? Math.abs(params.points) : params.points,
+      };
       const provider = ProviderFactory.getProvider();
-      const result = await provider.recordStudentBehavior(params, token);
+      const result = await provider.recordStudentBehavior(sanitizedParams, token);
 
       if (result.success) {
         // Refresh and broadcast updated behaviors list
@@ -140,7 +142,51 @@ export class StudentBehaviorRepository {
       return {
         success: false,
         newTotal: 0,
+        syncStatus: 'FAILED_SYNC',
         message: err?.message || 'Terjadi kesalahan sistem saat mencatat poin siswa.',
+      };
+    }
+  }
+
+  /**
+   * Voids an existing student behavior log with an audit reason.
+   */
+  public static async voidBehavior(
+    logId: string,
+    voidReason: string,
+    academicYear = '2026/2027',
+    token?: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    summary?: StudentCharacterSummary;
+  }> {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const result = await provider.voidStudentBehavior(logId, voidReason, token);
+
+      if (result.success) {
+        try {
+          const freshList = await provider.getStudentBehaviors('ALL', academicYear, token);
+          if (Array.isArray(freshList)) {
+            safeSetStorage(BEHAVIORS_STORAGE_KEY, JSON.stringify(freshList));
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent(BEHAVIORS_UPDATED_EVENT, { detail: freshList })
+              );
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      return result;
+    } catch (err: any) {
+      logger.error('StudentBehaviorRepository', 'Failed to void student behavior:', err);
+      return {
+        success: false,
+        message: err?.message || 'Gagal membatalkan catatan poin siswa.',
       };
     }
   }
@@ -165,44 +211,71 @@ export class StudentBehaviorRepository {
   /**
    * Retrieves official GradeMaster OS behavior categories & preset point weights.
    * Checks live GradeMaster OS settings endpoint if available, with robust fallback to official presets.
+   * Implements 24-hour TTL caching and weight validation.
    */
   public static async getCategories(): Promise<{
     kebaikan: GradeMasterBehaviorCategory[];
     pelanggaran: GradeMasterBehaviorCategory[];
   }> {
-    // 1. Try to load cached categories from storage
+    // 1. Try to load cached categories from storage with TTL validation
     const cached = safeGetStorage(BEHAVIORS_CATEGORIES_KEY);
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed?.kebaikan?.length && parsed?.pelanggaran?.length) {
-          return parsed;
+        const timestamp = parsed?._cachedAt || 0;
+        const isValidTTL = Date.now() - timestamp < BEHAVIORS_CATEGORIES_TTL_MS;
+
+        if (isValidTTL && parsed?.kebaikan?.length && parsed?.pelanggaran?.length) {
+          return {
+            kebaikan: parsed.kebaikan,
+            pelanggaran: parsed.pelanggaran,
+          };
         }
       } catch {
         // ignore
       }
     }
 
-    // 2. Try fetching dynamic settings from GradeMaster OS
+    // 2. Try fetching dynamic settings from GradeMaster OS with timeout
     try {
       if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+
         const res = await window.fetch(
           'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/api/grademaster/behaviors/settings',
           {
             headers: { Accept: 'application/json' },
             cache: 'no-store',
+            signal: controller.signal,
           }
         );
+        clearTimeout(timeoutId);
+
         if (res.ok) {
           const json = await res.json();
           if (json?.settings && Array.isArray(json.settings.reasons) && json.settings.reasons.length > 0) {
-            const reasons: GradeMasterBehaviorCategory[] = json.settings.reasons;
+            const reasons: GradeMasterBehaviorCategory[] = json.settings.reasons
+              .filter((r: any) => r && typeof r.text === 'string' && r.text.trim().length > 0)
+              .map((r: any) => ({
+                text: r.text.trim(),
+                weight: Math.min(100, Math.max(1, Math.round(Math.abs(Number(r.weight) || 5)))),
+                isGood: Boolean(r.isGood),
+                icon: r.icon || (r.isGood ? '🌟' : '⚠️'),
+              }));
+
             const result = {
               kebaikan: reasons.filter((r) => r.isGood),
               pelanggaran: reasons.filter((r) => !r.isGood),
             };
-            safeSetStorage(BEHAVIORS_CATEGORIES_KEY, JSON.stringify(result));
-            return result;
+
+            if (result.kebaikan.length > 0 && result.pelanggaran.length > 0) {
+              safeSetStorage(
+                BEHAVIORS_CATEGORIES_KEY,
+                JSON.stringify({ ...result, _cachedAt: Date.now() })
+              );
+              return result;
+            }
           }
         }
       }
@@ -214,7 +287,10 @@ export class StudentBehaviorRepository {
       kebaikan: GRADEMASTER_KEBAIKAN_PRESETS,
       pelanggaran: GRADEMASTER_PELANGGARAN_PRESETS,
     };
-    safeSetStorage(BEHAVIORS_CATEGORIES_KEY, JSON.stringify(official));
+    safeSetStorage(
+      BEHAVIORS_CATEGORIES_KEY,
+      JSON.stringify({ ...official, _cachedAt: Date.now() })
+    );
     return official;
   }
 }

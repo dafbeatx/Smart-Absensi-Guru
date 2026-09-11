@@ -24,6 +24,8 @@ import type {
   StudentBehaviorRecord,
   StudentBehaviorLog,
   RecordStudentBehaviorParams,
+  RecordStudentBehaviorResult,
+  StudentCharacterSummary,
   VerificationMethod,
   AttendanceSource,
   PushSubscriptionPayload,
@@ -2845,7 +2847,7 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   // ==============================================================================
-  // STUDENT BEHAVIOR & POINTS API (Tersinkron dengan GradeMaster OS - gm_behaviors)
+  // STUDENT BEHAVIOR & POINTS API (Relational Single Source of Truth + GradeMaster Sync)
   // ==============================================================================
 
   public async getStudentBehaviors(
@@ -2854,6 +2856,79 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<StudentBehaviorRecord[]> {
     try {
+      // 1. Primary: Coba baca dari tabel relasional student_character_summary & students
+      let querySummary = this.client
+        .from('student_character_summary')
+        .select('*, students!inner(id, full_name, class_name, academic_year, avatar_url)')
+        .eq('academic_year', academicYear)
+        .order('students(class_name)', { ascending: true })
+        .order('students(full_name)', { ascending: true });
+
+      if (className && className !== 'ALL') {
+        querySummary = querySummary.eq('students.class_name', className);
+      }
+
+      const { data: summaryData, error: summaryErr } = await querySummary;
+      if (!summaryErr && summaryData && summaryData.length > 0) {
+        const studentIds = summaryData.map((s: any) => s.student_id);
+        const logsByStudent: Record<string, StudentBehaviorLog[]> = {};
+
+        if (studentIds.length > 0) {
+          const { data: rawLogs } = await this.client
+            .from('student_behavior_logs')
+            .select('*')
+            .in('student_id', studentIds)
+            .is('voided_at', null)
+            .order('occurred_at', { ascending: false });
+
+          if (rawLogs) {
+            rawLogs.forEach((l: any) => {
+              if (!logsByStudent[l.student_id]) logsByStudent[l.student_id] = [];
+              logsByStudent[l.student_id].push({
+                id: l.id,
+                student_id: l.student_id,
+                type: l.type,
+                points: l.points,
+                reason: l.reason_text,
+                reason_code: l.reason_code,
+                timestamp: l.occurred_at,
+                violation_date: l.occurred_at,
+                occurred_at: l.occurred_at,
+                timezone: l.timezone || 'Asia/Jakarta',
+                recordedBy: l.recorded_by_name || 'Guru',
+                recorded_by_user_id: l.recorded_by_user_id,
+                recorded_by_name: l.recorded_by_name,
+                idempotency_key: l.idempotency_key,
+                sync_status: 'SYNCED',
+              });
+            });
+          }
+        }
+
+        return summaryData.map((row: any) => {
+          const merits = row.merits_points ?? 0;
+          const demerits = row.demerits_points ?? 0;
+          const net = merits - demerits;
+          return {
+            id: row.students?.id || row.student_id,
+            student_id: row.student_id,
+            student_name: row.students?.full_name || '',
+            class_name: row.students?.class_name || '',
+            academic_year: row.academic_year || academicYear,
+            total_points: net,
+            merits_points: merits,
+            demerits_points: demerits,
+            net_points: net,
+            behavior_logs: logsByStudent[row.student_id] || [],
+            avatar_url: row.students?.avatar_url || null,
+            sync_status: 'SYNCED' as const,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+          };
+        });
+      }
+
+      // 2. Fallback Kompatibilitas: Baca dari legacy gm_behaviors
       let query = this.client
         .from('gm_behaviors')
         .select('*')
@@ -2869,7 +2944,6 @@ export class SupabaseProvider implements IDataProvider {
       if (!error && data && data.length > 0) {
         const studentIds = data.map((d: any) => d.id).filter(Boolean);
 
-        // Fetch logs directly from relational gm_behavior_logs (GradeMaster OS primary logs table)
         let dbLogsByStudentId: Record<string, any[]> = {};
         if (studentIds.length > 0) {
           try {
@@ -2896,33 +2970,35 @@ export class SupabaseProvider implements IDataProvider {
           const rawDbLogs = dbLogsByStudentId[row.id] || [];
           const existingLogs: StudentBehaviorLog[] = Array.isArray(row.behavior_logs) ? row.behavior_logs : [];
 
-          // Convert relational logs from GradeMaster OS
           const convertedRelationalLogs: StudentBehaviorLog[] = rawDbLogs.map((l: any) => ({
+            id: l.id,
             type: l.points_delta < 0 ? ('GOOD' as const) : ('BAD' as const),
             points: Math.abs(l.points_delta),
             reason: l.reason || 'Catatan Sikap',
             timestamp: l.violation_date || l.created_at,
             violation_date: l.violation_date || l.created_at,
+            occurred_at: l.violation_date || l.created_at,
+            timezone: 'Asia/Jakarta',
             recordedBy: 'Guru',
+            sync_status: 'SYNCED' as const,
           }));
 
-          // Merge logs avoiding duplicates
           const seenKeys = new Set<string>();
           const allMergedLogs: StudentBehaviorLog[] = [];
 
           [...convertedRelationalLogs, ...existingLogs].forEach((log) => {
-            const key = `${log.timestamp}_${log.reason}_${log.points}_${log.type}`;
+            const key = log.id || `${log.timestamp}_${log.reason}_${log.points}_${log.type}`;
             if (!seenKeys.has(key)) {
               seenKeys.add(key);
-              allMergedLogs.push(log);
+              allMergedLogs.push({ ...log, sync_status: 'SYNCED' });
             }
           });
 
-          // Calculate merits (Poin Kebaikan) & demerits (Poin Pelanggaran/Kedisiplinan) separately
           let meritsTotal = 0;
           let demeritsTotal = 0;
 
           allMergedLogs.forEach((l) => {
+            if (l.voided_at) return;
             const p = Math.abs(l.points || 0);
             if (l.type === 'GOOD') {
               meritsTotal += p;
@@ -2931,18 +3007,23 @@ export class SupabaseProvider implements IDataProvider {
             }
           });
 
+          const netTotal = meritsTotal - demeritsTotal;
+
           return {
             id: row.id,
+            student_id: row.id,
             student_name: row.student_name,
             class_name: row.class_name,
             academic_year: row.academic_year || academicYear,
-            total_points: typeof row.total_points === 'number' ? row.total_points : 10,
+            total_points: netTotal,
             merits_points: meritsTotal,
             demerits_points: demeritsTotal,
+            net_points: netTotal,
             behavior_logs: allMergedLogs,
             avatar_url: row.avatar_url || null,
             points_used_today: row.points_used_today || 0,
             points_date: row.points_date || null,
+            sync_status: 'SYNCED' as const,
             created_at: row.created_at,
             updated_at: row.updated_at,
           };
@@ -2959,99 +3040,258 @@ export class SupabaseProvider implements IDataProvider {
   public async recordStudentBehavior(
     params: RecordStudentBehaviorParams,
     _token?: string
-  ): Promise<{
-    success: boolean;
-    newTotal: number;
-    record?: StudentBehaviorRecord;
-    message: string;
-  }> {
-    const cleanName = params.studentName.trim().toUpperCase();
-    const cleanClass = params.className.trim().toUpperCase();
+  ): Promise<RecordStudentBehaviorResult> {
+    const cleanName = (params.studentName || '').trim().toUpperCase();
+    const cleanClass = (params.className || '').trim().toUpperCase();
     const academicYear = params.academicYear || '2026/2027';
     const violationDateIso = params.violationDate || new Date().toISOString();
-    const pointsAbs = Math.abs(params.points);
-    // GradeMaster OS convention: Demerits (pelanggaran) > 0, Merits (kebaikan) < 0
-    const pointsDelta = params.type === 'GOOD' ? -pointsAbs : pointsAbs;
 
+    // 1. Validasi Input Keras
+    if (!cleanName) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'FAILED_SYNC',
+        message: 'Nama siswa wajib diisi.',
+      };
+    }
+
+    if (!params.type || !['GOOD', 'BAD'].includes(params.type)) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'FAILED_SYNC',
+        message: 'Tipe catatan karakter harus GOOD atau BAD.',
+      };
+    }
+
+    if (
+      typeof params.points !== 'number' ||
+      isNaN(params.points) ||
+      params.points <= 0 ||
+      params.points > 100 ||
+      !Number.isInteger(params.points)
+    ) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'FAILED_SYNC',
+        message: 'Bobot poin harus bernilai bulat antara 1 dan 100.',
+      };
+    }
+
+    if (!params.reason || params.reason.trim().length < 3 || params.reason.trim().length > 500) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'FAILED_SYNC',
+        message: 'Alasan pemberian poin wajib diisi (minimal 3 karakter, maksimal 500 karakter).',
+      };
+    }
+
+    if (params.academicYear && !/^\d{4}\/\d{4}$/.test(params.academicYear)) {
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'FAILED_SYNC',
+        message: 'Format tahun ajaran tidak valid (contoh: 2026/2027).',
+      };
+    }
+
+    const pointsAbs = params.points;
+
+    // 2. Resolusi ID Siswa Relasional (Wajib cocokkan class_name jika tidak ada studentId)
+    let resolvedStudentId = params.studentId;
+    if (!resolvedStudentId) {
+      try {
+        const { data: studentMatch } = await this.client
+          .from('students')
+          .select('id')
+          .eq('academic_year', academicYear)
+          .ilike('full_name', cleanName)
+          .ilike('class_name', cleanClass)
+          .limit(1)
+          .maybeSingle();
+
+        if (studentMatch?.id) {
+          resolvedStudentId = studentMatch.id;
+        }
+      } catch (stErr) {
+        logger.warn('SupabaseProvider', 'Failed resolving student from public.students:', stErr);
+      }
+    }
+
+    // 3. Eksekusi RPC Transaksional Server-Side (Single Transaction)
+    if (resolvedStudentId) {
+      try {
+        const { data: rpcData, error: rpcErr } = await this.client.rpc('record_student_behavior', {
+          p_student_id: resolvedStudentId,
+          p_academic_year: academicYear,
+          p_type: params.type,
+          p_points: pointsAbs,
+          p_reason: params.reason.trim(),
+          p_reason_code: params.reasonCode || null,
+          p_occurred_at: violationDateIso,
+          p_timezone: params.timezone || 'Asia/Jakarta',
+          p_idempotency_key: params.idempotencyKey || null,
+          p_recorded_by_name: params.teacherName || 'Guru',
+        });
+
+        if (!rpcErr && rpcData && rpcData.success) {
+          // Sync ke mock cache untuk offline responsiveness
+          try {
+            const mockProv = new (await import('./mock-provider.service')).MockProvider();
+            await mockProv.recordStudentBehavior({ ...params, studentId: resolvedStudentId });
+          } catch {
+            // ignore
+          }
+
+          return {
+            success: true,
+            newTotal: rpcData.net_points,
+            merits_points: rpcData.merits_points,
+            demerits_points: rpcData.demerits_points,
+            net_points: rpcData.net_points,
+            logId: rpcData.log_id,
+            isDuplicate: Boolean(rpcData.is_duplicate),
+            syncStatus: 'SYNCED',
+            message: rpcData.message || `Berhasil mencatat ${params.type === 'GOOD' ? 'Poin Kebaikan' : 'Catatan Pelanggaran'} (+${pointsAbs} Poin) untuk ${cleanName}.`,
+          };
+        }
+
+        if (rpcErr) {
+          // Jika pesan error berasal dari validasi Postgres RPC (ERRCODE 22000 / 22003 / 23503)
+          if (!rpcErr.message.includes('404') && !rpcErr.message.includes('function') && !rpcErr.message.includes('not found')) {
+            return {
+              success: false,
+              newTotal: 0,
+              syncStatus: 'FAILED_SYNC',
+              message: rpcErr.message,
+            };
+          }
+        }
+      } catch (rpcEx) {
+        logger.warn('SupabaseProvider', 'RPC record_student_behavior exception:', rpcEx);
+      }
+    }
+
+    // 4. Fallback Terkendali (Jika migration 20 RPC belum dijalankan di Supabase Cloud)
+    // Terapkan aturan aritmatika yang sama persis: merits positive, demerits positive, net = merits - demerits
     try {
-      // 1. Cari catatan siswa di tabel gm_behaviors
       let { data: existing, error: findErr } = await this.client
         .from('gm_behaviors')
         .select('*')
         .eq('academic_year', academicYear)
         .ilike('student_name', cleanName)
+        .ilike('class_name', cleanClass)
         .limit(1)
         .maybeSingle();
 
-      // Fallback jika tidak ditemukan dengan academicYear spesifik: cari berdasarkan nama siswa
-      if (!existing) {
-        const { data: fallbackExisting } = await this.client
-          .from('gm_behaviors')
-          .select('*')
-          .ilike('student_name', cleanName)
-          .order('academic_year', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (fallbackExisting) {
-          existing = fallbackExisting;
-        }
+      if (findErr) {
+        return {
+          success: false,
+          newTotal: 0,
+          syncStatus: 'FAILED_SYNC',
+          message: `Gagal memverifikasi data siswa di server: ${findErr.message}`,
+        };
       }
 
+      const logId = 'beh_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
       const newLog: StudentBehaviorLog = {
+        id: logId,
+        student_id: existing?.id || resolvedStudentId,
         type: params.type,
         points: pointsAbs,
         reason: params.reason.trim(),
         timestamp: violationDateIso,
         violation_date: violationDateIso,
+        occurred_at: violationDateIso,
+        timezone: params.timezone || 'Asia/Jakarta',
         recordedBy: params.teacherName || 'Guru',
+        idempotency_key: params.idempotencyKey,
+        sync_status: 'SYNCED',
       };
 
-      let targetStudentId: string | null = null;
-      let targetRecord: StudentBehaviorRecord | undefined;
-      let calculatedTotal = 0;
-
-      if (!findErr && existing) {
-        targetStudentId = existing.id;
-        const currentTotal = typeof existing.total_points === 'number' ? existing.total_points : 0;
+      if (existing) {
         const currentLogs: StudentBehaviorLog[] = Array.isArray(existing.behavior_logs) ? existing.behavior_logs : [];
-        const newTotal = currentTotal + pointsDelta;
-        calculatedTotal = newTotal;
-        const updatedLogs = [newLog, ...currentLogs];
 
-        const { data: updated, error: updateErr } = await this.client
+        // Idempotency check pada logs yang sudah ada
+        if (params.idempotencyKey) {
+          const matched = currentLogs.find((l) => l.idempotency_key === params.idempotencyKey);
+          if (matched) {
+            let m = 0; let d = 0;
+            currentLogs.forEach((l) => {
+              if (l.voided_at) return;
+              if (l.type === 'GOOD') m += Math.abs(l.points || 0);
+              else d += Math.abs(l.points || 0);
+            });
+            return {
+              success: true,
+              newTotal: m - d,
+              merits_points: m,
+              demerits_points: d,
+              net_points: m - d,
+              logId: matched.id,
+              isDuplicate: true,
+              syncStatus: 'SYNCED',
+              message: 'Catatan ini sudah pernah tersimpan sebelumnya (idempoten).',
+            };
+          }
+        }
+
+        const updatedLogs = [newLog, ...currentLogs];
+        let merits = 0;
+        let demerits = 0;
+        updatedLogs.forEach((l) => {
+          if (l.voided_at) return;
+          const p = Math.abs(l.points || 0);
+          if (l.type === 'GOOD') merits += p;
+          else demerits += p;
+        });
+        const net = merits - demerits;
+
+        const { error: updateErr } = await this.client
           .from('gm_behaviors')
           .update({
-            total_points: newTotal,
+            total_points: net,
             behavior_logs: updatedLogs,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', existing.id)
-          .select()
-          .single();
+          .eq('id', existing.id);
 
-        if (!updateErr && updated) {
-          targetRecord = {
-            id: updated.id,
-            student_name: updated.student_name,
-            class_name: updated.class_name,
-            academic_year: updated.academic_year,
-            total_points: updated.total_points,
-            behavior_logs: updated.behavior_logs,
-            avatar_url: updated.avatar_url,
-            created_at: updated.created_at,
-            updated_at: updated.updated_at,
+        if (updateErr) {
+          return {
+            success: false,
+            newTotal: 0,
+            syncStatus: 'FAILED_SYNC',
+            message: `Gagal memperbarui catatan perilaku: ${updateErr.message}`,
           };
         }
+
+        return {
+          success: true,
+          newTotal: net,
+          merits_points: merits,
+          demerits_points: demerits,
+          net_points: net,
+          logId: newLog.id,
+          isDuplicate: false,
+          syncStatus: 'SYNCED',
+          message: `Berhasil mencatat ${params.type === 'GOOD' ? 'Poin Kebaikan' : 'Catatan Pelanggaran'} (+${pointsAbs} Poin) untuk ${cleanName}.`,
+        };
       } else {
-        // Jika belum ada di gm_behaviors, buat catatan baru
-        calculatedTotal = pointsDelta;
+        // Siswa baru di tabel gm_behaviors
+        const merits = params.type === 'GOOD' ? pointsAbs : 0;
+        const demerits = params.type === 'BAD' ? pointsAbs : 0;
+        const net = merits - demerits;
+
         const { data: inserted, error: insertErr } = await this.client
           .from('gm_behaviors')
           .insert({
             student_name: cleanName,
             class_name: cleanClass,
             academic_year: academicYear,
-            total_points: calculatedTotal,
+            total_points: net,
             behavior_logs: [newLog],
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -3059,68 +3299,85 @@ export class SupabaseProvider implements IDataProvider {
           .select()
           .single();
 
-        if (!insertErr && inserted) {
-          targetStudentId = inserted.id;
-          targetRecord = {
-            id: inserted.id,
-            student_name: inserted.student_name,
-            class_name: inserted.class_name,
-            academic_year: inserted.academic_year,
-            total_points: inserted.total_points,
-            behavior_logs: inserted.behavior_logs,
-            created_at: inserted.created_at,
-            updated_at: inserted.updated_at,
+        if (insertErr || !inserted) {
+          return {
+            success: false,
+            newTotal: 0,
+            syncStatus: 'FAILED_SYNC',
+            message: `Gagal menyimpan catatan perilaku baru: ${insertErr?.message || 'Error tidak diketahui'}`,
           };
         }
-      }
 
-      // 2. Insert into relational gm_behavior_logs (Primary GradeMaster OS table)
-      if (targetStudentId) {
-        try {
-          const { data: insertedLog, error: logInsertErr } = await this.client
-            .from('gm_behavior_logs')
-            .insert({
-              student_id: targetStudentId,
-              points_delta: pointsDelta,
-              reason: params.reason.trim(),
-              violation_date: violationDateIso,
-              created_at: new Date().toISOString(),
-            })
-            .select();
-
-          if (logInsertErr) {
-            logger.error('SupabaseProvider', 'Failed writing into gm_behavior_logs:', logInsertErr);
-          } else {
-            logger.info('SupabaseProvider', 'Successfully synced log to gm_behavior_logs:', insertedLog?.[0]?.id);
-          }
-        } catch (logInsertErr) {
-          logger.warn('SupabaseProvider', 'Failed writing into gm_behavior_logs:', logInsertErr);
-        }
-      }
-
-      // Sync to mock provider cache
-      try {
-        const mockProv = new (await import('./mock-provider.service')).MockProvider();
-        await mockProv.recordStudentBehavior(params);
-      } catch {
-        // ignore
-      }
-
-      if (targetRecord) {
         return {
           success: true,
-          newTotal: calculatedTotal,
-          record: targetRecord,
-          message: `Berhasil mencatat ${params.type === 'GOOD' ? 'Poin Kebaikan' : 'Poin Kedisiplinan'} (+${pointsAbs} Poin) untuk ${cleanName}.`,
+          newTotal: net,
+          merits_points: merits,
+          demerits_points: demerits,
+          net_points: net,
+          logId: newLog.id,
+          isDuplicate: false,
+          syncStatus: 'SYNCED',
+          message: `Berhasil mencatat ${params.type === 'GOOD' ? 'Poin Kebaikan' : 'Catatan Pelanggaran'} (+${pointsAbs} Poin) untuk ${cleanName}.`,
         };
       }
     } catch (err: any) {
       logger.warn('SupabaseProvider', 'recordStudentBehavior DB exception:', err);
+      return {
+        success: false,
+        newTotal: 0,
+        syncStatus: 'FAILED_SYNC',
+        message: err?.message || 'Koneksi ke database Supabase gagal. Silakan coba lagi nanti.',
+      };
+    }
+  }
+
+  public async voidStudentBehavior(
+    logId: string,
+    voidReason: string,
+    _token?: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    summary?: StudentCharacterSummary;
+  }> {
+    if (!logId) {
+      return { success: false, message: 'ID log wajib disertakan.' };
+    }
+    if (!voidReason || voidReason.trim().length < 3) {
+      return { success: false, message: 'Alasan pembatalan minimal 3 karakter.' };
     }
 
-    // Fallback to mock provider
+    try {
+      // 1. Coba panggil RPC PostgreSQL
+      const { data, error } = await this.client.rpc('void_student_behavior', {
+        p_log_id: logId,
+        p_void_reason: voidReason.trim(),
+      });
+
+      if (!error && data?.success) {
+        return {
+          success: true,
+          message: data.message,
+          summary: {
+            student_id: data.student_id,
+            academic_year: data.academic_year || '2026/2027',
+            merits_points: data.merits_points,
+            demerits_points: data.demerits_points,
+            net_points: data.net_points,
+          },
+        };
+      }
+
+      if (error && !error.message.includes('404') && !error.message.includes('function')) {
+        return { success: false, message: error.message };
+      }
+    } catch (rpcEx) {
+      logger.warn('SupabaseProvider', 'RPC void_student_behavior exception:', rpcEx);
+    }
+
+    // Fallback ke MockProvider untuk voiding offline/mock
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
-    return mockProv.recordStudentBehavior(params);
+    return mockProv.voidStudentBehavior(logId, voidReason);
   }
 
   public async getStudentBehaviorHistory(
@@ -3128,13 +3385,46 @@ export class SupabaseProvider implements IDataProvider {
     className: string,
     _token?: string
   ): Promise<StudentBehaviorLog[]> {
+    const cleanName = (studentName || '').trim().toUpperCase();
+    const cleanClass = (className || '').trim().toUpperCase();
+
     try {
-      const cleanName = studentName.trim().toUpperCase();
+      // 1. Coba baca dari tabel relasional student_behavior_logs
+      const { data: relLogs, error: relErr } = await this.client
+        .from('student_behavior_logs')
+        .select('*, students!inner(full_name, class_name)')
+        .ilike('students.full_name', cleanName)
+        .ilike('students.class_name', cleanClass)
+        .order('occurred_at', { ascending: false });
+
+      if (!relErr && relLogs && relLogs.length > 0) {
+        return relLogs.map((l: any) => ({
+          id: l.id,
+          student_id: l.student_id,
+          type: l.type,
+          points: l.points,
+          reason: l.reason_text,
+          reason_code: l.reason_code,
+          timestamp: l.occurred_at,
+          violation_date: l.occurred_at,
+          occurred_at: l.occurred_at,
+          timezone: l.timezone || 'Asia/Jakarta',
+          recordedBy: l.recorded_by_name || 'Guru',
+          recorded_by_user_id: l.recorded_by_user_id,
+          recorded_by_name: l.recorded_by_name,
+          voided_at: l.voided_at,
+          void_reason: l.void_reason,
+          sync_status: 'SYNCED' as const,
+        }));
+      }
+
+      // 2. Fallback: Baca dari gm_behaviors
       const { data, error } = await this.client
         .from('gm_behaviors')
         .select('id, behavior_logs')
         .eq('academic_year', '2026/2027')
         .ilike('student_name', cleanName)
+        .ilike('class_name', cleanClass)
         .limit(1)
         .maybeSingle();
 
@@ -3149,22 +3439,25 @@ export class SupabaseProvider implements IDataProvider {
             .order('violation_date', { ascending: false });
 
           if (dbLogs && dbLogs.length > 0) {
-            const relLogs: StudentBehaviorLog[] = dbLogs.map((l: any) => ({
+            const mappedLogs: StudentBehaviorLog[] = dbLogs.map((l: any) => ({
+              id: l.id,
               type: l.points_delta < 0 ? ('GOOD' as const) : ('BAD' as const),
               points: Math.abs(l.points_delta),
               reason: l.reason || 'Catatan Sikap',
               timestamp: l.violation_date || l.created_at,
               violation_date: l.violation_date || l.created_at,
+              occurred_at: l.violation_date || l.created_at,
               recordedBy: 'Guru',
+              sync_status: 'SYNCED' as const,
             }));
 
             const seenKeys = new Set<string>();
             const merged: StudentBehaviorLog[] = [];
-            [...relLogs, ...existingLogs].forEach((l) => {
-              const key = `${l.timestamp}_${l.reason}_${l.points}_${l.type}`;
+            [...mappedLogs, ...existingLogs].forEach((l) => {
+              const key = l.id || `${l.timestamp}_${l.reason}_${l.points}_${l.type}`;
               if (!seenKeys.has(key)) {
                 seenKeys.add(key);
-                merged.push(l);
+                merged.push({ ...l, sync_status: 'SYNCED' });
               }
             });
 
@@ -3178,9 +3471,9 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       if (existingLogs.length > 0) {
-        return existingLogs.sort((a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
+        return existingLogs
+          .map((l) => ({ ...l, sync_status: 'SYNCED' as const }))
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'getStudentBehaviorHistory exception:', err);
