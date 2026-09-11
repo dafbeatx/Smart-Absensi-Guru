@@ -121,19 +121,13 @@ export const isTeacherLeaveMatch = (t: UserProfile, leave: LeaveRequest): boolea
     if (normalizePersonName(lTeacherName) === tNormName) return true;
   }
 
-  // 5. Admin / Operator Role cross-link (usr_admin_1001 <-> usr_op_002 <-> Admin Website / Operator Sekolah)
-  const isTargetAdmin = t.role === 'ADMIN' || t.role === 'OPERATOR';
-  const isAdminLeave =
-    lUserId === 'usr_admin_1001' ||
-    lUserId === 'usr_op_002' ||
-    lUserId.toLowerCase().includes('admin') ||
-    lUserId.toLowerCase().includes('operator') ||
-    (tNormName.includes('rina') && (lUserId.includes('op_002') || lUserId.includes('admin'))) ||
-    (tNormName.includes('qodiatul') && (lUserId.includes('admin') || lUserId.includes('op_002')));
-  if (isTargetAdmin && isAdminLeave) return true;
+  // 5. Legacy Mock Compatibility Aliasing (Strictly personal, NEVER cross-contaminates other admins)
+  if (tNormName.includes('rina') && (lUserId === 'usr_admin_1001' || lUserName.toLowerCase().includes('rina') || lTeacherName.toLowerCase().includes('rina'))) return true;
+  if (tNormName.includes('qodiatul') && (lUserId === 'usr_op_002' || lUserName.toLowerCase().includes('qodiatul') || lTeacherName.toLowerCase().includes('qodiatul'))) return true;
+  if (tNormName.includes('dafa') && (lUserId === 'usr_admin_001' || lUserName.toLowerCase().includes('dafa') || lTeacherName.toLowerCase().includes('dafa'))) return true;
 
   // 6. Compatibility rule for Mawar Andinia
-  if (lUserId === 'usr_guru_010' && (tName.includes('Mawar') || tId.includes('1001'))) return true;
+  if (lUserId === 'usr_guru_010' && (tName.includes('Mawar') || tId === 'usr_guru_010')) return true;
 
   return false;
 };
@@ -164,19 +158,13 @@ export const isTeacherRecordMatch = (t: UserProfile, rec: AttendanceRecord): boo
   if (tName && (rUserId === tName || (rec as any).teacher_name === tName)) return true;
   if (tNormName && tNormName.length >= 3 && normalizePersonName(rUserId) === tNormName) return true;
 
-  // 5. Admin / Operator Role cross-link
-  const isTargetAdmin = t.role === 'ADMIN' || t.role === 'OPERATOR';
-  const isAdminRecord =
-    rUserId === 'usr_admin_1001' ||
-    rUserId === 'usr_op_002' ||
-    rUserId.toLowerCase().includes('admin') ||
-    rUserId.toLowerCase().includes('operator') ||
-    (tNormName.includes('rina') && (rUserId.includes('op_002') || rUserId.includes('admin'))) ||
-    (tNormName.includes('qodiatul') && (rUserId.includes('admin') || rUserId.includes('op_002')));
-  if (isTargetAdmin && isAdminRecord) return true;
+  // 5. Legacy Mock Compatibility Aliasing (Strictly personal, NEVER cross-contaminates other admins)
+  if (tNormName.includes('rina') && (rUserId === 'usr_admin_1001' || (rec as any).teacher_name?.toLowerCase().includes('rina'))) return true;
+  if (tNormName.includes('qodiatul') && (rUserId === 'usr_op_002' || (rec as any).teacher_name?.toLowerCase().includes('qodiatul'))) return true;
+  if (tNormName.includes('dafa') && (rUserId === 'usr_admin_001' || (rec as any).teacher_name?.toLowerCase().includes('dafa'))) return true;
 
   // 6. Compatibility rule for Mawar Andinia
-  if (rUserId === 'usr_guru_010' && (tName.includes('Mawar') || tId.includes('1001'))) return true;
+  if (rUserId === 'usr_guru_010' && (tName.includes('Mawar') || tId === 'usr_guru_010')) return true;
 
   return false;
 };

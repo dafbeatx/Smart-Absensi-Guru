@@ -309,13 +309,21 @@ export const DailyAttendanceTracker: React.FC<DailyAttendanceTrackerProps> = ({
               : 'IZIN';
         }
 
+        const isCorrection = approvedLeave.leave_type === 'KOREKSI_ABSEN';
+        const displayCheckInTime = isCorrection
+          ? (record?.check_in_time ? record.check_in_time.substring(0, 5) : checkInTime)
+          : undefined;
+        const displayCheckOutTime = isCorrection
+          ? (record?.check_out_time ? record.check_out_time.substring(0, 5) : checkOutTime)
+          : undefined;
+
         map.set(teacher.id, {
           record,
           leave: approvedLeave,
           status,
           leaveApprovalStatus: 'APPROVED',
-          checkInTime: record?.check_in_time ? record.check_in_time.substring(0, 5) : checkInTime,
-          checkOutTime: record?.check_out_time ? record.check_out_time.substring(0, 5) : checkOutTime,
+          checkInTime: displayCheckInTime,
+          checkOutTime: displayCheckOutTime,
           notes:
             approvedLeave.leave_type === 'KOREKSI_ABSEN'
               ? `Koreksi Disetujui: ${approvedLeave.reason}`

@@ -34,6 +34,23 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Auto-reset form dates to today in Jakarta time when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      const todayStr = getTodayDateInJakarta();
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+      setLeaveType('SAKIT');
+      setReason('');
+      setAttachmentBase64('');
+      setFileName('');
+      setErrorMsg(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [isOpen]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
