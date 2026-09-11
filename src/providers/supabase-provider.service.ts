@@ -1877,12 +1877,12 @@ export class SupabaseProvider implements IDataProvider {
     let notificationId = '';
     let effectiveUserId = '';
 
-    if (typeof dtoOrId === 'object' && dtoOrId !== null) {
-      notificationId = dtoOrId.notification_id || dtoOrId.notificationId || '';
-      effectiveUserId = dtoOrId.user_id || dtoOrId.userId || '';
-    } else {
+    if (typeof dtoOrId === 'string') {
       notificationId = dtoOrId;
       effectiveUserId = useAuthStore.getState().user?.id || '';
+    } else if (dtoOrId && typeof dtoOrId === 'object') {
+      notificationId = dtoOrId.notification_id || dtoOrId.notificationId || '';
+      effectiveUserId = dtoOrId.user_id || dtoOrId.userId || '';
     }
 
     if (!effectiveUserId) {
@@ -1933,9 +1933,9 @@ export class SupabaseProvider implements IDataProvider {
     let effectiveUserId: string = '';
     let notificationIds: string[] = [];
 
-    if (typeof dtoOrIds === 'object' && !Array.isArray(dtoOrIds) && dtoOrIds !== null) {
-      effectiveUserId = dtoOrIds.user_id || dtoOrIds.userId || '';
-      notificationIds = dtoOrIds.notification_ids || dtoOrIds.notificationIds || [];
+    if (typeof dtoOrIds === 'string') {
+      effectiveUserId = dtoOrIds || useAuthStore.getState().user?.id || '';
+      notificationIds = Array.isArray(idsOrToken) ? idsOrToken : [];
     } else if (Array.isArray(dtoOrIds)) {
       notificationIds = dtoOrIds;
       // Periksa apakah idsOrToken adalah userId (bukan JWT token atau Bearer)
@@ -1950,9 +1950,9 @@ export class SupabaseProvider implements IDataProvider {
       } else {
         effectiveUserId = useAuthStore.getState().user?.id || '';
       }
-    } else {
-      effectiveUserId = dtoOrIds || useAuthStore.getState().user?.id || '';
-      notificationIds = Array.isArray(idsOrToken) ? idsOrToken : [];
+    } else if (dtoOrIds && typeof dtoOrIds === 'object') {
+      effectiveUserId = dtoOrIds.user_id || dtoOrIds.userId || '';
+      notificationIds = dtoOrIds.notification_ids || dtoOrIds.notificationIds || [];
     }
 
     if (!effectiveUserId) {

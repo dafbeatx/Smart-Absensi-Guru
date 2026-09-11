@@ -1145,12 +1145,12 @@ export class MockProvider implements IDataProvider {
     let notificationId = '';
     let effectiveUserId = '';
 
-    if (typeof dtoOrId === 'object' && dtoOrId !== null) {
+    if (typeof dtoOrId === 'string') {
+      notificationId = dtoOrId;
+      effectiveUserId = useAuthStore.getState().user?.id || 'usr_uuid_1001';
+    } else if (dtoOrId && typeof dtoOrId === 'object') {
       notificationId = dtoOrId.notification_id || dtoOrId.notificationId || '';
       effectiveUserId = dtoOrId.user_id || dtoOrId.userId || '';
-    } else {
-      notificationId = dtoOrId || '';
-      effectiveUserId = useAuthStore.getState().user?.id || 'usr_uuid_1001';
     }
 
     if (!effectiveUserId) {
@@ -1180,9 +1180,9 @@ export class MockProvider implements IDataProvider {
     let effectiveUserId: string = '';
     let notificationIds: string[] = [];
 
-    if (typeof dtoOrIds === 'object' && !Array.isArray(dtoOrIds) && dtoOrIds !== null) {
-      effectiveUserId = dtoOrIds.user_id || dtoOrIds.userId || '';
-      notificationIds = dtoOrIds.notification_ids || dtoOrIds.notificationIds || [];
+    if (typeof dtoOrIds === 'string') {
+      effectiveUserId = dtoOrIds || useAuthStore.getState().user?.id || 'usr_uuid_1001';
+      notificationIds = Array.isArray(idsOrToken) ? idsOrToken : [];
     } else if (Array.isArray(dtoOrIds)) {
       notificationIds = dtoOrIds;
       if (
@@ -1195,9 +1195,9 @@ export class MockProvider implements IDataProvider {
       } else {
         effectiveUserId = useAuthStore.getState().user?.id || 'usr_uuid_1001';
       }
-    } else {
-      effectiveUserId = dtoOrIds || useAuthStore.getState().user?.id || 'usr_uuid_1001';
-      notificationIds = Array.isArray(idsOrToken) ? idsOrToken : [];
+    } else if (dtoOrIds && typeof dtoOrIds === 'object') {
+      effectiveUserId = dtoOrIds.user_id || dtoOrIds.userId || '';
+      notificationIds = dtoOrIds.notification_ids || dtoOrIds.notificationIds || [];
     }
 
     if (!effectiveUserId) {
