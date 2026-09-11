@@ -5,6 +5,10 @@ import {
   TeachingScheduleRepository,
   TEACHING_SCHEDULES_UPDATED_EVENT,
 } from '../../../repositories/TeachingScheduleRepository';
+import {
+  normalizeDayOfWeek,
+  sortTeachingSlots,
+} from '../../../utils/teaching-schedule.utils';
 
 interface TeachingScheduleModalProps {
   isOpen: boolean;
@@ -23,26 +27,25 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
 }) => {
   const { user: authUser } = useAuthStore();
   const effectiveUser = propUser || authUser;
-  const days = ['Semua', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+  const days = ['Semua', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   const [selectedDay, setSelectedDay] = useState('Semua');
   const [activeSchedules, setActiveSchedules] = useState<TeachingSlot[]>([]);
 
   const loadSchedules = useCallback(async () => {
     if (schedule !== undefined) {
-      setActiveSchedules(schedule);
+      setActiveSchedules(sortTeachingSlots(schedule));
       return;
     }
 
-    if (!effectiveUser) {
+    if (!effectiveUser?.id) {
       setActiveSchedules([]);
       return;
     }
 
     const userSlots = await TeachingScheduleRepository.getTeacherSchedules(
-      effectiveUser.id,
-      effectiveUser.full_name || undefined
+      effectiveUser.id
     );
-    setActiveSchedules(userSlots);
+    setActiveSchedules(sortTeachingSlots(userSlots));
   }, [schedule, effectiveUser]);
 
   useEffect(() => {
@@ -58,12 +61,14 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
 
   if (!isOpen) return null;
 
-  const normalizeDay = (d?: string) => (d || '').toLowerCase().replace(/['`’]/g, '').trim();
-  const selectedDayNorm = normalizeDay(selectedDay);
+  const targetDayNum = selectedDay === 'Semua' ? null : normalizeDayOfWeek(selectedDay);
 
-  const filteredSchedule = selectedDay === 'Semua' 
-    ? activeSchedules 
-    : activeSchedules.filter(s => normalizeDay(s.day) === selectedDayNorm);
+  const filteredSchedule = selectedDay === 'Semua'
+    ? activeSchedules
+    : activeSchedules.filter((s) => {
+        const slotDay = normalizeDayOfWeek(s.day_of_week !== undefined ? s.day_of_week : s.day);
+        return slotDay === targetDayNum;
+      });
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">

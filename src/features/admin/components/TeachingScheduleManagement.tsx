@@ -13,6 +13,11 @@ import {
   SUBJECTS_STORAGE_KEY,
 } from './SubjectManagementModal';
 import type { SubjectItem } from './SubjectManagementModal';
+import {
+  validateScheduleConflict,
+  normalizeDayOfWeek,
+  timeStringToMinutes,
+} from '../../../utils/teaching-schedule.utils';
 
 export interface ExtendedTeachingSlot extends TeachingSlot {
   user_id?: string; // Associated teacher user ID or NIP
@@ -24,7 +29,7 @@ export interface TeachingScheduleManagementProps {
 }
 
 const STORAGE_KEY = 'smart_absensi_teaching_schedules';
-const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const FILTER_DAYS = ['Semua', ...DAYS];
 
 const TIME_PRESETS = [
@@ -74,6 +79,8 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   // Modal State for Add / Edit Schedule
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   // Modal State for Subject Management
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
@@ -95,6 +102,30 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
       }
     });
   }, []);
+
+  // Live Conflict Detection for the Modal Form
+  const formConflict = useMemo(() => {
+    if (!formTeacherId || !formTimeStart || !formTimeEnd || !formClassName) return null;
+    if (timeStringToMinutes(formTimeStart) >= timeStringToMinutes(formTimeEnd)) {
+      return {
+        conflict_type: 'TEACHER' as const,
+        conflicting_schedule: {} as any,
+        message: 'Jam selesai harus lebih akhir dari jam mulai.',
+      };
+    }
+    return validateScheduleConflict(
+      {
+        id: editingId || undefined,
+        teacher_user_id: formTeacherId,
+        day_of_week: normalizeDayOfWeek(formDay),
+        start_time: formTimeStart,
+        end_time: formTimeEnd,
+        class_name: formClassName,
+        room: formRoom,
+      },
+      schedules
+    );
+  }, [formTeacherId, formDay, formTimeStart, formTimeEnd, formClassName, formRoom, editingId, schedules]);
 
   // Handle subjects update
   const handleUpdateSubjects = (newSubjects: SubjectItem[]) => {
@@ -138,11 +169,13 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
   const handleOpenEditModal = (slot: ExtendedTeachingSlot) => {
     setEditingId(slot.id);
-    setFormTeacherId(slot.user_id || '');
+    setFormTeacherId(slot.teacher_user_id || slot.user_id || '');
     setFormDay(slot.day || 'Senin');
 
-    // Parse time range e.g. "07:30 - 08:50 WIB"
-    if (slot.time) {
+    if (slot.start_time && slot.end_time) {
+      setFormTimeStart(slot.start_time);
+      setFormTimeEnd(slot.end_time);
+    } else if (slot.time) {
       const parts = slot.time.replace(' WIB', '').split('-');
       if (parts.length === 2) {
         setFormTimeStart(parts[0].trim());
@@ -150,13 +183,13 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
       }
     }
 
-    setFormClassName(slot.className || '');
+    setFormClassName(slot.className || slot.class_name || '');
     setFormSubject(slot.subject || '');
     setFormRoom(slot.room || '');
     setIsModalOpen(true);
   };
 
-  const handleSaveSchedule = (e: React.FormEvent) => {
+  const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formTeacherId) {
@@ -171,56 +204,93 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
       showToast('error', 'Kelas Wajib', 'Masukkan nama kelas.');
       return;
     }
-
-    const selectedTeacher = teachers.find((t) => t.id === formTeacherId);
-    const timeFormatted = `${formTimeStart} - ${formTimeEnd} WIB`;
-
-    let updatedSchedules: ExtendedTeachingSlot[];
-
-    if (editingId) {
-      updatedSchedules = schedules.map((item) =>
-        item.id === editingId
-          ? {
-              ...item,
-              user_id: formTeacherId,
-              teacher_name: selectedTeacher?.full_name || 'Guru',
-              day: formDay,
-              time: timeFormatted,
-              className: formClassName,
-              subject: formSubject,
-              room: formRoom || 'Ruang Kelas',
-            }
-          : item
-      );
-      showToast('success', 'Jadwal Diperbarui', 'Jadwal mengajar berhasil diperbarui.');
-    } else {
-      const newSlot: ExtendedTeachingSlot = {
-        id: 'sch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-        user_id: formTeacherId,
-        teacher_name: selectedTeacher?.full_name || 'Guru',
-        day: formDay,
-        time: timeFormatted,
-        className: formClassName,
-        subject: formSubject,
-        room: formRoom || 'Ruang Kelas',
-      };
-      updatedSchedules = [...schedules, newSlot];
-      showToast('success', 'Jadwal Ditambahkan', 'Jadwal mengajar baru berhasil disimpan.');
+    if (timeStringToMinutes(formTimeStart) >= timeStringToMinutes(formTimeEnd)) {
+      showToast('error', 'Waktu Tidak Valid', 'Jam selesai harus lebih akhir dari jam mulai.');
+      return;
+    }
+    if (formConflict) {
+      showToast('error', 'Konflik Jadwal', formConflict.message);
+      return;
     }
 
-    setSchedules(updatedSchedules);
+    setIsSaving(true);
     const token = useAuthStore.getState().token || undefined;
-    TeachingScheduleRepository.saveSchedules(updatedSchedules, token);
-    setIsModalOpen(false);
+
+    try {
+      if (editingId) {
+        const currentSlot = schedules.find((s) => s.id === editingId);
+        const result = await TeachingScheduleRepository.updateSchedule(
+          {
+            id: editingId,
+            teacher_user_id: formTeacherId,
+            day_of_week: normalizeDayOfWeek(formDay),
+            day: formDay,
+            start_time: formTimeStart,
+            end_time: formTimeEnd,
+            class_name: formClassName,
+            subject: formSubject,
+            room: formRoom || 'Ruang Kelas',
+            version: currentSlot?.version || 1,
+          },
+          token
+        );
+
+        if (!result.success) {
+          showToast('error', 'Gagal Memperbarui', result.error || 'Terjadi kesalahan sistem.');
+          return;
+        }
+
+        showToast('success', 'Jadwal Diperbarui', 'Jadwal mengajar berhasil diperbarui di database.');
+      } else {
+        const result = await TeachingScheduleRepository.createSchedule(
+          {
+            teacher_user_id: formTeacherId,
+            day_of_week: normalizeDayOfWeek(formDay),
+            day: formDay,
+            start_time: formTimeStart,
+            end_time: formTimeEnd,
+            class_name: formClassName,
+            subject: formSubject,
+            room: formRoom || 'Ruang Kelas',
+          },
+          token
+        );
+
+        if (!result.success) {
+          showToast('error', 'Gagal Menambahkan', result.error || 'Terjadi kesalahan sistem.');
+          return;
+        }
+
+        showToast('success', 'Jadwal Ditambahkan', 'Jadwal mengajar baru berhasil disimpan di database.');
+      }
+
+      // Reload schedules from repository
+      const refreshed = await TeachingScheduleRepository.getSchedules(token);
+      setSchedules(refreshed);
+      setIsModalOpen(false);
+    } catch (err: any) {
+      showToast('error', 'Error Menyimpan', err?.message || 'Gagal menyimpan jadwal ke server.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteSchedule = (id: string) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus jam mengajar ini?')) {
-      const updatedSchedules = schedules.filter((s) => s.id !== id);
-      setSchedules(updatedSchedules);
-      const token = useAuthStore.getState().token || undefined;
-      TeachingScheduleRepository.saveSchedules(updatedSchedules, token);
-      showToast('success', 'Jadwal Dihapus', 'Jam mengajar berhasil dihapus.');
+  const handleDeleteSchedule = async (id: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus jam mengajar ini?')) return;
+    setIsDeletingId(id);
+    const token = useAuthStore.getState().token || undefined;
+    try {
+      const ok = await TeachingScheduleRepository.deleteSchedule(id, token);
+      if (ok) {
+        setSchedules((prev) => prev.filter((s) => s.id !== id));
+        showToast('success', 'Jadwal Dihapus', 'Jam mengajar berhasil dihapus.');
+      } else {
+        showToast('error', 'Gagal Menghapus', 'Tidak dapat menghapus jadwal dari database.');
+      }
+    } catch (err: any) {
+      showToast('error', 'Error Menghapus', err?.message || 'Gagal menghapus jadwal.');
+    } finally {
+      setIsDeletingId(null);
     }
   };
 
@@ -435,9 +505,10 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
                   </button>
                   <button
                     onClick={() => handleDeleteSchedule(slot.id)}
-                    className="px-2.5 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors cursor-pointer"
+                    disabled={isDeletingId === slot.id}
+                    className="px-2.5 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    🗑️ Hapus
+                    {isDeletingId === slot.id ? '⏳ Menghapus...' : '🗑️ Hapus'}
                   </button>
                 </div>
               </div>
@@ -521,7 +592,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
               {/* Day Segmented Selector */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700">Hari Mengajar *</label>
-                <div className="grid grid-cols-5 gap-1.5">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                   {DAYS.map((d) => (
                     <button
                       key={d}
@@ -638,13 +709,42 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
               </div>
             </div>
 
+            {/* Live Conflict Warning Box */}
+            {formConflict && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2 text-rose-800 text-xs">
+                <span className="text-base leading-none">⚠️</span>
+                <div>
+                  <strong className="font-black block">Terdeteksi Konflik Jadwal!</strong>
+                  <span>{formConflict.message}</span>
+                </div>
+              </div>
+            )}
+
             {/* Modal Actions */}
             <div className="pt-2 flex items-center justify-end gap-2.5">
-              <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                disabled={isSaving}
+              >
                 Batal
               </Button>
-              <Button variant="primary" type="submit" className="px-5">
-                {editingId ? '💾 Simpan Perubahan' : '➕ Tambah Jadwal'}
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={isSaving || !!formConflict}
+                className="px-5"
+              >
+                {isSaving ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="animate-spin text-sm">⏳</span> Menyimpan...
+                  </span>
+                ) : editingId ? (
+                  '💾 Simpan Perubahan'
+                ) : (
+                  '➕ Tambah Jadwal'
+                )}
               </Button>
             </div>
           </form>

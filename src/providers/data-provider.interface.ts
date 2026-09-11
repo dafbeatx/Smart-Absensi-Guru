@@ -14,6 +14,9 @@ import type {
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
   TeachingSlot,
+  CreateTeachingScheduleDTO,
+  UpdateTeachingScheduleDTO,
+  TeachingScheduleResult,
   StudentItem,
   StudentAttendanceRecord,
   StudentBehaviorRecord,
@@ -102,8 +105,14 @@ export interface IDataProvider {
   updateComplaintStatus(dto: UpdateComplaintStatusDTO, token?: string): Promise<boolean>;
 
   // Teaching Schedules API (Jadwal Mengajar Guru)
-  getTeachingSchedules(token?: string): Promise<TeachingSlot[]>;
+  getTeachingSchedules(
+    token?: string,
+    filter?: { teacher_user_id?: string; academic_year?: string; day_of_week?: number }
+  ): Promise<TeachingSlot[]>;
   saveTeachingSchedules(schedules: TeachingSlot[], token?: string): Promise<boolean>;
+  createTeachingSchedule(dto: CreateTeachingScheduleDTO, token?: string): Promise<TeachingScheduleResult>;
+  updateTeachingSchedule(dto: UpdateTeachingScheduleDTO, token?: string): Promise<TeachingScheduleResult>;
+  deleteTeachingSchedule(id: string, token?: string): Promise<boolean>;
 
   // Student Directory & RFID Attendance API (Direktori Siswa & Absensi RFID)
   getStudents(token?: string): Promise<StudentItem[]>;

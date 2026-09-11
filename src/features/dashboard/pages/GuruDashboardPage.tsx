@@ -111,6 +111,7 @@ import { AttendancePolicyAgreementModal } from '../../guru/components/Attendance
 import { AttendancePolicyService } from '../../../services/attendance-policy.service';
 import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
+import { normalizeDayOfWeek } from '../../../utils/teaching-schedule.utils';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -1444,7 +1445,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       smartAlarmStatus.minutesUntilNext !== undefined &&
       smartAlarmStatus.minutesUntilNext <= 10
     ) {
-      const slotKey = `${smartAlarmStatus.upcomingSlot.id}-${smartAlarmStatus.upcomingSlot.day}-${smartAlarmStatus.minutesUntilNext}`;
+      const todayDateStr = getTodayDateInJakarta();
+      const slotKey = `${smartAlarmStatus.upcomingSlot.id}_${todayDateStr}_UPCOMING_10MIN`;
       if (lastChimedSlotKeyRef.current !== slotKey) {
         lastChimedSlotKeyRef.current = slotKey;
         SoundService.playNotificationChime();
@@ -2588,9 +2590,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             {(() => {
               const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
               const todayDayName = dayNames[new Date().getDay()];
-              const normalizeDay = (d?: string) => (d || '').toLowerCase().replace(/['`’]/g, '').trim();
-              const todayDayNorm = normalizeDay(todayDayName);
-              const todaySlots = teachingSlots.filter((s) => s && normalizeDay(s.day) === todayDayNorm);
+              const targetDayNum = normalizeDayOfWeek(todayDayName);
+              const todaySlots = teachingSlots.filter((s) => {
+                if (!s || s.is_active === false) return false;
+                const slotDay = normalizeDayOfWeek(s.day_of_week !== undefined ? s.day_of_week : s.day);
+                return slotDay === targetDayNum;
+              });
 
               let activeOrNextSlot = todaySlots.find((s) => {
                 const status = getSlotLiveStatus(s.time, currentTime);

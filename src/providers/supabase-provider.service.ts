@@ -19,6 +19,9 @@ import type {
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
   TeachingSlot,
+  CreateTeachingScheduleDTO,
+  UpdateTeachingScheduleDTO,
+  TeachingScheduleResult,
   StudentItem,
   StudentAttendanceRecord,
   StudentBehaviorRecord,
@@ -51,6 +54,14 @@ import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
 import { logger } from '../utils/logger.utils';
 import { convertToWebP } from '../utils/image.utils';
+import {
+  normalizeDayOfWeek,
+  getDayNameIndonesian,
+  parseScheduleTime,
+  formatTimeRange,
+  validateScheduleConflict,
+  sortTeachingSlots,
+} from '../utils/teaching-schedule.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -2335,34 +2346,310 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   // ── TEACHING SCHEDULES API ────────────────────────────────────────────────
-  public async getTeachingSchedules(_token?: string): Promise<TeachingSlot[]> {
+  private mapDbRowToTeachingSlot(row: any): TeachingSlot {
+    const dayOfWeek = row.day_of_week !== undefined && row.day_of_week !== null
+      ? row.day_of_week
+      : normalizeDayOfWeek(row.day);
+    const day = row.day || getDayNameIndonesian(dayOfWeek);
+    const startTime = row.start_time || parseScheduleTime(row.time)?.startTime || '07:00';
+    const endTime = row.end_time || parseScheduleTime(row.time)?.endTime || '08:00';
+    const time = row.time || formatTimeRange(startTime, endTime);
+    const teacherId = row.teacher_user_id || row.user_id;
+
+    return {
+      id: row.id,
+      user_id: teacherId,
+      teacher_user_id: teacherId,
+      teacher_name: row.teacher_name || (row.users ? row.users.name : undefined) || 'Guru',
+      day_of_week: dayOfWeek,
+      day,
+      start_time: startTime,
+      end_time: endTime,
+      time,
+      className: row.class_name || '',
+      class_name: row.class_name || '',
+      subject: row.subject || '',
+      room: row.room || '',
+      academic_year: row.academic_year || '2024/2025',
+      is_active: row.is_active ?? true,
+      version: row.version ?? 1,
+      effective_from: row.effective_from,
+      effective_until: row.effective_until,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      created_by: row.created_by,
+      updated_by: row.updated_by,
+    };
+  }
+
+  public async getTeachingSchedules(
+    _token?: string,
+    filter?: { teacher_user_id?: string; academic_year?: string; day_of_week?: number }
+  ): Promise<TeachingSlot[]> {
     try {
-      const { data, error } = await this.client
+      let query = this.client
         .from('teaching_schedules')
-        .select('*')
-        .order('day', { ascending: true });
+        .select('*, users:teacher_user_id(id, name)')
+        .eq('is_active', true);
+
+      if (filter?.teacher_user_id) {
+        query = query.or(`teacher_user_id.eq.${filter.teacher_user_id},user_id.eq.${filter.teacher_user_id}`);
+      }
+      if (filter?.academic_year) {
+        query = query.eq('academic_year', filter.academic_year);
+      }
+      if (filter?.day_of_week !== undefined) {
+        query = query.eq('day_of_week', filter.day_of_week);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
-        logger.warn('SupabaseProvider', 'getTeachingSchedules Supabase query error, fallback to local storage:', error.message);
-      } else if (data && data.length > 0) {
-        return (data as any[]).map((row) => ({
-          id: row.id,
-          user_id: row.user_id,
-          teacher_name: row.teacher_name,
-          day: row.day,
-          time: row.time,
-          className: row.class_name,
-          subject: row.subject,
-          room: row.room,
-          created_at: row.created_at,
-        }));
+        logger.warn('SupabaseProvider', 'getTeachingSchedules joined query error, fallback select:', error.message);
+        let fallbackQuery = this.client.from('teaching_schedules').select('*');
+        if (filter?.teacher_user_id) {
+          fallbackQuery = fallbackQuery.or(`teacher_user_id.eq.${filter.teacher_user_id},user_id.eq.${filter.teacher_user_id}`);
+        }
+        const fallbackRes = await fallbackQuery;
+        if (fallbackRes.error) {
+          logger.warn('SupabaseProvider', 'getTeachingSchedules fallback query error:', fallbackRes.error.message);
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          return mockProv.getTeachingSchedules(_token, filter);
+        }
+        // Honest data state: empty array is valid, do not fall back to mock data
+        const mapped = (fallbackRes.data || []).map((row: any) => this.mapDbRowToTeachingSlot(row));
+        return sortTeachingSlots(mapped);
       }
+
+      // Honest data state: if query succeeded, return mapped records (even if empty [])
+      const mapped = (data || []).map((row: any) => this.mapDbRowToTeachingSlot(row));
+      return sortTeachingSlots(mapped);
     } catch (err) {
       logger.warn('SupabaseProvider', 'getTeachingSchedules DB exception:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getTeachingSchedules(_token, filter);
     }
+  }
 
-    const mockProv = new (await import('./mock-provider.service')).MockProvider();
-    return mockProv.getTeachingSchedules();
+  public async createTeachingSchedule(
+    dto: CreateTeachingScheduleDTO,
+    _token?: string
+  ): Promise<TeachingScheduleResult> {
+    try {
+      const dayOfWeek = normalizeDayOfWeek(dto.day_of_week !== undefined ? dto.day_of_week : dto.day);
+      const dayName = dto.day || getDayNameIndonesian(dayOfWeek);
+      const timeRange = formatTimeRange(dto.start_time, dto.end_time);
+
+      // Pre-validate schedule conflicts
+      const existing = await this.getTeachingSchedules(_token, {
+        academic_year: dto.academic_year || '2024/2025',
+        day_of_week: dayOfWeek,
+      });
+      const conflict = validateScheduleConflict(
+        {
+          teacher_user_id: dto.teacher_user_id,
+          day_of_week: dayOfWeek,
+          start_time: dto.start_time,
+          end_time: dto.end_time,
+          class_name: dto.class_name,
+          room: dto.room,
+          academic_year: dto.academic_year,
+        },
+        existing
+      );
+      if (conflict) {
+        return { success: false, error: conflict.message, conflict };
+      }
+
+      let teacherName = 'Guru';
+      try {
+        const { data: userRow } = await this.client
+          .from('users')
+          .select('name')
+          .eq('id', dto.teacher_user_id)
+          .maybeSingle();
+        if (userRow?.name) teacherName = userRow.name;
+      } catch {
+        // Fallback to default
+      }
+
+      const payload = {
+        teacher_user_id: dto.teacher_user_id,
+        user_id: dto.teacher_user_id,
+        teacher_name: teacherName,
+        day_of_week: dayOfWeek,
+        day: dayName,
+        start_time: dto.start_time,
+        end_time: dto.end_time,
+        time: timeRange,
+        class_name: dto.class_name,
+        subject: dto.subject,
+        room: dto.room,
+        academic_year: dto.academic_year || '2024/2025',
+        is_active: dto.is_active ?? true,
+        version: 1,
+        effective_from: dto.effective_from || null,
+        effective_until: dto.effective_until || null,
+      };
+
+      const { data, error } = await this.client
+        .from('teaching_schedules')
+        .insert([payload])
+        .select('*')
+        .single();
+
+      if (error) {
+        logger.error('SupabaseProvider', 'createTeachingSchedule insert failed:', error.message);
+        return { success: false, error: error.message };
+      }
+
+      const created = this.mapDbRowToTeachingSlot(data);
+
+      try {
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        await mockProv.createTeachingSchedule(dto);
+      } catch {
+        // Ignore mock sync error
+      }
+
+      return { success: true, data: created };
+    } catch (err: any) {
+      logger.error('SupabaseProvider', 'createTeachingSchedule exception:', err);
+      return { success: false, error: err?.message || 'Gagal menambahkan jadwal' };
+    }
+  }
+
+  public async updateTeachingSchedule(
+    dto: UpdateTeachingScheduleDTO,
+    _token?: string
+  ): Promise<TeachingScheduleResult> {
+    try {
+      const { data: existingRow, error: fetchErr } = await this.client
+        .from('teaching_schedules')
+        .select('*')
+        .eq('id', dto.id)
+        .maybeSingle();
+
+      if (fetchErr || !existingRow) {
+        return { success: false, error: 'Jadwal tidak ditemukan di database.' };
+      }
+
+      // Optimistic concurrency check
+      if (dto.version !== undefined && existingRow.version !== undefined && existingRow.version !== dto.version) {
+        return {
+          success: false,
+          error: 'Konflik versi: Jadwal telah diubah oleh operator lain. Silakan muat ulang halaman.',
+        };
+      }
+
+      const teacherUserId = dto.teacher_user_id || existingRow.teacher_user_id || existingRow.user_id;
+      const dayOfWeek = normalizeDayOfWeek(
+        dto.day_of_week !== undefined
+          ? dto.day_of_week
+          : (dto.day || existingRow.day_of_week || existingRow.day)
+      );
+      const dayName = dto.day || getDayNameIndonesian(dayOfWeek);
+      const startTime = dto.start_time || existingRow.start_time || parseScheduleTime(existingRow.time)?.startTime || '07:00';
+      const endTime = dto.end_time || existingRow.end_time || parseScheduleTime(existingRow.time)?.endTime || '08:00';
+      const className = dto.class_name || existingRow.class_name;
+      const room = dto.room !== undefined ? dto.room : existingRow.room;
+      const academicYear = dto.academic_year || existingRow.academic_year || '2024/2025';
+
+      // Conflict validation (ignoring current id)
+      const allSchedules = await this.getTeachingSchedules(_token, {
+        academic_year: academicYear,
+        day_of_week: dayOfWeek,
+      });
+      const conflict = validateScheduleConflict(
+        {
+          id: dto.id,
+          teacher_user_id: teacherUserId,
+          day_of_week: dayOfWeek,
+          start_time: startTime,
+          end_time: endTime,
+          class_name: className,
+          room,
+          academic_year: academicYear,
+        },
+        allSchedules
+      );
+
+      if (conflict) {
+        return { success: false, error: conflict.message, conflict };
+      }
+
+      const nextVersion = (existingRow.version || 1) + 1;
+      const updatePayload: Record<string, any> = {
+        teacher_user_id: teacherUserId,
+        user_id: teacherUserId,
+        day_of_week: dayOfWeek,
+        day: dayName,
+        start_time: startTime,
+        end_time: endTime,
+        time: formatTimeRange(startTime, endTime),
+        class_name: className,
+        subject: dto.subject !== undefined ? dto.subject : existingRow.subject,
+        room,
+        academic_year: academicYear,
+        is_active: dto.is_active !== undefined ? dto.is_active : existingRow.is_active,
+        version: nextVersion,
+        updated_at: new Date().toISOString(),
+      };
+      if (dto.effective_from !== undefined) updatePayload.effective_from = dto.effective_from;
+      if (dto.effective_until !== undefined) updatePayload.effective_until = dto.effective_until;
+
+      const { data: updatedRow, error: updateErr } = await this.client
+        .from('teaching_schedules')
+        .update(updatePayload)
+        .eq('id', dto.id)
+        .select('*')
+        .single();
+
+      if (updateErr) {
+        logger.error('SupabaseProvider', 'updateTeachingSchedule update failed:', updateErr.message);
+        return { success: false, error: updateErr.message };
+      }
+
+      const updated = this.mapDbRowToTeachingSlot(updatedRow);
+
+      try {
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        await mockProv.updateTeachingSchedule(dto);
+      } catch {
+        // Ignore mock sync error
+      }
+
+      return { success: true, data: updated };
+    } catch (err: any) {
+      logger.error('SupabaseProvider', 'updateTeachingSchedule exception:', err);
+      return { success: false, error: err?.message || 'Gagal memperbarui jadwal' };
+    }
+  }
+
+  public async deleteTeachingSchedule(id: string, _token?: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('teaching_schedules')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        logger.error('SupabaseProvider', 'deleteTeachingSchedule error:', error.message);
+        return false;
+      }
+
+      try {
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        await mockProv.deleteTeachingSchedule(id);
+      } catch {
+        // Ignore
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'deleteTeachingSchedule exception:', err);
+      return false;
+    }
   }
 
   public async saveTeachingSchedules(
@@ -2370,38 +2657,48 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<boolean> {
     try {
-      const dbRows = schedules.map((s) => ({
-        user_id: s.user_id || 'UNKNOWN',
-        teacher_name: s.teacher_name || 'Guru',
-        day: s.day,
-        time: s.time,
-        class_name: s.className,
-        subject: s.subject,
-        room: s.room,
-      }));
+      const currentList = await this.getTeachingSchedules(_token);
+      const currentMap = new Map(currentList.map((s) => [s.id, s]));
 
-      // Clear existing records and insert current schedules
-      await this.client
-        .from('teaching_schedules')
-        .delete()
-        .neq('day', '__CLEAR_ALL_RECORDS__');
+      for (const s of schedules) {
+        const parsedTime = parseScheduleTime(s.time);
+        const startTime = s.start_time || parsedTime?.startTime || '07:00';
+        const endTime = s.end_time || parsedTime?.endTime || '08:00';
+        const dayOfWeek = normalizeDayOfWeek(s.day_of_week !== undefined ? s.day_of_week : s.day);
+        const dayName = s.day || getDayNameIndonesian(dayOfWeek);
 
-      if (dbRows.length > 0) {
-        const { error: insertErr } = await this.client
-          .from('teaching_schedules')
-          .insert(dbRows);
+        const dbRow = {
+          teacher_user_id: s.teacher_user_id || s.user_id || 'UNKNOWN',
+          user_id: s.teacher_user_id || s.user_id || 'UNKNOWN',
+          teacher_name: s.teacher_name || 'Guru',
+          day_of_week: dayOfWeek,
+          day: dayName,
+          start_time: startTime,
+          end_time: endTime,
+          time: formatTimeRange(startTime, endTime),
+          class_name: s.className || s.class_name,
+          subject: s.subject,
+          room: s.room,
+          academic_year: s.academic_year || '2024/2025',
+          is_active: s.is_active ?? true,
+          version: s.version || 1,
+        };
 
-        if (insertErr) {
-          logger.warn('SupabaseProvider', 'saveTeachingSchedules insert error:', insertErr.message);
+        if (s.id && currentMap.has(s.id)) {
+          await this.client.from('teaching_schedules').update(dbRow).eq('id', s.id);
+        } else {
+          await this.client.from('teaching_schedules').insert([dbRow]);
         }
       }
+
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      await mockProv.saveTeachingSchedules(schedules);
+      return true;
     } catch (err) {
       logger.warn('SupabaseProvider', 'saveTeachingSchedules DB exception:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.saveTeachingSchedules(schedules);
     }
-
-    // Always update local cache
-    const mockProv = new (await import('./mock-provider.service')).MockProvider();
-    return mockProv.saveTeachingSchedules(schedules);
   }
 
   // ── STUDENT DIRECTORY & RFID ATTENDANCE API ──────────────────────────────

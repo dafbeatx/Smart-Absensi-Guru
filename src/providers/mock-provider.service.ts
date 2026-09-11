@@ -17,6 +17,9 @@ import type {
   SubmitComplaintDTO,
   UpdateComplaintStatusDTO,
   TeachingSlot,
+  CreateTeachingScheduleDTO,
+  UpdateTeachingScheduleDTO,
+  TeachingScheduleResult,
   StudentItem,
   StudentAttendanceRecord,
   StudentBehaviorRecord,
@@ -41,6 +44,14 @@ import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
 import { NotificationService } from '../services/notification-permission.service';
 import { getTodayDateInJakarta, getCurrentTimeInJakarta, timeToMinutes, generatePaydayEventsForYear } from '../utils/time.utils';
+import {
+  normalizeDayOfWeek,
+  getDayNameIndonesian,
+  parseScheduleTime,
+  formatTimeRange,
+  validateScheduleConflict,
+  sortTeachingSlots,
+} from '../utils/teaching-schedule.utils';
 
 const memoryStore = new Map<string, string>();
 
@@ -1672,15 +1683,205 @@ export class MockProvider implements IDataProvider {
   }
 
   // ── TEACHING SCHEDULES API ────────────────────────────────────────────────
-  public async getTeachingSchedules(_token?: string): Promise<TeachingSlot[]> {
+  public async getTeachingSchedules(
+    _token?: string,
+    filter?: { teacher_user_id?: string; academic_year?: string; day_of_week?: number }
+  ): Promise<TeachingSlot[]> {
     const raw = safeGetStorage('smart_absensi_teaching_schedules');
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
+    let list: TeachingSlot[] = [];
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        list = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        list = [];
+      }
     }
+
+    let filtered = list.map((slot) => {
+      const dayOfWeek = normalizeDayOfWeek(slot.day_of_week !== undefined ? slot.day_of_week : slot.day);
+      const day = slot.day || getDayNameIndonesian(dayOfWeek);
+      const startTime = slot.start_time || parseScheduleTime(slot.time)?.startTime || '07:00';
+      const endTime = slot.end_time || parseScheduleTime(slot.time)?.endTime || '08:00';
+      const time = slot.time || formatTimeRange(startTime, endTime);
+      const teacherId = slot.teacher_user_id || slot.user_id;
+
+      return {
+        ...slot,
+        user_id: teacherId,
+        teacher_user_id: teacherId,
+        day_of_week: dayOfWeek,
+        day,
+        start_time: startTime,
+        end_time: endTime,
+        time,
+        className: slot.className || slot.class_name || '',
+        class_name: slot.class_name || slot.className || '',
+        academic_year: slot.academic_year || '2024/2025',
+        is_active: slot.is_active ?? true,
+        version: slot.version || 1,
+      };
+    });
+
+    // Apply active filter
+    filtered = filtered.filter((s) => s.is_active !== false);
+
+    if (filter?.teacher_user_id) {
+      filtered = filtered.filter(
+        (s) => s.teacher_user_id === filter.teacher_user_id || s.user_id === filter.teacher_user_id
+      );
+    }
+    if (filter?.academic_year) {
+      filtered = filtered.filter((s) => s.academic_year === filter.academic_year);
+    }
+    if (filter?.day_of_week !== undefined) {
+      filtered = filtered.filter((s) => s.day_of_week === filter.day_of_week);
+    }
+
+    return sortTeachingSlots(filtered);
+  }
+
+  public async createTeachingSchedule(
+    dto: CreateTeachingScheduleDTO,
+    _token?: string
+  ): Promise<TeachingScheduleResult> {
+    const dayOfWeek = normalizeDayOfWeek(dto.day_of_week !== undefined ? dto.day_of_week : dto.day);
+    const dayName = dto.day || getDayNameIndonesian(dayOfWeek);
+    const timeRange = formatTimeRange(dto.start_time, dto.end_time);
+
+    const existing = await this.getTeachingSchedules(_token, {
+      academic_year: dto.academic_year || '2024/2025',
+      day_of_week: dayOfWeek,
+    });
+
+    const conflict = validateScheduleConflict(
+      {
+        teacher_user_id: dto.teacher_user_id,
+        day_of_week: dayOfWeek,
+        start_time: dto.start_time,
+        end_time: dto.end_time,
+        class_name: dto.class_name,
+        room: dto.room,
+        academic_year: dto.academic_year,
+      },
+      existing
+    );
+
+    if (conflict) {
+      return { success: false, error: conflict.message, conflict };
+    }
+
+    const all = await this.getTeachingSchedules(_token);
+    const newSlot: TeachingSlot = {
+      id: `sched_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      user_id: dto.teacher_user_id,
+      teacher_user_id: dto.teacher_user_id,
+      teacher_name: 'Guru',
+      day_of_week: dayOfWeek,
+      day: dayName,
+      start_time: dto.start_time,
+      end_time: dto.end_time,
+      time: timeRange,
+      className: dto.class_name,
+      class_name: dto.class_name,
+      subject: dto.subject,
+      room: dto.room,
+      academic_year: dto.academic_year || '2024/2025',
+      is_active: dto.is_active ?? true,
+      version: 1,
+      effective_from: dto.effective_from,
+      effective_until: dto.effective_until,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    all.push(newSlot);
+    safeSetStorage('smart_absensi_teaching_schedules', JSON.stringify(all));
+
+    return { success: true, data: newSlot };
+  }
+
+  public async updateTeachingSchedule(
+    dto: UpdateTeachingScheduleDTO,
+    _token?: string
+  ): Promise<TeachingScheduleResult> {
+    const all = await this.getTeachingSchedules(_token);
+    const idx = all.findIndex((s) => s.id === dto.id);
+    if (idx === -1) {
+      return { success: false, error: 'Jadwal tidak ditemukan.' };
+    }
+
+    const current = all[idx];
+    if (dto.version !== undefined && current.version !== undefined && current.version !== dto.version) {
+      return {
+        success: false,
+        error: 'Konflik versi: Jadwal telah diubah oleh operator lain. Silakan muat ulang halaman.',
+      };
+    }
+
+    const teacherUserId = dto.teacher_user_id || current.teacher_user_id || current.user_id || '';
+    const dayOfWeek = normalizeDayOfWeek(
+      dto.day_of_week !== undefined
+        ? dto.day_of_week
+        : (dto.day || current.day_of_week || current.day)
+    );
+    const dayName = dto.day || getDayNameIndonesian(dayOfWeek);
+    const startTime = dto.start_time || current.start_time || parseScheduleTime(current.time)?.startTime || '07:00';
+    const endTime = dto.end_time || current.end_time || parseScheduleTime(current.time)?.endTime || '08:00';
+    const className = dto.class_name || current.className || current.class_name || '';
+    const room = dto.room !== undefined ? dto.room : current.room;
+    const academicYear = dto.academic_year || current.academic_year || '2024/2025';
+
+    const conflict = validateScheduleConflict(
+      {
+        id: dto.id,
+        teacher_user_id: teacherUserId,
+        day_of_week: dayOfWeek,
+        start_time: startTime,
+        end_time: endTime,
+        class_name: className,
+        room,
+        academic_year: academicYear,
+      },
+      all
+    );
+
+    if (conflict) {
+      return { success: false, error: conflict.message, conflict };
+    }
+
+    const updated: TeachingSlot = {
+      ...current,
+      user_id: teacherUserId,
+      teacher_user_id: teacherUserId,
+      day_of_week: dayOfWeek,
+      day: dayName,
+      start_time: startTime,
+      end_time: endTime,
+      time: formatTimeRange(startTime, endTime),
+      className,
+      class_name: className,
+      subject: dto.subject !== undefined ? dto.subject : current.subject,
+      room,
+      academic_year: academicYear,
+      is_active: dto.is_active !== undefined ? dto.is_active : current.is_active,
+      version: (current.version || 1) + 1,
+      effective_from: dto.effective_from !== undefined ? dto.effective_from : current.effective_from,
+      effective_until: dto.effective_until !== undefined ? dto.effective_until : current.effective_until,
+      updated_at: new Date().toISOString(),
+    };
+
+    all[idx] = updated;
+    safeSetStorage('smart_absensi_teaching_schedules', JSON.stringify(all));
+
+    return { success: true, data: updated };
+  }
+
+  public async deleteTeachingSchedule(id: string, _token?: string): Promise<boolean> {
+    const all = await this.getTeachingSchedules(_token);
+    const filtered = all.filter((s) => s.id !== id);
+    safeSetStorage('smart_absensi_teaching_schedules', JSON.stringify(filtered));
+    return true;
   }
 
   public async saveTeachingSchedules(

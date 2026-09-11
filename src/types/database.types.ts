@@ -168,13 +168,71 @@ export interface HolidayRecord {
 export interface TeachingSlot {
   id: string;
   user_id?: string;
+  teacher_user_id?: string;
   teacher_name?: string;
+  day_of_week?: number; // 1 = Senin, 2 = Selasa, 3 = Rabu, 4 = Kamis, 5 = Jumat, 6 = Sabtu
   day: string;
+  start_time?: string; // HH:mm
+  end_time?: string;   // HH:mm
   time: string;
   className: string;
+  class_name?: string;
   subject: string;
   room: string;
+  academic_year?: string;
+  is_active?: boolean;
+  version?: number;
+  effective_from?: string;
+  effective_until?: string;
   created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+export interface CreateTeachingScheduleDTO {
+  teacher_user_id: string;
+  day_of_week: number;
+  day?: string;
+  start_time: string;
+  end_time: string;
+  class_name: string;
+  subject: string;
+  room: string;
+  academic_year?: string;
+  is_active?: boolean;
+  effective_from?: string;
+  effective_until?: string;
+}
+
+export interface UpdateTeachingScheduleDTO {
+  id: string;
+  teacher_user_id?: string;
+  day_of_week?: number;
+  day?: string;
+  start_time?: string;
+  end_time?: string;
+  class_name?: string;
+  subject?: string;
+  room?: string;
+  academic_year?: string;
+  is_active?: boolean;
+  version: number;
+  effective_from?: string;
+  effective_until?: string;
+}
+
+export interface TeachingScheduleConflictError {
+  conflict_type: 'TEACHER' | 'CLASS' | 'ROOM';
+  conflicting_schedule: TeachingSlot;
+  message: string;
+}
+
+export interface TeachingScheduleResult<T = TeachingSlot> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  conflict?: TeachingScheduleConflictError;
 }
 
 export type TeacherMoodType = 'VERY_HAPPY' | 'HAPPY' | 'NEUTRAL' | 'TIRED' | 'STRESSED';
