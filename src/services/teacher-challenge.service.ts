@@ -6,6 +6,7 @@ import type {
 } from '../types/database.types';
 import { NotificationService } from './notification-permission.service';
 import { logger } from '../utils/logger.utils';
+import { isDateOffDay, getTomorrowDateInJakarta } from '../utils/time.utils';
 
 export interface TeacherStreakInfo {
   currentStreak: number;
@@ -292,15 +293,52 @@ export class TeacherChallengeService {
   }
 
   /**
+   * Mengecek apakah esok hari (H+1) adalah hari libur di kalender (Sabtu, Minggu, atau Hari Libur Nasional / Kalender Sekolah).
+   */
+  public static isTomorrowOff(
+    settings?: { saturday_is_holiday?: boolean; sunday_is_holiday?: boolean } | null,
+    holidays?: Array<{ date: string; name: string; is_holiday?: boolean; category_type?: string; type?: string }> | null
+  ): boolean {
+    const tomorrowStr = getTomorrowDateInJakarta();
+    return isDateOffDay(tomorrowStr, settings, holidays).isOff;
+  }
+
+  /**
    * Membuat Pesan Motivasi Malam Hari Gaya Duolingo yang hidup, ramah, dan memicu semangat
    */
   public static generateNightlyMotivation(
     user: UserProfile,
     streakInfo: TeacherStreakInfo,
     score: TeacherAppreciationScore,
-    userRank = 1,
+    userRank?: number,
     rivalName?: string
-  ): NightlyMotivationMessage {
+  ): NightlyMotivationMessage;
+  public static generateNightlyMotivation(
+    user: UserProfile,
+    streakInfo: TeacherStreakInfo,
+    score: TeacherAppreciationScore,
+    userRank: number | undefined,
+    rivalName: string | undefined,
+    options: { suppressIfHoliday: boolean; isTomorrowOff?: boolean; settings?: any; holidays?: any }
+  ): NightlyMotivationMessage | null;
+  public static generateNightlyMotivation(
+    user: UserProfile,
+    streakInfo: TeacherStreakInfo,
+    score: TeacherAppreciationScore,
+    userRank = 1,
+    rivalName?: string,
+    options?: {
+      suppressIfHoliday?: boolean;
+      isTomorrowOff?: boolean;
+      settings?: { saturday_is_holiday?: boolean; sunday_is_holiday?: boolean } | null;
+      holidays?: Array<{ date: string; name: string; is_holiday?: boolean; category_type?: string; type?: string }> | null;
+    }
+  ): NightlyMotivationMessage | null {
+    if (options?.suppressIfHoliday) {
+      const isOff = options.isTomorrowOff ?? this.isTomorrowOff(options.settings, options.holidays);
+      if (isOff) return null;
+    }
+
     const firstName = user.full_name?.split(' ')[0] || 'Bapak/Ibu Guru';
 
     // 1. Jika streak sedang tinggi (>= 3 hari)
@@ -354,15 +392,28 @@ export class TeacherChallengeService {
   /**
    * Menjalankan evaluasi notifikasi malam gaya Duolingo (antara pukul 19:00 s/d 22:00 WIB)
    * Menjamin idempotent (hanya muncul 1x dalam 1 malam).
+   * Otomatis membatalkan pengiriman jika esok hari adalah hari libur di kalender.
    */
   public static evaluateNightlyChallengeNotification(
     user: UserProfile | null,
     streakInfo: TeacherStreakInfo,
     score: TeacherAppreciationScore,
     userRank = 1,
-    rivalName?: string
+    rivalName?: string,
+    options?: {
+      isTomorrowOff?: boolean;
+      settings?: { saturday_is_holiday?: boolean; sunday_is_holiday?: boolean } | null;
+      holidays?: Array<{ date: string; name: string; is_holiday?: boolean; category_type?: string; type?: string }> | null;
+    }
   ): void {
     if (!user || typeof window === 'undefined') return;
+
+    // Cek apakah hari esok adalah hari libur (Sabtu, Minggu, atau Hari Libur Nasional / Kalender Sekolah)
+    const isTomorrowOff = options?.isTomorrowOff ?? this.isTomorrowOff(options?.settings, options?.holidays);
+    if (isTomorrowOff) {
+      logger.info('TeacherChallengeService', `Pengingat malam dibatalkan: esok hari adalah hari libur di kalender.`);
+      return;
+    }
 
     const now = new Date();
     const hours = now.getHours();
@@ -380,6 +431,7 @@ export class TeacherChallengeService {
     }
 
     const motivation = this.generateNightlyMotivation(user, streakInfo, score, userRank, rivalName);
+    if (!motivation) return;
 
     // Kirim notifikasi via NotificationService
     try {

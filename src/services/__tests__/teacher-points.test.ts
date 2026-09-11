@@ -11,7 +11,7 @@ import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
 } from '../../utils/teacher-appreciation.utils';
-import { evaluateDisciplinePeriodTiming } from '../../utils/time.utils';
+import { evaluateDisciplinePeriodTiming, getTomorrowDateInJakarta } from '../../utils/time.utils';
 import { generateExcellenceCertificateHTML } from '../../lib/certificate-generator.lib';
 import { GroqAIService } from '../groq-ai.service';
 import type {
@@ -526,6 +526,73 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       'Challenge Engine: generateNightlyMotivation outputs compelling Duolingo-style streak message',
       motivation.title.includes('🔥') && motivation.type === 'STREAK_PRESERVATION' && Boolean(motivation.callToAction),
       `Generated: ${motivation.title} | CallToAction: ${motivation.callToAction}`
+    );
+
+    // 12b. Nightly motivation suppression on holidays / off-days
+    const tomorrowDateStr = getTomorrowDateInJakarta();
+    assert(
+      'Challenge Engine: getTomorrowDateInJakarta returns valid YYYY-MM-DD string',
+      /^\d{4}-\d{2}-\d{2}$/.test(tomorrowDateStr),
+      `Tomorrow date: ${tomorrowDateStr}`
+    );
+
+    // Test with explicit holiday for tomorrow
+    const mockHolidays = [
+      {
+        date: tomorrowDateStr,
+        name: 'Hari Libur Uji Coba',
+        is_holiday: true,
+      },
+    ];
+
+    const isOffTomorrow = TeacherChallengeService.isTomorrowOff(null, mockHolidays);
+    assert(
+      'Challenge Engine: isTomorrowOff returns true when tomorrow is in holiday calendar',
+      isOffTomorrow === true,
+      `isOffTomorrow: ${isOffTomorrow}`
+    );
+
+    // When suppressIfHoliday is active and tomorrow is an off-day, generateNightlyMotivation returns null
+    const suppressedMotivation = TeacherChallengeService.generateNightlyMotivation(
+      testUser,
+      {
+        currentStreak: 5,
+        longestStreak: 5,
+        isStreakActiveToday: true,
+        streakDaysThisWeek: [],
+        streakStatusLabel: '🔥 Streak Mingguan Membara!',
+      },
+      testScore,
+      2,
+      'Widianingsih, S.Si',
+      { suppressIfHoliday: true, isTomorrowOff: true }
+    );
+
+    assert(
+      'Challenge Engine: generateNightlyMotivation returns null when tomorrow is off-day / holiday',
+      suppressedMotivation === null,
+      `Suppressed motivation: ${JSON.stringify(suppressedMotivation)}`
+    );
+
+    // Nightly notification evaluation gracefully skips when tomorrow is holiday
+    TeacherChallengeService.evaluateNightlyChallengeNotification(
+      testUser,
+      {
+        currentStreak: 5,
+        longestStreak: 5,
+        isStreakActiveToday: true,
+        streakDaysThisWeek: [],
+        streakStatusLabel: '🔥 Streak Mingguan Membara!',
+      },
+      testScore,
+      1,
+      undefined,
+      { isTomorrowOff: true }
+    );
+    assert(
+      'Challenge Engine: evaluateNightlyChallengeNotification aborts silently without error when tomorrow is holiday',
+      true,
+      'Passed guard'
     );
   } catch (err: unknown) {
     assert('Challenge Engine: generateNightlyMotivation', false, String(err));

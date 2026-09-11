@@ -74,7 +74,7 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
-import { isDateOffDay, getTodayDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays, getPaydayReminderInfo, evaluateDisciplinePeriodTiming } from '../../../utils/time.utils';
+import { isDateOffDay, getTodayDateInJakarta, getTomorrowDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays, getPaydayReminderInfo, evaluateDisciplinePeriodTiming } from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
@@ -530,6 +530,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   // Check if today is a non-working day (Weekend or Holiday)
   const isTodayOff = isDateOffDay(new Date(), settings, todayHoliday ? [todayHoliday] : allHolidays);
+
+  // Check if tomorrow is a non-working day (Weekend or Holiday)
+  const isTomorrowOff = useMemo(() => {
+    const tomorrowStr = getTomorrowDateInJakarta();
+    return isDateOffDay(tomorrowStr, settings, allHolidays).isOff;
+  }, [settings, allHolidays]);
 
   // Indonesian Voice Announcement Initial Welcome Greeting Trigger
   const hasGreetedRef = React.useRef<boolean>(false);
@@ -1397,6 +1403,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, []);
 
   const nightlyMotivation = useMemo(() => {
+    if (isTomorrowOff) return null;
     const rival = disciplineLeaderboard.leaderboard.find((t) => t.rank === 1 && !t.isCurrentUser);
     return TeacherChallengeService.generateNightlyMotivation(
       effectiveUser,
@@ -1405,20 +1412,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       disciplineLeaderboard.currentUserRank,
       rival?.name
     );
-  }, [effectiveUser, streakInfo, appreciationScore, disciplineLeaderboard]);
+  }, [isTomorrowOff, effectiveUser, streakInfo, appreciationScore, disciplineLeaderboard]);
 
   // Evaluasi Pengiriman Notifikasi Malam Gaya Duolingo (Pukul 18:30 - 22:30 WIB)
   useEffect(() => {
-    if (!effectiveUser?.id) return;
+    if (!effectiveUser?.id || isTomorrowOff) return;
     const rival = disciplineLeaderboard.leaderboard.find((t) => t.rank === 1 && !t.isCurrentUser);
     TeacherChallengeService.evaluateNightlyChallengeNotification(
       effectiveUser,
       streakInfo,
       appreciationScore,
       disciplineLeaderboard.currentUserRank,
-      rival?.name
+      rival?.name,
+      { isTomorrowOff, settings, holidays: allHolidays }
     );
-  }, [effectiveUser?.id, streakInfo, appreciationScore, disciplineLeaderboard]);
+  }, [effectiveUser?.id, isTomorrowOff, streakInfo, appreciationScore, disciplineLeaderboard, settings, allHolidays]);
 
   // Auto-open modal jika dibuka dari link notifikasi PWA (openChallenge=true)
   useEffect(() => {
@@ -3403,6 +3411,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               streakInfo={streakInfo}
               quests={dailyQuests}
               nightlyMotivation={nightlyMotivation}
+              isTomorrowOff={isTomorrowOff}
               onOpenChallengeModal={() => setIsChallengeModalOpen(true)}
               onOpenLeaderboard={() => setIsDisciplineBadgeModalOpen(true)}
               onOpenQuestAction={handleOpenQuestAction}

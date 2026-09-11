@@ -214,6 +214,30 @@ export function getCurrentTimeInJakarta(timeZone: string = 'Asia/Jakarta'): stri
 }
 
 /**
+ * Returns tomorrow's date string formatted as "YYYY-MM-DD" strictly in Asia/Jakarta timezone (WIB/GMT+7).
+ */
+export function getTomorrowDateInJakarta(timeZone: string = 'Asia/Jakarta'): string {
+  try {
+    const todayStr = getTodayDateInJakarta(undefined, timeZone);
+    const parts = todayStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      const tomorrow = new Date(y, m - 1, d + 1);
+      return `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    }
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().substring(0, 10);
+  } catch {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().substring(0, 10);
+  }
+}
+
+/**
  * Checks if a given date (or date string YYYY-MM-DD / Date object) is a non-working day (Weekend or Holiday)
  * based on system settings and holiday records.
  */

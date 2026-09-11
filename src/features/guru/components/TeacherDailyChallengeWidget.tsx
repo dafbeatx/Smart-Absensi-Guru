@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import type { TeacherStreakInfo, TeacherDailyQuest, NightlyMotivationMessage } from '../../../services/teacher-challenge.service';
 import { CheckCircle2, Circle, Trophy, ChevronRight, Moon, Sparkles } from 'lucide-react';
+import { isDateOffDay, getTomorrowDateInJakarta } from '../../../utils/time.utils';
 
 interface TeacherDailyChallengeWidgetProps {
   streakInfo: TeacherStreakInfo;
   quests: TeacherDailyQuest[];
-  nightlyMotivation?: NightlyMotivationMessage;
+  nightlyMotivation?: NightlyMotivationMessage | null;
   onOpenChallengeModal: () => void;
   onOpenLeaderboard: () => void;
   onOpenQuestAction?: (actionType: 'MOOD' | 'COMPLAINT' | 'MERIT' | 'DEMERIT') => void;
   userRank?: number;
   totalPoints?: number;
+  isTomorrowOff?: boolean;
 }
 
 export const TeacherDailyChallengeWidget: React.FC<TeacherDailyChallengeWidgetProps> = ({
@@ -22,6 +24,7 @@ export const TeacherDailyChallengeWidget: React.FC<TeacherDailyChallengeWidgetPr
   onOpenQuestAction,
   userRank = 1,
   totalPoints = 0,
+  isTomorrowOff,
 }) => {
   const [isDismissedNightly, setIsDismissedNightly] = useState(false);
 
@@ -31,6 +34,15 @@ export const TeacherDailyChallengeWidget: React.FC<TeacherDailyChallengeWidgetPr
 
   // Cek apakah waktu saat ini adalah sore/malam hari (≥ 18:00 WIB)
   const isNightTime = typeof window !== 'undefined' ? new Date().getHours() >= 18 || new Date().getHours() <= 5 : false;
+
+  // Cek apakah hari esok adalah hari libur (Sabtu, Minggu, atau kalender libur sekolah)
+  const isTomorrowHoliday = typeof isTomorrowOff === 'boolean'
+    ? isTomorrowOff
+    : (() => {
+        if (typeof window === 'undefined') return false;
+        const tomorrowStr = getTomorrowDateInJakarta();
+        return isDateOffDay(tomorrowStr).isOff;
+      })();
 
   return (
     <div className="rounded-2xl sm:rounded-3xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden transition-all duration-200 hover:shadow-xs">
@@ -97,8 +109,8 @@ export const TeacherDailyChallengeWidget: React.FC<TeacherDailyChallengeWidgetPr
         </div>
       </div>
 
-      {/* ── Nightly Duolingo-Style Motivation Callout (Aktif Saat Malam) ──────── */}
-      {isNightTime && nightlyMotivation && !isDismissedNightly && (
+      {/* ── Nightly Duolingo-Style Motivation Callout (Aktif Saat Malam & Bukan Menjelang Hari Libur) ──────── */}
+      {isNightTime && nightlyMotivation && !isDismissedNightly && !isTomorrowHoliday && (
         <div className="m-3 sm:m-3.5 p-3 rounded-2xl bg-linear-to-r from-amber-500/10 via-amber-50 to-orange-50 border border-amber-200/90 flex items-start gap-2.5 relative animate-fade-in">
           <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-300 flex items-center justify-center text-base shrink-0">
             <span>{nightlyMotivation.icon || '🦉'}</span>
