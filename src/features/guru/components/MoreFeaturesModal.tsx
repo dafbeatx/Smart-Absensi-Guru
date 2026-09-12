@@ -1,6 +1,7 @@
 import React from 'react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
+import { WebTrafficService } from '../../../services/web-traffic.service';
 
 interface MoreFeaturesModalProps {
   isOpen: boolean;
@@ -81,6 +82,15 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           icon: '📝',
           action: () => {
             onClose();
+            WebTrafficService.recordVisit({
+              user_id: user.id,
+              user_name: user.full_name,
+              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
+              user_role: user.role || 'GURU',
+              website_name: 'Koreksi Soal & Input Nilai Siswa',
+              url: 'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/',
+              category: 'PENILAIAN_RAPOR',
+            });
             window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
           },
         },
@@ -168,6 +178,87 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
               },
             ]
           : []),
+      ],
+    },
+    {
+      category: 'Portal & Referensi Web Guru',
+      items: [
+        {
+          id: 'web_pmm',
+          title: 'Platform Merdeka Mengajar (PMM)',
+          subtitle: 'Perangkat ajar kurikulum merdeka & pelatihan mandiri',
+          icon: '🇮🇩',
+          action: () => {
+            onClose();
+            WebTrafficService.recordVisit({
+              user_id: user.id,
+              user_name: user.full_name,
+              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
+              user_role: user.role || 'GURU',
+              website_name: 'Platform Merdeka Mengajar (PMM)',
+              url: 'https://guru.kemdikbud.go.id/',
+              category: 'KURIKULUM_PMM',
+            });
+            window.open('https://guru.kemdikbud.go.id/', '_blank', 'noopener,noreferrer');
+          },
+        },
+        {
+          id: 'web_canva',
+          title: 'Canva untuk Pendidikan',
+          subtitle: 'Desain slide materi KBM, infografis & lembar kerja siswa',
+          icon: '🎨',
+          action: () => {
+            onClose();
+            WebTrafficService.recordVisit({
+              user_id: user.id,
+              user_name: user.full_name,
+              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
+              user_role: user.role || 'GURU',
+              website_name: 'Canva untuk Pendidikan',
+              url: 'https://www.canva.com/education/',
+              category: 'MEDIA_KBM',
+            });
+            window.open('https://www.canva.com/education/', '_blank', 'noopener,noreferrer');
+          },
+        },
+        {
+          id: 'web_classroom',
+          title: 'Google Classroom',
+          subtitle: 'Manajemen tugas daring, materi, dan diskusi kelas',
+          icon: '📚',
+          action: () => {
+            onClose();
+            WebTrafficService.recordVisit({
+              user_id: user.id,
+              user_name: user.full_name,
+              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
+              user_role: user.role || 'GURU',
+              website_name: 'Google Classroom',
+              url: 'https://classroom.google.com/',
+              category: 'KURIKULUM_PMM',
+            });
+            window.open('https://classroom.google.com/', '_blank', 'noopener,noreferrer');
+          },
+        },
+        {
+          id: 'web_quizizz',
+          title: 'Quizizz Belajar Interaktif',
+          subtitle: 'Kuis interaktif gamifikasi dan asesmen cepat siswa',
+          icon: '⚡',
+          action: () => {
+            onClose();
+            WebTrafficService.recordVisit({
+              user_id: user.id,
+              user_name: user.full_name,
+              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
+              user_role: user.role || 'GURU',
+              website_name: 'Quizizz Belajar Interaktif',
+              url: 'https://quizizz.com/',
+              category: 'MEDIA_KBM',
+            });
+            window.open('https://quizizz.com/', '_blank', 'noopener,noreferrer');
+          },
+        },
       ],
     },
     {

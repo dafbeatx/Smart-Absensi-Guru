@@ -12,6 +12,7 @@ import { StudentManagement } from '../components/StudentManagement';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
+import { TeacherWebTrafficView } from '../components/TeacherWebTrafficView';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { DailyAttendanceTracker } from '../components/DailyAttendanceTracker';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
@@ -420,6 +421,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       badgeVariant: 'RED',
     },
     {
+      id: 'TRAFFIC',
+      label: 'Trafik Web Guru',
+      icon: '🌐',
+    },
+    {
       id: 'TEACHERS',
       label: 'Manajemen Guru & Staf',
       icon: '👥',
@@ -576,6 +582,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 <PendingApprovalWidget requests={allLeaves.length > 0 ? allLeaves : pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
               </div>
             </div>
+          )}
+
+          {/* TAB: TRAFIK & MONITORING WEB GURU */}
+          {activeTab === 'TRAFFIC' && (
+            <TeacherWebTrafficView
+              teachers={teachers}
+              onBackToDashboard={() => setActiveTab('DASHBOARD')}
+            />
           )}
 
           {/* TAB 3: ACCOUNT APPLICATIONS / TEACHERS */}

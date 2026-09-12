@@ -21,6 +21,7 @@ import { runSarprasInventoryTestSuite } from './__tests__/sarpras-inventory.test
 import { runStudentBehaviorIntegrityTestSuite } from './__tests__/student-behavior-integrity.test';
 import { runTeachingScheduleOverhaulTestSuite } from './__tests__/teaching-schedule-overhaul.test';
 import { runNotificationRealtimeReadStateTestSuite } from './__tests__/notification-realtime-read-state.test';
+import { runWebTrafficTestSuite } from './__tests__/web-traffic.test';
 
 export interface TestResultItem {
   testName: string;
@@ -79,6 +80,7 @@ export class MasterTestRunner {
       { name: 'Student Behavior & Character Points Integrity Engine', fn: runStudentBehaviorIntegrityTestSuite },
       { name: 'Teaching Schedule Relational Overhaul & Smart Class Alarm', fn: runTeachingScheduleOverhaulTestSuite },
       { name: 'Notification Real-time & Read-State Overhaul Engine', fn: runNotificationRealtimeReadStateTestSuite },
+      { name: 'Web Traffic & Educational Activity Tracker', fn: runWebTrafficTestSuite },
     ];
 
     let totalPassed = 0;

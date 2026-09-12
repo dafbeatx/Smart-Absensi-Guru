@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { UserProfile } from '../../../types/database.types';
+import { WebTrafficService } from '../../../services/web-traffic.service';
 
 interface TeachingMaterialsModalProps {
   isOpen: boolean;
@@ -229,6 +230,17 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
                         href={m.fileUrl}
                         target="_blank"
                         rel="noreferrer"
+                        onClick={() => {
+                          WebTrafficService.recordVisit({
+                            user_id: user.id,
+                            user_name: user.full_name,
+                            user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
+                            user_role: user.role || 'GURU',
+                            website_name: m.title,
+                            url: m.fileUrl,
+                            category: 'REFERENSI',
+                          });
+                        }}
                         className="px-2.5 py-1 bg-violet-50 text-violet-800 hover:bg-violet-100 font-extrabold rounded-lg border border-violet-200 flex items-center gap-1 cursor-pointer"
                       >
                         <span>Buka Bahan ↗</span>

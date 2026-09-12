@@ -23,6 +23,7 @@ import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCal
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
 import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
+import { WebTrafficService } from '../../../services/web-traffic.service';
 import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricEnrollmentPromptModal';
 import { StudentBehaviorModal } from '../../guru/components/StudentBehaviorModal';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
@@ -420,6 +421,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         handleOpenCorrectionModal();
         break;
       case 'koreksi_soal':
+        if (effectiveUser) {
+          WebTrafficService.recordVisit({
+            user_id: effectiveUser.id,
+            user_name: effectiveUser.full_name,
+            user_npp: effectiveUser.nip ? `NPP. ${effectiveUser.nip}` : 'NPP. -',
+            user_role: effectiveUser.role || 'GURU',
+            website_name: 'Koreksi Soal & Input Nilai Siswa',
+            url: 'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/',
+            category: 'PENILAIAN_RAPOR',
+          });
+        }
         window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
         break;
       case 'direktori_siswa':
