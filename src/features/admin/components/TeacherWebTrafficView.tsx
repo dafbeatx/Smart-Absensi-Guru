@@ -753,7 +753,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-50 enabled:cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
               >
                 ←
               </button>
@@ -761,7 +761,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-50 enabled:cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
               >
                 →
               </button>
