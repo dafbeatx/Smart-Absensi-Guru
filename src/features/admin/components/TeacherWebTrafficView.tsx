@@ -287,7 +287,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
             {analytics.topWebsite ? analytics.topWebsite.website_name : 'Belum ada data'}
           </p>
           <div className="flex items-center justify-between text-[11px] text-slate-500">
-            <span className="font-mono text-[#287094] truncate max-w-[140px]">{analytics.topWebsite?.domain || '-'}</span>
+            <span className="font-mono text-[#287094] truncate max-w-35">{analytics.topWebsite?.domain || '-'}</span>
             <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
               {analytics.topWebsite ? `${analytics.topWebsite.total_visits}x (${analytics.topWebsite.percentage}%)` : '0x'}
             </span>
@@ -337,14 +337,14 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#D4D4CE]/50 shadow-xs space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Search Input */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative flex-1 min-w-60">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Cari nama guru, NPP, nama website, atau domain..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-slate-50 border border-[#D4D4CE] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#287094] focus:bg-white transition-all text-[#023246]"
+              className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-white border border-[#D4D4CE] rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#287094] transition-all text-[#023246]"
             />
           </div>
 
@@ -704,7 +704,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
                 <div className="pt-2 border-t border-slate-200/80 space-y-1 text-xs">
                   <div className="flex items-center justify-between text-slate-600">
                     <span className="text-slate-400">Situs Terbanyak:</span>
-                    <span className="font-semibold text-[#023246] truncate max-w-[150px]" title={teacherSummary.top_website}>
+                    <span className="font-semibold text-[#023246] truncate max-w-37.5" title={teacherSummary.top_website}>
                       {teacherSummary.top_website}
                     </span>
                   </div>
@@ -753,7 +753,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-50 enabled:cursor-pointer"
               >
                 ←
               </button>
@@ -761,7 +761,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-50 enabled:cursor-pointer"
               >
                 →
               </button>
