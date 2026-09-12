@@ -5,7 +5,6 @@ import { APP_CONFIG } from '../config/app.config';
 import { CONSTANTS } from '../config/constants';
 import { getMonthWorkingDays, parseIndonesianMonth, isDateOffDay, getTodayDateInJakarta } from '../utils/time.utils';
 import type { MonthWorkingDaysInfo } from '../utils/time.utils';
-import { PdfStamperService } from './pdf-stamper.lib';
 
 export const SIGNATORY_OFFICIALS = {
   KEPSEK_NAME: 'Farhan Sopian Sahid, S.Pd.I',
@@ -746,18 +745,20 @@ export class ExcelReportGenerator {
                 </svg>
               </div>
               <div style="color: #475569; font-weight: 600;">No: 421.3/SAG-BOGOR/${parseIndonesianMonth(payload.month)}/${payload.year}</div>
-              <div style="color: #15803d; font-weight: 700; margin-top: 2px;">Terverifikasi Digital & Kriptografis</div>
+              <div style="color: #15803d; font-weight: 700; margin-top: 2px;">TERVERIFIKASI RESMI &amp; Kriptografis</div>
             </div>
 
             <div class="sig-box" style="text-align: center; width: 220px; position: relative;">
               <p style="margin: 0 0 4px 0;">Mengetahui,</p>
               <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</p>
               
-              <!-- Stempel Basah Resmi Overlap -->
+              <!-- Stempel Basah Resmi & Tanda Tangan Asli Kepala Sekolah -->
               <div style="height: 65px; position: relative;">
-                <div style="position: absolute; top: -18px; left: -15px; z-index: 5; pointer-events: none; opacity: 0.92;">
-                  ${PdfStamperService.renderOfficialStampSVG({ size: 105, rotation: -6 })}
-                </div>
+                <img 
+                  src="/stempel-ttd-kepsek-as-salaam.png" 
+                  alt="Stempel & TTD Resmi Kepala Sekolah" 
+                  style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); width: 140px; height: 95px; object-fit: contain; z-index: 5; pointer-events: none; opacity: 0.95;" 
+                />
               </div>
 
               <p style="margin: 0; font-weight: 800; text-decoration: underline; position: relative; z-index: 10;">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</p>
@@ -1161,18 +1162,20 @@ export class ExcelReportGenerator {
               </svg>
             </div>
             <div style="color: #475569; font-weight: 600;">No: 421.3/IND-${teacher.nip || teacher.id.slice(0, 8)}/${monthPrefix}</div>
-            <div style="color: #15803d; font-weight: 700; margin-top: 2px;">Terverifikasi Digital & Kriptografis</div>
+            <div style="color: #15803d; font-weight: 700; margin-top: 2px;">TERVERIFIKASI RESMI &amp; Kriptografis</div>
           </div>
 
           <div class="sig-box" style="text-align: center; width: 220px; position: relative;">
             <p style="margin: 0 0 4px 0;">Mengetahui,</p>
             <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</p>
             
-            <!-- Stempel Basah Resmi Overlap -->
+            <!-- Stempel Basah Resmi & Tanda Tangan Asli Kepala Sekolah -->
             <div style="height: 65px; position: relative;">
-              <div style="position: absolute; top: -18px; left: -15px; z-index: 5; pointer-events: none; opacity: 0.92;">
-                ${PdfStamperService.renderOfficialStampSVG({ size: 105, rotation: -6 })}
-              </div>
+              <img 
+                src="/stempel-ttd-kepsek-as-salaam.png" 
+                alt="Stempel & TTD Resmi Kepala Sekolah" 
+                style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); width: 140px; height: 95px; object-fit: contain; z-index: 5; pointer-events: none; opacity: 0.95;" 
+              />
             </div>
 
             <p style="margin: 0; font-weight: 800; text-decoration: underline; position: relative; z-index: 10;">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</p>

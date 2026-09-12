@@ -362,9 +362,15 @@ export const SarprasExecutiveView: React.FC<SarprasExecutiveViewProps> = ({
             <p>Bogor, ${todayDateFormatted}</p>
             <p style="font-weight: bold; margin: 0;">Mengetahui,</p>
             <p style="color: #64748b; font-size: 10px;">Kepala Sekolah</p>
-            <div style="height: 60px;"></div>
-            <p style="font-weight: bold; text-decoration: underline; margin: 0;">Farhan Sopian Sahid, S.Pd.I</p>
-            <p style="font-size: 11px; margin-top: 2px;">NPP: 198807212015041001</p>
+            <div style="height: 60px; position: relative;">
+              <img 
+                src="/stempel-ttd-kepsek-as-salaam.png" 
+                alt="Stempel & TTD Kepala Sekolah" 
+                style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); height: 75px; object-fit: contain; pointer-events: none;" 
+              />
+            </div>
+            <p style="font-weight: bold; text-decoration: underline; margin: 0; position: relative; z-index: 5;">Farhan Sopian Sahid, S.Pd.I</p>
+            <p style="font-size: 11px; margin-top: 2px; position: relative; z-index: 5;">NPP: 198807212015041001</p>
           </div>
         </div>
       </body>

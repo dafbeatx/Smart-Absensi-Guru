@@ -597,8 +597,8 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
           <div class="cert-signature-col">
             <p class="sig-date">${dateIssued}</p>
             <p class="sig-role">${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</p>
-            <div class="sig-space">
-              <!-- Dikosongkan untuk tanda tangan basah & stempel fisik resmi Kepala Sekolah -->
+            <div class="sig-space" style="position: relative; height: 60px; display: flex; align-items: center; justify-content: center;">
+              <img src="/stempel-ttd-kepsek-as-salaam.png" alt="Stempel & TTD Resmi Kepala Sekolah" style="height: 72px; object-fit: contain; pointer-events: none;" />
             </div>
             <p class="sig-name">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</p>
             <p class="sig-title">NIP. 197805122005011004</p>

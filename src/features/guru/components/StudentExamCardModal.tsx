@@ -547,11 +547,17 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
                   <div className="text-center text-[7px] relative w-24 leading-tight shrink-0">
                     <p className="text-slate-600">Mengetahui,</p>
                     <p className="font-bold text-slate-900">Kepala Sekolah</p>
-                    <div className="h-4"></div>
-                    <p className="font-black text-slate-900 underline truncate">
+                    <div className="h-6 relative">
+                      <img
+                        src="/stempel-ttd-kepsek-as-salaam.png"
+                        alt="Tanda Tangan & Stempel Kepala Sekolah"
+                        className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-16 h-12 object-contain pointer-events-none opacity-95 z-10"
+                      />
+                    </div>
+                    <p className="font-black text-slate-900 underline truncate relative z-20">
                       {SIGNATORY_OFFICIALS.KEPSEK_NAME}
                     </p>
-                    <p className="text-[5.5px] text-slate-500 font-mono">
+                    <p className="text-[5.5px] text-slate-500 font-mono relative z-20">
                       NPP. 197605122005011004
                     </p>
                   </div>

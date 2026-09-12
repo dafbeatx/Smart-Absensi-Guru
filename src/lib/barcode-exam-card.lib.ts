@@ -7,7 +7,6 @@
 
 import JsBarcode from 'jsbarcode';
 import { SIGNATORY_OFFICIALS } from './excel-generator.lib';
-import { PdfStamperService } from './pdf-stamper.lib';
 import { SMP_AL_ITTIHADIYAH_LOGO_BASE64 } from '../assets/logo-smp-terpadu';
 import type { StudentItem } from '../types/database.types';
 
@@ -246,8 +245,6 @@ export class BarcodeExamCardService {
       pages.push(activeStudents.slice(i, i + chunkSize));
     }
 
-    const stampSVG = PdfStamperService.renderOfficialStampSVG({ size: 36, rotation: -6 });
-
     return `
 <!DOCTYPE html>
 <html lang="id">
@@ -468,12 +465,13 @@ export class BarcodeExamCardService {
     }
     .stamp-container {
       position: absolute;
-      top: -4px;
-      left: -6px;
-      width: 36px;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 42px;
       height: 36px;
       pointer-events: none;
-      opacity: 0.82;
+      opacity: 0.95;
       z-index: 10;
     }
     .sig-name {
@@ -628,7 +626,7 @@ export class BarcodeExamCardService {
                     <div>Mengetahui,</div>
                     <div style="font-weight: bold; margin-bottom: 12px;">Kepala Sekolah</div>
                     <div class="stamp-container">
-                      ${stampSVG}
+                      <img src="/stempel-ttd-kepsek-as-salaam.png" alt="Stempel & TTD Kepala Sekolah" style="width: 100%; height: 100%; object-fit: contain;" />
                     </div>
                     <div class="sig-name">${kepsekName}</div>
                     <div style="font-size: 5px; color: #64748b;">NPP. ${kepsekNip}</div>

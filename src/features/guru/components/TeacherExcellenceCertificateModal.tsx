@@ -270,11 +270,13 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
                     {SIGNATORY_OFFICIALS.KEPSEK_TITLE}
                   </p>
 
-                  {/* Ruang Kosong untuk Tanda Tangan Basah & Stempel Fisik */}
-                  <div className="h-12 sm:h-14 my-1 flex items-center justify-center">
-                    <span className="text-[8.5px] sm:text-[9px] text-slate-300 italic font-mono select-none">
-                      (Tanda tangan basah &amp; cap stempel)
-                    </span>
+                  {/* Tanda Tangan & Stempel Resmi Kepala Sekolah */}
+                  <div className="h-12 sm:h-14 my-1 flex items-center justify-center relative">
+                    <img
+                      src="/stempel-ttd-kepsek-as-salaam.png"
+                      alt="Tanda Tangan & Stempel Resmi Kepala Sekolah"
+                      className="h-14 sm:h-16 object-contain pointer-events-none drop-shadow-xs"
+                    />
                   </div>
 
                   <p className="text-[10px] sm:text-xs font-black text-[#023246] underline leading-tight">
