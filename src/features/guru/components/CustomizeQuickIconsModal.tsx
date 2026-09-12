@@ -200,7 +200,7 @@ export const DEFAULT_8_QUICK_ICONS = [
   'izin_cuti',
   'jadwal',
   'rekap',
-  'koreksi',
+  'exam_card',
   'koreksi_soal',
   'direktori_siswa',
   'kalender',
@@ -240,7 +240,7 @@ export const QUICK_ICON_STEPS: QuickIconStep[] = [
     id: 3,
     title: 'Akademik & KBM',
     category: 'Akademik & Nilai',
-    itemIds: ['materials', 'classroom', 'koreksi_soal'], // 3 items
+    itemIds: ['exam_card', 'materials', 'classroom', 'koreksi_soal'], // 4 items
   },
   {
     id: 4,

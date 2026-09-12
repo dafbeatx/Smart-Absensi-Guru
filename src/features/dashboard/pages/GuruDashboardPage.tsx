@@ -369,11 +369,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length === 8) {
+          let updated = parsed;
+          if (!updated.includes('exam_card') && updated.includes('koreksi')) {
+            updated = updated.map((id) => (id === 'koreksi' ? 'exam_card' : id));
+          }
           if (!isUserSarprasOfficer(effectiveUser)) {
             // Guru lain tidak boleh memiliki icon sarpras_inventory
-            return parsed.map((id) => (id === 'sarpras_inventory' ? 'kalender' : id));
+            return updated.map((id) => (id === 'sarpras_inventory' ? 'kalender' : id));
           }
-          return parsed;
+          return updated;
         }
       }
     } catch {
@@ -2605,6 +2609,48 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </button>
               </div>
 
+              {/* 🏷️ Akses Cepat Generator Kartu Peserta Ujian & Barcode Siswa */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (effectiveUser) {
+                      WebTrafficService.recordFeatureVisit({
+                        user_id: effectiveUser.id,
+                        user_name: effectiveUser.full_name,
+                        user_npp: effectiveUser.nip,
+                        user_role: effectiveUser.role,
+                        feature_id: 'exam_card',
+                      });
+                    }
+                    setIsExamCardModalOpen(true);
+                  }}
+                  className="w-full p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-amber-50 to-orange-50/70 hover:from-amber-100/80 hover:to-orange-100/80 active:scale-[0.98] border border-amber-200/90 flex items-center justify-between transition-all cursor-pointer group shadow-2xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-linear-to-br from-amber-600 to-amber-700 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                      <QrCode className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[11px] sm:text-xs font-black text-amber-950 truncate leading-tight">
+                          🏷️ Cetak Kartu Ujian &amp; Barcode Siswa
+                        </p>
+                        <span className="px-1.5 py-0.2 text-[8px] font-black bg-amber-500 text-white rounded-full">
+                          A4
+                        </span>
+                      </div>
+                      <p className="text-[9px] sm:text-[10px] font-semibold text-amber-800/90 truncate">
+                        Format 4 kartu/lembar A4 lengkap barcode NISN &amp; stempel
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-amber-800 group-hover:text-amber-950 shrink-0 px-2 py-1 rounded-lg bg-white/80 border border-amber-200">
+                    Buka →
+                  </span>
+                </button>
+              </div>
+
               {/* Tulisan & Tombol More: Pindah Layer ke Semua Fitur */}
               <div className="pt-2 border-t border-slate-100">
                 <button
@@ -3183,6 +3229,35 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Koreksi Soal
                     </span>
                   </a>
+
+                  {/* Cetak Kartu Peserta Ujian & Barcode Siswa */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (effectiveUser) {
+                        WebTrafficService.recordFeatureVisit({
+                          user_id: effectiveUser.id,
+                          user_name: effectiveUser.full_name,
+                          user_npp: effectiveUser.nip,
+                          user_role: effectiveUser.role,
+                          feature_id: 'exam_card',
+                        });
+                      }
+                      setIsExamCardModalOpen(true);
+                    }}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    title="Cetak Kartu Peserta Ujian & Barcode Siswa (A4)"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-amber-600 to-yellow-800 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <QrCode className="w-6 h-6 stroke-[1.8]" />
+                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                        A4
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-amber-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Kartu Ujian
+                    </span>
+                  </button>
 
                   {/* Poin Kebaikan Siswa */}
                   <button
