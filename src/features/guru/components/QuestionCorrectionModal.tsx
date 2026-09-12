@@ -883,7 +883,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         value={sessionSearchQuery}
                         onChange={(e) => setSessionSearchQuery(e.target.value)}
                         placeholder="Cari sesi ujian, mapel, atau guru..."
-                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl py-2 pl-9 pr-8 text-xs text-white placeholder:text-slate-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
+                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl py-2 pl-9 pr-8 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                       />
                       {sessionSearchQuery && (
                         <button
@@ -1168,7 +1168,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                           value={quickKeyInput}
                           onChange={(e) => setQuickKeyInput(e.target.value)}
                           placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A 6.B ... atau ABCDABCD"
-                          className="grow bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder:text-slate-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50"
+                          className="grow bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/50"
                         />
                         <button
                           type="button"
@@ -1563,7 +1563,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 value={quickKeyInput}
                 onChange={(e) => setQuickKeyInput(e.target.value)}
                 placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D atau ABCDABCD"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-white placeholder:text-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-hidden"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-white focus:ring-2 focus:ring-teal-500/50 focus:outline-hidden"
               />
               <div className="flex items-center justify-between text-[11px] text-slate-400">
                 <span>Terdeteksi: <strong className="text-teal-400">{parseAnswerKey(quickKeyInput).length}</strong> butir soal PG</span>
