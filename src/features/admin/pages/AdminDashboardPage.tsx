@@ -39,6 +39,8 @@ import { useToastStore } from '../../../store/useToastStore';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
 import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
+import { OfflineSyncIndicator } from '../../../components/ui/OfflineSyncIndicator';
+import { OfflineSyncService } from '../../../services/offline-sync.service';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -252,6 +254,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             currentUsersList = fetched;
             setTeachers(fetched);
             localStorage.setItem('smart_absensi_teachers', JSON.stringify(fetched));
+            OfflineSyncService.cacheTeachers(fetched);
             setTeachersSyncStatus('LIVE_SERVER');
           } else {
             const hasCache = !!localStorage.getItem('smart_absensi_teachers');
@@ -820,6 +823,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         isOpen={isPreferencesModalOpen}
         onClose={() => setIsPreferencesModalOpen(false)}
       />
+
+      {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
+      <OfflineSyncIndicator />
     </div>
   );
 };

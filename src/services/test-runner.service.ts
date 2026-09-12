@@ -23,6 +23,7 @@ import { runTeachingScheduleOverhaulTestSuite } from './__tests__/teaching-sched
 import { runNotificationRealtimeReadStateTestSuite } from './__tests__/notification-realtime-read-state.test';
 import { runWebTrafficTestSuite } from './__tests__/web-traffic.test';
 import { runAttendanceReportViewTestSuite } from './__tests__/attendance-report-view.test';
+import { runDexieOfflineSyncTestSuite } from './__tests__/dexie-offline-sync.test';
 
 export interface TestResultItem {
   testName: string;
@@ -83,6 +84,7 @@ export class MasterTestRunner {
       { name: 'Notification Real-time & Read-State Overhaul Engine', fn: runNotificationRealtimeReadStateTestSuite },
       { name: 'Web Traffic & Educational Activity Tracker', fn: runWebTrafficTestSuite },
       { name: 'Attendance Report In-Page View & Aggregation Engine', fn: runAttendanceReportViewTestSuite },
+      { name: 'Dexie.js Offline Database & Rapid PWA Sync', fn: runDexieOfflineSyncTestSuite },
     ];
 
     let totalPassed = 0;

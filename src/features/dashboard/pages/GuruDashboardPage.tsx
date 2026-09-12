@@ -24,6 +24,7 @@ import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
 import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
 import { WebTrafficService } from '../../../services/web-traffic.service';
+import { OfflineSyncIndicator } from '../../../components/ui/OfflineSyncIndicator';
 import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricEnrollmentPromptModal';
 import { StudentBehaviorModal } from '../../guru/components/StudentBehaviorModal';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
@@ -4681,6 +4682,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         isOpen={isPreferencesModalOpen}
         onClose={() => setIsPreferencesModalOpen(false)}
       />
+
+      {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
+      <OfflineSyncIndicator />
     </div>
   );
 };
