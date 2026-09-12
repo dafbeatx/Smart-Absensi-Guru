@@ -20,6 +20,7 @@ import { SIGNATORY_OFFICIALS } from '../../../lib/excel-generator.lib';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { SMP_AL_ITTIHADIYAH_LOGO_BASE64 } from '../../../assets/logo-smp-terpadu';
+import { SMA_AS_SALAAM_LOGO_BASE64 } from '../../../assets/logo-sma-terpadu';
 import type { StudentItem } from '../../../types/database.types';
 import {
   Printer,
@@ -144,8 +145,8 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
   // Current options
   const isSMP = selectedLevel === 'SMP';
   const schoolName = isSMP ? 'SMP TERPADU AL-ITTIHADIYAH' : 'SMA TERPADU AS SALAAM';
-  const schoolColor = isSMP ? '#047857' : '#023246';
-  const logoSrc = isSMP ? SMP_AL_ITTIHADIYAH_LOGO_BASE64 : '/school-logo.png';
+  const schoolColor = isSMP ? '#047857' : '#065f46';
+  const logoSrc = isSMP ? SMP_AL_ITTIHADIYAH_LOGO_BASE64 : SMA_AS_SALAAM_LOGO_BASE64;
 
   const examOptions: ExamCardRenderOptions = useMemo(() => {
     return {
@@ -155,10 +156,10 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
       semester,
       roomName,
       institutionName: schoolName,
-      institutionAddress: 'Ciampea - Bogor',
+      institutionAddress: isSMP ? 'Ciampea - Bogor' : 'Bogor - Jawa Barat',
       principalName: SIGNATORY_OFFICIALS.KEPSEK_NAME,
     };
-  }, [selectedLevel, examTitle, academicYear, semester, roomName, schoolName]);
+  }, [selectedLevel, examTitle, academicYear, semester, roomName, schoolName, isSMP]);
 
   const handlePrintAllFiltered = () => {
     if (filteredStudents.length === 0) {

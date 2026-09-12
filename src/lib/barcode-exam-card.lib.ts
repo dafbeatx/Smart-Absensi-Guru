@@ -8,6 +8,7 @@
 import JsBarcode from 'jsbarcode';
 import { SIGNATORY_OFFICIALS } from './excel-generator.lib';
 import { SMP_AL_ITTIHADIYAH_LOGO_BASE64 } from '../assets/logo-smp-terpadu';
+import { SMA_AS_SALAAM_LOGO_BASE64 } from '../assets/logo-sma-terpadu';
 import type { StudentItem } from '../types/database.types';
 
 export type EducationLevel = 'SMP' | 'SMA';
@@ -203,9 +204,9 @@ export class BarcodeExamCardService {
     const schoolName = isSMP
       ? (options.institutionName || options.namaSekolah || 'SMP TERPADU AL-ITTIHADIYAH')
       : (options.institutionName || options.namaSekolah || 'SMA TERPADU AS SALAAM');
-    const schoolAddress = options.institutionAddress || 'Ciampea - Bogor';
-    const headerColor = isSMP ? '#047857' : '#023246'; // Hijau Al-Ittihadiyah vs Navy As Salaam
-    const logoSrc = isSMP ? SMP_AL_ITTIHADIYAH_LOGO_BASE64 : '/school-logo.png';
+    const schoolAddress = options.institutionAddress || (isSMP ? 'Ciampea - Bogor' : 'Bogor - Jawa Barat');
+    const headerColor = isSMP ? '#047857' : '#065f46'; // Hijau Al-Ittihadiyah vs Hijau Hutan As Salaam
+    const logoSrc = isSMP ? SMP_AL_ITTIHADIYAH_LOGO_BASE64 : SMA_AS_SALAAM_LOGO_BASE64;
 
     const kepsekName = options.principalName || options.kepalaSekolah || SIGNATORY_OFFICIALS.KEPSEK_NAME;
     const rawTitle = options.examTitle || options.namaUjian || 'PENILAIAN AKHIR SEMESTER (PAS) GANJIL';

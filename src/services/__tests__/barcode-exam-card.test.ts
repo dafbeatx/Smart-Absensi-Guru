@@ -180,8 +180,9 @@ export const runBarcodeExamCardTestSuite = async (): Promise<{
     const smaHtml = BarcodeExamCardService.generateExamCardsA4HTML(filteredSma, smaConfig);
     assert(
       'Kop Resmi SMA: Memuat nama SMA TERPADU AS SALAAM terpisah dari SMP',
-      smaHtml.includes('SMA TERPADU AS SALAAM'),
-      'Kop kartu ujian SMA terpasang'
+      smaHtml.includes('SMA TERPADU AS SALAAM') &&
+      smaHtml.includes('logo-sma-terpadu-as-salaam.png'),
+      'Kop kartu ujian SMA terpasang dengan logo resmi'
     );
 
     // 7. Edge Case: List Siswa Kosong
