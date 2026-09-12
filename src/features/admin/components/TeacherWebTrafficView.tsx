@@ -202,7 +202,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
             <button
               type="button"
               onClick={() => setIsSimulateModalOpen(true)}
-              className="px-3 py-2 text-xs font-bold text-[#023246] bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-300 text-amber-950 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-3 py-2 text-xs font-bold bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-300 text-amber-950 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
               <Play className="w-3.5 h-3.5 text-amber-700 fill-amber-700" />
               <span>Uji Buka Fitur</span>
@@ -290,7 +290,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
           </div>
           <div>
             <span className="text-xl sm:text-2xl font-black text-[#023246] block">
-              {analytics.uniqueTeachersCount} <span className="text-xs text-slate-500 font-semibold font-normal">dari {analytics.totalRegisteredTeachers || teachers.length} Guru</span>
+              {analytics.uniqueTeachersCount} <span className="text-xs text-slate-500 font-semibold">dari {analytics.totalRegisteredTeachers || teachers.length} Guru</span>
             </span>
             <p className="text-[11px] text-emerald-700 font-bold truncate mt-0.5">
               {analytics.participationRate}% guru aktif menggunakan web
