@@ -487,6 +487,15 @@ export class TelegramService {
     const token = this.getBotToken();
     if (!token || this.isPollingActive) return;
 
+    // If webhook is already verified active on cloud backend, skip browser polling
+    try {
+      if (typeof window !== 'undefined' && sessionStorage.getItem('smart_absensi_tele_webhook_active') === 'true') {
+        return;
+      }
+    } catch {
+      // ignore storage errors
+    }
+
     this.isPollingActive = true;
     this.pollLoop().catch((err) => {
       logger.warn('TelegramService', 'Background polling loop encountered an error:', err);
@@ -535,14 +544,22 @@ export class TelegramService {
         const res = await fetch(url, { signal: controller.signal });
         const data = await res.json().catch(() => ({}));
 
-        if (!data.ok) {
-          // If webhook is active (error 409), pause and recheck rather than dying forever
-          if (data.error_code === 409) {
-            logger.info('TelegramService', 'Telegram Webhook sedang aktif, menunda polling browser 10 detik...');
-            await new Promise((resolve) => setTimeout(resolve, 10000));
-            continue;
+        if (!data.ok || res.status === 409) {
+          // If webhook is active (error 409 Conflict), the cloud serverless backend (api/telegram.ts) handles all Telegram updates.
+          // Browser polling cannot run concurrently with an active webhook.
+          if (data.error_code === 409 || res.status === 409) {
+            logger.info('TelegramService', 'Telegram Webhook aktif di cloud backend. Polling client browser dinonaktifkan.');
+            try {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('smart_absensi_tele_webhook_active', 'true');
+              }
+            } catch {
+              // ignore storage errors
+            }
+            this.isPollingActive = false;
+            break;
           }
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+          await new Promise((resolve) => setTimeout(resolve, 5000));
           continue;
         }
 
