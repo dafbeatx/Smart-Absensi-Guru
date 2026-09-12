@@ -27,6 +27,7 @@ interface MoreFeaturesModalProps {
   onOpenStudentBehaviorModal?: (tab?: 'KEBAIKAN' | 'KEDISIPLINAN') => void;
   onOpenEmergencyModal?: () => void;
   onOpenSarprasModal?: () => void;
+  onOpenExamCardModal?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -53,6 +54,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenStudentBehaviorModal,
   onOpenEmergencyModal,
   onOpenSarprasModal,
+  onOpenExamCardModal,
 }) => {
   if (!isOpen) return null;
 
@@ -75,6 +77,27 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
     {
       category: 'Akademik & KBM',
       items: [
+        ...(onOpenExamCardModal
+          ? [
+              {
+                id: 'exam_card',
+                title: 'Cetak Kartu Ujian & Barcode Siswa',
+                subtitle: 'Generator kartu peserta ujian & barcode NISN siswa (Format A4)',
+                icon: '🏷️',
+                action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'exam_card',
+                  });
+                  onClose();
+                  onOpenExamCardModal();
+                },
+              },
+            ]
+          : []),
         {
           id: 'koreksi_soal',
           title: 'Koreksi Soal & Input Nilai',

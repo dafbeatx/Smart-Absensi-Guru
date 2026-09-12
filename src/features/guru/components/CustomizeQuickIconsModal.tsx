@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Layers,
   Boxes,
+  QrCode,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
@@ -119,6 +120,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     description: 'Aplikasi koreksi lembar ujian & rekap nilai siswa (Link)',
     icon: ClipboardCheck,
     colorClass: 'from-[#18536B] to-[#023246]',
+  },
+  {
+    id: 'exam_card',
+    title: 'Kartu Ujian',
+    category: 'Akademik & Nilai',
+    description: 'Cetak kartu peserta ujian & barcode NISN siswa otomatis (A4)',
+    icon: QrCode,
+    colorClass: 'from-amber-600 to-yellow-800',
   },
   {
     id: 'direktori_siswa',

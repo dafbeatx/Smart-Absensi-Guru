@@ -21,6 +21,7 @@ import { StudentDirectoryModal } from '../../guru/components/StudentDirectoryMod
 import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
 import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCalendarModal';
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
+import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal';
 import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
 import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
 import { WebTrafficService } from '../../../services/web-traffic.service';
@@ -336,6 +337,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
   const [isEventsCalendarModalOpen, setIsEventsCalendarModalOpen] = useState(false);
   const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
+  const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isStudentKioskOpen, setIsStudentKioskOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isBioEnrolled, setIsBioEnrolled] = useState(false);
@@ -445,6 +447,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         break;
       case 'materials':
         setIsTeachingMaterialsModalOpen(true);
+        break;
+      case 'exam_card':
+        setIsExamCardModalOpen(true);
         break;
       case 'student_good':
         setStudentBehaviorInitialTab('KEBAIKAN');
@@ -4528,6 +4533,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }}
         onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
         onOpenSarprasModal={() => setIsSarprasModalOpen(true)}
+        onOpenExamCardModal={() => setIsExamCardModalOpen(true)}
       />
 
       {/* ⚙️ Modal Kustomisasi 8 Ikon Menu Utama Guru */}
@@ -4681,6 +4687,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <NotificationPreferencesModal
         isOpen={isPreferencesModalOpen}
         onClose={() => setIsPreferencesModalOpen(false)}
+      />
+
+      {/* 17. Modal Generator Kartu Ujian & Barcode Siswa (JsBarcode) */}
+      <StudentExamCardModal
+        isOpen={isExamCardModalOpen}
+        onClose={() => setIsExamCardModalOpen(false)}
       />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
