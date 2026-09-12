@@ -817,7 +817,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       }}
                       onFocus={() => setIsStudentDropdownOpen(true)}
                       placeholder="Ketik atau pilih nama siswa..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/50 min-h-11"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50 min-h-11"
                     />
                   </div>
 
