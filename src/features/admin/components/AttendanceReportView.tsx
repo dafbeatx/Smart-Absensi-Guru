@@ -674,7 +674,7 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
                   placeholder="Cari nama atau NPP..."
                   value={teacherSearchQuery}
                   onChange={(e) => setTeacherSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-[#D4D4CE] rounded-xl text-[#023246] placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#287094]"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-[#D4D4CE] rounded-xl text-[#023246] placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#287094]"
                 />
               </div>
             )}
@@ -698,15 +698,15 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 font-extrabold border-b border-slate-200">
                     <th className="py-3 px-3 text-center w-12">No</th>
-                    <th className="py-3 px-3 min-w-[130px]">NPP</th>
-                    <th className="py-3 px-3 min-w-[180px]">Nama Lengkap & Gelar</th>
-                    <th className="py-3 px-3 min-w-[140px]">Jabatan</th>
+                    <th className="py-3 px-3 min-w-32.5">NPP</th>
+                    <th className="py-3 px-3 min-w-45">Nama Lengkap & Gelar</th>
+                    <th className="py-3 px-3 min-w-35">Jabatan</th>
                     <th className="py-3 px-3 text-center">Tepat Waktu</th>
                     <th className="py-3 px-3 text-center">Terlambat</th>
                     <th className="py-3 px-3 text-center">Izin/Sakit</th>
                     <th className="py-3 px-3 text-center">Alpa</th>
                     <th className="py-3 px-3 text-center font-black text-[#023246]">Total Masuk</th>
-                    <th className="py-3 px-3 text-center min-w-[110px]">Persentase</th>
+                    <th className="py-3 px-3 text-center min-w-27.5">Persentase</th>
                     <th className="py-3 px-3 text-center w-28">Aksi</th>
                   </tr>
                 </thead>
@@ -822,9 +822,9 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 font-extrabold border-b border-slate-200">
                     <th className="py-3 px-3 text-center w-12">No</th>
-                    <th className="py-3 px-3 min-w-[100px]">Tanggal</th>
-                    <th className="py-3 px-3 min-w-[130px]">NPP</th>
-                    <th className="py-3 px-3 min-w-[180px]">Nama Guru</th>
+                    <th className="py-3 px-3 min-w-25">Tanggal</th>
+                    <th className="py-3 px-3 min-w-32.5">NPP</th>
+                    <th className="py-3 px-3 min-w-45">Nama Guru</th>
                     <th className="py-3 px-3 text-center">Jam Masuk</th>
                     <th className="py-3 px-3 text-center">Jam Pulang</th>
                     <th className="py-3 px-3 text-center">Status</th>
@@ -913,12 +913,12 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 font-extrabold border-b border-slate-200">
                     <th className="py-3 px-3 text-center w-12">No</th>
-                    <th className="py-3 px-3 min-w-[130px]">NPP</th>
-                    <th className="py-3 px-3 min-w-[180px]">Nama Guru</th>
-                    <th className="py-3 px-3 min-w-[110px]">Tipe Izin</th>
-                    <th className="py-3 px-3 min-w-[160px]">Rentang Tanggal</th>
+                    <th className="py-3 px-3 min-w-32.5">NPP</th>
+                    <th className="py-3 px-3 min-w-45">Nama Guru</th>
+                    <th className="py-3 px-3 min-w-27.5">Tipe Izin</th>
+                    <th className="py-3 px-3 min-w-40">Rentang Tanggal</th>
                     <th className="py-3 px-3 text-center w-20">Durasi</th>
-                    <th className="py-3 px-3 min-w-[200px]">Alasan / Keterangan</th>
+                    <th className="py-3 px-3 min-w-50">Alasan / Keterangan</th>
                     <th className="py-3 px-3 text-center w-28">Status</th>
                   </tr>
                 </thead>
