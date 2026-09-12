@@ -674,7 +674,7 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
                   placeholder="Cari nama atau NPP..."
                   value={teacherSearchQuery}
                   onChange={(e) => setTeacherSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-[#D4D4CE] rounded-xl text-[#023246] placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-[#287094]"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-[#D4D4CE] rounded-xl text-[#023246] focus:outline-hidden focus:ring-2 focus:ring-[#287094]"
                 />
               </div>
             )}
