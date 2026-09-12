@@ -45,11 +45,12 @@ ALTER TABLE public.gm_students
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- Bersihkan data duplikat (session_id, LOWER(name)) sebelum menambahkan constraint unik
+-- Menggunakan ctid (PostgreSQL physical row identifier) yang 100% aman
 DELETE FROM public.gm_students a
 USING public.gm_students b
 WHERE a.session_id = b.session_id
   AND LOWER(TRIM(a.name)) = LOWER(TRIM(b.name))
-  AND a.created_at < b.created_at;
+  AND a.ctid < b.ctid;
 
 -- Tambahkan Unique Constraint (session_id, name)
 DO $$
@@ -70,14 +71,16 @@ CREATE INDEX IF NOT EXISTS idx_gm_students_student_user_id ON public.gm_students
 -- 3. PEMBARUAN STRUKTUR TABEL gm_answers (Idempotent)
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE public.gm_answers
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
--- Bersihkan data duplikat per soal
+-- Bersihkan data duplikat per butir soal sebelum menambahkan constraint unik
+-- Menggunakan ctid (PostgreSQL physical row identifier) yang selalu tersedia
 DELETE FROM public.gm_answers a
 USING public.gm_answers b
 WHERE a.student_id = b.student_id
   AND a.question_number = b.question_number
-  AND a.created_at < b.created_at;
+  AND a.ctid < b.ctid;
 
 -- Tambahkan Unique Constraint (student_id, question_number) untuk atomic upsert
 DO $$
@@ -97,6 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_gm_answers_student_qnum ON public.gm_answers(stud
 -- 4. PEMBARUAN STRUKTUR TABEL student_scores (Idempotent)
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE public.student_scores
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS created_by TEXT,
   ADD COLUMN IF NOT EXISTS updated_by TEXT;
 

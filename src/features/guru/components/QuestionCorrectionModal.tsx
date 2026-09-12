@@ -660,7 +660,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       )}
 
       {/* Main Modal Card: Full screen on mobile (<640px), Centered card on desktop (>=640px) */}
-      <div className="bg-slate-900 text-slate-100 w-full h-[100dvh] sm:h-auto sm:max-w-5xl sm:max-h-[94vh] sm:rounded-2xl sm:border sm:border-slate-700/60 shadow-2xl flex flex-col overflow-hidden font-sans">
+      <div className="bg-slate-900 text-slate-100 w-full h-dvh sm:h-auto sm:max-w-5xl sm:max-h-[94vh] sm:rounded-2xl sm:border sm:border-slate-700/60 shadow-2xl flex flex-col overflow-hidden font-sans">
         {/* Top Header */}
         <div className="px-4 py-3 sm:px-6 sm:py-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -1768,7 +1768,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       {/* ========================================================================= */}
       {isKeyEditorModalOpen && (
         <div className="fixed inset-0 z-60 flex sm:items-center sm:justify-center bg-slate-950 sm:bg-slate-950/80 sm:backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 w-full h-[100dvh] sm:h-auto sm:max-w-lg sm:rounded-2xl sm:border sm:border-slate-700 p-4 sm:p-5 shadow-2xl flex flex-col justify-between sm:justify-start space-y-4">
+          <div className="bg-slate-900 w-full h-dvh sm:h-auto sm:max-w-lg sm:rounded-2xl sm:border sm:border-slate-700 p-4 sm:p-5 shadow-2xl flex flex-col justify-between sm:justify-start space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-teal-500/10 text-teal-400 rounded-xl border border-teal-500/20">
