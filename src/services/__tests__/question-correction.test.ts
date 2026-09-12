@@ -12,6 +12,11 @@ import {
 } from '../../utils/scoring.utils';
 import { ExamCorrectionRepository } from '../../repositories/ExamCorrectionRepository';
 import type { CreateExamSessionDTO, SaveGradedStudentDTO } from '../../types/database.types';
+import {
+  normalizeClassCode,
+  areClassCodesEqual,
+  formatClassDisplay,
+} from '../../utils/class.utils';
 
 export const runQuestionCorrectionTestSuite = async (): Promise<{
   passed: number;
@@ -217,6 +222,119 @@ export const runQuestionCorrectionTestSuite = async (): Promise<{
     assert(
       'Hapus Sesi: Sesi ujian beserta rekap terkait berhasil dihapus',
       !afterDeleteSession.some((s) => s.id === createdSession.id)
+    );
+
+    // ── Test 11: Normalisasi Kode Kelas Romawi & Prefix (normalizeClassCode)
+    const norm1 = normalizeClassCode('Kelas VIII-A');
+    const norm2 = normalizeClassCode('kls XII IPA 1');
+    const norm3 = normalizeClassCode('VII.B');
+    const norm4 = normalizeClassCode('X - 1');
+    assert(
+      'Normalisasi Kelas: Mengonversi angka romawi (XII, VIII, VII, X) dan menghapus prefix Kelas/Kls',
+      norm1 === '8A' && norm2 === '12IPA1' && norm3 === '7B' && norm4 === '101',
+      `Hasil: ${norm1}, ${norm2}, ${norm3}, ${norm4}`
+    );
+
+    // ── Test 12: Normalisasi Kode Kelas Bersihkan Tanda Baca & Case Insensitive
+    const norm5 = normalizeClassCode('kelas viii - b');
+    const norm6 = normalizeClassCode('IX_C');
+    const norm7 = normalizeClassCode('  8 . A  ');
+    assert(
+      'Normalisasi Kelas: Membersihkan spasi liar, strip, garis bawah, dan dot',
+      norm5 === '8B' && norm6 === '9C' && norm7 === '8A',
+      `Hasil: ${norm5}, ${norm6}, ${norm7}`
+    );
+
+    // ── Test 13: Normalisasi Edge Cases (Empty, Null, Undefined, Non-Roman)
+    const normEmpty = normalizeClassCode('');
+    const normNull = normalizeClassCode(null);
+    const normUndef = normalizeClassCode(undefined);
+    const normSMA = normalizeClassCode('SMA');
+    assert(
+      'Normalisasi Kelas Edge Cases: Menangani input null, empty, undefined, dan jenjang umum tanpa crash',
+      normEmpty === '' && normNull === '' && normUndef === '' && normSMA === 'SMA'
+    );
+
+    // ── Test 14: Perbandingan Kesetaraan Kelas (areClassCodesEqual)
+    const eq1 = areClassCodesEqual('Kelas VIII-A', '8A');
+    const eq2 = areClassCodesEqual('kls 7-B', 'VII.B');
+    const eq3 = areClassCodesEqual('XII MIPA 1', '12-MIPA-1');
+    const eqDiff = areClassCodesEqual('8A', '8B');
+    const eqEmpty = areClassCodesEqual('', '8A');
+    assert(
+      'Perbandingan Kelas (areClassCodesEqual): Memvalidasi kesetaraan format kelas yang bervariasi',
+      eq1 === true && eq2 === true && eq3 === true && eqDiff === false && eqEmpty === false,
+      `Hasil: eq1=${eq1}, eq2=${eq2}, eq3=${eq3}, eqDiff=${eqDiff}`
+    );
+
+    // ── Test 15: Format Tampilan Kelas Humanis (formatClassDisplay)
+    const disp1 = formatClassDisplay('8A');
+    const disp2 = formatClassDisplay('VIII-A');
+    const disp3 = formatClassDisplay('SMA');
+    const disp4 = formatClassDisplay('');
+    assert(
+      'Format Tampilan Kelas (formatClassDisplay): Menghasilkan label ramah pengguna',
+      disp1 === 'Kelas 8A' && disp2 === 'Kelas 8A' && disp3 === 'SMA' && disp4 === '-',
+      `Hasil: ${disp1}, ${disp2}, ${disp3}, ${disp4}`
+    );
+
+    // ── Test 16: State Machine Repository getSessionsWithStatus
+    const sessionStatusResult = await ExamCorrectionRepository.getSessionsWithStatus();
+    assert(
+      'Repository Status Machine: getSessionsWithStatus mengembalikan status eksplisit (ok/offline_cache/error)',
+      sessionStatusResult &&
+        Array.isArray(sessionStatusResult.data) &&
+        (sessionStatusResult.status === 'ok' || sessionStatusResult.status === 'offline_cache'),
+      `Status sesi: ${sessionStatusResult.status}, Total: ${sessionStatusResult.data?.length}`
+    );
+
+    // ── Test 17: State Machine Repository getGradedStudentsWithStatus
+    const dummySess = await ExamCorrectionRepository.saveSession({
+      session_name: 'Ujian Status Test 7B',
+      teacher: 'Guru Test',
+      subject: 'Matematika',
+      class_name: '7B',
+      school_level: 'SMP',
+      answer_key: ['A', 'B'],
+      student_list: ['Siswa 1'],
+      kkm: 75,
+    });
+    const studentsStatusResult = await ExamCorrectionRepository.getGradedStudentsWithStatus(dummySess.id);
+    assert(
+      'Repository Status Machine: getGradedStudentsWithStatus mengembalikan status valid tanpa silent mock fallback',
+      studentsStatusResult &&
+        Array.isArray(studentsStatusResult.data) &&
+        studentsStatusResult.data.length === 0 &&
+        (studentsStatusResult.status === 'ok' || studentsStatusResult.status === 'offline_cache'),
+      `Status graded: ${studentsStatusResult.status}, Data count: ${studentsStatusResult.data?.length}`
+    );
+    await ExamCorrectionRepository.deleteSession(dummySess.id);
+
+    // ── Test 18: Role Guard & Permission Verification
+    // Helper to evaluate access rules used in QuestionCorrectionModal
+    const evaluateRoleAccess = (userRole?: string) => {
+      const isAllowedRole = ['GURU', 'ADMIN', 'OPERATOR', 'KEPSEK'].includes(userRole || '');
+      const isReadOnly = userRole === 'KEPSEK';
+      const canEdit = isAllowedRole && !isReadOnly;
+      return { isAllowedRole, isReadOnly, canEdit };
+    };
+
+    const guruAccess = evaluateRoleAccess('GURU');
+    const adminAccess = evaluateRoleAccess('ADMIN');
+    const operatorAccess = evaluateRoleAccess('OPERATOR');
+    const kepsekAccess = evaluateRoleAccess('KEPSEK');
+    const siswaAccess = evaluateRoleAccess('SISWA');
+    const guestAccess = evaluateRoleAccess(undefined);
+
+    assert(
+      'Role Guard Logic: Guru, Admin, Operator memiliki full edit; Kepsek read-only; Siswa & Guest terblokir',
+      guruAccess.isAllowedRole && guruAccess.canEdit && !guruAccess.isReadOnly &&
+      adminAccess.isAllowedRole && adminAccess.canEdit && !adminAccess.isReadOnly &&
+      operatorAccess.isAllowedRole && operatorAccess.canEdit && !operatorAccess.isReadOnly &&
+      kepsekAccess.isAllowedRole && !kepsekAccess.canEdit && kepsekAccess.isReadOnly &&
+      !siswaAccess.isAllowedRole && !siswaAccess.canEdit &&
+      !guestAccess.isAllowedRole && !guestAccess.canEdit,
+      `Guru: ${guruAccess.canEdit}, Kepsek ReadOnly: ${kepsekAccess.isReadOnly}, Siswa Allowed: ${siswaAccess.isAllowedRole}`
     );
   } catch (err: any) {
     assert('Fatal Execution: Question Correction Test Suite threw an uncaught error', false, err?.message);

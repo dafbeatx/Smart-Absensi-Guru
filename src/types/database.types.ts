@@ -660,6 +660,8 @@ export interface ExamSessionRecord {
   teacher: string;
   subject: string;
   class_name: string;
+  class_code?: string;
+  owner_user_id?: string;
   school_level: 'SMP' | 'SMA';
   answer_key: string[];
   student_list: string[];
@@ -682,6 +684,8 @@ export interface CreateExamSessionDTO {
   teacher: string;
   subject: string;
   class_name: string;
+  class_code?: string;
+  owner_user_id?: string;
   school_level: 'SMP' | 'SMA';
   answer_key: string[];
   student_list: string[];
@@ -696,6 +700,7 @@ export interface GradedStudentScoreRecord {
   id: string;
   session_id: string;
   name: string;
+  student_user_id?: string;
   mcq_answers: Record<number, string>;
   essay_scores: number[];
   mcq_score: number;
@@ -707,12 +712,14 @@ export interface GradedStudentScoreRecord {
   wrong: number;
   remedial_status?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface SaveGradedStudentDTO {
   id?: string;
   session_id: string;
   name: string;
+  student_user_id?: string;
   mcq_answers: Record<number, string>;
   essay_scores: number[];
   mcq_score: number;

@@ -20,18 +20,50 @@ export interface ClassRecapSummary {
   passRate: number;
 }
 
+export interface SessionFetchResult {
+  data: ExamSessionRecord[];
+  status: 'ok' | 'offline_cache' | 'error';
+  error?: string;
+}
+
+export interface GradedStudentsFetchResult {
+  data: GradedStudentScoreRecord[];
+  status: 'ok' | 'offline_cache' | 'error';
+  error?: string;
+}
+
 export class ExamCorrectionRepository {
+  /**
+   * Retrieves all exam sessions with explicit load status ('ok' | 'offline_cache' | 'error').
+   */
+  public static async getSessionsWithStatus(token?: string): Promise<SessionFetchResult> {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const data = await provider.getExamSessions(token);
+      return { data: Array.isArray(data) ? data : [], status: 'ok' };
+    } catch (err: any) {
+      logger.warn('ExamCorrectionRepository', 'Cloud load failed, checking offline cache:', err?.message || err);
+      try {
+        if (typeof window !== 'undefined') {
+          const cached = window.localStorage.getItem('smart_absensi_exam_sessions');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return { data: parsed, status: 'offline_cache', error: err?.message || 'Memuat draft offline lokal' };
+            }
+          }
+        }
+      } catch {}
+      return { data: [], status: 'error', error: err?.message || 'Gagal memuat sesi ujian' };
+    }
+  }
+
   /**
    * Retrieves all exam sessions available from active provider.
    */
   public static async getSessions(token?: string): Promise<ExamSessionRecord[]> {
-    try {
-      const provider = ProviderFactory.getProvider();
-      return await provider.getExamSessions(token);
-    } catch (err) {
-      logger.error('ExamCorrectionRepository', 'Failed to get sessions:', err);
-      return [];
-    }
+    const res = await this.getSessionsWithStatus(token);
+    return res.data;
   }
 
   /**
@@ -54,19 +86,42 @@ export class ExamCorrectionRepository {
   }
 
   /**
+   * Retrieves all graded students for a session with explicit status.
+   */
+  public static async getGradedStudentsWithStatus(
+    sessionId: string,
+    token?: string
+  ): Promise<GradedStudentsFetchResult> {
+    try {
+      const provider = ProviderFactory.getProvider();
+      const data = await provider.getGradedStudents(sessionId, token);
+      return { data: Array.isArray(data) ? data : [], status: 'ok' };
+    } catch (err: any) {
+      logger.warn('ExamCorrectionRepository', 'Graded students cloud fetch failed, checking offline cache:', err?.message || err);
+      try {
+        if (typeof window !== 'undefined') {
+          const cached = window.localStorage.getItem(`smart_absensi_graded_${sessionId}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return { data: parsed, status: 'offline_cache', error: err?.message || 'Memuat draft offline' };
+            }
+          }
+        }
+      } catch {}
+      return { data: [], status: 'error', error: err?.message || 'Gagal memuat nilai siswa' };
+    }
+  }
+
+  /**
    * Retrieves all graded students for a session.
    */
   public static async getGradedStudents(
     sessionId: string,
     token?: string
   ): Promise<GradedStudentScoreRecord[]> {
-    try {
-      const provider = ProviderFactory.getProvider();
-      return await provider.getGradedStudents(sessionId, token);
-    } catch (err) {
-      logger.error('ExamCorrectionRepository', 'Failed to get graded students:', err);
-      return [];
-    }
+    const res = await this.getGradedStudentsWithStatus(sessionId, token);
+    return res.data;
   }
 
   /**

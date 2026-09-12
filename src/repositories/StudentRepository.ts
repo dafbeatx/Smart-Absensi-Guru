@@ -1,6 +1,7 @@
 import { ProviderFactory } from '../providers/provider-factory';
 import type { StudentItem } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
+import { areClassCodesEqual } from '../utils/class.utils';
 
 export const STUDENTS_STORAGE_KEY = 'smart_absensi_students';
 export const STUDENTS_UPDATED_EVENT = 'smart_absensi_students_updated';
@@ -62,7 +63,7 @@ export class StudentRepository {
   public static async getStudentsByClass(className: string, token?: string): Promise<StudentItem[]> {
     const all = await this.getStudents(token);
     if (!className || className === 'ALL') return all;
-    return all.filter((s) => s.className === className);
+    return all.filter((s) => areClassCodesEqual(s.className, className));
   }
 
   /**

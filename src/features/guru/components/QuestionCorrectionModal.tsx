@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   GraduationCap,
@@ -23,6 +24,10 @@ import {
   AlertCircle,
   Key,
   Filter,
+  RefreshCw,
+  WifiOff,
+  ShieldAlert,
+  Database,
 } from 'lucide-react';
 import type {
   ExamSessionRecord,
@@ -33,7 +38,19 @@ import type {
 import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel } from '../../../utils/scoring.utils';
+import { normalizeClassCode, areClassCodesEqual } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
+
+export type ModalLoadState =
+  | 'IDLE'
+  | 'LOADING_SESSIONS'
+  | 'READY'
+  | 'EMPTY'
+  | 'OFFLINE_CACHE'
+  | 'MIGRATION_REQUIRED'
+  | 'PERMISSION_DENIED'
+  | 'NETWORK_ERROR'
+  | 'RETRYING';
 
 interface QuestionCorrectionModalProps {
   isOpen: boolean;
@@ -63,18 +80,25 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   onClose,
   currentUser,
 }) => {
+  const userRole = (currentUser?.role || 'GURU').toUpperCase();
+  const isAuthorizedRole = ['GURU', 'ADMIN', 'OPERATOR', 'KEPSEK'].includes(userRole);
+  const isReadOnly = userRole === 'KEPSEK';
+
   // Navigation active tab: 'sessions' | 'grading' | 'recap'
   const [activeTab, setActiveTab] = useState<'sessions' | 'grading' | 'recap'>('sessions');
+
+  // Load state machine
+  const [loadState, setLoadState] = useState<ModalLoadState>('LOADING_SESSIONS');
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string>('');
 
   // Sessions list
   const [sessions, setSessions] = useState<ExamSessionRecord[]>([]);
   const [activeSession, setActiveSession] = useState<ExamSessionRecord | null>(null);
-  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
 
   // New Session Form State
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [sessionName, setSessionName] = useState('');
-  const [teacherName, setTeacherName] = useState(currentUser.full_name || '');
+  const [teacherName, setTeacherName] = useState(currentUser?.full_name || '');
   const [selectedSubject, setSelectedSubject] = useState('Informatika');
   const [customSubject, setCustomSubject] = useState('');
   const [selectedClass, setSelectedClass] = useState('8A');
@@ -118,31 +142,88 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
-  // Load sessions on open
-  const loadSessions = useCallback(async () => {
-    setIsLoadingSessions(true);
+  // Load sessions with state machine
+  const loadSessions = useCallback(async (isRetry = false) => {
+    setLoadState(isRetry ? 'RETRYING' : 'LOADING_SESSIONS');
     try {
-      const data = await ExamCorrectionRepository.getSessions();
-      setSessions(data);
-    } catch (err) {
+      const res = await ExamCorrectionRepository.getSessionsWithStatus();
+      if (res.status === 'ok') {
+        setSessions(res.data);
+        if (res.data.length === 0) {
+          setLoadState('EMPTY');
+        } else {
+          setLoadState('READY');
+        }
+      } else if (res.status === 'offline_cache') {
+        setSessions(res.data);
+        setLoadState('OFFLINE_CACHE');
+        setLoadErrorMessage(res.error || 'Memuat draft lokal (offline).');
+      } else {
+        const errMsg = res.error || '';
+        setLoadErrorMessage(errMsg);
+        if (/permission|row-level security|401|403|unauthorized/i.test(errMsg)) {
+          setLoadState('PERMISSION_DENIED');
+        } else if (/relation .* does not exist|column .* does not exist|42P01|42703/i.test(errMsg)) {
+          setLoadState('MIGRATION_REQUIRED');
+        } else {
+          setLoadState('NETWORK_ERROR');
+        }
+      }
+    } catch (err: any) {
       logger.error('QuestionCorrectionModal', 'Failed to load sessions:', err);
-    } finally {
-      setIsLoadingSessions(false);
+      const errMsg = err?.message || 'Gagal memuat sesi';
+      setLoadErrorMessage(errMsg);
+      setLoadState('NETWORK_ERROR');
     }
   }, []);
 
   useEffect(() => {
     if (isOpen) {
       loadSessions();
-      setTeacherName(currentUser.full_name || '');
+      setTeacherName(currentUser?.full_name || '');
     }
   }, [isOpen, currentUser, loadSessions]);
+
+  // Escape key & Android Back Button integration
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isKeyEditorModalOpen) {
+          setIsKeyEditorModalOpen(false);
+        } else if (isCreatingSession) {
+          setIsCreatingSession(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.history.pushState({ modal: 'question_correction' }, '');
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePopState);
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, isKeyEditorModalOpen, isCreatingSession, onClose]);
 
   // Load students of class when active session is chosen
   const loadSessionData = useCallback(async (session: ExamSessionRecord) => {
     try {
+      const classIdentifier = session.class_code || session.class_name;
       const [students, grades] = await Promise.all([
-        StudentRepository.getStudentsByClass(session.class_name),
+        StudentRepository.getStudentsByClass(classIdentifier),
         ExamCorrectionRepository.getGradedStudents(session.id),
       ]);
       setClassStudents(students);
@@ -221,6 +302,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         teacher: sessionToUpdate.teacher,
         subject: sessionToUpdate.subject,
         class_name: sessionToUpdate.class_name,
+        class_code: sessionToUpdate.class_code || normalizeClassCode(sessionToUpdate.class_name),
+        owner_user_id: sessionToUpdate.owner_user_id || currentUser.id,
         school_level: sessionToUpdate.school_level,
         answer_key: parsedKeys,
         student_list: sessionToUpdate.student_list || [],
@@ -260,10 +343,12 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         s.session_name.toLowerCase().includes(q) ||
         s.subject.toLowerCase().includes(q) ||
         s.teacher.toLowerCase().includes(q) ||
-        s.class_name.toLowerCase().includes(q);
+        s.class_name.toLowerCase().includes(q) ||
+        (s.class_code && s.class_code.toLowerCase().includes(q));
 
       const matchesClass =
-        sessionClassFilter === 'ALL' || s.class_name === sessionClassFilter;
+        sessionClassFilter === 'ALL' ||
+        areClassCodesEqual(s.class_code || s.class_name, sessionClassFilter);
 
       const hasKey = Array.isArray(s.answer_key) && s.answer_key.length > 0;
       const matchesStatus =
@@ -379,10 +464,15 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
     if (!calculation) return;
 
+    const matchedStudent = classStudents.find(
+      (cs) => cs.fullName?.toLowerCase().trim() === selectedStudentName.toLowerCase().trim()
+    );
+
     try {
       const saved = await ExamCorrectionRepository.saveGradedStudent({
         session_id: activeSession.id,
         name: selectedStudentName.trim(),
+        student_user_id: matchedStudent?.id,
         mcq_answers: userAnswers,
         essay_scores: essayScores,
         mcq_score: manualScore !== null ? manualScore : Math.round(calculation.score),
@@ -419,9 +509,10 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         setSelectedStudentName('');
         setStudentSearchQuery('');
       }
-    } catch (err) {
+    } catch (err: any) {
       logger.error('QuestionCorrectionModal', 'Failed to save student score:', err);
-      setToastMessage({ text: 'Gagal menyimpan nilai siswa. Periksa koneksi!', type: 'error' });
+      const errMsg = err?.message ? `Gagal menyimpan nilai: ${err.message}` : 'Gagal menyimpan nilai siswa. Periksa koneksi!';
+      setToastMessage({ text: errMsg, type: 'error' });
     }
   };
 
@@ -446,9 +537,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     try {
       const created = await ExamCorrectionRepository.saveSession({
         session_name: defaultSessionName,
-        teacher: teacherName.trim() || currentUser.full_name,
+        teacher: teacherName.trim() || currentUser?.full_name || 'Guru Pengampu',
         subject: finalSubject,
         class_name: selectedClass,
+        class_code: normalizeClassCode(selectedClass),
+        owner_user_id: currentUser?.id,
         school_level: selectedClass === 'SMA' ? 'SMA' : 'SMP',
         answer_key: previewNewKeys,
         student_list: [],
@@ -468,9 +561,10 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       setIsCreatingSession(false);
       setToastMessage({ text: 'Sesi ujian berhasil dibuat!', type: 'success' });
       await handleSelectSession(created);
-    } catch (err) {
+    } catch (err: any) {
       logger.error('QuestionCorrectionModal', 'Failed to create session:', err);
-      setToastMessage({ text: 'Gagal membuat sesi ujian!', type: 'error' });
+      const errMsg = err?.message ? `Gagal membuat sesi: ${err.message}` : 'Gagal membuat sesi ujian!';
+      setToastMessage({ text: errMsg, type: 'error' });
     }
   };
 
@@ -516,8 +610,41 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-md animate-fadeIn">
+  // Role Guard Check
+  if (!isAuthorizedRole) {
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 mx-auto flex items-center justify-center border border-rose-500/20">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-white">Akses Fitur Terbatas</h3>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              Fitur Koreksi Soal & Nilai tersedia untuk Guru Pengampu dan petugas Akademik.
+              Peran akun Anda saat ini ({userRole}) tidak memiliki otorisasi untuk membuka modul ini.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-colors"
+          >
+            Tutup
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="question-correction-title"
+      className="fixed inset-0 z-50 flex sm:items-center sm:justify-center bg-slate-950 sm:bg-slate-950/80 sm:backdrop-blur-md animate-fadeIn"
+    >
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -532,24 +659,29 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         </div>
       )}
 
-      {/* Main Modal Card */}
-      <div className="bg-slate-900 text-slate-100 w-full max-w-5xl max-h-[94vh] rounded-2xl border border-slate-700/60 shadow-2xl flex flex-col overflow-hidden font-sans">
+      {/* Main Modal Card: Full screen on mobile (<640px), Centered card on desktop (>=640px) */}
+      <div className="bg-slate-900 text-slate-100 w-full h-[100dvh] sm:h-auto sm:max-w-5xl sm:max-h-[94vh] sm:rounded-2xl sm:border sm:border-slate-700/60 shadow-2xl flex flex-col overflow-hidden font-sans">
         {/* Top Header */}
-        <div className="px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-md">
+        <div className="px-4 py-3 sm:px-6 sm:py-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-md shrink-0">
               <GraduationCap className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 id="question-correction-title" className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
                   Koreksi Soal & Input Nilai
                 </h2>
-                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-full">
+                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-full shrink-0">
                   GradeMaster In-App
                 </span>
+                {isReadOnly && (
+                  <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full shrink-0">
+                    Peninjauan (Read-Only)
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-400 truncate">
                 {activeSession
                   ? `${activeSession.subject} • Kelas ${activeSession.class_name} • KKM: ${activeSession.kkm}`
                   : 'Pemeriksaan lembar jawaban ujian & kalkulasi nilai otomatis'}
@@ -557,7 +689,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 ml-2">
             {/* Close Button */}
             <button
               type="button"
@@ -617,7 +749,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
             )}
           </div>
 
-          {activeTab === 'sessions' && !isCreatingSession && (
+          {activeTab === 'sessions' && !isCreatingSession && !isReadOnly && (
             <button
               type="button"
               onClick={() => setIsCreatingSession(true)}
@@ -925,22 +1057,104 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     </div>
                   </div>
 
-                  {isLoadingSessions ? (
-                    <div className="p-8 text-center text-slate-400 text-xs">Memuat sesi dari Supabase...</div>
+                  {/* Offline Cache Banner */}
+                  {loadState === 'OFFLINE_CACHE' && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-300">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Mode Offline: Menampilkan {sessions.length} sesi dari cache draft lokal (belum tersinkron dengan cloud).</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => loadSessions(true)}
+                        className="px-2.5 py-1 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 rounded-lg font-bold flex items-center gap-1 transition-colors text-[11px]"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Coba Sinkron
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Loading / Retrying Skeleton */}
+                  {(loadState === 'LOADING_SESSIONS' || loadState === 'RETRYING') ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 animate-pulse space-y-3">
+                          <div className="flex justify-between">
+                            <div className="h-4 bg-slate-700 rounded w-20"></div>
+                            <div className="h-4 bg-slate-700 rounded w-12"></div>
+                          </div>
+                          <div className="h-5 bg-slate-700 rounded w-3/4"></div>
+                          <div className="h-3 bg-slate-700 rounded w-1/2"></div>
+                          <div className="pt-2 border-t border-slate-700/40 flex justify-between">
+                            <div className="h-3 bg-slate-700 rounded w-24"></div>
+                            <div className="h-4 bg-slate-700 rounded w-16"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : loadState === 'NETWORK_ERROR' ? (
+                    <div className="bg-rose-950/20 border border-rose-500/30 rounded-2xl p-8 text-center space-y-3">
+                      <WifiOff className="w-10 h-10 text-rose-400 mx-auto" />
+                      <h4 className="text-sm font-bold text-white">Gagal Terhubung ke Database Cloud</h4>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        {loadErrorMessage || 'Koneksi jaringan terputus atau backend Supabase tidak merespons.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => loadSessions(true)}
+                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-lg"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> Coba Lagi
+                      </button>
+                    </div>
+                  ) : loadState === 'PERMISSION_DENIED' ? (
+                    <div className="bg-amber-950/20 border border-amber-500/30 rounded-2xl p-8 text-center space-y-3">
+                      <ShieldAlert className="w-10 h-10 text-amber-400 mx-auto" />
+                      <h4 className="text-sm font-bold text-white">Akses Data Dibatasi (RLS)</h4>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        Kebijakan Row Level Security hanya mengizinkan guru melihat sesi miliknya sendiri, atau akun Anda belum memiliki hak akses penuh.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => loadSessions(true)}
+                        className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> Segarkan Sesi
+                      </button>
+                    </div>
+                  ) : loadState === 'MIGRATION_REQUIRED' ? (
+                    <div className="bg-indigo-950/20 border border-indigo-500/30 rounded-2xl p-8 text-center space-y-3">
+                      <Database className="w-10 h-10 text-indigo-400 mx-auto" />
+                      <h4 className="text-sm font-bold text-white">Perlu Sinkronisasi Skema Database</h4>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        Kolom baru (owner_user_id / class_code) belum terpasang di PostgreSQL. Silakan jalankan berkas migration <code className="bg-slate-800 px-1 py-0.5 rounded text-teal-300">sql/26_exam_correction_rls_overhaul.sql</code> pada Supabase SQL Editor.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => loadSessions(true)}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors shadow-lg"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> Periksa Ulang
+                      </button>
+                    </div>
                   ) : sessions.length === 0 ? (
                     <div className="bg-slate-800/60 rounded-2xl p-8 text-center border border-slate-800">
                       <BookOpen className="w-10 h-10 text-slate-500 mx-auto mb-2" />
                       <h4 className="text-sm font-bold text-slate-300 mb-1">Belum Ada Sesi Ujian</h4>
                       <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
-                        Buat sesi ujian baru dengan kunci jawaban untuk memulai proses koreksi lembar siswa secara instan.
+                        {isReadOnly
+                          ? 'Belum ada sesi ujian yang dibuat oleh guru pengampu.'
+                          : 'Buat sesi ujian baru dengan kunci jawaban untuk memulai proses koreksi lembar siswa secara instan.'}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setIsCreatingSession(true)}
-                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold inline-flex items-center gap-1.5"
-                      >
-                        <Plus className="w-4 h-4" /> Buat Sesi Baru
-                      </button>
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          onClick={() => setIsCreatingSession(true)}
+                          className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold inline-flex items-center gap-1.5"
+                        >
+                          <Plus className="w-4 h-4" /> Buat Sesi Baru
+                        </button>
+                      )}
                     </div>
                   ) : filteredSessions.length === 0 ? (
                     <div className="bg-slate-800/40 rounded-2xl p-8 text-center border border-slate-800/80">
@@ -1007,23 +1221,27 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                             <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
                               <span className="truncate max-w-35">Guru: {sess.teacher}</span>
                               <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleOpenKeyEditor(sess, e)}
-                                  className="px-2 py-1 rounded-md text-[10px] font-bold text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 flex items-center gap-1 transition-colors"
-                                  title="Atur Kunci Jawaban"
-                                >
-                                  <Key className="w-3 h-3 text-teal-400" />
-                                  <span>{hasKey ? 'Edit Kunci' : 'Atur Kunci'}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleDeleteSession(sess.id, e)}
-                                  className="p-1 rounded hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                                  title="Hapus Sesi"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {!isReadOnly && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleOpenKeyEditor(sess, e)}
+                                      className="px-2 py-1 rounded-md text-[10px] font-bold text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 flex items-center gap-1 transition-colors"
+                                      title="Atur Kunci Jawaban"
+                                    >
+                                      <Key className="w-3 h-3 text-teal-400" />
+                                      <span>{hasKey ? 'Edit Kunci' : 'Atur Kunci'}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleDeleteSession(sess.id, e)}
+                                      className="p-1 rounded hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                      title="Hapus Sesi"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
                                 <span className="text-teal-400 font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform ml-1">
                                   Buka <ChevronRight className="w-3.5 h-3.5" />
                                 </span>
@@ -1046,6 +1264,18 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start max-w-5xl mx-auto">
               {/* Left Column: Student Selector & Answer Sheet */}
               <div className="lg:col-span-8 space-y-4">
+                {/* Class Mapping Warning if no students found in master */}
+                {classStudents.length === 0 && (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-amber-300 shadow-sm">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Informasi Master Siswa:</span> Belum ada data siswa untuk kelas{' '}
+                      <span className="font-bold underline">{activeSession.class_name}</span> (kode: {activeSession.class_code || normalizeClassCode(activeSession.class_name)}) pada direktori sekolah.
+                      Anda tetap dapat mengetik nama siswa secara manual pada input pencarian di bawah.
+                    </div>
+                  </div>
+                )}
+
                 {/* Student Selector Card */}
                 <div className="bg-slate-800/90 rounded-2xl p-4 border border-slate-700 relative z-30 shadow-sm" ref={dropdownRef}>
                   <div className="flex items-center justify-between mb-2">
@@ -1364,17 +1594,23 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     </div>
                   </div>
 
-                  {/* Save Button */}
+                  {/* Save Button / Read-only Notice */}
                   <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveStudent}
-                      disabled={!selectedStudentName.trim()}
-                      className="w-full py-3 bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-500 hover:to-[#023246] disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-teal-950/50 flex items-center justify-center gap-2 transition-all min-h-12 active:scale-[0.98]"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>Simpan & Siswa Berikutnya</span>
-                    </button>
+                    {isReadOnly ? (
+                      <div className="w-full py-3 px-3 bg-amber-950/40 border border-amber-800/50 rounded-xl text-center text-xs text-amber-300 font-semibold min-h-12 flex items-center justify-center">
+                        Mode Peninjauan: Kepala Sekolah tidak dapat mengubah nilai siswa secara langsung.
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSaveStudent}
+                        disabled={!selectedStudentName.trim()}
+                        className="w-full py-3 bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-500 hover:to-[#023246] disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-teal-950/50 flex items-center justify-center gap-2 transition-all min-h-12 active:scale-[0.98]"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>Simpan & Siswa Berikutnya</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1502,14 +1738,16 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                                   >
                                     <ClipboardList className="w-3.5 h-3.5" />
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteStudentGrade(s.id)}
-                                    className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
-                                    title="Hapus Nilai Siswa"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  {!isReadOnly && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteStudentGrade(s.id)}
+                                      className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10"
+                                      title="Hapus Nilai Siswa"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -1529,8 +1767,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       {/* UNIVERSAL ANSWER KEY EDITOR MODAL */}
       {/* ========================================================================= */}
       {isKeyEditorModalOpen && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-lg shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-60 flex sm:items-center sm:justify-center bg-slate-950 sm:bg-slate-950/80 sm:backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 w-full h-[100dvh] sm:h-auto sm:max-w-lg sm:rounded-2xl sm:border sm:border-slate-700 p-4 sm:p-5 shadow-2xl flex flex-col justify-between sm:justify-start space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-teal-500/10 text-teal-400 rounded-xl border border-teal-500/20">
@@ -1554,16 +1792,16 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 sm:flex-initial">
               <label className="text-xs font-semibold text-slate-300">
                 Kunci Jawaban PG (Bisa paste format 1.A 2.B atau ABCD...)
               </label>
               <textarea
-                rows={4}
+                rows={5}
                 value={quickKeyInput}
                 onChange={(e) => setQuickKeyInput(e.target.value)}
                 placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D atau ABCDABCD"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-white focus:ring-2 focus:ring-teal-500/50 focus:outline-hidden"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-white focus:ring-2 focus:ring-teal-500/50 focus:outline-hidden min-h-32"
               />
               <div className="flex items-center justify-between text-[11px] text-slate-400">
                 <span>Terdeteksi: <strong className="text-teal-400">{parseAnswerKey(quickKeyInput).length}</strong> butir soal PG</span>
@@ -1571,18 +1809,18 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsKeyEditorModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold min-h-11"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={() => handleSaveKeyEditor()}
-                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-900/30 flex items-center gap-1.5"
+                className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-900/30 flex items-center gap-1.5 min-h-11"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Simpan Kunci</span>
@@ -1591,6 +1829,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
