@@ -13,6 +13,7 @@ import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionMod
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { QRCodeGeneratorModal } from '../components/QRCodeGeneratorModal';
 import { TeacherWebTrafficView } from '../components/TeacherWebTrafficView';
+import { AttendanceReportView } from '../components/AttendanceReportView';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
 import { DailyAttendanceTracker } from '../components/DailyAttendanceTracker';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
@@ -376,14 +377,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-  const handleExportExcel = () => {
-    setIsExportModalOpen(true);
-  };
-
-  const handleExportPDF = () => {
-    setIsExportModalOpen(true);
-  };
-
   const todayStr = getTodayDateInJakarta();
   const isOffDay = useMemo(() => isDateOffDay(todayStr).isOff, [todayStr]);
 
@@ -717,24 +710,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
           {/* TAB 8: LAPORAN / EXPORT */}
           {activeTab === 'EXPORT' && (
-            <div className="bg-white p-8 rounded-3xl border border-[#D4D4CE]/40 shadow-card space-y-5 text-center">
-              <span className="text-5xl">📊</span>
-              <div className="space-y-1">
-                <h3 className="font-extrabold text-[#023246] text-xl">Generator Laporan Excel (.xlsx) & PDF Resmi</h3>
-                <p className="text-xs text-slate-500 max-w-lg mx-auto leading-relaxed">
-                  Pilih format berkas laporan yang Anda butuhkan. Format Excel (.xlsx) disajikan dalam 5 tab sheet terpisah dengan lebar kolom yang pas, sedangkan format PDF disajikan lengkap dengan Kop Surat sekolah dan lembar tanda tangan resmi.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
-                <Button variant="primary" onClick={handleExportExcel} className="flex items-center justify-center gap-2">
-                  <span>📊</span> Download File Excel Resmi (.xlsx)
-                </Button>
-                <Button variant="secondary" onClick={handleExportPDF} className="flex items-center justify-center gap-2">
-                  <span>📄</span> Cetak / Simpan Laporan PDF (.pdf)
-                </Button>
-              </div>
-            </div>
+            <AttendanceReportView
+              teachers={teachers}
+              attendanceRecords={attendanceRecords}
+              leaveRequests={allLeaves.length > 0 ? allLeaves : pendingRequests}
+              auditLogs={[]}
+              onBackToDashboard={() => setActiveTab('DASHBOARD')}
+              onRefresh={() => {
+                fetchAttendanceRecords();
+                fetchPendingRequests();
+              }}
+            />
           )}
 
           {/* TAB: INVENTARIS SARANA DAN PRASARANA (SARPRAS) */}

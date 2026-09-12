@@ -22,6 +22,7 @@ import { runStudentBehaviorIntegrityTestSuite } from './__tests__/student-behavi
 import { runTeachingScheduleOverhaulTestSuite } from './__tests__/teaching-schedule-overhaul.test';
 import { runNotificationRealtimeReadStateTestSuite } from './__tests__/notification-realtime-read-state.test';
 import { runWebTrafficTestSuite } from './__tests__/web-traffic.test';
+import { runAttendanceReportViewTestSuite } from './__tests__/attendance-report-view.test';
 
 export interface TestResultItem {
   testName: string;
@@ -81,6 +82,7 @@ export class MasterTestRunner {
       { name: 'Teaching Schedule Relational Overhaul & Smart Class Alarm', fn: runTeachingScheduleOverhaulTestSuite },
       { name: 'Notification Real-time & Read-State Overhaul Engine', fn: runNotificationRealtimeReadStateTestSuite },
       { name: 'Web Traffic & Educational Activity Tracker', fn: runWebTrafficTestSuite },
+      { name: 'Attendance Report In-Page View & Aggregation Engine', fn: runAttendanceReportViewTestSuite },
     ];
 
     let totalPassed = 0;

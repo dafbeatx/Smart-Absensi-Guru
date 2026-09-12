@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { Button } from '../../../components/ui/Button';
 import { TeacherManagementTable } from '../components/TeacherManagementTable';
 import { TeachingScheduleManagement } from '../../admin/components/TeachingScheduleManagement';
 import { StudentManagement } from '../../admin/components/StudentManagement';
 import { AttendanceCorrectionModal } from '../components/AttendanceCorrectionModal';
 import { ExportReportModal } from '../../../components/dashboard/ExportReportModal';
+import { AttendanceReportView } from '../../admin/components/AttendanceReportView';
 import { SystemSettingsForm } from '../components/SystemSettingsForm';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { UserProfile, AttendanceRecord } from '../../../types/database.types';
@@ -84,10 +84,6 @@ export const OperatorDashboardPage: React.FC = () => {
     };
   }, [teachers.length]);
 
-  const handleExportExcel = async () => {
-    setIsExportModalOpen(true);
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 pb-24 text-slate-900">
       {/* Operator Admin Control Center Header */}
@@ -159,18 +155,11 @@ export const OperatorDashboardPage: React.FC = () => {
         {activeTab === 'SETTINGS' && <SystemSettingsForm />}
 
         {activeTab === 'EXPORT' && (
-          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-card space-y-4 text-center">
-            <span className="text-5xl">📊</span>
-            <h3 className="font-extrabold text-slate-900 text-xl">Generator Laporan Excel Multi-Sheet</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-              Unduh berkas laporan bulanan terintegrasi 5-Sheet (Sheet 1: Dashboard Ringkasan, Sheet 2: Rekap Guru, Sheet 3: Detail Harian, Sheet 4: Pengajuan Izin, Sheet 5: Audit Log).
-            </p>
-            <div className="pt-2">
-              <Button variant="primary" onClick={handleExportExcel}>
-                ⚡ Download File Excel Multi-Sheet (.csv/.xlsx)
-              </Button>
-            </div>
-          </div>
+          <AttendanceReportView
+            teachers={teachers}
+            attendanceRecords={attendanceRecords}
+            onBackToDashboard={() => setActiveTab('TEACHERS')}
+          />
         )}
       </main>
 
