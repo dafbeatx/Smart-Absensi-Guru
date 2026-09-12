@@ -10,8 +10,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png', 'school-logo.png', 'pwa-192x192.png', 'pwa-512x512.png'],
+      includeAssets: ['favicon.png', 'school-logo.png', 'logo-smp-terpadu-al-ittihadiyah.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       workbox: {
+        maximumFileSizeToCacheInBytes: 3145728, // 3 MiB
         importScripts: ['sw-push-handler.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [

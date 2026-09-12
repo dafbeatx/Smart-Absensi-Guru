@@ -1,14 +1,17 @@
 /**
  * SMART ABSENSI GURU - BARCODE & EXAM CARD GENERATOR LIBRARY
- * High-speed Code128 Barcode generation and A4 4-Card Grid Print Engine
+ * High-speed Code128 Barcode generation and ISO/IEC 7810 ID-1 (KTP Standard Size 85.6mm x 54mm)
+ * Print Engine with SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam Level Segregation.
  * Powered by JsBarcode & Anti AI-Slop Design System
  */
 
 import JsBarcode from 'jsbarcode';
-import { APP_CONFIG } from '../config/app.config';
 import { SIGNATORY_OFFICIALS } from './excel-generator.lib';
 import { PdfStamperService } from './pdf-stamper.lib';
+import { SMP_AL_ITTIHADIYAH_LOGO_BASE64 } from '../assets/logo-smp-terpadu';
 import type { StudentItem } from '../types/database.types';
+
+export type EducationLevel = 'SMP' | 'SMA';
 
 export interface StudentCardData {
   id: string;
@@ -26,6 +29,7 @@ export interface StudentCardData {
 export type AnyStudentData = StudentItem | StudentCardData;
 
 export interface ExamCardRenderOptions {
+  level?: EducationLevel; // 'SMP' | 'SMA' (Wajib terpisah)
   examTitle?: string;
   namaUjian?: string; // alias
   academicYear?: string;
@@ -35,6 +39,7 @@ export interface ExamCardRenderOptions {
   ruangDefault?: string; // alias
   institutionName?: string;
   namaSekolah?: string; // alias
+  institutionAddress?: string;
   principalName?: string;
   kepalaSekolah?: string; // alias
   nipKepalaSekolah?: string;
@@ -42,6 +47,41 @@ export interface ExamCardRenderOptions {
 }
 
 export type ExamCardConfig = ExamCardRenderOptions;
+
+/**
+ * Deteksi otomatis jenjang pendidikan (SMP vs SMA) berdasarkan nama kelas/rombel
+ */
+export function detectEducationLevel(className?: string): EducationLevel {
+  if (!className) return 'SMP';
+  const raw = className.trim().toUpperCase();
+  if (raw.includes('SMP')) return 'SMP';
+  if (raw.includes('SMA') || raw.includes('SMK')) return 'SMA';
+
+  // SMA/SMK: Rombel X, XI, XII atau 10, 11, 12, jurusan MIPA, IPS, RPL, dll
+  if (
+    /^(KELAS\s*)?(X|XI|XII|10|11|12)(\b|[^A-Z0-9])/i.test(raw) ||
+    /\b(MIPA|IPS|RPL|TKJ|TBSM|OTKP|BDP)\b/i.test(raw)
+  ) {
+    return 'SMA';
+  }
+
+  // SMP: Rombel VII, VIII, IX atau 7, 8, 9
+  if (/^(KELAS\s*)?(VII|VIII|IX|7|8|9)(\b|[^A-Z0-9])/i.test(raw)) {
+    return 'SMP';
+  }
+
+  return 'SMP';
+}
+
+/**
+ * Filter daftar siswa agar murni hanya berisi jenjang yang dipilih (tidak bercampur)
+ */
+export function filterStudentsByLevel<T extends AnyStudentData>(students: T[], level: EducationLevel): T[] {
+  return students.filter((s) => {
+    const cls = (s as any).className || (s as any).kelas || '';
+    return detectEducationLevel(cls) === level;
+  });
+}
 
 export class BarcodeExamCardService {
   /**
@@ -83,8 +123,8 @@ export class BarcodeExamCardService {
     options?: { width?: number; height?: number; displayValue?: boolean }
   ): string {
     const cleanCode = (code || '1234567890').trim();
-    const barcodeWidth = options?.width || 1.4;
-    const barcodeHeight = options?.height || 36;
+    const barcodeWidth = options?.width || 1.1;
+    const barcodeHeight = options?.height || 22;
     const showText = options?.displayValue !== false;
 
     // In browser DOM environment, utilize JsBarcode directly
@@ -96,9 +136,9 @@ export class BarcodeExamCardService {
           width: barcodeWidth,
           height: barcodeHeight,
           displayValue: showText,
-          fontSize: 10,
+          fontSize: 8.5,
           font: 'monospace',
-          textMargin: 2,
+          textMargin: 1,
           margin: 0,
           lineColor: '#0f172a',
         });
@@ -121,16 +161,13 @@ export class BarcodeExamCardService {
     height: number,
     showText: boolean
   ): string {
-    // Generate deterministic pattern based on characters
     const bars: number[] = [];
-    // Start code
     bars.push(2, 1, 1, 4, 1, 2);
     for (let i = 0; i < text.length; i++) {
       const charCode = text.charCodeAt(i);
       const mod = charCode % 4;
       bars.push(1 + mod, 2 - (mod % 2), 1 + ((charCode >> 1) % 3), 2, 1, 1);
     }
-    // Stop code
     bars.push(2, 3, 3, 1, 1, 1, 2);
 
     let x = 0;
@@ -144,22 +181,33 @@ export class BarcodeExamCardService {
     });
 
     const totalWidth = x;
-    const totalHeight = showText ? height + 14 : height;
+    const totalHeight = showText ? height + 11 : height;
     const textElement = showText
-      ? `<text x="${(totalWidth / 2).toFixed(1)}" y="${totalHeight - 2}" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#0f172a">${text}</text>`
+      ? `<text x="${(totalWidth / 2).toFixed(1)}" y="${totalHeight - 1}" text-anchor="middle" font-family="monospace" font-size="8.5" font-weight="700" fill="#0f172a">${text}</text>`
       : '';
 
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth.toFixed(1)} ${totalHeight}" width="${totalWidth.toFixed(1)}" height="${totalHeight}" style="display: block; margin: 0 auto;">${rects.join('')}${textElement}</svg>`;
   }
 
   /**
-   * Generates a complete, print-optimized A4 HTML document containing 4 Exam Cards per sheet (2x2 grid)
+   * Generates an ISO/IEC 7810 ID-1 standard KTP Size (85.6mm x 54mm) Exam Card HTML document
+   * Layout: 2 Columns x 4 Rows = 8 KTP-sized Cards per A4 sheet
    */
   public static generateExamCardsA4HTML(
     students: AnyStudentData[],
     options: ExamCardRenderOptions
   ): string {
-    const schoolName = options.institutionName || options.namaSekolah || APP_CONFIG.INSTITUTION_NAME;
+    const selectedLevel: EducationLevel = options.level || 'SMP';
+    const isSMP = selectedLevel === 'SMP';
+
+    // Konfigurasi Lembaga Berdasarkan Jenjang (SMP vs SMA Terpisah)
+    const schoolName = isSMP
+      ? (options.institutionName || options.namaSekolah || 'SMP TERPADU AL-ITTIHADIYAH')
+      : (options.institutionName || options.namaSekolah || 'SMA TERPADU AS SALAAM');
+    const schoolAddress = options.institutionAddress || 'Ciampea - Bogor';
+    const headerColor = isSMP ? '#047857' : '#023246'; // Hijau Al-Ittihadiyah vs Navy As Salaam
+    const logoSrc = isSMP ? SMP_AL_ITTIHADIYAH_LOGO_BASE64 : '/school-logo.png';
+
     const kepsekName = options.principalName || options.kepalaSekolah || SIGNATORY_OFFICIALS.KEPSEK_NAME;
     const rawTitle = options.examTitle || options.namaUjian || 'PENILAIAN AKHIR SEMESTER (PAS) GANJIL';
     const title = rawTitle.toUpperCase();
@@ -168,45 +216,48 @@ export class BarcodeExamCardService {
     const defaultRoom = options.roomName || options.ruangDefault || 'Ruang 01';
     const kepsekNip = options.nipKepalaSekolah || '197605122005011004';
 
-    if (!students || students.length === 0) {
+    // Filter siswa agar tidak tercampur jika opsi level diberikan
+    const activeStudents = options.level ? filterStudentsByLevel(students, options.level) : students;
+
+    if (!activeStudents || activeStudents.length === 0) {
       return `
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Kartu Peserta Ujian - ${title}</title>
+  <title>Kartu Peserta Ujian - ${schoolName}</title>
   <style>
     @page { size: A4 portrait; margin: 10mm; }
     body { font-family: 'Inter', sans-serif; text-align: center; padding: 50px; color: #475569; }
   </style>
 </head>
 <body>
-  <h2>Tidak ada data peserta ujian yang ditemukan.</h2>
-  <p>Silakan pilih kelas atau tambahkan siswa terlebih dahulu.</p>
+  <h2>Tidak ada data peserta ujian yang ditemukan untuk jenjang ${selectedLevel}.</h2>
+  <p>Silakan pilih jenjang atau rombel kelas yang sesuai.</p>
 </body>
 </html>
       `.trim();
     }
 
-    // Group students into chunks of 4 (1 A4 sheet = 4 cards)
-    const chunkSize = 4;
+    // 8 Kartu Ukuran KTP (85.6mm x 54mm) per Lembar A4 (Grid 2 Kolom x 4 Baris)
+    const chunkSize = 8;
     const pages: AnyStudentData[][] = [];
-    for (let i = 0; i < students.length; i += chunkSize) {
-      pages.push(students.slice(i, i + chunkSize));
+    for (let i = 0; i < activeStudents.length; i += chunkSize) {
+      pages.push(activeStudents.slice(i, i + chunkSize));
     }
 
-    const stampSVG = PdfStamperService.renderOfficialStampSVG({ size: 70, rotation: -6 });
+    const stampSVG = PdfStamperService.renderOfficialStampSVG({ size: 36, rotation: -6 });
 
     return `
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Kartu Peserta Ujian - ${title}</title>
+  <title>Kartu Peserta Ujian (${selectedLevel}) - ${schoolName}</title>
   <style>
     @page {
       size: A4 portrait;
-      margin: 8mm 6mm;
+      margin: 8mm 10mm;
     }
     * {
       box-sizing: border-box;
@@ -218,97 +269,140 @@ export class BarcodeExamCardService {
       padding: 0;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #0f172a;
-      background: #f1f5f9;
+      background: #f8fafc;
     }
     .a4-sheet {
-      width: 100%;
+      width: 210mm;
       max-width: 210mm;
-      min-height: 280mm;
+      min-height: 297mm;
       margin: 0 auto 12mm auto;
-      padding: 6mm 4mm;
+      padding: 8mm 10mm;
       background: #ffffff;
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      grid-template-rows: repeat(2, 1fr);
-      gap: 6mm;
+      grid-template-columns: repeat(2, 85.6mm);
+      grid-auto-rows: 54mm;
+      gap: 5mm 8mm;
+      justify-content: center;
       page-break-after: always;
       break-after: page;
       box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      box-sizing: border-box;
     }
     @media print {
       body { background: #ffffff; }
       .a4-sheet {
         margin: 0;
-        padding: 4mm;
+        padding: 6mm 8mm;
         box-shadow: none;
         width: 100%;
         min-height: 100%;
       }
       .no-print { display: none !important; }
     }
+    /* Pembatas Potong Garis Putus-putus untuk Kemudahan Panitia Ujian */
     .exam-card-wrapper {
       position: relative;
-      border: 1.5px dashed #94a3b8;
-      padding: 3px;
-      border-radius: 8px;
+      width: 85.6mm;
+      height: 54mm;
+      max-width: 85.6mm;
+      max-height: 54mm;
+      box-sizing: border-box;
+      border: 1px dashed #94a3b8;
+      padding: 1.2mm;
+      border-radius: 3.5mm;
+      background: #ffffff;
     }
+    /* Kartu Peserta Ukuran Standar KTP (85.6mm x 54mm) */
     .exam-card {
       background: #ffffff;
-      border: 1.5px solid #0f172a;
-      border-radius: 6px;
-      padding: 8px 10px;
+      border: 1.2px solid ${headerColor};
+      border-radius: 3mm;
+      padding: 2mm 3mm;
+      width: 100%;
       height: 100%;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       position: relative;
       overflow: hidden;
     }
+    /* Header / Kop Kartu dengan Logo Resmi */
     .card-header {
-      text-align: center;
-      border-bottom: 2px solid #0f172a;
-      padding-bottom: 4px;
-      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 2.5mm;
+      border-bottom: 1.5px solid ${headerColor};
+      padding-bottom: 1.5mm;
+      margin-bottom: 1.5mm;
       position: relative;
     }
+    .card-header .logo-box {
+      width: 11mm;
+      height: 11mm;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card-header .logo-box img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .card-header .header-text {
+      flex: 1;
+      text-align: center;
+      min-width: 0;
+    }
     .card-header .inst-name {
-      font-size: 8.5px;
-      font-weight: 800;
-      color: #1e40af;
+      font-size: 7.2px;
+      font-weight: 900;
+      color: ${headerColor};
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      line-height: 1.2;
+      letter-spacing: 0.2px;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .card-header .doc-title {
-      font-size: 9.5px;
-      font-weight: 900;
+      font-size: 6.8px;
+      font-weight: 800;
       color: #0f172a;
       text-transform: uppercase;
-      margin-top: 2px;
-      letter-spacing: 0.5px;
+      margin-top: 0.5px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .card-header .doc-sub {
-      font-size: 7.5px;
+      font-size: 5.5px;
       font-weight: 600;
       color: #475569;
+      line-height: 1;
+      margin-top: 0.5px;
     }
+    /* Badan Kartu: Pasfoto 3x4 & Biodata */
     .card-body {
       display: flex;
-      gap: 8px;
-      align-items: flex-start;
+      gap: 2.5mm;
+      align-items: center;
       flex: 1;
+      min-height: 0;
     }
     .photo-box {
-      width: 60px;
-      height: 75px;
+      width: 15mm;
+      height: 20mm;
       border: 1px solid #cbd5e1;
-      border-radius: 4px;
+      border-radius: 2mm;
       background: #f8fafc;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 8px;
+      font-size: 6px;
       font-weight: 700;
       color: #64748b;
       text-align: center;
@@ -317,92 +411,105 @@ export class BarcodeExamCardService {
     }
     .info-table {
       flex: 1;
-      font-size: 8px;
+      font-size: 6.4px;
       border-collapse: collapse;
       width: 100%;
+      line-height: 1.25;
     }
     .info-table td {
-      padding: 1.5px 2px;
+      padding: 0.8px 1px;
       vertical-align: top;
     }
     .info-table .lbl {
-      width: 64px;
+      width: 18mm;
       color: #475569;
       font-weight: 600;
     }
     .info-table .sep {
-      width: 6px;
+      width: 2mm;
       text-align: center;
       font-weight: bold;
     }
     .info-table .val {
       color: #0f172a;
       font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 42mm;
     }
+    /* Footer Kartu: Barcode Code128 & Pengesahan */
     .card-footer {
       border-top: 1px dashed #cbd5e1;
-      padding-top: 5px;
-      margin-top: 4px;
+      padding-top: 1.5mm;
+      margin-top: 1mm;
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
+      gap: 2mm;
     }
     .barcode-container {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      max-width: 130px;
+      max-width: 44mm;
+      overflow: hidden;
     }
     .barcode-svg {
-      max-height: 38px;
+      max-height: 22px;
     }
     .signature-area {
       text-align: center;
       position: relative;
-      width: 110px;
-      font-size: 7.5px;
+      width: 28mm;
+      font-size: 5.5px;
+      line-height: 1.1;
+      flex-shrink: 0;
     }
     .stamp-container {
       position: absolute;
-      top: -12px;
-      left: -18px;
-      width: 70px;
-      height: 70px;
+      top: -4px;
+      left: -6px;
+      width: 36px;
+      height: 36px;
       pointer-events: none;
-      opacity: 0.85;
+      opacity: 0.82;
       z-index: 10;
     }
     .sig-name {
       font-weight: 800;
       color: #0f172a;
       text-decoration: underline;
-      margin-top: 22px;
-      font-size: 8px;
+      margin-top: 14px;
+      font-size: 5.8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .watermark-bg {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) rotate(-25deg);
-      font-size: 34px;
+      transform: translate(-50%, -50%) rotate(-22deg);
+      font-size: 22px;
       font-weight: 900;
-      color: rgba(15, 23, 42, 0.03);
-      letter-spacing: 4px;
+      color: rgba(15, 23, 42, 0.025);
+      letter-spacing: 2px;
       pointer-events: none;
       white-space: nowrap;
       user-select: none;
     }
     .cut-guide {
       position: absolute;
-      top: -6px;
-      left: -6px;
-      font-size: 8px;
+      top: -4px;
+      left: -4px;
+      font-size: 7px;
       color: #94a3b8;
     }
     .print-bar {
-      background: #023246;
+      background: ${headerColor};
       color: white;
-      padding: 12px 24px;
+      padding: 10px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -415,10 +522,10 @@ export class BarcodeExamCardService {
       background: #16a34a;
       color: white;
       border: none;
-      padding: 8px 18px;
+      padding: 7px 16px;
       border-radius: 8px;
       font-weight: 800;
-      font-size: 13px;
+      font-size: 12px;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -432,12 +539,12 @@ export class BarcodeExamCardService {
 <body>
   <div class="print-bar no-print">
     <div>
-      <div style="font-weight: 800; font-size: 15px;">🏷️ Generator Kartu Peserta Ujian Siswa (Format A4)</div>
-      <div style="font-size: 12px; opacity: 0.85;">Total ${students.length} Siswa • Layout 4 Kartu / Lembar A4 Siap Cetak</div>
+      <div style="font-weight: 800; font-size: 14px;">🏷️ Kartu Peserta Ujian ${selectedLevel} (Ukuran Standar KTP 85.6mm x 54mm)</div>
+      <div style="font-size: 11px; opacity: 0.9;">${schoolName} • Total ${activeStudents.length} Siswa • Layout 8 Kartu / Lembar A4 Siap Gunting</div>
     </div>
     <div style="display: flex; gap: 8px;">
       <button class="btn-print" onclick="window.print()">
-        🖨️ Cetak Semua Kartu (A4)
+        🖨️ Cetak Semua Kartu (${selectedLevel})
       </button>
     </div>
   </div>
@@ -455,8 +562,8 @@ export class BarcodeExamCardService {
             (student as any).nomor_peserta ||
             BarcodeExamCardService.formatExamParticipantNumber(student, globalIdx);
           const barcodeSvg = BarcodeExamCardService.generateBarcodeSVG(student.nisn || student.id, {
-            width: 1.1,
-            height: 28,
+            width: 0.95,
+            height: 18,
             displayValue: true,
           });
 
@@ -467,27 +574,32 @@ export class BarcodeExamCardService {
                 <div class="watermark-bg">KARTU PESERTA</div>
 
                 <div class="card-header">
-                  <div class="inst-name">${schoolName}</div>
-                  <div class="doc-title">${title}</div>
-                  <div class="doc-sub">TAHUN AJARAN ${academicYear} • SEMESTER ${semesterStr}</div>
+                  <div class="logo-box">
+                    <img src="${logoSrc}" alt="Logo ${selectedLevel}" />
+                  </div>
+                  <div class="header-text">
+                    <div class="inst-name">${schoolName}</div>
+                    <div class="doc-title">${title}</div>
+                    <div class="doc-sub">TA ${academicYear} • SEMESTER ${semesterStr} • ${schoolAddress}</div>
+                  </div>
                 </div>
 
                 <div class="card-body">
                   <div class="photo-box">
-                    <span style="font-size: 26px; line-height: 1;">${student.gender === 'P' ? '👩‍🎓' : '🧑‍🎓'}</span>
-                    <span style="font-size: 6.5px; margin-top: 4px; color: #94a3b8;">PASFOTO 3x4</span>
+                    <span style="font-size: 18px; line-height: 1;">${student.gender === 'P' ? '👩‍🎓' : '🧑‍🎓'}</span>
+                    <span style="font-size: 5.5px; margin-top: 2px; color: #94a3b8;">FOTO 3x4</span>
                   </div>
 
                   <table class="info-table">
                     <tr>
                       <td class="lbl">No. Peserta</td>
                       <td class="sep">:</td>
-                      <td class="val" style="color: #1e40af; font-family: monospace;">${examNumber}</td>
+                      <td class="val" style="color: ${headerColor}; font-family: monospace;">${examNumber}</td>
                     </tr>
                     <tr>
                       <td class="lbl">Nama Siswa</td>
                       <td class="sep">:</td>
-                      <td class="val" style="font-size: 8.5px;">${studentName}</td>
+                      <td class="val" style="font-size: 6.8px;">${studentName}</td>
                     </tr>
                     <tr>
                       <td class="lbl">NISN</td>
@@ -514,12 +626,12 @@ export class BarcodeExamCardService {
 
                   <div class="signature-area">
                     <div>Mengetahui,</div>
-                    <div style="font-weight: bold; margin-bottom: 24px;">Kepala Sekolah</div>
+                    <div style="font-weight: bold; margin-bottom: 12px;">Kepala Sekolah</div>
                     <div class="stamp-container">
                       ${stampSVG}
                     </div>
                     <div class="sig-name">${kepsekName}</div>
-                    <div style="font-size: 6.5px; color: #64748b;">NPP. ${kepsekNip}</div>
+                    <div style="font-size: 5px; color: #64748b;">NPP. ${kepsekNip}</div>
                   </div>
                 </div>
               </div>

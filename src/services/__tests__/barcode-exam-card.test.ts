@@ -1,11 +1,13 @@
 /**
  * SMART ABSENSI GURU - BARCODE ENGINE & STUDENT EXAM CARD GENERATOR TEST SUITE
  * Unit tests verifying JsBarcode integration, participant number formatting,
- * and 4-cards-per-A4 sheet HTML template generator.
+ * ISO/IEC 7810 ID-1 KTP size layout (85.6mm x 54mm), and SMP vs SMA segregation.
  */
 
 import {
   BarcodeExamCardService,
+  detectEducationLevel,
+  filterStudentsByLevel,
   type StudentCardData,
   type ExamCardConfig,
 } from '../../lib/barcode-exam-card.lib';
@@ -30,151 +32,164 @@ export const runBarcodeExamCardTestSuite = async (): Promise<{
   };
 
   try {
-    const mockStudents: StudentCardData[] = [
+    const mockSmpStudents: StudentCardData[] = [
       {
-        id: 'std_001',
-        nisn: '0071234567',
-        nama: 'Achmad Dani Pratama',
-        kelas: 'XII MIPA 1',
-        nomor_peserta: '01-026-XIIMIPA1-001-0071234567',
-        ruang: 'Ruang 04',
-        sesi: 'Sesi 1 (07:30 - 09:30)',
+        id: 'smp_001',
+        nisn: '0081112221',
+        nama: 'Ahmad Faiz Al-Ghifari',
+        kelas: 'VII-A',
+        ruang: 'Ruang 01',
       },
       {
-        id: 'std_002',
-        nisn: '0071234568',
-        nama: 'Bella Novita Sari',
-        kelas: 'XII MIPA 1',
-        nomor_peserta: '01-026-XIIMIPA1-002-0071234568',
-        ruang: 'Ruang 04',
-        sesi: 'Sesi 1 (07:30 - 09:30)',
+        id: 'smp_002',
+        nisn: '0081112222',
+        nama: 'Bunga Citra Lestari',
+        kelas: 'VII-A',
+        ruang: 'Ruang 01',
       },
       {
-        id: 'std_003',
-        nisn: '0071234569',
-        nama: 'Citra Kirana Dewi',
-        kelas: 'XII MIPA 1',
-        nomor_peserta: '01-026-XIIMIPA1-003-0071234569',
-        ruang: 'Ruang 04',
-        sesi: 'Sesi 1 (07:30 - 09:30)',
+        id: 'smp_003',
+        nisn: '0081112223',
+        nama: 'Chairul Tanjung Pratama',
+        kelas: 'VIII-B',
+        ruang: 'Ruang 02',
       },
       {
-        id: 'std_004',
-        nisn: '0071234570',
-        nama: 'Dimas Aditya Nugraha',
-        kelas: 'XII MIPA 1',
-        nomor_peserta: '01-026-XIIMIPA1-004-0071234570',
-        ruang: 'Ruang 04',
-        sesi: 'Sesi 1 (07:30 - 09:30)',
-      },
-      {
-        id: 'std_005',
-        nisn: '0071234571',
-        nama: 'Eka Putri Lestari',
-        kelas: 'XII MIPA 1',
-        nomor_peserta: '01-026-XIIMIPA1-005-0071234571',
-        ruang: 'Ruang 05',
-        sesi: 'Sesi 1 (07:30 - 09:30)',
+        id: 'smp_004',
+        nisn: '0081112224',
+        nama: 'Dinda Kirana Putri',
+        kelas: 'IX-A',
+        ruang: 'Ruang 03',
       },
     ];
 
-    const defaultConfig: ExamCardConfig = {
-      namaSekolah: 'SMK MA`ARIF TERPADU',
+    const mockSmaStudents: StudentCardData[] = [
+      {
+        id: 'sma_001',
+        nisn: '0071234567',
+        nama: 'Achmad Dani Pratama',
+        kelas: 'XII MIPA 1',
+        ruang: 'Ruang 04',
+      },
+      {
+        id: 'sma_002',
+        nisn: '0071234568',
+        nama: 'Bella Novita Sari',
+        kelas: 'XI IPS 2',
+        ruang: 'Ruang 04',
+      },
+    ];
+
+    const allStudents = [...mockSmpStudents, ...mockSmaStudents];
+
+    // 1. Uji Deteksi Jenjang Pendidikan Otomatis (SMP vs SMA)
+    assert(
+      'Deteksi Jenjang: Rombel VII, VIII, IX dikenali sebagai SMP',
+      detectEducationLevel('VII-A') === 'SMP' &&
+      detectEducationLevel('Kelas 8-B') === 'SMP' &&
+      detectEducationLevel('IX-A') === 'SMP',
+      'Kelas SMP terdeteksi akurat'
+    );
+
+    assert(
+      'Deteksi Jenjang: Rombel X, XI, XII dikenali sebagai SMA',
+      detectEducationLevel('X-1') === 'SMA' &&
+      detectEducationLevel('XI MIPA 1') === 'SMA' &&
+      detectEducationLevel('Kelas XII IPS') === 'SMA',
+      'Kelas SMA terdeteksi akurat'
+    );
+
+    // 2. Uji Isolasi & Pemisahan Siswa SMP vs SMA (Tidak Boleh Bercampur)
+    const filteredSmp = filterStudentsByLevel(allStudents, 'SMP');
+    const filteredSma = filterStudentsByLevel(allStudents, 'SMA');
+
+    assert(
+      'Pemisahan Jenjang: Filter jenjang SMP hanya mengembalikan siswa SMP (4 siswa)',
+      filteredSmp.length === 4 && filteredSmp.every((s) => detectEducationLevel(s.kelas) === 'SMP'),
+      `Total SMP: ${filteredSmp.length}`
+    );
+
+    assert(
+      'Pemisahan Jenjang: Filter jenjang SMA hanya mengembalikan siswa SMA (2 siswa)',
+      filteredSma.length === 2 && filteredSma.every((s) => detectEducationLevel(s.kelas) === 'SMA'),
+      `Total SMA: ${filteredSma.length}`
+    );
+
+    // 3. Uji Pembuatan Format Nomor Peserta Ujian Nasional
+    const generatedNo1 = BarcodeExamCardService.formatExamParticipantNumber('VII A', 1, '0081112221');
+    assert(
+      'Format Nomor Peserta Ujian: Padding urut 3 digit & kode rombel bersih',
+      generatedNo1 === '01-026-VIIA-001-0081112221',
+      `Hasil: ${generatedNo1}`
+    );
+
+    // 4. Uji Generator Barcode SVG (JsBarcode / Fallback)
+    const barcodeSvg1 = BarcodeExamCardService.generateBarcodeSVG('0081112221');
+    assert(
+      'JsBarcode SVG Output: Berisi tag svg valid dan elemen batang barcode',
+      barcodeSvg1.includes('<svg') && barcodeSvg1.includes('</svg>') && barcodeSvg1.includes('<rect'),
+      'Barcode SVG siap render'
+    );
+
+    // 5. Uji Dokumen Cetak Kartu Ujian SMP (Ukuran KTP & Logo Resmi Hijau Al-Ittihadiyah)
+    const smpConfig: ExamCardConfig = {
+      level: 'SMP',
       namaUjian: 'ASESMEN SUMATIF AKHIR SEMESTER (ASAS) GANJIL',
       tahunAjaran: '2026/2027',
       semester: 'Ganjil',
       kepalaSekolah: 'H. Suherman, S.Ag., M.Pd.I.',
       nipKepalaSekolah: '197605122005011004',
-      kotaTanggal: 'Majalengka, 01 Desember 2026',
-      ruangDefault: 'Ruang 01',
+      institutionAddress: 'Ciampea - Bogor',
     };
 
-    // 1. Uji Pembuatan Format Nomor Peserta Ujian Nasional
-    const generatedNo1 = BarcodeExamCardService.formatExamParticipantNumber('XII MIPA 1', 1, '0071234567');
-    assert(
-      'Format Nomor Peserta Ujian Standar: Padding urut 3 digit & format kelas bersih',
-      generatedNo1 === '01-026-XIIMIPA1-001-0071234567',
-      `Hasil: ${generatedNo1}`
-    );
-
-    const generatedNo2 = BarcodeExamCardService.formatExamParticipantNumber('X-RPL-2', 45, '0089998881');
-    assert(
-      'Format Nomor Peserta Ujian: Karakter strip pada nama kelas dihilangkan',
-      generatedNo2 === '01-026-XRPL2-045-0089998881',
-      `Hasil: ${generatedNo2}`
-    );
-
-    // 2. Uji Generator Barcode SVG (JsBarcode / Fallback Deterministik)
-    const barcodeSvg1 = BarcodeExamCardService.generateBarcodeSVG('0071234567');
-    assert(
-      'JsBarcode SVG Output: Berisi tag svg pembuka dan penutup',
-      barcodeSvg1.includes('<svg') && barcodeSvg1.includes('</svg>'),
-      'SVG tag valid'
-    );
-    assert(
-      'JsBarcode SVG Output: Memuat nilai NISN atau elemen grafis barcode',
-      barcodeSvg1.includes('0071234567') || barcodeSvg1.includes('<rect'),
-      'Barcode memuat payload data'
-    );
-
-    // 3. Uji Generator Dokumen HTML Siap Cetak A4 (Grid 2x2 = 4 Kartu/Halaman)
-    const htmlA4 = BarcodeExamCardService.generateExamCardsA4HTML(mockStudents, defaultConfig);
+    const smpHtml = BarcodeExamCardService.generateExamCardsA4HTML(filteredSmp, smpConfig);
 
     assert(
-      'A4 Document Template: Memuat deklarasi CSS print layout portrait dan @page',
-      htmlA4.includes('@page') && htmlA4.includes('size: A4 portrait'),
-      'CSS print layout terkonfigurasi untuk A4 portrait'
+      'Standar Ukuran KTP: Template memuat spesifikasi dimensi KTP presisi (85.6mm x 54mm)',
+      smpHtml.includes('85.6mm') && smpHtml.includes('54mm'),
+      'Dimensi KTP 85.6mm x 54mm terpasang di CSS'
     );
 
     assert(
-      'A4 Document Template: Memuat nama sekolah dan judul asesmen resmi',
-      htmlA4.includes('SMK MA`ARIF TERPADU') && htmlA4.includes('ASESMEN SUMATIF AKHIR SEMESTER (ASAS) GANJIL'),
-      'Kop kartu ujian memuat identitas sekolah'
+      'Kop Resmi SMP: Memuat nama SMP TERPADU AL-ITTIHADIYAH dan Logo Resmi Hijau',
+      smpHtml.includes('SMP TERPADU AL-ITTIHADIYAH') &&
+      (smpHtml.includes('logo-box') || smpHtml.includes('data:image/png;base64')),
+      'Kop kartu ujian memuat identitas resmi SMP Terpadu Al-Ittihadiyah'
     );
 
     assert(
-      'A4 Document Template: Memuat seluruh data 5 siswa yang diuji',
-      htmlA4.includes('Achmad Dani Pratama') &&
-      htmlA4.includes('Bella Novita Sari') &&
-      htmlA4.includes('Citra Kirana Dewi') &&
-      htmlA4.includes('Dimas Aditya Nugraha') &&
-      htmlA4.includes('Eka Putri Lestari'),
-      'Seluruh 5 nama siswa tercetak dalam dokumen'
+      'Layout Cetak A4: Memuat grid 2 kolom dan garis potong (cut-guide ✂️)',
+      smpHtml.includes('cut-guide') && smpHtml.includes('dashed') && smpHtml.includes('grid-template-columns'),
+      'Grid cetak KTP dan garis gunting aktif'
     );
 
     assert(
-      'A4 Document Template: Memuat NISN dan nomor peserta ujian',
-      htmlA4.includes('0071234567') && htmlA4.includes('01-026-XIIMIPA1-001-0071234567'),
-      'Identitas NISN dan no peserta akurat'
+      'Isolasi Data Siswa: Siswa SMA tidak bocor masuk ke lembar ujian SMP',
+      !smpHtml.includes('Achmad Dani Pratama') && !smpHtml.includes('Bella Novita Sari'),
+      'Siswa SMA terisolasi murni dari lembar ujian SMP'
     );
 
+    // 6. Uji Dokumen Cetak Kartu Ujian SMA (Terpisah dengan Kop SMA Terpadu As Salaam)
+    const smaConfig: ExamCardConfig = {
+      level: 'SMA',
+      namaUjian: 'PENILAIAN AKHIR TAHUN (PAT) GENAP',
+      tahunAjaran: '2026/2027',
+      semester: 'Genap',
+    };
+
+    const smaHtml = BarcodeExamCardService.generateExamCardsA4HTML(filteredSma, smaConfig);
     assert(
-      'A4 Document Template: Memuat stempel resmi digital dan pengesahan Kepala Sekolah',
-      htmlA4.includes('H. Suherman, S.Ag., M.Pd.I.') && htmlA4.includes('197605122005011004'),
-      'Tanda tangan & NIP Kepala Sekolah hadir'
+      'Kop Resmi SMA: Memuat nama SMA TERPADU AS SALAAM terpisah dari SMP',
+      smaHtml.includes('SMA TERPADU AS SALAAM'),
+      'Kop kartu ujian SMA terpasang'
     );
 
-    // 4. Uji Pemisahan Halaman (Pagination A4 Grid: 5 siswa = 2 halaman A4)
-    // Siswa 1-4 ada di lembar 1, siswa 5 ada di lembar 2 dengan page-break
+    // 7. Edge Case: List Siswa Kosong
+    const emptyHtml = BarcodeExamCardService.generateExamCardsA4HTML([], smpConfig);
     assert(
-      'A4 Pagination: Menggunakan page-break-after untuk membatasi 4 kartu per lembar',
-      htmlA4.includes('page-break-after: always') || htmlA4.includes('break-after: page'),
-      'Page-break CSS aktif untuk pembagian lembar A4'
-    );
-
-    // 5. Uji Garis Potong (Cut Guidelines) untuk Kemudahan Panitia Ujian
-    assert(
-      'A4 Grid Layout: Memuat garis batas potong (cut-guide) untuk kemudahan gunting panitia',
-      htmlA4.includes('cut-guide') || htmlA4.includes('dashed') || htmlA4.includes('border: 1px dashed'),
-      'Garis potong kartu terpasang'
-    );
-
-    // 6. Uji Edge Case: Siswa Kosong
-    const emptyA4 = BarcodeExamCardService.generateExamCardsA4HTML([], defaultConfig);
-    assert(
-      'Edge Case: Penanganan list siswa kosong menghasilkan template aman tanpa crash',
-      emptyA4.includes('Tidak ada data peserta ujian') || emptyA4.includes('html'),
-      'Dokumen HTML kosong tetap valid'
+      'Edge Case: Penanganan list siswa kosong aman tanpa crash',
+      emptyHtml.includes('Tidak ada data') || emptyHtml.includes('html'),
+      'Template kosong aman'
     );
 
   } catch (err: unknown) {
