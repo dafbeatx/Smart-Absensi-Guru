@@ -1,13 +1,13 @@
 /**
- * SMART ABSENSI GURU - WEB TRAFFIC & ACTIVITY TRACKING SERVICE
- * Menyimpan, mengolah, dan menganalisis data riwayat situs web yang diakses guru.
- * Data 100% murni bersumber dari akun guru yang terdaftar di sistem (tanpa seed/dummy data).
+ * SMART ABSENSI GURU - IN-APP FEATURE & MENU USAGE TRAFFIC SERVICE
+ * Menyimpan, mengolah, dan menganalisis data riwayat fitur/menu internal yang dibuka guru.
+ * Data 100% murni dari interaksi menu di dalam sistem (tanpa melacak situs luar/eksternal).
  */
 
 import type { UserProfile } from '../types/database.types';
 import type {
   WebTrafficLog,
-  WebsiteTrafficSummary,
+  FeatureTrafficSummary,
   TeacherTrafficSummary,
   TrafficCategory,
   TrafficFilterOptions,
@@ -16,51 +16,40 @@ import type {
   TrafficAnalyticsSummary,
 } from '../types/traffic.types';
 
-const STORAGE_KEY = 'smart_absensi_web_traffic_logs';
-const WEBSITES_STORAGE_KEY = 'smart_absensi_monitored_websites';
+const STORAGE_KEY = 'smart_absensi_web_traffic_logs_v3';
 
-export interface MonitoredWebsite {
+export interface InternalAppFeature {
   id: string;
   name: string;
-  domain: string;
-  url: string;
   category: TrafficCategory;
   description: string;
   icon: string;
-  addedBy?: string;
-  createdAt: string;
 }
 
 export const TRAFFIC_CATEGORY_METADATA: Record<
   TrafficCategory,
   { label: string; color: string; bgBadge: string; borderBadge: string }
 > = {
-  KURIKULUM_PMM: {
-    label: 'Kurikulum & PMM',
+  AKADEMIK_NILAI: {
+    label: 'Akademik & Penilaian',
     color: '#023246',
     bgBadge: 'bg-[#023246]/10 text-[#023246]',
     borderBadge: 'border-[#023246]/30',
   },
-  PENILAIAN_RAPOR: {
-    label: 'Penilaian & E-Rapor',
+  PRESENSI_ABSENSI: {
+    label: 'Presensi & Kehadiran',
     color: '#16A34A',
     bgBadge: 'bg-emerald-50 text-emerald-800',
     borderBadge: 'border-emerald-200',
   },
-  MEDIA_KBM: {
-    label: 'Media KBM Interaktif',
+  KESISWAAN_KARAKTER: {
+    label: 'Kesiswaan & Karakter',
     color: '#D97706',
     bgBadge: 'bg-amber-50 text-amber-800',
     borderBadge: 'border-amber-200',
   },
-  ADMINISTRASI: {
-    label: 'Administrasi & Dapodik',
-    color: '#287094',
-    bgBadge: 'bg-[#287094]/10 text-[#287094]',
-    borderBadge: 'border-[#287094]/30',
-  },
-  REFERENSI: {
-    label: 'Referensi & Jurnal',
+  KOMUNIKASI_LAYANAN: {
+    label: 'Komunikasi & Layanan',
     color: '#7C3AED',
     bgBadge: 'bg-purple-50 text-purple-800',
     borderBadge: 'border-purple-200',
@@ -74,179 +63,168 @@ export const TRAFFIC_CATEGORY_METADATA: Record<
 };
 
 /**
- * Katalog awal website rujukan pembelajaran yang dapat dikelola dan disesuaikan oleh Admin
+ * 18 Fitur dan Menu Resmi di Dalam Website Smart-Absensi-Guru
  */
-export const DEFAULT_MONITORED_WEBSITES: MonitoredWebsite[] = [
+export const INTERNAL_APP_FEATURES: InternalAppFeature[] = [
+  // 1. AKADEMIK & PENILAIAN
   {
-    id: 'web_pmm',
-    name: 'Platform Merdeka Mengajar (PMM)',
-    domain: 'guru.kemdikbud.go.id',
-    url: 'https://guru.kemdikbud.go.id/',
-    category: 'KURIKULUM_PMM',
-    description: 'Aplikasi resmi Kemdikbudristek untuk pelatihan mandiri & perangkat ajar',
-    icon: '🇮🇩',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'web_nilai',
-    name: 'Koreksi Soal & Input Nilai Siswa',
-    domain: 'web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app',
-    url: 'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/',
-    category: 'PENILAIAN_RAPOR',
-    description: 'Portal koreksi lembar ujian & penginputan rekap nilai kelas',
+    id: 'koreksi_soal',
+    name: 'Koreksi Soal & Input Nilai',
+    category: 'AKADEMIK_NILAI',
+    description: 'Aplikasi koreksi lembar ujian & rekap nilai siswa',
     icon: '📝',
-    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
-    id: 'web_canva',
-    name: 'Canva untuk Pendidikan',
-    domain: 'canva.com',
-    url: 'https://www.canva.com/education/',
-    category: 'MEDIA_KBM',
-    description: 'Pembuatan slide presentasi interaktif, LKPD, dan infografis ajar',
-    icon: '🎨',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'web_classroom',
-    name: 'Google Classroom',
-    domain: 'classroom.google.com',
-    url: 'https://classroom.google.com/',
-    category: 'KURIKULUM_PMM',
-    description: 'Pengelolaan kelas daring, penugasan, dan pengumpulan tugas siswa',
+    id: 'materials',
+    name: 'Modul & Bahan Ajar KBM',
+    category: 'AKADEMIK_NILAI',
+    description: 'Bank materi modul pembelajaran & referensi KBM guru',
     icon: '📚',
-    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
-    id: 'web_dapodik',
-    name: 'Dapodik Kemdikbudristek',
-    domain: 'dapodik.kemdikbud.go.id',
-    url: 'https://dapodik.kemdikbud.go.id/',
-    category: 'ADMINISTRASI',
-    description: 'Sinkronisasi data pokok pendidikan & beban mengajar guru',
-    icon: '🏛️',
-    createdAt: '2026-01-01T00:00:00.000Z',
+    id: 'jadwal',
+    name: 'Jadwal KBM & Kelas',
+    category: 'AKADEMIK_NILAI',
+    description: 'Jadwal jam mengajar harian dan ruangan kelas sekolah',
+    icon: '📅',
   },
   {
-    id: 'web_quizizz',
-    name: 'Quizizz Pembelajaran Interaktif',
-    domain: 'quizizz.com',
-    url: 'https://quizizz.com/',
-    category: 'MEDIA_KBM',
-    description: 'Kuis interaktif gamifikasi dan asesmen formatif di kelas',
-    icon: '⚡',
-    createdAt: '2026-01-01T00:00:00.000Z',
+    id: 'kalender',
+    name: 'Kalender Agenda & Libur',
+    category: 'AKADEMIK_NILAI',
+    description: 'Kalender akademik sekolah, agenda ujian, dan hari libur',
+    icon: '🗓️',
+  },
+
+  // 2. PRESENSI & KEHADIRAN
+  {
+    id: 'presensi',
+    name: 'Presensi Masuk & Pulang',
+    category: 'PRESENSI_ABSENSI',
+    description: 'Pencatatan presensi masuk dan pulang (QR / Biometrik)',
+    icon: '👆',
   },
   {
-    id: 'web_belajar',
-    name: 'Rumah Belajar Kemdikbud',
-    domain: 'belajar.kemdikbud.go.id',
-    url: 'https://belajar.kemdikbud.go.id/',
-    category: 'REFERENSI',
-    description: 'Laboratorium maya dan bank soal digital Kemdikbud',
-    icon: '🏠',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'web_youtube',
-    name: 'YouTube Edukasi & Sains',
-    domain: 'youtube.com',
-    url: 'https://www.youtube.com/',
-    category: 'MEDIA_KBM',
-    description: 'Video animasi pembelajaran dan demonstrasi praktikum sains',
-    icon: '📺',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'web_erapor',
-    name: 'E-Rapor SMP Terpadu',
-    domain: 'erapor-smp.kemdikbud.go.id',
-    url: 'https://erapor-smp.kemdikbud.go.id/',
-    category: 'PENILAIAN_RAPOR',
-    description: 'Sistem pengolahan nilai rapor kurikulum merdeka',
+    id: 'rekap',
+    name: 'Rekapitulasi Presensi Bulanan',
+    category: 'PRESENSI_ABSENSI',
+    description: 'Rekapitulasi riwayat presensi bulanan dan ketepatan waktu',
     icon: '📊',
-    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
-    id: 'web_wordwall',
-    name: 'Wordwall Edukasi',
-    domain: 'wordwall.net',
-    url: 'https://wordwall.net/',
-    category: 'MEDIA_KBM',
-    description: 'Game edukasi kosakata, teka-teki, dan roda putar siswa',
-    icon: '🎯',
-    createdAt: '2026-01-01T00:00:00.000Z',
+    id: 'izin_cuti',
+    name: 'Pengajuan Izin & Cuti',
+    category: 'PRESENSI_ABSENSI',
+    description: 'Pengajuan surat permohonan izin, sakit, dan dinas luar',
+    icon: '⏱️',
+  },
+  {
+    id: 'koreksi',
+    name: 'Pengajuan Koreksi Absen',
+    category: 'PRESENSI_ABSENSI',
+    description: 'Pengajuan koreksi presensi jika kendala GPS atau lupa absen',
+    icon: '✏️',
+  },
+  {
+    id: 'location',
+    name: 'Peta Lokasi & Geofence GPS',
+    category: 'PRESENSI_ABSENSI',
+    description: 'Pantau koordinat GPS gerbang sekolah dan radius presensi',
+    icon: '📍',
+  },
+
+  // 3. KESISWAAN & KARAKTER
+  {
+    id: 'student_good',
+    name: 'Poin Kebaikan Siswa',
+    category: 'KESISWAAN_KARAKTER',
+    description: 'Poin apresiasi prestasi & perilaku terpuji siswa (Live Sync)',
+    icon: '🌟',
+  },
+  {
+    id: 'student_discipline',
+    name: 'Poin Kedisiplinan Siswa',
+    category: 'KESISWAAN_KARAKTER',
+    description: 'Poin pelanggaran tata tertib & kedisiplinan siswa (Live Sync)',
+    icon: '⚠️',
+  },
+  {
+    id: 'direktori_siswa',
+    name: 'Direktori Siswa & RFID',
+    category: 'KESISWAAN_KARAKTER',
+    description: 'Database siswa, kelas, kontak wali, dan kartu RFID',
+    icon: '🎓',
+  },
+  {
+    id: 'classroom',
+    name: 'Ruang Kelas & Rombel',
+    category: 'KESISWAAN_KARAKTER',
+    description: 'Daftar rombongan belajar dan ruangan kelas sekolah',
+    icon: '🏫',
+  },
+  {
+    id: 'student_kiosk',
+    name: 'Kiosk Tap RFID Siswa',
+    category: 'KESISWAAN_KARAKTER',
+    description: 'Terminal pemindaian tap kartu RFID siswa untuk guru piket',
+    icon: '📻',
+  },
+
+  // 4. KOMUNIKASI & LAYANAN
+  {
+    id: 'complaint',
+    name: 'Kotak Aspirasi / Suara Guru',
+    category: 'KOMUNIKASI_LAYANAN',
+    description: 'Sampaikan aspirasi & masukan secara anonim ke Kepala Sekolah',
+    icon: '💬',
+  },
+  {
+    id: 'mood',
+    name: 'Catatan Mood Harian Guru',
+    category: 'KOMUNIKASI_LAYANAN',
+    description: 'Catat kesiapan energi dan suasana hati sebelum mengajar',
+    icon: '😊',
+  },
+  {
+    id: 'emergency',
+    name: 'Panggilan Darurat SOS Kelas',
+    category: 'KOMUNIKASI_LAYANAN',
+    description: 'Panggilan bantuan darurat kelas instan ke Guru Piket & UKS',
+    icon: '🚨',
+  },
+  {
+    id: 'sarpras_inventory',
+    name: 'Inventaris Sarpras Sekolah',
+    category: 'KOMUNIKASI_LAYANAN',
+    description: 'Inventaris sarana & prasarana sekolah untuk petugas Sarpras',
+    icon: '📦',
   },
 ];
 
-/**
- * Ekstraksi hostname / domain bersih dari URL
- */
-export function extractDomain(rawUrl: string): string {
-  try {
-    const parsed = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
-    return parsed.hostname.replace(/^www\./, '');
-  } catch {
-    return rawUrl.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0] || rawUrl;
-  }
+export function getFeatureById(featureId: string): InternalAppFeature | undefined {
+  return INTERNAL_APP_FEATURES.find((f) => f.id === featureId);
 }
 
-/**
- * Menentukan kategori otomatis berdasarkan domain/URL
- */
-export function inferCategoryFromUrl(url: string, websiteName: string): TrafficCategory {
-  const text = `${url} ${websiteName}`.toLowerCase();
-  if (
-    text.includes('guru.kemdikbud') ||
-    text.includes('pmm') ||
-    text.includes('merdeka') ||
-    text.includes('classroom.google')
-  ) {
-    return 'KURIKULUM_PMM';
+export function inferCategoryFromFeatureId(featureId: string): TrafficCategory {
+  const found = getFeatureById(featureId);
+  if (found) return found.category;
+  if (featureId.includes('student') || featureId.includes('class') || featureId.includes('direktori')) {
+    return 'KESISWAAN_KARAKTER';
   }
-  if (
-    text.includes('nilai') ||
-    text.includes('erapor') ||
-    text.includes('rapor') ||
-    text.includes('koreksi')
-  ) {
-    return 'PENILAIAN_RAPOR';
+  if (featureId.includes('presensi') || featureId.includes('rekap') || featureId.includes('izin') || featureId.includes('koreksi')) {
+    return 'PRESENSI_ABSENSI';
   }
-  if (
-    text.includes('canva') ||
-    text.includes('quizizz') ||
-    text.includes('wordwall') ||
-    text.includes('youtube') ||
-    text.includes('kahoot')
-  ) {
-    return 'MEDIA_KBM';
+  if (featureId.includes('soal') || featureId.includes('material') || featureId.includes('jadwal') || featureId.includes('kalender')) {
+    return 'AKADEMIK_NILAI';
   }
-  if (
-    text.includes('dapodik') ||
-    text.includes('siplah') ||
-    text.includes('simpkb') ||
-    text.includes('ptk.datadik')
-  ) {
-    return 'ADMINISTRASI';
-  }
-  if (
-    text.includes('belajar.kemdikbud') ||
-    text.includes('wikipedia') ||
-    text.includes('sciencedirect') ||
-    text.includes('perpus')
-  ) {
-    return 'REFERENSI';
-  }
-  return 'LAINNYA';
+  return 'KOMUNIKASI_LAYANAN';
 }
 
 let inMemoryLogs: WebTrafficLog[] = [];
-let inMemoryWebsites: MonitoredWebsite[] = [...DEFAULT_MONITORED_WEBSITES];
 
 export class WebTrafficService {
   /**
-   * Mengambil semua riwayat log asli dari localStorage
-   * (Otomatis membersihkan data dummy lawas jika ada)
+   * Mengambil semua log riwayat penggunaan fitur dari localStorage
    */
   public static getAllLogs(): WebTrafficLog[] {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
@@ -263,7 +241,6 @@ export class WebTrafficService {
       }
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        // Bersihkan data seed dummy lawas bila sebelumnya tersimpan
         const realLogs = parsed.filter(
           (log: WebTrafficLog) => log && log.id && !log.id.startsWith('traf_seed_')
         );
@@ -294,77 +271,110 @@ export class WebTrafficService {
   }
 
   /**
-   * Mengambil daftar website yang dipantau (bisa ditambah/diset oleh Admin)
+   * Mengosongkan seluruh riwayat log pemakaian fitur
    */
-  public static getMonitoredWebsites(): MonitoredWebsite[] {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      return inMemoryWebsites;
-    }
-    try {
-      const raw = localStorage.getItem(WEBSITES_STORAGE_KEY);
-      if (!raw) {
-        localStorage.setItem(WEBSITES_STORAGE_KEY, JSON.stringify(DEFAULT_MONITORED_WEBSITES));
-        return DEFAULT_MONITORED_WEBSITES;
-      }
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      return DEFAULT_MONITORED_WEBSITES;
-    } catch {
-      return DEFAULT_MONITORED_WEBSITES;
+  public static clearAllLogs(): void {
+    inMemoryLogs = [];
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+      window.dispatchEvent(new Event('smart_absensi_traffic_updated'));
     }
   }
 
   /**
-   * Admin menambahkan website/portal baru untuk dipantau
+   * Mengambil daftar fitur internal yang dipantau
    */
-  public static addMonitoredWebsite(website: {
-    name: string;
-    url: string;
-    category?: TrafficCategory;
-    description?: string;
-    icon?: string;
-    addedBy?: string;
-  }): MonitoredWebsite {
-    const list = this.getMonitoredWebsites();
-    const domain = extractDomain(website.url);
-    const cat = website.category || inferCategoryFromUrl(website.url, website.name);
+  public static getMonitoredFeatures(): InternalAppFeature[] {
+    return INTERNAL_APP_FEATURES;
+  }
 
-    const newSite: MonitoredWebsite = {
-      id: 'web_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      name: website.name.trim(),
-      domain: domain,
-      url: website.url.trim(),
-      category: cat,
-      description: website.description?.trim() || `Portal daring ${website.name.trim()}`,
-      icon: website.icon || '🌐',
-      addedBy: website.addedBy,
-      createdAt: new Date().toISOString(),
+  // Alias compatibility
+  public static getMonitoredWebsites(): any[] {
+    return INTERNAL_APP_FEATURES.map((f) => ({
+      id: f.id,
+      name: f.name,
+      domain: `menu:${f.id}`,
+      url: `#/${f.id}`,
+      category: f.category,
+      description: f.description,
+      icon: f.icon,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    }));
+  }
+
+  /**
+   * Mencatat aktivitas saat guru membuka salah satu menu/fitur di dalam aplikasi web
+   */
+  public static recordFeatureVisit(params: {
+    user_id: string;
+    user_name: string;
+    user_npp?: string | null;
+    user_role?: string;
+    feature_id: string;
+    feature_name?: string;
+    feature_icon?: string;
+    category?: TrafficCategory;
+    device?: string;
+  }): WebTrafficLog {
+    const featureMeta = getFeatureById(params.feature_id);
+    const resolvedName = params.feature_name || featureMeta?.name || params.feature_id;
+    const resolvedCat = params.category || featureMeta?.category || inferCategoryFromFeatureId(params.feature_id);
+    const resolvedIcon = params.feature_icon || featureMeta?.icon || '⚡';
+
+    // Format NPP Standar
+    const rawNpp = params.user_npp?.trim() || '';
+    const formattedNpp = rawNpp
+      ? rawNpp.startsWith('NPP.')
+        ? rawNpp
+        : `NPP. ${rawNpp}`
+      : 'NPP. -';
+
+    // Deteksi Perangkat
+    let deviceLabel = params.device;
+    if (!deviceLabel && typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+      const ua = navigator.userAgent;
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+      const isMac = /Macintosh|Mac OS/i.test(ua);
+      const isWindows = /Windows/i.test(ua);
+
+      if (isMobile) {
+        deviceLabel = ua.includes('iPhone') ? 'HP Apple (iOS)' : 'HP Android';
+      } else if (isWindows) {
+        deviceLabel = 'Desktop Windows';
+      } else if (isMac) {
+        deviceLabel = 'MacBook (macOS)';
+      } else {
+        deviceLabel = 'Web Browser';
+      }
+    }
+
+    const log: WebTrafficLog = {
+      id: 'traf_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      user_id: params.user_id,
+      user_name: params.user_name,
+      user_npp: formattedNpp,
+      user_role: params.user_role || 'GURU',
+      feature_id: params.feature_id,
+      feature_name: resolvedName,
+      feature_icon: resolvedIcon,
+      category: resolvedCat,
+      accessed_at: new Date().toISOString(),
+      device: deviceLabel || 'Web Desktop',
+      // Compatibility aliases
+      website_name: resolvedName,
+      domain: `fitur:${params.feature_id}`,
+      url: `#/${params.feature_id}`,
     };
 
-    const updated = [newSite, ...list];
-    inMemoryWebsites = updated;
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      localStorage.setItem(WEBSITES_STORAGE_KEY, JSON.stringify(updated));
-      window.dispatchEvent(new Event('smart_absensi_monitored_websites_updated'));
-    }
-    return newSite;
+    const currentLogs = this.getAllLogs();
+    const updated = [log, ...currentLogs].slice(0, 2000); // Pertahankan maks 2000 log terbaru
+    this.saveLogs(updated);
+
+    return log;
   }
 
   /**
-   * Admin menghapus website dari daftar pantauan
-   */
-  public static deleteMonitoredWebsite(id: string): void {
-    const list = this.getMonitoredWebsites();
-    const updated = list.filter((s) => s.id !== id);
-    inMemoryWebsites = updated;
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      localStorage.setItem(WEBSITES_STORAGE_KEY, JSON.stringify(updated));
-      window.dispatchEvent(new Event('smart_absensi_monitored_websites_updated'));
-    }
-  }
-
-  /**
-   * Mencatat kunjungan situs web baru oleh guru yang terdaftar
+   * Method compatibility untuk memanggil recordFeatureVisit
    */
   public static recordVisit(params: {
     user_id: string;
@@ -372,118 +382,96 @@ export class WebTrafficService {
     user_npp?: string | null;
     user_role?: string;
     website_name: string;
-    url: string;
+    url?: string;
     domain?: string;
     category?: TrafficCategory;
     device?: string;
-    duration_seconds?: number;
   }): WebTrafficLog {
-    const domain = params.domain || extractDomain(params.url);
-    const category = params.category || inferCategoryFromUrl(params.url, params.website_name);
-
-    // Auto-detect device
-    let detectedDevice = params.device;
-    if (!detectedDevice && typeof navigator !== 'undefined') {
-      const ua = navigator.userAgent;
-      if (/android/i.test(ua)) detectedDevice = 'Mobile Android';
-      else if (/iphone|ipad|ipod/i.test(ua)) detectedDevice = 'Mobile iOS';
-      else if (/windows/i.test(ua)) detectedDevice = 'Desktop Windows';
-      else if (/macintosh/i.test(ua)) detectedDevice = 'Desktop macOS';
-      else detectedDevice = 'Web Browser';
+    // Cari feature_id yang cocok jika website_name dipassing
+    let matchedFeatureId = 'koreksi_soal';
+    for (const f of INTERNAL_APP_FEATURES) {
+      if (
+        params.website_name.toLowerCase().includes(f.name.toLowerCase()) ||
+        params.website_name.toLowerCase().includes(f.id)
+      ) {
+        matchedFeatureId = f.id;
+        break;
+      }
     }
 
-    const nppFormatted = params.user_npp
-      ? params.user_npp.startsWith('NPP.')
-        ? params.user_npp
-        : `NPP. ${params.user_npp}`
-      : 'NPP. -';
-
-    const newLog: WebTrafficLog = {
-      id: 'traf_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    return this.recordFeatureVisit({
       user_id: params.user_id,
       user_name: params.user_name,
-      user_npp: nppFormatted,
-      user_role: params.user_role || 'GURU',
-      website_name: params.website_name,
-      domain: domain,
-      url: params.url,
-      category: category,
-      accessed_at: new Date().toISOString(),
-      device: detectedDevice || 'Web App Client',
-      duration_seconds: params.duration_seconds || 180,
-    };
-
-    const currentLogs = this.getAllLogs();
-    const updated = [newLog, ...currentLogs];
-    if (updated.length > 1000) {
-      updated.length = 1000;
-    }
-
-    this.saveLogs(updated);
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('smart_absensi_traffic_new_entry', { detail: newLog })
-      );
-    }
-
-    return newLog;
-  }
-
-  /**
-   * Mengambil log yang sudah difilter sesuai kriteria
-   */
-  public static getFilteredLogs(filter?: TrafficFilterOptions): WebTrafficLog[] {
-    const logs = this.getAllLogs();
-    if (!filter) return logs;
-
-    const now = new Date();
-    const todayDateStr = now.toISOString().slice(0, 10);
-
-    return logs.filter((log) => {
-      // 1. Filter Rentang Waktu
-      if (filter.dateRange && filter.dateRange !== 'ALL') {
-        const logDate = new Date(log.accessed_at);
-        if (filter.dateRange === 'TODAY') {
-          if (log.accessed_at.slice(0, 10) !== todayDateStr) return false;
-        } else if (filter.dateRange === '7_DAYS') {
-          const diffDays = (now.getTime() - logDate.getTime()) / (1000 * 3600 * 24);
-          if (diffDays > 7) return false;
-        } else if (filter.dateRange === '30_DAYS') {
-          const diffDays = (now.getTime() - logDate.getTime()) / (1000 * 3600 * 24);
-          if (diffDays > 30) return false;
-        }
-      }
-
-      // 2. Filter Guru
-      if (filter.teacherId && filter.teacherId !== 'ALL') {
-        if (log.user_id !== filter.teacherId) return false;
-      }
-
-      // 3. Filter Kategori
-      if (filter.category && filter.category !== 'ALL') {
-        if (log.category !== filter.category) return false;
-      }
-
-      // 4. Filter Pencarian Teks (Nama website, domain, guru, npp)
-      if (filter.searchQuery && filter.searchQuery.trim()) {
-        const q = filter.searchQuery.toLowerCase().trim();
-        const match =
-          log.website_name.toLowerCase().includes(q) ||
-          log.domain.toLowerCase().includes(q) ||
-          log.user_name.toLowerCase().includes(q) ||
-          log.user_npp.toLowerCase().includes(q) ||
-          log.url.toLowerCase().includes(q);
-        if (!match) return false;
-      }
-
-      return true;
+      user_npp: params.user_npp,
+      user_role: params.user_role,
+      feature_id: matchedFeatureId,
+      feature_name: params.website_name,
+      category: params.category,
+      device: params.device,
     });
   }
 
   /**
-   * Analisis lengkap: Top Websites Leaderboard, Per-Guru Asli Terdaftar, Kategori, dan Jam Puncak
-   * Menggunakan daftar guru asli terdaftar (targetTeachers) yang diatur oleh Admin.
+   * Mengambil log yang difilter
+   */
+  public static getFilteredLogs(options?: TrafficFilterOptions): WebTrafficLog[] {
+    const all = this.getAllLogs();
+    if (!options) return all;
+
+    let filtered = [...all];
+
+    // Filter Rentang Waktu
+    if (options.dateRange && options.dateRange !== 'ALL') {
+      const now = new Date();
+      filtered = filtered.filter((log) => {
+        const logDate = new Date(log.accessed_at);
+        const diffHours = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
+
+        if (options.dateRange === 'TODAY') {
+          return (
+            logDate.getDate() === now.getDate() &&
+            logDate.getMonth() === now.getMonth() &&
+            logDate.getFullYear() === now.getFullYear()
+          );
+        }
+        if (options.dateRange === '7_DAYS') {
+          return diffHours <= 24 * 7;
+        }
+        if (options.dateRange === '30_DAYS') {
+          return diffHours <= 24 * 30;
+        }
+        return true;
+      });
+    }
+
+    // Filter Guru
+    if (options.teacherId && options.teacherId !== 'ALL') {
+      filtered = filtered.filter((log) => log.user_id === options.teacherId);
+    }
+
+    // Filter Kategori
+    if (options.category && options.category !== 'ALL') {
+      filtered = filtered.filter((log) => log.category === options.category);
+    }
+
+    // Filter Pencarian (Nama fitur, Guru, NPP)
+    if (options.searchQuery && options.searchQuery.trim()) {
+      const q = options.searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(
+        (log) =>
+          log.feature_name.toLowerCase().includes(q) ||
+          log.user_name.toLowerCase().includes(q) ||
+          (log.user_npp && log.user_npp.toLowerCase().includes(q)) ||
+          log.feature_id.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Menghitung Ringkasan Analitik Penggunaan Fitur Web
+   * targetTeachers: Daftar seluruh guru resmi terdaftar yang diatur oleh Admin
    */
   public static getAnalytics(
     filter?: TrafficFilterOptions,
@@ -492,37 +480,39 @@ export class WebTrafficService {
     const filteredLogs = this.getFilteredLogs(filter);
     const totalVisits = filteredLogs.length;
 
-    // 1. Agregasi Top Websites
-    const domainMap = new Map<
+    // 1. Agregasi Penggunaan Per Fitur
+    const featureMap = new Map<
       string,
       {
-        domain: string;
-        website_name: string;
+        feature_id: string;
+        feature_name: string;
+        feature_icon: string;
         category: TrafficCategory;
         count: number;
         teachers: Set<string>;
-        userCounts: Map<string, { user_id: string; user_name: string; count: number }>;
         lastAccessed: string;
+        userCounts: Map<string, { user_id: string; user_name: string; count: number }>;
       }
     >();
 
     filteredLogs.forEach((log) => {
-      const key = log.domain.toLowerCase();
-      if (!domainMap.has(key)) {
-        domainMap.set(key, {
-          domain: log.domain,
-          website_name: log.website_name,
+      const fid = log.feature_id || 'lainnya';
+      if (!featureMap.has(fid)) {
+        featureMap.set(fid, {
+          feature_id: fid,
+          feature_name: log.feature_name || fid,
+          feature_icon: log.feature_icon || '⚡',
           category: log.category,
           count: 0,
-          teachers: new Set<string>(),
-          userCounts: new Map(),
+          teachers: new Set(),
           lastAccessed: log.accessed_at,
+          userCounts: new Map(),
         });
       }
-      const entry = domainMap.get(key)!;
+
+      const entry = featureMap.get(fid)!;
       entry.count += 1;
       entry.teachers.add(log.user_id);
-
       if (new Date(log.accessed_at) > new Date(entry.lastAccessed)) {
         entry.lastAccessed = log.accessed_at;
       }
@@ -536,10 +526,11 @@ export class WebTrafficService {
       entry.userCounts.set(log.user_id, userEntry);
     });
 
-    const topWebsites: WebsiteTrafficSummary[] = Array.from(domainMap.values())
+    const topFeatures: FeatureTrafficSummary[] = Array.from(featureMap.values())
       .map((entry) => ({
-        domain: entry.domain,
-        website_name: entry.website_name,
+        feature_id: entry.feature_id,
+        feature_name: entry.feature_name,
+        feature_icon: entry.feature_icon,
         category: entry.category,
         total_visits: entry.count,
         unique_teachers: entry.teachers.size,
@@ -548,6 +539,9 @@ export class WebTrafficService {
         top_users: Array.from(entry.userCounts.values())
           .sort((a, b) => b.count - a.count)
           .slice(0, 3),
+        // Compatibility
+        domain: `fitur:${entry.feature_id}`,
+        website_name: entry.feature_name,
       }))
       .sort((a, b) => b.total_visits - a.total_visits);
 
@@ -560,13 +554,13 @@ export class WebTrafficService {
         user_npp: string;
         user_role: string;
         count: number;
-        websites: Map<string, number>;
+        features: Map<string, number>;
         categories: Map<TrafficCategory, number>;
         lastAccessed: string;
       }
     >();
 
-    // Jika daftar guru terdaftar disediakan oleh Admin, inisialisasi semua guru asli sekolah
+    // Jika daftar guru terdaftar disediakan oleh Admin, inisialisasi semua guru resmi sekolah
     if (targetTeachers && targetTeachers.length > 0) {
       targetTeachers.forEach((t: any) => {
         const name = t.full_name || t.name || 'Guru';
@@ -578,7 +572,7 @@ export class WebTrafficService {
           user_npp: npp,
           user_role: t.role || 'GURU',
           count: 0,
-          websites: new Map(),
+          features: new Map(),
           categories: new Map(),
           lastAccessed: '',
         });
@@ -586,10 +580,8 @@ export class WebTrafficService {
     }
 
     filteredLogs.forEach((log) => {
-      // Cari apakah log cocok dengan guru yang ada di teacherMap
       let targetKey = log.user_id;
       if (!teacherMap.has(targetKey)) {
-        // Coba cocokan berdasarkan nama atau npp jika user_id berbeda format
         for (const [key, val] of teacherMap.entries()) {
           if (
             val.user_name.toLowerCase() === log.user_name.toLowerCase() ||
@@ -608,7 +600,7 @@ export class WebTrafficService {
           user_npp: log.user_npp,
           user_role: log.user_role,
           count: 0,
-          websites: new Map(),
+          features: new Map(),
           categories: new Map(),
           lastAccessed: log.accessed_at,
         });
@@ -616,7 +608,7 @@ export class WebTrafficService {
 
       const t = teacherMap.get(targetKey)!;
       t.count += 1;
-      t.websites.set(log.website_name, (t.websites.get(log.website_name) || 0) + 1);
+      t.features.set(log.feature_name, (t.features.get(log.feature_name) || 0) + 1);
       t.categories.set(log.category, (t.categories.get(log.category) || 0) + 1);
       if (!t.lastAccessed || new Date(log.accessed_at) > new Date(t.lastAccessed)) {
         t.lastAccessed = log.accessed_at;
@@ -625,16 +617,16 @@ export class WebTrafficService {
 
     const teacherSummaries: TeacherTrafficSummary[] = Array.from(teacherMap.values())
       .map((t) => {
-        let topWeb = '-';
-        let maxWebCount = 0;
-        t.websites.forEach((cnt, web) => {
-          if (cnt > maxWebCount) {
-            maxWebCount = cnt;
-            topWeb = web;
+        let topFeat = '-';
+        let maxFeatCount = 0;
+        t.features.forEach((cnt, feat) => {
+          if (cnt > maxFeatCount) {
+            maxFeatCount = cnt;
+            topFeat = feat;
           }
         });
 
-        let topCat: TrafficCategory = 'KURIKULUM_PMM';
+        let topCat: TrafficCategory = 'AKADEMIK_NILAI';
         let maxCatCount = 0;
         t.categories.forEach((cnt, cat) => {
           if (cnt > maxCatCount) {
@@ -649,7 +641,8 @@ export class WebTrafficService {
           user_npp: t.user_npp,
           user_role: t.user_role,
           total_visits: t.count,
-          top_website: t.count > 0 ? topWeb : 'Belum ada aktivitas',
+          top_feature: t.count > 0 ? topFeat : 'Belum ada aktivitas',
+          top_website: t.count > 0 ? topFeat : 'Belum ada aktivitas',
           top_category: topCat,
           last_accessed_at: t.lastAccessed || '',
         };
@@ -658,122 +651,129 @@ export class WebTrafficService {
 
     // 3. Distribusi Kategori
     const categoryCountMap: Record<TrafficCategory, number> = {
-      KURIKULUM_PMM: 0,
-      PENILAIAN_RAPOR: 0,
-      MEDIA_KBM: 0,
-      ADMINISTRASI: 0,
-      REFERENSI: 0,
+      AKADEMIK_NILAI: 0,
+      PRESENSI_ABSENSI: 0,
+      KESISWAAN_KARAKTER: 0,
+      KOMUNIKASI_LAYANAN: 0,
       LAINNYA: 0,
     };
 
     filteredLogs.forEach((log) => {
-      categoryCountMap[log.category] = (categoryCountMap[log.category] || 0) + 1;
+      const cat = log.category in categoryCountMap ? log.category : 'LAINNYA';
+      categoryCountMap[cat] = (categoryCountMap[cat] || 0) + 1;
     });
 
     const categoryDistribution: CategoryDistribution[] = (
       Object.keys(categoryCountMap) as TrafficCategory[]
     )
-      .map((cat) => {
-        const cnt = categoryCountMap[cat];
-        return {
-          category: cat,
-          label: TRAFFIC_CATEGORY_METADATA[cat].label,
-          count: cnt,
-          percentage: totalVisits > 0 ? Math.round((cnt / totalVisits) * 100) : 0,
-          color: TRAFFIC_CATEGORY_METADATA[cat].color,
-        };
-      })
+      .filter((k) => k !== 'LAINNYA' || categoryCountMap.LAINNYA > 0)
+      .map((cat) => ({
+        category: cat,
+        label: TRAFFIC_CATEGORY_METADATA[cat]?.label || cat,
+        count: categoryCountMap[cat],
+        percentage: totalVisits > 0 ? Math.round((categoryCountMap[cat] / totalVisits) * 100) : 0,
+        color: TRAFFIC_CATEGORY_METADATA[cat]?.color || '#64748B',
+      }))
       .sort((a, b) => b.count - a.count);
 
-    // 4. Jam Puncak Akses (07:00 s/d 17:00)
-    const hours = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
-    const hourlyCounts: Record<string, number> = {};
-    hours.forEach((h) => (hourlyCounts[h] = 0));
+    // 4. Tren Akses Per Jam (07.00 - 17.00 WIB)
+    const hourlyBuckets: Record<string, number> = {
+      '07:00': 0,
+      '08:00': 0,
+      '09:00': 0,
+      '10:00': 0,
+      '11:00': 0,
+      '12:00': 0,
+      '13:00': 0,
+      '14:00': 0,
+      '15:00': 0,
+      '16:00': 0,
+      '17:00': 0,
+    };
 
     filteredLogs.forEach((log) => {
       const d = new Date(log.accessed_at);
-      const hStr = String(d.getHours()).padStart(2, '0') + ':00';
-      if (hourlyCounts[hStr] !== undefined) {
-        hourlyCounts[hStr] += 1;
+      const h = d.getHours();
+      if (h >= 7 && h <= 17) {
+        const slotKey = `${String(h).padStart(2, '0')}:00`;
+        if (slotKey in hourlyBuckets) {
+          hourlyBuckets[slotKey] += 1;
+        }
       }
     });
 
-    const hourlyTrend: HourlyTrafficPoint[] = hours.map((h) => ({
-      hour: h,
-      count: hourlyCounts[h] || 0,
+    const hourlyTrend: HourlyTrafficPoint[] = Object.keys(hourlyBuckets).map((hour) => ({
+      hour,
+      count: hourlyBuckets[hour],
     }));
 
-    const topCategoryObj =
-      categoryDistribution[0]?.count > 0
-        ? {
-            category: categoryDistribution[0].category,
-            label: categoryDistribution[0].label,
-            count: categoryDistribution[0].count,
-          }
-        : null;
+    // Top Category
+    const topCat = categoryDistribution.length > 0 && categoryDistribution[0].count > 0
+      ? {
+          category: categoryDistribution[0].category,
+          label: categoryDistribution[0].label,
+          count: categoryDistribution[0].count,
+        }
+      : null;
 
-    const mostActive = teacherSummaries.find((t) => t.total_visits > 0) || null;
+    const mostActive = teacherSummaries.length > 0 && teacherSummaries[0].total_visits > 0
+      ? teacherSummaries[0]
+      : null;
+
+    const topFeat = topFeatures.length > 0 ? topFeatures[0] : null;
 
     return {
       totalVisits,
-      topWebsite: topWebsites[0] || null,
+      topFeature: topFeat,
+      topWebsite: topFeat,
       mostActiveTeacher: mostActive,
-      topCategory: topCategoryObj,
+      topCategory: topCat,
       categoryDistribution,
       hourlyTrend,
-      topWebsites,
+      topFeatures,
+      topWebsites: topFeatures,
       teacherSummaries,
     };
   }
 
   /**
-   * Hapus seluruh data log riwayat
-   */
-  public static clearAllLogs(): void {
-    inMemoryLogs = [];
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
-      window.dispatchEvent(new Event('smart_absensi_traffic_updated'));
-    }
-  }
-
-  /**
-   * Ekspor data riwayat trafik guru ke format CSV / Excel
+   * Ekspor Log ke CSV dengan Standar NPP
    */
   public static exportToCSV(logs: WebTrafficLog[]): string {
     const headers = [
-      'ID Kunjungan',
+      'ID Aktivitas',
       'Waktu Akses (WIB)',
       'Nama Guru',
       'NPP Pegawai',
-      'Peran',
-      'Nama Website / Portal',
-      'Domain',
-      'URL Tautan',
+      'Role',
+      'Fitur / Menu Dibuka',
       'Kategori',
       'Perangkat',
     ];
 
     const rows = logs.map((log) => {
-      const timeStr = new Date(log.accessed_at).toLocaleString('id-ID', {
+      const dateStr = new Date(log.accessed_at).toLocaleString('id-ID', {
         timeZone: 'Asia/Jakarta',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
       });
-      const catLabel = TRAFFIC_CATEGORY_METADATA[log.category]?.label || log.category;
 
       return [
-        log.id,
-        `"${timeStr}"`,
+        `"${log.id}"`,
+        `"${dateStr}"`,
         `"${log.user_name.replace(/"/g, '""')}"`,
-        `"${log.user_npp}"`,
+        `"${log.user_npp.replace(/"/g, '""')}"`,
         `"${log.user_role}"`,
-        `"${log.website_name.replace(/"/g, '""')}"`,
-        `"${log.domain}"`,
-        `"${log.url.replace(/"/g, '""')}"`,
-        `"${catLabel}"`,
-        `"${log.device}"`,
+        `"${log.feature_name.replace(/"/g, '""')}"`,
+        `"${TRAFFIC_CATEGORY_METADATA[log.category]?.label || log.category}"`,
+        `"${log.device || 'Desktop'}"`,
       ].join(',');
     });
 
-    return [headers.join(','), ...rows].join('\r\n');
+    return [headers.join(','), ...rows].join('\n');
   }
 }

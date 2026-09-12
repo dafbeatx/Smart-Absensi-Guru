@@ -397,6 +397,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   };
 
   const handleQuickIconClick = (iconId: string) => {
+    if (effectiveUser) {
+      WebTrafficService.recordFeatureVisit({
+        user_id: effectiveUser.id,
+        user_name: effectiveUser.full_name,
+        user_npp: effectiveUser.nip,
+        user_role: effectiveUser.role,
+        feature_id: iconId,
+      });
+    }
+
     switch (iconId) {
       case 'sarpras_inventory':
         if (isSarprasOfficer) {
@@ -421,17 +431,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         handleOpenCorrectionModal();
         break;
       case 'koreksi_soal':
-        if (effectiveUser) {
-          WebTrafficService.recordVisit({
-            user_id: effectiveUser.id,
-            user_name: effectiveUser.full_name,
-            user_npp: effectiveUser.nip ? `NPP. ${effectiveUser.nip}` : 'NPP. -',
-            user_role: effectiveUser.role || 'GURU',
-            website_name: 'Koreksi Soal & Input Nilai Siswa',
-            url: 'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/',
-            category: 'PENILAIAN_RAPOR',
-          });
-        }
         window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
         break;
       case 'direktori_siswa':
@@ -2486,6 +2485,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      if (effectiveUser) {
+                        WebTrafficService.recordFeatureVisit({
+                          user_id: effectiveUser.id,
+                          user_name: effectiveUser.full_name,
+                          user_npp: effectiveUser.nip,
+                          user_role: effectiveUser.role,
+                          feature_id: 'student_good',
+                        });
+                      }
                       setStudentBehaviorInitialTab('KEBAIKAN');
                       setIsStudentBehaviorModalOpen(true);
                     }}
@@ -2518,6 +2526,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      if (effectiveUser) {
+                        WebTrafficService.recordFeatureVisit({
+                          user_id: effectiveUser.id,
+                          user_name: effectiveUser.full_name,
+                          user_npp: effectiveUser.nip,
+                          user_role: effectiveUser.role,
+                          feature_id: 'student_discipline',
+                        });
+                      }
                       setStudentBehaviorInitialTab('KEDISIPLINAN');
                       setIsStudentBehaviorModalOpen(true);
                     }}

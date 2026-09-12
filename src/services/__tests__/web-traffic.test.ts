@@ -1,11 +1,12 @@
 /**
- * SMART ABSENSI GURU - WEB TRAFFIC & ACTIVITY TRACKING TEST SUITE
+ * SMART ABSENSI GURU - IN-APP FEATURE & MENU USAGE TRAFFIC TEST SUITE
  */
 
 import {
   WebTrafficService,
-  extractDomain,
-  inferCategoryFromUrl,
+  INTERNAL_APP_FEATURES,
+  getFeatureById,
+  inferCategoryFromFeatureId,
 } from '../web-traffic.service';
 
 export const runWebTrafficTestSuite = async (): Promise<{
@@ -28,63 +29,60 @@ export const runWebTrafficTestSuite = async (): Promise<{
   };
 
   try {
-    // Test 1: Extract domain helper
-    const domain1 = extractDomain('https://guru.kemdikbud.go.id/pelatihan-mandiri');
-    const domain2 = extractDomain('https://www.canva.com/education/');
-    const domain3 = extractDomain('classroom.google.com/u/0/h');
+    // Test 1: 18 Internal App Features Catalog
+    const featKoreksi = getFeatureById('koreksi_soal');
     assert(
-      'Traffic - Extracts Clean Domain from URLs',
-      domain1 === 'guru.kemdikbud.go.id' &&
-      domain2 === 'canva.com' &&
-      domain3 === 'classroom.google.com',
-      `Got: ${domain1}, ${domain2}, ${domain3}`
+      'Traffic - Contains 18 Internal In-App Features Catalog',
+      INTERNAL_APP_FEATURES.length === 18 &&
+      featKoreksi !== undefined &&
+      featKoreksi.name === 'Koreksi Soal & Input Nilai' &&
+      INTERNAL_APP_FEATURES.some((f) => f.id === 'presensi') &&
+      INTERNAL_APP_FEATURES.some((f) => f.id === 'student_good') &&
+      INTERNAL_APP_FEATURES.some((f) => f.id === 'complaint'),
+      `Features count: ${INTERNAL_APP_FEATURES.length}`
     );
 
-    // Test 2: Infer Category From URL / Website Name
-    const cat1 = inferCategoryFromUrl('https://guru.kemdikbud.go.id/', 'Platform Merdeka Mengajar');
-    const cat2 = inferCategoryFromUrl('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', 'Input Nilai');
-    const cat3 = inferCategoryFromUrl('https://canva.com', 'Canva Edukasi');
-    const cat4 = inferCategoryFromUrl('https://dapodik.kemdikbud.go.id', 'Dapodik Kemdikbud');
-    const cat5 = inferCategoryFromUrl('https://belajar.kemdikbud.go.id', 'Rumah Belajar');
+    // Test 2: Category Inference from Feature ID
+    const cat1 = inferCategoryFromFeatureId('koreksi_soal');
+    const cat2 = inferCategoryFromFeatureId('presensi');
+    const cat3 = inferCategoryFromFeatureId('student_discipline');
+    const cat4 = inferCategoryFromFeatureId('emergency');
     assert(
-      'Traffic - Infers Correct Educational Categories',
-      cat1 === 'KURIKULUM_PMM' &&
-      cat2 === 'PENILAIAN_RAPOR' &&
-      cat3 === 'MEDIA_KBM' &&
-      cat4 === 'ADMINISTRASI' &&
-      cat5 === 'REFERENSI',
-      `Categories: ${cat1}, ${cat2}, ${cat3}, ${cat4}, ${cat5}`
+      'Traffic - Infers Correct Internal Categories from Feature IDs',
+      cat1 === 'AKADEMIK_NILAI' &&
+      cat2 === 'PRESENSI_ABSENSI' &&
+      cat3 === 'KESISWAAN_KARAKTER' &&
+      cat4 === 'KOMUNIKASI_LAYANAN',
+      `Categories: ${cat1}, ${cat2}, ${cat3}, ${cat4}`
     );
 
-    // Test 3: Record Visit & NPP Formatting
-    const recorded = WebTrafficService.recordVisit({
+    // Test 3: Record In-App Feature Visit & NPP Formatting
+    const recorded = WebTrafficService.recordFeatureVisit({
       user_id: 'usr_test_99',
       user_name: 'Dewi Sartika, S.Pd.',
       user_npp: '199001012015012001',
       user_role: 'GURU',
-      website_name: 'Platform Merdeka Mengajar (PMM)',
-      url: 'https://guru.kemdikbud.go.id/',
-      category: 'KURIKULUM_PMM',
+      feature_id: 'koreksi_soal',
       device: 'Desktop Windows (Chrome)',
     });
 
     assert(
-      'Traffic - Records Visit with Formatted NPP Standard',
+      'Traffic - Records Feature Visit with Formatted NPP Standard',
       recorded.user_npp.startsWith('NPP. ') &&
-      recorded.domain === 'guru.kemdikbud.go.id' &&
-      recorded.category === 'KURIKULUM_PMM',
+      recorded.feature_id === 'koreksi_soal' &&
+      recorded.category === 'AKADEMIK_NILAI',
       `Recorded: ${JSON.stringify(recorded)}`
     );
 
-    // Test 4: Seed and Analytics Aggregation
+    // Test 4: Analytics Aggregation (Top Feature, Category, Hourly Trend)
     const analytics = WebTrafficService.getAnalytics();
     assert(
-      'Traffic - Calculates Analytics Summary Accurately',
+      'Traffic - Calculates In-App Analytics Summary Accurately',
       analytics.totalVisits > 0 &&
-      analytics.topWebsites.length > 0 &&
+      analytics.topFeatures.length > 0 &&
       analytics.categoryDistribution.length > 0 &&
       analytics.hourlyTrend.length === 11,
-      `Total: ${analytics.totalVisits}, Top: ${analytics.topWebsite?.website_name}`
+      `Total: ${analytics.totalVisits}, Top Feature: ${analytics.topFeature?.feature_name}`
     );
 
     // Test 5: Filter by Teacher
@@ -99,15 +97,15 @@ export const runWebTrafficTestSuite = async (): Promise<{
       `Filtered count: ${filteredByTeacher.length}`
     );
 
-    // Test 6: Search Query Filter (Domain / Name / NPP)
+    // Test 6: Search Query Filter (Feature Name / Teacher Name / NPP)
     const searchLogs = WebTrafficService.getFilteredLogs({
       dateRange: 'ALL',
-      searchQuery: 'Dewi Sartika',
+      searchQuery: 'Koreksi Soal',
     });
     assert(
-      'Traffic - Filters Logs by Search Query',
+      'Traffic - Filters Logs by Feature Search Query',
       searchLogs.length >= 1 &&
-      searchLogs.every((l) => l.user_name.includes('Dewi Sartika')),
+      searchLogs.every((l) => l.feature_name.includes('Koreksi Soal')),
       `Search count: ${searchLogs.length}`
     );
 
@@ -115,10 +113,10 @@ export const runWebTrafficTestSuite = async (): Promise<{
     const csv = WebTrafficService.exportToCSV([recorded]);
     assert(
       'Traffic - Generates Valid CSV Export Content',
-      csv.includes('ID Kunjungan') &&
+      csv.includes('ID Aktivitas') &&
       csv.includes('NPP Pegawai') &&
       csv.includes('Dewi Sartika') &&
-      csv.includes('guru.kemdikbud.go.id'),
+      csv.includes('Koreksi Soal'),
       'CSV header and row verified'
     );
 
@@ -128,45 +126,28 @@ export const runWebTrafficTestSuite = async (): Promise<{
       { id: 'usr_active_teacher_2', name: 'Ahmad Dahlan, M.Pd.', npp: '198805052012011002' },
     ];
     const analyticsWithTeachers = WebTrafficService.getAnalytics(undefined, mockAdminTeachers);
-    const dewiSummary = analyticsWithTeachers.teacherSummaries.find(t => t.user_id === 'usr_test_99');
-    const ahmadSummary = analyticsWithTeachers.teacherSummaries.find(t => t.user_id === 'usr_active_teacher_2');
+    const dewiSummary = analyticsWithTeachers.teacherSummaries.find((t) => t.user_id === 'usr_test_99');
+    const ahmadSummary = analyticsWithTeachers.teacherSummaries.find((t) => t.user_id === 'usr_active_teacher_2');
 
     assert(
-      'Traffic - Maps Admin Registered Teachers Accurately with Honest Activity Counts',
+      'Traffic - Maps Admin Registered Teachers with Honest Activity Counts',
       analyticsWithTeachers.teacherSummaries.length === 2 &&
       dewiSummary?.total_visits === 1 &&
       ahmadSummary?.total_visits === 0 &&
-      ahmadSummary?.top_website === 'Belum ada aktivitas',
+      ahmadSummary?.top_feature === 'Belum ada aktivitas',
       `Dewi visits: ${dewiSummary?.total_visits}, Ahmad visits: ${ahmadSummary?.total_visits}`
     );
 
-    // Test 9: Monitored Websites Management (Add & Retrieve)
-    const addedSite = WebTrafficService.addMonitoredWebsite({
-      name: 'LMS Sekolah Sukses',
-      url: 'https://lms.sekolahku.sch.id',
-      category: 'MEDIA_KBM',
-      description: 'Moodle LMS Resmi Sekolah',
-    });
-    const monitoredList = WebTrafficService.getMonitoredWebsites();
-    const foundSite = monitoredList.find(s => s.id === addedSite.id);
-    assert(
-      'Traffic - Admin Can Add and Retrieve Monitored Websites',
-      foundSite !== undefined &&
-      foundSite.domain === 'lms.sekolahku.sch.id' &&
-      foundSite.name === 'LMS Sekolah Sukses',
-      `Found: ${foundSite?.name} (${foundSite?.domain})`
-    );
-
-    // Test 10: Legacy Seed Data Purging
+    // Test 9: Legacy Seed Data Purging
     WebTrafficService.saveLogs([
-      { id: 'traf_seed_fake_1', user_name: 'Fake Teacher', website_name: 'Fake Site' } as any,
+      { id: 'traf_seed_fake_1', user_name: 'Fake Teacher', feature_name: 'Fake Feature' } as any,
       recorded,
     ]);
     const cleanLogs = WebTrafficService.getAllLogs();
     assert(
       'Traffic - Automatically Purges Legacy Fake Seed Logs',
-      cleanLogs.every(l => !l.id.startsWith('traf_seed_')) &&
-      cleanLogs.some(l => l.id === recorded.id),
+      cleanLogs.every((l) => !l.id.startsWith('traf_seed_')) &&
+      cleanLogs.some((l) => l.id === recorded.id),
       `Clean logs count: ${cleanLogs.length}`
     );
   } catch (err: any) {

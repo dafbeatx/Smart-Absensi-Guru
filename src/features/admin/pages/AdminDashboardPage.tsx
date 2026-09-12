@@ -422,8 +422,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     },
     {
       id: 'TRAFFIC',
-      label: 'Trafik Web Guru',
-      icon: '🌐',
+      label: 'Trafik Fitur Guru',
+      icon: '📊',
     },
     {
       id: 'TEACHERS',

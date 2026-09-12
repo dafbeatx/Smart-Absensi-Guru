@@ -231,14 +231,13 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
                         target="_blank"
                         rel="noreferrer"
                         onClick={() => {
-                          WebTrafficService.recordVisit({
+                          WebTrafficService.recordFeatureVisit({
                             user_id: user.id,
                             user_name: user.full_name,
                             user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
                             user_role: user.role || 'GURU',
-                            website_name: m.title,
-                            url: m.fileUrl,
-                            category: 'REFERENSI',
+                            feature_id: 'materials',
+                            feature_name: `Bahan Ajar: ${m.title}`,
                           });
                         }}
                         className="px-2.5 py-1 bg-violet-50 text-violet-800 hover:bg-violet-100 font-extrabold rounded-lg border border-violet-200 flex items-center gap-1 cursor-pointer"

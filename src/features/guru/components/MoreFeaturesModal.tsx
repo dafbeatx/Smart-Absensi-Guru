@@ -81,16 +81,14 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           subtitle: 'Aplikasi koreksi lembar ujian & rekap nilai siswa',
           icon: '📝',
           action: () => {
-            onClose();
-            WebTrafficService.recordVisit({
+            WebTrafficService.recordFeatureVisit({
               user_id: user.id,
               user_name: user.full_name,
-              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
-              user_role: user.role || 'GURU',
-              website_name: 'Koreksi Soal & Input Nilai Siswa',
-              url: 'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/',
-              category: 'PENILAIAN_RAPOR',
+              user_npp: user.nip,
+              user_role: user.role,
+              feature_id: 'koreksi_soal',
             });
+            onClose();
             window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
           },
         },
@@ -104,6 +102,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 badge: hasAwardedMeritToday ? '✓ +5 Pts' : '+5 Poin',
                 badgeDone: hasAwardedMeritToday,
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'student_good',
+                  });
                   onClose();
                   onOpenStudentBehaviorModal('KEBAIKAN');
                 },
@@ -116,6 +121,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 badge: hasRecordedDemeritToday ? '✓ +5 Pts' : '+5 Poin',
                 badgeDone: hasRecordedDemeritToday,
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'student_discipline',
+                  });
                   onClose();
                   onOpenStudentBehaviorModal('KEDISIPLINAN');
                 },
@@ -130,6 +142,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Database siswa, kelas, kontak wali, dan kartu RFID',
                 icon: '🎓',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'direktori_siswa',
+                  });
                   onClose();
                   onOpenStudentDirectoryModal();
                 },
@@ -144,6 +163,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Daftar rombongan belajar dan jadwal kelas',
                 icon: '🏫',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'classroom',
+                  });
                   onClose();
                   onOpenClassroomModal();
                 },
@@ -158,6 +184,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Bank materi pembelajaran dan referensi ajar',
                 icon: '📚',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'materials',
+                  });
                   onClose();
                   onOpenTeachingMaterialsModal();
                 },
@@ -172,93 +205,19 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Jadwal kegiatan akademik, ujian, dan hari libur',
                 icon: '📅',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'kalender',
+                  });
                   onClose();
                   onOpenEventsCalendarModal();
                 },
               },
             ]
           : []),
-      ],
-    },
-    {
-      category: 'Portal & Referensi Web Guru',
-      items: [
-        {
-          id: 'web_pmm',
-          title: 'Platform Merdeka Mengajar (PMM)',
-          subtitle: 'Perangkat ajar kurikulum merdeka & pelatihan mandiri',
-          icon: '🇮🇩',
-          action: () => {
-            onClose();
-            WebTrafficService.recordVisit({
-              user_id: user.id,
-              user_name: user.full_name,
-              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
-              user_role: user.role || 'GURU',
-              website_name: 'Platform Merdeka Mengajar (PMM)',
-              url: 'https://guru.kemdikbud.go.id/',
-              category: 'KURIKULUM_PMM',
-            });
-            window.open('https://guru.kemdikbud.go.id/', '_blank', 'noopener,noreferrer');
-          },
-        },
-        {
-          id: 'web_canva',
-          title: 'Canva untuk Pendidikan',
-          subtitle: 'Desain slide materi KBM, infografis & lembar kerja siswa',
-          icon: '🎨',
-          action: () => {
-            onClose();
-            WebTrafficService.recordVisit({
-              user_id: user.id,
-              user_name: user.full_name,
-              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
-              user_role: user.role || 'GURU',
-              website_name: 'Canva untuk Pendidikan',
-              url: 'https://www.canva.com/education/',
-              category: 'MEDIA_KBM',
-            });
-            window.open('https://www.canva.com/education/', '_blank', 'noopener,noreferrer');
-          },
-        },
-        {
-          id: 'web_classroom',
-          title: 'Google Classroom',
-          subtitle: 'Manajemen tugas daring, materi, dan diskusi kelas',
-          icon: '📚',
-          action: () => {
-            onClose();
-            WebTrafficService.recordVisit({
-              user_id: user.id,
-              user_name: user.full_name,
-              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
-              user_role: user.role || 'GURU',
-              website_name: 'Google Classroom',
-              url: 'https://classroom.google.com/',
-              category: 'KURIKULUM_PMM',
-            });
-            window.open('https://classroom.google.com/', '_blank', 'noopener,noreferrer');
-          },
-        },
-        {
-          id: 'web_quizizz',
-          title: 'Quizizz Belajar Interaktif',
-          subtitle: 'Kuis interaktif gamifikasi dan asesmen cepat siswa',
-          icon: '⚡',
-          action: () => {
-            onClose();
-            WebTrafficService.recordVisit({
-              user_id: user.id,
-              user_name: user.full_name,
-              user_npp: user.nip ? `NPP. ${user.nip}` : 'NPP. -',
-              user_role: user.role || 'GURU',
-              website_name: 'Quizizz Belajar Interaktif',
-              url: 'https://quizizz.com/',
-              category: 'MEDIA_KBM',
-            });
-            window.open('https://quizizz.com/', '_blank', 'noopener,noreferrer');
-          },
-        },
       ],
     },
     {
@@ -272,6 +231,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Pengajuan koreksi kehadiran jika lupa atau terkendala GPS',
                 icon: '📝',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'koreksi',
+                  });
                   onClose();
                   onOpenCorrectionModal();
                 },
@@ -286,6 +252,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Pantau koordinat GPS sekolah dan radius presensi',
                 icon: '📍',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'location',
+                  });
                   onClose();
                   onOpenLocationModal();
                 },
@@ -300,6 +273,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Kiosk tap kartu RFID siswa untuk guru piket',
                 icon: '📡',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'student_kiosk',
+                  });
                   onClose();
                   onOpenStudentKiosk();
                 },
@@ -319,6 +299,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Pencatatan aset barang, kondisi, dan kebutuhan pengadaan sekolah',
                 icon: '📦',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'sarpras_inventory',
+                  });
                   onClose();
                   onOpenSarprasModal();
                 },
@@ -338,6 +325,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                 subtitle: 'Panggil Guru Piket & Tim UKS instan dengan deteksi ruang kelas otomatis',
                 icon: '🚨',
                 action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'emergency',
+                  });
                   onClose();
                   onOpenEmergencyModal();
                 },
@@ -357,6 +351,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           badge: hasSubmittedComplaintToday ? '✓ +5 Pts' : '+5 Poin',
           badgeDone: hasSubmittedComplaintToday,
           action: () => {
+            WebTrafficService.recordFeatureVisit({
+              user_id: user.id,
+              user_name: user.full_name,
+              user_npp: user.nip,
+              user_role: user.role,
+              feature_id: 'complaint',
+            });
             onClose();
             onOpenComplaintModal();
           },
@@ -369,6 +370,13 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
           badge: hasFilledMoodToday ? '✓ +5 Pts' : '+5 Poin',
           badgeDone: hasFilledMoodToday,
           action: () => {
+            WebTrafficService.recordFeatureVisit({
+              user_id: user.id,
+              user_name: user.full_name,
+              user_npp: user.nip,
+              user_role: user.role,
+              feature_id: 'mood',
+            });
             onClose();
             onOpenMoodModal();
           },
