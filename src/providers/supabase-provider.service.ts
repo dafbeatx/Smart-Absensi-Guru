@@ -2564,11 +2564,11 @@ export class SupabaseProvider implements IDataProvider {
     try {
       let query = this.client
         .from('teaching_schedules')
-        .select('*, users:teacher_user_id(id, name)')
+        .select('*, users:teacher_user_id(id, full_name)')
         .eq('is_active', true);
 
       if (filter?.teacher_user_id) {
-        query = query.or(`teacher_user_id.eq.${filter.teacher_user_id},user_id.eq.${filter.teacher_user_id}`);
+        query = query.eq('teacher_user_id', filter.teacher_user_id);
       }
       if (filter?.academic_year) {
         query = query.eq('academic_year', filter.academic_year);
@@ -2583,7 +2583,13 @@ export class SupabaseProvider implements IDataProvider {
         logger.warn('SupabaseProvider', 'getTeachingSchedules joined query error, fallback select:', error.message);
         let fallbackQuery = this.client.from('teaching_schedules').select('*');
         if (filter?.teacher_user_id) {
-          fallbackQuery = fallbackQuery.or(`teacher_user_id.eq.${filter.teacher_user_id},user_id.eq.${filter.teacher_user_id}`);
+          fallbackQuery = fallbackQuery.eq('teacher_user_id', filter.teacher_user_id);
+        }
+        if (filter?.academic_year) {
+          fallbackQuery = fallbackQuery.eq('academic_year', filter.academic_year);
+        }
+        if (filter?.day_of_week !== undefined) {
+          fallbackQuery = fallbackQuery.eq('day_of_week', filter.day_of_week);
         }
         const fallbackRes = await fallbackQuery;
         if (fallbackRes.error) {
@@ -2640,17 +2646,16 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const { data: userRow } = await this.client
           .from('users')
-          .select('name')
+          .select('full_name')
           .eq('id', dto.teacher_user_id)
           .maybeSingle();
-        if (userRow?.name) teacherName = userRow.name;
+        if (userRow?.full_name) teacherName = userRow.full_name;
       } catch {
         // Fallback to default
       }
 
       const payload = {
         teacher_user_id: dto.teacher_user_id,
-        user_id: dto.teacher_user_id,
         teacher_name: teacherName,
         day_of_week: dayOfWeek,
         day: dayName,
@@ -2756,7 +2761,6 @@ export class SupabaseProvider implements IDataProvider {
       const nextVersion = (existingRow.version || 1) + 1;
       const updatePayload: Record<string, any> = {
         teacher_user_id: teacherUserId,
-        user_id: teacherUserId,
         day_of_week: dayOfWeek,
         day: dayName,
         start_time: startTime,
@@ -2844,7 +2848,6 @@ export class SupabaseProvider implements IDataProvider {
 
         const dbRow = {
           teacher_user_id: s.teacher_user_id || s.user_id || 'UNKNOWN',
-          user_id: s.teacher_user_id || s.user_id || 'UNKNOWN',
           teacher_name: s.teacher_name || 'Guru',
           day_of_week: dayOfWeek,
           day: dayName,
