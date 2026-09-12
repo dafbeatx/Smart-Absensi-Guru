@@ -408,7 +408,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-xl shadow-2xl text-xs sm:text-sm font-semibold flex items-center gap-2 border animate-bounce ${
+          className={`fixed top-5 left-1/2 -translate-x-1/2 z-100 px-4 py-2.5 rounded-xl shadow-2xl text-xs sm:text-sm font-semibold flex items-center gap-2 border animate-bounce ${
             toastMessage.type === 'success'
               ? 'bg-emerald-900 text-emerald-100 border-emerald-500/50'
               : 'bg-rose-900 text-rose-100 border-rose-500/50'
@@ -424,7 +424,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         {/* Top Header */}
         <div className="px-4 py-3.5 sm:px-6 sm:py-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-md">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-md">
               <GraduationCap className="w-5 h-5" />
             </div>
             <div>
@@ -463,7 +463,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
             <button
               type="button"
               onClick={() => setActiveTab('sessions')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-[38px] ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
                 activeTab === 'sessions'
                   ? 'bg-[#18536B] text-white shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -478,7 +478,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 <button
                   type="button"
                   onClick={() => setActiveTab('grading')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-[38px] ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
                     activeTab === 'grading'
                       ? 'bg-[#18536B] text-white shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -491,7 +491,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 <button
                   type="button"
                   onClick={() => setActiveTab('recap')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-[38px] ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
                     activeTab === 'recap'
                       ? 'bg-[#18536B] text-white shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -508,7 +508,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
             <button
               type="button"
               onClick={() => setIsCreatingSession(true)}
-              className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shrink-0 min-h-[36px]"
+              className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shrink-0 min-h-9"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Buat Sesi Ujian</span>
@@ -548,7 +548,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         <select
                           value={selectedSubject}
                           onChange={(e) => setSelectedSubject(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 outline-none"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                         >
                           {PREDEFINED_SUBJECTS.map((sub) => (
                             <option key={sub} value={sub}>
@@ -567,7 +567,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                             value={customSubject}
                             onChange={(e) => setCustomSubject(e.target.value)}
                             placeholder="Contoh: Geografi, Fisika..."
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 outline-none"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                             required
                           />
                         </div>
@@ -578,7 +578,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         <select
                           value={selectedClass}
                           onChange={(e) => setSelectedClass(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 outline-none"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                         >
                           {PREDEFINED_CLASSES.map((cls) => (
                             <option key={cls} value={cls}>
@@ -593,7 +593,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         <select
                           value={examType}
                           onChange={(e) => setExamType(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 outline-none"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                         >
                           {PREDEFINED_EXAM_TYPES.map((et) => (
                             <option key={et} value={et}>
@@ -611,7 +611,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                           max="100"
                           value={kkm}
                           onChange={(e) => setKkm(Number(e.target.value))}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 outline-none"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                           required
                         />
                       </div>
@@ -621,7 +621,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         <select
                           value={academicYear}
                           onChange={(e) => setAcademicYear(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 outline-none"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                         >
                           <option value="2024/2025">2024/2025</option>
                           <option value="2025/2026">2025/2026</option>
@@ -634,7 +634,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         <select
                           value={semester}
                           onChange={(e) => setSemester(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 outline-none"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                         >
                           <option value="Ganjil">Ganjil</option>
                           <option value="Genap">Genap</option>
@@ -657,7 +657,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         value={keyInput}
                         onChange={(e) => setKeyInput(e.target.value)}
                         placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A atau ABCDABCD"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-teal-500 outline-none font-mono"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50 font-mono"
                         required
                       />
                       <p className="text-[11px] text-slate-400 mt-1">
@@ -689,7 +689,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         value={sessionName}
                         onChange={(e) => setSessionName(e.target.value)}
                         placeholder="Otomatis digenerate jika dikosongkan..."
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 outline-none"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                       />
                     </div>
 
@@ -817,7 +817,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       }}
                       onFocus={() => setIsStudentDropdownOpen(true)}
                       placeholder="Ketik atau pilih nama siswa..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-white placeholder:text-slate-500 focus:border-teal-500 outline-none min-h-[44px]"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/50 min-h-11"
                     />
                   </div>
 
@@ -830,7 +830,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                             key={stu.name}
                             type="button"
                             onClick={() => handleSelectStudent(stu.name)}
-                            className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-slate-800 flex items-center justify-between transition-colors min-h-[40px]"
+                            className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-slate-800 flex items-center justify-between transition-colors min-h-10"
                           >
                             <span>{stu.name}</span>
                             {stu.isGraded ? (
@@ -924,7 +924,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                                     key={opt}
                                     type="button"
                                     onClick={() => handleAnswerSelect(qNum, opt)}
-                                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-xs font-black transition-all flex items-center justify-center min-h-[36px] ${
+                                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-xs font-black transition-all flex items-center justify-center min-h-9 ${
                                       isSelected
                                         ? isCorrect
                                           ? 'bg-emerald-500 text-white shadow-md shadow-emerald-900/50 scale-105 ring-2 ring-emerald-300'
@@ -999,7 +999,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                           setManualScore(val);
                         }}
                         placeholder="Ketik nilai langsung..."
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:border-teal-500 outline-none"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                       />
                       {manualScore !== null && (
                         <button
@@ -1064,7 +1064,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                                 return next;
                               });
                             }}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-center text-xs font-black text-teal-300 outline-none focus:border-teal-500"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-center text-xs font-black text-teal-300 focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
                           />
                         </div>
                       ))}
@@ -1077,7 +1077,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       type="button"
                       onClick={handleSaveStudent}
                       disabled={!selectedStudentName.trim()}
-                      className="w-full py-3 bg-gradient-to-r from-teal-600 to-[#18536B] hover:from-teal-500 hover:to-[#023246] disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-teal-950/50 flex items-center justify-center gap-2 transition-all min-h-[48px] active:scale-[0.98]"
+                      className="w-full py-3 bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-500 hover:to-[#023246] disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-teal-950/50 flex items-center justify-center gap-2 transition-all min-h-12 active:scale-[0.98]"
                     >
                       <Save className="w-4 h-4" />
                       <span>Simpan & Siswa Berikutnya</span>
@@ -1128,7 +1128,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     type="button"
                     onClick={() => ExamCorrectionRepository.exportToExcel(activeSession, gradedStudents)}
                     disabled={gradedStudents.length === 0}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all min-h-[40px]"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all min-h-10"
                   >
                     <FileSpreadsheet className="w-4 h-4" />
                     <span>Ekspor Excel (.xlsx)</span>
@@ -1138,7 +1138,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     type="button"
                     onClick={() => ExamCorrectionRepository.exportToCSV(activeSession, gradedStudents)}
                     disabled={gradedStudents.length === 0}
-                    className="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all min-h-[40px]"
+                    className="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all min-h-10"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Unduh CSV</span>
