@@ -194,7 +194,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
         {/* ── KONTROL PENGATURAN UJIAN & FILTER SISWA ──────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
           <div>
-            <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label className="flex items-center gap-1 text-[11px] font-bold text-slate-700 mb-1">
               <Tag className="w-3.5 h-3.5 text-[#287094]" />
               Jenis Asesmen / Ujian
             </label>
@@ -212,7 +212,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label className="flex items-center gap-1 text-[11px] font-bold text-slate-700 mb-1">
               <Calendar className="w-3.5 h-3.5 text-[#287094]" />
               Tahun Ajaran & Semester
             </label>
@@ -236,7 +236,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label className="flex items-center gap-1 text-[11px] font-bold text-slate-700 mb-1">
               <Building className="w-3.5 h-3.5 text-[#287094]" />
               Ruangan Ujian
             </label>
@@ -250,7 +250,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label className="flex items-center gap-1 text-[11px] font-bold text-slate-700 mb-1">
               <Filter className="w-3.5 h-3.5 text-[#287094]" />
               Filter Rombel / Kelas
             </label>
@@ -281,7 +281,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
                   placeholder="Cari nama atau NISN siswa..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-[#287094]"
+                  className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#287094]"
                 />
               </div>
               <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500 px-1">
@@ -379,7 +379,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
                 {/* Badan Kartu */}
                 <div className="flex gap-3 items-center py-1">
                   {/* Foto Siswa */}
-                  <div className="w-16 h-20 bg-slate-100 border border-slate-300 rounded-md flex flex-col items-center justify-center text-center p-1 flex-shrink-0">
+                  <div className="w-16 h-20 bg-slate-100 border border-slate-300 rounded-md flex flex-col items-center justify-center text-center p-1 shrink-0">
                     <span className="text-2xl">{activeStudent.gender === 'P' ? '👩‍🎓' : '🧑‍🎓'}</span>
                     <span className="text-[7px] text-slate-400 font-bold mt-1">FOTO 3x4</span>
                   </div>
@@ -424,7 +424,7 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
 
                 {/* Footer Kartu: Barcode & Tanda Tangan */}
                 <div className="border-t border-dashed border-slate-300 pt-2 flex items-end justify-between">
-                  <div className="max-w-[140px] overflow-hidden">
+                  <div className="max-w-35 overflow-hidden">
                     <div
                       dangerouslySetInnerHTML={{ __html: previewBarcodeSvg }}
                       className="scale-90 origin-left"
