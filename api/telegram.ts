@@ -134,6 +134,17 @@ export default async function handler(req: any, res: any) {
     }
   }
 
+  // 0. Secure Outbound Proxy: Send Telegram message without exposing Bot Token to browser
+  if (update?.action === 'send_message' || update?.action === 'send') {
+    const targetChat = update.chatId || update.chat_id || process.env.VITE_TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
+    const messageText = update.text;
+    if (!messageText || !targetChat) {
+      return res.status(400).json({ error: 'Missing text or chatId' });
+    }
+    await sendTelegramMessage(token, targetChat, messageText, update.parseMode || 'HTML');
+    return res.status(200).json({ success: true, mode: 'proxy_sent' });
+  }
+
   const message = update?.message || update?.edited_message;
 
   if (!message || !message.text) {

@@ -109,9 +109,34 @@ export class TelegramService {
     parseMode: 'HTML' | 'Markdown' = 'HTML',
     targetChatId?: string | number
   ): Promise<{ success: boolean; error?: string }> {
-    const token = this.getBotToken();
     const chatId = targetChatId ? String(targetChatId).trim() : this.getChatId();
 
+    // 1. Secure Path: Forward through Serverless Webhook Proxy (/api/telegram)
+    // This keeps the Telegram Bot Token 100% on the server and hidden from browser DevTools
+    if (typeof window !== 'undefined') {
+      try {
+        const proxyRes = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'send_message',
+            text,
+            chatId: chatId || undefined,
+            parseMode,
+          }),
+        });
+        if (proxyRes.ok) {
+          const json = await proxyRes.json().catch(() => ({}));
+          if (json.success) {
+            return { success: true };
+          }
+        }
+      } catch {
+        // Fallback to direct client API if proxy is unavailable (e.g. local dev without vercel)
+      }
+    }
+
+    const token = this.getBotToken();
     if (!token || !chatId) {
       logger.info('TelegramService', 'Telegram Bot Token / Chat ID belum diisi di .env. Notifikasi Telegram dilewati.');
       return { success: false, error: 'NOT_CONFIGURED' };
@@ -468,121 +493,27 @@ export class TelegramService {
   // BACKGROUND POLLING & GROQ AI INTERACTIVE ENGINE
   // =========================================================================
 
-  private static isPollingActive = false;
-  private static lastUpdateId = 0;
-  private static pollingAbortController: AbortController | null = null;
-
   /**
-   * Initializes background silent polling when client web app is open
+   * Initializes background service.
+   * Incoming messages and commands (/start, Groq AI) are handled by the Vercel Webhook (api/telegram.ts).
+   * Client-side polling is permanently disabled to protect the bot token and prevent 409 Conflict.
    */
   public static init(): void {
-    if (typeof window === 'undefined') return;
-    this.startPolling();
+    // Webhook on cloud backend handles incoming bot messages securely
   }
 
   /**
-   * Starts background long-polling for incoming updates (/start, admin queries)
+   * Browser long-polling is disabled for security and webhook coexistence
    */
   public static startPolling(): void {
-    const token = this.getBotToken();
-    if (!token || this.isPollingActive) return;
-
-    // If webhook is already verified active on cloud backend, skip browser polling
-    try {
-      if (typeof window !== 'undefined' && sessionStorage.getItem('smart_absensi_tele_webhook_active') === 'true') {
-        return;
-      }
-    } catch {
-      // ignore storage errors
-    }
-
-    this.isPollingActive = true;
-    this.pollLoop().catch((err) => {
-      logger.warn('TelegramService', 'Background polling loop encountered an error:', err);
-    });
+    // Disabled in client browser
   }
 
   /**
    * Stops background polling cleanly
    */
   public static stopPolling(): void {
-    this.isPollingActive = false;
-    if (this.pollingAbortController) {
-      this.pollingAbortController.abort();
-      this.pollingAbortController = null;
-    }
-  }
-
-  /**
-   * Main background polling loop
-   */
-  private static async pollLoop(): Promise<void> {
-    const token = this.getBotToken();
-    if (!token) {
-      this.isPollingActive = false;
-      return;
-    }
-
-    try {
-      const savedOffset = localStorage.getItem('smart_absensi_tele_offset');
-      if (savedOffset) {
-        this.lastUpdateId = parseInt(savedOffset, 10) || 0;
-      }
-    } catch {
-      // ignore storage errors
-    }
-
-    while (this.isPollingActive) {
-      try {
-        // Short polling timeout (3s) for fast /start responsiveness
-        const offsetQuery = this.lastUpdateId > 0 ? `?offset=${this.lastUpdateId + 1}&timeout=3` : `?timeout=3`;
-        const url = `https://api.telegram.org/bot${token}/getUpdates${offsetQuery}`;
-
-        const controller = new AbortController();
-        this.pollingAbortController = controller;
-
-        const res = await fetch(url, { signal: controller.signal });
-        const data = await res.json().catch(() => ({}));
-
-        if (!data.ok || res.status === 409) {
-          // If webhook is active (error 409 Conflict), the cloud serverless backend (api/telegram.ts) handles all Telegram updates.
-          // Browser polling cannot run concurrently with an active webhook.
-          if (data.error_code === 409 || res.status === 409) {
-            logger.info('TelegramService', 'Telegram Webhook aktif di cloud backend. Polling client browser dinonaktifkan.');
-            try {
-              if (typeof window !== 'undefined') {
-                sessionStorage.setItem('smart_absensi_tele_webhook_active', 'true');
-              }
-            } catch {
-              // ignore storage errors
-            }
-            this.isPollingActive = false;
-            break;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 5000));
-          continue;
-        }
-
-        const updates = data.result || [];
-        for (const update of updates) {
-          if (update.update_id) {
-            this.lastUpdateId = Math.max(this.lastUpdateId, update.update_id);
-            try {
-              localStorage.setItem('smart_absensi_tele_offset', String(this.lastUpdateId));
-            } catch {
-              // ignore
-            }
-          }
-          // Fire-and-forget: don't block the polling loop while waiting for Groq AI
-          this.handleIncomingUpdate(update).catch((e) =>
-            logger.warn('TelegramService', 'Error handling Telegram update:', e)
-          );
-        }
-      } catch (err: any) {
-        if (err?.name === 'AbortError') break;
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-      }
-    }
+    // No-op
   }
 
   /**
