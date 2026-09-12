@@ -121,6 +121,54 @@ export const runWebTrafficTestSuite = async (): Promise<{
       csv.includes('guru.kemdikbud.go.id'),
       'CSV header and row verified'
     );
+
+    // Test 8: Admin Registered Teachers Mapping (Honest Zero State for Inactive Teachers)
+    const mockAdminTeachers: any[] = [
+      { id: 'usr_test_99', name: 'Dewi Sartika, S.Pd.', npp: '199001012015012001' },
+      { id: 'usr_active_teacher_2', name: 'Ahmad Dahlan, M.Pd.', npp: '198805052012011002' },
+    ];
+    const analyticsWithTeachers = WebTrafficService.getAnalytics(undefined, mockAdminTeachers);
+    const dewiSummary = analyticsWithTeachers.teacherSummaries.find(t => t.user_id === 'usr_test_99');
+    const ahmadSummary = analyticsWithTeachers.teacherSummaries.find(t => t.user_id === 'usr_active_teacher_2');
+
+    assert(
+      'Traffic - Maps Admin Registered Teachers Accurately with Honest Activity Counts',
+      analyticsWithTeachers.teacherSummaries.length === 2 &&
+      dewiSummary?.total_visits === 1 &&
+      ahmadSummary?.total_visits === 0 &&
+      ahmadSummary?.top_website === 'Belum ada aktivitas',
+      `Dewi visits: ${dewiSummary?.total_visits}, Ahmad visits: ${ahmadSummary?.total_visits}`
+    );
+
+    // Test 9: Monitored Websites Management (Add & Retrieve)
+    const addedSite = WebTrafficService.addMonitoredWebsite({
+      name: 'LMS Sekolah Sukses',
+      url: 'https://lms.sekolahku.sch.id',
+      category: 'MEDIA_KBM',
+      description: 'Moodle LMS Resmi Sekolah',
+    });
+    const monitoredList = WebTrafficService.getMonitoredWebsites();
+    const foundSite = monitoredList.find(s => s.id === addedSite.id);
+    assert(
+      'Traffic - Admin Can Add and Retrieve Monitored Websites',
+      foundSite !== undefined &&
+      foundSite.domain === 'lms.sekolahku.sch.id' &&
+      foundSite.name === 'LMS Sekolah Sukses',
+      `Found: ${foundSite?.name} (${foundSite?.domain})`
+    );
+
+    // Test 10: Legacy Seed Data Purging
+    WebTrafficService.saveLogs([
+      { id: 'traf_seed_fake_1', user_name: 'Fake Teacher', website_name: 'Fake Site' } as any,
+      recorded,
+    ]);
+    const cleanLogs = WebTrafficService.getAllLogs();
+    assert(
+      'Traffic - Automatically Purges Legacy Fake Seed Logs',
+      cleanLogs.every(l => !l.id.startsWith('traf_seed_')) &&
+      cleanLogs.some(l => l.id === recorded.id),
+      `Clean logs count: ${cleanLogs.length}`
+    );
   } catch (err: any) {
     assert('Traffic - Test Execution Error', false, err?.message || String(err));
   }

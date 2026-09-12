@@ -1,8 +1,10 @@
 /**
  * SMART ABSENSI GURU - WEB TRAFFIC & ACTIVITY TRACKING SERVICE
  * Menyimpan, mengolah, dan menganalisis data riwayat situs web yang diakses guru.
+ * Data 100% murni bersumber dari akun guru yang terdaftar di sistem (tanpa seed/dummy data).
  */
 
+import type { UserProfile } from '../types/database.types';
 import type {
   WebTrafficLog,
   WebsiteTrafficSummary,
@@ -15,8 +17,24 @@ import type {
 } from '../types/traffic.types';
 
 const STORAGE_KEY = 'smart_absensi_web_traffic_logs';
+const WEBSITES_STORAGE_KEY = 'smart_absensi_monitored_websites';
 
-export const TRAFFIC_CATEGORY_METADATA: Record<TrafficCategory, { label: string; color: string; bgBadge: string; borderBadge: string }> = {
+export interface MonitoredWebsite {
+  id: string;
+  name: string;
+  domain: string;
+  url: string;
+  category: TrafficCategory;
+  description: string;
+  icon: string;
+  addedBy?: string;
+  createdAt: string;
+}
+
+export const TRAFFIC_CATEGORY_METADATA: Record<
+  TrafficCategory,
+  { label: string; color: string; bgBadge: string; borderBadge: string }
+> = {
   KURIKULUM_PMM: {
     label: 'Kurikulum & PMM',
     color: '#023246',
@@ -56,88 +74,108 @@ export const TRAFFIC_CATEGORY_METADATA: Record<TrafficCategory, { label: string;
 };
 
 /**
- * Daftar situs web rujukan pendidikan resmi yang dipantau
+ * Katalog awal website rujukan pembelajaran yang dapat dikelola dan disesuaikan oleh Admin
  */
-export const MONITORED_EDUCATIONAL_WEBSITES = [
+export const DEFAULT_MONITORED_WEBSITES: MonitoredWebsite[] = [
   {
+    id: 'web_pmm',
     name: 'Platform Merdeka Mengajar (PMM)',
     domain: 'guru.kemdikbud.go.id',
     url: 'https://guru.kemdikbud.go.id/',
-    category: 'KURIKULUM_PMM' as TrafficCategory,
+    category: 'KURIKULUM_PMM',
     description: 'Aplikasi resmi Kemdikbudristek untuk pelatihan mandiri & perangkat ajar',
     icon: '🇮🇩',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_nilai',
     name: 'Koreksi Soal & Input Nilai Siswa',
     domain: 'web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app',
     url: 'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/',
-    category: 'PENILAIAN_RAPOR' as TrafficCategory,
+    category: 'PENILAIAN_RAPOR',
     description: 'Portal koreksi lembar ujian & penginputan rekap nilai kelas',
     icon: '📝',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_canva',
     name: 'Canva untuk Pendidikan',
     domain: 'canva.com',
     url: 'https://www.canva.com/education/',
-    category: 'MEDIA_KBM' as TrafficCategory,
+    category: 'MEDIA_KBM',
     description: 'Pembuatan slide presentasi interaktif, LKPD, dan infografis ajar',
     icon: '🎨',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_classroom',
     name: 'Google Classroom',
     domain: 'classroom.google.com',
     url: 'https://classroom.google.com/',
-    category: 'KURIKULUM_PMM' as TrafficCategory,
+    category: 'KURIKULUM_PMM',
     description: 'Pengelolaan kelas daring, penugasan, dan pengumpulan tugas siswa',
     icon: '📚',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_dapodik',
     name: 'Dapodik Kemdikbudristek',
     domain: 'dapodik.kemdikbud.go.id',
     url: 'https://dapodik.kemdikbud.go.id/',
-    category: 'ADMINISTRASI' as TrafficCategory,
+    category: 'ADMINISTRASI',
     description: 'Sinkronisasi data pokok pendidikan & beban mengajar guru',
     icon: '🏛️',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_quizizz',
     name: 'Quizizz Pembelajaran Interaktif',
     domain: 'quizizz.com',
     url: 'https://quizizz.com/',
-    category: 'MEDIA_KBM' as TrafficCategory,
+    category: 'MEDIA_KBM',
     description: 'Kuis interaktif gamifikasi dan asesmen formatif di kelas',
     icon: '⚡',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_belajar',
     name: 'Rumah Belajar Kemdikbud',
     domain: 'belajar.kemdikbud.go.id',
     url: 'https://belajar.kemdikbud.go.id/',
-    category: 'REFERENSI' as TrafficCategory,
+    category: 'REFERENSI',
     description: 'Laboratorium maya dan bank soal digital Kemdikbud',
     icon: '🏠',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_youtube',
     name: 'YouTube Edukasi & Sains',
     domain: 'youtube.com',
     url: 'https://www.youtube.com/',
-    category: 'MEDIA_KBM' as TrafficCategory,
+    category: 'MEDIA_KBM',
     description: 'Video animasi pembelajaran dan demonstrasi praktikum sains',
     icon: '📺',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_erapor',
     name: 'E-Rapor SMP Terpadu',
     domain: 'erapor-smp.kemdikbud.go.id',
     url: 'https://erapor-smp.kemdikbud.go.id/',
-    category: 'PENILAIAN_RAPOR' as TrafficCategory,
+    category: 'PENILAIAN_RAPOR',
     description: 'Sistem pengolahan nilai rapor kurikulum merdeka',
     icon: '📊',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
+    id: 'web_wordwall',
     name: 'Wordwall Edukasi',
     domain: 'wordwall.net',
     url: 'https://wordwall.net/',
-    category: 'MEDIA_KBM' as TrafficCategory,
+    category: 'MEDIA_KBM',
     description: 'Game edukasi kosakata, teka-teki, dan roda putar siswa',
     icon: '🎯',
+    createdAt: '2026-01-01T00:00:00.000Z',
   },
 ];
 
@@ -158,237 +196,86 @@ export function extractDomain(rawUrl: string): string {
  */
 export function inferCategoryFromUrl(url: string, websiteName: string): TrafficCategory {
   const text = `${url} ${websiteName}`.toLowerCase();
-  if (text.includes('guru.kemdikbud') || text.includes('pmm') || text.includes('merdeka') || text.includes('classroom.google')) {
+  if (
+    text.includes('guru.kemdikbud') ||
+    text.includes('pmm') ||
+    text.includes('merdeka') ||
+    text.includes('classroom.google')
+  ) {
     return 'KURIKULUM_PMM';
   }
-  if (text.includes('nilai') || text.includes('erapor') || text.includes('rapor') || text.includes('koreksi')) {
+  if (
+    text.includes('nilai') ||
+    text.includes('erapor') ||
+    text.includes('rapor') ||
+    text.includes('koreksi')
+  ) {
     return 'PENILAIAN_RAPOR';
   }
-  if (text.includes('canva') || text.includes('quizizz') || text.includes('wordwall') || text.includes('youtube') || text.includes('kahoot')) {
+  if (
+    text.includes('canva') ||
+    text.includes('quizizz') ||
+    text.includes('wordwall') ||
+    text.includes('youtube') ||
+    text.includes('kahoot')
+  ) {
     return 'MEDIA_KBM';
   }
-  if (text.includes('dapodik') || text.includes('siplah') || text.includes('simpkb') || text.includes('ptk.datadik')) {
+  if (
+    text.includes('dapodik') ||
+    text.includes('siplah') ||
+    text.includes('simpkb') ||
+    text.includes('ptk.datadik')
+  ) {
     return 'ADMINISTRASI';
   }
-  if (text.includes('belajar.kemdikbud') || text.includes('wikipedia') || text.includes('sciencedirect') || text.includes('perpus')) {
+  if (
+    text.includes('belajar.kemdikbud') ||
+    text.includes('wikipedia') ||
+    text.includes('sciencedirect') ||
+    text.includes('perpus')
+  ) {
     return 'REFERENSI';
   }
   return 'LAINNYA';
 }
 
-/**
- * Seed data awal realistis untuk guru di sekolah
- */
-function createInitialSeedLogs(): WebTrafficLog[] {
-  const now = new Date();
-  const formatTimeAgo = (hoursAgo: number, minutesAgo: number = 0): string => {
-    const d = new Date(now.getTime() - (hoursAgo * 60 + minutesAgo) * 60 * 1000);
-    return d.toISOString();
-  };
-
-  return [
-    {
-      id: 'traf_seed_01',
-      user_id: 'usr_1001',
-      user_name: 'Ahmad Hidayat, S.Pd.',
-      user_npp: 'NPP. 198503152010011002',
-      user_role: 'GURU',
-      website_name: 'Platform Merdeka Mengajar (PMM)',
-      domain: 'guru.kemdikbud.go.id',
-      url: 'https://guru.kemdikbud.go.id/pelatihan-mandiri',
-      category: 'KURIKULUM_PMM',
-      accessed_at: formatTimeAgo(0, 24),
-      device: 'Mobile Android (Infinix Note 8)',
-      duration_seconds: 720,
-    },
-    {
-      id: 'traf_seed_02',
-      user_id: 'usr_1001',
-      user_name: 'Ahmad Hidayat, S.Pd.',
-      user_npp: 'NPP. 198503152010011002',
-      user_role: 'GURU',
-      website_name: 'Koreksi Soal & Input Nilai Siswa',
-      domain: 'web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app',
-      url: 'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/',
-      category: 'PENILAIAN_RAPOR',
-      accessed_at: formatTimeAgo(1, 15),
-      device: 'Desktop Windows (Chrome)',
-      duration_seconds: 1450,
-    },
-    {
-      id: 'traf_seed_03',
-      user_id: 'usr_1002',
-      user_name: 'Budi Santoso, M.Pd.',
-      user_npp: 'NPP. 198807202014021003',
-      user_role: 'GURU',
-      website_name: 'Canva untuk Pendidikan',
-      domain: 'canva.com',
-      url: 'https://www.canva.com/education/',
-      category: 'MEDIA_KBM',
-      accessed_at: formatTimeAgo(1, 45),
-      device: 'Desktop Windows (Chrome)',
-      duration_seconds: 2100,
-    },
-    {
-      id: 'traf_seed_04',
-      user_id: 'usr_1002',
-      user_name: 'Budi Santoso, M.Pd.',
-      user_npp: 'NPP. 198807202014021003',
-      user_role: 'GURU',
-      website_name: 'Platform Merdeka Mengajar (PMM)',
-      domain: 'guru.kemdikbud.go.id',
-      url: 'https://guru.kemdikbud.go.id/',
-      category: 'KURIKULUM_PMM',
-      accessed_at: formatTimeAgo(2, 30),
-      device: 'Mobile Android',
-      duration_seconds: 450,
-    },
-    {
-      id: 'traf_seed_05',
-      user_id: 'usr_1001',
-      user_name: 'Ahmad Hidayat, S.Pd.',
-      user_npp: 'NPP. 198503152010011002',
-      user_role: 'GURU',
-      website_name: 'Quizizz Pembelajaran Interaktif',
-      domain: 'quizizz.com',
-      url: 'https://quizizz.com/admin/quiz',
-      category: 'MEDIA_KBM',
-      accessed_at: formatTimeAgo(3, 10),
-      device: 'Mobile Android',
-      duration_seconds: 980,
-    },
-    {
-      id: 'traf_seed_06',
-      user_id: 'usr_1003',
-      user_name: 'Drs. H. M. Yusuf, M.Pd.',
-      user_npp: 'NPP. 197501102000031001',
-      user_role: 'KEPSEK',
-      website_name: 'Dapodik Kemdikbudristek',
-      domain: 'dapodik.kemdikbud.go.id',
-      url: 'https://dapodik.kemdikbud.go.id/',
-      category: 'ADMINISTRASI',
-      accessed_at: formatTimeAgo(4, 5),
-      device: 'Desktop Windows (Chrome)',
-      duration_seconds: 1800,
-    },
-    {
-      id: 'traf_seed_07',
-      user_id: 'usr_1002',
-      user_name: 'Budi Santoso, M.Pd.',
-      user_npp: 'NPP. 198807202014021003',
-      user_role: 'GURU',
-      website_name: 'YouTube Edukasi & Sains',
-      domain: 'youtube.com',
-      url: 'https://www.youtube.com/results?search_query=praktikum+fisika+smp',
-      category: 'MEDIA_KBM',
-      accessed_at: formatTimeAgo(5, 20),
-      device: 'Desktop Windows',
-      duration_seconds: 820,
-    },
-    {
-      id: 'traf_seed_08',
-      user_id: 'usr_1001',
-      user_name: 'Ahmad Hidayat, S.Pd.',
-      user_npp: 'NPP. 198503152010011002',
-      user_role: 'GURU',
-      website_name: 'Platform Merdeka Mengajar (PMM)',
-      domain: 'guru.kemdikbud.go.id',
-      url: 'https://guru.kemdikbud.go.id/bukti-karya',
-      category: 'KURIKULUM_PMM',
-      accessed_at: formatTimeAgo(6, 0),
-      device: 'Mobile Android',
-      duration_seconds: 600,
-    },
-    {
-      id: 'traf_seed_09',
-      user_id: 'usr_1002',
-      user_name: 'Budi Santoso, M.Pd.',
-      user_npp: 'NPP. 198807202014021003',
-      user_role: 'GURU',
-      website_name: 'Google Classroom',
-      domain: 'classroom.google.com',
-      url: 'https://classroom.google.com/',
-      category: 'KURIKULUM_PMM',
-      accessed_at: formatTimeAgo(7, 15),
-      device: 'Desktop Windows',
-      duration_seconds: 1200,
-    },
-    {
-      id: 'traf_seed_10',
-      user_id: 'usr_1001',
-      user_name: 'Ahmad Hidayat, S.Pd.',
-      user_npp: 'NPP. 198503152010011002',
-      user_role: 'GURU',
-      website_name: 'Koreksi Soal & Input Nilai Siswa',
-      domain: 'web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app',
-      url: 'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/',
-      category: 'PENILAIAN_RAPOR',
-      accessed_at: formatTimeAgo(24, 10), // Kemarin
-      device: 'Mobile Android',
-      duration_seconds: 900,
-    },
-    {
-      id: 'traf_seed_11',
-      user_id: 'usr_1002',
-      user_name: 'Budi Santoso, M.Pd.',
-      user_npp: 'NPP. 198807202014021003',
-      user_role: 'GURU',
-      website_name: 'Rumah Belajar Kemdikbud',
-      domain: 'belajar.kemdikbud.go.id',
-      url: 'https://belajar.kemdikbud.go.id/LaboratoriumMaya',
-      category: 'REFERENSI',
-      accessed_at: formatTimeAgo(26, 40),
-      device: 'Desktop Windows',
-      duration_seconds: 1540,
-    },
-    {
-      id: 'traf_seed_12',
-      user_id: 'usr_1003',
-      user_name: 'Drs. H. M. Yusuf, M.Pd.',
-      user_npp: 'NPP. 197501102000031001',
-      user_role: 'KEPSEK',
-      website_name: 'Platform Merdeka Mengajar (PMM)',
-      domain: 'guru.kemdikbud.go.id',
-      url: 'https://guru.kemdikbud.go.id/refleksi-kompetensi',
-      category: 'KURIKULUM_PMM',
-      accessed_at: formatTimeAgo(28, 15),
-      device: 'Mobile Android',
-      duration_seconds: 880,
-    },
-  ];
-}
-
-let inMemoryLogs: WebTrafficLog[] | null = null;
+let inMemoryLogs: WebTrafficLog[] = [];
+let inMemoryWebsites: MonitoredWebsite[] = [...DEFAULT_MONITORED_WEBSITES];
 
 export class WebTrafficService {
   /**
-   * Mengambil semua riwayat log dari localStorage atau seed awal
+   * Mengambil semua riwayat log asli dari localStorage
+   * (Otomatis membersihkan data dummy lawas jika ada)
    */
   public static getAllLogs(): WebTrafficLog[] {
-    if (typeof window === 'undefined') {
-      if (!inMemoryLogs) {
-        inMemoryLogs = createInitialSeedLogs();
-      }
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      inMemoryLogs = inMemoryLogs.filter(
+        (log: WebTrafficLog) => log && log.id && !log.id.startsWith('traf_seed_')
+      );
       return inMemoryLogs;
     }
 
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        const seed = createInitialSeedLogs();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
-        return seed;
+        return [];
       }
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        // Bersihkan data seed dummy lawas bila sebelumnya tersimpan
+        const realLogs = parsed.filter(
+          (log: WebTrafficLog) => log && log.id && !log.id.startsWith('traf_seed_')
+        );
+        if (realLogs.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(realLogs));
+        }
+        return realLogs;
       }
-      const seed = createInitialSeedLogs();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
-      return seed;
+      return [];
     } catch (e) {
-      console.warn('Failed to parse web traffic logs, falling back to seed:', e);
-      return createInitialSeedLogs();
+      console.warn('Failed to parse web traffic logs:', e);
+      return [];
     }
   }
 
@@ -397,7 +284,7 @@ export class WebTrafficService {
    */
   public static saveLogs(logs: WebTrafficLog[]): void {
     inMemoryLogs = logs;
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
       window.dispatchEvent(new Event('smart_absensi_traffic_updated'));
@@ -407,7 +294,77 @@ export class WebTrafficService {
   }
 
   /**
-   * Mencatat kunjungan situs web baru oleh guru
+   * Mengambil daftar website yang dipantau (bisa ditambah/diset oleh Admin)
+   */
+  public static getMonitoredWebsites(): MonitoredWebsite[] {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return inMemoryWebsites;
+    }
+    try {
+      const raw = localStorage.getItem(WEBSITES_STORAGE_KEY);
+      if (!raw) {
+        localStorage.setItem(WEBSITES_STORAGE_KEY, JSON.stringify(DEFAULT_MONITORED_WEBSITES));
+        return DEFAULT_MONITORED_WEBSITES;
+      }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      return DEFAULT_MONITORED_WEBSITES;
+    } catch {
+      return DEFAULT_MONITORED_WEBSITES;
+    }
+  }
+
+  /**
+   * Admin menambahkan website/portal baru untuk dipantau
+   */
+  public static addMonitoredWebsite(website: {
+    name: string;
+    url: string;
+    category?: TrafficCategory;
+    description?: string;
+    icon?: string;
+    addedBy?: string;
+  }): MonitoredWebsite {
+    const list = this.getMonitoredWebsites();
+    const domain = extractDomain(website.url);
+    const cat = website.category || inferCategoryFromUrl(website.url, website.name);
+
+    const newSite: MonitoredWebsite = {
+      id: 'web_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      name: website.name.trim(),
+      domain: domain,
+      url: website.url.trim(),
+      category: cat,
+      description: website.description?.trim() || `Portal daring ${website.name.trim()}`,
+      icon: website.icon || '🌐',
+      addedBy: website.addedBy,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [newSite, ...list];
+    inMemoryWebsites = updated;
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.setItem(WEBSITES_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event('smart_absensi_monitored_websites_updated'));
+    }
+    return newSite;
+  }
+
+  /**
+   * Admin menghapus website dari daftar pantauan
+   */
+  public static deleteMonitoredWebsite(id: string): void {
+    const list = this.getMonitoredWebsites();
+    const updated = list.filter((s) => s.id !== id);
+    inMemoryWebsites = updated;
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.setItem(WEBSITES_STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event('smart_absensi_monitored_websites_updated'));
+    }
+  }
+
+  /**
+   * Mencatat kunjungan situs web baru oleh guru yang terdaftar
    */
   public static recordVisit(params: {
     user_id: string;
@@ -423,7 +380,7 @@ export class WebTrafficService {
   }): WebTrafficLog {
     const domain = params.domain || extractDomain(params.url);
     const category = params.category || inferCategoryFromUrl(params.url, params.website_name);
-    
+
     // Auto-detect device
     let detectedDevice = params.device;
     if (!detectedDevice && typeof navigator !== 'undefined') {
@@ -457,9 +414,7 @@ export class WebTrafficService {
     };
 
     const currentLogs = this.getAllLogs();
-    // Prepend new log
     const updated = [newLog, ...currentLogs];
-    // Keep max 1000 logs in storage
     if (updated.length > 1000) {
       updated.length = 1000;
     }
@@ -527,9 +482,13 @@ export class WebTrafficService {
   }
 
   /**
-   * Analisis lengkap: Top Websites Leaderboard, Per-Guru, Kategori, dan Jam Puncak
+   * Analisis lengkap: Top Websites Leaderboard, Per-Guru Asli Terdaftar, Kategori, dan Jam Puncak
+   * Menggunakan daftar guru asli terdaftar (targetTeachers) yang diatur oleh Admin.
    */
-  public static getAnalytics(filter?: TrafficFilterOptions): TrafficAnalyticsSummary {
+  public static getAnalytics(
+    filter?: TrafficFilterOptions,
+    targetTeachers?: UserProfile[]
+  ): TrafficAnalyticsSummary {
     const filteredLogs = this.getFilteredLogs(filter);
     const totalVisits = filteredLogs.length;
 
@@ -563,7 +522,7 @@ export class WebTrafficService {
       const entry = domainMap.get(key)!;
       entry.count += 1;
       entry.teachers.add(log.user_id);
-      
+
       if (new Date(log.accessed_at) > new Date(entry.lastAccessed)) {
         entry.lastAccessed = log.accessed_at;
       }
@@ -592,7 +551,7 @@ export class WebTrafficService {
       }))
       .sort((a, b) => b.total_visits - a.total_visits);
 
-    // 2. Agregasi Aktivitas Per Guru
+    // 2. Agregasi Aktivitas Per Guru Asli Terdaftar (set by Admin)
     const teacherMap = new Map<
       string,
       {
@@ -607,9 +566,43 @@ export class WebTrafficService {
       }
     >();
 
+    // Jika daftar guru terdaftar disediakan oleh Admin, inisialisasi semua guru asli sekolah
+    if (targetTeachers && targetTeachers.length > 0) {
+      targetTeachers.forEach((t: any) => {
+        const name = t.full_name || t.name || 'Guru';
+        const rawNpp = t.nip || t.npp;
+        const npp = rawNpp ? (String(rawNpp).startsWith('NPP.') ? String(rawNpp) : `NPP. ${rawNpp}`) : 'NPP. -';
+        teacherMap.set(t.id, {
+          user_id: t.id,
+          user_name: name,
+          user_npp: npp,
+          user_role: t.role || 'GURU',
+          count: 0,
+          websites: new Map(),
+          categories: new Map(),
+          lastAccessed: '',
+        });
+      });
+    }
+
     filteredLogs.forEach((log) => {
-      if (!teacherMap.has(log.user_id)) {
-        teacherMap.set(log.user_id, {
+      // Cari apakah log cocok dengan guru yang ada di teacherMap
+      let targetKey = log.user_id;
+      if (!teacherMap.has(targetKey)) {
+        // Coba cocokan berdasarkan nama atau npp jika user_id berbeda format
+        for (const [key, val] of teacherMap.entries()) {
+          if (
+            val.user_name.toLowerCase() === log.user_name.toLowerCase() ||
+            (log.user_npp && log.user_npp !== 'NPP. -' && val.user_npp === log.user_npp)
+          ) {
+            targetKey = key;
+            break;
+          }
+        }
+      }
+
+      if (!teacherMap.has(targetKey)) {
+        teacherMap.set(targetKey, {
           user_id: log.user_id,
           user_name: log.user_name,
           user_npp: log.user_npp,
@@ -620,11 +613,12 @@ export class WebTrafficService {
           lastAccessed: log.accessed_at,
         });
       }
-      const t = teacherMap.get(log.user_id)!;
+
+      const t = teacherMap.get(targetKey)!;
       t.count += 1;
       t.websites.set(log.website_name, (t.websites.get(log.website_name) || 0) + 1);
       t.categories.set(log.category, (t.categories.get(log.category) || 0) + 1);
-      if (new Date(log.accessed_at) > new Date(t.lastAccessed)) {
+      if (!t.lastAccessed || new Date(log.accessed_at) > new Date(t.lastAccessed)) {
         t.lastAccessed = log.accessed_at;
       }
     });
@@ -655,9 +649,9 @@ export class WebTrafficService {
           user_npp: t.user_npp,
           user_role: t.user_role,
           total_visits: t.count,
-          top_website: topWeb,
+          top_website: t.count > 0 ? topWeb : 'Belum ada aktivitas',
           top_category: topCat,
-          last_accessed_at: t.lastAccessed,
+          last_accessed_at: t.lastAccessed || '',
         };
       })
       .sort((a, b) => b.total_visits - a.total_visits);
@@ -709,18 +703,21 @@ export class WebTrafficService {
       count: hourlyCounts[h] || 0,
     }));
 
-    const topCategoryObj = categoryDistribution[0]?.count > 0
-      ? {
-          category: categoryDistribution[0].category,
-          label: categoryDistribution[0].label,
-          count: categoryDistribution[0].count,
-        }
-      : null;
+    const topCategoryObj =
+      categoryDistribution[0]?.count > 0
+        ? {
+            category: categoryDistribution[0].category,
+            label: categoryDistribution[0].label,
+            count: categoryDistribution[0].count,
+          }
+        : null;
+
+    const mostActive = teacherSummaries.find((t) => t.total_visits > 0) || null;
 
     return {
       totalVisits,
       topWebsite: topWebsites[0] || null,
-      mostActiveTeacher: teacherSummaries[0] || null,
+      mostActiveTeacher: mostActive,
       topCategory: topCategoryObj,
       categoryDistribution,
       hourlyTrend,
@@ -730,22 +727,18 @@ export class WebTrafficService {
   }
 
   /**
-   * Reset ke data bawaan simulasi (untuk demo/pengujian)
-   */
-  public static resetToDefaultSeed(): void {
-    const seed = createInitialSeedLogs();
-    this.saveLogs(seed);
-  }
-
-  /**
-   * Hapus seluruh data log
+   * Hapus seluruh data log riwayat
    */
   public static clearAllLogs(): void {
-    this.saveLogs([]);
+    inMemoryLogs = [];
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+      window.dispatchEvent(new Event('smart_absensi_traffic_updated'));
+    }
   }
 
   /**
-   * Ekspor data riwayat trafik guru ke berkas format CSV / Excel
+   * Ekspor data riwayat trafik guru ke format CSV / Excel
    */
   public static exportToCSV(logs: WebTrafficLog[]): string {
     const headers = [
