@@ -20,6 +20,9 @@ import {
   Trash2,
   AlertOctagon,
   ChevronRight,
+  AlertCircle,
+  Key,
+  Filter,
 } from 'lucide-react';
 import type {
   ExamSessionRecord,
@@ -93,6 +96,16 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [essayScores, setEssayScores] = useState<number[]>([0, 0, 0, 0, 0]);
   const [manualScore, setManualScore] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Session Search & Filtering State
+  const [sessionSearchQuery, setSessionSearchQuery] = useState('');
+  const [sessionClassFilter, setSessionClassFilter] = useState<string>('ALL');
+  const [sessionStatusFilter, setSessionStatusFilter] = useState<'ALL' | 'WITH_KEY' | 'WITHOUT_KEY'>('ALL');
+
+  // Key Editor Modal State
+  const [isKeyEditorModalOpen, setIsKeyEditorModalOpen] = useState(false);
+  const [editingSessionTarget, setEditingSessionTarget] = useState<ExamSessionRecord | null>(null);
+  const [quickKeyInput, setQuickKeyInput] = useState('');
 
   const undoStack = useRef<{ qNum: number; prev: string | undefined }[]>([]);
   const questionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -176,14 +189,114 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
   const effectiveFinalScore = manualScore !== null ? manualScore : (calculation?.finalScore || 0);
 
+  // Open Key Editor for a specific session
+  const handleOpenKeyEditor = (session: ExamSessionRecord, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingSessionTarget(session);
+    const existing = Array.isArray(session.answer_key) ? session.answer_key : [];
+    if (existing.length > 0) {
+      setQuickKeyInput(existing.map((k, i) => `${i + 1}.${k}`).join(' '));
+    } else {
+      setQuickKeyInput('1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D 9.A 10.B');
+    }
+    setIsKeyEditorModalOpen(true);
+  };
+
+  // Save answer key from editor or quick inline input
+  const handleSaveKeyEditor = async (targetSession?: ExamSessionRecord, customKeyStr?: string) => {
+    const sessionToUpdate = targetSession || editingSessionTarget || activeSession;
+    if (!sessionToUpdate) return;
+
+    const rawStr = customKeyStr !== undefined ? customKeyStr : quickKeyInput;
+    const parsedKeys = parseAnswerKey(rawStr);
+    if (parsedKeys.length === 0) {
+      setToastMessage({ text: 'Kunci jawaban belum valid! Masukkan minimal 1 butir soal.', type: 'error' });
+      return;
+    }
+
+    try {
+      const updated = await ExamCorrectionRepository.saveSession({
+        id: sessionToUpdate.id,
+        session_name: sessionToUpdate.session_name,
+        teacher: sessionToUpdate.teacher,
+        subject: sessionToUpdate.subject,
+        class_name: sessionToUpdate.class_name,
+        school_level: sessionToUpdate.school_level,
+        answer_key: parsedKeys,
+        student_list: sessionToUpdate.student_list || [],
+        kkm: sessionToUpdate.kkm,
+        academic_year: sessionToUpdate.academic_year,
+        semester: sessionToUpdate.semester,
+        exam_type: sessionToUpdate.exam_type,
+        scoring_config: sessionToUpdate.scoring_config,
+      });
+
+      // Update in sessions list
+      setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+
+      // If active session is updated, refresh activeSession
+      if (activeSession?.id === updated.id) {
+        setActiveSession(updated);
+      }
+
+      setIsKeyEditorModalOpen(false);
+      setEditingSessionTarget(null);
+      setToastMessage({
+        text: `Kunci jawaban berhasil disimpan (${parsedKeys.length} Soal PG)!`,
+        type: 'success',
+      });
+    } catch (err) {
+      logger.error('QuestionCorrectionModal', 'Failed to save answer key:', err);
+      setToastMessage({ text: 'Gagal memperbarui kunci jawaban.', type: 'error' });
+    }
+  };
+
+  // Filtered sessions for Tab 1
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((s) => {
+      const q = sessionSearchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        s.session_name.toLowerCase().includes(q) ||
+        s.subject.toLowerCase().includes(q) ||
+        s.teacher.toLowerCase().includes(q) ||
+        s.class_name.toLowerCase().includes(q);
+
+      const matchesClass =
+        sessionClassFilter === 'ALL' || s.class_name === sessionClassFilter;
+
+      const hasKey = Array.isArray(s.answer_key) && s.answer_key.length > 0;
+      const matchesStatus =
+        sessionStatusFilter === 'ALL' ||
+        (sessionStatusFilter === 'WITH_KEY' && hasKey) ||
+        (sessionStatusFilter === 'WITHOUT_KEY' && !hasKey);
+
+      return matchesSearch && matchesClass && matchesStatus;
+    });
+  }, [sessions, sessionSearchQuery, sessionClassFilter, sessionStatusFilter]);
+
+  const sessionsWithKeyCount = useMemo(
+    () => sessions.filter((s) => Array.isArray(s.answer_key) && s.answer_key.length > 0).length,
+    [sessions]
+  );
+  const sessionsWithoutKeyCount = sessions.length - sessionsWithKeyCount;
+
   // Filtered students for dropdown
   const filteredStudents = useMemo(() => {
     // Collect all candidate student names
     const names = new Set<string>();
-    classStudents.forEach((s) => names.add(s.fullName.trim()));
+    classStudents.forEach((s) => {
+      if (s.fullName) names.add(s.fullName.trim());
+    });
     if (activeSession?.student_list) {
-      activeSession.student_list.forEach((n) => names.add(n.trim()));
+      activeSession.student_list.forEach((n) => {
+        if (n) names.add(n.trim());
+      });
     }
+    // Also ALWAYS include any student who already has grades in this session!
+    gradedStudents.forEach((g) => {
+      if (g.name) names.add(g.name.trim());
+    });
 
     const gradedSet = new Set(gradedStudents.map((g) => g.name.toLowerCase().trim()));
 
@@ -713,10 +826,102 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h3 className="text-sm font-bold text-white">Sesi Koreksi Terdaftar di Supabase</h3>
-                      <p className="text-xs text-slate-400">Pilih sesi untuk melanjutkan koreksi atau melihat rekap nilai</p>
+                      <p className="text-xs text-slate-400">
+                        {sessions.length} total sesi • {sessionsWithKeyCount} siap koreksi • {sessionsWithoutKeyCount} perlu kunci
+                      </p>
+                    </div>
+
+                    {/* Status Filter Badges */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setSessionStatusFilter('ALL')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                          sessionStatusFilter === 'ALL'
+                            ? 'bg-slate-700 text-white'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Semua ({sessions.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSessionStatusFilter('WITH_KEY')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
+                          sessionStatusFilter === 'WITH_KEY'
+                            ? 'bg-emerald-600 text-white'
+                            : 'text-emerald-400 hover:text-emerald-300'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Siap ({sessionsWithKeyCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSessionStatusFilter('WITHOUT_KEY')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 ${
+                          sessionStatusFilter === 'WITHOUT_KEY'
+                            ? 'bg-amber-600 text-slate-950'
+                            : 'text-amber-400 hover:text-amber-300'
+                        }`}
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                        Perlu Kunci ({sessionsWithoutKeyCount})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search Bar & Class Filter */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative grow">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={sessionSearchQuery}
+                        onChange={(e) => setSessionSearchQuery(e.target.value)}
+                        placeholder="Cari sesi ujian, mapel, atau guru..."
+                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl py-2 pl-9 pr-8 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/50"
+                      />
+                      {sessionSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSessionSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+                      <button
+                        type="button"
+                        onClick={() => setSessionClassFilter('ALL')}
+                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
+                          sessionClassFilter === 'ALL'
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        }`}
+                      >
+                        Semua Kelas
+                      </button>
+                      {PREDEFINED_CLASSES.map((cls) => (
+                        <button
+                          key={cls}
+                          type="button"
+                          onClick={() => setSessionClassFilter(cls)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
+                            sessionClassFilter === cls
+                              ? 'bg-teal-600 text-white'
+                              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                          }`}
+                        >
+                          {cls}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -737,49 +942,96 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         <Plus className="w-4 h-4" /> Buat Sesi Baru
                       </button>
                     </div>
+                  ) : filteredSessions.length === 0 ? (
+                    <div className="bg-slate-800/40 rounded-2xl p-8 text-center border border-slate-800/80">
+                      <Filter className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+                      <h4 className="text-xs font-bold text-slate-300 mb-1">Tidak Ada Sesi yang Sesuai Filter</h4>
+                      <p className="text-[11px] text-slate-500 mb-3">
+                        Coba ubah kata kunci pencarian atau reset filter status / kelas.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSessionSearchQuery('');
+                          setSessionClassFilter('ALL');
+                          setSessionStatusFilter('ALL');
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold"
+                      >
+                        Reset Filter
+                      </button>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      {sessions.map((sess) => (
-                        <div
-                          key={sess.id}
-                          onClick={() => handleSelectSession(sess)}
-                          className="group bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-teal-500/50 rounded-2xl p-4 cursor-pointer transition-all flex flex-col justify-between shadow-sm hover:shadow-md"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between gap-2 mb-2">
-                              <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-slate-700 text-slate-300 rounded-md">
-                                Kelas {sess.class_name} • {sess.school_level}
-                              </span>
-                              <span className="text-[10px] font-bold text-teal-400">
-                                KKM {sess.kkm}
-                              </span>
-                            </div>
-                            <h4 className="text-sm font-bold text-white group-hover:text-teal-300 transition-colors line-clamp-2">
-                              {sess.session_name}
-                            </h4>
-                            <p className="text-xs text-slate-400 mt-1 font-medium">
-                              {sess.subject} • {sess.answer_key?.length || 0} Soal PG
-                            </p>
-                          </div>
+                      {filteredSessions.map((sess) => {
+                        const keyCount = Array.isArray(sess.answer_key) ? sess.answer_key.length : 0;
+                        const hasKey = keyCount > 0;
 
-                          <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
-                            <span>Guru: {sess.teacher}</span>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={(e) => handleDeleteSession(sess.id, e)}
-                                className="p-1 rounded hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                                title="Hapus Sesi"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                              <span className="text-teal-400 font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                                Buka <ChevronRight className="w-3.5 h-3.5" />
-                              </span>
+                        return (
+                          <div
+                            key={sess.id}
+                            onClick={() => handleSelectSession(sess)}
+                            className="group bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-teal-500/50 rounded-2xl p-4 cursor-pointer transition-all flex flex-col justify-between shadow-sm hover:shadow-md"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-slate-700 text-slate-300 rounded-md">
+                                  Kelas {sess.class_name} • {sess.school_level}
+                                </span>
+                                <span className="text-[10px] font-bold text-teal-400">
+                                  KKM {sess.kkm}
+                                </span>
+                              </div>
+                              <h4 className="text-sm font-bold text-white group-hover:text-teal-300 transition-colors line-clamp-2">
+                                {sess.session_name}
+                              </h4>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-xs text-slate-400 font-medium">
+                                  {sess.subject}
+                                </span>
+                                <span className="text-slate-600">•</span>
+                                {hasKey ? (
+                                  <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-full flex items-center gap-1">
+                                    <CheckCircle2 className="w-2.5 h-2.5" />
+                                    {keyCount} Soal PG
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-full flex items-center gap-1">
+                                    <AlertCircle className="w-2.5 h-2.5" />
+                                    Kunci Belum Diisi
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+                              <span className="truncate max-w-[140px]">Guru: {sess.teacher}</span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenKeyEditor(sess, e)}
+                                  className="px-2 py-1 rounded-md text-[10px] font-bold text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 flex items-center gap-1 transition-colors"
+                                  title="Atur Kunci Jawaban"
+                                >
+                                  <Key className="w-3 h-3 text-teal-400" />
+                                  <span>{hasKey ? 'Edit Kunci' : 'Atur Kunci'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDeleteSession(sess.id, e)}
+                                  className="p-1 rounded hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                                  title="Hapus Sesi"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                                <span className="text-teal-400 font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform ml-1">
+                                  Buka <ChevronRight className="w-3.5 h-3.5" />
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </>
@@ -864,8 +1116,17 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-white">Lembar Jawaban Siswa</span>
                       <span className="text-[11px] text-slate-400">
-                        ({Object.keys(userAnswers).length} / {activeSession.answer_key.length} Terjawab)
+                        ({Object.keys(userAnswers).length} / {activeSession.answer_key?.length || 0} Terjawab)
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenKeyEditor(activeSession)}
+                        className="px-2 py-0.5 rounded-md bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 text-[10px] font-bold flex items-center gap-1 transition-colors ml-1"
+                        title="Edit Kunci Jawaban Sesi Ini"
+                      >
+                        <Key className="w-3 h-3" />
+                        <span>{activeSession.answer_key && activeSession.answer_key.length > 0 ? `Kunci (${activeSession.answer_key.length})` : 'Atur Kunci'}</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -889,72 +1150,104 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     </div>
                   </div>
 
-                  {/* List of Questions with Keypad Buttons */}
-                  <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                    {activeSession.answer_key.map((correctKey, index) => {
-                      const qNum = index + 1;
-                      const studentAns = userAnswers[qNum];
-                      const isAnswered = !!studentAns;
-                      const isCorrect = isAnswered && studentAns.toUpperCase() === correctKey.toUpperCase();
-
-                      return (
-                        <div
-                          key={qNum}
-                          ref={(el) => {
-                            if (el) questionRefs.current.set(qNum, el);
-                          }}
-                          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
-                            isAnswered
-                              ? isCorrect
-                                ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
-                                : 'bg-rose-950/30 border-rose-500/40 text-rose-200'
-                              : 'bg-slate-900/60 border-slate-700/70 text-slate-300'
-                          }`}
+                  {/* Inline Warning & Quick Setup if No Answer Key */}
+                  {(!activeSession.answer_key || activeSession.answer_key.length === 0) ? (
+                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-3 my-2">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-xs font-bold text-white">Sesi ini belum memiliki Kunci Jawaban PG</h4>
+                          <p className="text-[11px] text-amber-300/80 mt-0.5">
+                            Kunci jawaban diperlukan untuk menampilkan butir soal dan menghitung nilai otomatis. Masukkan kunci jawaban di bawah ini:
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={quickKeyInput}
+                          onChange={(e) => setQuickKeyInput(e.target.value)}
+                          placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A 6.B ... atau ABCDABCD"
+                          className="grow bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveKeyEditor(activeSession, quickKeyInput)}
+                          className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 flex items-center justify-center gap-1.5 shadow-md transition-colors"
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center font-black text-xs text-slate-300">
-                              {qNum}
-                            </span>
+                          <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                          <span>Simpan Kunci</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* List of Questions with Keypad Buttons */
+                    <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                      {activeSession.answer_key.map((correctKey, index) => {
+                        const qNum = index + 1;
+                        const studentAns = userAnswers[qNum];
+                        const isAnswered = !!studentAns;
+                        const isCorrect = isAnswered && studentAns.toUpperCase() === correctKey.toUpperCase();
 
-                            <div className="flex items-center gap-1.5">
-                              {availableOptions.map((opt) => {
-                                const isSelected = studentAns === opt;
-                                return (
-                                  <button
-                                    key={opt}
-                                    type="button"
-                                    onClick={() => handleAnswerSelect(qNum, opt)}
-                                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-xs font-black transition-all flex items-center justify-center min-h-9 ${
-                                      isSelected
-                                        ? isCorrect
-                                          ? 'bg-emerald-500 text-white shadow-md shadow-emerald-900/50 scale-105 ring-2 ring-emerald-300'
-                                          : 'bg-rose-500 text-white shadow-md shadow-rose-900/50 scale-105 ring-2 ring-rose-300'
-                                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60 active:scale-95'
-                                    }`}
-                                  >
-                                    {opt}
-                                  </button>
-                                );
-                              })}
+                        return (
+                          <div
+                            key={qNum}
+                            ref={(el) => {
+                              if (el) questionRefs.current.set(qNum, el);
+                            }}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
+                              isAnswered
+                                ? isCorrect
+                                  ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                                  : 'bg-rose-950/30 border-rose-500/40 text-rose-200'
+                                : 'bg-slate-900/60 border-slate-700/70 text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center font-black text-xs text-slate-300">
+                                {qNum}
+                              </span>
+
+                              <div className="flex items-center gap-1.5">
+                                {availableOptions.map((opt) => {
+                                  const isSelected = studentAns === opt;
+                                  return (
+                                    <button
+                                      key={opt}
+                                      type="button"
+                                      onClick={() => handleAnswerSelect(qNum, opt)}
+                                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-xs font-black transition-all flex items-center justify-center min-h-9 ${
+                                        isSelected
+                                          ? isCorrect
+                                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-900/50 scale-105 ring-2 ring-emerald-300'
+                                            : 'bg-rose-500 text-white shadow-md shadow-rose-900/50 scale-105 ring-2 ring-rose-300'
+                                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60 active:scale-95'
+                                      }`}
+                                    >
+                                      {opt}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="pr-1">
+                              {isAnswered && (
+                                isCorrect ? (
+                                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                ) : (
+                                  <div className="flex items-center gap-1 text-[11px] font-bold text-rose-400">
+                                    <XCircle className="w-4 h-4" />
+                                    <span className="text-[10px] text-slate-400 font-normal">Kunci: {correctKey}</span>
+                                  </div>
+                                )
+                              )}
                             </div>
                           </div>
-
-                          <div className="pr-1">
-                            {isAnswered && (
-                              isCorrect ? (
-                                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                              ) : (
-                                <div className="flex items-center gap-1 text-[11px] font-bold text-rose-400">
-                                  <XCircle className="w-4 h-4" />
-                                  <span className="text-[10px] text-slate-400 font-normal">Kunci: {correctKey}</span>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1231,6 +1524,73 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           )}
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* UNIVERSAL ANSWER KEY EDITOR MODAL */}
+      {/* ========================================================================= */}
+      {isKeyEditorModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-lg shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-teal-500/10 text-teal-400 rounded-xl border border-teal-500/20">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Pengaturan Kunci Jawaban
+                  </h3>
+                  <p className="text-[11px] text-slate-400 line-clamp-1">
+                    {editingSessionTarget?.session_name || activeSession?.session_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsKeyEditorModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-300">
+                Kunci Jawaban PG (Bisa paste format 1.A 2.B atau ABCD...)
+              </label>
+              <textarea
+                rows={4}
+                value={quickKeyInput}
+                onChange={(e) => setQuickKeyInput(e.target.value)}
+                placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D atau ABCDABCD"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-white placeholder-slate-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-hidden"
+              />
+              <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <span>Terdeteksi: <strong className="text-teal-400">{parseAnswerKey(quickKeyInput).length}</strong> butir soal PG</span>
+                <span className="text-[10px] text-slate-500">Mendukung A, B, C, D, E</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsKeyEditorModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveKeyEditor()}
+                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-900/30 flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Simpan Kunci</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

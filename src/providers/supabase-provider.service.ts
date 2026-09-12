@@ -70,6 +70,7 @@ import {
   validateScheduleConflict,
   sortTeachingSlots,
 } from '../utils/teaching-schedule.utils';
+import { parseAnswerKey } from '../utils/scoring.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -4308,23 +4309,49 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       if (data && data.length > 0) {
-        const mapped: ExamSessionRecord[] = data.map((d: any) => ({
-          id: d.id,
-          session_name: d.session_name,
-          teacher: d.teacher,
-          subject: d.subject,
-          class_name: d.class_name,
-          school_level: d.school_level || 'SMP',
-          answer_key: Array.isArray(d.answer_key) ? d.answer_key : [],
-          student_list: Array.isArray(d.student_list) ? d.student_list : [],
-          scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
-          exam_type: d.exam_type || 'Harian',
-          academic_year: d.academic_year || '2025/2026',
-          semester: d.semester || 'Ganjil',
-          kkm: Number(d.kkm) || 75,
-          created_at: d.created_at,
-          updated_at: d.updated_at,
-        }));
+        const mapped: ExamSessionRecord[] = data.map((d: any) => {
+          let answerKey: string[] = [];
+          if (Array.isArray(d.answer_key)) {
+            answerKey = d.answer_key;
+          } else if (typeof d.answer_key === 'string' && d.answer_key.trim()) {
+            try {
+              const parsed = JSON.parse(d.answer_key);
+              if (Array.isArray(parsed)) answerKey = parsed;
+            } catch {
+              answerKey = parseAnswerKey(d.answer_key);
+            }
+          }
+
+          let studentList: string[] = [];
+          if (Array.isArray(d.student_list)) {
+            studentList = d.student_list;
+          } else if (typeof d.student_list === 'string' && d.student_list.trim()) {
+            try {
+              const parsed = JSON.parse(d.student_list);
+              if (Array.isArray(parsed)) studentList = parsed;
+            } catch {
+              studentList = d.student_list.split(',').map((x: string) => x.trim()).filter(Boolean);
+            }
+          }
+
+          return {
+            id: d.id,
+            session_name: d.session_name,
+            teacher: d.teacher,
+            subject: d.subject,
+            class_name: d.class_name,
+            school_level: d.school_level || (d.class_name && (d.class_name.startsWith('7') || d.class_name.startsWith('8') || d.class_name.startsWith('9')) ? 'SMP' : 'SMA'),
+            answer_key: answerKey,
+            student_list: studentList,
+            scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
+            exam_type: d.exam_type || 'Harian',
+            academic_year: d.academic_year || '2025/2026',
+            semester: d.semester || 'Ganjil',
+            kkm: Number(d.kkm) || 75,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+          };
+        });
         // Update local cache
         try {
           if (typeof window !== 'undefined') {
