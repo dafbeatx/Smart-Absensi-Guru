@@ -20,6 +20,7 @@ import { ExportReportModal } from '../../../components/dashboard/ExportReportMod
 import { PDFPreviewModal } from '../../../components/dashboard/PDFPreviewModal';
 import { ReportService } from '../../../services/report.service';
 import { ExcelReportGenerator, SIGNATORY_OFFICIALS, isTeacherRecordMatch, isTeacherLeaveMatch } from '../../../lib/excel-generator.lib';
+import { PdfStamperService } from '../../../lib/pdf-stamper.lib';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
@@ -72,6 +73,7 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
   const [previewTitle, setPreviewTitle] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isGeneratingCertifiedPDF, setIsGeneratingCertifiedPDF] = useState(false);
 
   // Custom Month Attendance Records (if different month fetched)
   const [monthlyRecords, setMonthlyRecords] = useState<AttendanceRecord[]>(initialAttendanceRecords);
@@ -326,6 +328,23 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
     }
   };
 
+  const handleDownloadCertifiedPDF = async () => {
+    setIsGeneratingCertifiedPDF(true);
+    try {
+      await PdfStamperService.downloadCertifiedSchoolReportPDF(reportPayload);
+      showToast(
+        'success',
+        'PDF Berstempel Berhasil Diunduh',
+        `Laporan resmi ${selectedMonth} ${selectedYear} dengan cap stempel basah & QR validasi berhasil diunduh via pdf-lib.`
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal membuat PDF berstempel';
+      showToast('error', 'Gagal Unduh PDF', msg);
+    } finally {
+      setIsGeneratingCertifiedPDF(false);
+    }
+  };
+
   const handlePrintIndividualTeacherPDF = (teacher: UserProfile) => {
     try {
       const htmlContent = ExcelReportGenerator.getIndividualTeacherPDFHTML(
@@ -461,6 +480,18 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Cetak PDF</span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleDownloadCertifiedPDF}
+              disabled={isGeneratingCertifiedPDF || isDownloading}
+              className="text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer border-blue-200 text-blue-800 bg-blue-50 hover:bg-blue-100"
+              title="Unduh PDF Resmi dengan Cap Stempel Basah & QR Validasi Digital (pdf-lib)"
+            >
+              <FileCheck2 className="w-3.5 h-3.5 text-blue-700" />
+              <span>{isGeneratingCertifiedPDF ? 'Menyusun...' : 'PDF Berstempel'}</span>
             </Button>
 
             <button
@@ -987,6 +1018,17 @@ export const AttendanceReportView: React.FC<AttendanceReportViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDownloadCertifiedPDF}
+                  disabled={isGeneratingCertifiedPDF || isDownloading}
+                  className="text-xs flex items-center gap-1.5 shadow-xs cursor-pointer border-blue-200 text-blue-800 bg-blue-50 hover:bg-blue-100"
+                >
+                  <FileCheck2 className="w-3.5 h-3.5 text-blue-700" />
+                  <span>{isGeneratingCertifiedPDF ? 'Menyusun...' : 'Unduh PDF Berstempel (pdf-lib)'}</span>
+                </Button>
+
                 <Button
                   variant="primary"
                   size="sm"

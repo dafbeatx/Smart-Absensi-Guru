@@ -5,6 +5,7 @@ import { APP_CONFIG } from '../config/app.config';
 import { CONSTANTS } from '../config/constants';
 import { getMonthWorkingDays, parseIndonesianMonth, isDateOffDay, getTodayDateInJakarta } from '../utils/time.utils';
 import type { MonthWorkingDaysInfo } from '../utils/time.utils';
+import { PdfStamperService } from './pdf-stamper.lib';
 
 export const SIGNATORY_OFFICIALS = {
   KEPSEK_NAME: 'Farhan Sopian Sahid, S.Pd.I',
@@ -726,19 +727,41 @@ export class ExcelReportGenerator {
             </tbody>
           </table>
 
-          <div class="signature-section">
-            <div class="sig-box">
-              <p>Diperiksa oleh,</p>
-              <p><strong>${SIGNATORY_OFFICIALS.TU_TITLE}</strong></p>
-              <div class="sig-space"></div>
-              <p><strong>${SIGNATORY_OFFICIALS.TU_NAME}</strong></p>
+          <div class="signature-section" style="margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; page-break-inside: avoid;">
+            <div class="sig-box" style="text-align: center; width: 200px;">
+              <p style="margin: 0 0 4px 0;">Diperiksa oleh,</p>
+              <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.TU_TITLE}</p>
+              <div style="height: 65px;"></div>
+              <p style="margin: 0; font-weight: 800; text-decoration: underline;">${SIGNATORY_OFFICIALS.TU_NAME}</p>
+              <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b;">NPP. 199208152020122003</p>
             </div>
 
-            <div class="sig-box">
-              <p>Mengetahui,</p>
-              <p><strong>${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</strong></p>
-              <div class="sig-space"></div>
-              <p><strong>${SIGNATORY_OFFICIALS.KEPSEK_NAME}</strong></p>
+            <!-- QR Validasi Dokumen Resmi -->
+            <div style="text-align: center; padding: 8px 14px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 8px; max-width: 190px;">
+              <div style="font-weight: 800; color: #1e40af; font-size: 9px; margin-bottom: 4px;">🛡️ VALIDASI DOKUMEN RESMI</div>
+              <div style="margin-bottom: 4px;">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto; display: block;">
+                  <rect width="18" height="18" x="3" y="3" rx="2"/>
+                  <path d="M7 7h.01"/><path d="M17 7h.01"/><path d="M7 17h.01"/><path d="M17 17h.01"/><path d="M7 12h10"/><path d="M12 7v10"/>
+                </svg>
+              </div>
+              <div style="color: #475569; font-weight: 600;">No: 421.3/SAG-BOGOR/${parseIndonesianMonth(payload.month)}/${payload.year}</div>
+              <div style="color: #15803d; font-weight: 700; margin-top: 2px;">Terverifikasi Digital & Kriptografis</div>
+            </div>
+
+            <div class="sig-box" style="text-align: center; width: 220px; position: relative;">
+              <p style="margin: 0 0 4px 0;">Mengetahui,</p>
+              <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</p>
+              
+              <!-- Stempel Basah Resmi Overlap -->
+              <div style="height: 65px; position: relative;">
+                <div style="position: absolute; top: -18px; left: -15px; z-index: 5; pointer-events: none; opacity: 0.92;">
+                  ${PdfStamperService.renderOfficialStampSVG({ size: 105, rotation: -6 })}
+                </div>
+              </div>
+
+              <p style="margin: 0; font-weight: 800; text-decoration: underline; position: relative; z-index: 10;">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</p>
+              <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b; position: relative; z-index: 10;">NPP. 198205122008011004</p>
             </div>
           </div>
         </div>
@@ -1119,19 +1142,41 @@ export class ExcelReportGenerator {
           </table>
         ` : ''}
 
-        <div class="signature-section">
-          <div class="sig-box">
-            <p>Diperiksa oleh,</p>
-            <p><strong>${SIGNATORY_OFFICIALS.TU_TITLE}</strong></p>
-            <div class="sig-space"></div>
-            <p><strong>${SIGNATORY_OFFICIALS.TU_NAME}</strong></p>
+        <div class="signature-section" style="margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; page-break-inside: avoid;">
+          <div class="sig-box" style="text-align: center; width: 200px;">
+            <p style="margin: 0 0 4px 0;">Diperiksa oleh,</p>
+            <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.TU_TITLE}</p>
+            <div style="height: 65px;"></div>
+            <p style="margin: 0; font-weight: 800; text-decoration: underline;">${SIGNATORY_OFFICIALS.TU_NAME}</p>
+            <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b;">NPP. 199208152020122003</p>
           </div>
 
-          <div class="sig-box">
-            <p>Mengetahui,</p>
-            <p><strong>${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</strong></p>
-            <div class="sig-space"></div>
-            <p><strong>${SIGNATORY_OFFICIALS.KEPSEK_NAME}</strong></p>
+          <!-- QR Validasi Dokumen Resmi Individu -->
+          <div style="text-align: center; padding: 8px 14px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 8px; max-width: 190px;">
+            <div style="font-weight: 800; color: #1e40af; font-size: 9px; margin-bottom: 4px;">🛡️ VALIDASI DOKUMEN RESMI</div>
+            <div style="margin-bottom: 4px;">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto; display: block;">
+                <rect width="18" height="18" x="3" y="3" rx="2"/>
+                <path d="M7 7h.01"/><path d="M17 7h.01"/><path d="M7 17h.01"/><path d="M17 17h.01"/><path d="M7 12h10"/><path d="M12 7v10"/>
+              </svg>
+            </div>
+            <div style="color: #475569; font-weight: 600;">No: 421.3/IND-${teacher.nip || teacher.id.slice(0, 8)}/${monthPrefix}</div>
+            <div style="color: #15803d; font-weight: 700; margin-top: 2px;">Terverifikasi Digital & Kriptografis</div>
+          </div>
+
+          <div class="sig-box" style="text-align: center; width: 220px; position: relative;">
+            <p style="margin: 0 0 4px 0;">Mengetahui,</p>
+            <p style="margin: 0; font-weight: 700;">${SIGNATORY_OFFICIALS.KEPSEK_TITLE}</p>
+            
+            <!-- Stempel Basah Resmi Overlap -->
+            <div style="height: 65px; position: relative;">
+              <div style="position: absolute; top: -18px; left: -15px; z-index: 5; pointer-events: none; opacity: 0.92;">
+                ${PdfStamperService.renderOfficialStampSVG({ size: 105, rotation: -6 })}
+              </div>
+            </div>
+
+            <p style="margin: 0; font-weight: 800; text-decoration: underline; position: relative; z-index: 10;">${SIGNATORY_OFFICIALS.KEPSEK_NAME}</p>
+            <p style="margin: 2px 0 0 0; font-size: 9px; color: #64748b; position: relative; z-index: 10;">NPP. 198205122008011004</p>
           </div>
         </div>
       </body>

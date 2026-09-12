@@ -5,6 +5,7 @@ import { ReportService } from '../../services/report.service';
 import { useToastStore } from '../../store/useToastStore';
 import { ProviderFactory } from '../../providers/provider-factory';
 import { SIGNATORY_OFFICIALS, ExcelReportGenerator } from '../../lib/excel-generator.lib';
+import { PdfStamperService } from '../../lib/pdf-stamper.lib';
 import { PDFPreviewModal } from './PDFPreviewModal';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog, HolidayRecord } from '../../types/database.types';
 
@@ -41,6 +42,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   const [month, setMonth] = useState<string>(monthNames[currentMonthIdx] || 'Agustus');
   const [year, setYear] = useState<string>(String(new Date().getFullYear()));
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingCertified, setIsGeneratingCertified] = useState(false);
 
   // In-App PDF Preview Fallback State (When Pop-up Blocker is Active)
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -213,6 +215,33 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
     }
   };
 
+  const handleExportCertifiedPDF = async () => {
+    setIsGeneratingCertified(true);
+    try {
+      const payload = ReportService.preparePayload(
+        month,
+        year,
+        teachers,
+        attendanceRecords,
+        effectiveLeaves,
+        auditLogs,
+        effectiveHolidays
+      );
+      await PdfStamperService.downloadCertifiedSchoolReportPDF(payload);
+      showToast(
+        'success',
+        'PDF Berstempel Resmi Berhasil Diunduh!',
+        `Berkas PDF laporan resmi ${month} ${year} dengan cap stempel basah dan QR validasi telah tersimpan.`
+      );
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gagal mengunduh PDF berstempel';
+      showToast('error', 'Gagal Unduh PDF', msg);
+    } finally {
+      setIsGeneratingCertified(false);
+    }
+  };
+
   const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
 
   return (
@@ -332,25 +361,35 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
         )}
 
         {/* Action Buttons */}
-        <div className="pt-2 grid grid-cols-2 gap-2">
+        <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Button
             variant="secondary"
             onClick={handleExportXLSX}
             isLoading={isLoading}
-            className="w-full flex items-center justify-center gap-1.5 py-3 cursor-pointer"
+            className="w-full flex items-center justify-center gap-1.5 py-3 cursor-pointer text-xs"
           >
             <span>📊</span>
-            <span>Download Excel (.xlsx)</span>
+            <span>Excel (.xlsx)</span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            onClick={handleExportPDF}
+            isLoading={isLoading}
+            className="w-full flex items-center justify-center gap-1.5 py-3 cursor-pointer text-xs"
+          >
+            <span>🖨️</span>
+            <span>Cetak PDF</span>
           </Button>
 
           <Button
             variant="primary"
-            onClick={handleExportPDF}
-            isLoading={isLoading}
-            className="w-full flex items-center justify-center gap-1.5 py-3 cursor-pointer"
+            onClick={handleExportCertifiedPDF}
+            isLoading={isGeneratingCertified}
+            className="w-full flex items-center justify-center gap-1.5 py-3 cursor-pointer text-xs bg-blue-600 hover:bg-blue-700 text-white"
           >
-            <span>🖨️</span>
-            <span>Cetak PDF Resmi</span>
+            <span>🛡️</span>
+            <span>PDF Berstempel</span>
           </Button>
         </div>
       </div>

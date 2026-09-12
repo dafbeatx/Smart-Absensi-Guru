@@ -24,6 +24,7 @@ import { runNotificationRealtimeReadStateTestSuite } from './__tests__/notificat
 import { runWebTrafficTestSuite } from './__tests__/web-traffic.test';
 import { runAttendanceReportViewTestSuite } from './__tests__/attendance-report-view.test';
 import { runDexieOfflineSyncTestSuite } from './__tests__/dexie-offline-sync.test';
+import { runPdfStamperTestSuite } from './__tests__/pdf-stamper.test';
 
 export interface TestResultItem {
   testName: string;
@@ -85,6 +86,7 @@ export class MasterTestRunner {
       { name: 'Web Traffic & Educational Activity Tracker', fn: runWebTrafficTestSuite },
       { name: 'Attendance Report In-Page View & Aggregation Engine', fn: runAttendanceReportViewTestSuite },
       { name: 'Dexie.js Offline Database & Rapid PWA Sync', fn: runDexieOfflineSyncTestSuite },
+      { name: 'PDF-Lib Digital Stamp & Document Verification Engine', fn: runPdfStamperTestSuite },
     ];
 
     let totalPassed = 0;
