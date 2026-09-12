@@ -56,7 +56,7 @@ export const runWebTrafficTestSuite = async (): Promise<{
       `Categories: ${cat1}, ${cat2}, ${cat3}, ${cat4}`
     );
 
-    // Test 3: Record In-App Feature Visit & NPP Formatting
+    // Test 3: Record In-App Feature Visit (Anonymous by Default)
     const recorded = WebTrafficService.recordFeatureVisit({
       user_id: 'usr_test_99',
       user_name: 'Dewi Sartika, S.Pd.',
@@ -67,8 +67,9 @@ export const runWebTrafficTestSuite = async (): Promise<{
     });
 
     assert(
-      'Traffic - Records Feature Visit with Formatted NPP Standard',
-      recorded.user_npp.startsWith('NPP. ') &&
+      'Traffic - Records Feature Visit with Anonymized Display Identity',
+      recorded.user_name === 'Guru Anonim' &&
+      recorded.user_npp.startsWith('NPP.') &&
       recorded.feature_id === 'koreksi_soal' &&
       recorded.category === 'AKADEMIK_NILAI',
       `Recorded: ${JSON.stringify(recorded)}`
@@ -97,7 +98,7 @@ export const runWebTrafficTestSuite = async (): Promise<{
       `Filtered count: ${filteredByTeacher.length}`
     );
 
-    // Test 6: Search Query Filter (Feature Name / Teacher Name / NPP)
+    // Test 6: Search Query Filter (Feature Name / Keyword)
     const searchLogs = WebTrafficService.getFilteredLogs({
       dateRange: 'ALL',
       searchQuery: 'Koreksi Soal',
@@ -109,33 +110,30 @@ export const runWebTrafficTestSuite = async (): Promise<{
       `Search count: ${searchLogs.length}`
     );
 
-    // Test 7: Export to CSV
+    // Test 7: Export to CSV (Anonymous: No Teacher Personal Names)
     const csv = WebTrafficService.exportToCSV([recorded]);
     assert(
-      'Traffic - Generates Valid CSV Export Content',
+      'Traffic - Generates Valid Anonymous CSV Export Content',
       csv.includes('ID Aktivitas') &&
-      csv.includes('NPP Pegawai') &&
-      csv.includes('Dewi Sartika') &&
-      csv.includes('Koreksi Soal'),
-      'CSV header and row verified'
+      csv.includes('Fitur / Menu Dibuka') &&
+      csv.includes('Koreksi Soal') &&
+      !csv.includes('Dewi Sartika'),
+      'CSV header and row verified without personal names'
     );
 
-    // Test 8: Admin Registered Teachers Mapping (Honest Zero State for Inactive Teachers)
+    // Test 8: Admin Registered Teachers Mapping & Participation Rate
     const mockAdminTeachers: any[] = [
       { id: 'usr_test_99', name: 'Dewi Sartika, S.Pd.', npp: '199001012015012001' },
       { id: 'usr_active_teacher_2', name: 'Ahmad Dahlan, M.Pd.', npp: '198805052012011002' },
     ];
     const analyticsWithTeachers = WebTrafficService.getAnalytics(undefined, mockAdminTeachers);
-    const dewiSummary = analyticsWithTeachers.teacherSummaries.find((t) => t.user_id === 'usr_test_99');
-    const ahmadSummary = analyticsWithTeachers.teacherSummaries.find((t) => t.user_id === 'usr_active_teacher_2');
 
     assert(
-      'Traffic - Maps Admin Registered Teachers with Honest Activity Counts',
-      analyticsWithTeachers.teacherSummaries.length === 2 &&
-      dewiSummary?.total_visits === 1 &&
-      ahmadSummary?.total_visits === 0 &&
-      ahmadSummary?.top_feature === 'Belum ada aktivitas',
-      `Dewi visits: ${dewiSummary?.total_visits}, Ahmad visits: ${ahmadSummary?.total_visits}`
+      'Traffic - Calculates Anonymous Teacher Participation Metrics Accurately',
+      analyticsWithTeachers.uniqueTeachersCount === 1 &&
+      analyticsWithTeachers.totalRegisteredTeachers === 2 &&
+      analyticsWithTeachers.participationRate === 50,
+      `Unique: ${analyticsWithTeachers.uniqueTeachersCount}, Total: ${analyticsWithTeachers.totalRegisteredTeachers}, Rate: ${analyticsWithTeachers.participationRate}%`
     );
 
     // Test 9: Legacy Seed Data Purging

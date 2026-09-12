@@ -321,14 +321,6 @@ export class WebTrafficService {
     const resolvedCat = params.category || featureMeta?.category || inferCategoryFromFeatureId(params.feature_id);
     const resolvedIcon = params.feature_icon || featureMeta?.icon || '⚡';
 
-    // Format NPP Standar
-    const rawNpp = params.user_npp?.trim() || '';
-    const formattedNpp = rawNpp
-      ? rawNpp.startsWith('NPP.')
-        ? rawNpp
-        : `NPP. ${rawNpp}`
-      : 'NPP. -';
-
     // Deteksi Perangkat
     let deviceLabel = params.device;
     if (!deviceLabel && typeof window !== 'undefined' && typeof navigator !== 'undefined') {
@@ -351,8 +343,8 @@ export class WebTrafficService {
     const log: WebTrafficLog = {
       id: 'traf_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       user_id: params.user_id,
-      user_name: params.user_name,
-      user_npp: formattedNpp,
+      user_name: 'Guru Anonim',
+      user_npp: 'NPP. ••••••••',
       user_role: params.user_role || 'GURU',
       feature_id: params.feature_id,
       feature_name: resolvedName,
@@ -707,6 +699,17 @@ export class WebTrafficService {
       count: hourlyBuckets[hour],
     }));
 
+    // Partisipasi Pengguna Guru (Agregat Anonim)
+    const allUniqueTeachers = new Set<string>();
+    filteredLogs.forEach((log) => {
+      if (log.user_id) allUniqueTeachers.add(log.user_id);
+    });
+    const uniqueTeachersCount = allUniqueTeachers.size;
+    const totalRegisteredTeachers = targetTeachers?.length || (uniqueTeachersCount > 0 ? uniqueTeachersCount : 0);
+    const participationRate = totalRegisteredTeachers > 0
+      ? Math.min(100, Math.round((uniqueTeachersCount / totalRegisteredTeachers) * 100))
+      : 0;
+
     // Top Category
     const topCat = categoryDistribution.length > 0 && categoryDistribution[0].count > 0
       ? {
@@ -724,6 +727,9 @@ export class WebTrafficService {
 
     return {
       totalVisits,
+      uniqueTeachersCount,
+      totalRegisteredTeachers,
+      participationRate,
       topFeature: topFeat,
       topWebsite: topFeat,
       mostActiveTeacher: mostActive,
@@ -737,18 +743,16 @@ export class WebTrafficService {
   }
 
   /**
-   * Ekspor Log ke CSV dengan Standar NPP
+   * Ekspor Log ke CSV Bersifat 100% Anonim (Hanya Data Trafik & Fitur)
    */
   public static exportToCSV(logs: WebTrafficLog[]): string {
     const headers = [
       'ID Aktivitas',
       'Waktu Akses (WIB)',
-      'Nama Guru',
-      'NPP Pegawai',
-      'Role',
+      'Peran Pengguna',
       'Fitur / Menu Dibuka',
-      'Kategori',
-      'Perangkat',
+      'Kategori Fitur',
+      'Jenis Perangkat',
     ];
 
     const rows = logs.map((log) => {
@@ -765,9 +769,7 @@ export class WebTrafficService {
       return [
         `"${log.id}"`,
         `"${dateStr}"`,
-        `"${log.user_name.replace(/"/g, '""')}"`,
-        `"${log.user_npp.replace(/"/g, '""')}"`,
-        `"${log.user_role}"`,
+        `"${log.user_role || 'GURU'}"`,
         `"${log.feature_name.replace(/"/g, '""')}"`,
         `"${TRAFFIC_CATEGORY_METADATA[log.category]?.label || log.category}"`,
         `"${log.device || 'Desktop'}"`,

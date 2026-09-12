@@ -1,7 +1,7 @@
 /**
- * SMART ABSENSI GURU - TEACHER IN-APP FEATURE USAGE TRAFFIC MONITOR
- * Memantau aktivitas dan frekuensi pemanfaatan fitur serta menu internal di dalam website oleh dewan guru.
- * Mematuhi protokol Anti AI-Slop, warna tema resmi, Inter font, dan standar NPP.
+ * SMART ABSENSI GURU - ANONYMOUS IN-APP FEATURE TRAFFIC MONITOR
+ * Memantau volume trafik, frekuensi pemakaian menu, dan jam sibuk akses di dalam web aplikasi.
+ * Bersifat 100% Anonim: Hanya melihat data trafik agregat tanpa membuka nama atau identitas pribadi guru.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,14 +11,14 @@ import {
   Filter,
   Download,
   Calendar,
-  UserCheck,
   Zap,
   ArrowLeft,
   Trash2,
   Play,
-  RotateCcw,
   Sparkles,
   Layers,
+  ShieldCheck,
+  Users,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
@@ -45,7 +45,6 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
 }) => {
   // State Filter & Pencarian
   const [dateRange, setDateRange] = useState<TrafficFilterOptions['dateRange']>('ALL');
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('ALL');
   const [selectedCategory, setSelectedCategory] = useState<TrafficCategory | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -59,8 +58,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [isClearLogsModalOpen, setIsClearLogsModalOpen] = useState(false);
 
-  // Form Simulasi
-  const [simTeacherId, setSimTeacherId] = useState<string>(teachers[0]?.id || 'usr_guru_sample');
+  // Form Simulasi (Anonim)
   const [simFeatureId, setSimFeatureId] = useState<string>('koreksi_soal');
 
   // Load Data
@@ -82,35 +80,26 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
     };
   }, []);
 
-  // Set default guru simulasi jika teachers dimuat
-  useEffect(() => {
-    if (teachers.length > 0 && !simTeacherId) {
-      setSimTeacherId(teachers[0].id);
-    }
-  }, [teachers, simTeacherId]);
-
-  // Hitung Analitik Menggunakan Data Murni Guru Terdaftar (Admin)
+  // Hitung Analitik Agregat Anonim
   const analytics = useMemo(() => {
     return WebTrafficService.getAnalytics(
       {
         dateRange,
-        teacherId: selectedTeacherId,
         category: selectedCategory,
         searchQuery,
       },
       teachers
     );
-  }, [dateRange, selectedTeacherId, selectedCategory, searchQuery, teachers, logs]);
+  }, [dateRange, selectedCategory, searchQuery, teachers, logs]);
 
   // Log yang Difilter untuk Tabel
   const filteredLogs = useMemo(() => {
     return WebTrafficService.getFilteredLogs({
       dateRange,
-      teacherId: selectedTeacherId,
       category: selectedCategory,
       searchQuery,
     });
-  }, [dateRange, selectedTeacherId, selectedCategory, searchQuery, logs]);
+  }, [dateRange, selectedCategory, searchQuery, logs]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
@@ -122,9 +111,9 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
   // Reset page when filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [dateRange, selectedTeacherId, selectedCategory, searchQuery]);
+  }, [dateRange, selectedCategory, searchQuery]);
 
-  // Ekspor CSV
+  // Ekspor CSV Bersifat Anonim
   const handleExportCSV = () => {
     const csvContent = WebTrafficService.exportToCSV(filteredLogs);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -133,26 +122,22 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
     link.setAttribute('href', url);
     link.setAttribute(
       'download',
-      `Trafik_Fitur_Web_Guru_${new Date().toISOString().slice(0, 10)}.csv`
+      `Trafik_Fitur_Web_Anonim_${new Date().toISOString().slice(0, 10)}.csv`
     );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Uji Catat Interaksi Fitur Web
+  // Uji Catat Interaksi Fitur Web (Anonim)
   const handleSimulateVisit = () => {
-    const teacher = teachers.find((t) => t.id === simTeacherId);
     const feat = INTERNAL_APP_FEATURES.find((f) => f.id === simFeatureId);
 
-    const teacherName = teacher?.full_name || 'Guru Percobaan';
-    const teacherNpp = teacher?.nip || 'NPP. -';
-
     WebTrafficService.recordFeatureVisit({
-      user_id: simTeacherId,
-      user_name: teacherName,
-      user_npp: teacherNpp,
-      user_role: teacher?.role || 'GURU',
+      user_id: 'usr_anon_sim',
+      user_name: 'Guru Anonim',
+      user_npp: 'NPP. ••••••••',
+      user_role: 'GURU',
       feature_id: simFeatureId,
       feature_name: feat?.name,
       feature_icon: feat?.icon,
@@ -172,7 +157,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-12 animate-fade-in font-sans">
-      {/* ── HEADER HALAMAN ──────────────────────────────────────────────── */}
+      {/* ── HEADER HALAMAN & BADGE ANONIM ──────────────────────────────── */}
       <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200/90 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
@@ -190,17 +175,17 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
               <h1 className="text-xl sm:text-2xl font-black text-[#023246] tracking-tight">
                 Trafik Fitur Web Guru
               </h1>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                100% Mode Anonim (Privasi Terjaga)
+              </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-[#023246]/10 text-[#023246] border border-[#023246]/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live In-App Analytics
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                <UserCheck className="w-3 h-3 text-emerald-600" />
-                {teachers.length} Guru Terdaftar (Admin)
+                Live In-App Traffic
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 max-w-2xl leading-relaxed">
-              Memantau fitur dan menu apa saja di dalam website Smart Absensi yang paling sering dibuka dan dimanfaatkan oleh para dewan guru terdaftar (100% internal web sekolah).
+              Memantau volume trafik agregat, frekuensi pemakaian menu, dan jam sibuk akses di dalam website sekolah tanpa menampilkan nama atau identitas pribadi guru.
             </p>
           </div>
 
@@ -211,7 +196,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
               className="px-3 py-2 text-xs font-bold text-[#023246] bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >
               <Layers className="w-3.5 h-3.5 text-[#287094]" />
-              <span>Daftar 18 Fitur Web</span>
+              <span>Katalog 18 Fitur Web</span>
             </button>
 
             <button
@@ -231,7 +216,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
               className="text-xs flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Ekspor CSV</span>
+              <span>Ekspor CSV (Anonim)</span>
             </Button>
 
             {logs.length > 0 && (
@@ -248,7 +233,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
         </div>
       </div>
 
-      {/* ── 4 KARTU STATISTIK KPI UTAMA ─────────────────────────────────── */}
+      {/* ── 4 KARTU STATISTIK KPI UTAMA (AGREGAT ANONIM) ────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Akses Fitur */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-1.5">
@@ -267,7 +252,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
             <span className="text-xs text-slate-500 font-semibold">klik</span>
           </div>
           <p className="text-[11px] text-slate-500 truncate">
-            {filteredLogs.length} aksi pada filter saat ini
+            Volume seluruh interaksi menu web
           </p>
         </div>
 
@@ -293,24 +278,22 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
           </div>
         </div>
 
-        {/* Guru Paling Aktif Membuka Fitur */}
+        {/* Partisipasi Guru Aktif (Agregat Anonim) */}
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-              Guru Paling Aktif
+              Partisipasi Guru Aktif
             </span>
             <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <UserCheck className="w-4 h-4" />
+              <Users className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <span className="text-sm sm:text-base font-black text-[#023246] block truncate" title={analytics.mostActiveTeacher?.user_name || '-'}>
-              {analytics.mostActiveTeacher ? analytics.mostActiveTeacher.user_name : 'Belum Ada Data'}
+            <span className="text-xl sm:text-2xl font-black text-[#023246] block">
+              {analytics.uniqueTeachersCount} <span className="text-xs text-slate-500 font-semibold font-normal">dari {analytics.totalRegisteredTeachers || teachers.length} Guru</span>
             </span>
-            <p className="text-[11px] text-slate-500 truncate mt-0.5">
-              {analytics.mostActiveTeacher
-                ? `${analytics.mostActiveTeacher.total_visits}x akses menu • ${analytics.mostActiveTeacher.user_npp}`
-                : 'Menunggu aktivitas guru'}
+            <p className="text-[11px] text-emerald-700 font-bold truncate mt-0.5">
+              {analytics.participationRate}% guru aktif menggunakan web
             </p>
           </div>
         </div>
@@ -331,7 +314,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
             </span>
             <p className="text-[11px] text-slate-500 truncate mt-0.5">
               {analytics.topCategory
-                ? `${analytics.topCategory.count}x klik pada kategori ini`
+                ? `${analytics.topCategory.count}x klik (${analytics.topCategory.label})`
                 : 'Aktivitas KBM seimbang'}
             </p>
           </div>
@@ -344,10 +327,10 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
           <div>
             <h2 className="text-base sm:text-lg font-black text-[#023246] tracking-tight flex items-center gap-2">
               <span>🏆</span>
-              <span>Peringkat Fitur &amp; Menu Web Paling Banyak Digunakan Guru</span>
+              <span>Peringkat Fitur &amp; Menu Web Paling Banyak Digunakan</span>
             </h2>
             <p className="text-xs text-slate-500">
-              Urutan menu di dalam web Smart-Absensi-Guru berdasarkan frekuensi akses dewan guru.
+              Statistik pemanfaatan fitur di dalam website Smart Absensi berdasarkan total klik dan jumlah guru unik yang mengakses.
             </p>
           </div>
           <span className="text-xs font-bold text-slate-500">
@@ -359,7 +342,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
           <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 space-y-2">
             <p className="font-bold text-sm text-[#023246]">Belum ada aktivitas penggunaan fitur</p>
             <p className="text-xs max-w-md mx-auto">
-              Data akan otomatis muncul saat guru membuka menu di dashboard guru (seperti Presensi, Koreksi Soal, Bahan Ajar, atau Poin Siswa).
+              Data akan otomatis terakumulasi saat guru membuka menu di dashboard guru (seperti Presensi, Koreksi Soal, Bahan Ajar, atau Poin Siswa).
             </p>
           </div>
         ) : (
@@ -511,92 +494,21 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
         </div>
       </div>
 
-      {/* ── MATRIKS AKTIVITAS GURU RESMI TERDAFTAR (ADMIN) ──────────────── */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base sm:text-lg font-black text-[#023246] tracking-tight flex items-center gap-2">
-              <span>👥</span>
-              <span>Matriks Penggunaan Fitur Per Guru Terdaftar</span>
-            </h2>
-            <p className="text-xs text-slate-500">
-              Data diambil langsung dari {teachers.length} akun guru yang diatur oleh Admin. Klik kartu guru untuk memfilter log di bawah.
-            </p>
-          </div>
-          {selectedTeacherId !== 'ALL' && (
-            <button
-              type="button"
-              onClick={() => setSelectedTeacherId('ALL')}
-              className="text-xs font-bold text-[#287094] hover:underline flex items-center gap-1 self-start sm:self-auto cursor-pointer"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Reset Filter Guru</span>
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {analytics.teacherSummaries.map((teacher) => {
-            const isSelected = selectedTeacherId === teacher.user_id;
-            return (
-              <div
-                key={teacher.user_id}
-                onClick={() =>
-                  setSelectedTeacherId(isSelected ? 'ALL' : teacher.user_id)
-                }
-                className={`p-3.5 rounded-2xl border transition-all cursor-pointer active:scale-[0.99] space-y-2 ${
-                  isSelected
-                    ? 'bg-[#023246]/5 border-[#023246] ring-2 ring-[#023246]/20'
-                    : 'bg-slate-50/80 hover:bg-slate-50 border-slate-200'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h4 className="text-xs sm:text-sm font-black text-[#023246] truncate">
-                      {teacher.user_name}
-                    </h4>
-                    <p className="text-[11px] font-mono text-slate-500 truncate">
-                      {teacher.user_npp}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                      teacher.total_visits > 0
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                        : 'bg-slate-100 text-slate-500 border border-slate-200'
-                    }`}
-                  >
-                    {teacher.total_visits}x Akses
-                  </span>
-                </div>
-
-                <div className="pt-1 border-t border-slate-200/60 text-[11px] flex items-center justify-between text-slate-600">
-                  <span className="text-slate-400">Fitur Terfavorit:</span>
-                  <span className="font-bold text-[#023246] truncate max-w-[55%] text-right">
-                    {teacher.top_feature}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── LOG RIWAYAT AKTIVITAS REAL-TIME & FILTER ─────────────────────── */}
+      {/* ── LOG RIWAYAT AKTIVITAS REAL-TIME (100% ANONIM) ────────────────── */}
       <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-base sm:text-lg font-black text-[#023246] tracking-tight">
-              Log Riwayat Penggunaan Fitur Web
+              Log Riwayat Trafik Akses Fitur (Anonim)
             </h2>
             <p className="text-xs text-slate-500">
-              Jejak interaksi kronologis guru saat membuka menu di aplikasi ({filteredLogs.length} entri).
+              Jejak kronologis pemakaian menu web secara agregat tanpa menyimpan data pribadi ({filteredLogs.length} entri).
             </p>
           </div>
         </div>
 
         {/* Bar Filter & Pencarian */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
           {/* Rentang Tanggal */}
           <div className="relative">
             <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -612,23 +524,6 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
             </select>
           </div>
 
-          {/* Filter Guru Terdaftar */}
-          <div className="relative">
-            <UserCheck className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <select
-              value={selectedTeacherId}
-              onChange={(e) => setSelectedTeacherId(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-[#D4D4CE] rounded-xl text-xs font-semibold text-[#023246] focus:ring-2 focus:ring-[#287094] focus:outline-none"
-            >
-              <option value="ALL">Semua Guru Terdaftar</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.full_name} ({t.nip ? (t.nip.startsWith('NPP.') ? t.nip : `NPP. ${t.nip}`) : 'NPP. -'})
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Filter Kategori */}
           <div className="relative">
             <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -637,7 +532,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
               onChange={(e) => setSelectedCategory(e.target.value as any)}
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-[#D4D4CE] rounded-xl text-xs font-semibold text-[#023246] focus:ring-2 focus:ring-[#287094] focus:outline-none"
             >
-              <option value="ALL">Semua Kategori</option>
+              <option value="ALL">Semua Kategori Fitur</option>
               {Object.keys(TRAFFIC_CATEGORY_METADATA).map((k) => (
                 <option key={k} value={k}>
                   {TRAFFIC_CATEGORY_METADATA[k as TrafficCategory].label}
@@ -651,7 +546,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Cari fitur, guru, atau NPP..."
+              placeholder="Cari nama fitur web..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-[#D4D4CE] rounded-xl text-xs font-semibold text-[#023246] focus:ring-2 focus:ring-[#287094] focus:outline-none"
@@ -659,23 +554,22 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
           </div>
         </div>
 
-        {/* Tabel Desktop */}
+        {/* Tabel Desktop (Kolom Bersifat Anonim) */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-slate-200 text-slate-400 font-extrabold uppercase text-[10px] tracking-wider">
                 <th className="py-2.5 px-3">Waktu Akses (WIB)</th>
-                <th className="py-2.5 px-3">Nama Guru</th>
-                <th className="py-2.5 px-3">NPP Pegawai</th>
                 <th className="py-2.5 px-3">Fitur / Menu Dibuka</th>
-                <th className="py-2.5 px-3">Kategori</th>
-                <th className="py-2.5 px-3">Perangkat</th>
+                <th className="py-2.5 px-3">Kategori Fitur</th>
+                <th className="py-2.5 px-3">Peran Pengguna</th>
+                <th className="py-2.5 px-3">Jenis Perangkat</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 font-semibold">
+                  <td colSpan={5} className="py-8 text-center text-slate-400 font-semibold">
                     Tidak ada catatan aktivitas fitur yang sesuai dengan filter.
                   </td>
                 </tr>
@@ -695,15 +589,9 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
                       <td className="py-3 px-3 font-mono text-slate-500 whitespace-nowrap">
                         {dateStr} WIB
                       </td>
-                      <td className="py-3 px-3 font-bold text-[#023246]">
-                        {log.user_name}
-                      </td>
-                      <td className="py-3 px-3 font-mono text-slate-500 whitespace-nowrap">
-                        {log.user_npp}
-                      </td>
                       <td className="py-3 px-3">
-                        <div className="flex items-center gap-1.5">
-                          <span>{log.feature_icon || '⚡'}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{log.feature_icon || '⚡'}</span>
                           <span className="font-bold text-[#023246]">{log.feature_name}</span>
                         </div>
                       </td>
@@ -712,6 +600,12 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
                           className={`text-[9.5px] font-extrabold px-2 py-0.5 rounded-md border ${catMeta.bgBadge} ${catMeta.borderBadge}`}
                         >
                           {catMeta.label}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-600 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 font-semibold text-slate-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          Guru Terdaftar (Anonim)
                         </span>
                       </td>
                       <td className="py-3 px-3 text-slate-500 whitespace-nowrap text-[11px]">
@@ -745,9 +639,11 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
               return (
                 <div key={log.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-[#023246] text-xs truncate">{log.user_name}</p>
-                      <p className="text-[10px] font-mono text-slate-500">{log.user_npp}</p>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-base">{log.feature_icon || '⚡'}</span>
+                      <span className="font-bold text-xs text-[#023246] truncate">
+                        {log.feature_name}
+                      </span>
                     </div>
                     <span className="text-[9.5px] font-mono text-slate-400 shrink-0">
                       {dateStr}
@@ -755,12 +651,9 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span>{log.feature_icon || '⚡'}</span>
-                      <span className="font-bold text-xs text-[#023246] truncate">
-                        {log.feature_name}
-                      </span>
-                    </div>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Guru Terdaftar (Anonim) • {log.device}
+                    </span>
                     <span
                       className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded shrink-0 ${catMeta.bgBadge}`}
                     >
@@ -809,7 +702,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
       >
         <div className="space-y-4 text-xs sm:text-sm text-[#023246]">
           <p className="text-slate-500 leading-relaxed text-xs">
-            Seluruh pelacakan trafik berfokus 100% pada fitur resmi di dalam website Smart-Absensi-Guru tanpa melacak situs di luar sistem:
+            Trafik dipantau secara agregat dan anonim untuk 18 fitur resmi internal berikut:
           </p>
 
           <div className="max-h-80 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
@@ -847,32 +740,16 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
         </div>
       </Modal>
 
-      {/* ── MODAL: SIMULASI UJI BUKA FITUR ───────────────────────────────── */}
+      {/* ── MODAL: SIMULASI UJI BUKA FITUR (ANONIM) ──────────────────────── */}
       <Modal
         isOpen={isSimulateModalOpen}
         onClose={() => setIsSimulateModalOpen(false)}
-        title="Uji Buka Fitur Web Guru"
+        title="Uji Buka Fitur Web Guru (Mode Anonim)"
       >
         <div className="space-y-4 text-xs sm:text-sm text-[#023246]">
           <p className="text-xs text-slate-500 leading-relaxed">
-            Pilih salah satu guru terdaftar dan fitur internal untuk menguji bagaimana sistem merekam saat guru membuka fitur tersebut secara real-time.
+            Pilih salah satu fitur internal untuk menguji pencatatan volume trafik secara anonim langsung ke analitik.
           </p>
-
-          {/* Pilih Guru */}
-          <div className="space-y-1.5">
-            <label className="font-bold text-slate-700">Pilih Guru Terdaftar:</label>
-            <select
-              value={simTeacherId}
-              onChange={(e) => setSimTeacherId(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-[#D4D4CE] rounded-xl text-xs sm:text-sm text-[#023246] focus:ring-2 focus:ring-[#287094]"
-            >
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.full_name} ({t.nip ? (t.nip.startsWith('NPP.') ? t.nip : `NPP. ${t.nip}`) : 'NPP. -'})
-                </option>
-              ))}
-            </select>
-          </div>
 
           {/* Pilih Fitur Internal */}
           <div className="space-y-1.5">
@@ -899,7 +776,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
               Batal
             </button>
             <Button variant="primary" size="sm" onClick={handleSimulateVisit}>
-              Catat Buka Fitur
+              Catat Buka Fitur (Anonim)
             </Button>
           </div>
         </div>
@@ -913,7 +790,7 @@ export const TeacherWebTrafficView: React.FC<TeacherWebTrafficViewProps> = ({
       >
         <div className="space-y-4 text-xs sm:text-sm text-[#023246]">
           <p className="text-slate-600 leading-relaxed">
-            Apakah Anda yakin ingin mengosongkan seluruh riwayat rekaman penggunaan fitur web guru? Statistik akan kembali bersih dan mulai menghitung dari nol saat guru membuka menu di aplikasi.
+            Apakah Anda yakin ingin mengosongkan seluruh riwayat rekaman trafik fitur web guru? Statistik akan kembali bersih dan mulai menghitung dari nol saat guru membuka menu di aplikasi.
           </p>
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
             <button

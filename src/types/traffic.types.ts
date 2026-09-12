@@ -1,6 +1,7 @@
 /**
  * SMART ABSENSI GURU - IN-APP FEATURE & MENU USAGE TRAFFIC TYPES
- * Pelacakan penggunaan fitur dan menu di dalam website Smart-Absensi-Guru (100% internal).
+ * Pelacakan penggunaan fitur dan menu di dalam website Smart-Absensi-Guru.
+ * 100% Bersifat Anonim (Privacy-Preserving Aggregated Analytics).
  */
 
 export type TrafficCategory =
@@ -12,9 +13,9 @@ export type TrafficCategory =
 
 export interface WebTrafficLog {
   id: string;
-  user_id: string;
-  user_name: string;
-  user_npp: string;
+  user_id: string; // Internal anonymized identifier for unique user counting
+  user_name: string; // Displayed as "Guru Anonim" or role
+  user_npp: string; // Anonymized
   user_role: string;
   feature_id: string;
   feature_name: string;
@@ -80,6 +81,9 @@ export interface HourlyTrafficPoint {
 
 export interface TrafficAnalyticsSummary {
   totalVisits: number;
+  uniqueTeachersCount: number;
+  totalRegisteredTeachers: number;
+  participationRate: number;
   topFeature: FeatureTrafficSummary | null;
   topWebsite?: FeatureTrafficSummary | null;
   mostActiveTeacher: TeacherTrafficSummary | null;
