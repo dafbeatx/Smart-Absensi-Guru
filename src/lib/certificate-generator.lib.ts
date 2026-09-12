@@ -5,7 +5,7 @@
  */
 
 import { APP_CONFIG } from '../config/app.config';
-import { SIGNATORY_OFFICIALS } from './excel-generator.lib';
+import { SIGNATORY_OFFICIALS, getDynamicBranding } from './excel-generator.lib';
 
 export interface CertificatePayload {
   recipientName: string;
@@ -21,6 +21,7 @@ export interface CertificatePayload {
 }
 
 export const generateExcellenceCertificateHTML = (payload: CertificatePayload): string => {
+  const branding = getDynamicBranding();
   const recipientName = payload.recipientName || 'Bapak/Ibu Guru Teladan';
   const rawNip = (payload.recipientNipOrNpp || '').trim();
   // Aturan pengguna: Jika tidak ada data NPP/NIP jangan dipakai, pakai - saja
@@ -534,7 +535,7 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
 
           <div class="cert-institution-meta">
             <h1 class="inst-school">SMP TERPADU AL-ITTIHADIYAH &amp; SMA TERPADU AS SALAAM</h1>
-            <p class="inst-sub">Sistem Manajemen Presensi &amp; Keteladanan Pendidik Terintegrasi (${APP_CONFIG.APP_NAME})</p>
+            <p class="inst-sub">Sistem Manajemen Presensi &amp; Keteladanan Pendidik Terintegrasi (${branding.appName})</p>
           </div>
 
           <div class="cert-medal-badge">
@@ -588,7 +589,7 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
               <div class="security-meta">
                 <strong>Verifikasi Sistem:</strong><br />
                 Dokumen resmi terenkripsi QR &amp; GPS Presensi.<br />
-                <em>Smart Absensi Pendidik v${APP_CONFIG.VERSION}</em>
+                <em>${branding.appName} v${APP_CONFIG.VERSION}</em>
               </div>
             </div>
           </div>

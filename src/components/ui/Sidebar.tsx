@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 export interface SidebarItem {
   id: string;
@@ -31,7 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
   title,
-  subtitle = 'SMP Terpadu Al-Ittihadiyah',
+  subtitle,
   roleBadge: _roleBadge,
   roleColor: _roleColor = 'bg-[#287094]/30 text-[#F6F6F6] border-[#287094]',
   items,
@@ -43,6 +44,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDesktopFixed = true,
 }) => {
   const { user } = useAuthStore();
+  const dynamicAppName = useSettingsStore((s) => s.settings.app_name) || 'Smart Absensi Guru';
+  const dynamicInstitution = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah';
+  const displaySubtitle = subtitle || dynamicInstitution;
 
   // Close sidebar on ESC key press
   useEffect(() => {
@@ -68,8 +72,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
         </div>
         <div className="space-y-0.5 overflow-hidden">
-          <h2 className="font-black text-xs tracking-wider text-white uppercase truncate">Smart Absensi Guru</h2>
-          <p className="text-[10px] text-[#D4D4CE] truncate">{subtitle}</p>
+          <h2 className="font-black text-xs tracking-wider text-white uppercase truncate">{dynamicAppName}</h2>
+          <p className="text-[10px] text-[#D4D4CE] truncate">{displaySubtitle}</p>
         </div>
       </div>
 
@@ -189,8 +193,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-full" />
                 </div>
                 <div className="space-y-0.5 overflow-hidden text-left">
-                  <h2 className="font-black text-xs tracking-wider text-[#023246] uppercase truncate">Smart Absensi Guru</h2>
-                  <p className="text-[10px] text-slate-400 truncate">{subtitle}</p>
+                  <h2 className="font-black text-xs tracking-wider text-[#023246] uppercase truncate">{dynamicAppName}</h2>
+                  <p className="text-[10px] text-slate-400 truncate">{displaySubtitle}</p>
                 </div>
               </div>
               <button
@@ -290,7 +294,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <div className="text-center pt-2 border-t border-slate-100 text-[10px] text-slate-400 font-mono space-y-0.5">
                 <p>v1.0 RC1</p>
-                <p>© 2026 Smart Absensi Guru</p>
+                <p>© 2026 {dynamicAppName}</p>
               </div>
             </div>
           </aside>

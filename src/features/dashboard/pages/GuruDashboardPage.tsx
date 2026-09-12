@@ -19,6 +19,7 @@ import { ClassroomManagementModal } from '../../guru/components/ClassroomManagem
 import { TeacherLocationModal } from '../../guru/components/TeacherLocationModal';
 import { StudentDirectoryModal } from '../../guru/components/StudentDirectoryModal';
 import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCalendarModal';
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal';
@@ -280,17 +281,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [isChangingPin, setIsChangingPin] = useState(false);
 
-  // System Settings & Work Schedule State
-  const [settings, setSettings] = useState<SystemSettings>({
-    app_name: 'Smart Absensi Guru',
-    institution_name: 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
-    work_checkin_start: CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
-    work_checkin_end: CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
-    work_checkout_start: CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
-    geofence_lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
-    geofence_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
-    geofence_radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
-  });
+  // System Settings & Work Schedule State (Dynamically synchronized)
+  const settings = useSettingsStore((s) => s.settings);
 
   // Date selection state for monthly history
   const currentDate = new Date();
@@ -731,7 +723,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       try {
         const sysSettings = await provider.getSettings();
         if (sysSettings) {
-          setSettings(sysSettings);
+          useSettingsStore.getState().setSettingsLocally(sysSettings);
           loadedSettings = sysSettings;
         }
       } catch (err) {
@@ -1217,6 +1209,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     window.addEventListener('smart_absensi_holidays_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_policy_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_settings_updated', handleScannedEvent);
     window.addEventListener('storage', handleScannedEvent);
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
@@ -1227,6 +1220,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       window.removeEventListener('smart_absensi_holidays_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_policy_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_settings_updated', handleScannedEvent);
       window.removeEventListener('storage', handleScannedEvent);
     };
   }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);

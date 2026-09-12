@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { getOrCreateDeviceUUID, getDeviceModelString } from '../../../utils/device.utils';
@@ -21,6 +22,12 @@ export const LoginPage: React.FC = () => {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const { loginSuccess } = useAuthStore();
+  const appName = useSettingsStore((s) => s.settings.app_name) || 'SMART ABSENSI GURU';
+  const institutionName = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam';
+
+  useEffect(() => {
+    useSettingsStore.getState().loadSettings().catch(() => {});
+  }, []);
   const deviceUUID = getOrCreateDeviceUUID();
   const deviceModel = getDeviceModelString();
 
@@ -85,9 +92,9 @@ export const LoginPage: React.FC = () => {
           <div className="w-16 h-16 bg-white p-1 rounded-2xl mx-auto flex items-center justify-center shadow-lg border border-slate-200 ring-4 ring-emerald-50">
             <img src="/school-logo.png" alt="Logo SMP Terpadu Al-Ittihadiyah" className="w-full h-full object-contain rounded-xl" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">SMART ABSENSI GURU</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">{appName}</h1>
           <p className="text-xs font-semibold text-slate-600">
-            SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam
+            {institutionName}
           </p>
           <div>
             <span className="inline-block px-2.5 py-0.5 bg-slate-100 text-slate-500 font-mono text-[10px] rounded-full border border-slate-200">

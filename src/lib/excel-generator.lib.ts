@@ -3,8 +3,24 @@ import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog, HolidayReco
 import type { DailyAttendanceSummary } from '../services/analytics.service';
 import { APP_CONFIG } from '../config/app.config';
 import { CONSTANTS } from '../config/constants';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { getMonthWorkingDays, parseIndonesianMonth, isDateOffDay, getTodayDateInJakarta } from '../utils/time.utils';
 import type { MonthWorkingDaysInfo } from '../utils/time.utils';
+
+export const getDynamicBranding = () => {
+  try {
+    const s = useSettingsStore.getState().settings;
+    return {
+      appName: s?.app_name || APP_CONFIG.APP_NAME,
+      institutionName: s?.institution_name || APP_CONFIG.INSTITUTION_NAME,
+    };
+  } catch {
+    return {
+      appName: APP_CONFIG.APP_NAME,
+      institutionName: APP_CONFIG.INSTITUTION_NAME,
+    };
+  }
+};
 
 export const SIGNATORY_OFFICIALS = {
   KEPSEK_NAME: 'Farhan Sopian Sahid, S.Pd.I',
@@ -34,10 +50,11 @@ export class ExcelReportGenerator {
    * Generates CSV format for backward compatibility & tests
    */
   public static generateMultiSheetCSVData(payload: MultiSheetReportPayload): string {
+    const branding = getDynamicBranding();
     const lines: string[] = [];
     lines.push(`=== SHEET 1: DASHBOARD RINGKASAN ===`);
-    lines.push(`Aplikasi,${APP_CONFIG.APP_NAME}`);
-    lines.push(`Institusi,${APP_CONFIG.INSTITUTION_NAME}`);
+    lines.push(`Aplikasi,${branding.appName}`);
+    lines.push(`Institusi,${branding.institutionName}`);
     lines.push(`Periode,${payload.month} ${payload.year}`);
     lines.push(`Total Guru,${payload.summary.totalTeachers}`);
     lines.push(`Kepala Sekolah,${SIGNATORY_OFFICIALS.KEPSEK_NAME}`);
@@ -65,10 +82,11 @@ export class ExcelReportGenerator {
     const monthPrefix = `${payload.year}-${String(monthNumber).padStart(2, '0')}`;
 
     // ── SHEET 1: DASHBOARD RINGKASAN ──────────────────────────────────────────
+    const branding = getDynamicBranding();
     const summaryData = [
       ['LAPORAN RINGKASAN KEHADIRAN GURU & STAF'],
-      ['Institusi', APP_CONFIG.INSTITUTION_NAME],
-      ['Aplikasi', APP_CONFIG.APP_NAME],
+      ['Institusi', branding.institutionName],
+      ['Aplikasi', branding.appName],
       ['Periode Laporan', `${payload.month} ${payload.year}`],
       ['Status Periode', workingDaysInfo.isCurrentMonth ? `Bulan Berjalan (${workingDaysInfo.effectiveWorkingDays} Hari Kerja Terlewati)` : `Bulan Selesai (${workingDaysInfo.totalMonthWorkingDays} Hari Kerja)`],
       ['Target Hari Kerja Efektif', `${workingDaysInfo.effectiveWorkingDays} Hari`],
@@ -410,7 +428,7 @@ export class ExcelReportGenerator {
               LAPORAN RESMI KEHADIRAN GURU & STAF
             </h2>
             <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600;">
-              Sistem Absensi Berbasis QR Code & Geofence GPS (${APP_CONFIG.APP_NAME})
+              Sistem Absensi Berbasis QR Code & Geofence GPS (${getDynamicBranding().appName})
             </p>
           </div>
         </div>
@@ -969,7 +987,7 @@ export class ExcelReportGenerator {
               LAPORAN PRESENSI INDIVIDU GURU &amp; STAF
             </h2>
             <p style="margin: 3px 0 0 0; font-size: 11px; color: #64748b; font-weight: 600;">
-              Sistem Absensi Berbasis Digital Scan &amp; Geofence GPS (${APP_CONFIG.APP_NAME})
+              Sistem Absensi Berbasis Digital Scan &amp; Geofence GPS (${getDynamicBranding().appName})
             </p>
           </div>
         </div>
@@ -1238,7 +1256,7 @@ export class ExcelReportGenerator {
 
     const summaryData = [
       ['LAPORAN PRESENSI INDIVIDU GURU & STAF'],
-      ['Institusi', APP_CONFIG.INSTITUTION_NAME],
+      ['Institusi', getDynamicBranding().institutionName],
       ['Nama Guru', teacher.full_name],
       ['NPP', teacher.nip || '-'],
       ['Jabatan / Tugas', teacher.position],

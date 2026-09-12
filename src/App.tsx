@@ -13,6 +13,7 @@ import { TelegramService } from './services/telegram.service';
 import { getTodayDateInJakarta } from './utils/time.utils';
 import { PointRewardCelebrationOverlay } from './components/ui/PointRewardCelebrationOverlay';
 import { usePointRewardStore } from './store/usePointRewardStore';
+import { useSettingsStore } from './store/useSettingsStore';
 
 // Helper: retry a dynamic import once by reloading the page when the chunk
 // is missing (stale deployment).  Uses sessionStorage to prevent infinite loops.
@@ -82,6 +83,19 @@ export const App: React.FC = () => {
   const isCelebrationOpen = usePointRewardStore((s) => s.isOpen);
   const celebrationData = usePointRewardStore((s) => s.data);
   const closeCelebration = usePointRewardStore((s) => s.closeCelebration);
+
+  const appName = useSettingsStore((s) => s.settings.app_name);
+
+  // Initialize and synchronize dynamic application settings
+  useEffect(() => {
+    useSettingsStore.getState().loadSettings().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (appName && typeof document !== 'undefined') {
+      document.title = appName;
+    }
+  }, [appName]);
 
   // Global listener: Setiap kali memperoleh poin (Guru, Admin, Kepsek), selalu munculkan pop-up apresiasi cardless
   useEffect(() => {

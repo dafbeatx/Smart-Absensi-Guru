@@ -5,6 +5,7 @@ import { CONSTANTS } from '../../../config/constants';
 import { AuditLogger } from '../../../services/audit-logger.service';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { SystemSettings } from '../../../types/database.types';
 import { formatTimeForInput } from '../../../utils/time.utils';
@@ -156,14 +157,9 @@ export const SystemSettingsForm: React.FC = () => {
     };
 
     try {
-      // 1. Persist to backend / Google Sheets first
-      const provider = ProviderFactory.getProvider();
+      // 1. Persist to backend and update centralized settings store
       const token = useAuthStore.getState().token || '';
-      await provider.updateSettings(updatedSettings, token);
-
-      // 2. Persist to localStorage & dispatch event ONLY after backend succeeds
-      localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updatedSettings));
-      window.dispatchEvent(new Event('smart_absensi_settings_updated'));
+      await useSettingsStore.getState().updateSettings(updatedSettings, token);
 
       // 3. Log Audit Trail
       await AuditLogger.log({

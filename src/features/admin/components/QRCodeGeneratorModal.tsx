@@ -5,6 +5,7 @@ import { Button } from '../../../components/ui/Button';
 import { APP_CONFIG } from '../../../config/app.config';
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 
 export interface QRCodeGeneratorModalProps {
   isOpen: boolean;
@@ -17,14 +18,17 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const qrPayload = CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED;
+  const storeSettings = useSettingsStore((s) => s.settings);
 
   const [settings, setSettings] = useState<{
+    app_name: string;
     work_checkin_start: string;
     work_checkin_end: string;
     work_checkout_start: string;
     friday_checkout_start: string;
     institution_name: string;
   }>({
+    app_name: storeSettings.app_name || APP_CONFIG.APP_NAME,
     work_checkin_start: CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
     work_checkin_end: CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
     work_checkout_start: CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
@@ -41,11 +45,12 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
           const parsed = JSON.parse(savedLocal);
           setSettings((prev) => ({
             ...prev,
+            app_name: parsed.app_name || storeSettings.app_name || prev.app_name,
             work_checkin_start: parsed.work_checkin_start || prev.work_checkin_start,
             work_checkin_end: parsed.work_checkin_end || prev.work_checkin_end,
             work_checkout_start: parsed.work_checkout_start || prev.work_checkout_start,
             friday_checkout_start: parsed.friday_checkout_start || prev.friday_checkout_start,
-            institution_name: parsed.institution_name || prev.institution_name,
+            institution_name: parsed.institution_name || storeSettings.institution_name || prev.institution_name,
           }));
         } catch (e) {
           console.error('Failed to parse local settings in QRCodeGeneratorModal:', e);
@@ -57,13 +62,14 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
         .getSettings()
         .then((fetched) => {
           if (fetched) {
-            setSettings({
+            setSettings((prev) => ({
+              app_name: fetched.app_name || storeSettings.app_name || prev.app_name || APP_CONFIG.APP_NAME,
               work_checkin_start: fetched.work_checkin_start || CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
               work_checkin_end: fetched.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
               work_checkout_start: fetched.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
               friday_checkout_start: fetched.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START,
-              institution_name: fetched.institution_name || APP_CONFIG.INSTITUTION_NAME,
-            });
+              institution_name: fetched.institution_name || storeSettings.institution_name || APP_CONFIG.INSTITUTION_NAME,
+            }));
           }
         })
         .catch((err) => {
@@ -184,7 +190,7 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
           <div class="header">
             <h1>${settings.institution_name}</h1>
             <h2>POSTER RESMI QR CODE ABSENSI GURU & STAF</h2>
-            <p>Sistem Absensi Berbasis QR Code & Digital Scan (${APP_CONFIG.APP_NAME})</p>
+            <p>Sistem Absensi Berbasis QR Code & Digital Scan (${settings.app_name})</p>
           </div>
 
           <div class="qr-container">
@@ -197,7 +203,7 @@ export const QRCodeGeneratorModal: React.FC<QRCodeGeneratorModalProps> = ({
           <div class="instructions">
             <h3>📱 PANDUAN CARA ABSENSI GURU & STAF:</h3>
             <ol>
-              <li>Buka Web Aplikasi <strong>Smart Absensi Guru</strong> di HP Anda.</li>
+              <li>Buka Web Aplikasi <strong>${settings.app_name}</strong> di HP Anda.</li>
               <li>Klik tombol hijau melayang <strong>📷 Scan QR</strong> di bagian bawah layar.</li>
               <li>Arahkan Kamera HP ke gambar QR Code di atas.</li>
               <li><strong>Jam Masuk Tepat Waktu:</strong> ${settings.work_checkin_start} - ${settings.work_checkin_end} WIB (Di atas ${settings.work_checkin_end} WIB otomatis dicatat <i>Terlambat</i>).</li>

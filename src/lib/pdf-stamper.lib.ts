@@ -6,8 +6,7 @@
 
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
 import QRCode from 'qrcode';
-import { APP_CONFIG } from '../config/app.config';
-import { SIGNATORY_OFFICIALS, type MultiSheetReportPayload } from './excel-generator.lib';
+import { SIGNATORY_OFFICIALS, getDynamicBranding, type MultiSheetReportPayload } from './excel-generator.lib';
 
 export interface DocumentVerificationMetadata {
   docId: string;
@@ -51,9 +50,10 @@ export class PdfStamperService {
    * Generates a base64 PNG data URL of the verification QR code
    */
   public static async generateVerificationQRCodeDataURL(metadata: DocumentVerificationMetadata): Promise<string> {
+    const branding = getDynamicBranding();
     const qrPayload = JSON.stringify({
-      app: APP_CONFIG.APP_NAME,
-      institution: APP_CONFIG.INSTITUTION_NAME,
+      app: branding.appName,
+      institution: branding.institutionName,
       docId: metadata.docId,
       docCode: metadata.docCode,
       signatory: metadata.signatoryKepsek,
@@ -92,7 +92,8 @@ export class PdfStamperService {
     rotation?: number;
     size?: number;
   }): string {
-    const institution = (options?.institutionName || APP_CONFIG.INSTITUTION_NAME || 'SMA SMART ABSENSI GURU').toUpperCase();
+    const branding = getDynamicBranding();
+    const institution = (options?.institutionName || branding.institutionName || 'SMA SMART ABSENSI GURU').toUpperCase();
     const centerText = options?.labelCenter || 'TERVERIFIKASI RESMI';
     const strokeColor = options?.color || '#1e40af'; // Authentic official blue wet ink
     const rotation = options?.rotation ?? -5;
@@ -175,14 +176,15 @@ export class PdfStamperService {
    */
   public static async generateCertifiedSchoolReportPDF(payload: MultiSheetReportPayload): Promise<Uint8Array> {
     const pdfDoc = await PDFDocument.create();
+    const branding = getDynamicBranding();
 
     // Set Document Metadata
     const metadata = this.generateVerificationMetadata(payload.month, payload.year);
-    pdfDoc.setTitle(`Laporan Presensi ${payload.month} ${payload.year} - ${APP_CONFIG.INSTITUTION_NAME}`);
+    pdfDoc.setTitle(`Laporan Presensi ${payload.month} ${payload.year} - ${branding.institutionName}`);
     pdfDoc.setAuthor(SIGNATORY_OFFICIALS.KEPSEK_NAME);
     pdfDoc.setSubject('Laporan Kehadiran Guru Resmi Terverifikasi Digital');
-    pdfDoc.setCreator(APP_CONFIG.APP_NAME);
-    pdfDoc.setProducer('Hopding/pdf-lib (Smart Absensi Guru Engine)');
+    pdfDoc.setCreator(branding.appName);
+    pdfDoc.setProducer(`Hopding/pdf-lib (${branding.appName} Engine)`);
     pdfDoc.setCreationDate(new Date());
 
     // Fonts
@@ -226,7 +228,7 @@ export class PdfStamperService {
       font: fontBold,
       color: primaryColor,
     });
-    page.drawText(APP_CONFIG.INSTITUTION_NAME.toUpperCase(), {
+    page.drawText(branding.institutionName.toUpperCase(), {
       x: 135,
       y: height - 80,
       size: 14,
@@ -467,14 +469,14 @@ export class PdfStamperService {
       color: rgb(0.8, 0.85, 0.9),
     });
 
-    page.drawText(`Dicetak otomatis oleh ${APP_CONFIG.APP_NAME} pada ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}`, {
+    page.drawText(`Dicetak otomatis oleh ${branding.appName} pada ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}`, {
       x: 45,
       y: 28,
       size: 7,
       font: fontRegular,
       color: slateColor,
     });
-    page.drawText(`Keaslian dokumen dijamin kriptografis melalui sistem Smart Absensi Guru Cloud`, {
+    page.drawText(`Keaslian dokumen dijamin kriptografis melalui sistem ${branding.appName} Cloud`, {
       x: width - 300,
       y: 28,
       size: 7,

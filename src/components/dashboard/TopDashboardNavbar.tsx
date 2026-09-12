@@ -1,5 +1,6 @@
 import type { UserProfile } from '../../types/database.types';
 import { NotificationBellDropdown } from './NotificationBellDropdown';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 export interface TopDashboardNavbarProps {
   onToggleSidebar: () => void;
@@ -20,6 +21,9 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
   onOpenPreferences,
   onLogout,
 }) => {
+  const dynamicAppName = useSettingsStore((s) => s.settings.app_name) || 'Smart Absensi Guru';
+  const dynamicInstitution = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam';
+
   return (
     <header className="bg-white/95 backdrop-blur-md border-b border-[#D4D4CE]/30 sticky top-0 z-40 px-3 py-2 sm:px-4 sm:py-2.5 shadow-2xs">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
@@ -41,8 +45,8 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
               <img src="/school-logo.png" alt="Logo" className="w-full h-full object-contain rounded-full" />
             </div>
             <div className="space-y-0 overflow-hidden text-left min-w-0">
-              <h2 className="font-black text-[11px] text-[#023246] uppercase tracking-wide truncate">Smart Absensi Guru</h2>
-              <p className="text-[8px] text-slate-500 truncate">SMP Terpadu Al-Ittihadiyah</p>
+              <h2 className="font-black text-[11px] text-[#023246] uppercase tracking-wide truncate">{dynamicAppName}</h2>
+              <p className="text-[8px] text-slate-500 truncate">{dynamicInstitution}</p>
             </div>
           </div>
 
