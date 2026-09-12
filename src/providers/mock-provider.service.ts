@@ -39,6 +39,10 @@ import type {
   InventorySarprasItem,
   CreateInventorySarprasDTO,
   UpdateInventorySarprasDTO,
+  ExamSessionRecord,
+  CreateExamSessionDTO,
+  GradedStudentScoreRecord,
+  SaveGradedStudentDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -2897,6 +2901,149 @@ export class MockProvider implements IDataProvider {
     if (filtered.length === list.length) return false;
 
     safeSetStorage('smart_absensi_sarpras_inventory', JSON.stringify(filtered));
+    return true;
+  }
+
+  // ─── EXAM CORRECTION & GRADING API (Koreksi Soal & Nilai Siswa) ───────────────
+
+  public async getExamSessions(_token?: string): Promise<ExamSessionRecord[]> {
+    const raw = safeGetStorage('smart_absensi_exam_sessions');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // fallback
+      }
+    }
+    return [];
+  }
+
+  public async saveExamSession(dto: CreateExamSessionDTO, _token?: string): Promise<ExamSessionRecord> {
+    const sessions = await this.getExamSessions();
+    const existingIndex = dto.id ? sessions.findIndex((s) => s.id === dto.id) : -1;
+
+    const record: ExamSessionRecord = {
+      id: dto.id || `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      session_name: dto.session_name.trim(),
+      teacher: dto.teacher.trim(),
+      subject: dto.subject.trim(),
+      class_name: dto.class_name.trim(),
+      school_level: dto.school_level || (dto.class_name.startsWith('7') || dto.class_name.startsWith('8') || dto.class_name.startsWith('9') ? 'SMP' : 'SMA'),
+      answer_key: dto.answer_key || [],
+      student_list: dto.student_list || [],
+      scoring_config: dto.scoring_config || {
+        pgWeight: 0.7,
+        essayWeight: 0.3,
+        essayMaxScore: 20,
+        essayCount: 5,
+      },
+      exam_type: dto.exam_type || 'Harian',
+      academic_year: dto.academic_year || '2025/2026',
+      semester: dto.semester || 'Ganjil',
+      kkm: dto.kkm || 75,
+      created_at: existingIndex >= 0 ? sessions[existingIndex].created_at : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      sessions[existingIndex] = record;
+    } else {
+      sessions.unshift(record);
+    }
+
+    safeSetStorage('smart_absensi_exam_sessions', JSON.stringify(sessions));
+    return record;
+  }
+
+  public async deleteExamSession(sessionId: string, _token?: string): Promise<boolean> {
+    const sessions = await this.getExamSessions();
+    const filtered = sessions.filter((s) => s.id !== sessionId);
+    safeSetStorage('smart_absensi_exam_sessions', JSON.stringify(filtered));
+
+    // Also remove associated student grades
+    const allStudentsRaw = safeGetStorage('smart_absensi_graded_students');
+    if (allStudentsRaw) {
+      try {
+        const allStudents: GradedStudentScoreRecord[] = JSON.parse(allStudentsRaw);
+        const filteredStudents = allStudents.filter((s) => s.session_id !== sessionId);
+        safeSetStorage('smart_absensi_graded_students', JSON.stringify(filteredStudents));
+      } catch {
+        // ignore
+      }
+    }
+    return true;
+  }
+
+  public async getGradedStudents(sessionId: string, _token?: string): Promise<GradedStudentScoreRecord[]> {
+    const raw = safeGetStorage('smart_absensi_graded_students');
+    if (raw) {
+      try {
+        const all: GradedStudentScoreRecord[] = JSON.parse(raw);
+        if (Array.isArray(all)) {
+          return all.filter((s) => s.session_id === sessionId);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  }
+
+  public async saveGradedStudent(dto: SaveGradedStudentDTO, _token?: string): Promise<GradedStudentScoreRecord> {
+    const raw = safeGetStorage('smart_absensi_graded_students');
+    let all: GradedStudentScoreRecord[] = [];
+    if (raw) {
+      try {
+        all = JSON.parse(raw);
+        if (!Array.isArray(all)) all = [];
+      } catch {
+        all = [];
+      }
+    }
+
+    const existingIndex = all.findIndex(
+      (s) => s.session_id === dto.session_id && (s.id === dto.id || s.name.trim().toLowerCase() === dto.name.trim().toLowerCase())
+    );
+
+    const record: GradedStudentScoreRecord = {
+      id: dto.id || (existingIndex >= 0 ? all[existingIndex].id : `stu_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
+      session_id: dto.session_id,
+      name: dto.name.trim(),
+      mcq_answers: dto.mcq_answers,
+      essay_scores: dto.essay_scores,
+      mcq_score: dto.mcq_score,
+      essay_score: dto.essay_score,
+      final_score: dto.final_score,
+      csi: dto.csi,
+      lps: dto.lps,
+      correct: dto.correct,
+      wrong: dto.wrong,
+      created_at: existingIndex >= 0 ? all[existingIndex].created_at : new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      all[existingIndex] = record;
+    } else {
+      all.push(record);
+    }
+
+    safeSetStorage('smart_absensi_graded_students', JSON.stringify(all));
+    return record;
+  }
+
+  public async deleteGradedStudent(studentId: string, _token?: string): Promise<boolean> {
+    const raw = safeGetStorage('smart_absensi_graded_students');
+    if (!raw) return true;
+    try {
+      const all: GradedStudentScoreRecord[] = JSON.parse(raw);
+      if (Array.isArray(all)) {
+        const filtered = all.filter((s) => s.id !== studentId);
+        safeSetStorage('smart_absensi_graded_students', JSON.stringify(filtered));
+      }
+    } catch {
+      // ignore
+    }
     return true;
   }
 }

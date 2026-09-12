@@ -42,6 +42,10 @@ import type {
   InventorySarprasItem,
   CreateInventorySarprasDTO,
   UpdateInventorySarprasDTO,
+  ExamSessionRecord,
+  CreateExamSessionDTO,
+  GradedStudentScoreRecord,
+  SaveGradedStudentDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
@@ -4286,6 +4290,279 @@ export class SupabaseProvider implements IDataProvider {
       const mockProv = new (await import('./mock-provider.service')).MockProvider();
       return mockProv.deleteInventorySarpras(id);
     }
+  }
+
+  // ─── EXAM CORRECTION & GRADING API (Koreksi Soal & Nilai Siswa) ───────────────
+
+  public async getExamSessions(_token?: string): Promise<ExamSessionRecord[]> {
+    try {
+      const { data, error } = await this.client
+        .from('gm_sessions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getExamSessions error, checking local cache:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getExamSessions();
+      }
+
+      if (data && data.length > 0) {
+        const mapped: ExamSessionRecord[] = data.map((d: any) => ({
+          id: d.id,
+          session_name: d.session_name,
+          teacher: d.teacher,
+          subject: d.subject,
+          class_name: d.class_name,
+          school_level: d.school_level || 'SMP',
+          answer_key: Array.isArray(d.answer_key) ? d.answer_key : [],
+          student_list: Array.isArray(d.student_list) ? d.student_list : [],
+          scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
+          exam_type: d.exam_type || 'Harian',
+          academic_year: d.academic_year || '2025/2026',
+          semester: d.semester || 'Ganjil',
+          kkm: Number(d.kkm) || 75,
+          created_at: d.created_at,
+          updated_at: d.updated_at,
+        }));
+        // Update local cache
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('smart_absensi_exam_sessions', JSON.stringify(mapped));
+          }
+        } catch {}
+        return mapped;
+      }
+
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getExamSessions();
+    } catch (err) {
+      logger.error('SupabaseProvider', 'getExamSessions exception:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getExamSessions();
+    }
+  }
+
+  public async saveExamSession(dto: CreateExamSessionDTO, _token?: string): Promise<ExamSessionRecord> {
+    const recordPayload: any = {
+      session_name: dto.session_name.trim(),
+      teacher: dto.teacher.trim(),
+      subject: dto.subject.trim(),
+      class_name: dto.class_name.trim(),
+      school_level: dto.school_level || (dto.class_name.startsWith('7') || dto.class_name.startsWith('8') || dto.class_name.startsWith('9') ? 'SMP' : 'SMA'),
+      answer_key: dto.answer_key || [],
+      student_list: dto.student_list || [],
+      scoring_config: dto.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
+      exam_type: dto.exam_type || 'Harian',
+      academic_year: dto.academic_year || '2025/2026',
+      semester: dto.semester || 'Ganjil',
+      kkm: dto.kkm || 75,
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      let savedId = dto.id;
+      if (dto.id) {
+        const { error } = await this.client
+          .from('gm_sessions')
+          .update(recordPayload)
+          .eq('id', dto.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await this.client
+          .from('gm_sessions')
+          .insert(recordPayload)
+          .select('id')
+          .single();
+        if (error) throw error;
+        savedId = data.id;
+      }
+
+      const result: ExamSessionRecord = {
+        ...recordPayload,
+        id: savedId,
+        created_at: new Date().toISOString(),
+      };
+
+      // Also update local cache
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      await mockProv.saveExamSession({ ...dto, id: savedId });
+
+      return result;
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'saveExamSession error, saving to local offline store:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.saveExamSession(dto);
+    }
+  }
+
+  public async deleteExamSession(sessionId: string, _token?: string): Promise<boolean> {
+    try {
+      await this.client.from('gm_sessions').delete().eq('id', sessionId);
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'deleteExamSession remote error:', err);
+    }
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.deleteExamSession(sessionId);
+  }
+
+  public async getGradedStudents(sessionId: string, _token?: string): Promise<GradedStudentScoreRecord[]> {
+    try {
+      const { data, error } = await this.client
+        .from('gm_students')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('name', { ascending: true });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'getGradedStudents error, using local store:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getGradedStudents(sessionId);
+      }
+
+      if (data && data.length > 0) {
+        const mapped: GradedStudentScoreRecord[] = data.map((s: any) => ({
+          id: s.id,
+          session_id: s.session_id,
+          name: s.name,
+          mcq_answers: s.mcq_answers || {},
+          essay_scores: Array.isArray(s.essay_scores) ? s.essay_scores : [],
+          mcq_score: Number(s.mcq_score) || 0,
+          essay_score: Number(s.essay_score) || 0,
+          final_score: Number(s.final_score) || 0,
+          csi: Number(s.csi) || 0,
+          lps: Number(s.lps) || 0,
+          correct: Number(s.correct) || 0,
+          wrong: Number(s.wrong) || 0,
+          remedial_status: s.remedial_status,
+          created_at: s.created_at,
+        }));
+        return mapped;
+      }
+
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getGradedStudents(sessionId);
+    } catch (err) {
+      logger.error('SupabaseProvider', 'getGradedStudents exception:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getGradedStudents(sessionId);
+    }
+  }
+
+  public async saveGradedStudent(dto: SaveGradedStudentDTO, _token?: string): Promise<GradedStudentScoreRecord> {
+    const studentPayload: any = {
+      session_id: dto.session_id,
+      name: dto.name.trim(),
+      mcq_answers: dto.mcq_answers || {},
+      essay_scores: dto.essay_scores || [],
+      mcq_score: dto.mcq_score || 0,
+      essay_score: dto.essay_score || 0,
+      final_score: dto.final_score || 0,
+      csi: dto.csi || 0,
+      lps: dto.lps || 0,
+      correct: dto.correct || 0,
+      wrong: dto.wrong || 0,
+    };
+
+    let savedId = dto.id;
+
+    try {
+      // 1. Check existing student in gm_students
+      let existingRecord: any = null;
+      if (dto.id) {
+        const { data } = await this.client.from('gm_students').select('id').eq('id', dto.id).maybeSingle();
+        existingRecord = data;
+      }
+      if (!existingRecord) {
+        const { data } = await this.client
+          .from('gm_students')
+          .select('id')
+          .eq('session_id', dto.session_id)
+          .ilike('name', dto.name.trim())
+          .maybeSingle();
+        existingRecord = data;
+      }
+
+      if (existingRecord) {
+        savedId = existingRecord.id;
+        await this.client.from('gm_students').update(studentPayload).eq('id', savedId);
+      } else {
+        const { data: inserted, error: insErr } = await this.client
+          .from('gm_students')
+          .insert(studentPayload)
+          .select('id')
+          .single();
+        if (insErr) throw insErr;
+        savedId = inserted.id;
+      }
+
+      // 2. Also insert per-question answers if answer_key provided
+      if (savedId && dto.answer_key && Array.isArray(dto.answer_key)) {
+        try {
+          await this.client.from('gm_answers').delete().eq('student_id', savedId);
+          const normalize = (v?: string) => (v ? v.trim().toUpperCase() : '');
+          const answerRows = Object.entries(dto.mcq_answers).map(([qNum, selected]) => ({
+            student_id: savedId,
+            question_number: parseInt(qNum, 10),
+            selected_answer: selected,
+            is_correct: normalize(dto.answer_key?.[parseInt(qNum, 10) - 1]) === normalize(selected),
+          }));
+          if (answerRows.length > 0) {
+            await this.client.from('gm_answers').insert(answerRows);
+          }
+        } catch {
+          // ignore answer rows insert issues
+        }
+      }
+
+      // 3. Mirror record to public.student_scores for relational student grade history
+      try {
+        const { data: acc } = await this.client
+          .from('gm_student_accounts')
+          .select('id')
+          .ilike('student_name', dto.name.trim())
+          .limit(1)
+          .maybeSingle();
+
+        const studentUuid = acc?.id || (savedId && savedId.length === 36 ? savedId : undefined);
+        if (studentUuid) {
+          await this.client.from('student_scores').insert({
+            student_id: studentUuid,
+            score: dto.final_score,
+            answers: {
+              session_id: dto.session_id,
+              name: dto.name,
+              mcq_answers: dto.mcq_answers,
+              essay_scores: dto.essay_scores,
+              csi: dto.csi,
+              lps: dto.lps,
+              correct: dto.correct,
+              wrong: dto.wrong,
+            },
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+          });
+        }
+      } catch (scoreSyncErr) {
+        logger.debug('SupabaseProvider', 'student_scores sync note:', scoreSyncErr);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'saveGradedStudent Supabase write note, ensuring local copy:', err);
+    }
+
+    // Always update local cache for instant offline access
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.saveGradedStudent({ ...dto, id: savedId });
+  }
+
+  public async deleteGradedStudent(studentId: string, _token?: string): Promise<boolean> {
+    try {
+      await this.client.from('gm_students').delete().eq('id', studentId);
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'deleteGradedStudent Supabase note:', err);
+    }
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.deleteGradedStudent(studentId);
   }
 }
 

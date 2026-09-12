@@ -27,6 +27,7 @@ import { runDexieOfflineSyncTestSuite } from './__tests__/dexie-offline-sync.tes
 import { runPdfStamperTestSuite } from './__tests__/pdf-stamper.test';
 import { runBarcodeExamCardTestSuite } from './__tests__/barcode-exam-card.test';
 import { runSettingsSyncTestSuite } from './__tests__/settings-sync.test';
+import { runQuestionCorrectionTestSuite } from './__tests__/question-correction.test';
 
 export interface TestResultItem {
   testName: string;
@@ -91,6 +92,7 @@ export class MasterTestRunner {
       { name: 'PDF-Lib Digital Stamp & Document Verification Engine', fn: runPdfStamperTestSuite },
       { name: 'Barcode Engine & Student Exam Card Generator', fn: runBarcodeExamCardTestSuite },
       { name: 'Dynamic Settings & Realtime Branding Sync Engine', fn: runSettingsSyncTestSuite },
+      { name: 'Question Correction & Grading Engine (Web-Input-Nilai)', fn: runQuestionCorrectionTestSuite },
     ];
 
     let totalPassed = 0;

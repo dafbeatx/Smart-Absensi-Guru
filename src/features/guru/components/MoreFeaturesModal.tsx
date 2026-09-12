@@ -28,6 +28,7 @@ interface MoreFeaturesModalProps {
   onOpenEmergencyModal?: () => void;
   onOpenSarprasModal?: () => void;
   onOpenExamCardModal?: () => void;
+  onOpenQuestionCorrectionModal?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -55,6 +56,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenEmergencyModal,
   onOpenSarprasModal,
   onOpenExamCardModal,
+  onOpenQuestionCorrectionModal,
 }) => {
   if (!isOpen) return null;
 
@@ -101,7 +103,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
         {
           id: 'koreksi_soal',
           title: 'Koreksi Soal & Input Nilai',
-          subtitle: 'Aplikasi koreksi lembar ujian & rekap nilai siswa',
+          subtitle: 'Aplikasi koreksi lembar ujian & rekap nilai siswa (In-App)',
           icon: '📝',
           action: () => {
             WebTrafficService.recordFeatureVisit({
@@ -112,7 +114,9 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
               feature_id: 'koreksi_soal',
             });
             onClose();
-            window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
+            if (onOpenQuestionCorrectionModal) {
+              onOpenQuestionCorrectionModal();
+            }
           },
         },
         ...(onOpenStudentBehaviorModal

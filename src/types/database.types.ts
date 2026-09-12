@@ -636,3 +636,104 @@ export interface UpdateInventorySarprasDTO {
   keterangan?: string;
 }
 
+// ==============================================================================
+// EXAM CORRECTION & GRADING ENGINE (Koreksi Soal & Nilai Siswa - Web-Input-Nilai)
+// ==============================================================================
+
+export interface ScoringConfig {
+  pgWeight: number;
+  essayWeight: number;
+  essayMaxScore: number;
+  essayCount: number;
+}
+
+export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
+  pgWeight: 0.7,
+  essayWeight: 0.3,
+  essayMaxScore: 20,
+  essayCount: 5,
+};
+
+export interface ExamSessionRecord {
+  id: string;
+  session_name: string;
+  teacher: string;
+  subject: string;
+  class_name: string;
+  school_level: 'SMP' | 'SMA';
+  answer_key: string[];
+  student_list: string[];
+  scoring_config?: ScoringConfig;
+  exam_type?: string;
+  academic_year?: string;
+  semester?: string;
+  kkm: number;
+  remedial_essay_count?: number;
+  remedial_timer?: number;
+  is_public?: boolean;
+  is_demo?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateExamSessionDTO {
+  id?: string;
+  session_name: string;
+  teacher: string;
+  subject: string;
+  class_name: string;
+  school_level: 'SMP' | 'SMA';
+  answer_key: string[];
+  student_list: string[];
+  scoring_config?: ScoringConfig;
+  exam_type?: string;
+  academic_year?: string;
+  semester?: string;
+  kkm: number;
+}
+
+export interface GradedStudentScoreRecord {
+  id: string;
+  session_id: string;
+  name: string;
+  mcq_answers: Record<number, string>;
+  essay_scores: number[];
+  mcq_score: number;
+  essay_score: number;
+  final_score: number;
+  csi: number;
+  lps: number;
+  correct: number;
+  wrong: number;
+  remedial_status?: string;
+  created_at?: string;
+}
+
+export interface SaveGradedStudentDTO {
+  id?: string;
+  session_id: string;
+  name: string;
+  mcq_answers: Record<number, string>;
+  essay_scores: number[];
+  mcq_score: number;
+  essay_score: number;
+  final_score: number;
+  csi: number;
+  lps: number;
+  correct: number;
+  wrong: number;
+  answer_key?: string[];
+}
+
+export interface StudentCalculationResult {
+  correct: number;
+  wrong: number;
+  unanswered: number;
+  score: number;
+  essayScore: number;
+  finalScore: number;
+  percentage: number;
+  csi: number;
+  lps: number;
+}
+

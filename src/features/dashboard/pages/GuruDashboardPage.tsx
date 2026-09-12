@@ -23,6 +23,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCalendarModal';
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal';
+import { QuestionCorrectionModal } from '../../guru/components/QuestionCorrectionModal';
 import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
 import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
 import { WebTrafficService } from '../../../services/web-traffic.service';
@@ -275,6 +276,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
+  const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
 
   // Change PIN Form State
   const [newPin, setNewPin] = useState('');
@@ -430,7 +432,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         handleOpenCorrectionModal();
         break;
       case 'koreksi_soal':
-        window.open('https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/', '_blank', 'noopener,noreferrer');
+        setIsQuestionCorrectionModalOpen(true);
         break;
       case 'direktori_siswa':
         setIsStudentDirectoryModalOpen(true);
@@ -2402,7 +2404,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   if (iconId === 'sarpras_inventory' && !isSarprasOfficer) return null;
                   const item = ALL_QUICK_ICONS.find((i) => i.id === iconId) || ALL_QUICK_ICONS[0];
                   const IconComponent = item.icon;
-                  const isExternal = item.id === 'koreksi_soal';
+                  const isExternal = false;
 
                   // Engagement quest badge (+5 Poin / ✓ 5p)
                   const questBadge = (() => {
@@ -3205,24 +3207,31 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </span>
                   </button>
 
-                  {/* Koreksi Soal & Input Nilai (Link Eksternal) */}
-                  <a
-                    href="https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  {/* Koreksi Soal & Input Nilai (In-App) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (effectiveUser) {
+                        WebTrafficService.recordFeatureVisit({
+                          user_id: effectiveUser.id,
+                          user_name: effectiveUser.full_name,
+                          user_npp: effectiveUser.nip,
+                          user_role: effectiveUser.role,
+                          feature_id: 'koreksi_soal',
+                        });
+                      }
+                      setIsQuestionCorrectionModalOpen(true);
+                    }}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                     title="Koreksi Soal & Input Nilai"
                   >
-                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
                       <ClipboardCheck className="w-6 h-6 stroke-[1.8]" />
-                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
-                        Link
-                      </span>
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                       Koreksi Soal
                     </span>
-                  </a>
+                  </button>
 
                   {/* Cetak Kartu Peserta Ujian & Barcode Siswa */}
                   <button
@@ -4603,6 +4612,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
         onOpenSarprasModal={() => setIsSarprasModalOpen(true)}
         onOpenExamCardModal={() => setIsExamCardModalOpen(true)}
+        onOpenQuestionCorrectionModal={() => setIsQuestionCorrectionModalOpen(true)}
       />
 
       {/* ⚙️ Modal Kustomisasi 8 Ikon Menu Utama Guru */}
@@ -4762,6 +4772,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <StudentExamCardModal
         isOpen={isExamCardModalOpen}
         onClose={() => setIsExamCardModalOpen(false)}
+      />
+
+      {/* 18. Modal Koreksi Soal & Input Nilai Siswa (GradeMaster In-App) */}
+      <QuestionCorrectionModal
+        isOpen={isQuestionCorrectionModalOpen}
+        onClose={() => setIsQuestionCorrectionModalOpen(false)}
+        currentUser={effectiveUser}
       />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}

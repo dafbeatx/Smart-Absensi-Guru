@@ -33,6 +33,10 @@ import type {
   InventorySarprasItem,
   CreateInventorySarprasDTO,
   UpdateInventorySarprasDTO,
+  ExamSessionRecord,
+  CreateExamSessionDTO,
+  GradedStudentScoreRecord,
+  SaveGradedStudentDTO,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -171,6 +175,14 @@ export interface IDataProvider {
   createInventorySarpras(dto: CreateInventorySarprasDTO, token?: string): Promise<InventorySarprasItem>;
   updateInventorySarpras(id: string, dto: UpdateInventorySarprasDTO, token?: string): Promise<boolean>;
   deleteInventorySarpras(id: string, token?: string): Promise<boolean>;
+
+  // Exam Correction & Student Scores API (Koreksi Soal & Nilai Siswa)
+  getExamSessions(token?: string): Promise<ExamSessionRecord[]>;
+  saveExamSession(session: CreateExamSessionDTO, token?: string): Promise<ExamSessionRecord>;
+  deleteExamSession(sessionId: string, token?: string): Promise<boolean>;
+  getGradedStudents(sessionId: string, token?: string): Promise<GradedStudentScoreRecord[]>;
+  saveGradedStudent(data: SaveGradedStudentDTO, token?: string): Promise<GradedStudentScoreRecord>;
+  deleteGradedStudent(studentId: string, token?: string): Promise<boolean>;
 }
 
 
