@@ -5,40 +5,53 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-const DEFAULT_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
-
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  DEFAULT_SUPABASE_ANON_KEY;
-
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
 
-let activeClient: any = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+let customClient: any = null;
 
-export const serverSupabase: any = new Proxy({} as any, {
-  get(_target, prop) {
-    return activeClient[prop];
-  },
-});
-
-export function setServerSupabaseClient(client: any) {
-  activeClient = client;
+/**
+ * Checks whether SUPABASE_SERVICE_ROLE_KEY is properly configured on the server
+ */
+export function isServiceRoleConfigured(): boolean {
+  if (customClient) return true; // Custom client injected (e.g. for unit testing)
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return typeof key === 'string' && key.trim().length > 0;
 }
 
-export function resetServerSupabaseClient() {
-  activeClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+function getActiveServerClient(): any {
+  if (customClient) return customClient;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key || !key.trim()) {
+    console.error('[SessionAuth] SUPABASE_SERVICE_ROLE_KEY configured: false');
+    return null;
+  }
+  return createClient(SUPABASE_URL, key.trim(), {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
     },
   });
+}
+
+/**
+ * Proxy for server-side Supabase operations requiring Service Role privileges
+ */
+export const serverSupabase: any = new Proxy({} as any, {
+  get(_target, prop) {
+    const client = getActiveServerClient();
+    if (!client) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY_MISSING: Operasi database server memerlukan Service Role Key yang valid.');
+    }
+    return client[prop];
+  },
+});
+
+export function setServerSupabaseClient(client: any) {
+  customClient = client;
+}
+
+export function resetServerSupabaseClient() {
+  customClient = null;
 }
 
 export interface AuthenticatedUser {
@@ -62,7 +75,13 @@ export interface AuthSuccessContext {
 export interface AuthErrorContext {
   ok: false;
   status: number;
-  errorCode: 'AUTH_SESSION_MISSING' | 'AUTH_SESSION_INVALID' | 'AUTH_SESSION_REVOKED' | 'AUTH_SESSION_EXPIRED' | 'AUTH_USER_INACTIVE';
+  errorCode:
+    | 'AUTH_SESSION_MISSING'
+    | 'AUTH_SESSION_INVALID'
+    | 'AUTH_SESSION_REVOKED'
+    | 'AUTH_SESSION_EXPIRED'
+    | 'AUTH_USER_INACTIVE'
+    | 'SUPABASE_SERVICE_ROLE_KEY_MISSING';
   errorMessage: string;
 }
 
@@ -106,6 +125,16 @@ export async function authenticateUser(req: any): Promise<AuthContext> {
       status: 401,
       errorCode: 'AUTH_SESSION_INVALID',
       errorMessage: 'Format token tidak valid atau bukan sesi server-verifiable.',
+    };
+  }
+
+  if (!isServiceRoleConfigured()) {
+    console.error('[SessionAuth] SUPABASE_SERVICE_ROLE_KEY configured: false');
+    return {
+      ok: false,
+      status: 500,
+      errorCode: 'SUPABASE_SERVICE_ROLE_KEY_MISSING',
+      errorMessage: 'Konfigurasi keamanan server belum lengkap (Service Role missing). Hubungi Administrator.',
     };
   }
 

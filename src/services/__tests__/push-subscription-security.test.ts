@@ -223,11 +223,11 @@ export async function runPushSubscriptionSecurityTestSuite(): Promise<TestSuiteR
     const data = res.getData();
 
     assert(
-      'Security 5: Backend trusted endpoint menolak token palsu dengan HTTP 401 AUTH_SESSION_MISSING',
+      'Security 5: Backend trusted endpoint menolak token palsu dengan HTTP 401',
       statusCode === 401 &&
         data?.success === false &&
         data?.persisted === false &&
-        data?.errorCode === 'AUTH_SESSION_MISSING',
+        (data?.errorCode === 'AUTH_SESSION_MISSING' || data?.errorCode === 'AUTH_SESSION_INVALID'),
       `HTTP status: ${statusCode}, Body: ${JSON.stringify(data)}`
     );
   } catch (err: any) {

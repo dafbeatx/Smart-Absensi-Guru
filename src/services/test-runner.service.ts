@@ -29,6 +29,7 @@ import { runBarcodeExamCardTestSuite } from './__tests__/barcode-exam-card.test'
 import { runSettingsSyncTestSuite } from './__tests__/settings-sync.test';
 import { runQuestionCorrectionTestSuite } from './__tests__/question-correction.test';
 import { runPushSubscriptionSecurityTestSuite } from './__tests__/push-subscription-security.test';
+import { runPhase421PushServiceRoleTestSuite } from './__tests__/phase-4-2-1-push-service-role.test';
 import { runAuthHardeningSessionTestSuite } from './__tests__/auth-hardening-session.test';
 import { runHomeroomAuthorizationTestSuite } from './__tests__/homeroom-authorization.test';
 import { runHomeroomMobileResponsiveTestSuite } from './__tests__/homeroom-mobile-responsive.test';
@@ -98,6 +99,7 @@ export class MasterTestRunner {
       { name: 'Dynamic Settings & Realtime Branding Sync Engine', fn: runSettingsSyncTestSuite },
       { name: 'Question Correction & Grading Engine (Web-Input-Nilai)', fn: runQuestionCorrectionTestSuite },
       { name: 'Push Subscription Security & RLS Compliance', fn: runPushSubscriptionSecurityTestSuite },
+      { name: 'Push Subscription & Service Role Compatibility (Phase 4.2.1)', fn: runPhase421PushServiceRoleTestSuite },
       { name: 'Authentication Hardening & Database Session Store (Phase 4.2)', fn: runAuthHardeningSessionTestSuite },
       { name: 'Ruang Wali Kelas & Continuation Authorization Security (Phase 4.3)', fn: runHomeroomAuthorizationTestSuite },
       { name: 'Infinix Note 8 & Ruang Wali Kelas Mobile-First UX (Phase 4.3)', fn: runHomeroomMobileResponsiveTestSuite },

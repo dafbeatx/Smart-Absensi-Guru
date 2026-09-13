@@ -1,25 +1,13 @@
 // Vercel Serverless Function: api/push-subscriptions.ts
 // Handles secure, server-side Web Push subscription storage using Supabase Service-Role
-// Protects against unauthorized endpoint takeovers and client-side RLS 401 violations
+// Protects against unauthorized endpoint takeovers and client-side RLS violations
+// Integrates with SAGA Session Store (saga_sess_...) via authenticateUser
 
-import { createClient } from '@supabase/supabase-js';
-
-const DEFAULT_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
-
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  DEFAULT_SUPABASE_ANON_KEY;
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+import {
+  serverSupabase,
+  authenticateUser,
+  isServiceRoleConfigured,
+} from './_shared/session-auth';
 
 interface SubscriptionRequestBody {
   subscription?: {
@@ -28,66 +16,10 @@ interface SubscriptionRequestBody {
     auth: string;
     device_type?: 'MOBILE' | 'DESKTOP' | 'TABLET' | 'UNKNOWN';
     user_agent?: string;
+    user_id?: string; // May be sent by client, but MUST BE IGNORED by server
   };
   endpoint?: string;
-}
-
-/**
- * Validates session token and returns the authenticated user's ID
- */
-async function authenticateUser(authHeader: string | undefined): Promise<{ userId: string; role: string } | null> {
-  if (!authHeader) return null;
-
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return null;
-
-  // Format token internal: SB_JWT_<userId>_<timestamp> atau token khusus
-  // Contoh: SB_JWT_usr_guru_002_1789269893399
-  let candidateUserId: string | null = null;
-  if (token.startsWith('SB_JWT_')) {
-    const parts = token.split('_');
-    // parts: ['SB', 'JWT', 'usr', 'guru', '002', 'timestamp']
-    // User ID di Smart Absensi berformat: usr_guru_002, usr_kepsek_002, usr_admin_001, atau UUID
-    if (parts.length >= 4) {
-      // Ambil bagian tengah sebelum timestamp terakhir
-      const withoutPrefix = token.substring('SB_JWT_'.length);
-      const lastUnderscore = withoutPrefix.lastIndexOf('_');
-      if (lastUnderscore > 0) {
-        candidateUserId = withoutPrefix.substring(0, lastUnderscore);
-      }
-    }
-  } else if (token.startsWith('usr_')) {
-    candidateUserId = token;
-  }
-
-  // Jika tidak terurai via convention, cek apakah token ada di header admin secret
-  const expectedSecret = process.env.INTERNAL_PUSH_SECRET || process.env.VAPID_PRIVATE_KEY;
-  if (expectedSecret && token === expectedSecret) {
-    return { userId: 'SYSTEM_INTERNAL', role: 'ADMIN' };
-  }
-
-  if (!candidateUserId) return null;
-
-  // Verifikasi keabsahan user di PostgreSQL public.users
-  try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, role, account_status')
-      .eq('id', candidateUserId)
-      .maybeSingle();
-
-    if (error || !user) {
-      return null;
-    }
-
-    if (user.account_status === 'LOCKED' || user.account_status === 'INACTIVE') {
-      return null;
-    }
-
-    return { userId: user.id, role: user.role };
-  } catch {
-    return null;
-  }
+  user_id?: string;
 }
 
 export default async function handler(req: any, res: any) {
@@ -100,22 +32,39 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
-  // 1. Verifikasi Autentikasi Pengguna
-  const authHeader = req.headers.authorization || req.headers['x-session-token'];
-  const authenticated = await authenticateUser(authHeader);
+  // 1. Verifikasi Autentikasi Pengguna via Session Store (saga_sess_...)
+  const internalSecret = req.headers?.['x-internal-secret'];
+  const expectedSecret = process.env.INTERNAL_PUSH_SECRET || process.env.VAPID_PRIVATE_KEY;
 
-  if (!authenticated) {
-    return res.status(401).json({
+  let currentUserId: string | null = null;
+
+  if (internalSecret && expectedSecret && internalSecret === expectedSecret) {
+    currentUserId = 'SYSTEM_INTERNAL';
+  } else {
+    const auth = await authenticateUser(req);
+    if (!auth.ok) {
+      return res.status(auth.status || 401).json({
+        success: false,
+        persisted: false,
+        errorCode: auth.errorCode,
+        errorMessage: auth.errorMessage,
+      });
+    }
+    currentUserId = auth.userId;
+  }
+
+  // 2. Fail-Closed Check: Server Service Role Configuration
+  if (!isServiceRoleConfigured()) {
+    console.error('[PushSubscription] SUPABASE_SERVICE_ROLE_KEY configured: false');
+    return res.status(500).json({
       success: false,
       persisted: false,
-      errorCode: 'AUTH_SESSION_MISSING',
-      errorMessage: 'Sesi login tidak valid, kedaluwarsa, atau pengguna belum terotentikasi.',
+      errorCode: 'SUPABASE_SERVICE_ROLE_KEY_MISSING',
+      errorMessage: 'Konfigurasi keamanan push notification belum lengkap (Service Role missing). Hubungi Administrator.',
     });
   }
 
-  const currentUserId = authenticated.userId;
-
-  // 2. Handler POST: Simpan / Perbarui Push Subscription
+  // 3. Handler POST: Simpan / Perbarui Push Subscription
   if (req.method === 'POST') {
     const body: SubscriptionRequestBody = req.body || {};
     const sub = body.subscription || (body as any);
@@ -139,8 +88,8 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-      // 2A. Verifikasi Kepemilikan Endpoint (Mencegah Endpoint Hijacking antar-user)
-      const { data: existingSub, error: checkError } = await supabase
+      // 3A. Verifikasi Kepemilikan Endpoint (Mencegah Endpoint Hijacking antar-user)
+      const { data: existingSub, error: checkError } = await serverSupabase
         .from('push_subscriptions')
         .select('id, user_id')
         .eq('endpoint', sub.endpoint)
@@ -157,7 +106,6 @@ export default async function handler(req: any, res: any) {
 
       // Jika endpoint sudah ada dan dimiliki oleh user LAIN:
       if (existingSub && existingSub.user_id !== currentUserId && currentUserId !== 'SYSTEM_INTERNAL') {
-        // Blokir jika ada usaha manipulasi kepemilikan tanpa izin
         return res.status(409).json({
           success: false,
           persisted: false,
@@ -166,8 +114,9 @@ export default async function handler(req: any, res: any) {
         });
       }
 
-      // 2B. Simpan dengan Service-Role Key (Bypass RLS anonim secara aman dari server)
-      const userAgent = sub.user_agent || req.headers['user-agent'] || null;
+      // 3B. Simpan dengan Service-Role Key (Bypass RLS anonim secara aman dari server)
+      // User identity DIKUNCI KE currentUserId (berasal dari sesi database, BUKAN dari payload client)
+      const userAgent = sub.user_agent || req.headers?.['user-agent'] || null;
       const deviceType = sub.device_type || (/mobile|android|iphone|ipad/i.test(userAgent || '') ? 'MOBILE' : 'DESKTOP');
       const nowIso = new Date().toISOString();
 
@@ -182,14 +131,14 @@ export default async function handler(req: any, res: any) {
         updated_at: nowIso,
       };
 
-      const { data, error: upsertError } = await supabase
+      const { data, error: upsertError } = await serverSupabase
         .from('push_subscriptions')
         .upsert(payload, { onConflict: 'endpoint' })
         .select('id, user_id, endpoint, updated_at')
         .single();
 
       if (upsertError) {
-        console.error('[API push-subscriptions] Upsert error:', upsertError.message);
+        console.error('[API push-subscriptions] Upsert error code:', upsertError.code);
         return res.status(500).json({
           success: false,
           persisted: false,
@@ -208,19 +157,19 @@ export default async function handler(req: any, res: any) {
         },
       });
     } catch (err: any) {
-      console.error('[API push-subscriptions] Exception:', err);
+      console.error('[API push-subscriptions] Exception:', err?.message);
       return res.status(500).json({
         success: false,
         persisted: false,
         errorCode: 'NETWORK_ERROR',
-        errorMessage: err?.message || 'Terjadi kesalahan jaringan saat menyimpan subscription.',
+        errorMessage: err?.message || 'Terjadi kesalahan saat menyimpan subscription.',
       });
     }
   }
 
-  // 3. Handler DELETE: Hapus Push Subscription Milik Pengguna
+  // 4. Handler DELETE: Hapus Push Subscription Milik Pengguna
   if (req.method === 'DELETE') {
-    const endpointToDelete = req.query.endpoint || req.body?.endpoint;
+    const endpointToDelete = req.query?.endpoint || req.body?.endpoint;
 
     if (!endpointToDelete || typeof endpointToDelete !== 'string') {
       return res.status(400).json({
@@ -232,7 +181,7 @@ export default async function handler(req: any, res: any) {
 
     try {
       // User hanya dapat menghapus subscription miliknya sendiri
-      let deleteQuery = supabase
+      let deleteQuery = serverSupabase
         .from('push_subscriptions')
         .delete()
         .eq('endpoint', endpointToDelete.trim());

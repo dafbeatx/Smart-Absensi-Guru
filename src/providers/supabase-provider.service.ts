@@ -37,7 +37,6 @@ import type {
   AttendanceSource,
   PushSubscriptionPayload,
   SavePushSubscriptionResult,
-  PushSubscriptionErrorCode,
   NotificationPreferences,
   TeacherPointLog,
   TeacherPointActivityType,
@@ -108,8 +107,10 @@ export class SupabaseProvider implements IDataProvider {
   public async login(dto: LoginDTO): Promise<LoginResponseDTO> {
     // 1. Jalur Utama: Server-Side Stateful Session Engine (/api/auth/login)
     if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      let resp: Response | null = null;
+      let json: any = null;
       try {
-        const resp = await fetch('/api/auth/login', {
+        resp = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -120,8 +121,13 @@ export class SupabaseProvider implements IDataProvider {
           }),
         });
 
-        const json = await resp.json().catch(() => null);
+        json = await resp.json().catch(() => null);
+      } catch (err: any) {
+        logger.warn('SupabaseProvider', 'Serverless login API fetch network error:', err?.message);
+      }
 
+      // Jika server memberikan respon HTTP aktif (200, 401, 429, 500), wajib ikuti otoritas server
+      if (resp) {
         if (resp.ok && json?.success && json?.token) {
           logger.info('SupabaseProvider', 'Login berhasil diterbitkan oleh Serverless Session Engine');
           return {
@@ -130,21 +136,9 @@ export class SupabaseProvider implements IDataProvider {
           };
         }
 
-        if (!resp.ok && json?.errorMessage) {
-          throw new Error(json.errorMessage);
-        }
-      } catch (err: any) {
-        // Jika penolakan kredensial / akun terkunci dari server, teruskan error ke UI
-        if (
-          err.message &&
-          (err.message.includes('PIN') ||
-            err.message.includes('terblokir') ||
-            err.message.includes('ditemukan') ||
-            err.message.includes('terkunci'))
-        ) {
-          throw err;
-        }
-        logger.warn('SupabaseProvider', 'Serverless login API offline/unreachable, fallback ke direct client provider', err);
+        // Server merespon dengan kegagalan -> WAJIB fail closed, dilarang silent fallback ke legacy token
+        const errorMsg = json?.errorMessage || `Login server gagal (HTTP ${resp.status}). Silakan periksa kembali akun Anda.`;
+        throw new Error(errorMsg);
       }
     }
 
@@ -4189,74 +4183,31 @@ export class SupabaseProvider implements IDataProvider {
             errorMessage: resData?.errorMessage || 'Format subscription ditolak oleh server.',
           };
         }
-      }
-    } catch (fetchErr: any) {
-      logger.warn('SupabaseProvider', 'Serverless proxy fetch exception:', fetchErr?.message);
-    }
 
-    // 4. Fallback Direct Supabase Client Query (jika serverless proxy tidak terjangkau)
-    try {
-      const nowIso = new Date().toISOString();
-      const payload = {
-        user_id: subscription.user_id,
-        endpoint: subscription.endpoint,
-        p256dh: subscription.p256dh,
-        auth: subscription.auth,
-        device_type: subscription.device_type || 'MOBILE',
-        user_agent: subscription.user_agent || (typeof navigator !== 'undefined' ? navigator.userAgent : null),
-        last_seen_at: nowIso,
-        updated_at: nowIso,
-      };
-
-      const { error } = await this.client
-        .from('push_subscriptions')
-        .upsert(payload, { onConflict: 'endpoint' });
-
-      if (error) {
-        let classifiedCode: PushSubscriptionErrorCode = 'NETWORK_ERROR';
-        if (
-          error.code === '42501' ||
-          error.message?.includes('row-level security') ||
-          error.message?.includes('401')
-        ) {
-          classifiedCode = 'RLS_DENIED';
-        } else if (
-          error.code === '42P01' ||
-          error.message?.includes('relation') ||
-          error.message?.includes('does not exist')
-        ) {
-          classifiedCode = 'TABLE_NOT_FOUND';
-        } else if (
-          error.code === '23505' ||
-          error.message?.includes('unique') ||
-          error.message?.includes('conflict')
-        ) {
-          classifiedCode = 'ENDPOINT_CONFLICT';
-        }
-
-        logger.error('SupabaseProvider', `savePushSubscription failed [${classifiedCode}]:`, error.message);
+        // Tangani error internal / missing service role
         return {
           success: false,
           persisted: false,
-          errorCode: classifiedCode,
-          errorMessage: `Gagal menyimpan subscription ke database (${classifiedCode}): ${error.message}`,
+          errorCode: resData?.errorCode || 'NETWORK_ERROR',
+          errorMessage: resData?.errorMessage || `Gagal menyimpan subscription (HTTP ${response.status}).`,
         };
       }
-
-      logger.info('SupabaseProvider', 'Web push subscription saved via direct client for user:', subscription.user_id);
-      return {
-        success: true,
-        persisted: true,
-      };
-    } catch (err: any) {
-      logger.error('SupabaseProvider', 'savePushSubscription unhandled exception:', err);
+    } catch (fetchErr: any) {
+      logger.warn('SupabaseProvider', 'Serverless proxy fetch exception:', fetchErr?.message);
       return {
         success: false,
         persisted: false,
         errorCode: 'NETWORK_ERROR',
-        errorMessage: err?.message || 'Kendala koneksi jaringan saat menghubungi server database.',
+        errorMessage: fetchErr?.message || 'Serverless proxy push-subscriptions tidak dapat dihubungi.',
       };
     }
+
+    return {
+      success: false,
+      persisted: false,
+      errorCode: 'NETWORK_ERROR',
+      errorMessage: 'Koneksi ke endpoint push-subscriptions gagal.',
+    };
   }
 
   public async deletePushSubscription(endpoint: string, _token?: string): Promise<boolean> {

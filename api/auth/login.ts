@@ -3,7 +3,7 @@
 // Emits server-verifiable, stateful CSPRNG session tokens and stores only SHA-256 token hash
 
 import crypto from 'crypto';
-import { serverSupabase, hashSessionToken } from '../_shared/session-auth';
+import { serverSupabase, hashSessionToken, isServiceRoleConfigured } from '../_shared/session-auth';
 
 function timingSafeMatch(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;
@@ -31,9 +31,19 @@ export default async function handler(req: any, res: any) {
     });
   }
 
+  // 1. Fail-Closed Check: Server Service Role Configuration
+  if (!isServiceRoleConfigured()) {
+    console.error('[AuthLogin] SUPABASE_SERVICE_ROLE_KEY configured: false');
+    return res.status(500).json({
+      success: false,
+      errorCode: 'SUPABASE_SERVICE_ROLE_KEY_MISSING',
+      errorMessage: 'Konfigurasi keamanan server belum lengkap (Service Role missing). Hubungi Administrator.',
+    });
+  }
+
   const { identity, pin, device_uuid, device_model } = req.body || {};
 
-  // 1. Validasi Kelengkapan Input
+  // 2. Validasi Kelengkapan Input
   if (!identity || typeof identity !== 'string' || !pin || typeof pin !== 'string') {
     return res.status(400).json({
       success: false,
