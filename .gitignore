@@ -13,6 +13,7 @@ dist
 dist-ssr
 release
 dist-electron
+*.tsbuildinfo
 
 # Environment Variables (Secrets - DO NOT COMMIT TO GIT)
 .env

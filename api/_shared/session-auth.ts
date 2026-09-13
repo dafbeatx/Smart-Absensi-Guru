@@ -3,7 +3,8 @@
 // Implements server-verifiable, stateful session security with SHA-256 token hashing
 
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
+import process from 'node:process';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
 

@@ -2,8 +2,9 @@
 // Serverless Homeroom Upload Document Endpoint for Smart Absensi Guru (SAGA)
 // Handles direct upload of student documents from mobile cameras or file managers into private bucket student-documents
 
-import { serverSupabase } from '../_shared/session-auth';
-import { authenticateHomeroomTeacher, normalizeClassName } from '../_shared/homeroom-auth';
+import { Buffer } from 'node:buffer';
+import { serverSupabase } from '../_shared/session-auth.js';
+import { authenticateHomeroomTeacher, normalizeClassName } from '../_shared/homeroom-auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

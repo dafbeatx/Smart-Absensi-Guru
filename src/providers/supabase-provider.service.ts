@@ -84,6 +84,8 @@ import {
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
 
+let sharedClientInstance: SupabaseClient | null = null;
+
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
 
@@ -99,7 +101,16 @@ export class SupabaseProvider implements IDataProvider {
         : '') ||
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
 
-    this.client = createClient(url, key);
+    if (!sharedClientInstance) {
+      sharedClientInstance = createClient(url, key, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      });
+    }
+
+    this.client = sharedClientInstance;
   }
 
   // ─── AUTHENTICATION API ───────────────────────────────────────────────────
@@ -4210,22 +4221,34 @@ export class SupabaseProvider implements IDataProvider {
     };
   }
 
-  public async deletePushSubscription(endpoint: string, _token?: string): Promise<boolean> {
-    try {
-      const { error } = await this.client
-        .from('push_subscriptions')
-        .delete()
-        .eq('endpoint', endpoint);
+  public async deletePushSubscription(endpoint: string, token?: string): Promise<boolean> {
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      try {
+        const effectiveToken = token || useAuthStore.getState().token;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (effectiveToken) {
+          headers['Authorization'] = `Bearer ${effectiveToken}`;
+        }
 
-      if (error) {
-        logger.warn('SupabaseProvider', 'deletePushSubscription error:', error.message);
+        const res = await fetch(`/api/push-subscriptions?endpoint=${encodeURIComponent(endpoint)}`, {
+          method: 'DELETE',
+          headers,
+        });
+
+        if (res.ok) {
+          logger.info('SupabaseProvider', 'Push subscription deleted via serverless proxy');
+          return true;
+        }
+        logger.warn('SupabaseProvider', 'Serverless push deletion returned HTTP', res.status);
+        return false;
+      } catch (err: any) {
+        logger.error('SupabaseProvider', 'deletePushSubscription serverless error:', err?.message);
         return false;
       }
-      return true;
-    } catch (err) {
-      logger.error('SupabaseProvider', 'deletePushSubscription exception:', err);
-      return false;
     }
+    return true;
   }
 
   // TEACHER DISCIPLINE POINT HISTORY API
