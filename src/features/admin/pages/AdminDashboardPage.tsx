@@ -41,6 +41,8 @@ import { NotificationPermissionBanner } from '../../../components/dashboard/Noti
 import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
 import { OfflineSyncIndicator } from '../../../components/ui/OfflineSyncIndicator';
 import { OfflineSyncService } from '../../../services/offline-sync.service';
+import { QuestionCorrectionModal } from '../../guru/components/QuestionCorrectionModal';
+import { WebTrafficService } from '../../../services/web-traffic.service';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -53,6 +55,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
+  const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [selectedCorrectionDate, setSelectedCorrectionDate] = useState<string | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
@@ -62,6 +65,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
+
+  const handleCloseQuestionCorrectionModal = useCallback(() => {
+    setIsQuestionCorrectionModalOpen(false);
+  }, []);
 
   // Settings for Geofence & Work Hours
   const [settings, setSettings] = useState<SystemSettings>({
@@ -432,6 +439,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       icon: '🎓',
     },
     {
+      id: 'QUESTION_CORRECTION',
+      label: 'Koreksi Soal & Nilai',
+      icon: '📋',
+    },
+    {
       id: 'COMPLAINTS',
       label: 'Kotak Aspirasi Guru',
       icon: '💬',
@@ -481,6 +493,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     }
     if (id === 'CORRECTION') {
       setIsCorrectionModalOpen(true);
+      return;
+    }
+    if (id === 'QUESTION_CORRECTION') {
+      if (user) {
+        WebTrafficService.recordFeatureVisit({
+          user_id: user.id,
+          user_name: user.full_name,
+          user_npp: user.nip,
+          user_role: user.role,
+          feature_id: 'koreksi_soal',
+        });
+      }
+      setIsQuestionCorrectionModalOpen(true);
       return;
     }
     if (id === 'QR_POSTER') {
@@ -823,6 +848,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         isOpen={isPreferencesModalOpen}
         onClose={() => setIsPreferencesModalOpen(false)}
       />
+
+      {/* Modal Koreksi Soal & Input Nilai (GradeMaster In-App) */}
+      {user && (
+        <QuestionCorrectionModal
+          isOpen={isQuestionCorrectionModalOpen}
+          onClose={handleCloseQuestionCorrectionModal}
+          currentUser={user}
+        />
+      )}
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
       <OfflineSyncIndicator />
