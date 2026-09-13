@@ -368,6 +368,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
+  const pushSubAttemptedRef = useRef(false);
 
   // 8 Quick Icons Customization State & Hak Akses Wakasek Sarpras (M. Iqbal Gustiawan)
   const isSarprasOfficer = isUserSarprasOfficer(effectiveUser);
@@ -1211,8 +1212,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     loadAllData();
     loadAllDataRef.current = loadAllData;
 
-    // Auto-ensure Web Push registration to cloud if permission is already granted
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    // Auto-ensure Web Push registration to cloud if permission is already granted (maksimal 1x per sesi)
+    if (
+      !pushSubAttemptedRef.current &&
+      typeof window !== 'undefined' &&
+      'Notification' in window &&
+      Notification.permission === 'granted' &&
+      effectiveUser?.id &&
+      token
+    ) {
+      pushSubAttemptedRef.current = true;
       NotificationService.subscribeUserToPush(effectiveUser.id).catch(() => {});
     }
 

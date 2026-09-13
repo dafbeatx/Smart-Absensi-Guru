@@ -96,7 +96,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
         window.removeEventListener('smart_absensi_push_status_updated', handlePushStatusEvent);
       }
     };
-  }, [isOpen, user, token]);
+  }, [isOpen, user?.id, token]);
 
   if (!isOpen) return null;
 
