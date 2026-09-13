@@ -29,6 +29,7 @@ interface MoreFeaturesModalProps {
   onOpenSarprasModal?: () => void;
   onOpenExamCardModal?: () => void;
   onOpenQuestionCorrectionModal?: () => void;
+  onOpenHomeroomModal?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -57,6 +58,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenSarprasModal,
   onOpenExamCardModal,
   onOpenQuestionCorrectionModal,
+  onOpenHomeroomModal,
 }) => {
   if (!isOpen) return null;
 
@@ -79,6 +81,28 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
     {
       category: 'Akademik & KBM',
       items: [
+        ...(onOpenHomeroomModal
+          ? [
+              {
+                id: 'homeroom_plan',
+                title: 'Ruang Wali Kelas: Rencana Studi Siswa',
+                subtitle: 'Pendataan & verifikasi rencana pendidikan lanjutan siswa kelas 9',
+                icon: '🎓',
+                badge: 'Wali Kelas 9',
+                action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'homeroom_plan',
+                  });
+                  onClose();
+                  onOpenHomeroomModal();
+                },
+              },
+            ]
+          : []),
         ...(onOpenExamCardModal
           ? [
               {

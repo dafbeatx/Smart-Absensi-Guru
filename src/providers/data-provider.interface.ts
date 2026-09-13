@@ -42,6 +42,13 @@ import type {
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
+import type {
+  HomeroomOverview,
+  HomeroomStudentItem,
+  StudentPlanDetail,
+  VerifyPlanDTO,
+  VerifyPlanResult,
+} from '../types/homeroom.types';
 
 export interface IDataProvider {
   // Auth API
@@ -184,6 +191,13 @@ export interface IDataProvider {
   getGradedStudents(sessionId: string, token?: string): Promise<GradedStudentScoreRecord[]>;
   saveGradedStudent(data: SaveGradedStudentDTO, token?: string): Promise<GradedStudentScoreRecord>;
   deleteGradedStudent(studentId: string, token?: string): Promise<boolean>;
+
+  // Homeroom & Student Continuation Plans API (Ruang Wali Kelas 9)
+  getHomeroomOverview(token: string, className?: string): Promise<HomeroomOverview>;
+  getHomeroomStudents(token: string, className?: string): Promise<HomeroomStudentItem[]>;
+  getStudentPlanDetail(studentId: string, token: string): Promise<StudentPlanDetail>;
+  verifyStudentPlan(dto: VerifyPlanDTO, token: string): Promise<VerifyPlanResult>;
+  getHomeroomDocumentUrl(documentId: string, token: string): Promise<string>;
 }
 
 

@@ -24,6 +24,7 @@ import { SchoolEventsCalendarModal } from '../../guru/components/SchoolEventsCal
 import { MoreFeaturesModal } from '../../guru/components/MoreFeaturesModal';
 import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal';
 import { QuestionCorrectionModal } from '../../guru/components/QuestionCorrectionModal';
+import { HomeroomModal } from '../../homeroom/components/HomeroomModal';
 import { StudentRfidKioskModal } from '../../attendance/components/StudentRfidKioskModal';
 import { AttendancePermissionBlockedModal } from '../../guru/components/AttendancePermissionBlockedModal';
 import { WebTrafficService } from '../../../services/web-traffic.service';
@@ -337,6 +338,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
   const [isEventsCalendarModalOpen, setIsEventsCalendarModalOpen] = useState(false);
   const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
+  const [isHomeroomModalOpen, setIsHomeroomModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isStudentKioskOpen, setIsStudentKioskOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
@@ -4654,6 +4656,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenSarprasModal={() => setIsSarprasModalOpen(true)}
         onOpenExamCardModal={() => setIsExamCardModalOpen(true)}
         onOpenQuestionCorrectionModal={() => setIsQuestionCorrectionModalOpen(true)}
+        onOpenHomeroomModal={() => setIsHomeroomModalOpen(true)}
+      />
+
+      {/* 🎓 Ruang Wali Kelas (Pendataan & Verifikasi Rencana Lanjutan Siswa Kelas 9) */}
+      <HomeroomModal
+        isOpen={isHomeroomModalOpen}
+        onClose={() => setIsHomeroomModalOpen(false)}
+        user={effectiveUser}
+        token={token || ''}
       />
 
       {/* ⚙️ Modal Kustomisasi 8 Ikon Menu Utama Guru */}

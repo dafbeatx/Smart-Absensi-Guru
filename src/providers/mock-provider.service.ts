@@ -48,6 +48,13 @@ import type {
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
+import type {
+  HomeroomOverview,
+  HomeroomStudentItem,
+  StudentPlanDetail,
+  VerifyPlanDTO,
+  VerifyPlanResult,
+} from '../types/homeroom.types';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
 import { NotificationService } from '../services/notification-permission.service';
@@ -3063,6 +3070,232 @@ export class MockProvider implements IDataProvider {
       // ignore
     }
     return true;
+  }
+
+  // ─── HOMEROOM & STUDENT CONTINUATION PLANS API ───────────────────────────
+
+  public async getHomeroomOverview(_token: string, className?: string): Promise<HomeroomOverview> {
+    const targetClass = className || '9A';
+    return {
+      teacherId: useAuthStore.getState().user?.id || 'usr_guru_001',
+      teacherName: useAuthStore.getState().user?.full_name || 'Ahmad Fauzi, S.Pd.',
+      teacherRole: 'GURU',
+      assignedClass: targetClass,
+      academicYear: '2026/2027',
+      targetGraduationYear: 2027,
+      totalStudents: 4,
+      completionRate: 50,
+      stats: {
+        draft: 1,
+        submitted: 1,
+        pendingVerification: 1,
+        verified: 2,
+        needsRevision: 0,
+        parentAgreed: 3,
+      },
+    };
+  }
+
+  public async getHomeroomStudents(_token: string, className?: string): Promise<HomeroomStudentItem[]> {
+    const targetClass = className || '9A';
+    return [
+      {
+        id: 'std_mock_001',
+        nis: '26001',
+        nisn: '0081112221',
+        fullName: 'Muhammad Rizky Pratama',
+        className: targetClass,
+        gender: 'L',
+        photoUrl: null,
+        plan: {
+          id: 'plan_mock_001',
+          continuationType: 'SMA_NEGERI',
+          status: 'verified',
+          parentAgreement: true,
+          submittedAt: '2026-09-01T08:00:00Z',
+          verifiedAt: '2026-09-05T10:00:00Z',
+          revisionNote: null,
+          firstChoice: {
+            schoolName: 'SMAN 1 Bogor',
+            schoolType: 'SMA',
+            majorName: 'MIPA',
+          },
+        },
+      },
+      {
+        id: 'std_mock_002',
+        nis: '26002',
+        nisn: '0081112222',
+        fullName: 'Aisyah Putri Azzahra',
+        className: targetClass,
+        gender: 'P',
+        photoUrl: null,
+        plan: {
+          id: 'plan_mock_002',
+          continuationType: 'SMK_NEGERI',
+          status: 'pending_verification',
+          parentAgreement: true,
+          submittedAt: '2026-09-10T09:30:00Z',
+          verifiedAt: null,
+          revisionNote: null,
+          firstChoice: {
+            schoolName: 'SMKN 1 Cibinong',
+            schoolType: 'SMK',
+            majorName: 'Rekayasa Perangkat Lunak',
+          },
+        },
+      },
+      {
+        id: 'std_mock_003',
+        nis: '26003',
+        nisn: '0081112223',
+        fullName: 'Fajar Nugraha',
+        className: targetClass,
+        gender: 'L',
+        photoUrl: null,
+        plan: {
+          id: 'plan_mock_003',
+          continuationType: 'PONDOK_PESANTREN',
+          status: 'needs_revision',
+          parentAgreement: false,
+          submittedAt: '2026-09-08T11:00:00Z',
+          verifiedAt: null,
+          revisionNote: 'Harap lampirkan surat persetujuan orang tua bermaterai.',
+          firstChoice: {
+            schoolName: 'Pondok Pesantren Darussalam Gontor',
+            schoolType: 'PESANTREN',
+            majorName: 'Keagamaan',
+          },
+        },
+      },
+      {
+        id: 'std_mock_004',
+        nis: '26004',
+        nisn: '0081112224',
+        fullName: 'Siti Nurhaliza',
+        className: targetClass,
+        gender: 'P',
+        photoUrl: null,
+        plan: {
+          id: null,
+          continuationType: 'BELUM_MENENTUKAN',
+          status: 'draft',
+          parentAgreement: false,
+          submittedAt: null,
+          verifiedAt: null,
+          revisionNote: null,
+          firstChoice: null,
+        },
+      },
+    ];
+  }
+
+  public async getStudentPlanDetail(studentId: string, _token: string): Promise<StudentPlanDetail> {
+    return {
+      student: {
+        id: studentId,
+        nis: '26001',
+        nisn: '0081112221',
+        fullName: 'Muhammad Rizky Pratama',
+        className: '9A',
+        gender: 'L',
+        photoUrl: null,
+      },
+      plan: {
+        id: 'plan_mock_001',
+        academicYear: '2026/2027',
+        graduationYear: 2027,
+        continuationType: 'SMA_NEGERI',
+        status: 'verified',
+        submittedAt: '2026-09-01T08:00:00Z',
+        verifiedAt: '2026-09-05T10:00:00Z',
+        verifiedByName: 'Ahmad Fauzi, S.Pd.',
+        revisionNote: null,
+        parentAgreement: true,
+      },
+      choices: [
+        {
+          id: 'choice_mock_001',
+          priority: 1,
+          schoolName: 'SMAN 1 Bogor',
+          schoolType: 'SMA_NEGERI',
+          majorName: 'MIPA',
+          registrationTrack: 'Prestasi Akademik',
+          notes: 'Pilihan utama jarak 2.5km',
+        },
+        {
+          id: 'choice_mock_002',
+          priority: 2,
+          schoolName: 'SMAN 3 Bogor',
+          schoolType: 'SMA_NEGERI',
+          majorName: 'MIPA',
+          registrationTrack: 'Zonasi',
+          notes: 'Pilihan cadangan',
+        },
+      ],
+      interests: [
+        {
+          id: 'interest_mock_001',
+          interestField: 'Sains & Teknologi Komputer',
+          reason: 'Tertarik mendalami rekayasa sistem kecerdasan buatan',
+          careerGoal: 'Software Engineer / AI Researcher',
+        },
+      ],
+      achievements: [
+        {
+          id: 'achieve_mock_001',
+          achievementTitle: 'Juara 1 Olimpiade Matematika Kabupaten Bogor',
+          achievementType: 'Akademik',
+          level: 'Kabupaten',
+          year: 2025,
+          organizer: 'Dinas Pendidikan Kab. Bogor',
+        },
+      ],
+      documents: [
+        {
+          id: 'doc_mock_001',
+          studentId,
+          documentType: 'KARTU_KELUARGA',
+          versionNumber: 1,
+          isActive: true,
+          originalFilename: 'KK_Rizky_Pratama.pdf',
+          mimeType: 'application/pdf',
+          fileSizeBytes: 245000,
+          status: 'verified',
+          verificationNotes: 'Sesuai data Disdukcapil',
+          createdAt: '2026-09-01T08:00:00Z',
+        },
+      ],
+      verificationLogs: [
+        {
+          id: 'log_mock_001',
+          action: 'VERIFIED',
+          performedByType: 'TEACHER',
+          performedByUserId: 'usr_guru_001',
+          actorName: 'Ahmad Fauzi, S.Pd.',
+          note: 'Rencana disetujui sesuai minat dan restu orang tua.',
+          createdAt: '2026-09-05T10:00:00Z',
+        },
+      ],
+    };
+  }
+
+  public async verifyStudentPlan(dto: VerifyPlanDTO, _token: string): Promise<VerifyPlanResult> {
+    return {
+      success: true,
+      message: dto.decision === 'verified'
+        ? 'Rencana pendidikan lanjutan siswa berhasil disetujui.'
+        : 'Catatan revisi berhasil dikirim ke siswa.',
+      result: {
+        plan_id: dto.plan_id,
+        decision: dto.decision,
+        verified_at: new Date().toISOString(),
+      },
+    };
+  }
+
+  public async getHomeroomDocumentUrl(_documentId: string, _token: string): Promise<string> {
+    return 'https://example.com/mock-student-documents/sample-verification-doc.pdf';
   }
 }
 

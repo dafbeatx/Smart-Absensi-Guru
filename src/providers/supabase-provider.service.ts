@@ -60,6 +60,13 @@ import { NotificationService } from '../services/notification-permission.service
 import { hashPin } from '../utils/hash.utils';
 import { useAuthStore } from '../store/useAuthStore';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
+import type {
+  HomeroomOverview,
+  HomeroomStudentItem,
+  StudentPlanDetail,
+  VerifyPlanDTO,
+  VerifyPlanResult,
+} from '../types/homeroom.types';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
 import { logger } from '../utils/logger.utils';
@@ -4853,6 +4860,98 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error(`Gagal menghapus nilai siswa di cloud: ${error.message}`);
     }
     return true;
+  }
+
+  // ─── HOMEROOM & STUDENT CONTINUATION PLANS API ───────────────────────────
+
+  public async getHomeroomOverview(token: string, className?: string): Promise<HomeroomOverview> {
+    const url = '/api/homeroom/overview' + (className ? `?class_name=${encodeURIComponent(className)}` : '');
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.success) {
+      throw new Error(json?.errorMessage || 'Gagal memuat ringkasan Ruang Wali Kelas.');
+    }
+
+    return json.overview;
+  }
+
+  public async getHomeroomStudents(token: string, className?: string): Promise<HomeroomStudentItem[]> {
+    const url = '/api/homeroom/students' + (className ? `?class_name=${encodeURIComponent(className)}` : '');
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.success) {
+      throw new Error(json?.errorMessage || 'Gagal memuat daftar siswa wali kelas.');
+    }
+
+    return json.students || [];
+  }
+
+  public async getStudentPlanDetail(studentId: string, token: string): Promise<StudentPlanDetail> {
+    const url = `/api/homeroom/student-detail?student_id=${encodeURIComponent(studentId)}`;
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.success) {
+      throw new Error(json?.errorMessage || 'Gagal memuat detail rencana studi siswa.');
+    }
+
+    return json.detail;
+  }
+
+  public async verifyStudentPlan(dto: VerifyPlanDTO, token: string): Promise<VerifyPlanResult> {
+    const resp = await fetch('/api/homeroom/verify-plan', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dto),
+    });
+
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.success) {
+      throw new Error(json?.errorMessage || 'Gagal mengeksekusi verifikasi rencana siswa.');
+    }
+
+    return json;
+  }
+
+  public async getHomeroomDocumentUrl(documentId: string, token: string): Promise<string> {
+    const url = `/api/homeroom/document-download?document_id=${encodeURIComponent(documentId)}`;
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.success || !json?.downloadUrl) {
+      throw new Error(json?.errorMessage || 'Gagal membuat tautan unduhan dokumen.');
+    }
+
+    return json.downloadUrl;
   }
 }
 
