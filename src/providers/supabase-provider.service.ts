@@ -96,6 +96,49 @@ export class SupabaseProvider implements IDataProvider {
   // ─── AUTHENTICATION API ───────────────────────────────────────────────────
 
   public async login(dto: LoginDTO): Promise<LoginResponseDTO> {
+    // 1. Jalur Utama: Server-Side Stateful Session Engine (/api/auth/login)
+    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identity: dto.identity,
+            pin: dto.pin,
+            device_uuid: dto.device_uuid,
+            device_model: dto.device_model,
+          }),
+        });
+
+        const json = await resp.json().catch(() => null);
+
+        if (resp.ok && json?.success && json?.token) {
+          logger.info('SupabaseProvider', 'Login berhasil diterbitkan oleh Serverless Session Engine');
+          return {
+            token: json.token,
+            user: json.user,
+          };
+        }
+
+        if (!resp.ok && json?.errorMessage) {
+          throw new Error(json.errorMessage);
+        }
+      } catch (err: any) {
+        // Jika penolakan kredensial / akun terkunci dari server, teruskan error ke UI
+        if (
+          err.message &&
+          (err.message.includes('PIN') ||
+            err.message.includes('terblokir') ||
+            err.message.includes('ditemukan') ||
+            err.message.includes('terkunci'))
+        ) {
+          throw err;
+        }
+        logger.warn('SupabaseProvider', 'Serverless login API offline/unreachable, fallback ke direct client provider', err);
+      }
+    }
+
+    // 2. Jalur Fallback (untuk testing offline/unit test runner tanpa backend server)
     const { data: user, error } = await this.client
       .from('users')
       .select('*')
@@ -111,13 +154,6 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     const hashedInputPin = await hashPin(dto.pin);
-    logger.info('SupabaseProvider', 'PIN comparison debug', {
-      storedHashPrefix: user.pin_hash ? user.pin_hash.substring(0, 8) + '...' : '(null)',
-      inputHashPrefix: hashedInputPin.substring(0, 8) + '...',
-      storedLen: user.pin_hash?.length ?? 0,
-      inputLen: hashedInputPin.length,
-      match: user.pin_hash === hashedInputPin,
-    });
     const isPinMatch = user.pin_hash === hashedInputPin || user.pin_hash === dto.pin;
 
     if (!user.pin_hash || !isPinMatch) {

@@ -29,6 +29,7 @@ import { runBarcodeExamCardTestSuite } from './__tests__/barcode-exam-card.test'
 import { runSettingsSyncTestSuite } from './__tests__/settings-sync.test';
 import { runQuestionCorrectionTestSuite } from './__tests__/question-correction.test';
 import { runPushSubscriptionSecurityTestSuite } from './__tests__/push-subscription-security.test';
+import { runAuthHardeningSessionTestSuite } from './__tests__/auth-hardening-session.test';
 
 export interface TestResultItem {
   testName: string;
@@ -95,6 +96,7 @@ export class MasterTestRunner {
       { name: 'Dynamic Settings & Realtime Branding Sync Engine', fn: runSettingsSyncTestSuite },
       { name: 'Question Correction & Grading Engine (Web-Input-Nilai)', fn: runQuestionCorrectionTestSuite },
       { name: 'Push Subscription Security & RLS Compliance', fn: runPushSubscriptionSecurityTestSuite },
+      { name: 'Authentication Hardening & Database Session Store (Phase 4.2)', fn: runAuthHardeningSessionTestSuite },
     ];
 
     let totalPassed = 0;

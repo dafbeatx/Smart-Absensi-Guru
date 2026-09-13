@@ -20,7 +20,7 @@ export interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
@@ -40,6 +40,18 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        const currentToken = get().token;
+        if (currentToken && currentToken.startsWith('saga_sess_') && typeof window !== 'undefined' && typeof window.fetch === 'function') {
+          fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${currentToken}`,
+              'Content-Type': 'application/json',
+            },
+          }).catch(() => {
+            // fire-and-forget: fail gracefully if offline
+          });
+        }
         set({
           user: null,
           token: null,
