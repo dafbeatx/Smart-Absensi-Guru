@@ -222,7 +222,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="🔍 Cari nama siswa atau NISN..."
-              className="w-full h-11 text-xs sm:text-sm pl-4 pr-10 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all placeholder:text-slate-400 bg-slate-50/80 text-slate-800"
+              className="w-full h-11 text-xs sm:text-sm pl-4 pr-10 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all bg-slate-50/80 text-slate-800"
             />
             {searchQuery && (
               <button
@@ -327,7 +327,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
               <article
                 key={s.id}
                 onClick={() => handleOpenStudentDetail(s.id)}
-                className="w-full bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs hover:border-emerald-300 hover:shadow-xs active:bg-slate-50 transition-all cursor-pointer flex flex-col gap-2.5 touch-manipulation"
+                className="w-full bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all cursor-pointer flex flex-col gap-2.5 touch-manipulation"
                 aria-label={`Pilih siswa ${s.fullName}`}
               >
                 {/* Top Row: Avatar + Name + Class & NISN */}
@@ -337,7 +337,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <h2 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug break-words">
+                      <h2 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug wrap-break-word">
                         {s.fullName}
                       </h2>
                       <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">

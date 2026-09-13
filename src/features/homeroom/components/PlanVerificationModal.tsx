@@ -112,7 +112,7 @@ export const PlanVerificationModal: React.FC<PlanVerificationModalProps> = ({
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Contoh: Lampirkan Surat Pernyataan Orang Tua terbaru atau lengkapi pilihan sekolah cadangan."
                 rows={4}
-                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all placeholder:text-slate-400"
+                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all text-slate-800"
                 required
               />
               <p className="text-[11px] text-slate-600 mt-1">
