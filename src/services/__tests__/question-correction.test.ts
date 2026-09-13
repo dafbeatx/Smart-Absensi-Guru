@@ -16,6 +16,7 @@ import {
   normalizeClassCode,
   areClassCodesEqual,
   formatClassDisplay,
+  resolveSchoolLevel,
 } from '../../utils/class.utils';
 
 export const runQuestionCorrectionTestSuite = async (): Promise<{
@@ -276,6 +277,20 @@ export const runQuestionCorrectionTestSuite = async (): Promise<{
       'Format Tampilan Kelas (formatClassDisplay): Menghasilkan label ramah pengguna',
       disp1 === 'Kelas 8A' && disp2 === 'Kelas 8A' && disp3 === 'SMA' && disp4 === '-',
       `Hasil: ${disp1}, ${disp2}, ${disp3}, ${disp4}`
+    );
+
+    // ── Test 15B: Resolusi Sinkronisasi Jenjang (resolveSchoolLevel)
+    const lvl8A = resolveSchoolLevel('8A', 'SMA'); // Bahkan jika database salah simpan 'SMA', tetap disanitasi jadi 'SMP'
+    const lvl8B = resolveSchoolLevel('Kelas VIII-A');
+    const lvl7A = resolveSchoolLevel('7A');
+    const lvl9B = resolveSchoolLevel('Kelas IX-B');
+    const lvl10 = resolveSchoolLevel('10A');
+    const lvlSMA = resolveSchoolLevel('SMA');
+    const lvlXII = resolveSchoolLevel('Kelas XII IPS');
+    assert(
+      'Resolusi Jenjang (resolveSchoolLevel): Kelas 8A murni SMP dan tidak pernah desinkronisasi menjadi SMA',
+      lvl8A === 'SMP' && lvl8B === 'SMP' && lvl7A === 'SMP' && lvl9B === 'SMP' && lvl10 === 'SMA' && lvlSMA === 'SMA' && lvlXII === 'SMA',
+      `Hasil: 8A=${lvl8A}, VIII-A=${lvl8B}, 7A=${lvl7A}, 9B=${lvl9B}, 10A=${lvl10}, SMA=${lvlSMA}`
     );
 
     // ── Test 16: State Machine Repository getSessionsWithStatus

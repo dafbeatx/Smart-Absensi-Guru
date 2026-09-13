@@ -40,7 +40,7 @@ import type {
 import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel } from '../../../utils/scoring.utils';
-import { normalizeClassCode, areClassCodesEqual } from '../../../utils/class.utils';
+import { normalizeClassCode, areClassCodesEqual, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
 
 export type ModalLoadState =
@@ -254,7 +254,10 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const previewNewKeys = useMemo(() => parseAnswerKey(keyInput), [keyInput]);
 
   // Options: A, B, C, D (and E if SMA)
-  const isSMA = (activeSession?.school_level === 'SMA') || selectedClass === 'SMA';
+  const currentLevel = activeSession
+    ? resolveSchoolLevel(activeSession.class_name, activeSession.school_level)
+    : resolveSchoolLevel(selectedClass);
+  const isSMA = currentLevel === 'SMA';
   const availableOptions = isSMA ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
 
   // Calculate live score
@@ -304,7 +307,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         class_name: sessionToUpdate.class_name,
         class_code: sessionToUpdate.class_code || normalizeClassCode(sessionToUpdate.class_name),
         owner_user_id: sessionToUpdate.owner_user_id || currentUser.id,
-        school_level: sessionToUpdate.school_level,
+        school_level: resolveSchoolLevel(sessionToUpdate.class_name, sessionToUpdate.school_level),
         answer_key: parsedKeys,
         student_list: sessionToUpdate.student_list || [],
         kkm: sessionToUpdate.kkm,
@@ -542,7 +545,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         class_name: selectedClass,
         class_code: normalizeClassCode(selectedClass),
         owner_user_id: currentUser?.id,
-        school_level: selectedClass === 'SMA' ? 'SMA' : 'SMP',
+        school_level: resolveSchoolLevel(selectedClass),
         answer_key: previewNewKeys,
         student_list: [],
         kkm: Number(kkm) || 75,
@@ -863,7 +866,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         >
                           {PREDEFINED_CLASSES.map((cls) => (
                             <option key={cls} value={cls}>
-                              Kelas {cls}
+                              {cls === 'SMA' ? 'SMA (Umum)' : `Kelas ${cls}`} ({resolveSchoolLevel(cls)})
                             </option>
                           ))}
                         </select>
@@ -1226,7 +1229,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                             <div>
                               <div className="flex items-center justify-between gap-2 mb-2">
                                 <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-slate-700 text-slate-300 rounded-md">
-                                  Kelas {sess.class_name} • {sess.school_level}
+                                  Kelas {sess.class_name} • {resolveSchoolLevel(sess.class_name, sess.school_level)}
                                 </span>
                                 <span className="text-[10px] font-bold text-teal-400">
                                   KKM {sess.kkm}

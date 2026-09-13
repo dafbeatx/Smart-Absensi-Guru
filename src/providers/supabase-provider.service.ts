@@ -73,7 +73,7 @@ import {
   sortTeachingSlots,
 } from '../utils/teaching-schedule.utils';
 import { parseAnswerKey } from '../utils/scoring.utils';
-import { normalizeClassCode } from '../utils/class.utils';
+import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -4505,7 +4505,7 @@ export class SupabaseProvider implements IDataProvider {
           class_name: d.class_name,
           class_code: d.class_code || normalizeClassCode(d.class_name),
           owner_user_id: d.owner_user_id,
-          school_level: d.school_level || (d.class_name && (d.class_name.startsWith('7') || d.class_name.startsWith('8') || d.class_name.startsWith('9')) ? 'SMP' : 'SMA'),
+          school_level: resolveSchoolLevel(d.class_name, d.school_level),
           answer_key: answerKey,
           student_list: studentList,
           scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
@@ -4539,7 +4539,7 @@ export class SupabaseProvider implements IDataProvider {
       subject: dto.subject.trim(),
       class_name: dto.class_name.trim(),
       class_code: dto.class_code || normalizeClassCode(dto.class_name),
-      school_level: dto.school_level || (dto.class_name.startsWith('7') || dto.class_name.startsWith('8') || dto.class_name.startsWith('9') ? 'SMP' : 'SMA'),
+      school_level: resolveSchoolLevel(dto.class_name, dto.school_level),
       answer_key: dto.answer_key || [],
       student_list: dto.student_list || [],
       scoring_config: dto.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },

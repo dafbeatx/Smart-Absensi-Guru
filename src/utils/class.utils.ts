@@ -76,3 +76,38 @@ export function formatClassDisplay(classInput?: string | null): string {
   }
   return canonical;
 }
+
+/**
+ * Resolves whether a class belongs to SMP or SMA deterministically.
+ * Guarantees that SMP classes (7, 8, 9, VII, VIII, IX) never get desynchronized as SMA.
+ */
+export function resolveSchoolLevel(className?: string | null, fallbackLevel?: string | null): 'SMP' | 'SMA' {
+  const raw = (className || '').trim();
+  const norm = normalizeClassCode(raw);
+
+  // 1. Definite SMP patterns: 7, 8, 9, VII, VIII, IX, or explicit SMP keyword
+  if (
+    /^[789]/.test(norm) ||
+    /^(?:kelas\s*)?(?:VII|VIII|IX)(?:\b|[^A-Z0-9]|$)/i.test(raw) ||
+    /\bSMP\b/i.test(raw)
+  ) {
+    return 'SMP';
+  }
+
+  // 2. Definite SMA/SMK patterns: 10, 11, 12, X, XI, XII, MIPA, IPS, SMK, or explicit SMA
+  if (
+    /^(?:10|11|12)/.test(norm) ||
+    /^(?:kelas\s*)?(?:X|XI|XII)(?:\b|[^A-Z0-9]|$)/i.test(raw) ||
+    /\b(?:SMA|SMK|MIPA|IPS|RPL|TKJ)\b/i.test(raw) ||
+    norm === 'SMA'
+  ) {
+    return 'SMA';
+  }
+
+  // 3. Fallback level if valid
+  const upperFallback = (fallbackLevel || '').trim().toUpperCase();
+  if (upperFallback === 'SMA') return 'SMA';
+  if (upperFallback === 'SMP') return 'SMP';
+
+  return 'SMP';
+}

@@ -60,6 +60,7 @@ import {
   validateScheduleConflict,
   sortTeachingSlots,
 } from '../utils/teaching-schedule.utils';
+import { resolveSchoolLevel } from '../utils/class.utils';
 
 const memoryStore = new Map<string, string>();
 
@@ -2923,7 +2924,12 @@ export class MockProvider implements IDataProvider {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map((s: ExamSessionRecord) => ({
+            ...s,
+            school_level: resolveSchoolLevel(s.class_name, s.school_level),
+          }));
+        }
       } catch {
         // fallback
       }
@@ -2941,7 +2947,7 @@ export class MockProvider implements IDataProvider {
       teacher: dto.teacher.trim(),
       subject: dto.subject.trim(),
       class_name: dto.class_name.trim(),
-      school_level: dto.school_level || (dto.class_name.startsWith('7') || dto.class_name.startsWith('8') || dto.class_name.startsWith('9') ? 'SMP' : 'SMA'),
+      school_level: resolveSchoolLevel(dto.class_name, dto.school_level),
       answer_key: dto.answer_key || [],
       student_list: dto.student_list || [],
       scoring_config: dto.scoring_config || {

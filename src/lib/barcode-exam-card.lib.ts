@@ -10,6 +10,7 @@ import { SIGNATORY_OFFICIALS } from './excel-generator.lib';
 import { SMP_AL_ITTIHADIYAH_LOGO_BASE64 } from '../assets/logo-smp-terpadu';
 import { SMA_AS_SALAAM_LOGO_BASE64 } from '../assets/logo-sma-terpadu';
 import type { StudentItem } from '../types/database.types';
+import { resolveSchoolLevel } from '../utils/class.utils';
 
 export type EducationLevel = 'SMP' | 'SMA';
 
@@ -52,25 +53,7 @@ export type ExamCardConfig = ExamCardRenderOptions;
  * Deteksi otomatis jenjang pendidikan (SMP vs SMA) berdasarkan nama kelas/rombel
  */
 export function detectEducationLevel(className?: string): EducationLevel {
-  if (!className) return 'SMP';
-  const raw = className.trim().toUpperCase();
-  if (raw.includes('SMP')) return 'SMP';
-  if (raw.includes('SMA') || raw.includes('SMK')) return 'SMA';
-
-  // SMA/SMK: Rombel X, XI, XII atau 10, 11, 12, jurusan MIPA, IPS, RPL, dll
-  if (
-    /^(KELAS\s*)?(X|XI|XII|10|11|12)(\b|[^A-Z0-9])/i.test(raw) ||
-    /\b(MIPA|IPS|RPL|TKJ|TBSM|OTKP|BDP)\b/i.test(raw)
-  ) {
-    return 'SMA';
-  }
-
-  // SMP: Rombel VII, VIII, IX atau 7, 8, 9
-  if (/^(KELAS\s*)?(VII|VIII|IX|7|8|9)(\b|[^A-Z0-9])/i.test(raw)) {
-    return 'SMP';
-  }
-
-  return 'SMP';
+  return resolveSchoolLevel(className);
 }
 
 /**
