@@ -269,7 +269,7 @@ export async function runNotificationVoiceOverhaulTestSuite(): Promise<TestSuite
     auth: 'mock_auth_secret',
     device_type: 'MOBILE',
   });
-  assert('MockProvider - savePushSubscription succeeds', pushSaveResult === true);
+  assert('MockProvider - savePushSubscription succeeds', (pushSaveResult as any) === true || pushSaveResult.success === true);
 
   // Batch mark as read
   const batchReadResult = await mock.markNotificationsAsRead(['notif_b1', 'notif_b2']);

@@ -56,13 +56,20 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
       setDetailedStatus(status);
       if (status === 'granted') {
         // Auto attempt to subscribe to push so device is connected to cloud
-        const subscribed = await NotificationService.subscribeUserToPush(user.id);
-        if (subscribed) {
-          const updated = await NotificationService.getDetailedStatus(user.id);
-          setDetailedStatus(updated);
-        }
+        await NotificationService.subscribeUserToPush(user.id);
+        const updated = await NotificationService.getDetailedStatus(user.id);
+        setDetailedStatus(updated);
       }
     });
+
+    const handlePushStatusEvent = (e: any) => {
+      if (e.detail?.status) {
+        setDetailedStatus(e.detail.status);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('smart_absensi_push_status_updated', handlePushStatusEvent);
+    }
 
     setChimeMuted(SoundService.getIsChimeMuted());
     setAttendanceSoundMuted(SoundService.getIsAttendanceSoundMuted());
@@ -83,6 +90,12 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
     };
 
     fetchPrefs();
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('smart_absensi_push_status_updated', handlePushStatusEvent);
+      }
+    };
   }, [isOpen, user, token]);
 
   if (!isOpen) return null;
@@ -121,9 +134,18 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
     const granted = await NotificationService.requestPermission(user.id);
     const newStatus = await NotificationService.getDetailedStatus(user.id);
     setDetailedStatus(newStatus);
-    if (granted) {
+    if (newStatus === 'subscribed') {
       setPrefs((prev) => ({ ...prev, push_enabled: true }));
-      showToast('success', 'Web Push Aktif', 'Notifikasi browser diizinkan untuk akun ini.');
+      showToast('success', 'Web Push Aktif', 'Notifikasi browser & cloud berhasil terhubung untuk akun ini.');
+    } else if (newStatus === 'subscription_failed') {
+      const lastErr = NotificationService.getLastPushSaveResult();
+      showToast(
+        'error',
+        'Notifikasi HP Belum Tersambung',
+        lastErr?.errorMessage || 'Gagal menyinkronkan Web Push subscription ke cloud database.'
+      );
+    } else if (granted) {
+      showToast('warning', 'Izin Diberikan', 'Izin peramban aktif, namun subscription cloud belum tuntas.');
     } else {
       showToast('warning', 'Izin Ditolak', 'Periksa pengaturan izin notifikasi peramban Anda.');
     }
@@ -198,6 +220,8 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                     className={`px-2.5 py-0.5 rounded-full font-black text-[10px] ${
                       detailedStatus === 'subscribed'
                         ? 'bg-emerald-100 text-emerald-800'
+                        : detailedStatus === 'subscription_failed'
+                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
                         : detailedStatus === 'denied'
                         ? 'bg-rose-100 text-rose-800'
                         : 'bg-amber-100 text-amber-800'
@@ -205,6 +229,8 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                   >
                     {detailedStatus === 'subscribed'
                       ? '✓ Terhubung Push Cloud'
+                      : detailedStatus === 'subscription_failed'
+                      ? '⚠️ Notifikasi HP belum tersambung'
                       : detailedStatus === 'granted'
                       ? 'Izin Diberikan'
                       : detailedStatus === 'denied'
@@ -213,6 +239,18 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                   </span>
                 </div>
 
+                {detailedStatus === 'subscription_failed' && (
+                  <div className="p-2.5 bg-rose-50 rounded-xl border border-rose-200 text-[11px] text-rose-800 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <span>⚠️ Notifikasi HP belum tersambung ke server cloud.</span>
+                    </div>
+                    <p className="text-[10.5px] text-rose-700 leading-relaxed">
+                      {NotificationService.getLastPushSaveResult()?.errorMessage ||
+                        'Izin notifikasi browser telah aktif, namun penyimpanan ke database cloud tertahan. Ketuk tombol coba lagi di bawah.'}
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row gap-2">
                   {detailedStatus !== 'subscribed' && (
                     <button
@@ -220,7 +258,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                       onClick={handleRequestPush}
                       className="flex-1 min-h-11 px-3.5 py-2 bg-[#0D7A5F] hover:bg-[#0b654f] text-white font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-95"
                     >
-                      🔔 Sambungkan Web Push Cloud
+                      {detailedStatus === 'subscription_failed' ? '🔄 Coba Sambungkan Lagi' : '🔔 Sambungkan Web Push Cloud'}
                     </button>
                   )}
                   <button

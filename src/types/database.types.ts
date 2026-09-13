@@ -549,6 +549,21 @@ export interface CreateEmergencyAlertDTO {
 }
 
 // Web Push Notifications Subscription
+export type PushSubscriptionErrorCode =
+  | 'TABLE_NOT_FOUND'
+  | 'RLS_DENIED'
+  | 'AUTH_SESSION_MISSING'
+  | 'INVALID_SUBSCRIPTION'
+  | 'ENDPOINT_CONFLICT'
+  | 'NETWORK_ERROR';
+
+export interface SavePushSubscriptionResult {
+  success: boolean;
+  persisted: boolean;
+  errorCode?: PushSubscriptionErrorCode;
+  errorMessage?: string;
+}
+
 export interface PushSubscriptionPayload {
   user_id: string;
   endpoint: string;
@@ -556,6 +571,7 @@ export interface PushSubscriptionPayload {
   auth: string;
   device_type?: 'MOBILE' | 'DESKTOP' | 'TABLET' | 'UNKNOWN';
   user_agent?: string;
+  last_seen_at?: string;
 }
 
 export interface PushSubscriptionRecord extends PushSubscriptionPayload {

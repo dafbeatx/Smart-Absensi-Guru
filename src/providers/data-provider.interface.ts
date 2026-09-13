@@ -28,6 +28,7 @@ import type {
   RecordStudentBehaviorResult,
   StudentCharacterSummary,
   PushSubscriptionPayload,
+  SavePushSubscriptionResult,
   NotificationPreferences,
   TeacherPointLog,
   InventorySarprasItem,
@@ -160,7 +161,7 @@ export interface IDataProvider {
   getStudentBehaviorHistory(studentName: string, className: string, token?: string): Promise<StudentBehaviorLog[]>;
 
   // Web Push Subscriptions API (VAPID)
-  savePushSubscription(subscription: PushSubscriptionPayload, token?: string): Promise<boolean>;
+  savePushSubscription(subscription: PushSubscriptionPayload, token?: string): Promise<SavePushSubscriptionResult>;
   deletePushSubscription(endpoint: string, token?: string): Promise<boolean>;
 
   // Teacher Discipline Point History API

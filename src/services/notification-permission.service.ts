@@ -7,6 +7,7 @@ import { SoundService } from './audio.service';
 import { pwaService } from './pwa.service';
 import { ProviderFactory } from '../providers/provider-factory';
 import { useAuthStore } from '../store/useAuthStore';
+import type { SavePushSubscriptionResult } from '../types/database.types';
 
 /**
  * Helper: Konversi URL-safe base64 string ke Uint8Array untuk VAPID applicationServerKey
@@ -75,6 +76,7 @@ const memoryPendingReads: Map<string, string[]> = new Map();
 class NotificationPermissionService {
   private activeCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
   private activeEarlyCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastPushSaveResult: SavePushSubscriptionResult | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -85,6 +87,20 @@ class NotificationPermissionService {
         }
       });
     }
+  }
+
+  /**
+   * Mengembalikan hasil penyimpanan push subscription terakhir
+   */
+  public getLastPushSaveResult(): SavePushSubscriptionResult | null {
+    return this.lastPushSaveResult;
+  }
+
+  /**
+   * Menetapkan hasil penyimpanan push subscription terakhir
+   */
+  public setLastPushSaveResult(result: SavePushSubscriptionResult | null): void {
+    this.lastPushSaveResult = result;
   }
 
   /**
@@ -106,7 +122,7 @@ class NotificationPermissionService {
   /**
    * Dapatkan status mendalam (unsupported, default, granted, denied, subscribed, subscription_failed)
    */
-  public async getDetailedStatus(_userId?: string): Promise<DetailedPermissionStatus> {
+  public async getDetailedStatus(userId?: string): Promise<DetailedPermissionStatus> {
     if (
       typeof window === 'undefined' ||
       !('Notification' in window) ||
@@ -126,10 +142,32 @@ class NotificationPermissionService {
       }
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        return 'subscribed';
+      if (!subscription) {
+        return 'granted';
       }
-      return 'granted';
+
+      // Verifikasi status penyimpanan ke cloud database
+      const effectiveUserId = userId || useAuthStore.getState().user?.id || 'guest';
+      let syncFailed = false;
+      try {
+        if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {
+          syncFailed = localStorage.getItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`) === 'true';
+        } else if (typeof window !== 'undefined' && (window as any).localStorage && typeof (window as any).localStorage.getItem === 'function') {
+          syncFailed = (window as any).localStorage.getItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`) === 'true';
+        }
+      } catch {
+        syncFailed = false;
+      }
+
+      if (syncFailed) {
+        return 'subscription_failed';
+      }
+
+      if (this.lastPushSaveResult && (!this.lastPushSaveResult.persisted || !this.lastPushSaveResult.success)) {
+        return 'subscription_failed';
+      }
+
+      return 'subscribed';
     } catch {
       return 'subscription_failed';
     }
@@ -646,7 +684,7 @@ class NotificationPermissionService {
       const effectiveUserId = userId || useAuthStore.getState().user?.id || 'unknown_user';
       const provider = ProviderFactory.getProvider();
 
-      await provider.savePushSubscription({
+      const saveResult = await provider.savePushSubscription({
         user_id: effectiveUserId,
         endpoint: subscription.endpoint,
         p256dh,
@@ -655,10 +693,62 @@ class NotificationPermissionService {
         user_agent: navigator.userAgent,
       });
 
+      this.lastPushSaveResult = saveResult;
+
+      if (!saveResult.success || !saveResult.persisted) {
+        console.warn(
+          '[PushManager] Web Push Subscription gagal disimpan ke database:',
+          saveResult.errorCode,
+          saveResult.errorMessage
+        );
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`, 'true');
+          localStorage.removeItem(`smart_absensi_push_cloud_synced_${effectiveUserId}`);
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('smart_absensi_push_status_updated', {
+              detail: { status: 'subscription_failed', result: saveResult },
+            })
+          );
+        }
+        return false;
+      }
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`);
+        localStorage.setItem(`smart_absensi_push_cloud_synced_${effectiveUserId}`, 'true');
+      }
+
       console.info('[PushManager] Web Push Subscription berhasil tersimpan ke database untuk user:', effectiveUserId);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('smart_absensi_push_status_updated', {
+            detail: { status: 'subscribed', result: saveResult },
+          })
+        );
+      }
       return true;
     } catch (error) {
       console.warn('[PushManager] Error mendaftarkan push subscription:', error);
+      const errResult: SavePushSubscriptionResult = {
+        success: false,
+        persisted: false,
+        errorCode: 'NETWORK_ERROR',
+        errorMessage: (error as any)?.message || 'Terjadi kesalahan saat mendaftarkan push subscription.',
+      };
+      this.lastPushSaveResult = errResult;
+      const effectiveUserId = userId || useAuthStore.getState().user?.id || 'unknown_user';
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`, 'true');
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('smart_absensi_push_status_updated', {
+            detail: { status: 'subscription_failed', result: errResult },
+          })
+        );
+      }
       return false;
     }
   }

@@ -33,6 +33,7 @@ import type {
   VerificationMethod,
   AttendanceSource,
   PushSubscriptionPayload,
+  SavePushSubscriptionResult,
   NotificationPreferences,
   TeacherPointLog,
   TeacherPointActivityType,
@@ -2564,7 +2565,15 @@ export class MockProvider implements IDataProvider {
   public async savePushSubscription(
     subscription: PushSubscriptionPayload,
     _token?: string
-  ): Promise<boolean> {
+  ): Promise<SavePushSubscriptionResult> {
+    if (!subscription || !subscription.endpoint) {
+      return {
+        success: false,
+        persisted: false,
+        errorCode: 'INVALID_SUBSCRIPTION',
+        errorMessage: 'Payload subscription tidak valid: endpoint wajib diisi.',
+      };
+    }
     const raw = safeGetStorage('smart_absensi_push_subscriptions');
     let list: PushSubscriptionPayload[] = [];
     if (raw) {
@@ -2581,7 +2590,10 @@ export class MockProvider implements IDataProvider {
       device_type: subscription.device_type || 'MOBILE',
     });
     safeSetStorage('smart_absensi_push_subscriptions', JSON.stringify(filtered));
-    return true;
+    return {
+      success: true,
+      persisted: true,
+    };
   }
 
   public async deletePushSubscription(

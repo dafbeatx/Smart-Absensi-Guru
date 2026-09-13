@@ -94,7 +94,7 @@ export async function runPWAGeofenceTestSuite(): Promise<TestSuiteResult> {
   };
 
   const saveSubSuccess = await provider.savePushSubscription(testSub);
-  assert('Push Subscription - Provider saves subscription payload successfully', saveSubSuccess === true);
+  assert('Push Subscription - Provider saves subscription payload successfully', (saveSubSuccess as any) === true || saveSubSuccess.success === true);
 
   const deleteSubSuccess = await provider.deletePushSubscription(testSub.endpoint);
   assert('Push Subscription - Provider deletes subscription endpoint successfully', deleteSubSuccess === true);

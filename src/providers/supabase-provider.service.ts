@@ -36,6 +36,8 @@ import type {
   VerificationMethod,
   AttendanceSource,
   PushSubscriptionPayload,
+  SavePushSubscriptionResult,
+  PushSubscriptionErrorCode,
   NotificationPreferences,
   TeacherPointLog,
   TeacherPointActivityType,
@@ -4024,8 +4026,131 @@ export class SupabaseProvider implements IDataProvider {
     return mockProv.getStudentBehaviorHistory(studentName, className);
   }
 
-  public async savePushSubscription(subscription: PushSubscriptionPayload, _token?: string): Promise<boolean> {
+  public async savePushSubscription(
+    subscription: PushSubscriptionPayload,
+    token?: string
+  ): Promise<SavePushSubscriptionResult> {
+    // 1. Validasi keabsahan payload subscription
+    if (
+      !subscription ||
+      !subscription.endpoint ||
+      typeof subscription.endpoint !== 'string' ||
+      !subscription.endpoint.startsWith('http')
+    ) {
+      logger.warn('SupabaseProvider', 'savePushSubscription rejected: INVALID_SUBSCRIPTION (invalid endpoint)');
+      return {
+        success: false,
+        persisted: false,
+        errorCode: 'INVALID_SUBSCRIPTION',
+        errorMessage: 'Payload subscription tidak valid: URL endpoint push service tidak valid atau kosong.',
+      };
+    }
+
+    if (!subscription.p256dh || !subscription.auth) {
+      logger.warn('SupabaseProvider', 'savePushSubscription rejected: INVALID_SUBSCRIPTION (keys missing)');
+      return {
+        success: false,
+        persisted: false,
+        errorCode: 'INVALID_SUBSCRIPTION',
+        errorMessage: 'Payload subscription tidak valid: p256dh dan auth key wajib diisi.',
+      };
+    }
+
+    // 2. Validasi ketersediaan sesi autentikasi pengguna
+    const effectiveToken = token || useAuthStore.getState().token;
+    if (!effectiveToken) {
+      logger.warn('SupabaseProvider', 'savePushSubscription rejected: AUTH_SESSION_MISSING');
+      return {
+        success: false,
+        persisted: false,
+        errorCode: 'AUTH_SESSION_MISSING',
+        errorMessage: 'Pengguna belum memiliki sesi login aktif (AUTH_SESSION_MISSING).',
+      };
+    }
+
+    // 3. Jalur Utama: Serverless Trusted Proxy (/api/push-subscriptions) dengan Service-Role
     try {
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+        const response = await fetch('/api/push-subscriptions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${effectiveToken}`,
+          },
+          body: JSON.stringify({
+            subscription: {
+              endpoint: subscription.endpoint,
+              p256dh: subscription.p256dh,
+              auth: subscription.auth,
+              device_type: subscription.device_type || 'MOBILE',
+              user_agent: subscription.user_agent || (typeof navigator !== 'undefined' ? navigator.userAgent : null),
+            },
+          }),
+        });
+
+        const resData = await response.json().catch(() => null);
+
+        if (response.ok && resData?.success) {
+          logger.info('SupabaseProvider', 'Web push subscription saved via serverless proxy for user:', subscription.user_id);
+          return {
+            success: true,
+            persisted: true,
+          };
+        }
+
+        // Tangani dan klasifikasikan error HTTP dari serverless API
+        if (response.status === 401) {
+          return {
+            success: false,
+            persisted: false,
+            errorCode: 'AUTH_SESSION_MISSING',
+            errorMessage: resData?.errorMessage || 'Token autentikasi tidak sah atau telah kedaluwarsa.',
+          };
+        }
+
+        if (response.status === 403 || resData?.errorCode === 'RLS_DENIED') {
+          return {
+            success: false,
+            persisted: false,
+            errorCode: 'RLS_DENIED',
+            errorMessage: resData?.errorMessage || 'Akses ditolak oleh kebijakan keamanan server (RLS_DENIED).',
+          };
+        }
+
+        if (response.status === 404 || resData?.errorCode === 'TABLE_NOT_FOUND') {
+          return {
+            success: false,
+            persisted: false,
+            errorCode: 'TABLE_NOT_FOUND',
+            errorMessage: resData?.errorMessage || 'Tabel push_subscriptions belum terpasang di database.',
+          };
+        }
+
+        if (response.status === 409 || resData?.errorCode === 'ENDPOINT_CONFLICT') {
+          return {
+            success: false,
+            persisted: false,
+            errorCode: 'ENDPOINT_CONFLICT',
+            errorMessage: resData?.errorMessage || 'Endpoint push telah terdaftar untuk pengguna lain.',
+          };
+        }
+
+        if (response.status === 400 || resData?.errorCode === 'INVALID_SUBSCRIPTION') {
+          return {
+            success: false,
+            persisted: false,
+            errorCode: 'INVALID_SUBSCRIPTION',
+            errorMessage: resData?.errorMessage || 'Format subscription ditolak oleh server.',
+          };
+        }
+      }
+    } catch (fetchErr: any) {
+      logger.warn('SupabaseProvider', 'Serverless proxy fetch exception:', fetchErr?.message);
+    }
+
+    // 4. Fallback Direct Supabase Client Query (jika serverless proxy tidak terjangkau)
+    try {
+      const nowIso = new Date().toISOString();
       const payload = {
         user_id: subscription.user_id,
         endpoint: subscription.endpoint,
@@ -4033,7 +4158,8 @@ export class SupabaseProvider implements IDataProvider {
         auth: subscription.auth,
         device_type: subscription.device_type || 'MOBILE',
         user_agent: subscription.user_agent || (typeof navigator !== 'undefined' ? navigator.userAgent : null),
-        updated_at: new Date().toISOString(),
+        last_seen_at: nowIso,
+        updated_at: nowIso,
       };
 
       const { error } = await this.client
@@ -4041,18 +4167,49 @@ export class SupabaseProvider implements IDataProvider {
         .upsert(payload, { onConflict: 'endpoint' });
 
       if (error) {
-        logger.warn('SupabaseProvider', 'savePushSubscription error (tabel mungkin belum dimigrasi):', error.message);
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(`smart_absensi_push_sub_${subscription.user_id}`, JSON.stringify(payload));
+        let classifiedCode: PushSubscriptionErrorCode = 'NETWORK_ERROR';
+        if (
+          error.code === '42501' ||
+          error.message?.includes('row-level security') ||
+          error.message?.includes('401')
+        ) {
+          classifiedCode = 'RLS_DENIED';
+        } else if (
+          error.code === '42P01' ||
+          error.message?.includes('relation') ||
+          error.message?.includes('does not exist')
+        ) {
+          classifiedCode = 'TABLE_NOT_FOUND';
+        } else if (
+          error.code === '23505' ||
+          error.message?.includes('unique') ||
+          error.message?.includes('conflict')
+        ) {
+          classifiedCode = 'ENDPOINT_CONFLICT';
         }
-        return false;
+
+        logger.error('SupabaseProvider', `savePushSubscription failed [${classifiedCode}]:`, error.message);
+        return {
+          success: false,
+          persisted: false,
+          errorCode: classifiedCode,
+          errorMessage: `Gagal menyimpan subscription ke database (${classifiedCode}): ${error.message}`,
+        };
       }
 
-      logger.info('SupabaseProvider', 'Web push subscription saved successfully for user:', subscription.user_id);
-      return true;
-    } catch (err) {
-      logger.error('SupabaseProvider', 'savePushSubscription exception:', err);
-      return false;
+      logger.info('SupabaseProvider', 'Web push subscription saved via direct client for user:', subscription.user_id);
+      return {
+        success: true,
+        persisted: true,
+      };
+    } catch (err: any) {
+      logger.error('SupabaseProvider', 'savePushSubscription unhandled exception:', err);
+      return {
+        success: false,
+        persisted: false,
+        errorCode: 'NETWORK_ERROR',
+        errorMessage: err?.message || 'Kendala koneksi jaringan saat menghubungi server database.',
+      };
     }
   }
 
