@@ -11,7 +11,11 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE public.gm_sessions
   ADD COLUMN IF NOT EXISTS owner_user_id TEXT REFERENCES public.users(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS class_code TEXT;
+  ADD COLUMN IF NOT EXISTS class_code TEXT,
+  ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;
+
+-- Backfill is_public agar semua sesi aktif dapat diakses
+UPDATE public.gm_sessions SET is_public = true WHERE is_public IS NULL;
 
 -- Backfill owner_user_id berdasarkan kecocokan nama guru pada public.users
 UPDATE public.gm_sessions s
@@ -161,17 +165,7 @@ USING (
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
   OR current_setting('request.jwt.claim.app_role', true) IN ('ADMIN', 'OPERATOR', 'KEPSEK')
   -- Akses Aplikasi SAG via Anon Key
-  OR (
-    auth.role() = 'anon'
-    AND (
-      owner_user_id IS NULL -- sesi warisan (legacy)
-      OR is_public = true
-      OR EXISTS (
-        SELECT 1 FROM public.users u
-        WHERE (u.id = owner_user_id OR LOWER(TRIM(u.full_name)) = LOWER(TRIM(public.gm_sessions.teacher)))
-      )
-    )
-  )
+  OR (auth.role() = 'anon')
 );
 
 -- INSERT: Guru pemilik, Admin, Operator
@@ -246,18 +240,20 @@ USING (
     WHERE s.id = public.gm_students.session_id
   )
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
+  OR (auth.role() = 'anon')
 );
 
 CREATE POLICY "gm_students_insert_policy" ON public.gm_students
 FOR INSERT
 TO public
 WITH CHECK (
-  length(trim(name)) > 0
+  (length(trim(name)) > 0
   AND EXISTS (
     SELECT 1 FROM public.gm_sessions s
     WHERE s.id = public.gm_students.session_id
-  )
+  ))
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
+  OR (auth.role() = 'anon' AND length(trim(name)) > 0)
 );
 
 CREATE POLICY "gm_students_update_policy" ON public.gm_students
@@ -269,6 +265,7 @@ USING (
     WHERE s.id = public.gm_students.session_id
   )
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
+  OR (auth.role() = 'anon')
 );
 
 CREATE POLICY "gm_students_delete_policy" ON public.gm_students
@@ -280,6 +277,7 @@ USING (
     WHERE s.id = public.gm_students.session_id
   )
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
+  OR (auth.role() = 'anon')
 );
 
 
@@ -295,6 +293,7 @@ USING (
     WHERE st.id = public.gm_answers.student_id
   )
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
+  OR (auth.role() = 'anon')
 );
 
 CREATE POLICY "gm_answers_insert_policy" ON public.gm_answers
@@ -306,6 +305,7 @@ WITH CHECK (
     WHERE st.id = public.gm_answers.student_id
   )
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
+  OR (auth.role() = 'anon')
 );
 
 CREATE POLICY "gm_answers_update_policy" ON public.gm_answers
@@ -317,6 +317,7 @@ USING (
     WHERE st.id = public.gm_answers.student_id
   )
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
+  OR (auth.role() = 'anon')
 );
 
 CREATE POLICY "gm_answers_delete_policy" ON public.gm_answers
@@ -328,6 +329,7 @@ USING (
     WHERE st.id = public.gm_answers.student_id
   )
   OR current_setting('request.jwt.claim.role', true) IN ('service_role', 'supabase_admin')
+  OR (auth.role() = 'anon')
 );
 
 

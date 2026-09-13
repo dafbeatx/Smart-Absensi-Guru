@@ -4390,6 +4390,7 @@ export class SupabaseProvider implements IDataProvider {
       academic_year: dto.academic_year || '2025/2026',
       semester: dto.semester || 'Ganjil',
       kkm: dto.kkm || 75,
+      is_public: true,
       updated_at: new Date().toISOString(),
     };
 
