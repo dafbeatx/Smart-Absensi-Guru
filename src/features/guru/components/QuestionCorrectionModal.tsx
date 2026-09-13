@@ -1811,11 +1811,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
-              <div className="flex-1 w-full min-h-[580px] sm:min-h-[640px] rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950 shadow-inner">
+              <div className="flex-1 w-full min-h-145 sm:min-h-160 rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950 shadow-inner">
                 <iframe
                   src={gradeMasterUrl}
                   title="GradeMaster Web Input Nilai"
-                  className="w-full h-full min-h-[580px] sm:min-h-[640px] border-0"
+                  className="w-full h-full min-h-145 sm:min-h-160 border-0"
                   allow="clipboard-write; clipboard-read"
                 />
               </div>
