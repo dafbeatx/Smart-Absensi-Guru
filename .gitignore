@@ -43,3 +43,8 @@ scratch/
 # =====================================
 .ai/
 .ai/**
+
+# Database SQL Migrations & Scripts
+sql/
+*.sql
+
