@@ -28,6 +28,8 @@ import {
   WifiOff,
   ShieldAlert,
   Database,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 import type {
   ExamSessionRecord,
@@ -84,8 +86,13 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const isAuthorizedRole = ['GURU', 'ADMIN', 'OPERATOR', 'KEPSEK'].includes(userRole);
   const isReadOnly = userRole === 'KEPSEK';
 
-  // Navigation active tab: 'sessions' | 'grading' | 'recap'
-  const [activeTab, setActiveTab] = useState<'sessions' | 'grading' | 'recap'>('sessions');
+  // Navigation active tab: 'sessions' | 'grading' | 'recap' | 'grademaster_web'
+  const [activeTab, setActiveTab] = useState<'sessions' | 'grading' | 'recap' | 'grademaster_web'>('sessions');
+
+  const gradeMasterUrl = useMemo(() => {
+    const teacher = encodeURIComponent(currentUser?.full_name || 'Guru');
+    return `https://web-input-nilai.vercel.app/?embed=true&teacher=${teacher}#setup`;
+  }, [currentUser?.full_name]);
 
   // Load state machine
   const [loadState, setLoadState] = useState<ModalLoadState>('LOADING_SESSIONS');
@@ -182,9 +189,9 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       loadSessions();
       setTeacherName(currentUser?.full_name || '');
     }
-  }, [isOpen, currentUser, loadSessions]);
+  }, [isOpen, currentUser?.id, loadSessions]);
 
-  // Escape key & Android Back Button integration
+  // Escape key handler & prevent body scroll
   useEffect(() => {
     if (!isOpen) return;
 
@@ -200,20 +207,13 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       }
     };
 
-    window.history.pushState({ modal: 'question_correction' }, '');
-    const handlePopState = () => {
-      onClose();
-    };
-
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('popstate', handlePopState);
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('popstate', handlePopState);
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen, isKeyEditorModalOpen, isCreatingSession, onClose]);
@@ -690,6 +690,18 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           </div>
 
           <div className="flex items-center gap-2 shrink-0 ml-2">
+            <a
+              href={gradeMasterUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 hover:text-teal-200 border border-slate-700/80 text-xs font-medium transition-colors"
+              title="Buka Web Input Nilai (GradeMaster Cloud) di Tab Baru"
+            >
+              <Globe className="w-3.5 h-3.5 text-teal-400" />
+              <span>Web Cloud</span>
+              <ExternalLink className="w-3 h-3 text-slate-400" />
+            </a>
+
             {/* Close Button */}
             <button
               type="button"
@@ -747,6 +759,22 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 </button>
               </>
             )}
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('grademaster_web')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
+                activeTab === 'grademaster_web'
+                  ? 'bg-[#18536B] text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-teal-400" />
+              <span>GradeMaster Web</span>
+              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-teal-500/20 text-teal-300 rounded border border-teal-500/30">
+                Cloud
+              </span>
+            </button>
           </div>
 
           {activeTab === 'sessions' && !isCreatingSession && !isReadOnly && (
@@ -1757,6 +1785,39 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 4: GRADEMASTER WEB EMBED (CLOUD) */}
+          {/* ========================================================================= */}
+          {activeTab === 'grademaster_web' && (
+            <div className="space-y-3 h-full flex flex-col max-w-5xl mx-auto">
+              <div className="flex items-center justify-between bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700 shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="text-xs font-medium text-slate-300 truncate">
+                    Web Input Nilai (GradeMaster Cloud) tersambung via frame resmi.
+                  </span>
+                </div>
+                <a
+                  href={gradeMasterUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shrink-0"
+                >
+                  <span>Buka Layar Penuh</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="flex-1 w-full min-h-[580px] sm:min-h-[640px] rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950 shadow-inner">
+                <iframe
+                  src={gradeMasterUrl}
+                  title="GradeMaster Web Input Nilai"
+                  className="w-full h-full min-h-[580px] sm:min-h-[640px] border-0"
+                  allow="clipboard-write; clipboard-read"
+                />
               </div>
             </div>
           )}

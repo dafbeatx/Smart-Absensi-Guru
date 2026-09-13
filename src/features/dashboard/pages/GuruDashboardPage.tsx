@@ -235,6 +235,17 @@ const LogOutIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' })
   </svg>
 );
 
+const FALLBACK_GURU_USER: UserProfile = {
+  id: 'usr_guru_sample',
+  nip: null,
+  full_name: 'Guru Utama',
+  phone_number: '081234567890',
+  role: 'GURU',
+  position: 'Guru Utama / Pendidik',
+  avatar_url: null,
+  is_active: true,
+  created_at: '2025-01-01T00:00:00.000Z',
+};
 
 export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   onOpenScanner,
@@ -246,25 +257,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const { user: authUser, token, logout, deviceUUID } = useAuthStore();
   const { showToast } = useToastStore();
 
-  const fallbackUser: UserProfile = {
-    id: 'usr_guru_sample',
-    nip: null,
-    full_name: 'Guru Utama',
-    phone_number: '081234567890',
-    role: 'GURU',
-    position: 'Guru Utama / Pendidik',
-    avatar_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-  };
-
   // Effective user: merge previewUser with authUser (prioritize authUser.avatar_url if present)
-  const effectiveUser: UserProfile = previewUser
-    ? {
+  const effectiveUser: UserProfile = useMemo(() => {
+    if (previewUser) {
+      return {
         ...previewUser,
         avatar_url: authUser?.avatar_url || previewUser.avatar_url || null,
-      }
-    : (authUser || fallbackUser);
+      };
+    }
+    return authUser || FALLBACK_GURU_USER;
+  }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
   const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE'>('HOME');
@@ -277,6 +279,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
+
+  const handleCloseQuestionCorrectionModal = useCallback(() => {
+    setIsQuestionCorrectionModalOpen(false);
+  }, []);
 
   // Change PIN Form State
   const [newPin, setNewPin] = useState('');
@@ -4777,7 +4783,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       {/* 18. Modal Koreksi Soal & Input Nilai Siswa (GradeMaster In-App) */}
       <QuestionCorrectionModal
         isOpen={isQuestionCorrectionModalOpen}
-        onClose={() => setIsQuestionCorrectionModalOpen(false)}
+        onClose={handleCloseQuestionCorrectionModal}
         currentUser={effectiveUser}
       />
 
