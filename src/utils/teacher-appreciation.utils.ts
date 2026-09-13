@@ -70,6 +70,10 @@ export function calculateTeacherAppreciationScore(
     return Boolean(timeClean && timeClean <= '07:00');
   }).length;
 
+  const rawCheckOutCount = attendanceHistory.filter((r) => Boolean(r.check_out_time)).length;
+  const historyCheckOutCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_OUT').length;
+  const checkOutCount = Math.max(rawCheckOutCount, historyCheckOutCount);
+
   const hadirTepatWaktuCount = Math.max(rawHadirTepatWaktuCount, historyOnTimeCount);
   const terlambatCount = Math.max(rawTerlambatCount, historyLateCount);
   const piketCount = Math.max(rawPiketCount, historyPiketCount);
@@ -77,18 +81,20 @@ export function calculateTeacherAppreciationScore(
   const streakCount = historyStreakCount;
   const totalMasukFisik = hadirTepatWaktuCount + terlambatCount;
 
-  // Points Formula: Murni kehadiran fisik nyata + bonus kedisiplinan
+  // Points Formula: Murni kehadiran fisik nyata + presensi pulang + tugas piket + bonus kedisiplinan
   // - Hadir Tepat Waktu: +15 Poin
   // - Hadir Terlambat: +5 Poin
+  // - Presensi Pulang Tuntas Bertugas: +10 Poin per kepulangan
   // - Tugas Piket: +10 Poin per hari tugas piket
   // - Teladan Fajar (≤ 07:00 WIB): +5 Poin
   // - Bonus Konsistensi Streak 5 Hari: +10 Poin
   // - Penalti ALFA: -10 Poin per kejadian
   const attendancePoints = hadirTepatWaktuCount * 15 + terlambatCount * 5;
+  const checkOutPoints = checkOutCount * 10;
   const dutyPoints = piketCount * 10;
   const bonusPoints = earlyBirdCount * 5 + streakCount * 10;
   const alfaPenalty = alfaCount * 10;
-  const calculatedPoints = Math.max(0, attendancePoints + dutyPoints + bonusPoints - alfaPenalty);
+  const calculatedPoints = Math.max(0, attendancePoints + checkOutPoints + dutyPoints + bonusPoints - alfaPenalty);
 
   // Jika riwayat transaksi poin bulanan tersedia, gunakan akumulasi ledger poin bulan berjalan
   const totalPoints = (monthlyPointLogs.length > 0)
@@ -223,24 +229,25 @@ export interface TeacherDisciplineLeaderboardResult {
  */
 export function getTeacherDisciplineLeaderboard(
   currentUser: { id?: string; full_name?: string; nip?: string | null; position?: string; avatar_url?: string | null; phone_number?: string } | null,
-  currentUserScore: TeacherAppreciationScore,
+  currentUserScore?: TeacherAppreciationScore | null,
   period: DisciplinePeriodType = 'CURRENT_MONTH',
   allPointLogs?: TeacherPointLog[]
 ): TeacherDisciplineLeaderboardResult {
   const isCurrent = period === 'CURRENT_MONTH';
 
-  // 1. Data Riil Bulan Berjalan (September 2026, s/d Hari ke-7 • 5 Hari Kerja Efektif)
-  //    Formula: Hadir=15, Telat=5, Piket=10, EarlyBird(≤07:00)=5, Streak=10, Sakit/Izin/Cuti=0, Alfa=-10.
+  // 1. Data Riil Bulan Berjalan (September 2026, s/d Hari ke-9 • 7 Hari Kerja Efektif)
+  //    Formula: Hadir=15, Telat=5, Pulang=10, Piket=10, EarlyBird(≤07:00)=5, Streak=10, Sakit/Izin/Cuti=0, Alfa=-10.
+  //    100% sinkron dengan buku besar poin ledger database & generateSeedTeacherPointLogs.
   const currentMonthTeachers: TeacherLeaderboardItem[] = [
     {
       id: 'usr_guru_002',
       name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
       nip: '19880512 201503 1 002',
       position: 'Wakasek Sarana dan Prasarana',
-      totalPoints: 100, // 5 Hadir (75) + 1 Piket (10) + 1 Early Bird (5) + 1 Streak (10)
+      totalPoints: 150, // 7 Hadir (105) + 1 Piket (10) + 1 Early Bird (5) + 1 Streak (10) + 2 Pulang (20)
       level: '🏆 Pendidik Teladan Utama',
       rank: 1,
-      hadirTepatWaktuCount: 5,
+      hadirTepatWaktuCount: 7,
       terlambatCount: 0,
       piketCount: 1,
       earlyBirdCount: 1,
@@ -252,10 +259,10 @@ export function getTeacherDisciplineLeaderboard(
       name: 'Widianingsih, S.Si., G.r',
       nip: '19920311 202002 2 006',
       position: 'Guru Mapel IPA',
-      totalPoints: 95, // 5 Hadir (75) + 1 Piket (10) + 1 Streak (10)
+      totalPoints: 145, // 7 Hadir (105) + 1 Piket (10) + 1 Streak (10) + 2 Pulang (20)
       level: '🏆 Pendidik Teladan Utama',
       rank: 2,
-      hadirTepatWaktuCount: 5,
+      hadirTepatWaktuCount: 7,
       terlambatCount: 0,
       piketCount: 1,
       earlyBirdCount: 0,
@@ -267,10 +274,10 @@ export function getTeacherDisciplineLeaderboard(
       name: 'Septi Nur Aeni, S.E',
       nip: '19921105 202102 2 009',
       position: 'Guru Mapel B. Indonesia',
-      totalPoints: 95, // 5 Hadir (75) + 1 Piket (10) + 1 Streak (10)
+      totalPoints: 145, // 7 Hadir (105) + 1 Piket (10) + 1 Streak (10) + 2 Pulang (20)
       level: '🏆 Pendidik Teladan Utama',
       rank: 3,
-      hadirTepatWaktuCount: 5,
+      hadirTepatWaktuCount: 7,
       terlambatCount: 0,
       piketCount: 1,
       earlyBirdCount: 0,
@@ -278,57 +285,48 @@ export function getTeacherDisciplineLeaderboard(
       topBadge: { icon: '🌟', title: '100% Kehadiran Sempurna' },
     },
     {
-      id: 'usr_guru_004',
-      name: 'Mira Nurdianti, S.Pd',
-      nip: '19950117 202303 2 010',
-      position: 'Tata Usaha (TU)',
-      totalPoints: 80, // 4 Hadir (60) + 1 Telat (5) + 1 Piket (10) + 1 Early Bird (5)
-      level: '🥇 Pendidik Disiplin Emas',
-      rank: 4,
-      hadirTepatWaktuCount: 4,
-      terlambatCount: 1,
-      piketCount: 1,
-      earlyBirdCount: 1,
-      streakCount: 0,
-      topBadge: { icon: '🛡️', title: 'Piket Responsif & Teladan' },
-    },
-    {
-      id: 'usr_1786512137742',
-      name: 'Ridho Maulana Al Farizi',
-      nip: null,
-      position: 'Guru Mapel Akhlak lil Banin',
-      totalPoints: 75, // 4 Hadir (60) + 1 Telat (5) + 1 Piket (10)
-      level: '🥇 Pendidik Disiplin Emas',
-      rank: 5,
-      hadirTepatWaktuCount: 4,
-      terlambatCount: 1,
-      piketCount: 1,
-      topBadge: { icon: '🎖️', title: 'Garda Disiplin Waktu' },
-    },
-    {
       id: 'usr_guru_003',
       name: 'Adi Prasetyo, S.Pd., G.r',
       nip: '19890918 201801 1 003',
       position: 'Guru Mapel Bahasa Inggris',
-      totalPoints: 70, // 4 Hadir (60) + 0 Telat + 1 Izin (0) + 1 Piket (10)
+      totalPoints: 120, // 6 Hadir (90) + 2 Pulang (20) + 2 Piket (20) - 1 izin hari ke-3
       level: '🥇 Pendidik Disiplin Emas',
-      rank: 6,
-      hadirTepatWaktuCount: 4,
+      rank: 4,
+      hadirTepatWaktuCount: 6,
       terlambatCount: 0,
-      piketCount: 1,
+      piketCount: 2,
+      earlyBirdCount: 0,
+      streakCount: 0,
       topBadge: { icon: '🎖️', title: 'Guru Terdisiplin Waktu' },
+    },
+    {
+      id: 'usr_guru_004',
+      name: 'Mira Nurdianti, S.Pd',
+      nip: '19950117 202303 2 010',
+      position: 'Tata Usaha (TU)',
+      totalPoints: 120, // 5 Hadir (75) + 2 Telat (10) + 2 Pulang (20) + 2 Piket (20) + 1 Early Bird (5) - 1 Alfa (10)
+      level: '🥇 Pendidik Disiplin Emas',
+      rank: 5,
+      hadirTepatWaktuCount: 5,
+      terlambatCount: 2,
+      piketCount: 2,
+      earlyBirdCount: 1,
+      streakCount: 0,
+      topBadge: { icon: '🛡️', title: 'Piket Responsif & Teladan' },
     },
     {
       id: 'usr_admin_001',
       name: 'Dafa Maulana, S.Pd',
       nip: null,
       position: 'Guru Mapel Informatika',
-      totalPoints: 55, // 2 Hadir (30) + 3 Telat (15) + 1 Piket (10)
-      level: '🥈 Pendidik Berdedikasi',
-      rank: 7,
-      hadirTepatWaktuCount: 2,
-      terlambatCount: 3,
+      totalPoints: 95, // 3 Hadir (45) + 4 Telat (20) + 2 Pulang (20) + 1 Piket (10)
+      level: '🏆 Pendidik Teladan Utama',
+      rank: 6,
+      hadirTepatWaktuCount: 3,
+      terlambatCount: 4,
       piketCount: 1,
+      earlyBirdCount: 0,
+      streakCount: 0,
       topBadge: { icon: '🛡️', title: 'Piket Responsif & Teladan' },
     },
     {
@@ -336,12 +334,14 @@ export function getTeacherDisciplineLeaderboard(
       name: 'Fitri Ani Rahayu, S.Mat',
       nip: '19931201 202103 2 007',
       position: 'Wakasek Kesiswaan',
-      totalPoints: 50, // 2 Hadir (30) + 2 Telat (10) + 1 Sakit (0) + 1 Piket (10)
+      totalPoints: 60, // 1 Hadir (15) + 2 Telat (10) + 2 Pulang (20) + 1 Early Bird (5) + 1 Piket (10)
       level: '🥈 Pendidik Berdedikasi',
-      rank: 8,
-      hadirTepatWaktuCount: 2,
+      rank: 7,
+      hadirTepatWaktuCount: 1,
       terlambatCount: 2,
       piketCount: 1,
+      earlyBirdCount: 1,
+      streakCount: 0,
       topBadge: { icon: '🎖️', title: 'Guru Berdedikasi' },
     },
     {
@@ -349,12 +349,14 @@ export function getTeacherDisciplineLeaderboard(
       name: 'Mawar Andinia, S.Pd., G.r',
       nip: '19940725 202201 2 008',
       position: 'Bimbingan Konseling (BK)',
-      totalPoints: 50, // 2 Hadir (30) + 2 Telat (10) + 1 Sakit (0) + 1 Piket (10)
-      level: '🥈 Pendidik Berdedikasi',
-      rank: 9,
-      hadirTepatWaktuCount: 2,
-      terlambatCount: 2,
+      totalPoints: 45, // 0 Hadir (0) + 3 Telat (15) + 2 Pulang (20) + 1 Piket (10)
+      level: '🥉 Pendidik Berkomitmen',
+      rank: 8,
+      hadirTepatWaktuCount: 0,
+      terlambatCount: 3,
       piketCount: 1,
+      earlyBirdCount: 0,
+      streakCount: 0,
       topBadge: { icon: '💚', title: 'Kesejahteraan & Self-Care' },
     },
     {
@@ -362,25 +364,44 @@ export function getTeacherDisciplineLeaderboard(
       name: 'Nurul Fahriya, S.Pd., G.r',
       nip: '19910415 201902 2 004',
       position: 'Wakasek Kurikulum',
-      totalPoints: 35, // 2 Hadir (30) + 1 Telat (5) + 2 Sakit (0) + 0 Piket (0)
+      totalPoints: 35, // 0 Hadir (0) + 3 Telat (15) + 2 Pulang (20)
+      level: '🥉 Pendidik Berkomitmen',
+      rank: 9,
+      hadirTepatWaktuCount: 0,
+      terlambatCount: 3,
+      piketCount: 0,
+      earlyBirdCount: 0,
+      streakCount: 0,
+      topBadge: { icon: '💚', title: 'Kesejahteraan & Self-Care' },
+    },
+    {
+      id: 'usr_1786512137742',
+      name: 'Ridho Maulana Al Farizi',
+      nip: null,
+      position: 'Guru Mapel Akhlak lil Banin',
+      totalPoints: 25, // 0 Hadir (0) + 3 Telat (15) + 1 Pulang (10)
       level: '🥉 Pendidik Berkomitmen',
       rank: 10,
-      hadirTepatWaktuCount: 2,
-      terlambatCount: 1,
+      hadirTepatWaktuCount: 0,
+      terlambatCount: 3,
       piketCount: 0,
-      topBadge: { icon: '💚', title: 'Kesejahteraan & Self-Care' },
+      earlyBirdCount: 0,
+      streakCount: 0,
+      topBadge: { icon: '🎖️', title: 'Garda Disiplin Waktu' },
     },
     {
       id: 'usr_op_002',
       name: 'Qodiatul Asrof Ramadhoni, S.E., G.r',
       nip: '19940608 202202 1 005',
       position: 'Operator Sekolah',
-      totalPoints: 5, // 0 Hadir + 1 Telat (5) + 4 Tanpa Keterangan / Belum Absen (0)
+      totalPoints: 5, // 0 Hadir + 1 Telat (5)
       level: '🥉 Pendidik Berkomitmen',
       rank: 11,
       hadirTepatWaktuCount: 0,
       terlambatCount: 1,
       piketCount: 0,
+      earlyBirdCount: 0,
+      streakCount: 0,
       topBadge: { icon: '⏱️', title: 'Evaluasi Disiplin' },
     },
     {
@@ -394,6 +415,8 @@ export function getTeacherDisciplineLeaderboard(
       hadirTepatWaktuCount: 0,
       terlambatCount: 0,
       piketCount: 0,
+      earlyBirdCount: 0,
+      streakCount: 0,
       topBadge: { icon: '🏖️', title: 'Sedang Cuti Resmi' },
     },
   ];
@@ -613,16 +636,40 @@ export function getTeacherDisciplineLeaderboard(
 
     if (matchedIdx !== -1) {
       if (isCurrent) {
+        // Jangan timpa poin jika currentUserScore kosong atau bernilai 0 sementara data guru sudah memiliki poin riil
+        const hasValidUserScore = Boolean(currentUserScore && currentUserScore.totalPoints > 0);
+        const resolvedTotalPoints = hasValidUserScore
+          ? currentUserScore!.totalPoints
+          : teachers[matchedIdx].totalPoints;
+        const resolvedLevel = hasValidUserScore && currentUserScore?.level
+          ? currentUserScore.level
+          : teachers[matchedIdx].level;
+        const resolvedOnTime = hasValidUserScore && currentUserScore?.hadirTepatWaktuCount !== undefined
+          ? currentUserScore.hadirTepatWaktuCount
+          : teachers[matchedIdx].hadirTepatWaktuCount;
+        const resolvedLate = hasValidUserScore && currentUserScore?.terlambatCount !== undefined
+          ? currentUserScore.terlambatCount
+          : teachers[matchedIdx].terlambatCount;
+        const resolvedPiket = hasValidUserScore && currentUserScore?.piketCount !== undefined
+          ? currentUserScore.piketCount
+          : teachers[matchedIdx].piketCount;
+        const resolvedEarlyBird = hasValidUserScore && currentUserScore?.earlyBirdCount !== undefined
+          ? currentUserScore.earlyBirdCount
+          : (teachers[matchedIdx].earlyBirdCount ?? 0);
+        const resolvedStreak = hasValidUserScore && currentUserScore?.streakCount !== undefined
+          ? currentUserScore.streakCount
+          : (teachers[matchedIdx].streakCount ?? 0);
+
         teachers[matchedIdx] = {
           ...teachers[matchedIdx],
-          totalPoints: currentUserScore?.totalPoints ?? 0,
-          level: currentUserScore?.level || '🥉 Pendidik Berkomitmen',
-          hadirTepatWaktuCount: currentUserScore?.hadirTepatWaktuCount ?? 0,
-          terlambatCount: currentUserScore?.terlambatCount ?? 0,
-          piketCount: currentUserScore?.piketCount ?? 0,
-          earlyBirdCount: currentUserScore?.earlyBirdCount ?? teachers[matchedIdx].earlyBirdCount ?? 0,
-          streakCount: currentUserScore?.streakCount ?? teachers[matchedIdx].streakCount ?? 0,
-          topBadge: { icon: activeBadge.icon, title: activeBadge.title },
+          totalPoints: resolvedTotalPoints,
+          level: resolvedLevel,
+          hadirTepatWaktuCount: resolvedOnTime,
+          terlambatCount: resolvedLate,
+          piketCount: resolvedPiket,
+          earlyBirdCount: resolvedEarlyBird,
+          streakCount: resolvedStreak,
+          topBadge: activeBadge ? { icon: activeBadge.icon, title: activeBadge.title } : teachers[matchedIdx].topBadge,
           avatar_url: currentUser.avatar_url || teachers[matchedIdx].avatar_url,
           isCurrentUser: true,
         };

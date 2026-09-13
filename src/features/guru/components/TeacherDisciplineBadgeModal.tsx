@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { TeacherAppreciationScore, UserProfile, TeacherPointLog } from '../../../types/database.types';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import { TeacherPointHistoryModal } from './TeacherPointHistoryModal';
 import {
   getTeacherDisciplineLeaderboard,
@@ -90,9 +92,17 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     if (!isOpen) return;
     const fetchPoints = async () => {
       try {
+        const token = useAuthStore.getState().token || undefined;
         const provider = ProviderFactory.getProvider();
-        const logs = await provider.getTeacherPointHistory('ALL');
-        setAllPointLogs(logs || []);
+        const logs = await provider.getTeacherPointHistory('ALL', token);
+        if (logs && logs.length > 0) {
+          setAllPointLogs(logs);
+        }
+        // Rekonsiliasi idempoten seluruh guru agar poin kehadiran fisik selalu 100% mutakhir
+        const reconciled = await TeacherPointReconciliationService.reconcileAllTeachers(token);
+        if (reconciled && reconciled.length > 0) {
+          setAllPointLogs(reconciled);
+        }
       } catch (e) {
         console.warn('Failed to load point logs in modal:', e);
       }
@@ -130,27 +140,16 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
   const handleOpenPointHistory = async (t: any) => {
     setPointHistoryTeacher(t);
+    const token = useAuthStore.getState().token || undefined;
     const provider = ProviderFactory.getProvider();
     try {
-      const logs = await provider.getTeacherPointHistory(t.id);
+      const logs = await provider.getTeacherPointHistory(t.id, token);
       setTeacherLogs(logs || []);
     } catch {
       setTeacherLogs(allPointLogs.filter((l) => l.user_id === t.id));
     }
     setIsPointHistoryModalOpen(true);
   };
-
-  const defaultScore: TeacherAppreciationScore = useMemo(() => ({
-    totalPoints: 0,
-    level: 'Pendidik',
-    nextLevelPoints: 50,
-    levelProgressPercent: 0,
-    hadirTepatWaktuCount: 0,
-    terlambatCount: 0,
-    piketCount: 0,
-    moodCheckinCount: 0,
-    badges: [],
-  }), []);
 
   const {
     leaderboard,
@@ -160,11 +159,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   } = useMemo(() => {
     return getTeacherDisciplineLeaderboard(
       currentUser,
-      currentUserScore || defaultScore,
+      currentUserScore || null,
       selectedPeriod,
       allPointLogs
     );
-  }, [currentUser, currentUserScore, defaultScore, selectedPeriod, allPointLogs]);
+  }, [currentUser, currentUserScore, selectedPeriod, allPointLogs]);
 
   // Filtered leaderboard for fullscreen
   const filteredLeaderboard = useMemo(() => {

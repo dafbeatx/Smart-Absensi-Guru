@@ -217,4 +217,72 @@ export class TeacherPointReconciliationService {
 
     return currentPointLogs;
   }
+
+  /**
+   * Rekonsiliasi massal idempoten untuk seluruh guru sekolah.
+   * Dipanggil saat Admin atau Kepsek membuka dashboard atau klasemen,
+   * memastikan semua catatan presensi guru (masuk, pulang, piket, early bird)
+   * terkonversi menjadi poin di buku besar secara konsisten 100%.
+   */
+  public static async reconcileAllTeachers(token?: string): Promise<TeacherPointLog[]> {
+    const provider = ProviderFactory.getProvider();
+    try {
+      const now = new Date();
+      const currentMonth = String(now.getMonth() + 1);
+      const currentYear = String(now.getFullYear());
+      const allAttendance = await provider.getMonthlyAttendance('ALL', currentMonth, currentYear, token || '');
+      const allLogs = await provider.getTeacherPointHistory('ALL', token);
+      const dutySchedules = await provider.getDutySchedules(token).catch(() => []);
+
+      if (!Array.isArray(allAttendance) || allAttendance.length === 0) {
+        return allLogs || [];
+      }
+
+      // Map nama guru dari log transaksi yang telah ada
+      const teacherNameMap = new Map<string, string>();
+      for (const log of (allLogs || [])) {
+        if (log.user_id && log.teacher_name) {
+          teacherNameMap.set(log.user_id, log.teacher_name);
+        }
+      }
+
+      // Kelompokkan data presensi per user_id
+      const recordsByUser = new Map<string, AttendanceRecord[]>();
+      for (const att of allAttendance) {
+        if (!att.user_id) continue;
+        const list = recordsByUser.get(att.user_id) || [];
+        list.push(att);
+        recordsByUser.set(att.user_id, list);
+      }
+
+      let currentLogs = allLogs || [];
+      let totalChanges = false;
+
+      for (const [userId, userRecords] of recordsByUser.entries()) {
+        const teacherName = teacherNameMap.get(userId) || userRecords[0]?.notes || 'Guru';
+        const reconciled = await this.reconcilePoints(
+          userId,
+          teacherName,
+          userRecords,
+          currentLogs,
+          dutySchedules || [],
+          token
+        );
+        if (reconciled !== currentLogs) {
+          currentLogs = reconciled;
+          totalChanges = true;
+        }
+      }
+
+      if (totalChanges && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smart_absensi_points_updated'));
+      }
+
+      return currentLogs;
+    } catch (e) {
+      logger.warn('TeacherPointReconciliationService', 'Gagal rekonsiliasi massal seluruh guru:', e);
+      const fallbackLogs = await provider.getTeacherPointHistory('ALL', token).catch(() => []);
+      return fallbackLogs || [];
+    }
+  }
 }

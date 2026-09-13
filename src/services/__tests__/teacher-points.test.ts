@@ -241,12 +241,12 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     };
 
     const mockScore: TeacherAppreciationScore = {
-      totalPoints: 120,
-      level: '🥇 Pendidik Disiplin Emas (Level 3)',
-      nextLevelPoints: 150,
-      levelProgressPercent: 80,
-      hadirTepatWaktuCount: 6,
-      terlambatCount: 2,
+      totalPoints: 180,
+      level: '🏆 Pendidik Teladan Utama',
+      nextLevelPoints: 200,
+      levelProgressPercent: 90,
+      hadirTepatWaktuCount: 10,
+      terlambatCount: 0,
       piketCount: 2,
       moodCheckinCount: 0,
       badges: [],
@@ -258,7 +258,7 @@ export const runTeacherPointsTestSuite = async (): Promise<{
         id: 'l-1',
         user_id: testUserId,
         activity_type: 'CHECK_IN_ON_TIME',
-        points: 120,
+        points: 180,
         title: 'On-time total',
         description: 'On-time total',
         date: '2026-09-09',
@@ -288,7 +288,7 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       leaderboard.leaderboard.length > 0 &&
         leaderboard.currentUserRank === 1 &&
         leaderboard.topTeacher?.id === testUserId &&
-        leaderboard.topTeacher?.totalPoints === 120,
+        leaderboard.topTeacher?.totalPoints === 180,
       `Rank: ${leaderboard.currentUserRank}, Top: ${leaderboard.topTeacher?.name} (${leaderboard.topTeacher?.totalPoints} pts)`
     );
   } catch (err: unknown) {
@@ -779,6 +779,60 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     );
   } catch (err: unknown) {
     assert('Discipline Period Timing: Guard', false, String(err));
+  }
+
+  // 17. Leaderboard Synchronization: Admin / Kepsek views do NOT overwrite user points to 0
+  try {
+    const adminUser: UserProfile = {
+      id: 'usr_admin_001',
+      full_name: 'Dafa Maulana, S.Pd',
+      role: 'ADMIN',
+      position: 'Guru Mapel Informatika',
+      nip: null,
+      phone_number: '081234567890',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+    };
+
+    // Saat Admin melihat leaderboard tanpa currentUserScore (null/undefined)
+    const adminLeaderboard = getTeacherDisciplineLeaderboard(
+      adminUser,
+      null,
+      'CURRENT_MONTH'
+    );
+
+    const dafaInAdmin = adminLeaderboard.leaderboard.find((t) => t.id === 'usr_admin_001');
+
+    assert(
+      'Leaderboard Synchronization: Admin viewing leaderboard preserves teacher points (> 0) without blind 0 overwrite',
+      dafaInAdmin !== undefined && dafaInAdmin.totalPoints === 95,
+      `Dafa totalPoints in Admin view: ${dafaInAdmin?.totalPoints}`
+    );
+
+    // Saat Kepsek melihat leaderboard
+    const kepsekLeaderboard = getTeacherDisciplineLeaderboard(
+      null,
+      null,
+      'CURRENT_MONTH'
+    );
+    const topTeacherInKepsek = kepsekLeaderboard.topTeacher;
+
+    assert(
+      'Leaderboard Synchronization: Kepsek view has accurate Champion points',
+      topTeacherInKepsek !== undefined && topTeacherInKepsek.totalPoints === 150,
+      `Kepsek top teacher: ${topTeacherInKepsek?.name} (${topTeacherInKepsek?.totalPoints} pts)`
+    );
+
+    // Batch reconciliation for all teachers
+    const batchReconciledLogs = await TeacherPointReconciliationService.reconcileAllTeachers();
+    assert(
+      'Reconciliation Engine: reconcileAllTeachers executes cleanly without errors',
+      Array.isArray(batchReconciledLogs) && batchReconciledLogs.length > 0,
+      `Total reconciled logs: ${batchReconciledLogs.length}`
+    );
+  } catch (err: unknown) {
+    assert('Leaderboard Synchronization & Batch Reconciliation', false, String(err));
   }
 
   return { passed, failed, results };

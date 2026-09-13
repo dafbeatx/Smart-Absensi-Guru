@@ -29,6 +29,7 @@ import { KepsekRewardSuggestionModal } from '../components/KepsekRewardSuggestio
 import { TeacherExcellenceCertificateModal } from '../../guru/components/TeacherExcellenceCertificateModal';
 import { SarprasExecutiveView } from '../../sarpras/components/SarprasExecutiveView';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
+import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import {
   getTeacherDisciplineLeaderboard,
   type TeacherLeaderboardItem,
@@ -97,9 +98,17 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   useEffect(() => {
     const fetchPointLogs = async () => {
       try {
+        const token = useAuthStore.getState().token || undefined;
         const provider = ProviderFactory.getProvider();
-        const logs = await provider.getTeacherPointHistory('ALL');
-        setAllTeacherPointLogs(logs || []);
+        const logs = await provider.getTeacherPointHistory('ALL', token);
+        if (logs && logs.length > 0) {
+          setAllTeacherPointLogs(logs);
+        }
+        // Rekonsiliasi idempoten seluruh guru agar poin kehadiran fisik selalu 100% mutakhir
+        const reconciled = await TeacherPointReconciliationService.reconcileAllTeachers(token);
+        if (reconciled && reconciled.length > 0) {
+          setAllTeacherPointLogs(reconciled);
+        }
       } catch (err) {
         console.warn('Gagal memuat buku besar poin guru:', err);
       }
@@ -113,18 +122,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   useEffect(() => {
     const res = getTeacherDisciplineLeaderboard(
       null,
-      {
-        totalPoints: 0,
-        level: '',
-        nextLevelPoints: 0,
-        levelProgressPercent: 0,
-        hadirTepatWaktuCount: 0,
-        terlambatCount: 0,
-        piketCount: 0,
-        moodCheckinCount: 0,
-        badges: [],
-        pointHistory: [],
-      },
+      null,
       'CURRENT_MONTH',
       allTeacherPointLogs
     );
