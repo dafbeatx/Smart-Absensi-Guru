@@ -875,6 +875,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         onClose={() => setIsLeaderboardModalOpen(false)}
         currentUser={user}
         isFullscreen={true}
+        allRegisteredTeachers={teachers}
       />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}

@@ -231,7 +231,8 @@ export function getTeacherDisciplineLeaderboard(
   currentUser: { id?: string; full_name?: string; nip?: string | null; position?: string; avatar_url?: string | null; phone_number?: string } | null,
   currentUserScore?: TeacherAppreciationScore | null,
   period: DisciplinePeriodType = 'CURRENT_MONTH',
-  allPointLogs?: TeacherPointLog[]
+  allPointLogs?: TeacherPointLog[],
+  allRegisteredTeachers?: Array<{ id?: string; nip?: string | null; full_name?: string; avatar_url?: string | null }> | null
 ): TeacherDisciplineLeaderboardResult {
   const isCurrent = period === 'CURRENT_MONTH';
 
@@ -766,6 +767,55 @@ export function getTeacherDisciplineLeaderboard(
     };
   });
 
+  // 6. Resolusi Foto Profil Guru yang diset oleh Admin (Sinkronisasi Antar-Perangkat Realtime)
+  let registeredProfiles: Array<{ id?: string; nip?: string | null; full_name?: string; avatar_url?: string | null }> = [];
+  if (allRegisteredTeachers && allRegisteredTeachers.length > 0) {
+    registeredProfiles = allRegisteredTeachers;
+  } else if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('smart_absensi_teachers') || localStorage.getItem('smart_absensi_cached_teachers_v2');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          registeredProfiles = parsed;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  teachers = teachers.map((t) => {
+    let resolvedAvatar = t.avatar_url || null;
+
+    if (registeredProfiles.length > 0) {
+      const matched = registeredProfiles.find(
+        (p) =>
+          (p.id && t.id === p.id) ||
+          (p.nip && t.nip && p.nip.replace(/\s+/g, '') === t.nip.replace(/\s+/g, '')) ||
+          (p.full_name && t.name && p.full_name.trim().toLowerCase() === t.name.trim().toLowerCase())
+      );
+      if (matched && matched.avatar_url) {
+        resolvedAvatar = matched.avatar_url;
+      }
+    }
+
+    if (currentUser && currentUser.avatar_url) {
+      const isMe =
+        (currentUser.id && t.id === currentUser.id) ||
+        (currentUser.nip && t.nip && currentUser.nip.replace(/\s+/g, '') === t.nip.replace(/\s+/g, '')) ||
+        (currentUser.full_name && t.name && currentUser.full_name.trim().toLowerCase() === t.name.trim().toLowerCase());
+      if (isMe) {
+        resolvedAvatar = currentUser.avatar_url;
+      }
+    }
+
+    return {
+      ...t,
+      avatar_url: resolvedAvatar,
+    };
+  });
+
   const topTeacher = teachers[0] || {
     id: 'usr_default',
     name: 'Guru Pendidik',
@@ -777,6 +827,7 @@ export function getTeacherDisciplineLeaderboard(
     terlambatCount: 0,
     piketCount: 0,
     topBadge: { icon: '🏆', title: 'Pendidik Teladan Utama Kepsek' },
+    avatar_url: null,
   };
   const currentUserIdx = teachers.findIndex((t) => t.isCurrentUser);
   const currentUserRank = currentUserIdx !== -1 ? currentUserIdx + 1 : 1;

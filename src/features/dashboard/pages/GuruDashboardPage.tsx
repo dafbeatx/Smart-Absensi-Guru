@@ -349,6 +349,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
   const [pointHistory, setPointHistory] = useState<TeacherPointLog[]>([]);
   const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>([]);
+  const [allRegisteredTeachers, setAllRegisteredTeachers] = useState<UserProfile[]>(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_teachers') : null;
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [isStudentBehaviorModalOpen, setIsStudentBehaviorModalOpen] = useState(false);
   const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
@@ -709,6 +717,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         let teacherList: UserProfile[] = savedTeachersStr ? JSON.parse(savedTeachersStr) : [];
         if (!Array.isArray(teacherList) || teacherList.length === 0) {
           teacherList = await provider.getAllUsers(authToken).catch(() => []);
+        }
+        if (Array.isArray(teacherList) && teacherList.length > 0) {
+          setAllRegisteredTeachers(teacherList);
         }
         const matched = teacherList.find(
           (t) =>
@@ -1204,6 +1215,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
 
     const handleScannedEvent = () => loadAllData();
+    const handleTeachersInstantSync = () => {
+      try {
+        const saved = localStorage.getItem('smart_absensi_teachers');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAllRegisteredTeachers(parsed);
+          }
+        }
+      } catch {
+        // ignore
+      }
+      loadAllData();
+    };
     const handleNotificationPushed = () => {
       loadAllData();
       SoundService.playNotificationChime();
@@ -1213,23 +1238,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_points_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
-    window.addEventListener('smart_absensi_teachers_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_teachers_updated', handleTeachersInstantSync);
     window.addEventListener('smart_absensi_holidays_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_policy_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_settings_updated', handleScannedEvent);
-    window.addEventListener('storage', handleScannedEvent);
+    window.addEventListener('storage', handleTeachersInstantSync);
     return () => {
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_points_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
-      window.removeEventListener('smart_absensi_teachers_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_teachers_updated', handleTeachersInstantSync);
       window.removeEventListener('smart_absensi_holidays_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_policy_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_settings_updated', handleScannedEvent);
-      window.removeEventListener('storage', handleScannedEvent);
+      window.removeEventListener('storage', handleTeachersInstantSync);
     };
   }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);
 
@@ -1324,8 +1349,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   // Teacher Discipline Leaderboard & Top Teacher Recognition
   const disciplineLeaderboard = useMemo(() => {
-    return getTeacherDisciplineLeaderboard(effectiveUser, appreciationScore, 'CURRENT_MONTH', allTeacherPointLogs);
-  }, [effectiveUser, appreciationScore, allTeacherPointLogs]);
+    return getTeacherDisciplineLeaderboard(effectiveUser, appreciationScore, 'CURRENT_MONTH', allTeacherPointLogs, allRegisteredTeachers);
+  }, [effectiveUser, appreciationScore, allTeacherPointLogs, allRegisteredTeachers]);
 
   // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
   // Piagam resmi dan selebrasi penghargaan hanya aktif jika telah memasuki akhir bulan
@@ -2308,8 +2333,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                 <div className="flex items-center justify-between gap-2 pt-0.5">
                   <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border border-amber-300/60 shadow-xs">
-                      {disciplineLeaderboard?.topTeacher?.name ? disciplineLeaderboard.topTeacher.name.charAt(0) : 'G'}
+                    <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border border-amber-300/60 shadow-xs overflow-hidden">
+                      <span>{disciplineLeaderboard?.topTeacher?.name ? disciplineLeaderboard.topTeacher.name.charAt(0) : 'G'}</span>
+                      {disciplineLeaderboard?.topTeacher?.avatar_url && (
+                        <img
+                          src={disciplineLeaderboard.topTeacher.avatar_url}
+                          alt={disciplineLeaderboard.topTeacher.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <h4
@@ -4713,6 +4748,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={() => setIsDisciplineBadgeModalOpen(false)}
         currentUser={effectiveUser}
         currentUserScore={appreciationScore}
+        allRegisteredTeachers={allRegisteredTeachers}
       />
 
       {/* 14b. Modal Riwayat Pendapatan Poin Transparan Disiplin Guru */}

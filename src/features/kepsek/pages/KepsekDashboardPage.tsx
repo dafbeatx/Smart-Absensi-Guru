@@ -118,40 +118,6 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     return () => window.removeEventListener('smart_absensi_points_updated', fetchPointLogs);
   }, []);
 
-  // Evaluasi Juara 1 & Popup Otomatis ke Kepala Sekolah
-  useEffect(() => {
-    const res = getTeacherDisciplineLeaderboard(
-      null,
-      null,
-      'CURRENT_MONTH',
-      allTeacherPointLogs
-    );
-
-    const top1 = res.leaderboard?.[0] || null;
-    setChampionTeacher(top1);
-
-    // Cek Hadiah Tersimpan
-    const periodKey = 'September_2026';
-    const storageKey = `smart_absensi_kepsek_reward_champion_${periodKey}`;
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed?.rewardText) setSavedChampionReward(parsed.rewardText);
-      } else if (top1) {
-        // Otomatis munculkan popup saran hadiah ke Kepala Sekolah saat login jika belum ditentukan
-        const popupSessionKey = `smart_absensi_kepsek_popup_shown_${periodKey}`;
-        const hasShown = sessionStorage.getItem(popupSessionKey);
-        if (!hasShown) {
-          setIsRewardModalOpen(true);
-          sessionStorage.setItem(popupSessionKey, 'true');
-        }
-      }
-    } catch {
-      // Ignored
-    }
-  }, [allTeacherPointLogs]);
-
   const fetchMyAttendance = useCallback(async () => {
     if (!user) return;
     setIsLoadingMyAttendance(true);
@@ -236,6 +202,41 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     localStorage.setItem('smart_absensi_teachers', JSON.stringify(updated));
     window.dispatchEvent(new Event('smart_absensi_teachers_updated'));
   };
+
+  // Evaluasi Juara 1 & Popup Otomatis ke Kepala Sekolah
+  useEffect(() => {
+    const res = getTeacherDisciplineLeaderboard(
+      null,
+      null,
+      'CURRENT_MONTH',
+      allTeacherPointLogs,
+      teachers
+    );
+
+    const top1 = res.leaderboard?.[0] || null;
+    setChampionTeacher(top1);
+
+    // Cek Hadiah Tersimpan
+    const periodKey = 'September_2026';
+    const storageKey = `smart_absensi_kepsek_reward_champion_${periodKey}`;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.rewardText) setSavedChampionReward(parsed.rewardText);
+      } else if (top1) {
+        // Otomatis munculkan popup saran hadiah ke Kepala Sekolah saat login jika belum ditentukan
+        const popupSessionKey = `smart_absensi_kepsek_popup_shown_${periodKey}`;
+        const hasShown = sessionStorage.getItem(popupSessionKey);
+        if (!hasShown) {
+          setIsRewardModalOpen(true);
+          sessionStorage.setItem(popupSessionKey, 'true');
+        }
+      }
+    } catch {
+      // Ignored
+    }
+  }, [allTeacherPointLogs, teachers]);
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
 
@@ -643,8 +644,18 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           {championTeacher && (
             <div className="p-4 rounded-3xl bg-linear-to-r from-[#023246] via-[#0A4158] to-[#18536B] text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3 border border-amber-400/40 animate-fade-in">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
-                  🥇
+                <div className="relative w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-2xl shadow-inner shrink-0 overflow-hidden">
+                  <span>🥇</span>
+                  {championTeacher.avatar_url && (
+                    <img
+                      src={championTeacher.avatar_url}
+                      alt={championTeacher.name}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -1046,7 +1057,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             position: championTeacher.position || 'Pendidik Profesional',
             role: 'GURU',
             phone_number: '',
-            avatar_url: null,
+            avatar_url: championTeacher.avatar_url || null,
             is_active: true,
             created_at: '',
           }}
@@ -1062,6 +1073,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         onClose={() => setIsLeaderboardModalOpen(false)}
         currentUser={user}
         isFullscreen={true}
+        allRegisteredTeachers={teachers}
       />
     </div>
   );

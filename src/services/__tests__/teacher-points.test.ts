@@ -893,5 +893,42 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     assert('Leaderboard Tier Hierarchy: Guard', false, String(err));
   }
 
+  // 36. Verification of Avatar Matching in Leaderboard
+  try {
+    const mockRegisteredTeachers: UserProfile[] = [
+      {
+        id: 'usr_guru_002',
+        full_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
+        nip: '19880512 201503 1 002',
+        position: 'Wakasek Sarana dan Prasarana',
+        role: 'GURU',
+        phone_number: '08123456789',
+        avatar_url: 'https://example.com/photos/iqbal_avatar.jpg',
+        is_active: true,
+        created_at: '2024-01-01',
+      },
+    ];
+
+    const lbWithAvatars = getTeacherDisciplineLeaderboard(
+      null,
+      null,
+      'CURRENT_MONTH',
+      undefined,
+      mockRegisteredTeachers
+    );
+
+    const matchedTeacher = lbWithAvatars.leaderboard.find((t) =>
+      t.id === 'usr_guru_002'
+    );
+
+    assert(
+      'Leaderboard Avatar Matching: Correctly maps avatar_url from registered teachers into leaderboard',
+      matchedTeacher !== undefined && matchedTeacher.avatar_url === 'https://example.com/photos/iqbal_avatar.jpg',
+      `Matched teacher avatar_url: ${matchedTeacher?.avatar_url}`
+    );
+  } catch (err: unknown) {
+    assert('Leaderboard Avatar Matching: Guard', false, String(err));
+  }
+
   return { passed, failed, results };
 };

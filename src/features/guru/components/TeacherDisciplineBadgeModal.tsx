@@ -30,6 +30,7 @@ export interface TeacherDisciplineBadgeModalProps {
   currentUser: UserProfile | null;
   currentUserScore?: TeacherAppreciationScore;
   isFullscreen?: boolean;
+  allRegisteredTeachers?: UserProfile[];
 }
 
 type TabKey = 'LEADERBOARD' | 'HISTORY' | 'RULES' | 'BADGES' | 'MESSAGE';
@@ -71,6 +72,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   currentUser,
   currentUserScore,
   isFullscreen = false,
+  allRegisteredTeachers: allRegisteredTeachersProp,
 }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('LEADERBOARD');
   const [selectedPeriod, setSelectedPeriod] = useState<DisciplinePeriodType>('CURRENT_MONTH');
@@ -88,8 +90,31 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   const [pointHistoryTeacher, setPointHistoryTeacher] = useState<any>(null);
   const [teacherLogs, setTeacherLogs] = useState<TeacherPointLog[]>([]);
 
+  // Registered teacher profiles with avatars configured by Admin
+  const [registeredTeachers, setRegisteredTeachers] = useState<UserProfile[]>(() => {
+    if (allRegisteredTeachersProp && allRegisteredTeachersProp.length > 0) {
+      return allRegisteredTeachersProp;
+    }
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('smart_absensi_teachers');
+        if (cached) return JSON.parse(cached);
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (allRegisteredTeachersProp && allRegisteredTeachersProp.length > 0) {
+      setRegisteredTeachers(allRegisteredTeachersProp);
+    }
+  }, [allRegisteredTeachersProp]);
+
   useEffect(() => {
     if (!isOpen) return;
+
     const fetchPoints = async () => {
       try {
         const token = useAuthStore.getState().token || undefined;
@@ -103,15 +128,39 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
         if (reconciled && reconciled.length > 0) {
           setAllPointLogs(reconciled);
         }
+
+        // Sinkronisasi foto profil guru terbaru dari provider
+        const users = await provider.getAllUsers(token || '');
+        if (users && users.length > 0) {
+          setRegisteredTeachers(users);
+        }
       } catch (e) {
-        console.warn('Failed to load point logs in modal:', e);
+        console.warn('Failed to load point logs or users in modal:', e);
       }
     };
     fetchPoints();
 
     const handleUpdate = () => fetchPoints();
+    const handleTeachersUpdate = () => {
+      try {
+        const raw = localStorage.getItem('smart_absensi_teachers');
+        if (raw) {
+          setRegisteredTeachers(JSON.parse(raw));
+        }
+      } catch {
+        // ignore
+      }
+    };
+
     window.addEventListener('smart_absensi_points_updated', handleUpdate);
-    return () => window.removeEventListener('smart_absensi_points_updated', handleUpdate);
+    window.addEventListener('smart_absensi_teachers_updated', handleTeachersUpdate);
+    window.addEventListener('storage', handleTeachersUpdate);
+
+    return () => {
+      window.removeEventListener('smart_absensi_points_updated', handleUpdate);
+      window.removeEventListener('smart_absensi_teachers_updated', handleTeachersUpdate);
+      window.removeEventListener('storage', handleTeachersUpdate);
+    };
   }, [isOpen]);
 
   // Keyboard navigation & body scroll lock
@@ -161,9 +210,19 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
       currentUser,
       currentUserScore || null,
       selectedPeriod,
-      allPointLogs
+      allPointLogs,
+      registeredTeachers.length > 0 ? registeredTeachers : allRegisteredTeachersProp
     );
-  }, [currentUser, currentUserScore, selectedPeriod, allPointLogs]);
+  }, [currentUser, currentUserScore, selectedPeriod, allPointLogs, registeredTeachers, allRegisteredTeachersProp]);
+
+  // Keep selectedTeacher synchronized with fresh avatar
+  useEffect(() => {
+    if (!selectedTeacher) return;
+    const fresh = leaderboard.find((t) => t.id === selectedTeacher.id);
+    if (fresh && fresh.avatar_url !== selectedTeacher.avatar_url) {
+      setSelectedTeacher(fresh);
+    }
+  }, [leaderboard, selectedTeacher]);
 
   // Filtered leaderboard for fullscreen
   const filteredLeaderboard = useMemo(() => {
@@ -378,8 +437,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 <div className="p-5 sm:p-6 rounded-3xl bg-linear-to-br from-slate-900 via-[#023246] to-[#18536B] text-white shadow-md space-y-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0 flex-1">
-                      <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0">
-                        {selectedTeacher.name ? selectedTeacher.name.charAt(0) : 'G'}
+                      <div className="relative w-14 h-14 rounded-2xl bg-white/10 border border-white/20 text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0 overflow-hidden">
+                        <span>{selectedTeacher.name ? selectedTeacher.name.charAt(0) : 'G'}</span>
+                        {selectedTeacher.avatar_url && (
+                          <img
+                            src={selectedTeacher.avatar_url}
+                            alt={selectedTeacher.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -700,8 +769,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             </div>
 
                             <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-2xl bg-slate-200 text-slate-800 flex items-center justify-center font-black text-lg border border-slate-300 shrink-0">
-                                {leaderboard[1].name ? leaderboard[1].name.charAt(0) : '2'}
+                              <div className="relative w-12 h-12 rounded-2xl bg-slate-200 text-slate-800 flex items-center justify-center font-black text-lg border border-slate-300 shrink-0 overflow-hidden shadow-2xs">
+                                <span>{leaderboard[1].name ? leaderboard[1].name.charAt(0) : '2'}</span>
+                                {leaderboard[1].avatar_url && (
+                                  <img
+                                    src={leaderboard[1].avatar_url}
+                                    alt={leaderboard[1].name}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                )}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
@@ -745,8 +824,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             </div>
 
                             <div className="flex items-center gap-3.5">
-                              <div className="w-14 h-14 rounded-2xl bg-[#023246] text-white flex items-center justify-center font-black text-xl border-2 border-amber-300 shadow-sm shrink-0">
-                                {topTeacher.name ? topTeacher.name.charAt(0) : '1'}
+                              <div className="relative w-14 h-14 rounded-2xl bg-[#023246] text-white flex items-center justify-center font-black text-xl border-2 border-amber-300 shadow-sm shrink-0 overflow-hidden">
+                                <span>{topTeacher.name ? topTeacher.name.charAt(0) : '1'}</span>
+                                {topTeacher.avatar_url && (
+                                  <img
+                                    src={topTeacher.avatar_url}
+                                    alt={topTeacher.name}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                )}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <h4 className="text-sm sm:text-base font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
@@ -800,8 +889,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             </div>
 
                             <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-black text-lg border border-amber-200 shrink-0">
-                                {leaderboard[2].name ? leaderboard[2].name.charAt(0) : '3'}
+                              <div className="relative w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-black text-lg border border-amber-200 shrink-0 overflow-hidden shadow-2xs">
+                                <span>{leaderboard[2].name ? leaderboard[2].name.charAt(0) : '3'}</span>
+                                {leaderboard[2].avatar_url && (
+                                  <img
+                                    src={leaderboard[2].avatar_url}
+                                    alt={leaderboard[2].name}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                )}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
@@ -982,8 +1081,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                   {/* Nama & NPP */}
                                   <td className="py-3.5 px-4">
                                     <div className="flex items-center gap-3">
-                                      <div className="w-9 h-9 rounded-xl bg-[#023246] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                                        {teacher.name ? teacher.name.charAt(0) : 'G'}
+                                      <div className="relative w-9 h-9 rounded-xl bg-[#023246] text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
+                                        <span>{teacher.name ? teacher.name.charAt(0) : 'G'}</span>
+                                        {teacher.avatar_url && (
+                                          <img
+                                            src={teacher.avatar_url}
+                                            alt={teacher.name}
+                                            className="absolute inset-0 w-full h-full object-cover"
+                                            onError={(e) => {
+                                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                            }}
+                                          />
+                                        )}
                                       </div>
                                       <div className="min-w-0">
                                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -1101,8 +1210,33 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                               className="p-3.5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs transition-all flex items-center justify-between gap-3 cursor-pointer"
                             >
                               <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center font-black text-xs shrink-0">
-                                  {rankMedal}
+                                <div className="relative shrink-0">
+                                  <div className="relative w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
+                                    <span>{teacher.name ? teacher.name.charAt(0) : 'G'}</span>
+                                    {teacher.avatar_url && (
+                                      <img
+                                        src={teacher.avatar_url}
+                                        alt={teacher.name}
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`absolute -bottom-1 -right-1 px-1 py-0.2 rounded-md font-black text-[9px] shadow-xs flex items-center justify-center ${
+                                      teacher.rank === 1
+                                        ? 'bg-amber-400 text-slate-950'
+                                        : teacher.rank === 2
+                                        ? 'bg-slate-300 text-slate-900'
+                                        : teacher.rank === 3
+                                        ? 'bg-amber-600 text-white'
+                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                    }`}
+                                  >
+                                    {rankMedal}
+                                  </span>
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="text-xs font-black text-slate-900 truncate">
@@ -1560,8 +1694,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               <div className="p-3.5 rounded-2xl bg-linear-to-br from-slate-900 to-[#023246] text-white shadow-xs space-y-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="w-11 h-11 rounded-xl bg-white/10 border border-white/20 text-white flex items-center justify-center font-black text-base shadow-xs shrink-0">
-                      {selectedTeacher.name ? selectedTeacher.name.charAt(0) : 'G'}
+                    <div className="relative w-11 h-11 rounded-xl bg-white/10 border border-white/20 text-white flex items-center justify-center font-black text-base shadow-xs shrink-0 overflow-hidden">
+                      <span>{selectedTeacher.name ? selectedTeacher.name.charAt(0) : 'G'}</span>
+                      {selectedTeacher.avatar_url && (
+                        <img
+                          src={selectedTeacher.avatar_url}
+                          alt={selectedTeacher.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -1837,8 +1981,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm border-2 border-amber-300 shrink-0">
-                          {topTeacher?.name ? topTeacher.name.charAt(0) : 'G'}
+                        <div className="relative w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm border-2 border-amber-300 shrink-0 overflow-hidden shadow-2xs">
+                          <span>{topTeacher?.name ? topTeacher.name.charAt(0) : 'G'}</span>
+                          {topTeacher?.avatar_url && (
+                            <img
+                              src={topTeacher.avatar_url}
+                              alt={topTeacher.name}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
@@ -1888,8 +2042,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       className="bg-slate-50 hover:bg-slate-100/80 rounded-xl p-2.5 sm:p-3 border border-slate-200 flex items-center justify-between gap-2 cursor-pointer transition-colors group"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className="w-8 h-8 rounded-xl bg-[#023246] text-white flex items-center justify-center text-xs font-black shrink-0">
-                          #{currentUserRank ?? 1}
+                        <div className="relative w-8 h-8 rounded-xl bg-[#023246] text-white flex items-center justify-center text-xs font-black shrink-0 overflow-hidden border border-slate-200">
+                          <span>#{currentUserRank ?? 1}</span>
+                          {currentUser?.avatar_url && (
+                            <img
+                              src={currentUser.avatar_url}
+                              alt={currentUser.full_name || 'Anda'}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1957,18 +2121,33 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             }`}
                           >
                             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-                              <div
-                                className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
-                                  teacher.rank === 1
-                                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                    : teacher.rank === 2
-                                    ? 'bg-slate-200 text-slate-800'
-                                    : teacher.rank === 3
-                                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                }`}
-                              >
-                                {rankMedal}
+                              <div className="relative shrink-0">
+                                <div className="relative w-8 h-8 rounded-xl bg-[#023246] text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
+                                  <span>{teacher.name ? teacher.name.charAt(0) : 'G'}</span>
+                                  {teacher.avatar_url && (
+                                    <img
+                                      src={teacher.avatar_url}
+                                      alt={teacher.name}
+                                      className="absolute inset-0 w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                                <span
+                                  className={`absolute -bottom-1 -right-1 px-1 py-0.2 rounded-md font-black text-[8px] shadow-xs flex items-center justify-center ${
+                                    teacher.rank === 1
+                                      ? 'bg-amber-400 text-slate-950'
+                                      : teacher.rank === 2
+                                      ? 'bg-slate-300 text-slate-900'
+                                      : teacher.rank === 3
+                                      ? 'bg-amber-600 text-white'
+                                      : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  }`}
+                                >
+                                  {rankMedal}
+                                </span>
                               </div>
 
                               <div className="min-w-0 flex-1">
