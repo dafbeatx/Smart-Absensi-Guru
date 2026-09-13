@@ -632,7 +632,10 @@ export function getTeacherDisciplineLeaderboard(
           isCurrentUser: true,
         };
       }
-    } else {
+    } else if (
+      !currentUser ||
+      ((currentUser as any).role !== 'KEPSEK' && (currentUser as any).role !== 'ADMIN')
+    ) {
       // Akun guru lain yang terdaftar secara dinamis
       teachers.push({
         id: currentUser.id || 'usr_current',

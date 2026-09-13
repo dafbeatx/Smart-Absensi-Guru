@@ -42,6 +42,7 @@ import { NotificationPreferencesModal } from '../../../components/dashboard/Noti
 import { OfflineSyncIndicator } from '../../../components/ui/OfflineSyncIndicator';
 import { OfflineSyncService } from '../../../services/offline-sync.service';
 import { QuestionCorrectionModal } from '../../guru/components/QuestionCorrectionModal';
+import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { WebTrafficService } from '../../../services/web-traffic.service';
 
 export interface AdminDashboardPageProps {
@@ -56,6 +57,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
+  const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [selectedCorrectionDate, setSelectedCorrectionDate] = useState<string | undefined>(undefined);
   const [isQrGeneratorOpen, setIsQrGeneratorOpen] = useState(false);
@@ -444,6 +446,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       icon: '📋',
     },
     {
+      id: 'LEADERBOARD',
+      label: 'Peringkat Poin Terbanyak',
+      icon: '🏆',
+    },
+    {
       id: 'COMPLAINTS',
       label: 'Kotak Aspirasi Guru',
       icon: '💬',
@@ -506,6 +513,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         });
       }
       setIsQuestionCorrectionModalOpen(true);
+      return;
+    }
+    if (id === 'LEADERBOARD') {
+      setIsLeaderboardModalOpen(true);
       return;
     }
     if (id === 'QR_POSTER') {
@@ -857,6 +868,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           currentUser={user}
         />
       )}
+
+      {/* Modal Peringkat Poin Terbanyak Guru (Fullscreen Workspace) */}
+      <TeacherDisciplineBadgeModal
+        isOpen={isLeaderboardModalOpen}
+        onClose={() => setIsLeaderboardModalOpen(false)}
+        currentUser={user}
+        isFullscreen={true}
+      />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
       <OfflineSyncIndicator />

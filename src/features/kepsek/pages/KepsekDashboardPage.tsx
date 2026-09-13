@@ -28,6 +28,7 @@ import { NotificationPreferencesModal } from '../../../components/dashboard/Noti
 import { KepsekRewardSuggestionModal } from '../components/KepsekRewardSuggestionModal';
 import { TeacherExcellenceCertificateModal } from '../../guru/components/TeacherExcellenceCertificateModal';
 import { SarprasExecutiveView } from '../../sarpras/components/SarprasExecutiveView';
+import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import {
   getTeacherDisciplineLeaderboard,
   type TeacherLeaderboardItem,
@@ -58,6 +59,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   // Leaderboard Poin & Juara 1 Apresiasi States (Hak Prerogatif Kepala Sekolah)
   const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>([]);
   const [championTeacher, setChampionTeacher] = useState<TeacherLeaderboardItem | null>(null);
+  const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [savedChampionReward, setSavedChampionReward] = useState<string | null>(null);
@@ -502,6 +504,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       icon: '👥',
     },
     {
+      id: 'LEADERBOARD',
+      label: 'Peringkat Poin Terbanyak',
+      icon: '🏆',
+    },
+    {
       id: 'COMPLAINTS',
       label: 'Kotak Aspirasi Guru',
       icon: '💬',
@@ -542,7 +549,13 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         roleColor="bg-[#287094]/30 text-[#F6F6F6] border-[#287094]"
         items={sidebarItems}
         activeTab={activeTab}
-        onSelectTab={(id) => setActiveTab(id as typeof activeTab)}
+        onSelectTab={(id) => {
+          if (id === 'LEADERBOARD') {
+            setIsLeaderboardModalOpen(true);
+            return;
+          }
+          setActiveTab(id as typeof activeTab);
+        }}
         onSwitchToGuruView={onSwitchToGuruView}
         onOpenScanner={onOpenScanner}
         onLogout={logout}
@@ -1044,6 +1057,14 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           rank={1}
         />
       )}
+
+      {/* Modal Peringkat Poin Terbanyak Guru (Fullscreen Workspace) */}
+      <TeacherDisciplineBadgeModal
+        isOpen={isLeaderboardModalOpen}
+        onClose={() => setIsLeaderboardModalOpen(false)}
+        currentUser={user}
+        isFullscreen={true}
+      />
     </div>
   );
 };

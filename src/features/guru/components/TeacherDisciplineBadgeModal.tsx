@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { TeacherAppreciationScore, UserProfile, TeacherPointLog } from '../../../types/database.types';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { TeacherPointHistoryModal } from './TeacherPointHistoryModal';
@@ -18,16 +19,19 @@ import {
   TrendingUp,
   ChevronRight,
   Sparkles,
+  Search,
 } from 'lucide-react';
 
-interface TeacherDisciplineBadgeModalProps {
+export interface TeacherDisciplineBadgeModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile | null;
-  currentUserScore: TeacherAppreciationScore;
+  currentUserScore?: TeacherAppreciationScore;
+  isFullscreen?: boolean;
 }
 
 type TabKey = 'LEADERBOARD' | 'HISTORY' | 'RULES' | 'BADGES' | 'MESSAGE';
+type TierFilter = 'ALL' | 'TELADAN' | 'EMAS' | 'DEDIKASI' | 'KOMITMEN';
 
 /**
  * Calculates deterministic weekly consistency rates for teacher performance graphs.
@@ -64,12 +68,17 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   onClose,
   currentUser,
   currentUserScore,
+  isFullscreen = false,
 }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('LEADERBOARD');
   const [selectedPeriod, setSelectedPeriod] = useState<DisciplinePeriodType>('CURRENT_MONTH');
 
-  // Layer detail state: when teacher card is clicked, open clear detail chart view!
+  // Layer detail state: when teacher card is clicked, open clear detail chart view
   const [selectedTeacher, setSelectedTeacher] = useState<TeacherLeaderboardItem | null>(null);
+
+  // Search & Filter state for fullscreen view
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tierFilter, setTierFilter] = useState<TierFilter>('ALL');
 
   // Point history modal state
   const [allPointLogs, setAllPointLogs] = useState<TeacherPointLog[]>([]);
@@ -95,6 +104,30 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     return () => window.removeEventListener('smart_absensi_points_updated', handleUpdate);
   }, [isOpen]);
 
+  // Keyboard navigation & body scroll lock
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedTeacher) {
+          setSelectedTeacher(null);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, selectedTeacher, onClose]);
+
   const handleOpenPointHistory = async (t: any) => {
     setPointHistoryTeacher(t);
     const provider = ProviderFactory.getProvider();
@@ -107,17 +140,1286 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     setIsPointHistoryModalOpen(true);
   };
 
+  const defaultScore: TeacherAppreciationScore = useMemo(() => ({
+    totalPoints: 0,
+    level: 'Pendidik',
+    nextLevelPoints: 50,
+    levelProgressPercent: 0,
+    hadirTepatWaktuCount: 0,
+    terlambatCount: 0,
+    piketCount: 0,
+    moodCheckinCount: 0,
+    badges: [],
+  }), []);
+
   const {
     leaderboard,
     topTeacher,
     currentUserRank,
     totalTeachers,
   } = useMemo(() => {
-    return getTeacherDisciplineLeaderboard(currentUser, currentUserScore, selectedPeriod, allPointLogs);
-  }, [currentUser, currentUserScore, selectedPeriod, allPointLogs]);
+    return getTeacherDisciplineLeaderboard(
+      currentUser,
+      currentUserScore || defaultScore,
+      selectedPeriod,
+      allPointLogs
+    );
+  }, [currentUser, currentUserScore, defaultScore, selectedPeriod, allPointLogs]);
+
+  // Filtered leaderboard for fullscreen
+  const filteredLeaderboard = useMemo(() => {
+    return leaderboard.filter((t) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        t.name.toLowerCase().includes(q) ||
+        (t.nip && t.nip.replace(/\s+/g, '').includes(q.replace(/\s+/g, ''))) ||
+        (t.position && t.position.toLowerCase().includes(q));
+
+      let matchTier = true;
+      if (tierFilter === 'TELADAN') matchTier = t.totalPoints >= 80;
+      else if (tierFilter === 'EMAS') matchTier = t.totalPoints >= 65 && t.totalPoints < 80;
+      else if (tierFilter === 'DEDIKASI') matchTier = t.totalPoints >= 50 && t.totalPoints < 65;
+      else if (tierFilter === 'KOMITMEN') matchTier = t.totalPoints < 50;
+
+      return matchSearch && matchTier;
+    });
+  }, [leaderboard, searchQuery, tierFilter]);
 
   if (!isOpen) return null;
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FULLSCREEN WORKSPACE LAYOUT (FOR ADMIN, KEPSEK, OR EXPLICIT FULLSCREEN)
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (isFullscreen) {
+    return createPortal(
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="leaderboard-fullscreen-title"
+        className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
+      >
+        {/* ── 1. FULLSCREEN TOPBAR HEADER ───────────────────────────────────── */}
+        <header className="px-4 py-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={selectedTeacher ? () => setSelectedTeacher(null) : onClose}
+              className="p-2 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-semibold shrink-0 cursor-pointer"
+              title={selectedTeacher ? 'Kembali ke Klasemen' : 'Kembali ke Dashboard'}
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+              <span className="hidden sm:inline">{selectedTeacher ? 'Daftar' : 'Kembali'}</span>
+            </button>
+
+            <div className="h-6 w-px bg-slate-200 hidden sm:block shrink-0" />
+
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs shrink-0">
+              {selectedTeacher ? (
+                <BarChart3 className="w-5 h-5 text-amber-300" />
+              ) : (
+                <Trophy className="w-5 h-5 text-amber-300" />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 id="leaderboard-fullscreen-title" className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
+                  {selectedTeacher
+                    ? `Rapor Grafik: ${formatShortTeacherName(selectedTeacher.name)}`
+                    : 'Peringkat Poin Terbanyak'}
+                </h2>
+                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200 rounded-full shrink-0">
+                  Disiplin &amp; Apresiasi
+                </span>
+                <span className="hidden md:inline-flex px-2 py-0.5 text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 rounded-full shrink-0">
+                  {selectedPeriod === 'CURRENT_MONTH' ? 'Bulan Berjalan (September 2026)' : 'Rekap Final (Agustus 2026)'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 truncate">
+                {selectedTeacher
+                  ? 'Grafik Ketepatan Waktu, Konsistensi Mingguan & Riwayat Poin Transparan'
+                  : 'Klasemen Performa Kedisiplinan & Akumulasi Poin Guru • SMP Terpadu Al-Ittihadiyah'}
+              </p>
+            </div>
+          </div>
+
+          {/* Right Controls: Period Selector & Close Button */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Desktop Period Switcher */}
+            <div className="hidden sm:flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setSelectedPeriod('CURRENT_MONTH')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedPeriod === 'CURRENT_MONTH'
+                    ? 'bg-white text-[#023246] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>September 2026</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPeriod('PREVIOUS_MONTH')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedPeriod === 'PREVIOUS_MONTH'
+                    ? 'bg-white text-[#023246] shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🏅</span>
+                <span>Agustus 2026</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Tutup Workspace"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* ── 2. SUB-TABS NAVIGATION BAR ────────────────────────────────────── */}
+        {!selectedTeacher && (
+          <div className="px-4 sm:px-6 bg-white border-b border-slate-200/80 flex items-center justify-between shrink-0 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1 sm:gap-2 py-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('LEADERBOARD')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  activeTab === 'LEADERBOARD'
+                    ? 'bg-[#023246] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <span>🏆</span>
+                <span>Klasemen Peringkat ({totalTeachers})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('HISTORY')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  activeTab === 'HISTORY'
+                    ? 'bg-[#023246] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <span>⭐</span>
+                <span>Riwayat Transaksi Poin</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('RULES')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  activeTab === 'RULES'
+                    ? 'bg-[#023246] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <span>📊</span>
+                <span>Sistem &amp; Bobot Poin</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('BADGES')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  activeTab === 'BADGES'
+                    ? 'bg-[#023246] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <span>🎖️</span>
+                <span>Katalog Lencana</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('MESSAGE')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  activeTab === 'MESSAGE'
+                    ? 'bg-[#023246] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <span>📜</span>
+                <span>Amanat Kepala Sekolah</span>
+              </button>
+            </div>
+
+            {/* Mobile Period Toggle */}
+            <div className="sm:hidden flex items-center gap-1 py-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedPeriod(selectedPeriod === 'CURRENT_MONTH' ? 'PREVIOUS_MONTH' : 'CURRENT_MONTH')}
+                className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 text-[#023246] border border-slate-200"
+              >
+                {selectedPeriod === 'CURRENT_MONTH' ? 'Sep 2026' : 'Agt 2026'} ▾
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── 3. MAIN WORKSPACE CONTENT ─────────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#F8FAFC]">
+          <div className="max-w-6xl mx-auto space-y-6">
+
+            {/* ──── VIEW 1: DETAIL GURU TUNGGAL (CHART & ANALISIS LENGKAP) ──── */}
+            {selectedTeacher ? (
+              <div className="space-y-6 animate-fadeIn">
+                {/* Profile Banner */}
+                <div className="p-5 sm:p-6 rounded-3xl bg-linear-to-br from-slate-900 via-[#023246] to-[#18536B] text-white shadow-md space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0">
+                        {selectedTeacher.name ? selectedTeacher.name.charAt(0) : 'G'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base sm:text-lg font-black text-white leading-tight truncate">
+                            {selectedTeacher.name}
+                          </h3>
+                          {selectedTeacher.isCurrentUser && (
+                            <span className="px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-black rounded-md">
+                              Profil Anda
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-cyan-200 font-medium mt-1 truncate">
+                          {selectedTeacher.position}
+                        </p>
+                        {selectedTeacher.nip && (
+                          <p className="text-xs text-slate-300 font-mono mt-0.5">
+                            NPP: {selectedTeacher.nip}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0 border-t sm:border-t-0 border-white/10 pt-3 sm:pt-0">
+                      <div className="text-left sm:text-right">
+                        <div className="px-4 py-1.5 rounded-2xl bg-amber-400 text-slate-950 text-sm font-black shadow-xs flex items-center gap-1.5">
+                          <span>⭐</span>
+                          <span>{selectedTeacher.totalPoints} Poin</span>
+                        </div>
+                        <span className="text-xs font-bold text-amber-300 block mt-1">
+                          Peringkat #{selectedTeacher.rank} dari {totalTeachers} Guru
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/15 flex flex-wrap items-center justify-between gap-2 text-xs text-cyan-100">
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <span>{selectedTeacher.topBadge.icon}</span>
+                      <strong className="text-white">{selectedTeacher.level}</strong>
+                    </span>
+                    <span className="text-slate-300">
+                      Periode: {selectedPeriod === 'CURRENT_MONTH' ? 'September 2026' : 'Agustus 2026'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2-Column Responsive Analysis */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Column: Kehadiran & Rasio */}
+                  <div className="space-y-6">
+                    {/* Rasio Ketepatan Waktu */}
+                    <div className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[#023246]">
+                          <TrendingUp className="w-5 h-5 text-emerald-600" />
+                          <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider">
+                            Rasio Ketepatan Waktu Presensi
+                          </h4>
+                        </div>
+                        {(() => {
+                          const totalMasuk = selectedTeacher.hadirTepatWaktuCount + selectedTeacher.terlambatCount;
+                          const onTimePct = totalMasuk > 0 ? Math.round((selectedTeacher.hadirTepatWaktuCount / totalMasuk) * 100) : 0;
+                          return (
+                            <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              {onTimePct}% Tepat Waktu
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Stacked Progress Bar */}
+                      {(() => {
+                        const totalMasuk = selectedTeacher.hadirTepatWaktuCount + selectedTeacher.terlambatCount;
+                        const hadirPct = totalMasuk > 0 ? (selectedTeacher.hadirTepatWaktuCount / totalMasuk) * 100 : 0;
+                        const telatPct = totalMasuk > 0 ? (selectedTeacher.terlambatCount / totalMasuk) * 100 : 0;
+
+                        return (
+                          <div className="space-y-2">
+                            <div className="h-3.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                              <div
+                                className="bg-emerald-500 h-full transition-all duration-700"
+                                style={{ width: `${hadirPct}%` }}
+                                title={`Tepat Waktu: ${selectedTeacher.hadirTepatWaktuCount} hari`}
+                              />
+                              <div
+                                className="bg-amber-400 h-full transition-all duration-700"
+                                style={{ width: `${telatPct}%` }}
+                                title={`Terlambat: ${selectedTeacher.terlambatCount} hari`}
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs text-slate-500 font-bold px-0.5">
+                              <span className="flex items-center gap-1.5 text-emerald-700">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                Hadir Tepat Waktu ({selectedTeacher.hadirTepatWaktuCount} Hari)
+                              </span>
+                              <span className="flex items-center gap-1.5 text-amber-700">
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                                Terlambat ({selectedTeacher.terlambatCount} Hari)
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* 3 Metric Mini Cards */}
+                      <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-100 text-center">
+                        <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
+                          <span className="text-[10px] text-emerald-800 font-bold block uppercase">On-Time</span>
+                          <span className="text-base font-black text-emerald-950 block mt-1">
+                            {selectedTeacher.hadirTepatWaktuCount} Hari
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-semibold block">
+                            +{selectedTeacher.hadirTepatWaktuCount * 15} Poin
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80">
+                          <span className="text-[10px] text-amber-800 font-bold block uppercase">Terlambat</span>
+                          <span className="text-base font-black text-amber-950 block mt-1">
+                            {selectedTeacher.terlambatCount} Hari
+                          </span>
+                          <span className="text-[10px] text-amber-600 font-semibold block">
+                            +{selectedTeacher.terlambatCount * 5} Poin
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-cyan-50/70 border border-cyan-200/80">
+                          <span className="text-[10px] text-cyan-800 font-bold block uppercase">Tugas Piket</span>
+                          <span className="text-base font-black text-cyan-950 block mt-1">
+                            {selectedTeacher.piketCount} Kali
+                          </span>
+                          <span className="text-[10px] text-cyan-600 font-semibold block">
+                            +{selectedTeacher.piketCount * 10} Poin
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Grafik Konsistensi Mingguan */}
+                    <div className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[#023246]">
+                          <BarChart3 className="w-5 h-5 text-cyan-600" />
+                          <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider">
+                            Grafik Konsistensi Mingguan
+                          </h4>
+                        </div>
+                        <span className="text-xs text-slate-400 font-semibold">
+                          4 Pekan Terakhir
+                        </span>
+                      </div>
+
+                      <div className="pt-2 pb-1">
+                        <div className="grid grid-cols-4 gap-3 h-36 items-end px-2 border-b border-slate-200 pb-2">
+                          {getWeeklyDisciplineRates(selectedTeacher).map((item) => (
+                            <div key={item.week} className="flex flex-col items-center h-full justify-end group">
+                              <span className="text-[10px] font-black text-slate-700 mb-1">
+                                {item.rate}%
+                              </span>
+
+                              <div className="w-full max-w-12 bg-slate-100 rounded-t-xl h-24 flex items-end justify-center p-0.5">
+                                <div
+                                  className={`w-full rounded-t-lg transition-all duration-700 ${
+                                    item.rate >= 80
+                                      ? 'bg-linear-to-t from-emerald-600 to-emerald-400'
+                                      : item.rate >= 50
+                                      ? 'bg-linear-to-t from-amber-500 to-amber-300'
+                                      : 'bg-slate-300'
+                                  }`}
+                                  style={{ height: `${Math.max(12, item.rate)}%` }}
+                                />
+                              </div>
+
+                              <span className="text-xs font-black text-slate-700 mt-2">
+                                Pekan {item.week}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-medium truncate max-w-full">
+                                {item.avgTime}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-2xl leading-relaxed">
+                        💡 Kehadiran di atas 80% per minggu memenuhi standar keteladanan tertinggi sekolah.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Apresiasi Kepsek & Buku Riwayat Poin */}
+                  <div className="space-y-6">
+                    {/* Apresiasi Khusus Pimpinan */}
+                    <div className="p-5 rounded-3xl bg-amber-50/80 border border-amber-200 text-amber-950 space-y-3">
+                      <div className="flex items-center gap-2 text-amber-900 font-black text-xs sm:text-sm">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        <span>Apresiasi Resmi Kepala Sekolah</span>
+                      </div>
+                      <blockquote className="text-xs sm:text-sm leading-relaxed text-amber-900/90 italic bg-white/60 p-4 rounded-2xl border border-amber-200/60">
+                        {selectedTeacher.rank === 1
+                          ? '“Luar biasa! Konsistensi dan kedisiplinan waktu Bapak/Ibu menjadi teladan hidup bagi seluruh guru dan para siswa di sekolah kita.”'
+                          : selectedTeacher.rank <= 3
+                          ? '“Pencapaian disiplin yang sangat membanggakan. Terus pertahankan komitmen mengajar tepat waktu untuk kemajuan peradaban sekolah.”'
+                          : selectedTeacher.totalPoints >= 50
+                          ? '“Terima kasih atas dedikasi dan kerja keras Bapak/Ibu dalam membina siswa dan menjalankan tugas mengajar harian.”'
+                          : '“Mari bersama-sama meningkatkan ketepatan waktu kehadiran demi memberikan keteladanan terbaik bagi para peserta didik.”'}
+                      </blockquote>
+                      <p className="text-xs text-amber-800 font-bold text-right">
+                        — Farhan Sopian Sahid, S.Pd.I (Kepala Sekolah)
+                      </p>
+                    </div>
+
+                    {/* Transaksi Poin Terakhir Guru */}
+                    <div className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[#023246]">
+                          <Award className="w-4 h-4 text-[#18536B]" />
+                          <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider">
+                            Buku Catatan Poin Disiplin
+                          </h4>
+                        </div>
+                        <span className="text-xs font-bold text-amber-600">
+                          Total: {selectedTeacher.totalPoints} Poin
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const logs = allPointLogs.filter((l) => l.user_id === selectedTeacher.id);
+                        if (logs.length === 0) {
+                          return (
+                            <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
+                              <span className="text-xl">📋</span>
+                              <p className="text-xs font-bold text-slate-700">Belum Ada Transaksi Poin Khusus</p>
+                              <p className="text-[11px] text-slate-400">
+                                Poin otomatis bertambah saat presensi masuk tepat waktu (+15), terlambat (+5), atau piket (+10).
+                              </p>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {logs.slice(0, 5).map((log) => (
+                              <div
+                                key={log.id}
+                                className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 text-xs"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-black text-slate-900 truncate">{log.title}</p>
+                                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                    {log.date} • {log.description || 'Poin kedisiplinan'}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`px-2.5 py-1 rounded-xl text-xs font-black border shrink-0 ${
+                                    log.points >= 15
+                                      ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                      : 'bg-amber-50 text-amber-900 border-amber-300'
+                                  }`}
+                                >
+                                  +{log.points} Poin
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPointHistory(selectedTeacher)}
+                        className="w-full py-3 px-4 rounded-2xl bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 active:scale-98 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+                      >
+                        <Award className="w-4 h-4 text-amber-300" />
+                        <span>Buka Buku Riwayat Transaksi Lengkap</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Back to List Button */}
+                <div className="pt-2 flex justify-start">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTeacher(null)}
+                    className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Kembali ke Klasemen Seluruh Guru</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ──── VIEW 2: DAFTAR UTAMA FULLSCREEN ──── */
+              <>
+                {/* TAB 1: KLASEMEN PERINGKAT */}
+                {activeTab === 'LEADERBOARD' && (
+                  <div className="space-y-6">
+
+                    {/* 👑 TOP 3 PODIUM HERO CARDS ───────────────────────────── */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+                      {/* Juara 2 (Perak) */}
+                      {leaderboard[1] && (
+                        <div
+                          onClick={() => setSelectedTeacher(leaderboard[1])}
+                          className="order-2 md:order-1 rounded-3xl p-5 border border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-50/50 shadow-xs hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                <span>🥈</span>
+                                <span>Juara 2 • Perak</span>
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-900 transition-colors flex items-center gap-0.5">
+                                Rapor Detail <ChevronRight className="w-3 h-3" />
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-2xl bg-slate-200 text-slate-800 flex items-center justify-center font-black text-lg border border-slate-300 shrink-0">
+                                {leaderboard[1].name ? leaderboard[1].name.charAt(0) : '2'}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                                  {formatShortTeacherName(leaderboard[1].name)}
+                                </h4>
+                                <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                  {leaderboard[1].position}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
+                            <span className="text-xs text-slate-600 font-bold">
+                              {leaderboard[1].hadirTepatWaktuCount} Hari On-Time
+                            </span>
+                            <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 text-xs font-black">
+                              ⭐ {leaderboard[1].totalPoints} Poin
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Juara 1 (Emas) - Highlighted Podium Champion */}
+                      {topTeacher && (
+                        <div
+                          onClick={() => setSelectedTeacher(topTeacher)}
+                          className="order-1 md:order-2 rounded-3xl p-5 sm:p-6 border-2 border-amber-300 bg-linear-to-b from-amber-50 via-white to-amber-50/50 shadow-md hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
+                        >
+                          <div className="absolute -top-12 -right-12 w-28 h-28 rounded-full bg-amber-200/30 blur-xl pointer-events-none" />
+
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1 shadow-2xs">
+                                <span>👑</span>
+                                <span>Juara 1 • Poin Tertinggi</span>
+                              </span>
+                              <span className="text-xs font-black text-amber-800 group-hover:text-amber-950 transition-colors flex items-center gap-1">
+                                Rapor Detail <ChevronRight className="w-3.5 h-3.5" />
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3.5">
+                              <div className="w-14 h-14 rounded-2xl bg-[#023246] text-white flex items-center justify-center font-black text-xl border-2 border-amber-300 shadow-sm shrink-0">
+                                {topTeacher.name ? topTeacher.name.charAt(0) : '1'}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-sm sm:text-base font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                                  {formatShortTeacherName(topTeacher.name)}
+                                </h4>
+                                <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                                  {topTeacher.position}
+                                </p>
+                                {topTeacher.nip && (
+                                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                    NPP: {topTeacher.nip}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-4 mt-4 border-t border-amber-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                                {topTeacher.hadirTepatWaktuCount} Hari On-Time
+                              </span>
+                              {topTeacher.earlyBirdCount && topTeacher.earlyBirdCount > 0 ? (
+                                <span className="text-[11px] text-amber-800 font-bold">
+                                  🌅 {topTeacher.earlyBirdCount} Fajar
+                                </span>
+                              ) : null}
+                            </div>
+                            <span className="px-3.5 py-1 rounded-2xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-xs">
+                              ⭐ {topTeacher.totalPoints} Poin
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Juara 3 (Perunggu) */}
+                      {leaderboard[2] && (
+                        <div
+                          onClick={() => setSelectedTeacher(leaderboard[2])}
+                          className="order-3 rounded-3xl p-5 border border-amber-200/80 bg-linear-to-b from-amber-50/40 via-white to-amber-50/20 shadow-xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                <span>🥉</span>
+                                <span>Juara 3 • Perunggu</span>
+                              </span>
+                              <span className="text-[10px] font-bold text-amber-800 group-hover:text-amber-950 transition-colors flex items-center gap-0.5">
+                                Rapor Detail <ChevronRight className="w-3 h-3" />
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-black text-lg border border-amber-200 shrink-0">
+                                {leaderboard[2].name ? leaderboard[2].name.charAt(0) : '3'}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                                  {formatShortTeacherName(leaderboard[2].name)}
+                                </h4>
+                                <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                  {leaderboard[2].position}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
+                            <span className="text-xs text-slate-600 font-bold">
+                              {leaderboard[2].hadirTepatWaktuCount} Hari On-Time
+                            </span>
+                            <span className="px-3 py-1 rounded-xl bg-amber-100 text-amber-900 text-xs font-black">
+                              ⭐ {leaderboard[2].totalPoints} Poin
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Tie-Breaker Info Strip */}
+                    <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/70 text-xs text-amber-900">
+                      <span className="text-base shrink-0">⚖️</span>
+                      <p className="leading-relaxed font-medium">
+                        <strong>Kriteria Fair Ranking:</strong> Jika poin sama, peringkat ditentukan oleh 1) Hadir On-Time terbanyak, 2) Bonus Teladan Fajar (≤ 07:00 WIB), 3) Keterlambatan paling sedikit, dan 4) Keaktifan tugas piket.
+                      </p>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        {/* Search Input */}
+                        <div className="relative flex-1 w-full">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Cari nama guru atau NPP..."
+                            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#023246]/30 focus:border-[#023246] transition-all"
+                          />
+                        </div>
+
+                        {/* Tier Filters */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto no-scrollbar pb-1 sm:pb-0">
+                          <button
+                            type="button"
+                            onClick={() => setTierFilter('ALL')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                              tierFilter === 'ALL'
+                                ? 'bg-[#023246] text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            Semua ({leaderboard.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTierFilter('TELADAN')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                              tierFilter === 'TELADAN'
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                            }`}
+                          >
+                            🏆 Teladan (≥80)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTierFilter('EMAS')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                              tierFilter === 'EMAS'
+                                ? 'bg-amber-400 text-slate-950'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            🥇 Emas (≥65)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTierFilter('DEDIKASI')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                              tierFilter === 'DEDIKASI'
+                                ? 'bg-cyan-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            🥈 Berdedikasi (≥50)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* TABLE: KLASEMEN SELURUH GURU */}
+                    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                      <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider">
+                            Daftar Klasemen Peringkat ({filteredLeaderboard.length} Guru)
+                          </h3>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Sentuh atau klik guru mana pun untuk membuka grafik rapor &amp; rincian kedisiplinan.
+                          </p>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shrink-0">
+                          Live Data Sinkron
+                        </span>
+                      </div>
+
+                      {/* Desktop Table View */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider">
+                            <tr>
+                              <th className="py-3.5 px-4 w-16 text-center">Rank</th>
+                              <th className="py-3.5 px-4">Nama Guru &amp; Jabatan</th>
+                              <th className="py-3.5 px-4 text-center">Ketepatan Waktu</th>
+                              <th className="py-3.5 px-4 text-center">Tren 4 Pekan</th>
+                              <th className="py-3.5 px-4">Tingkat / Lencana</th>
+                              <th className="py-3.5 px-4 text-right">Total Poin</th>
+                              <th className="py-3.5 px-4 text-center w-24">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {filteredLeaderboard.map((teacher) => {
+                              const weeklyData = getWeeklyDisciplineRates(teacher);
+                              const totalMasuk = teacher.hadirTepatWaktuCount + teacher.terlambatCount;
+                              const onTimePct = totalMasuk > 0 ? Math.round((teacher.hadirTepatWaktuCount / totalMasuk) * 100) : 0;
+                              const rankMedal =
+                                teacher.rank === 1
+                                  ? '🥇'
+                                  : teacher.rank === 2
+                                  ? '🥈'
+                                  : teacher.rank === 3
+                                  ? '🥉'
+                                  : `#${teacher.rank}`;
+
+                              return (
+                                <tr
+                                  key={teacher.id}
+                                  onClick={() => setSelectedTeacher(teacher)}
+                                  className={`hover:bg-slate-50/90 transition-colors cursor-pointer group ${
+                                    teacher.isCurrentUser ? 'bg-cyan-50/50' : ''
+                                  }`}
+                                >
+                                  {/* Rank */}
+                                  <td className="py-3.5 px-4 text-center font-black text-sm">
+                                    <span
+                                      className={`inline-flex items-center justify-center w-7 h-7 rounded-xl font-black text-xs ${
+                                        teacher.rank === 1
+                                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                          : teacher.rank === 2
+                                          ? 'bg-slate-200 text-slate-800'
+                                          : teacher.rank === 3
+                                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                          : 'bg-slate-100 text-slate-600'
+                                      }`}
+                                    >
+                                      {rankMedal}
+                                    </span>
+                                  </td>
+
+                                  {/* Nama & NPP */}
+                                  <td className="py-3.5 px-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-9 h-9 rounded-xl bg-[#023246] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                        {teacher.name ? teacher.name.charAt(0) : 'G'}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <p className="font-extrabold text-slate-900 group-hover:text-[#023246] leading-tight">
+                                            {teacher.name}
+                                          </p>
+                                          {teacher.isCurrentUser && (
+                                            <span className="px-1.5 py-0.2 bg-[#023246] text-white text-[9px] font-bold rounded">
+                                              Anda
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                          {teacher.position}
+                                        </p>
+                                        {teacher.nip && (
+                                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                            NPP: {teacher.nip}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Ketepatan Waktu */}
+                                  <td className="py-3.5 px-4 text-center">
+                                    <div className="inline-flex flex-col items-center">
+                                      <span className="font-extrabold text-emerald-700">
+                                        {teacher.hadirTepatWaktuCount} Hari On-Time
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">
+                                        {teacher.terlambatCount} Terlambat • {teacher.piketCount} Piket
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Tren 4 Pekan */}
+                                  <td className="py-3.5 px-4 text-center">
+                                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200">
+                                      <div className="flex items-end gap-1 h-5 w-10">
+                                        {weeklyData.map((d, idx) => (
+                                          <div
+                                            key={idx}
+                                            className={`w-1.5 rounded-xs transition-all ${
+                                              d.rate >= 80
+                                                ? 'bg-emerald-500'
+                                                : d.rate >= 50
+                                                ? 'bg-amber-500'
+                                                : 'bg-slate-300'
+                                            }`}
+                                            style={{ height: `${Math.max(20, (d.rate / 100) * 20)}px` }}
+                                            title={`Pekan ${d.week}: ${d.rate}%`}
+                                          />
+                                        ))}
+                                      </div>
+                                      <span className="text-[11px] font-black text-slate-700">
+                                        {onTimePct}%
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Level & Lencana */}
+                                  <td className="py-3.5 px-4">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-base">{teacher.topBadge.icon}</span>
+                                      <span className="font-bold text-slate-700 text-xs">
+                                        {teacher.level}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Total Poin */}
+                                  <td className="py-3.5 px-4 text-right">
+                                    <span className="px-3 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs inline-block shadow-2xs">
+                                      ⭐ {teacher.totalPoints} Pts
+                                    </span>
+                                  </td>
+
+                                  {/* Aksi */}
+                                  <td className="py-3.5 px-4 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedTeacher(teacher);
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#023246] hover:text-white text-slate-700 text-[11px] font-bold transition-colors cursor-pointer"
+                                    >
+                                      Detail →
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile Card List View */}
+                      <div className="md:hidden divide-y divide-slate-100 p-2 space-y-2">
+                        {filteredLeaderboard.map((teacher) => {
+                          const rankMedal =
+                            teacher.rank === 1
+                              ? '🥇'
+                              : teacher.rank === 2
+                              ? '🥈'
+                              : teacher.rank === 3
+                              ? '🥉'
+                              : `#${teacher.rank}`;
+
+                          return (
+                            <div
+                              key={teacher.id}
+                              onClick={() => setSelectedTeacher(teacher)}
+                              className="p-3.5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs transition-all flex items-center justify-between gap-3 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center font-black text-xs shrink-0">
+                                  {rankMedal}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-black text-slate-900 truncate">
+                                    {teacher.name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                                    {teacher.position} • {teacher.hadirTepatWaktuCount} On-Time
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <span className="px-2.5 py-0.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs inline-block">
+                                  ⭐ {teacher.totalPoints}
+                                </span>
+                                <ChevronRight className="w-4 h-4 text-slate-400 inline-block ml-1" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 2: RIWAYAT TRANSAKSI POIN */}
+                {activeTab === 'HISTORY' && (
+                  <div className="space-y-4">
+                    <div className="p-5 rounded-3xl bg-linear-to-br from-[#023246] to-[#0A455E] text-white border border-[#023246]/40 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div>
+                        <span className="text-xs text-cyan-200 uppercase tracking-wider font-extrabold block">
+                          Buku Besar Riwayat Poin Kedisiplinan
+                        </span>
+                        <h4 className="text-base sm:text-lg font-black text-white mt-1">
+                          Log Transparansi Perolehan &amp; Pengurangan Poin
+                        </h4>
+                        <p className="text-xs text-slate-300 font-medium mt-0.5">
+                          Tercatat otomatis dari check-in presensi fisik, tugas piket, dan komitmen evaluasi
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-4 sm:p-6 space-y-3">
+                      {allPointLogs.length === 0 ? (
+                        <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                          <span className="text-3xl">📋</span>
+                          <h5 className="text-sm font-bold text-slate-700">Belum Ada Transaksi Poin</h5>
+                          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                            Log poin otomatis tercatat saat guru melakukan presensi masuk (tepat waktu +15, terlambat +5) atau tugas piket (+10).
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {allPointLogs.slice(0, 20).map((log) => (
+                            <div
+                              key={log.id}
+                              className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex items-center justify-between gap-3 text-xs"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <h6 className="font-black text-slate-900 truncate text-xs sm:text-sm">
+                                  {log.title}
+                                </h6>
+                                <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                  {log.date} • {log.description || 'Poin kedisiplinan guru'}
+                                </p>
+                              </div>
+                              <span
+                                className={`px-3 py-1 rounded-xl text-xs font-black border shrink-0 ${
+                                  log.points >= 15
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                    : log.points >= 10
+                                    ? 'bg-cyan-50 text-[#18536B] border-cyan-300'
+                                    : 'bg-amber-50 text-amber-900 border-amber-300'
+                                }`}
+                              >
+                                +{log.points} Poin
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: SISTEM & BOBOT POIN */}
+                {activeTab === 'RULES' && (
+                  <div className="space-y-6">
+                    <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-2">
+                      <div className="flex items-center gap-2 text-[#023246]">
+                        <Info className="w-5 h-5 text-cyan-600 shrink-0" />
+                        <h4 className="text-sm sm:text-base font-black uppercase tracking-wider">
+                          Transparansi Formula Perhitungan Poin Disiplin
+                        </h4>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                        Poin performa kedisiplinan dihitung secara otomatis dan deterministik setiap hari kerja berdasarkan waktu kedatangan, kepulangan, keaktifan tugas piket, dan komitmen evaluasi harian.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">⏰</span>
+                          <span className="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-black border border-emerald-200">
+                            +15 Poin
+                          </span>
+                        </div>
+                        <h5 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                          Hadir Tepat Waktu (≤ 07:30 WIB)
+                        </h5>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Scan QR Code atau Sidik Jari tepat waktu sebelum bel masuk dibunyikan.
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">⚠️</span>
+                          <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-black border border-amber-200">
+                            +5 Poin
+                          </span>
+                        </div>
+                        <h5 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                          Kehadiran Terlambat (&gt; 07:30 WIB)
+                        </h5>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Tetap diapresiasi karena hadir bertugas membina siswa di sekolah.
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">🛡️</span>
+                          <span className="px-2.5 py-1 rounded-xl bg-cyan-50 text-cyan-800 text-xs font-black border border-cyan-200">
+                            +10 Poin
+                          </span>
+                        </div>
+                        <h5 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                          Melaksanakan Tugas Piket Sekolah
+                        </h5>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Mendampingi ketertiban gerbang, memantau presensi siswa, dan piket harian.
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">🌅</span>
+                          <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-black border border-amber-200">
+                            +5 Poin Bonus
+                          </span>
+                        </div>
+                        <h5 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                          Teladan Fajar (≤ 07:00 WIB)
+                        </h5>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Bonus kedatangan sangat awal sebelum jam operasional sekolah dimulai.
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">🔥</span>
+                          <span className="px-2.5 py-1 rounded-xl bg-rose-50 text-rose-800 text-xs font-black border border-rose-200">
+                            +10 Poin Bonus
+                          </span>
+                        </div>
+                        <h5 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                          Streak Konsistensi 5 Hari
+                        </h5>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Konsistensi hadir tepat waktu berturut-turut tanpa jeda terlambat.
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-3xl bg-rose-50/70 border border-rose-200 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">🚫</span>
+                          <span className="px-2.5 py-1 rounded-xl bg-rose-100 text-rose-900 text-xs font-black border border-rose-300">
+                            -10 Poin
+                          </span>
+                        </div>
+                        <h5 className="text-xs sm:text-sm font-extrabold text-rose-950">
+                          Pengecualian Status ALFA
+                        </h5>
+                        <p className="text-[11px] text-rose-700 leading-relaxed">
+                          Mangkir tanpa izin resmi atau tanpa keterangan dari Kepala Sekolah.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 4: KATALOG LENCANA APRESIASI */}
+                {activeTab === 'BADGES' && (
+                  <div className="space-y-6">
+                    <div className="bg-amber-50/80 rounded-3xl p-5 border border-amber-200 flex items-start gap-3">
+                      <Award className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                      <p className="text-xs sm:text-sm text-amber-900 font-medium leading-relaxed">
+                        Lencana kehormatan resmi dari Kepala Sekolah yang tersemat pada profil pendidik secara transparan dan terukur.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {(currentUserScore?.badges || [
+                        { id: 'b1', title: 'Guru Terdisiplin Waktu', icon: '🎖️', description: 'Menjaga persentase kehadiran tepat waktu di atas 70% pada bulan berjalan.', isUnlocked: true, progressPercent: 100 },
+                        { id: 'b2', title: 'Piket Responsif & Teladan', icon: '🛡️', description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah.', isUnlocked: true, progressPercent: 100 },
+                        { id: 'b3', title: '100% Kehadiran Sempurna', icon: '🌟', description: 'Tercatat hadir tepat waktu tanpa ada keterlambatan di bulan berjalan.', isUnlocked: false, progressPercent: 80 },
+                        { id: 'b4', title: 'Dedikasi & Konsistensi Pendidik', icon: '💚', description: 'Konsisten hadir di sekolah memenuhi jam kerja dan amanah mengajar siswa.', isUnlocked: true, progressPercent: 100 },
+                      ]).map((badge) => (
+                        <div
+                          key={badge.id}
+                          className={`p-4 sm:p-5 rounded-3xl border transition-all ${
+                            badge.isUnlocked
+                              ? 'bg-white border-emerald-200 shadow-2xs'
+                              : 'bg-slate-50 border-slate-200 opacity-80'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3.5">
+                            <span className="text-3xl shrink-0">{badge.icon}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <h5 className="text-xs sm:text-sm font-extrabold text-slate-900 truncate">
+                                  {badge.title}
+                                </h5>
+                                <span
+                                  className={`px-2 py-0.5 text-[10px] font-bold rounded-md shrink-0 ${
+                                    badge.isUnlocked ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                                  }`}
+                                >
+                                  {badge.isUnlocked ? 'Aktif' : `${badge.progressPercent}%`}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                {badge.description}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 5: AMANAT KEPALA SEKOLAH */}
+                {activeTab === 'MESSAGE' && (
+                  <div className="max-w-3xl mx-auto space-y-6">
+                    <div className="bg-linear-to-br from-[#023246] via-[#18536B] to-[#0A455E] text-white rounded-3xl p-6 sm:p-8 shadow-md space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center font-black text-lg border border-white/20 shrink-0">
+                          FS
+                        </div>
+                        <div>
+                          <h4 className="text-base sm:text-lg font-black text-white">Farhan Sopian Sahid, S.Pd.I</h4>
+                          <p className="text-xs text-cyan-200 font-medium">Kepala Sekolah SMP Terpadu Al-Ittihadiyah</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/15 text-xs sm:text-sm leading-relaxed text-slate-100 space-y-3">
+                        <p><em>&ldquo;Bapak dan Ibu Pendidik yang kami muliakan,&rdquo;</em></p>
+                        <p>
+                          &ldquo;Kedisiplinan di sekolah kita bukan sekadar angka di atas kertas. Disiplin adalah bahasa cinta kita kepada para murid—sebuah keteladanan hidup yang mereka rekam setiap pagi saat melihat para gurunya telah hadir dengan senyum dan kesiapan mendidik.&rdquo;
+                        </p>
+                        <p>
+                          &ldquo;Setiap menit kebersamaan yang Bapak/Ibu dedikasikan di ruang-ruang kelas adalah benih peradaban yang kita tanam bersama untuk masa depan generasi penerus bangsa.&rdquo;
+                        </p>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/15 flex items-center justify-between text-xs text-cyan-200">
+                        <span>Disahkan di Ciampea, Bogor</span>
+                        <span>Kepala Sekolah SMPTAL</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+          </div>
+        </main>
+
+        {/* ── 4. STICKY FOOTER ──────────────────────────────────────────────── */}
+        <footer className="px-4 py-3 sm:px-6 sm:py-3.5 bg-white border-t border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
+          <div className="text-xs text-slate-500 font-medium truncate flex-1 min-w-0">
+            {selectedTeacher ? (
+              <span>Sedang meninjau: <strong>{selectedTeacher.name}</strong></span>
+            ) : (
+              <span>
+                Juara 1: <strong>{formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}</strong> ({topTeacher?.totalPoints ?? 0} Poin) • {totalTeachers} Guru Terdaftar
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={selectedTeacher ? () => setSelectedTeacher(null) : onClose}
+            className="px-4 sm:px-5 py-2 rounded-xl bg-[#023246] hover:bg-[#034560] active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-1.5"
+          >
+            {selectedTeacher ? (
+              <>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Kembali ke Klasemen</span>
+              </>
+            ) : (
+              <span>Tutup Workspace</span>
+            )}
+          </button>
+        </footer>
+
+        {/* Modal Riwayat Pendapatan Poin Khusus */}
+        <TeacherPointHistoryModal
+          isOpen={isPointHistoryModalOpen}
+          onClose={() => setIsPointHistoryModalOpen(false)}
+          teacher={pointHistoryTeacher}
+          pointHistory={teacherLogs}
+          selectedMonth={selectedPeriod === 'CURRENT_MONTH' ? 9 : 8}
+          selectedYear={2026}
+        />
+      </div>,
+      document.body
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COMPACT MODAL DIALOG (DEFAULT FOR GURU DASHBOARD OR COMPACT DISPLAY)
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-fade-in overflow-x-hidden">
       {/* Backdrop */}
@@ -407,17 +1709,14 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </span>
                 </div>
 
-                {/* Vertical Bar Chart */}
                 <div className="pt-2 pb-1">
                   <div className="grid grid-cols-4 gap-2 h-32 items-end px-1 border-b border-slate-200 pb-2">
                     {getWeeklyDisciplineRates(selectedTeacher).map((item) => (
                       <div key={item.week} className="flex flex-col items-center h-full justify-end group">
-                        {/* Bar Rate Value */}
                         <span className="text-[9px] font-black text-slate-700 mb-1">
                           {item.rate}%
                         </span>
 
-                        {/* Bar Pillar */}
                         <div className="w-full max-w-10 bg-slate-100 rounded-t-lg h-24 flex items-end justify-center p-0.5">
                           <div
                             className={`w-full rounded-t-md transition-all duration-700 ${
@@ -431,7 +1730,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                           />
                         </div>
 
-                        {/* Week Label */}
                         <span className="text-[10px] font-black text-slate-700 mt-1.5">
                           Pekan {item.week}
                         </span>
@@ -469,7 +1767,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               </div>
             </div>
           ) : (
-            /* ──── LAYER DAFTAR UTAMA (LEADERBOARD / RULES / BADGES / MESSAGE) ─── */
+            /* ──── LAYER DAFTAR UTAMA ──── */
             <>
               {/* TAB 1: LEADERBOARD / PERINGKAT DISIPLIN */}
               {activeTab === 'LEADERBOARD' && (
@@ -540,7 +1838,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             {topTeacher?.position || 'Guru Pengajar'}
                           </p>
 
-                          {/* Mini Sparkline Bar Chart in Hero Card */}
                           <div className="flex items-center gap-2 mt-1.5">
                             {topTeacher && (
                               <div className="flex items-end gap-0.5 h-3.5 w-6 bg-amber-100/60 p-0.5 rounded">
@@ -649,7 +1946,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                 : 'bg-white hover:bg-slate-50 border-slate-200 shadow-2xs'
                             }`}
                           >
-                            {/* Left: Medal & Teacher Info */}
                             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                               <div
                                 className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
@@ -687,7 +1983,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                               </div>
                             </div>
 
-                            {/* Middle: GRAFIK KECIL (SPARKLINE ATTENDANCE TREND) */}
                             <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/80 shrink-0 group-hover:bg-white transition-colors">
                               <div className="flex items-end gap-0.5 h-4 w-7">
                                 {weeklyData.map((d, idx) => (
@@ -710,7 +2005,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                               </span>
                             </div>
 
-                            {/* Right: Points & Chevron */}
                             <div className="flex items-center gap-1.5 shrink-0 text-right">
                               <div>
                                 <span className={`text-xs font-black block ${teacher.totalPoints === 0 ? 'text-slate-400' : 'text-slate-900'}`}>
@@ -748,6 +2042,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                         Akumulasi perolehan poin kehadiran &amp; piket
                       </p>
                     </div>
+
                     <div className="text-right shrink-0">
                       <div className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-xs flex items-center gap-1 justify-end">
                         <span>⭐</span>
@@ -797,7 +2092,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                               key={log.id}
                               className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex items-center justify-between gap-3"
                             >
-                              {/* Left Calendar Tile */}
                               <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center shrink-0">
                                 <span className="text-[7.5px] font-extrabold text-slate-400 uppercase leading-none">
                                   {dateParts.month}
@@ -807,7 +2101,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                 </span>
                               </div>
 
-                              {/* Center Content */}
                               <div className="min-w-0 flex-1 space-y-0.5">
                                 <h6 className="text-xs font-black text-slate-900 truncate leading-tight">
                                   {log.title}
@@ -817,7 +2110,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                 </p>
                               </div>
 
-                              {/* Right Point Chip */}
                               <span
                                 className={`px-2.5 py-1 rounded-xl text-xs font-black border shrink-0 shadow-2xs ${
                                   log.points >= 15
@@ -862,7 +2154,6 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     </p>
                   </div>
 
-                  {/* Rincian Bobot */}
                   <div className="space-y-1.5">
                     <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
                       <div className="flex items-center gap-2">

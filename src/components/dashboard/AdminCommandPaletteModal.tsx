@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, User, LayoutDashboard, Eye, Users, Calendar, Settings, QrCode, Edit3, TestTube, ArrowRight, MessageSquare, GraduationCap, BarChart3, ClipboardCheck } from 'lucide-react';
+import { Search, X, User, LayoutDashboard, Eye, Users, Calendar, Settings, QrCode, Edit3, TestTube, ArrowRight, MessageSquare, GraduationCap, BarChart3, ClipboardCheck, Trophy } from 'lucide-react';
 import type { UserProfile } from '../../types/database.types';
 
 export interface CommandItem {
@@ -55,6 +55,7 @@ export const AdminCommandPaletteModal: React.FC<AdminCommandPaletteModalProps> =
       { id: 'TEACHERS', title: 'Kelola Data Guru & Staf', subtitle: 'Manajemen akun, NIP, & status aktif', icon: <Users className="w-4 h-4 text-sky-600" /> },
       { id: 'STUDENTS', title: 'Direktori Siswa & Kontak Wali', subtitle: 'Master data siswa & nomor WA orang tua/wali', icon: <GraduationCap className="w-4 h-4 text-emerald-600" /> },
       { id: 'QUESTION_CORRECTION', title: 'Koreksi Soal & Input Nilai', subtitle: 'GradeMaster In-App & pemeriksaan lembar ujian', icon: <ClipboardCheck className="w-4 h-4 text-teal-600" /> },
+      { id: 'LEADERBOARD', title: 'Peringkat Poin Terbanyak', subtitle: 'Klasemen kedisiplinan & akumulasi poin guru', icon: <Trophy className="w-4 h-4 text-amber-500" /> },
       { id: 'COMPLAINTS', title: 'Kotak Aspirasi & Keluhan Guru', subtitle: 'Pantau laporan & keluhan guru secara 100% anonim', icon: <MessageSquare className="w-4 h-4 text-amber-600" /> },
       { id: 'SCHEDULE', title: 'Jadwal Mengajar Guru', subtitle: 'Atur alokasi kelas & mata pelajaran', icon: <Calendar className="w-4 h-4 text-purple-600" /> },
       { id: 'CALENDAR', title: 'Kalender Akademik', subtitle: 'Atur hari libur & agenda sekolah', icon: <Calendar className="w-4 h-4 text-indigo-600" /> },
