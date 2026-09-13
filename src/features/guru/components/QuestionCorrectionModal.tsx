@@ -836,7 +836,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       <select
                         value={selectedSubject}
                         onChange={(e) => setSelectedSubject(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       >
                         {PREDEFINED_SUBJECTS.map((sub) => (
                           <option key={sub} value={sub}>
@@ -855,7 +855,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                           value={customSubject}
                           onChange={(e) => setCustomSubject(e.target.value)}
                           placeholder="Contoh: Geografi, Fisika..."
-                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                           required
                         />
                       </div>
@@ -866,7 +866,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       <select
                         value={selectedClass}
                         onChange={(e) => setSelectedClass(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       >
                         {PREDEFINED_CLASSES.map((cls) => (
                           <option key={cls} value={cls}>
@@ -881,7 +881,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       <select
                         value={examType}
                         onChange={(e) => setExamType(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       >
                         {PREDEFINED_EXAM_TYPES.map((et) => (
                           <option key={et} value={et}>
@@ -899,7 +899,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         max="100"
                         value={kkm}
                         onChange={(e) => setKkm(Number(e.target.value))}
-                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                         required
                       />
                     </div>
@@ -909,7 +909,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       <select
                         value={academicYear}
                         onChange={(e) => setAcademicYear(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       >
                         <option value="2024/2025">2024/2025</option>
                         <option value="2025/2026">2025/2026</option>
@@ -922,7 +922,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       <select
                         value={semester}
                         onChange={(e) => setSemester(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       >
                         <option value="Ganjil">Ganjil</option>
                         <option value="Genap">Genap</option>
@@ -945,7 +945,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       value={keyInput}
                       onChange={(e) => setKeyInput(e.target.value)}
                       placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A atau ABCDABCD"
-                      className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 font-mono"
+                      className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono"
                       required
                     />
                     <p className="text-[11px] text-slate-500 mt-1">
@@ -977,7 +977,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       value={sessionName}
                       onChange={(e) => setSessionName(e.target.value)}
                       placeholder="Otomatis digenerate jika dikosongkan..."
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                     />
                   </div>
 
@@ -1058,7 +1058,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       value={sessionSearchQuery}
                       onChange={(e) => setSessionSearchQuery(e.target.value)}
                       placeholder="Cari sesi ujian, mapel, atau guru..."
-                      className="w-full bg-white border border-slate-300 rounded-xl py-2 pl-9 pr-8 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                      className="w-full bg-white border border-slate-300 rounded-xl py-2 pl-9 pr-8 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                     />
                     {sessionSearchQuery && (
                       <button
@@ -1342,7 +1342,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     }}
                     onFocus={() => setIsStudentDropdownOpen(true)}
                     placeholder="Ketik atau pilih nama siswa..."
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 min-h-11 transition-colors"
+                    className="w-full bg-white border border-slate-300 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 min-h-11 transition-colors"
                   />
                 </div>
 
@@ -1441,7 +1441,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         value={quickKeyInput}
                         onChange={(e) => setQuickKeyInput(e.target.value)}
                         placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A 6.B ... atau ABCDABCD"
-                        className="grow bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
+                        className="grow bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                       />
                       <button
                         type="button"
@@ -1565,7 +1565,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         setManualScore(val);
                       }}
                       placeholder="Ketik nilai langsung..."
-                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                     />
                     {manualScore !== null && (
                       <button
@@ -1630,7 +1630,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                               return next;
                             });
                           }}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-center text-xs font-black text-teal-700 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600"
+                          className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-center text-xs font-black text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                         />
                       </div>
                     ))}
@@ -1876,7 +1876,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 value={quickKeyInput}
                 onChange={(e) => setQuickKeyInput(e.target.value)}
                 placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D atau ABCDABCD"
-                className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 focus:outline-hidden min-h-32"
+                className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 min-h-32"
               />
               <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <span>Terdeteksi: <strong className="text-teal-700">{parseAnswerKey(quickKeyInput).length}</strong> butir soal PG</span>
