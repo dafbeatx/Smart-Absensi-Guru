@@ -58,7 +58,12 @@ export async function authenticateHomeroomTeacher(
   // 1. Validasi sesi dasar melalui session middleware
   const auth = await authenticateUser(req);
   if (!auth.ok) {
-    return auth;
+    return {
+      ok: false,
+      status: auth.status,
+      errorCode: auth.errorCode,
+      errorMessage: auth.errorMessage,
+    };
   }
 
   const { userId, user, role } = auth;
