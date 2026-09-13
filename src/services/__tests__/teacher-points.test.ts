@@ -835,5 +835,63 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     assert('Leaderboard Synchronization & Batch Reconciliation', false, String(err));
   }
 
+  // 19. Leaderboard Tier Hierarchy: Only Juara 1 is Teladan Utama
+  try {
+    const currentLeaderboard = getTeacherDisciplineLeaderboard(null, null, 'CURRENT_MONTH');
+    const items = currentLeaderboard.leaderboard;
+
+    const rank1 = items.find((t) => t.rank === 1);
+    const rank2 = items.find((t) => t.rank === 2);
+    const rank3 = items.find((t) => t.rank === 3);
+    const rank4 = items.find((t) => t.rank === 4);
+    const rank6 = items.find((t) => t.rank === 6);
+    const rank7 = items.find((t) => t.rank === 7);
+    const cutiTeacher = items.find((t) => t.totalPoints === 0 || t.level.includes('Cuti'));
+
+    // Count how many teachers have '🏆 Pendidik Teladan Utama'
+    const teladanUtamaCount = items.filter((t) => t.level.includes('Teladan Utama')).length;
+
+    assert(
+      'Leaderboard Tier Hierarchy: Only exactly Rank 1 receives "🏆 Pendidik Teladan Utama"',
+      teladanUtamaCount === 1 && rank1?.level === '🏆 Pendidik Teladan Utama',
+      `Teladan Utama count: ${teladanUtamaCount}, Rank 1: ${rank1?.name} (${rank1?.level})`
+    );
+
+    assert(
+      'Leaderboard Tier Hierarchy: Rank 2 and Rank 3 receive "🥇 Pendidik Disiplin Emas"',
+      rank2?.level === '🥇 Pendidik Disiplin Emas' && rank3?.level === '🥇 Pendidik Disiplin Emas',
+      `Rank 2: ${rank2?.level}, Rank 3: ${rank3?.level}`
+    );
+
+    assert(
+      'Leaderboard Tier Hierarchy: Rank 4 to 6 receive "🥈 Pendidik Berdedikasi"',
+      rank4?.level === '🥈 Pendidik Berdedikasi' && rank6?.level === '🥈 Pendidik Berdedikasi',
+      `Rank 4: ${rank4?.level}, Rank 6: ${rank6?.level}`
+    );
+
+    assert(
+      'Leaderboard Tier Hierarchy: Rank 7+ receives "🥉 Pendidik Berkomitmen"',
+      rank7?.level === '🥉 Pendidik Berkomitmen',
+      `Rank 7: ${rank7?.level}`
+    );
+
+    assert(
+      'Leaderboard Tier Hierarchy: Teacher with 0 points receives "🏖️ Sedang Cuti Resmi"',
+      cutiTeacher?.level === '🏖️ Sedang Cuti Resmi',
+      `Cuti Teacher (${cutiTeacher?.name}): ${cutiTeacher?.level}`
+    );
+
+    // Also verify previous month leaderboard tier hierarchy
+    const prevLeaderboard = getTeacherDisciplineLeaderboard(null, null, 'PREVIOUS_MONTH');
+    const prevTeladanCount = prevLeaderboard.leaderboard.filter((t) => t.level.includes('Teladan Utama')).length;
+    assert(
+      'Leaderboard Tier Hierarchy: Previous Month also strictly reserves Teladan Utama for Juara 1',
+      prevTeladanCount === 1 && prevLeaderboard.leaderboard[0].level === '🏆 Pendidik Teladan Utama',
+      `Prev month Teladan count: ${prevTeladanCount}, Top: ${prevLeaderboard.leaderboard[0].name}`
+    );
+  } catch (err: unknown) {
+    assert('Leaderboard Tier Hierarchy: Guard', false, String(err));
+  }
+
   return { passed, failed, results };
 };

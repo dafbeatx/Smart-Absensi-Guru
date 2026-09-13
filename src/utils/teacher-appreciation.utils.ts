@@ -110,18 +110,18 @@ export function calculateTeacherAppreciationScore(
     level = '🏖️ Sedang Cuti / Izin Resmi';
     nextLevelPoints = 50;
     levelProgressPercent = 0;
-  } else if (totalPoints >= 80) {
+  } else if (totalPoints >= 150) {
     level = '🏆 Pendidik Teladan Utama (Level 4)';
-    nextLevelPoints = 150;
-    levelProgressPercent = Math.min(100, Math.round((totalPoints / 100) * 100));
-  } else if (totalPoints >= 65) {
+    nextLevelPoints = 200;
+    levelProgressPercent = Math.min(100, Math.round(((totalPoints - 150) / 50) * 100));
+  } else if (totalPoints >= 100) {
     level = '🥇 Pendidik Disiplin Emas (Level 3)';
-    nextLevelPoints = 80;
-    levelProgressPercent = Math.min(100, Math.round(((totalPoints - 65) / 15) * 100));
+    nextLevelPoints = 150;
+    levelProgressPercent = Math.min(100, Math.round(((totalPoints - 100) / 50) * 100));
   } else if (totalPoints >= 50) {
     level = '🥈 Pendidik Berdedikasi (Level 2)';
-    nextLevelPoints = 65;
-    levelProgressPercent = Math.min(100, Math.round(((totalPoints - 50) / 15) * 100));
+    nextLevelPoints = 100;
+    levelProgressPercent = Math.min(100, Math.round(((totalPoints - 50) / 50) * 100));
   }
 
   // Badges Calculation: Evaluasi berbasis presensi masuk fisik
@@ -260,7 +260,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19920311 202002 2 006',
       position: 'Guru Mapel IPA',
       totalPoints: 145, // 7 Hadir (105) + 1 Piket (10) + 1 Streak (10) + 2 Pulang (20)
-      level: '🏆 Pendidik Teladan Utama',
+      level: '🥇 Pendidik Disiplin Emas',
       rank: 2,
       hadirTepatWaktuCount: 7,
       terlambatCount: 0,
@@ -275,7 +275,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19921105 202102 2 009',
       position: 'Guru Mapel B. Indonesia',
       totalPoints: 145, // 7 Hadir (105) + 1 Piket (10) + 1 Streak (10) + 2 Pulang (20)
-      level: '🏆 Pendidik Teladan Utama',
+      level: '🥇 Pendidik Disiplin Emas',
       rank: 3,
       hadirTepatWaktuCount: 7,
       terlambatCount: 0,
@@ -290,7 +290,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19890918 201801 1 003',
       position: 'Guru Mapel Bahasa Inggris',
       totalPoints: 120, // 6 Hadir (90) + 2 Pulang (20) + 2 Piket (20) - 1 izin hari ke-3
-      level: '🥇 Pendidik Disiplin Emas',
+      level: '🥈 Pendidik Berdedikasi',
       rank: 4,
       hadirTepatWaktuCount: 6,
       terlambatCount: 0,
@@ -305,7 +305,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19950117 202303 2 010',
       position: 'Tata Usaha (TU)',
       totalPoints: 120, // 5 Hadir (75) + 2 Telat (10) + 2 Pulang (20) + 2 Piket (20) + 1 Early Bird (5) - 1 Alfa (10)
-      level: '🥇 Pendidik Disiplin Emas',
+      level: '🥈 Pendidik Berdedikasi',
       rank: 5,
       hadirTepatWaktuCount: 5,
       terlambatCount: 2,
@@ -320,7 +320,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: null,
       position: 'Guru Mapel Informatika',
       totalPoints: 95, // 3 Hadir (45) + 4 Telat (20) + 2 Pulang (20) + 1 Piket (10)
-      level: '🏆 Pendidik Teladan Utama',
+      level: '🥈 Pendidik Berdedikasi',
       rank: 6,
       hadirTepatWaktuCount: 3,
       terlambatCount: 4,
@@ -335,7 +335,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19931201 202103 2 007',
       position: 'Wakasek Kesiswaan',
       totalPoints: 60, // 1 Hadir (15) + 2 Telat (10) + 2 Pulang (20) + 1 Early Bird (5) + 1 Piket (10)
-      level: '🥈 Pendidik Berdedikasi',
+      level: '🥉 Pendidik Berkomitmen',
       rank: 7,
       hadirTepatWaktuCount: 1,
       terlambatCount: 2,
@@ -443,7 +443,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19920311 202002 2 006',
       position: 'Guru Mapel IPA',
       totalPoints: 220, // 14 Hadir (210) + 2 Telat (10) + 1 Izin (0)
-      level: '🏆 Pendidik Teladan Utama',
+      level: '🥇 Pendidik Disiplin Emas',
       rank: 2,
       hadirTepatWaktuCount: 14,
       terlambatCount: 2,
@@ -469,7 +469,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19880512 201503 1 002',
       position: 'Wakasek Sarana dan Prasarana',
       totalPoints: 200, // 12 Hadir (180) + 4 Telat (20) + 1 Izin (0)
-      level: '🥇 Pendidik Disiplin Emas',
+      level: '🥈 Pendidik Berdedikasi',
       rank: 4,
       hadirTepatWaktuCount: 12,
       terlambatCount: 4,
@@ -482,7 +482,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19890918 201801 1 003',
       position: 'Guru Mapel Bahasa Inggris',
       totalPoints: 190, // 12 Hadir (180) + 2 Telat (10) + 1 Izin (0) + 3 Sakit (0)
-      level: '🥇 Pendidik Disiplin Emas',
+      level: '🥈 Pendidik Berdedikasi',
       rank: 5,
       hadirTepatWaktuCount: 12,
       terlambatCount: 2,
@@ -495,7 +495,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: null,
       position: 'Guru Mapel Informatika',
       totalPoints: 185, // 10 Hadir (150) + 7 Telat (35) + 2 Izin (0)
-      level: '🥇 Pendidik Disiplin Emas',
+      level: '🥈 Pendidik Berdedikasi',
       rank: 6,
       hadirTepatWaktuCount: 10,
       terlambatCount: 7,
@@ -508,7 +508,7 @@ export function getTeacherDisciplineLeaderboard(
       nip: '19910415 201902 2 004',
       position: 'Wakasek Kurikulum',
       totalPoints: 175, // 9 Hadir (135) + 8 Telat (40) + 1 Izin (0)
-      level: '🥇 Pendidik Disiplin Emas',
+      level: '🥉 Pendidik Berkomitmen',
       rank: 7,
       hadirTepatWaktuCount: 9,
       terlambatCount: 8,
@@ -601,12 +601,6 @@ export function getTeacherDisciplineLeaderboard(
       const earlyBird = logs.filter((l) => l.activity_type === 'EARLY_BIRD_BONUS').length;
       const streak = logs.filter((l) => l.activity_type === 'STREAK_MILESTONE').length;
 
-      let lvl = t.level;
-      if (pts >= 80) lvl = '🏆 Pendidik Teladan Utama';
-      else if (pts >= 65) lvl = '🥇 Pendidik Disiplin Emas';
-      else if (pts >= 50) lvl = '🥈 Pendidik Berdedikasi';
-      else if (pts > 0) lvl = '🥉 Pendidik Berkomitmen';
-
       return {
         ...t,
         totalPoints: pts,
@@ -615,7 +609,6 @@ export function getTeacherDisciplineLeaderboard(
         piketCount: piket,
         earlyBirdCount: earlyBird,
         streakCount: streak,
-        level: lvl,
       };
     });
   }
@@ -731,11 +724,47 @@ export function getTeacherDisciplineLeaderboard(
     return a.name.localeCompare(b.name);
   });
 
-  // Update peringkat rank
-  teachers = teachers.map((t, idx) => ({
-    ...t,
-    rank: idx + 1,
-  }));
+  // Update peringkat rank dan standarisasi tingkat prestasi:
+  // - Juara 1 strictly reserved untuk Pendidik Teladan Utama
+  // - Peringkat 2 - 3: Pendidik Disiplin Emas
+  // - Peringkat 4 - 6: Pendidik Berdedikasi
+  // - Peringkat 7+: Pendidik Berkomitmen
+  // - 0 Poin / Sedang Cuti: Sedang Cuti Resmi
+  teachers = teachers.map((t, idx) => {
+    const rank = idx + 1;
+    let level = t.level;
+    let topBadge = t.topBadge;
+
+    if (t.totalPoints === 0 || (t.level && t.level.includes('Cuti'))) {
+      level = '🏖️ Sedang Cuti Resmi';
+      topBadge = { icon: '🏖️', title: 'Sedang Cuti Resmi' };
+    } else if (rank === 1) {
+      level = '🏆 Pendidik Teladan Utama';
+      topBadge = { icon: '🏆', title: 'Pendidik Teladan Utama Kepsek' };
+    } else if (rank <= 3) {
+      level = '🥇 Pendidik Disiplin Emas';
+      if (!topBadge || topBadge.icon === '🏆') {
+        topBadge = { icon: '🌟', title: '100% Kehadiran Sempurna' };
+      }
+    } else if (rank <= 6) {
+      level = '🥈 Pendidik Berdedikasi';
+      if (!topBadge || topBadge.icon === '🏆' || topBadge.icon === '🥇') {
+        topBadge = { icon: '🛡️', title: 'Piket Responsif & Teladan' };
+      }
+    } else {
+      level = '🥉 Pendidik Berkomitmen';
+      if (!topBadge || topBadge.icon === '🏆' || topBadge.icon === '🥇' || topBadge.icon === '🥈') {
+        topBadge = { icon: '🥉', title: 'Pendidik Berkomitmen' };
+      }
+    }
+
+    return {
+      ...t,
+      rank,
+      level,
+      topBadge,
+    };
+  });
 
   const topTeacher = teachers[0] || {
     id: 'usr_default',

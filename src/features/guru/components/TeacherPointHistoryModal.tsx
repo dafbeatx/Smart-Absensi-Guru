@@ -157,24 +157,24 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
 
   // Evaluasi Tier / Level Disiplin berdasarkan saldo periode terpilih
   const teacherLevel = useMemo(() => {
-    if (calculatedTotal >= 80) return '🏆 Level 4: Pendidik Teladan Utama';
-    if (calculatedTotal >= 65) return '🥇 Level 3: Pendidik Disiplin Emas';
+    if (calculatedTotal >= 150) return '🏆 Level 4: Pendidik Teladan Utama';
+    if (calculatedTotal >= 100) return '🥇 Level 3: Pendidik Disiplin Emas';
     if (calculatedTotal >= 50) return '🥈 Level 2: Pendidik Berdedikasi';
     if (calculatedTotal > 0) return '🥉 Level 1: Pendidik Berkomitmen';
     return '🌱 Level 0: Awal Periode (0 Poin)';
   }, [calculatedTotal]);
 
   const levelProgress = useMemo(() => {
-    if (calculatedTotal >= 80) {
+    if (calculatedTotal >= 150) {
       return { percent: 100, label: 'Level Teladan Maksimal' };
     }
-    if (calculatedTotal >= 65) {
-      const progress = Math.min(100, Math.round(((calculatedTotal - 65) / 15) * 100));
-      return { percent: progress, label: `${80 - calculatedTotal} poin lagi ke Teladan Utama` };
+    if (calculatedTotal >= 100) {
+      const progress = Math.min(100, Math.round(((calculatedTotal - 100) / 50) * 100));
+      return { percent: progress, label: `${150 - calculatedTotal} poin lagi ke Teladan Utama` };
     }
     if (calculatedTotal >= 50) {
-      const progress = Math.min(100, Math.round(((calculatedTotal - 50) / 15) * 100));
-      return { percent: progress, label: `${65 - calculatedTotal} poin lagi ke Level Emas` };
+      const progress = Math.min(100, Math.round(((calculatedTotal - 50) / 50) * 100));
+      return { percent: progress, label: `${100 - calculatedTotal} poin lagi ke Level Emas` };
     }
     const progress = Math.min(100, Math.round((calculatedTotal / 50) * 100));
     return { percent: progress, label: `${50 - calculatedTotal} poin lagi ke Level 2` };

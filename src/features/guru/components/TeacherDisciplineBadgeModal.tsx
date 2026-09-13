@@ -176,10 +176,10 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
         (t.position && t.position.toLowerCase().includes(q));
 
       let matchTier = true;
-      if (tierFilter === 'TELADAN') matchTier = t.totalPoints >= 80;
-      else if (tierFilter === 'EMAS') matchTier = t.totalPoints >= 65 && t.totalPoints < 80;
-      else if (tierFilter === 'DEDIKASI') matchTier = t.totalPoints >= 50 && t.totalPoints < 65;
-      else if (tierFilter === 'KOMITMEN') matchTier = t.totalPoints < 50;
+      if (tierFilter === 'TELADAN') matchTier = t.level.includes('Teladan');
+      else if (tierFilter === 'EMAS') matchTier = t.level.includes('Emas');
+      else if (tierFilter === 'DEDIKASI') matchTier = t.level.includes('Dedikasi');
+      else if (tierFilter === 'KOMITMEN') matchTier = t.level.includes('Komitmen');
 
       return matchSearch && matchTier;
     });
@@ -867,33 +867,44 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             onClick={() => setTierFilter('TELADAN')}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                               tierFilter === 'TELADAN'
-                                ? 'bg-amber-500 text-white'
+                                ? 'bg-amber-500 text-white shadow-2xs'
                                 : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
                             }`}
                           >
-                            🏆 Teladan (≥80)
+                            🏆 Teladan Utama
                           </button>
                           <button
                             type="button"
                             onClick={() => setTierFilter('EMAS')}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                               tierFilter === 'EMAS'
-                                ? 'bg-amber-400 text-slate-950'
+                                ? 'bg-amber-400 text-slate-950 shadow-2xs'
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                           >
-                            🥇 Emas (≥65)
+                            🥇 Disiplin Emas
                           </button>
                           <button
                             type="button"
                             onClick={() => setTierFilter('DEDIKASI')}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                               tierFilter === 'DEDIKASI'
-                                ? 'bg-cyan-600 text-white'
+                                ? 'bg-cyan-600 text-white shadow-2xs'
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                           >
-                            🥈 Berdedikasi (≥50)
+                            🥈 Berdedikasi
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTierFilter('KOMITMEN')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                              tierFilter === 'KOMITMEN'
+                                ? 'bg-slate-800 text-white shadow-2xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            🥉 Berkomitmen
                           </button>
                         </div>
                       </div>
