@@ -172,3 +172,28 @@ export interface MasterSmkMajor {
   name: string;
   field: string;
 }
+
+export interface SaveStudentPlanDTO {
+  student_id: string;
+  continuation_type: ContinuationType;
+  parent_agreement: boolean;
+  first_choice_school_name?: string;
+  first_choice_major_name?: string;
+  second_choice_school_name?: string;
+  second_choice_major_name?: string;
+  parent_notes?: string;
+}
+
+export interface UploadStudentDocumentDTO {
+  student_id: string;
+  document_type: string;
+  file_base64: string;
+  file_name: string;
+  mime_type: string;
+}
+
+export interface UploadDocumentResult {
+  success: boolean;
+  message: string;
+  document?: StudentDocumentItem;
+}

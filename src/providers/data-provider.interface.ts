@@ -48,6 +48,9 @@ import type {
   StudentPlanDetail,
   VerifyPlanDTO,
   VerifyPlanResult,
+  SaveStudentPlanDTO,
+  UploadStudentDocumentDTO,
+  UploadDocumentResult,
 } from '../types/homeroom.types';
 
 export interface IDataProvider {
@@ -198,6 +201,8 @@ export interface IDataProvider {
   getStudentPlanDetail(studentId: string, token: string): Promise<StudentPlanDetail>;
   verifyStudentPlan(dto: VerifyPlanDTO, token: string): Promise<VerifyPlanResult>;
   getHomeroomDocumentUrl(documentId: string, token: string): Promise<string>;
+  saveStudentPlan(dto: SaveStudentPlanDTO, token: string): Promise<{ success: boolean; message: string; plan_id?: string }>;
+  uploadStudentDocument(dto: UploadStudentDocumentDTO, token: string): Promise<UploadDocumentResult>;
 }
 
 

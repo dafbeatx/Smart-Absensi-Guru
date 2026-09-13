@@ -9,6 +9,9 @@ import type {
   StudentPlanDetail,
   VerifyPlanDTO,
   VerifyPlanResult,
+  SaveStudentPlanDTO,
+  UploadStudentDocumentDTO,
+  UploadDocumentResult,
 } from '../types/homeroom.types';
 
 export class HomeroomRepository {
@@ -30,5 +33,13 @@ export class HomeroomRepository {
 
   public static async getDocumentUrl(documentId: string, token: string): Promise<string> {
     return ProviderFactory.getProvider().getHomeroomDocumentUrl(documentId, token);
+  }
+
+  public static async savePlan(dto: SaveStudentPlanDTO, token: string): Promise<{ success: boolean; message: string; plan_id?: string }> {
+    return ProviderFactory.getProvider().saveStudentPlan(dto, token);
+  }
+
+  public static async uploadDocument(dto: UploadStudentDocumentDTO, token: string): Promise<UploadDocumentResult> {
+    return ProviderFactory.getProvider().uploadStudentDocument(dto, token);
   }
 }

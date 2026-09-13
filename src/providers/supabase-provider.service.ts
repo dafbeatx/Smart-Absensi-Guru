@@ -66,6 +66,9 @@ import type {
   StudentPlanDetail,
   VerifyPlanDTO,
   VerifyPlanResult,
+  SaveStudentPlanDTO,
+  UploadStudentDocumentDTO,
+  UploadDocumentResult,
 } from '../types/homeroom.types';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
@@ -4952,6 +4955,48 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     return json.downloadUrl;
+  }
+
+  public async saveStudentPlan(
+    dto: SaveStudentPlanDTO,
+    token: string
+  ): Promise<{ success: boolean; message: string; plan_id?: string }> {
+    const resp = await fetch('/api/homeroom/save-plan', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dto),
+    });
+
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.success) {
+      throw new Error(json?.errorMessage || 'Gagal menyimpan rencana pendidikan lanjutan siswa.');
+    }
+
+    return json;
+  }
+
+  public async uploadStudentDocument(
+    dto: UploadStudentDocumentDTO,
+    token: string
+  ): Promise<UploadDocumentResult> {
+    const resp = await fetch('/api/homeroom/upload-document', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dto),
+    });
+
+    const json = await resp.json().catch(() => null);
+    if (!resp.ok || !json?.success) {
+      throw new Error(json?.errorMessage || 'Gagal mengunggah dokumen siswa.');
+    }
+
+    return json;
   }
 }
 
