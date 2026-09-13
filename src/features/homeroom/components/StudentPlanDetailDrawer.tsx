@@ -383,7 +383,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
                 <select
                   value={continuationType}
                   onChange={(e) => setContinuationType(e.target.value as ContinuationType)}
-                  className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 font-medium text-slate-800 cursor-pointer"
+                  className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 font-medium text-slate-800 cursor-pointer"
                 >
                   <option value="SMA_NEGERI">SMA Negeri</option>
                   <option value="SMA_SWASTA">SMA Swasta</option>
@@ -413,7 +413,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
                     value={firstSchoolName}
                     onChange={(e) => setFirstSchoolName(e.target.value)}
                     placeholder="Contoh: SMAN 1 Bogor / SMKN 1 Cibinong"
-                    className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-slate-800 font-medium"
+                    className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-slate-800 font-medium"
                   />
                 </div>
                 <div>
@@ -423,7 +423,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
                     value={firstMajorName}
                     onChange={(e) => setFirstMajorName(e.target.value)}
                     placeholder="Contoh: MIPA / Rekayasa Perangkat Lunak"
-                    className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-slate-800 font-medium"
+                    className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-slate-800 font-medium"
                   />
                 </div>
               </div>
@@ -444,7 +444,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
                     value={secondSchoolName}
                     onChange={(e) => setSecondSchoolName(e.target.value)}
                     placeholder="Contoh: SMAN 3 Bogor / SMKN 2 Bogor"
-                    className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-slate-800 font-medium"
+                    className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-slate-800 font-medium"
                   />
                 </div>
                 <div>
@@ -454,7 +454,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
                     value={secondMajorName}
                     onChange={(e) => setSecondMajorName(e.target.value)}
                     placeholder="Contoh: IPS / Teknik Komputer & Jaringan"
-                    className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-slate-800 font-medium"
+                    className="w-full h-11 text-xs sm:text-sm px-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-slate-800 font-medium"
                   />
                 </div>
               </div>
@@ -485,7 +485,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
                     value={parentNotes}
                     onChange={(e) => setParentNotes(e.target.value)}
                     placeholder="Contoh: Orang tua menyetujui jika masuk lewat jalur zonasi."
-                    className="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-slate-800 font-medium"
+                    className="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-slate-800 font-medium"
                   />
                 </div>
               </div>

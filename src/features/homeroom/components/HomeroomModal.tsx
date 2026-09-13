@@ -132,7 +132,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
       aria-labelledby="homeroom-modal-title"
     >
       {/* Mobile-First Fullscreen Container (Target: Infinix Note 8 / 360px-412px, responsive on tablet/desktop) */}
-      <div className="bg-slate-50 w-full h-full sm:max-w-4xl sm:h-[92vh] sm:max-h-[860px] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border-0 sm:border sm:border-slate-200">
+      <div className="bg-slate-50 w-full h-full sm:max-w-4xl sm:h-[92vh] sm:max-h-215 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border-0 sm:border sm:border-slate-200">
         {/* Top App Bar Header */}
         <header className="px-4 py-3 sm:px-5 sm:py-3.5 bg-white border-b border-slate-200 shrink-0 flex items-center justify-between gap-3 safe-top">
           <div className="flex items-center gap-3 min-w-0">
@@ -222,7 +222,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="🔍 Cari nama siswa atau NISN..."
-              className="w-full h-11 text-xs sm:text-sm pl-4 pr-10 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all placeholder:text-slate-400 bg-slate-50/80 text-slate-800"
+              className="w-full h-11 text-xs sm:text-sm pl-4 pr-10 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all placeholder:text-slate-400 bg-slate-50/80 text-slate-800"
             />
             {searchQuery && (
               <button
