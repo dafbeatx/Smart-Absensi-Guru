@@ -5,17 +5,26 @@ import { RefreshCw, X, Trash2, CheckCircle2 } from 'lucide-react';
 
 export const QueueMonitor: React.FC = () => {
   const { pendingItems, syncState, lastSyncedCount, lastError } = useSyncQueueStore();
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem('dismiss_offline_queue_banner') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [prevCount, setPrevCount] = useState(pendingItems.length);
 
   useEffect(() => {
     SyncEngine.initAutoSync();
   }, []);
 
-  // Reset status tutup jika ada item antrean offline baru yang masuk
+  // Reset status tutup HANYA jika ada item antrean offline baru yang bertambah
   useEffect(() => {
     if (pendingItems.length > prevCount) {
       setIsDismissed(false);
+      try {
+        sessionStorage.removeItem('dismiss_offline_queue_banner');
+      } catch {}
     }
     setPrevCount(pendingItems.length);
   }, [pendingItems.length, prevCount]);
@@ -72,7 +81,7 @@ export const QueueMonitor: React.FC = () => {
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            onClick={() => SyncEngine.processSyncQueue()}
+            onClick={() => SyncEngine.processSyncQueue(true)}
             disabled={isSyncing}
             className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-[11px] rounded-xl disabled:opacity-50 transition-all flex items-center gap-1 cursor-pointer shadow-sm"
           >
@@ -95,7 +104,12 @@ export const QueueMonitor: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setIsDismissed(true)}
+            onClick={() => {
+              setIsDismissed(true);
+              try {
+                sessionStorage.setItem('dismiss_offline_queue_banner', 'true');
+              } catch {}
+            }}
             className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
             title="Tutup banner ini"
           >

@@ -23,12 +23,18 @@ export class SyncEngine {
         SyncEngine.processSyncQueue();
       });
 
-      // Interval fallback every 60 seconds
+      // Interval fallback every 90 seconds (only when online, tab visible, and queue has pending items)
       setInterval(() => {
-        if (typeof navigator !== 'undefined' && navigator.onLine) {
-          SyncEngine.processSyncQueue();
+        if (
+          typeof navigator !== 'undefined' &&
+          navigator.onLine &&
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'visible' &&
+          useSyncQueueStore.getState().pendingItems.length > 0
+        ) {
+          SyncEngine.processSyncQueue(false);
         }
-      }, 60000);
+      }, 90000);
     }
 
     // Initial check
@@ -72,15 +78,17 @@ export class SyncEngine {
   /**
    * Processes all pending offline attendance records using smart retries and error resolution
    */
-  public static async processSyncQueue(): Promise<void> {
+  public static async processSyncQueue(isManual = false): Promise<void> {
     if (SyncEngine.isSyncing) return;
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      useToastStore.getState().showToast(
-        'warning',
-        'Sedang Offline',
-        'Perangkat tidak terhubung ke internet. Sinkronisasi akan otomatis berjalan saat online.'
-      );
+      if (isManual) {
+        useToastStore.getState().showToast(
+          'warning',
+          'Sedang Offline',
+          'Perangkat tidak terhubung ke internet. Sinkronisasi akan otomatis berjalan saat online.'
+        );
+      }
       return;
     }
 
