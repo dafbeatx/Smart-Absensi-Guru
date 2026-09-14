@@ -2,8 +2,8 @@
 // Serverless Homeroom Student Detail Endpoint for Smart Absensi Guru (SAGA)
 // Returns complete relational data of a student's continuation plan for homeroom verification
 
-import { serverSupabase } from '../_shared/session-auth';
-import { authenticateHomeroomTeacher, normalizeClassName } from '../_shared/homeroom-auth';
+import { serverSupabase } from '../_shared/session-auth.js';
+import { authenticateHomeroomTeacher, normalizeClassName } from '../_shared/homeroom-auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

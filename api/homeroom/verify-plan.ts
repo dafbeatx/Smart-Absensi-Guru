@@ -2,8 +2,8 @@
 // Serverless Homeroom Plan Verification Endpoint for Smart Absensi Guru (SAGA)
 // Executes atomic PostgreSQL RPC rpc_verify_continuation_plan with strict security boundary
 
-import { serverSupabase } from '../_shared/session-auth';
-import { authenticateHomeroomTeacher } from '../_shared/homeroom-auth';
+import { serverSupabase } from '../_shared/session-auth.js';
+import { authenticateHomeroomTeacher } from '../_shared/homeroom-auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

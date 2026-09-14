@@ -7,7 +7,7 @@ import {
   serverSupabase,
   authenticateUser,
   isServiceRoleConfigured,
-} from './_shared/session-auth';
+} from './_shared/session-auth.js';
 
 interface SubscriptionRequestBody {
   subscription?: {
