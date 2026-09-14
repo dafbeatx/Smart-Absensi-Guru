@@ -13,7 +13,7 @@ const SUPABASE_SERVICE_ROLE_KEY =
   process.env.VITE_SUPABASE_ANON_KEY ||
   DEFAULT_SUPABASE_ANON_KEY;
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fnppfmjsbqxbtioypnap.supabase.co';
 
 let activeClient: any = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
