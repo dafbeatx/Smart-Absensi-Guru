@@ -2,12 +2,49 @@ import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Mengambil konfigurasi dari .env atau parameter baris perintah
-const targetUrl = process.env.TARGET_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const targetKey = process.env.TARGET_SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+// Muat konfigurasi dari file .env secara otomatis
+function loadEnv(): Record<string, string> {
+  const envMap: Record<string, string> = {};
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        const k = trimmed.substring(0, eqIdx).trim();
+        let v = trimmed.substring(eqIdx + 1).trim();
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+          v = v.slice(1, -1);
+        }
+        envMap[k] = v;
+      }
+    }
+  }
+  return envMap;
+}
+
+const envFile = loadEnv();
+
+// Prioritaskan TOREN 2 jika ada, lalu fallback ke variabel TARGET atau default
+const targetUrl =
+  envFile.VITE_SUPABASE_URL_TOREN2 ||
+  process.env.TARGET_SUPABASE_URL ||
+  envFile.TARGET_SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  envFile.VITE_SUPABASE_URL;
+
+const targetKey =
+  envFile.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
+  envFile.VITE_SUPABASE_ANON_KEY_TOREN2 ||
+  process.env.TARGET_SUPABASE_KEY ||
+  envFile.TARGET_SUPABASE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  envFile.VITE_SUPABASE_ANON_KEY;
 
 if (!targetUrl || !targetKey) {
-  console.error('❌ Harap tentukan TARGET_SUPABASE_URL dan TARGET_SUPABASE_KEY!');
+  console.error('❌ Harap isi VITE_SUPABASE_URL_TOREN2 dan VITE_SUPABASE_ANON_KEY_TOREN2 di file .env!');
   process.exit(1);
 }
 
