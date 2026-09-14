@@ -369,6 +369,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
   const pushSubAttemptedRef = useRef(false);
+  const notifiedAlertIdsRef = useRef<Set<string>>(new Set());
 
   // 8 Quick Icons Customization State & Hak Akses Wakasek Sarpras (M. Iqbal Gustiawan)
   const isSarprasOfficer = isUserSarprasOfficer(effectiveUser);
@@ -1136,7 +1137,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
           missingAttNotifs.push(missingItem);
 
-          if (!isRead) {
+          if (!isRead && !notifiedAlertIdsRef.current.has(notifId)) {
+            notifiedAlertIdsRef.current.add(notifId);
             NotificationService.notifyTeacherMissingAttendance(effectiveUser.full_name, dateStr, effectiveUser.id);
           }
         }
@@ -1193,7 +1195,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             return [paydayNotif, ...prev];
           });
 
-          if (!isPaydayRead) {
+          if (!isPaydayRead && !notifiedAlertIdsRef.current.has(paydayNotifId)) {
+            notifiedAlertIdsRef.current.add(paydayNotifId);
             NotificationService.notifyPayday(
               effectiveUser.full_name,
               todayIsoStr,
@@ -1241,7 +1244,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       loadAllData();
     };
     const handleNotificationPushed = () => {
-      loadAllData();
+      // Jangan panggil loadAllData() di sini untuk memutus loop rekursif notification -> load -> notification
       SoundService.playNotificationChime();
     };
 

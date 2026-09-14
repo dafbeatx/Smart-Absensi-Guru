@@ -50,6 +50,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   // Keep track of known unread IDs to prevent repeated audio chimes on polling
   const prevUnreadIdsRef = useRef<Set<string>>(new Set());
   const isInitialMountRef = useRef<boolean>(true);
+  const isLoadingRef = useRef<boolean>(false);
 
   // Sync readIds whenever storage / read event fires
   const syncReadIdsFromService = useCallback(() => {
@@ -75,7 +76,8 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   }, [syncReadIdsFromService]);
 
   const loadNotifications = useCallback(async () => {
-    if (!user) return;
+    if (!user || isLoadingRef.current) return;
+    isLoadingRef.current = true;
     setIsLoading(true);
 
     try {
@@ -348,6 +350,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       console.warn('Failed to load dynamic notification items:', err);
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   }, [user, token]);
 

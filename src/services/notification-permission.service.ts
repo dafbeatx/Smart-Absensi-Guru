@@ -673,9 +673,14 @@ class NotificationPermissionService {
     }
 
     // 2. Circuit Breaker / Failure Cooldown: Cegah retry otomatis tanpa batas setelah error
-    if (!forceRetry) {
-      const prevFailure = this.failureCooldownMap.get(effectiveUserId);
-      if (prevFailure && Date.now() - prevFailure.timestamp < NotificationPermissionService.FAILURE_COOLDOWN_MS) {
+    const prevFailure = this.failureCooldownMap.get(effectiveUserId);
+    if (prevFailure) {
+      const isFatalConfig = prevFailure.errorCode === 'RLS_DENIED' || prevFailure.errorCode === 'SUPABASE_SERVICE_ROLE_KEY_MISSING';
+      const cooldownMs = isFatalConfig ? 15 * 60 * 1000 : NotificationPermissionService.FAILURE_COOLDOWN_MS;
+      if (!forceRetry && Date.now() - prevFailure.timestamp < cooldownMs) {
+        return false;
+      }
+      if (isFatalConfig && Date.now() - prevFailure.timestamp < 10 * 1000) {
         return false;
       }
     }
