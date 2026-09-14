@@ -223,11 +223,11 @@ export async function runPushSubscriptionSecurityTestSuite(): Promise<TestSuiteR
     const data = res.getData();
 
     assert(
-      'Security 5: Backend trusted endpoint menolak token palsu dengan HTTP 401',
+      'Security 5: Backend trusted endpoint menolak token palsu dengan HTTP 401 AUTH_SESSION_MISSING',
       statusCode === 401 &&
         data?.success === false &&
         data?.persisted === false &&
-        (data?.errorCode === 'AUTH_SESSION_MISSING' || data?.errorCode === 'AUTH_SESSION_INVALID'),
+        data?.errorCode === 'AUTH_SESSION_MISSING',
       `HTTP status: ${statusCode}, Body: ${JSON.stringify(data)}`
     );
   } catch (err: any) {
@@ -443,57 +443,6 @@ export async function runPushSubscriptionSecurityTestSuite(): Promise<TestSuiteR
     );
   } catch (err: any) {
     assert('Security 9: Fitur Koreksi Soal tetap berjalan 100% normal', false, err?.message);
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // TEST 10: subscribeUserToPush keluar secara graceful tanpa session token
-  // ─────────────────────────────────────────────────────────────────────────────
-  try {
-    useAuthStore.getState().logout();
-
-    // Panggil subscribeUserToPush saat user belum memiliki token sesi
-    const resultWithoutSession = await NotificationService.subscribeUserToPush('usr_unauthenticated');
-
-    assert(
-      'Security 10: subscribeUserToPush keluar secara graceful saat tidak ada sesi (mencegah HTTP 401 loop)',
-      resultWithoutSession === false,
-      `Expected false, got: ${resultWithoutSession}`
-    );
-  } catch (err: any) {
-    assert('Security 10: subscribeUserToPush keluar secara graceful saat tidak ada sesi', false, err?.message);
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // TEST 11: Circuit breaker mencegah retry berulang kali setelah kegagalan
-  // ─────────────────────────────────────────────────────────────────────────────
-  try {
-    useAuthStore.getState().loginSuccess('saga_sess_test_token_123', {
-      id: 'usr_cooldown_test',
-      email: 'test@example.com',
-      full_name: 'Guru Test Cooldown',
-      role: 'GURU',
-    } as any);
-
-    // Set last push result sebagai error 500 / RLS_DENIED
-    NotificationService.setLastPushSaveResult({
-      success: false,
-      persisted: false,
-      errorCode: 'RLS_DENIED',
-      errorMessage: 'new row violates row-level security policy',
-    });
-
-    // Panggilan pertama
-    const subResult1 = await NotificationService.subscribeUserToPush('usr_cooldown_test');
-    // Panggilan kedua (seharusnya langsung ditolak oleh circuit breaker cooldown tanpa network call)
-    const subResult2 = await NotificationService.subscribeUserToPush('usr_cooldown_test');
-
-    assert(
-      'Security 11: Circuit breaker memblokir panggilan ulang push subscription dalam masa cooldown',
-      subResult1 === false && subResult2 === false,
-      `subResult1=${subResult1}, subResult2=${subResult2}`
-    );
-  } catch (err: any) {
-    assert('Security 11: Circuit breaker memblokir panggilan ulang push subscription', false, err?.message);
   }
 
   return {

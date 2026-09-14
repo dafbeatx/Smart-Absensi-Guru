@@ -77,10 +77,6 @@ class NotificationPermissionService {
   private activeCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
   private activeEarlyCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPushSaveResult: SavePushSubscriptionResult | null = null;
-  private activeSubscribePromise: Promise<boolean> | null = null;
-  private failureCooldownMap = new Map<string, { timestamp: number; errorCode?: string }>();
-  private loggedFailureSet = new Set<string>();
-  private static readonly FAILURE_COOLDOWN_MS = 5 * 60 * 1000; // 5 menit cooldown setelah error untuk mencegah retry storm
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -222,7 +218,7 @@ class NotificationPermissionService {
       if (permission === 'granted') {
         // Otomatis daftarkan Web Push Subscription ke Google FCM / Supabase di background
         const effectiveUserId = userId || useAuthStore.getState().user?.id;
-        this.subscribeUserToPush(effectiveUserId, true).catch((err) =>
+        this.subscribeUserToPush(effectiveUserId).catch((err) =>
           console.warn('Silent failure subscribing user to push:', err)
         );
 
@@ -648,10 +644,9 @@ class NotificationPermissionService {
 
   /**
    * Daftarkan PushSubscription ke Google FCM / Apple APNs via ServiceWorker PushManager
-   * dan simpan endpoint ke Supabase Database dengan user_id yang tepat.
-   * Dilengkapi circuit breaker, in-flight mutex, dan session pre-check untuk mencegah infinite retry.
+   * dan simpan endpoint ke Supabase Database dengan user_id yang tepat
    */
-  public async subscribeUserToPush(userId?: string, forceRetry = false): Promise<boolean> {
+  public async subscribeUserToPush(userId?: string): Promise<boolean> {
     if (
       typeof window === 'undefined' ||
       !('serviceWorker' in navigator) ||
@@ -661,153 +656,101 @@ class NotificationPermissionService {
       return false;
     }
 
-    // 1. Session Auth Pre-validation (Graceful early exit jika belum ada sesi/token login aktif)
-    const authState = useAuthStore.getState();
-    const effectiveUserId = userId || authState.user?.id || 'unknown_user';
-    const effectiveToken = authState.token;
+    try {
+      const vapidPublicKey =
+        (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_VAPID_PUBLIC_KEY) ||
+        'BJxAOVY7XCFiipXVppN_IPu5rWUzXaLzhM33dytmGI6oQ0SES9Qspm3sTPYcz9euG1NhSOSZb8BHLShozXnotnI';
 
-    if (!effectiveToken || effectiveUserId === 'unknown_user') {
-      // User belum login atau belum memiliki token sesi valid.
-      // Graceful early exit tanpa memanggil API /api/push-subscriptions untuk mencegah 401 loop.
-      return false;
-    }
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
 
-    // 2. Circuit Breaker / Failure Cooldown: Cegah retry otomatis tanpa batas setelah error
-    const prevFailure = this.failureCooldownMap.get(effectiveUserId);
-    if (prevFailure) {
-      const isFatalConfig = prevFailure.errorCode === 'RLS_DENIED' || prevFailure.errorCode === 'SUPABASE_SERVICE_ROLE_KEY_MISSING';
-      const cooldownMs = isFatalConfig ? 15 * 60 * 1000 : NotificationPermissionService.FAILURE_COOLDOWN_MS;
-      if (!forceRetry && Date.now() - prevFailure.timestamp < cooldownMs) {
+      if (!subscription) {
+        const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedVapidKey as unknown as BufferSource,
+        });
+      }
+
+      if (!subscription) {
+        console.warn('[PushManager] Gagal memperoleh PushSubscription dari browser.');
         return false;
       }
-      if (isFatalConfig && Date.now() - prevFailure.timestamp < 10 * 1000) {
-        return false;
-      }
-    }
 
-    // 3. Mutex / In-flight Deduplication: Hindari request paralel bersamaan
-    if (this.activeSubscribePromise) {
-      return this.activeSubscribePromise;
-    }
+      const p256dh = arrayBufferToBase64Url(subscription.getKey('p256dh'));
+      const auth = arrayBufferToBase64Url(subscription.getKey('auth'));
+      const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent);
 
-    this.activeSubscribePromise = (async (): Promise<boolean> => {
-      try {
-        const vapidPublicKey =
-          (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_VAPID_PUBLIC_KEY) ||
-          'BJxAOVY7XCFiipXVppN_IPu5rWUzXaLzhM33dytmGI6oQ0SES9Qspm3sTPYcz9euG1NhSOSZb8BHLShozXnotnI';
+      const effectiveUserId = userId || useAuthStore.getState().user?.id || 'unknown_user';
+      const provider = ProviderFactory.getProvider();
 
-        const registration = await navigator.serviceWorker.ready;
-        let subscription = await registration.pushManager.getSubscription();
+      const saveResult = await provider.savePushSubscription({
+        user_id: effectiveUserId,
+        endpoint: subscription.endpoint,
+        p256dh,
+        auth,
+        device_type: isMobile ? 'MOBILE' : 'DESKTOP',
+        user_agent: navigator.userAgent,
+      });
 
-        if (!subscription) {
-          const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-          subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: convertedVapidKey as unknown as BufferSource,
-          });
-        }
+      this.lastPushSaveResult = saveResult;
 
-        if (!subscription) {
-          console.warn('[PushManager] Gagal memperoleh PushSubscription dari browser.');
-          return false;
-        }
-
-        const p256dh = arrayBufferToBase64Url(subscription.getKey('p256dh'));
-        const auth = arrayBufferToBase64Url(subscription.getKey('auth'));
-        const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent);
-
-        const provider = ProviderFactory.getProvider();
-
-        const saveResult = await provider.savePushSubscription({
-          user_id: effectiveUserId,
-          endpoint: subscription.endpoint,
-          p256dh,
-          auth,
-          device_type: isMobile ? 'MOBILE' : 'DESKTOP',
-          user_agent: navigator.userAgent,
-        });
-
-        this.lastPushSaveResult = saveResult;
-
-        if (!saveResult.success || !saveResult.persisted) {
-          // Catat kegagalan ke circuit breaker agar tidak retry otomatis terus-menerus
-          this.failureCooldownMap.set(effectiveUserId, {
-            timestamp: Date.now(),
-            errorCode: saveResult.errorCode,
-          });
-
-          // Log hanya 1 kali per user & error code untuk menghindari console spam
-          const logKey = `${effectiveUserId}:${saveResult.errorCode || 'UNKNOWN'}`;
-          if (!this.loggedFailureSet.has(logKey)) {
-            this.loggedFailureSet.add(logKey);
-            console.warn(
-              `[PushManager] Web Push Subscription gagal (${saveResult.errorCode || 'UNKNOWN'}). Menjeda retry otomatis:`,
-              saveResult.errorMessage
-            );
-          }
-
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`, 'true');
-            localStorage.removeItem(`smart_absensi_push_cloud_synced_${effectiveUserId}`);
-          }
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(
-              new CustomEvent('smart_absensi_push_status_updated', {
-                detail: { status: 'subscription_failed', result: saveResult },
-              })
-            );
-          }
-          return false;
-        }
-
-        // Sukses: Bersihkan circuit breaker cooldown
-        this.failureCooldownMap.delete(effectiveUserId);
-        this.loggedFailureSet.delete(`${effectiveUserId}:${saveResult.errorCode || 'UNKNOWN'}`);
-
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`);
-          localStorage.setItem(`smart_absensi_push_cloud_synced_${effectiveUserId}`, 'true');
-        }
-
-        console.info('[PushManager] Web Push Subscription berhasil tersimpan ke database untuk user:', effectiveUserId);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(
-            new CustomEvent('smart_absensi_push_status_updated', {
-              detail: { status: 'subscribed', result: saveResult },
-            })
-          );
-        }
-        return true;
-      } catch (error) {
-        console.warn('[PushManager] Error mendaftarkan push subscription:', error);
-        const errResult: SavePushSubscriptionResult = {
-          success: false,
-          persisted: false,
-          errorCode: 'NETWORK_ERROR',
-          errorMessage: (error as any)?.message || 'Terjadi kesalahan saat mendaftarkan push subscription.',
-        };
-        this.lastPushSaveResult = errResult;
-        this.failureCooldownMap.set(effectiveUserId, {
-          timestamp: Date.now(),
-          errorCode: 'NETWORK_ERROR',
-        });
+      if (!saveResult.success || !saveResult.persisted) {
+        console.warn(
+          '[PushManager] Web Push Subscription gagal disimpan ke database:',
+          saveResult.errorCode,
+          saveResult.errorMessage
+        );
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`, 'true');
+          localStorage.removeItem(`smart_absensi_push_cloud_synced_${effectiveUserId}`);
         }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('smart_absensi_push_status_updated', {
-              detail: { status: 'subscription_failed', result: errResult },
+              detail: { status: 'subscription_failed', result: saveResult },
             })
           );
         }
         return false;
-      } finally {
-        this.activeSubscribePromise = null;
       }
-    })();
 
-    return this.activeSubscribePromise;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`);
+        localStorage.setItem(`smart_absensi_push_cloud_synced_${effectiveUserId}`, 'true');
+      }
+
+      console.info('[PushManager] Web Push Subscription berhasil tersimpan ke database untuk user:', effectiveUserId);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('smart_absensi_push_status_updated', {
+            detail: { status: 'subscribed', result: saveResult },
+          })
+        );
+      }
+      return true;
+    } catch (error) {
+      console.warn('[PushManager] Error mendaftarkan push subscription:', error);
+      const errResult: SavePushSubscriptionResult = {
+        success: false,
+        persisted: false,
+        errorCode: 'NETWORK_ERROR',
+        errorMessage: (error as any)?.message || 'Terjadi kesalahan saat mendaftarkan push subscription.',
+      };
+      this.lastPushSaveResult = errResult;
+      const effectiveUserId = userId || useAuthStore.getState().user?.id || 'unknown_user';
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`smart_absensi_push_cloud_sync_failed_${effectiveUserId}`, 'true');
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('smart_absensi_push_status_updated', {
+            detail: { status: 'subscription_failed', result: errResult },
+          })
+        );
+      }
+      return false;
+    }
   }
 
   /**

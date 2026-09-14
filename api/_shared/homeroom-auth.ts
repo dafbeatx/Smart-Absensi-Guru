@@ -29,8 +29,7 @@ export interface HomeroomAuthErrorContext {
     | 'AUTH_USER_INACTIVE'
     | 'AUTH_FORBIDDEN_NOT_HOMEROOM'
     | 'AUTH_FORBIDDEN_CLASS_MISMATCH'
-    | 'AUTH_FORBIDDEN_ROLE'
-    | 'SUPABASE_SERVICE_ROLE_KEY_MISSING';
+    | 'AUTH_FORBIDDEN_ROLE';
   errorMessage: string;
 }
 
@@ -58,12 +57,7 @@ export async function authenticateHomeroomTeacher(
   // 1. Validasi sesi dasar melalui session middleware
   const auth = await authenticateUser(req);
   if (!auth.ok) {
-    return {
-      ok: false,
-      status: auth.status,
-      errorCode: auth.errorCode,
-      errorMessage: auth.errorMessage,
-    };
+    return auth;
   }
 
   const { userId, user, role } = auth;

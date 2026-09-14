@@ -37,6 +37,7 @@ import type {
   AttendanceSource,
   PushSubscriptionPayload,
   SavePushSubscriptionResult,
+  PushSubscriptionErrorCode,
   NotificationPreferences,
   TeacherPointLog,
   TeacherPointActivityType,
@@ -65,9 +66,6 @@ import type {
   StudentPlanDetail,
   VerifyPlanDTO,
   VerifyPlanResult,
-  SaveStudentPlanDTO,
-  UploadStudentDocumentDTO,
-  UploadDocumentResult,
 } from '../types/homeroom.types';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
@@ -84,8 +82,6 @@ import {
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
 
-let sharedClientInstance: SupabaseClient | null = null;
-
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
 
@@ -101,16 +97,7 @@ export class SupabaseProvider implements IDataProvider {
         : '') ||
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
 
-    if (!sharedClientInstance) {
-      sharedClientInstance = createClient(url, key, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      });
-    }
-
-    this.client = sharedClientInstance;
+    this.client = createClient(url, key);
   }
 
   // ─── AUTHENTICATION API ───────────────────────────────────────────────────
@@ -118,10 +105,8 @@ export class SupabaseProvider implements IDataProvider {
   public async login(dto: LoginDTO): Promise<LoginResponseDTO> {
     // 1. Jalur Utama: Server-Side Stateful Session Engine (/api/auth/login)
     if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
-      let resp: Response | null = null;
-      let json: any = null;
       try {
-        resp = await fetch('/api/auth/login', {
+        const resp = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -132,13 +117,8 @@ export class SupabaseProvider implements IDataProvider {
           }),
         });
 
-        json = await resp.json().catch(() => null);
-      } catch (err: any) {
-        logger.warn('SupabaseProvider', 'Serverless login API fetch network error:', err?.message);
-      }
+        const json = await resp.json().catch(() => null);
 
-      // Jika server memberikan respon HTTP aktif (200, 401, 429, 500), wajib ikuti otoritas server
-      if (resp) {
         if (resp.ok && json?.success && json?.token) {
           logger.info('SupabaseProvider', 'Login berhasil diterbitkan oleh Serverless Session Engine');
           return {
@@ -147,9 +127,21 @@ export class SupabaseProvider implements IDataProvider {
           };
         }
 
-        // Server merespon dengan kegagalan -> WAJIB fail closed, dilarang silent fallback ke legacy token
-        const errorMsg = json?.errorMessage || `Login server gagal (HTTP ${resp.status}). Silakan periksa kembali akun Anda.`;
-        throw new Error(errorMsg);
+        if (!resp.ok && json?.errorMessage) {
+          throw new Error(json.errorMessage);
+        }
+      } catch (err: any) {
+        // Jika penolakan kredensial / akun terkunci dari server, teruskan error ke UI
+        if (
+          err.message &&
+          (err.message.includes('PIN') ||
+            err.message.includes('terblokir') ||
+            err.message.includes('ditemukan') ||
+            err.message.includes('terkunci'))
+        ) {
+          throw err;
+        }
+        logger.warn('SupabaseProvider', 'Serverless login API offline/unreachable, fallback ke direct client provider', err);
       }
     }
 
@@ -1457,22 +1449,13 @@ export class SupabaseProvider implements IDataProvider {
 
   // ─── USER MANAGEMENT API (ADMIN) ──────────────────────────────────────────
 
-  private static usersCache: UserProfile[] | null = null;
-  private static usersCacheExpiry: number = 0;
-
   public async getAllUsers(_token: string): Promise<UserProfile[]> {
-    // In-memory cache 2 menit untuk mencegah query berulang dari polling/komponen UI
-    const now = Date.now();
-    if (SupabaseProvider.usersCache && now < SupabaseProvider.usersCacheExpiry) {
-      return SupabaseProvider.usersCache;
-    }
-
     const { data } = await this.client
       .from('users')
-      .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at')
+      .select('*')
       .order('created_at', { ascending: false });
 
-    const result = (data || []).map((row) => ({
+    return (data || []).map((row) => ({
       id: row.id,
       nip: row.nip,
       full_name: row.full_name,
@@ -1483,10 +1466,6 @@ export class SupabaseProvider implements IDataProvider {
       is_active: row.account_status === 'ACTIVE',
       created_at: row.created_at,
     }));
-
-    SupabaseProvider.usersCache = result;
-    SupabaseProvider.usersCacheExpiry = now + 120000; // 2 menit
-    return result;
   }
 
   public async createUser(user: Partial<UserProfile>, _token: string): Promise<UserProfile> {
@@ -1507,7 +1486,6 @@ export class SupabaseProvider implements IDataProvider {
 
     const { error } = await this.client.from('users').insert(newUser);
     if (error) throw new Error('Gagal menambahkan pengguna baru: ' + error.message);
-    SupabaseProvider.usersCache = null;
 
     return {
       id: newId,
@@ -1534,7 +1512,6 @@ export class SupabaseProvider implements IDataProvider {
 
     const { error } = await this.client.from('users').update(payload).eq('id', userId);
     if (error) throw new Error('Gagal memperbarui data pengguna: ' + error.message);
-    SupabaseProvider.usersCache = null;
 
     const activeUser = useAuthStore.getState().user;
     if (activeUser && (activeUser.id === userId || (activeUser.nip && activeUser.nip === userId))) {
@@ -1545,11 +1522,11 @@ export class SupabaseProvider implements IDataProvider {
 
   public async uploadAvatar(userId: string, file: File): Promise<string> {
     try {
-      // Auto-convert to WebP format (max 300x300px, 75% quality) to save Supabase Storage (~15-25KB per photo)
+      // Auto-convert to WebP format (max 400x400px, 80% quality) to save Supabase Storage (~20-30KB per photo)
       let fileToUpload = file;
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         try {
-          fileToUpload = await convertToWebP(file, 300, 300, 0.75);
+          fileToUpload = await convertToWebP(file, 400, 400, 0.8);
           logger.info('SupabaseProvider', 'Image converted to WebP successfully', {
             originalSize: `${(file.size / 1024).toFixed(1)} KB`,
             webpSize: `${(fileToUpload.size / 1024).toFixed(1)} KB`,
@@ -1561,8 +1538,8 @@ export class SupabaseProvider implements IDataProvider {
 
       const filePath = `teacher_${userId}_${Date.now()}.webp`;
 
-      // Coba bucket standar 'avatars' terlebih dahulu
-      const bucketsToTry = ['avatars', 'avatas-1', 'avatas 1'];
+      // Try bucket 'avatas 1', fallback to 'avatas-1' or 'avatars'
+      const bucketsToTry = ['avatas 1', 'avatas-1', 'avatars'];
       let publicUrl = '';
       let uploadSuccess = false;
 
@@ -1580,7 +1557,6 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       if (!uploadSuccess || !publicUrl) {
-        // Fallback darurat: gunakan file yang SUDAH dikompresi WebP (bukan file asli raksasa)
         publicUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
@@ -1590,26 +1566,21 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       await this.updateUser(userId, { avatar_url: publicUrl }, '');
-      SupabaseProvider.usersCache = null;
       return publicUrl;
     } catch (err) {
-      logger.warn('SupabaseProvider', 'uploadAvatar fallback to compressed WebP', { userId, err });
-      const fallbackUrl = await new Promise<string>((resolve, reject) => {
+      logger.warn('SupabaseProvider', 'uploadAvatar fallback to base64 Data URI', { userId, err });
+      return new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = (err) => reject(err);
         reader.readAsDataURL(file);
       });
-      await this.updateUser(userId, { avatar_url: fallbackUrl }, '');
-      SupabaseProvider.usersCache = null;
-      return fallbackUrl;
     }
   }
 
   public async deleteUser(userId: string, _token: string): Promise<boolean> {
     const { error } = await this.client.from('users').delete().eq('id', userId);
     if (error) throw new Error('Gagal menghapus pengguna: ' + error.message);
-    SupabaseProvider.usersCache = null;
     return true;
   }
 
@@ -1848,7 +1819,7 @@ export class SupabaseProvider implements IDataProvider {
         query = query.or(`user_id.eq.${userId},user_id.is.null`);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(30);
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         // Fallback for older schemas where recipient_user_id might not exist
@@ -1856,8 +1827,7 @@ export class SupabaseProvider implements IDataProvider {
           .from('notifications')
           .select('*')
           .or(`user_id.eq.${userId},user_id.is.null`)
-          .order('created_at', { ascending: false })
-          .limit(30);
+          .order('created_at', { ascending: false });
 
         if (fallback.error) {
           logger.warn('SupabaseProvider', 'notifications query error:', fallback.error.message);
@@ -4216,61 +4186,92 @@ export class SupabaseProvider implements IDataProvider {
             errorMessage: resData?.errorMessage || 'Format subscription ditolak oleh server.',
           };
         }
-
-        // Tangani error internal / missing service role
-        return {
-          success: false,
-          persisted: false,
-          errorCode: resData?.errorCode || 'NETWORK_ERROR',
-          errorMessage: resData?.errorMessage || `Gagal menyimpan subscription (HTTP ${response.status}).`,
-        };
       }
     } catch (fetchErr: any) {
       logger.warn('SupabaseProvider', 'Serverless proxy fetch exception:', fetchErr?.message);
+    }
+
+    // 4. Fallback Direct Supabase Client Query (jika serverless proxy tidak terjangkau)
+    try {
+      const nowIso = new Date().toISOString();
+      const payload = {
+        user_id: subscription.user_id,
+        endpoint: subscription.endpoint,
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+        device_type: subscription.device_type || 'MOBILE',
+        user_agent: subscription.user_agent || (typeof navigator !== 'undefined' ? navigator.userAgent : null),
+        last_seen_at: nowIso,
+        updated_at: nowIso,
+      };
+
+      const { error } = await this.client
+        .from('push_subscriptions')
+        .upsert(payload, { onConflict: 'endpoint' });
+
+      if (error) {
+        let classifiedCode: PushSubscriptionErrorCode = 'NETWORK_ERROR';
+        if (
+          error.code === '42501' ||
+          error.message?.includes('row-level security') ||
+          error.message?.includes('401')
+        ) {
+          classifiedCode = 'RLS_DENIED';
+        } else if (
+          error.code === '42P01' ||
+          error.message?.includes('relation') ||
+          error.message?.includes('does not exist')
+        ) {
+          classifiedCode = 'TABLE_NOT_FOUND';
+        } else if (
+          error.code === '23505' ||
+          error.message?.includes('unique') ||
+          error.message?.includes('conflict')
+        ) {
+          classifiedCode = 'ENDPOINT_CONFLICT';
+        }
+
+        logger.error('SupabaseProvider', `savePushSubscription failed [${classifiedCode}]:`, error.message);
+        return {
+          success: false,
+          persisted: false,
+          errorCode: classifiedCode,
+          errorMessage: `Gagal menyimpan subscription ke database (${classifiedCode}): ${error.message}`,
+        };
+      }
+
+      logger.info('SupabaseProvider', 'Web push subscription saved via direct client for user:', subscription.user_id);
+      return {
+        success: true,
+        persisted: true,
+      };
+    } catch (err: any) {
+      logger.error('SupabaseProvider', 'savePushSubscription unhandled exception:', err);
       return {
         success: false,
         persisted: false,
         errorCode: 'NETWORK_ERROR',
-        errorMessage: fetchErr?.message || 'Serverless proxy push-subscriptions tidak dapat dihubungi.',
+        errorMessage: err?.message || 'Kendala koneksi jaringan saat menghubungi server database.',
       };
     }
-
-    return {
-      success: false,
-      persisted: false,
-      errorCode: 'NETWORK_ERROR',
-      errorMessage: 'Koneksi ke endpoint push-subscriptions gagal.',
-    };
   }
 
-  public async deletePushSubscription(endpoint: string, token?: string): Promise<boolean> {
-    if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
-      try {
-        const effectiveToken = token || useAuthStore.getState().token;
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        if (effectiveToken) {
-          headers['Authorization'] = `Bearer ${effectiveToken}`;
-        }
+  public async deletePushSubscription(endpoint: string, _token?: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('push_subscriptions')
+        .delete()
+        .eq('endpoint', endpoint);
 
-        const res = await fetch(`/api/push-subscriptions?endpoint=${encodeURIComponent(endpoint)}`, {
-          method: 'DELETE',
-          headers,
-        });
-
-        if (res.ok) {
-          logger.info('SupabaseProvider', 'Push subscription deleted via serverless proxy');
-          return true;
-        }
-        logger.warn('SupabaseProvider', 'Serverless push deletion returned HTTP', res.status);
-        return false;
-      } catch (err: any) {
-        logger.error('SupabaseProvider', 'deletePushSubscription serverless error:', err?.message);
+      if (error) {
+        logger.warn('SupabaseProvider', 'deletePushSubscription error:', error.message);
         return false;
       }
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'deletePushSubscription exception:', err);
+      return false;
     }
-    return true;
   }
 
   // TEACHER DISCIPLINE POINT HISTORY API
@@ -4294,40 +4295,23 @@ export class SupabaseProvider implements IDataProvider {
         return mockProv.getTeacherPointHistory(userId);
       }
 
-      const dbLogs: TeacherPointLog[] = (data || []).map((row: any) => ({
-        id: row.id,
-        user_id: row.user_id,
-        teacher_name: row.teacher_name || undefined,
-        date: row.date,
-        points: row.points,
-        activity_type: row.activity_type as TeacherPointActivityType,
-        title: row.title,
-        description: row.description || undefined,
-        created_at: row.created_at,
-      }));
-
-      // Smart Merge: Gabungkan dengan seed MockProvider untuk riwayat hari yang belum tercatat di database Supabase
-      // Menjamin poin guru tidak anjlok ke 15 atau 0 saat transaksi pertama kali dicatat
-      const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      const seedLogs = await mockProv.getTeacherPointHistory(userId);
-
-      const existingKeys = new Set(
-        dbLogs.map((l) => `${l.user_id}_${l.date}_${l.activity_type}`)
-      );
-
-      const mergedLogs = [...dbLogs];
-      for (const s of seedLogs) {
-        const key = `${s.user_id}_${s.date}_${s.activity_type}`;
-        if (!existingKeys.has(key)) {
-          mergedLogs.push(s);
-          existingKeys.add(key);
-        }
+      if (data && data.length > 0) {
+        return data.map((row: any) => ({
+          id: row.id,
+          user_id: row.user_id,
+          teacher_name: row.teacher_name || undefined,
+          date: row.date,
+          points: row.points,
+          activity_type: row.activity_type as TeacherPointActivityType,
+          title: row.title,
+          description: row.description || undefined,
+          created_at: row.created_at,
+        }));
       }
 
-      return mergedLogs.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() ||
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      // If database returned 0 rows, check fallback seed in mock provider
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getTeacherPointHistory(userId);
     } catch (err) {
       logger.error('SupabaseProvider', 'getTeacherPointHistory exception:', err);
       const mockProv = new (await import('./mock-provider.service')).MockProvider();
@@ -4968,48 +4952,6 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     return json.downloadUrl;
-  }
-
-  public async saveStudentPlan(
-    dto: SaveStudentPlanDTO,
-    token: string
-  ): Promise<{ success: boolean; message: string; plan_id?: string }> {
-    const resp = await fetch('/api/homeroom/save-plan', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(dto),
-    });
-
-    const json = await resp.json().catch(() => null);
-    if (!resp.ok || !json?.success) {
-      throw new Error(json?.errorMessage || 'Gagal menyimpan rencana pendidikan lanjutan siswa.');
-    }
-
-    return json;
-  }
-
-  public async uploadStudentDocument(
-    dto: UploadStudentDocumentDTO,
-    token: string
-  ): Promise<UploadDocumentResult> {
-    const resp = await fetch('/api/homeroom/upload-document', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(dto),
-    });
-
-    const json = await resp.json().catch(() => null);
-    if (!resp.ok || !json?.success) {
-      throw new Error(json?.errorMessage || 'Gagal mengunggah dokumen siswa.');
-    }
-
-    return json;
   }
 }
 

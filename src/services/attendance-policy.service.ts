@@ -19,26 +19,19 @@ export class AttendancePolicyService {
   private static readonly POLICY_VERSION = 'v1.0';
 
   /**
-   * Mengambil objek persetujuan Syarat & Ketentuan guru
-   */
-  public static getPolicyAgreement(userId?: string): AttendancePolicyAgreement | null {
-    if (!userId || typeof window === 'undefined') return null;
-    try {
-      const key = `${this.STORAGE_PREFIX}${userId}`;
-      const saved = localStorage.getItem(key);
-      if (!saved) return null;
-      return JSON.parse(saved);
-    } catch {
-      return null;
-    }
-  }
-
-  /**
    * Cek apakah guru telah menceklis & menyetujui Kebijakan Disiplin Absensi Datang & Pulang
    */
   public static isPolicyAgreed(userId?: string): boolean {
-    const agreement = this.getPolicyAgreement(userId);
-    return Boolean(agreement && agreement.agreed);
+    if (!userId || typeof window === 'undefined') return false;
+    try {
+      const key = `${this.STORAGE_PREFIX}${userId}`;
+      const saved = localStorage.getItem(key);
+      if (!saved) return false;
+      const parsed: AttendancePolicyAgreement = JSON.parse(saved);
+      return Boolean(parsed && parsed.agreed);
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -101,12 +94,10 @@ export class AttendancePolicyService {
     attendanceHistory: AttendanceRecord[],
     token?: string
   ): Promise<void> {
-    const agreement = this.getPolicyAgreement(userId);
-    if (!userId || !agreement || !agreement.agreed) return;
+    if (!userId || !this.isPolicyAgreed(userId)) return;
 
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
-    const agreedDateStr = (agreement.agreed_at ? agreement.agreed_at.substring(0, 10) : todayStr);
     const provider = ProviderFactory.getProvider();
 
     try {
@@ -114,10 +105,8 @@ export class AttendancePolicyService {
       const pointLogs = await provider.getTeacherPointHistory(userId, token);
 
       // Cari record hari-hari sebelum hari ini di mana guru Check-in tapi TIDAK Check-out
-      // Non-retroaktif: hanya kenakan penalti untuk presensi pada atau setelah tanggal persetujuan kebijakan
       const pastUncheckedOut = (attendanceHistory || []).filter((rec) => {
         if (!rec.date || rec.date >= todayStr) return false; // Jangan penalti hari yang sedang berjalan
-        if (rec.date < agreedDateStr) return false; // Jangan penalti hari sebelum guru menyetujui kebijakan
         if (rec.status === 'BELUM_ABSEN' || rec.status === 'IZIN' || rec.status === 'SAKIT') return false;
         // Hadir check_in tapi tidak ada check_out_time
         return Boolean(rec.check_in_time && !rec.check_out_time);

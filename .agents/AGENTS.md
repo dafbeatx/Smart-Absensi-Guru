@@ -35,10 +35,5 @@
 | Radius card           |        **12–16px** |
 | Lebar maksimal konten |          **480px** |
 
-## Sistem Toren & Bandwidth Egress Preservation Protocol
-- **Sistem Toren (Multi-Database Redundancy)**: Aplikasi mendukung arsitektur Toren (Toren 1: Primary, Toren 2: Failover Backup). Konfigurasi kredensial tersimpan di `.env` (`VITE_SUPABASE_URL_TOREN1`, `VITE_SUPABASE_URL_TOREN2`). Mesin pemulihan & pencadangan data tersedia di `npm run backup:database` dan `npm run restore:database`.
-- **Egress & Polling Throttling**: Polling background dilarang keras di bawah 60–90 detik. Setiap polling wajib dipagari oleh `document.visibilityState === 'visible'` untuk mencegah lonjakan kuota bandwidth saat tab di-minimize atau layar HP mati.
-- **Offline Sync Notification Silence**: Background sync offline di `SyncEngine` wajib berjalan secara senyap (*silent background worker*). Dilarang memunculkan popup/toast peringatan offline berulang kali saat background interval berjalan; toast offline hanya diizinkan muncul saat pengguna menekan tombol sinkronisasi secara eksplisit/manual.
-
 ## Windows CLI Execution Protocol
 - Pada lingkungan Windows PowerShell di mana eksekusi script `.ps1` diblokir, selalu jalankan perintah build dan pengujian melalui shell `cmd /c "npm run build"`.

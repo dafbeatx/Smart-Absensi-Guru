@@ -50,7 +50,6 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   // Keep track of known unread IDs to prevent repeated audio chimes on polling
   const prevUnreadIdsRef = useRef<Set<string>>(new Set());
   const isInitialMountRef = useRef<boolean>(true);
-  const isLoadingRef = useRef<boolean>(false);
 
   // Sync readIds whenever storage / read event fires
   const syncReadIdsFromService = useCallback(() => {
@@ -76,8 +75,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   }, [syncReadIdsFromService]);
 
   const loadNotifications = useCallback(async () => {
-    if (!user || isLoadingRef.current) return;
-    isLoadingRef.current = true;
+    if (!user) return;
     setIsLoading(true);
 
     try {
@@ -350,19 +348,13 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       console.warn('Failed to load dynamic notification items:', err);
     } finally {
       setIsLoading(false);
-      isLoadingRef.current = false;
     }
   }, [user, token]);
 
   // Setup periodic polling & real-time event listeners
   useEffect(() => {
     loadNotifications();
-    // Smart Polling: 90 detik (dan hanya saat tab aktif terlihat) untuk menghemat kuota Supabase
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        loadNotifications();
-      }
-    }, 90000);
+    const interval = setInterval(loadNotifications, 20000); // polling refresh every 20s
 
     const handleRealtimeUpdate = () => {
       loadNotifications();

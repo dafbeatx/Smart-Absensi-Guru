@@ -13,7 +13,6 @@ dist
 dist-ssr
 release
 dist-electron
-*.tsbuildinfo
 
 # Environment Variables (Secrets - DO NOT COMMIT TO GIT)
 .env
@@ -48,6 +47,4 @@ scratch/
 # Database SQL Migrations & Scripts
 sql/
 *.sql
-database_backup/
-
 

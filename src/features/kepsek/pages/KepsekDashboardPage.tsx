@@ -386,7 +386,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   // Real-time Supabase channel & heartbeat live tracking sync for Kepsek
   useLiveAttendanceSync({
     onSync: handleManualRefresh,
-    heartbeatIntervalMs: 60000,
+    heartbeatIntervalMs: 30000,
     enabled: !!user?.id,
   });
 

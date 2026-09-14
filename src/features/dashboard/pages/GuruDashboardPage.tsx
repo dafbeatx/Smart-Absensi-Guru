@@ -368,8 +368,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
-  const pushSubAttemptedRef = useRef(false);
-  const notifiedAlertIdsRef = useRef<Set<string>>(new Set());
 
   // 8 Quick Icons Customization State & Hak Akses Wakasek Sarpras (M. Iqbal Gustiawan)
   const isSarprasOfficer = isUserSarprasOfficer(effectiveUser);
@@ -1137,8 +1135,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
           missingAttNotifs.push(missingItem);
 
-          if (!isRead && !notifiedAlertIdsRef.current.has(notifId)) {
-            notifiedAlertIdsRef.current.add(notifId);
+          if (!isRead) {
             NotificationService.notifyTeacherMissingAttendance(effectiveUser.full_name, dateStr, effectiveUser.id);
           }
         }
@@ -1195,8 +1192,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             return [paydayNotif, ...prev];
           });
 
-          if (!isPaydayRead && !notifiedAlertIdsRef.current.has(paydayNotifId)) {
-            notifiedAlertIdsRef.current.add(paydayNotifId);
+          if (!isPaydayRead) {
             NotificationService.notifyPayday(
               effectiveUser.full_name,
               todayIsoStr,
@@ -1215,16 +1211,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     loadAllData();
     loadAllDataRef.current = loadAllData;
 
-    // Auto-ensure Web Push registration to cloud if permission is already granted (maksimal 1x per sesi)
-    if (
-      !pushSubAttemptedRef.current &&
-      typeof window !== 'undefined' &&
-      'Notification' in window &&
-      Notification.permission === 'granted' &&
-      effectiveUser?.id &&
-      token
-    ) {
-      pushSubAttemptedRef.current = true;
+    // Auto-ensure Web Push registration to cloud if permission is already granted
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       NotificationService.subscribeUserToPush(effectiveUser.id).catch(() => {});
     }
 
@@ -1244,7 +1232,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       loadAllData();
     };
     const handleNotificationPushed = () => {
-      // Jangan panggil loadAllData() di sini untuk memutus loop rekursif notification -> load -> notification
+      loadAllData();
       SoundService.playNotificationChime();
     };
 
@@ -2082,7 +2070,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     {(dailyQuests || []).filter((q) => q?.status === 'COMPLETED').length}/{(dailyQuests || []).length} Misi
                   </span>
                   <span className="text-[8.5px] text-cyan-200/80 font-mono block mt-0.5">
-                    #{(disciplineLeaderboard?.currentUserRank) ?? 1} • {(appreciationScore?.totalPoints) ?? 0} PTS (Bln Ini)
+                    #{(disciplineLeaderboard?.currentUserRank) ?? 1} • {(appreciationScore?.totalPoints) ?? 0} PTS
                   </span>
                 </div>
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 group-hover:bg-white/20 text-white flex items-center justify-center transition-all">
@@ -2404,10 +2392,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </span>
                   <p className="text-[10.5px] sm:text-xs font-black text-slate-800 truncate">
                     #{disciplineLeaderboard?.currentUserRank ?? 1} dari {disciplineLeaderboard?.totalTeachers ?? 12} Guru{' '}
-                    <span className="text-emerald-600 font-bold">({appreciationScore?.totalPoints ?? 0} Poin Bulan Ini)</span>
-                    {appreciationScore?.lifetimePoints !== undefined && appreciationScore.lifetimePoints > (appreciationScore.totalPoints || 0) && (
-                      <span className="text-amber-700 font-bold text-[10px] ml-1.5">• Total Karir: {appreciationScore.lifetimePoints} PTS</span>
-                    )}
+                    <span className="text-emerald-600 font-bold">({appreciationScore?.totalPoints ?? 0} Poin)</span>
                   </p>
                 </div>
 
@@ -3602,7 +3587,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Peringkat &amp; Piagam Penghargaan
                     </h3>
                     <p className="text-[10.5px] text-slate-500 font-medium">
-                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({(appreciationScore?.totalPoints) ?? 0} PTS Bulan Ini)
+                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({(appreciationScore?.totalPoints) ?? 0} PTS)
                     </p>
                   </div>
                 </div>
@@ -4261,16 +4246,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <p className="text-[10px] text-slate-500 font-medium">Monitoring performa disiplin internal sekolah</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl shadow-2xs block">
-                      {appreciationScore.totalPoints} Poin Bulan Ini
-                    </span>
-                    {appreciationScore?.lifetimePoints !== undefined && appreciationScore.lifetimePoints > appreciationScore.totalPoints && (
-                      <span className="text-[9px] font-bold text-amber-800 block mt-0.5">
-                        Total Karir: {appreciationScore.lifetimePoints} PTS
-                      </span>
-                    )}
-                  </div>
+                  <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl shadow-2xs">
+                    {appreciationScore.totalPoints} Poin
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">

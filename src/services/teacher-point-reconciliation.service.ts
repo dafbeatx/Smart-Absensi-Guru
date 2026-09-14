@@ -228,20 +228,9 @@ export class TeacherPointReconciliationService {
     const provider = ProviderFactory.getProvider();
     try {
       const now = new Date();
-      let currentMonth = String(now.getMonth() + 1);
-      let currentYear = String(now.getFullYear());
-      let allAttendance = await provider.getMonthlyAttendance('ALL', currentMonth, currentYear, token || '');
-
-      // Jika bulan kalender sistem kosong, periksa data presensi periode aktif September 2026
-      if ((!allAttendance || allAttendance.length === 0) && (currentMonth !== '9' || currentYear !== '2026')) {
-        const activePeriodAttendance = await provider.getMonthlyAttendance('ALL', '9', '2026', token || '').catch(() => []);
-        if (activePeriodAttendance && activePeriodAttendance.length > 0) {
-          allAttendance = activePeriodAttendance;
-          currentMonth = '9';
-          currentYear = '2026';
-        }
-      }
-
+      const currentMonth = String(now.getMonth() + 1);
+      const currentYear = String(now.getFullYear());
+      const allAttendance = await provider.getMonthlyAttendance('ALL', currentMonth, currentYear, token || '');
       const allLogs = await provider.getTeacherPointHistory('ALL', token);
       const dutySchedules = await provider.getDutySchedules(token).catch(() => []);
 

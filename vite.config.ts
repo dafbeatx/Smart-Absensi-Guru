@@ -72,12 +72,8 @@ export default defineConfig({
     })
   ],
   build: {
-    chunkSizeWarningLimit: 2500,
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
-      onwarn(warning, warn) {
-        if (warning.code === 'INEFFECTIVE_DYNAMIC_IMPORT') return;
-        warn(warning);
-      },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {

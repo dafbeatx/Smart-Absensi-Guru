@@ -54,9 +54,6 @@ import type {
   StudentPlanDetail,
   VerifyPlanDTO,
   VerifyPlanResult,
-  SaveStudentPlanDTO,
-  UploadStudentDocumentDTO,
-  UploadDocumentResult,
 } from '../types/homeroom.types';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
@@ -3299,40 +3296,6 @@ export class MockProvider implements IDataProvider {
 
   public async getHomeroomDocumentUrl(_documentId: string, _token: string): Promise<string> {
     return 'https://example.com/mock-student-documents/sample-verification-doc.pdf';
-  }
-
-  public async saveStudentPlan(
-    dto: SaveStudentPlanDTO,
-    _token: string
-  ): Promise<{ success: boolean; message: string; plan_id?: string }> {
-    return {
-      success: true,
-      message: 'Rencana pendidikan lanjutan siswa berhasil disimpan.',
-      plan_id: 'plan_mock_' + dto.student_id,
-    };
-  }
-
-  public async uploadStudentDocument(
-    dto: UploadStudentDocumentDTO,
-    _token: string
-  ): Promise<UploadDocumentResult> {
-    return {
-      success: true,
-      message: 'Dokumen berhasil diunggah.',
-      document: {
-        id: 'doc_mock_' + Date.now(),
-        studentId: dto.student_id,
-        documentType: dto.document_type,
-        versionNumber: 1,
-        isActive: true,
-        originalFilename: dto.file_name,
-        mimeType: dto.mime_type,
-        fileSizeBytes: Math.round(dto.file_base64.length * 0.75),
-        status: 'pending_verification',
-        verificationNotes: null,
-        createdAt: new Date().toISOString(),
-      },
-    };
   }
 }
 

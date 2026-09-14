@@ -5,9 +5,7 @@ import { Button } from '../../../components/ui/Button';
 interface PlanVerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  student?: HomeroomStudentItem | null;
-  planId?: string | null;
-  studentName?: string;
+  student: HomeroomStudentItem | null;
   mode: 'verified' | 'needs_revision';
   onConfirm: (dto: VerifyPlanDTO) => Promise<void>;
 }
@@ -16,8 +14,6 @@ export const PlanVerificationModal: React.FC<PlanVerificationModalProps> = ({
   isOpen,
   onClose,
   student,
-  planId,
-  studentName,
   mode,
   onConfirm,
 }) => {
@@ -25,10 +21,7 @@ export const PlanVerificationModal: React.FC<PlanVerificationModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const effectivePlanId = student?.plan?.id || planId;
-  const effectiveStudentName = student?.fullName || studentName || 'Siswa';
-
-  if (!isOpen || !effectivePlanId) return null;
+  if (!isOpen || !student || !student.plan?.id) return null;
 
   const isApproveMode = mode === 'verified';
 
@@ -44,7 +37,7 @@ export const PlanVerificationModal: React.FC<PlanVerificationModalProps> = ({
     setIsSubmitting(true);
     try {
       await onConfirm({
-        plan_id: effectivePlanId,
+        plan_id: student.plan.id!,
         decision: mode,
         notes: notes.trim() || undefined,
       });
@@ -76,7 +69,7 @@ export const PlanVerificationModal: React.FC<PlanVerificationModalProps> = ({
                 {isApproveMode ? 'Verifikasi & Setujui Rencana' : 'Minta Perbaikan / Revisi'}
               </h3>
               <p className="text-xs text-slate-600 mt-0.5">
-                {effectiveStudentName} {student?.className ? `(${student.className})` : ''}
+                {student.fullName} ({student.className})
               </p>
             </div>
           </div>
@@ -92,11 +85,9 @@ export const PlanVerificationModal: React.FC<PlanVerificationModalProps> = ({
 
           {isApproveMode ? (
             <div className="text-xs text-slate-600 space-y-2 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-              {student?.plan?.firstChoice && (
-                <p className="font-semibold text-slate-700">
-                  Pilihan Sekolah: {student.plan.firstChoice.schoolName || '-'} ({student.plan.continuationType})
-                </p>
-              )}
+              <p className="font-semibold text-slate-700">
+                Pilihan Sekolah: {student.plan.firstChoice?.schoolName || '-'} ({student.plan.continuationType})
+              </p>
               <p>
                 Dengan menyetujui, Anda menyatakan bahwa rencana pendidikan lanjutan siswa telah sesuai dengan kriteria dan telah mendapatkan restu orang tua.
               </p>
@@ -112,7 +103,7 @@ export const PlanVerificationModal: React.FC<PlanVerificationModalProps> = ({
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Contoh: Lampirkan Surat Pernyataan Orang Tua terbaru atau lengkapi pilihan sekolah cadangan."
                 rows={4}
-                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all text-slate-800"
+                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400"
                 required
               />
               <p className="text-[11px] text-slate-600 mt-1">

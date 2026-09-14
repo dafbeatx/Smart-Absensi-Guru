@@ -55,15 +55,10 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
     NotificationService.getDetailedStatus(user.id).then(async (status) => {
       setDetailedStatus(status);
       if (status === 'granted') {
-        const hasFailedBefore =
-          typeof localStorage !== 'undefined' &&
-          localStorage.getItem(`smart_absensi_push_cloud_sync_failed_${user.id}`) === 'true';
-        if (!hasFailedBefore) {
-          // Auto attempt to subscribe to push so device is connected to cloud
-          await NotificationService.subscribeUserToPush(user.id);
-          const updated = await NotificationService.getDetailedStatus(user.id);
-          setDetailedStatus(updated);
-        }
+        // Auto attempt to subscribe to push so device is connected to cloud
+        await NotificationService.subscribeUserToPush(user.id);
+        const updated = await NotificationService.getDetailedStatus(user.id);
+        setDetailedStatus(updated);
       }
     });
 
@@ -101,7 +96,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
         window.removeEventListener('smart_absensi_push_status_updated', handlePushStatusEvent);
       }
     };
-  }, [isOpen, user?.id, token]);
+  }, [isOpen, user, token]);
 
   if (!isOpen) return null;
 

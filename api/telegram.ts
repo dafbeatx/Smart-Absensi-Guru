@@ -32,7 +32,7 @@ async function callGroq(apiKey: string, messages: Array<{ role: string; content:
         continue;
       }
 
-      const data: any = await res.json();
+      const data = await res.json();
       const content = data?.choices?.[0]?.message?.content;
       if (content && content.trim()) {
         return content.trim();
