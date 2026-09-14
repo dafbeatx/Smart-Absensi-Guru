@@ -517,13 +517,14 @@ export class SupabaseProvider implements IDataProvider {
           const checkoutUpsertPayload: Record<string, unknown> = {
             ...existing,
             ...updatePayload,
+            id: existing.id || attId,
             user_id: existing.user_id || userId,
             date: existing.date || todayStr,
             check_out_time: dbTime,
           };
           const upsertRes = await this.client
             .from('attendance')
-            .upsert(checkoutUpsertPayload, { onConflict: 'user_id,date' });
+            .upsert(checkoutUpsertPayload, { onConflict: 'id' });
           
           if (!upsertRes.error) {
             updateErr = null;
@@ -575,9 +576,10 @@ export class SupabaseProvider implements IDataProvider {
     const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
     const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
 
-    // Insert new check-in record
+    // Insert new check-in record using deterministic primary key 'id'
+    const targetRecordId = existing?.id || attId;
     const insertPayload: Record<string, unknown> = {
-      id: attId,
+      id: targetRecordId,
       user_id: userId,
       date: todayStr,
       check_in_time: dbTime,
@@ -592,14 +594,26 @@ export class SupabaseProvider implements IDataProvider {
 
     let { error } = await this.client.from('attendance').upsert(
       insertPayload,
-      { onConflict: 'user_id,date' }
+      { onConflict: 'id' }
     );
 
     if (error && (error.message.includes('column') || error.message.includes('verification_method') || error.message.includes('attendance_source'))) {
       delete insertPayload.verification_method;
       delete insertPayload.attendance_source;
-      const retryRes = await this.client.from('attendance').upsert(insertPayload, { onConflict: 'user_id,date' });
+      const retryRes = await this.client.from('attendance').upsert(insertPayload, { onConflict: 'id' });
       error = retryRes.error;
+    }
+
+    // Secondary fallback: jika upsert terkendala, gunakan direct insert atau direct update berdasarkan id
+    if (error && (error.code === '42P10' || error.message.includes('ON CONFLICT') || error.message.includes('constraint'))) {
+      logger.warn('SupabaseProvider', 'Upsert with id encountered constraint issue, trying fallback insert/update:', error.message);
+      if (existing?.id) {
+        const directUpd = await this.client.from('attendance').update(insertPayload).eq('id', existing.id);
+        error = directUpd.error;
+      } else {
+        const directIns = await this.client.from('attendance').insert(insertPayload);
+        error = directIns.error;
+      }
     }
 
     if (error) {
@@ -785,14 +799,14 @@ export class SupabaseProvider implements IDataProvider {
         ...basePayload,
         notes: dto.notes || dto.reason,
       },
-      { onConflict: 'user_id,date' }
+      { onConflict: 'id' }
     );
 
     if (error && (error.message.includes("'notes'") || error.message.includes('"notes"'))) {
       // Fallback: retry upsert without the optional 'notes' column if it does not exist in schema
       const retryRes = await this.client.from('attendance').upsert(
         basePayload,
-        { onConflict: 'user_id,date' }
+        { onConflict: 'id' }
       );
       error = retryRes.error;
     }
@@ -1195,10 +1209,10 @@ export class SupabaseProvider implements IDataProvider {
                     : `Izin Disetujui: ${notes || leaveRow.reason}`,
               };
 
-              // Try upsert first
+              // Try upsert first using deterministic id (Primary Key)
               const { error: upsertErr } = await this.client
                 .from('attendance')
-                .upsert(attendancePayload, { onConflict: 'user_id,date' });
+                .upsert(attendancePayload, { onConflict: 'id' });
 
               if (upsertErr) {
                 // Fallback: Check if record exists, then update or insert
@@ -2185,13 +2199,14 @@ export class SupabaseProvider implements IDataProvider {
         .from('teacher_moods')
         .upsert(
           {
+            id: `mood_${userId}_${date}`,
             user_id: userId,
             date,
             mood,
             note: note || null,
             created_at: new Date().toISOString(),
           },
-          { onConflict: 'user_id,date' }
+          { onConflict: 'id' }
         );
 
       if (error) {
@@ -4323,8 +4338,9 @@ export class SupabaseProvider implements IDataProvider {
     log: Omit<TeacherPointLog, 'id' | 'created_at'>,
     _token?: string
   ): Promise<TeacherPointLog> {
-    const payload = {
+    const payload: Record<string, unknown> = {
       user_id: log.user_id,
+      teacher_name: log.teacher_name || null,
       date: log.date,
       points: log.points,
       activity_type: log.activity_type,
@@ -4333,17 +4349,36 @@ export class SupabaseProvider implements IDataProvider {
     };
 
     try {
-      const { data, error } = await this.client
+      // Check if this point activity already exists today
+      const { data: existingPoint } = await this.client
         .from('teacher_point_history')
-        .upsert(payload, { onConflict: 'user_id,date,activity_type' })
-        .select()
+        .select('id')
+        .eq('user_id', log.user_id)
+        .eq('date', log.date)
+        .eq('activity_type', log.activity_type)
         .maybeSingle();
 
-      if (error) {
-        logger.warn('SupabaseProvider', 'recordTeacherPoint Supabase error, falling back to mock provider:', error.message);
-        const mockProv = new (await import('./mock-provider.service')).MockProvider();
-        return mockProv.recordTeacherPoint(log);
+      let savedRecord: TeacherPointLog | null = null;
+      if (existingPoint?.id) {
+        const { data, error } = await this.client
+          .from('teacher_point_history')
+          .update(payload)
+          .eq('id', existingPoint.id)
+          .select()
+          .maybeSingle();
+        if (error) throw error;
+        savedRecord = data as TeacherPointLog;
+      } else {
+        const { data, error } = await this.client
+          .from('teacher_point_history')
+          .insert(payload)
+          .select()
+          .maybeSingle();
+        if (error) throw error;
+        savedRecord = data as TeacherPointLog;
       }
+
+      const data = savedRecord;
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(

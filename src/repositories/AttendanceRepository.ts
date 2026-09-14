@@ -194,14 +194,34 @@ export class AttendanceRepository {
           return false;
         })();
 
-      if (!isNetworkOrTimeoutError(err)) {
+      const errMsg = err && typeof err === 'object' && 'message' in err
+        ? String((err as { message: string }).message)
+        : String(err);
+
+      const isBusinessValidationError =
+        errMsg.includes('Absensi Ditolak!') ||
+        errMsg.includes('Akun guru tidak ditemukan') ||
+        errMsg.includes('Sesi pengguna tidak valid');
+
+      const isDatabaseStorageFailure =
+        errMsg.includes('Gagal menyimpan data absensi') ||
+        errMsg.includes('Gagal mencatat absensi') ||
+        errMsg.includes('ON CONFLICT') ||
+        errMsg.includes('constraint') ||
+        errMsg.includes('42P10') ||
+        errMsg.includes('Internal Server Error') ||
+        errMsg.includes('500') ||
+        errMsg.includes('502') ||
+        errMsg.includes('503') ||
+        errMsg.includes('504');
+
+      const shouldFallbackOffline = isNetworkOrTimeoutError(err) || (!isBusinessValidationError && isDatabaseStorageFailure);
+
+      if (!shouldFallbackOffline) {
         logger.warn('AttendanceRepository', 'scanAttendance rejected by backend/validation, rethrowing error to UI:', err);
         
         // Dispatch failure alert to Telegram so issues are immediately logged and monitored
         const currentUser = useAuthStore.getState().user;
-        const errMsg = err && typeof err === 'object' && 'message' in err
-          ? String((err as { message: string }).message)
-          : String(err);
 
         TelegramService.sendAttendanceFailureNotification({
           teacherName: currentUser?.full_name || dto.user_id || 'Guru',
@@ -216,7 +236,7 @@ export class AttendanceRepository {
         throw err;
       }
 
-      logger.warn('AttendanceRepository', 'scanAttendance failed or timed out on weak network, switching to offline IndexedDB fallback:', err);
+      logger.warn('AttendanceRepository', 'scanAttendance encountered network/database storage error, switching to offline IndexedDB fallback:', err);
       
       // If network fetch fails or times out, fallback to IndexedDB Queue
       const userId = useAuthStore.getState().user?.id || 'usr_offline';
