@@ -48,4 +48,6 @@ scratch/
 # Database SQL Migrations & Scripts
 sql/
 *.sql
+database_backup/
+
 

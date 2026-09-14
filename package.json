@@ -10,6 +10,8 @@
     "test": "tsx scripts/run-tests.ts",
     "test:e2e": "npm test",
     "preview": "vite preview",
+    "backup:database": "tsx scripts/backup-full-database.ts",
+    "restore:database": "tsx scripts/restore-full-database.ts",
     "electron:build": "npm run build && electron-builder --win"
   },
   "dependencies": {
