@@ -96,10 +96,18 @@ export function calculateTeacherAppreciationScore(
   const alfaPenalty = alfaCount * 10;
   const calculatedPoints = Math.max(0, attendancePoints + checkOutPoints + dutyPoints + bonusPoints - alfaPenalty);
 
-  // Jika riwayat transaksi poin bulanan tersedia, gunakan akumulasi ledger poin bulan berjalan
-  const totalPoints = (monthlyPointLogs.length > 0)
+  // 1. Poin Siklus Bulan Berjalan (untuk Klasemen Juara Bulanan)
+  const monthlyPoints = (monthlyPointLogs.length > 0)
     ? Math.max(0, monthlyPointLogs.reduce((sum, p) => sum + (p.points || 0), 0))
     : calculatedPoints;
+
+  // 2. Total Poin Akumulasi Sepanjang Masa (Lifetime Points)
+  const lifetimePoints = (pointHistory && pointHistory.length > 0)
+    ? Math.max(0, pointHistory.reduce((sum, p) => sum + (p.points || 0), 0))
+    : calculatedPoints;
+
+  // Backward-compatibility: totalPoints mencerminkan periode yang dievaluasi
+  const totalPoints = monthlyPoints;
 
   // Penentuan Level Apresiasi Berbasis Poin Kehadiran Riil
   let level = '🥉 Pendidik Berkomitmen (Level 1)';
@@ -172,6 +180,8 @@ export function calculateTeacherAppreciationScore(
 
   return {
     totalPoints,
+    monthlyPoints,
+    lifetimePoints,
     level,
     nextLevelPoints,
     levelProgressPercent,
@@ -588,7 +598,17 @@ export function getTeacherDisciplineLeaderboard(
   // Pembaruan dinamis skor dan perolehan poin seluruh guru jika allPointLogs tersedia
   // Wajib difilter per-bulan berjalan / per-bulan target agar tidak terjadi akumulasi lintas bulan
   if (allPointLogs && allPointLogs.length > 0) {
-    const targetMonthPrefix = isCurrent ? '2026-09' : '2026-08';
+    const has2026 = allPointLogs.some((l) => l.date && l.date.startsWith('2026'));
+    const now = new Date();
+    const currYear = has2026 ? 2026 : now.getFullYear();
+    const currMonth = has2026 ? 9 : now.getMonth() + 1;
+    const prevMonth = currMonth === 1 ? 12 : currMonth - 1;
+    const prevYear = currMonth === 1 ? currYear - 1 : currYear;
+
+    const targetMonthPrefix = isCurrent
+      ? `${currYear}-${String(currMonth).padStart(2, '0')}`
+      : `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+
     teachers = teachers.map((t) => {
       const logs = allPointLogs.filter(
         (l) => l.user_id === t.id && l.date && l.date.startsWith(targetMonthPrefix)
@@ -602,9 +622,16 @@ export function getTeacherDisciplineLeaderboard(
       const earlyBird = logs.filter((l) => l.activity_type === 'EARLY_BIRD_BONUS').length;
       const streak = logs.filter((l) => l.activity_type === 'STREAK_MILESTONE').length;
 
+      let level = t.level;
+      if (pts >= 150) level = '🏆 Pendidik Teladan Utama';
+      else if (pts >= 100) level = '🥇 Pendidik Disiplin Emas';
+      else if (pts >= 50) level = '🥈 Pendidik Berdedikasi';
+      else if (pts > 0) level = '🥉 Pendidik Berkomitmen';
+
       return {
         ...t,
         totalPoints: pts,
+        level,
         hadirTepatWaktuCount: onTime,
         terlambatCount: late,
         piketCount: piket,

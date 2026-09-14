@@ -2079,7 +2079,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     {(dailyQuests || []).filter((q) => q?.status === 'COMPLETED').length}/{(dailyQuests || []).length} Misi
                   </span>
                   <span className="text-[8.5px] text-cyan-200/80 font-mono block mt-0.5">
-                    #{(disciplineLeaderboard?.currentUserRank) ?? 1} • {(appreciationScore?.totalPoints) ?? 0} PTS
+                    #{(disciplineLeaderboard?.currentUserRank) ?? 1} • {(appreciationScore?.totalPoints) ?? 0} PTS (Bln Ini)
                   </span>
                 </div>
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 group-hover:bg-white/20 text-white flex items-center justify-center transition-all">
@@ -2401,7 +2401,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </span>
                   <p className="text-[10.5px] sm:text-xs font-black text-slate-800 truncate">
                     #{disciplineLeaderboard?.currentUserRank ?? 1} dari {disciplineLeaderboard?.totalTeachers ?? 12} Guru{' '}
-                    <span className="text-emerald-600 font-bold">({appreciationScore?.totalPoints ?? 0} Poin)</span>
+                    <span className="text-emerald-600 font-bold">({appreciationScore?.totalPoints ?? 0} Poin Bulan Ini)</span>
+                    {appreciationScore?.lifetimePoints !== undefined && appreciationScore.lifetimePoints > (appreciationScore.totalPoints || 0) && (
+                      <span className="text-amber-700 font-bold text-[10px] ml-1.5">• Total Karir: {appreciationScore.lifetimePoints} PTS</span>
+                    )}
                   </p>
                 </div>
 
@@ -3596,7 +3599,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Peringkat &amp; Piagam Penghargaan
                     </h3>
                     <p className="text-[10.5px] text-slate-500 font-medium">
-                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({(appreciationScore?.totalPoints) ?? 0} PTS)
+                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({(appreciationScore?.totalPoints) ?? 0} PTS Bulan Ini)
                     </p>
                   </div>
                 </div>
@@ -4255,9 +4258,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <p className="text-[10px] text-slate-500 font-medium">Monitoring performa disiplin internal sekolah</p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl shadow-2xs">
-                    {appreciationScore.totalPoints} Poin
-                  </span>
+                  <div className="text-right">
+                    <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl shadow-2xs block">
+                      {appreciationScore.totalPoints} Poin Bulan Ini
+                    </span>
+                    {appreciationScore?.lifetimePoints !== undefined && appreciationScore.lifetimePoints > appreciationScore.totalPoints && (
+                      <span className="text-[9px] font-bold text-amber-800 block mt-0.5">
+                        Total Karir: {appreciationScore.lifetimePoints} PTS
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">

@@ -1457,13 +1457,22 @@ export class SupabaseProvider implements IDataProvider {
 
   // ─── USER MANAGEMENT API (ADMIN) ──────────────────────────────────────────
 
+  private static usersCache: UserProfile[] | null = null;
+  private static usersCacheExpiry: number = 0;
+
   public async getAllUsers(_token: string): Promise<UserProfile[]> {
+    // In-memory cache 2 menit untuk mencegah query berulang dari polling/komponen UI
+    const now = Date.now();
+    if (SupabaseProvider.usersCache && now < SupabaseProvider.usersCacheExpiry) {
+      return SupabaseProvider.usersCache;
+    }
+
     const { data } = await this.client
       .from('users')
-      .select('*')
+      .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at')
       .order('created_at', { ascending: false });
 
-    return (data || []).map((row) => ({
+    const result = (data || []).map((row) => ({
       id: row.id,
       nip: row.nip,
       full_name: row.full_name,
@@ -1474,6 +1483,10 @@ export class SupabaseProvider implements IDataProvider {
       is_active: row.account_status === 'ACTIVE',
       created_at: row.created_at,
     }));
+
+    SupabaseProvider.usersCache = result;
+    SupabaseProvider.usersCacheExpiry = now + 120000; // 2 menit
+    return result;
   }
 
   public async createUser(user: Partial<UserProfile>, _token: string): Promise<UserProfile> {
@@ -1494,6 +1507,7 @@ export class SupabaseProvider implements IDataProvider {
 
     const { error } = await this.client.from('users').insert(newUser);
     if (error) throw new Error('Gagal menambahkan pengguna baru: ' + error.message);
+    SupabaseProvider.usersCache = null;
 
     return {
       id: newId,
@@ -1520,6 +1534,7 @@ export class SupabaseProvider implements IDataProvider {
 
     const { error } = await this.client.from('users').update(payload).eq('id', userId);
     if (error) throw new Error('Gagal memperbarui data pengguna: ' + error.message);
+    SupabaseProvider.usersCache = null;
 
     const activeUser = useAuthStore.getState().user;
     if (activeUser && (activeUser.id === userId || (activeUser.nip && activeUser.nip === userId))) {
@@ -1530,11 +1545,11 @@ export class SupabaseProvider implements IDataProvider {
 
   public async uploadAvatar(userId: string, file: File): Promise<string> {
     try {
-      // Auto-convert to WebP format (max 400x400px, 80% quality) to save Supabase Storage (~20-30KB per photo)
+      // Auto-convert to WebP format (max 300x300px, 75% quality) to save Supabase Storage (~15-25KB per photo)
       let fileToUpload = file;
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         try {
-          fileToUpload = await convertToWebP(file, 400, 400, 0.8);
+          fileToUpload = await convertToWebP(file, 300, 300, 0.75);
           logger.info('SupabaseProvider', 'Image converted to WebP successfully', {
             originalSize: `${(file.size / 1024).toFixed(1)} KB`,
             webpSize: `${(fileToUpload.size / 1024).toFixed(1)} KB`,
@@ -1546,8 +1561,8 @@ export class SupabaseProvider implements IDataProvider {
 
       const filePath = `teacher_${userId}_${Date.now()}.webp`;
 
-      // Try bucket 'avatas 1', fallback to 'avatas-1' or 'avatars'
-      const bucketsToTry = ['avatas 1', 'avatas-1', 'avatars'];
+      // Coba bucket standar 'avatars' terlebih dahulu
+      const bucketsToTry = ['avatars', 'avatas-1', 'avatas 1'];
       let publicUrl = '';
       let uploadSuccess = false;
 
@@ -1565,6 +1580,7 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       if (!uploadSuccess || !publicUrl) {
+        // Fallback darurat: gunakan file yang SUDAH dikompresi WebP (bukan file asli raksasa)
         publicUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
@@ -1574,21 +1590,26 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       await this.updateUser(userId, { avatar_url: publicUrl }, '');
+      SupabaseProvider.usersCache = null;
       return publicUrl;
     } catch (err) {
-      logger.warn('SupabaseProvider', 'uploadAvatar fallback to base64 Data URI', { userId, err });
-      return new Promise<string>((resolve, reject) => {
+      logger.warn('SupabaseProvider', 'uploadAvatar fallback to compressed WebP', { userId, err });
+      const fallbackUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = (err) => reject(err);
         reader.readAsDataURL(file);
       });
+      await this.updateUser(userId, { avatar_url: fallbackUrl }, '');
+      SupabaseProvider.usersCache = null;
+      return fallbackUrl;
     }
   }
 
   public async deleteUser(userId: string, _token: string): Promise<boolean> {
     const { error } = await this.client.from('users').delete().eq('id', userId);
     if (error) throw new Error('Gagal menghapus pengguna: ' + error.message);
+    SupabaseProvider.usersCache = null;
     return true;
   }
 
@@ -1827,7 +1848,7 @@ export class SupabaseProvider implements IDataProvider {
         query = query.or(`user_id.eq.${userId},user_id.is.null`);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(30);
 
       if (error) {
         // Fallback for older schemas where recipient_user_id might not exist
@@ -1835,7 +1856,8 @@ export class SupabaseProvider implements IDataProvider {
           .from('notifications')
           .select('*')
           .or(`user_id.eq.${userId},user_id.is.null`)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(30);
 
         if (fallback.error) {
           logger.warn('SupabaseProvider', 'notifications query error:', fallback.error.message);
@@ -4272,23 +4294,40 @@ export class SupabaseProvider implements IDataProvider {
         return mockProv.getTeacherPointHistory(userId);
       }
 
-      if (data && data.length > 0) {
-        return data.map((row: any) => ({
-          id: row.id,
-          user_id: row.user_id,
-          teacher_name: row.teacher_name || undefined,
-          date: row.date,
-          points: row.points,
-          activity_type: row.activity_type as TeacherPointActivityType,
-          title: row.title,
-          description: row.description || undefined,
-          created_at: row.created_at,
-        }));
+      const dbLogs: TeacherPointLog[] = (data || []).map((row: any) => ({
+        id: row.id,
+        user_id: row.user_id,
+        teacher_name: row.teacher_name || undefined,
+        date: row.date,
+        points: row.points,
+        activity_type: row.activity_type as TeacherPointActivityType,
+        title: row.title,
+        description: row.description || undefined,
+        created_at: row.created_at,
+      }));
+
+      // Smart Merge: Gabungkan dengan seed MockProvider untuk riwayat hari yang belum tercatat di database Supabase
+      // Menjamin poin guru tidak anjlok ke 15 atau 0 saat transaksi pertama kali dicatat
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      const seedLogs = await mockProv.getTeacherPointHistory(userId);
+
+      const existingKeys = new Set(
+        dbLogs.map((l) => `${l.user_id}_${l.date}_${l.activity_type}`)
+      );
+
+      const mergedLogs = [...dbLogs];
+      for (const s of seedLogs) {
+        const key = `${s.user_id}_${s.date}_${s.activity_type}`;
+        if (!existingKeys.has(key)) {
+          mergedLogs.push(s);
+          existingKeys.add(key);
+        }
       }
 
-      // If database returned 0 rows, check fallback seed in mock provider
-      const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      return mockProv.getTeacherPointHistory(userId);
+      return mergedLogs.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() ||
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     } catch (err) {
       logger.error('SupabaseProvider', 'getTeacherPointHistory exception:', err);
       const mockProv = new (await import('./mock-provider.service')).MockProvider();

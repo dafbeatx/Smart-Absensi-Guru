@@ -350,6 +350,8 @@ export interface TeacherPointLog {
 
 export interface TeacherAppreciationScore {
   totalPoints: number;
+  monthlyPoints?: number; // Poin presensi siklus bulan berjalan (untuk penentuan klasemen & juara bulanan)
+  lifetimePoints?: number; // Total akumulasi seluruh poin sepanjang masa (saldo dedikasi karir guru)
   level: string; // e.g. "Pendidik Teladan Platinum", "Pendidik Disiplin Emas"
   nextLevelPoints: number;
   levelProgressPercent: number;

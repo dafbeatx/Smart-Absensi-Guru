@@ -354,7 +354,12 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
   // Setup periodic polling & real-time event listeners
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(loadNotifications, 20000); // polling refresh every 20s
+    // Smart Polling: 90 detik (dan hanya saat tab aktif terlihat) untuk menghemat kuota Supabase
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadNotifications();
+      }
+    }, 90000);
 
     const handleRealtimeUpdate = () => {
       loadNotifications();

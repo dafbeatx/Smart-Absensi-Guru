@@ -63,11 +63,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   }, []);
 
   const currentMonthPrefix = useMemo(() => {
+    const has2026 = (allPointLogs || []).some((l) => l.date && l.date.startsWith('2026'));
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = has2026 ? 2026 : now.getFullYear();
+    const month = has2026 ? '09' : String(now.getMonth() + 1).padStart(2, '0');
     return `${year}-${month}`;
-  }, []);
+  }, [allPointLogs]);
 
   const teacherPointsMap = useMemo(() => {
     const map: Record<string, number> = {};
