@@ -6,23 +6,33 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'node:crypto';
 import process from 'node:process';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
+const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  'https://fnppfmjsbqxbtioypnap.supabase.co';
 
 let customClient: any = null;
+
+function getServiceRoleKey(): string | null {
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
+    process.env.SERVICE_ROLE_KEY;
+  return typeof key === 'string' && key.trim().length > 0 ? key.trim() : null;
+}
 
 /**
  * Checks whether SUPABASE_SERVICE_ROLE_KEY is properly configured on the server
  */
 export function isServiceRoleConfigured(): boolean {
   if (customClient) return true; // Custom client injected (e.g. for unit testing)
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return typeof key === 'string' && key.trim().length > 0;
+  return getServiceRoleKey() !== null;
 }
 
 function getActiveServerClient(): any {
   if (customClient) return customClient;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key || !key.trim()) {
+  const key = getServiceRoleKey();
+  if (!key) {
     console.error('[SessionAuth] SUPABASE_SERVICE_ROLE_KEY configured: false');
     return null;
   }
