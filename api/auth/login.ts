@@ -2,9 +2,8 @@
 // Serverless Login Engine for Smart Absensi Guru (SAGA)
 // Emits server-verifiable, stateful CSPRNG session tokens and stores only SHA-256 token hash
 
-import crypto from 'node:crypto';
-import { Buffer } from 'node:buffer';
-import { serverSupabase, hashSessionToken, isServiceRoleConfigured } from '../_shared/session-auth.js';
+import crypto from 'crypto';
+import { serverSupabase, hashSessionToken, isServiceRoleConfigured } from '../_shared/session-auth';
 
 function timingSafeMatch(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;

@@ -2,8 +2,8 @@
 // Serverless Homeroom Overview Endpoint for Smart Absensi Guru (SAGA)
 // Returns high-level statistics and class profile for the authenticated homeroom teacher
 
-import { serverSupabase } from '../_shared/session-auth.js';
-import { authenticateHomeroomTeacher } from '../_shared/homeroom-auth.js';
+import { serverSupabase } from '../_shared/session-auth';
+import { authenticateHomeroomTeacher } from '../_shared/homeroom-auth';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
