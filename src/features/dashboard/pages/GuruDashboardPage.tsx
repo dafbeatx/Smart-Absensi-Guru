@@ -1359,23 +1359,33 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   useEffect(() => {
     if (!effectiveUser?.id) return;
     const rank = disciplineLeaderboard.currentUserRank;
-    if (rank >= 1 && rank <= 3) {
-      const timing = evaluateDisciplinePeriodTiming(currentDate, selectedYear, selectedMonth);
-      if (!timing.isEndOfMonth) return;
+    if (rank < 1 || rank > 3) {
+      setIsCelebrationModalOpen(false);
+      return;
+    }
 
-      const todayStr = getTodayDateInJakarta();
-      const storageKey = `smart_absensi_celebrated_top3_${effectiveUser.id}_${todayStr}`;
-      const alreadyCelebrated = sessionStorage.getItem(storageKey);
-      if (!alreadyCelebrated) {
-        const timer = setTimeout(() => {
+    // Hindari race-condition saat log poin seluruh guru sekolah belum selesai dimuat
+    if (!allTeacherPointLogs || allTeacherPointLogs.length === 0) return;
+
+    const timing = evaluateDisciplinePeriodTiming(currentDate, selectedYear, selectedMonth);
+    if (!timing.isEndOfMonth) return;
+
+    const todayStr = getTodayDateInJakarta();
+    const storageKey = `smart_absensi_celebrated_top3_${effectiveUser.id}_${todayStr}`;
+    const alreadyCelebrated = sessionStorage.getItem(storageKey);
+    if (!alreadyCelebrated) {
+      const timer = setTimeout(() => {
+        // Re-verifikasi rank mutakhir sesaat sebelum membuka modal
+        const currentFreshRank = disciplineLeaderboard.currentUserRank;
+        if (currentFreshRank >= 1 && currentFreshRank <= 3) {
           setIsCelebrationModalOpen(true);
           SoundService.play('SUCCESS');
           sessionStorage.setItem(storageKey, 'true');
-        }, 800);
-        return () => clearTimeout(timer);
-      }
+        }
+      }, 800);
+      return () => clearTimeout(timer);
     }
-  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank, selectedYear, selectedMonth]);
+  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank, selectedYear, selectedMonth, allTeacherPointLogs, currentDate]);
 
   // ── Teacher Challenge & Streak Engine (Duolingo Style) ─────────────────
   const streakInfo = useMemo(() => {
@@ -4792,13 +4802,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
       {/* 15. Modal Pop-up Apresiasi Kehormatan Juara 1, 2, dan 3 */}
       <TopDisciplineCelebrationModal
-        isOpen={isCelebrationModalOpen}
+        isOpen={isCelebrationModalOpen && (disciplineLeaderboard?.currentUserRank ?? 99) <= 3}
         onClose={() => setIsCelebrationModalOpen(false)}
         onOpenLeaderboard={() => {
           setIsCelebrationModalOpen(false);
           setIsDisciplineBadgeModalOpen(true);
         }}
-        rank={disciplineLeaderboard?.currentUserRank ?? 1}
+        rank={disciplineLeaderboard?.currentUserRank ?? 99}
         totalPoints={appreciationScore?.totalPoints ?? 0}
         user={effectiveUser}
         teacherData={disciplineLeaderboard?.leaderboard?.find((t) => t.isCurrentUser)}

@@ -830,7 +830,7 @@ export function getTeacherDisciplineLeaderboard(
     avatar_url: null,
   };
   const currentUserIdx = teachers.findIndex((t) => t.isCurrentUser);
-  const currentUserRank = currentUserIdx !== -1 ? currentUserIdx + 1 : 1;
+  const currentUserRank = currentUserIdx !== -1 ? currentUserIdx + 1 : (currentUser ? Math.max(teachers.length, 1) : 1);
 
   return {
     periodType: period,

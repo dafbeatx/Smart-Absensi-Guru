@@ -34,18 +34,21 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
   onOpenCertificate,
 }) => {
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
-  if (!isOpen) return null;
+  if (!isOpen || rank < 1 || rank > 3) return null;
 
   const isRank1 = rank === 1;
   const isRank2 = rank === 2;
+  const isRank3 = rank === 3;
 
   const rankTitle = isRank1
     ? 'Juara 1 Teladan Utama Kepsek'
     : isRank2
     ? 'Peringkat 2 Pendidik Terdisiplin'
-    : 'Peringkat 3 Pendidik Terdisiplin';
+    : isRank3
+    ? 'Peringkat 3 Pendidik Terdisiplin'
+    : `Peringkat #${rank} Pendidik Terdisiplin`;
 
-  const rankBadgeEmoji = isRank1 ? '🥇' : isRank2 ? '🥈' : '🥉';
+  const rankBadgeEmoji = isRank1 ? '🥇' : isRank2 ? '🥈' : isRank3 ? '🥉' : '🎖️';
 
   const rankTheme = isRank1
     ? {
