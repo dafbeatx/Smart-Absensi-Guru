@@ -16,9 +16,9 @@ export const AboutAppModal: React.FC<AboutAppModalProps> = ({ isOpen, onClose })
       title="ℹ️ Tentang Smart Absensi Guru"
       maxWidth="md"
     >
-      <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1 text-slate-700 text-sm max-w-[480px] mx-auto">
+      <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1 text-slate-700 text-sm max-w-120 mx-auto">
         {/* Hero Card: Developer Spotlight */}
-        <div className="bg-gradient-to-br from-[#023246] via-[#1E5670] to-[#287094] text-white p-4 sm:p-5 rounded-2xl shadow-sm relative overflow-hidden">
+        <div className="bg-linear-to-br from-[#023246] via-[#1E5670] to-[#287094] text-white p-4 sm:p-5 rounded-2xl shadow-sm relative overflow-hidden">
           <div className="absolute right-0 bottom-0 translate-x-3 translate-y-3 opacity-10 pointer-events-none">
             <span className="text-8xl font-black">SAGA</span>
           </div>
