@@ -435,7 +435,7 @@ export class MockProvider implements IDataProvider {
           const todayDayOfWeek = new Date().getDay();
           const isDutyToday = (dutySchedules || []).some(
             (s) =>
-              s.day_of_week === todayDayOfWeek &&
+              Number(s.day_of_week) === Number(todayDayOfWeek) &&
               (s.teacher_id === userId ||
                 (sessionUser?.full_name &&
                   s.teacher_name &&
@@ -1672,7 +1672,10 @@ export class MockProvider implements IDataProvider {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          return parsed;
+          return parsed.map((item: any) => ({
+            ...item,
+            day_of_week: Number(item.day_of_week),
+          }));
         }
       } catch (e) {
         console.warn('Failed to parse duty schedules from storage:', e);
@@ -1689,6 +1692,7 @@ export class MockProvider implements IDataProvider {
   ): Promise<boolean> {
     const formatted: TeacherDutySchedule[] = schedules.map((item) => ({
       ...item,
+      day_of_week: Number(item.day_of_week),
       id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-4000-8000-' + Math.random().toString(16).substring(2, 14),
       created_at: new Date().toISOString(),
     }));

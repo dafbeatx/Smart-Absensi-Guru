@@ -28,7 +28,7 @@ export class DutyScheduleRepository {
    */
   public static async getDutyTeachersForDay(dayOfWeek: number, token?: string): Promise<TeacherDutySchedule[]> {
     const all = await this.getDutySchedules(token);
-    return all.filter((s) => s.day_of_week === dayOfWeek);
+    return all.filter((s) => Number(s.day_of_week) === Number(dayOfWeek));
   }
 
   /**
@@ -43,7 +43,7 @@ export class DutyScheduleRepository {
     // Only Monday (1) through Friday (5)
     if (day < 1 || day > 5) return false;
 
-    const todaySchedules = dutySchedules.filter((s) => s.day_of_week === day);
+    const todaySchedules = dutySchedules.filter((s) => Number(s.day_of_week) === Number(day));
     const cleanQuery = teacherIdOrName.trim().toLowerCase();
 
     return todaySchedules.some((s) => {

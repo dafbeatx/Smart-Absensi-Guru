@@ -55,7 +55,7 @@ export const DutyScheduleManagement: React.FC = () => {
   }, []);
 
   // Filter schedules for the current selected day
-  const daySchedules = schedules.filter((s) => s.day_of_week === selectedDay);
+  const daySchedules = schedules.filter((s) => Number(s.day_of_week) === Number(selectedDay));
 
   const handleAddTeacherDuty = async () => {
     if (!selectedTeacherId) {
@@ -126,8 +126,8 @@ export const DutyScheduleManagement: React.FC = () => {
   };
 
   const handleRemoveDuty = async (teacherId: string) => {
-    const teacherToRemove = schedules.find((s) => s.day_of_week === selectedDay && s.teacher_id === teacherId);
-    const updatedSchedules = schedules.filter((s) => !(s.day_of_week === selectedDay && s.teacher_id === teacherId));
+    const teacherToRemove = schedules.find((s) => Number(s.day_of_week) === Number(selectedDay) && s.teacher_id === teacherId);
+    const updatedSchedules = schedules.filter((s) => !(Number(s.day_of_week) === Number(selectedDay) && s.teacher_id === teacherId));
     const payload = updatedSchedules.map((s) => ({
       day_of_week: s.day_of_week,
       teacher_id: s.teacher_id,
@@ -209,7 +209,7 @@ export const DutyScheduleManagement: React.FC = () => {
       <div className="bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap gap-2">
         {DAYS_OF_WEEK.map((d) => {
           const isSelected = selectedDay === d.day;
-          const count = schedules.filter((s) => s.day_of_week === d.day).length;
+          const count = schedules.filter((s) => Number(s.day_of_week) === Number(d.day)).length;
           return (
             <button
               key={d.day}

@@ -29,7 +29,7 @@ export function calculateTeacherAppreciationScore(
   const userDutyDays = new Set(
     dutySchedules
       .filter((d) => d && (d.teacher_id === userId || (userId && d.teacher_id?.includes(userId))))
-      .map((d) => d.day_of_week)
+      .map((d) => Number(d.day_of_week))
   );
 
   let realPiketCount = 0;

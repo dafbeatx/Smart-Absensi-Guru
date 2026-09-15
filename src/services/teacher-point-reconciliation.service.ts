@@ -171,7 +171,7 @@ export class TeacherPointReconciliationService {
       if (att.status === 'HADIR' || att.status === 'TERLAMBAT') {
         const isScheduledDuty = (activeDuties || []).some(
           (d) =>
-            d.day_of_week === dayOfWeek &&
+            Number(d.day_of_week) === Number(dayOfWeek) &&
             (d.teacher_id === userId ||
               (Boolean(d.teacher_name) &&
                 Boolean(teacherName) &&

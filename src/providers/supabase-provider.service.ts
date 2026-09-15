@@ -666,7 +666,7 @@ export class SupabaseProvider implements IDataProvider {
           const todayDayOfWeek = new Date().getDay();
           const isDutyToday = (dutySchedules || []).some(
             (s) =>
-              s.day_of_week === todayDayOfWeek &&
+              Number(s.day_of_week) === Number(todayDayOfWeek) &&
               (s.teacher_id === userId ||
                 (sessionUser?.full_name &&
                   s.teacher_name &&
@@ -2451,10 +2451,15 @@ export class SupabaseProvider implements IDataProvider {
         .order('day_of_week', { ascending: true });
 
       if (!error && data) {
+        const normalized: TeacherDutySchedule[] = data.map((item: any) => ({
+          ...item,
+          day_of_week: Number(item.day_of_week),
+        }));
+
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('smart_absensi_duty_schedules', JSON.stringify(data));
+          localStorage.setItem('smart_absensi_duty_schedules', JSON.stringify(normalized));
         }
-        return data as TeacherDutySchedule[];
+        return normalized;
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'getDutySchedules error, falling back to local storage:', err);
@@ -2474,10 +2479,14 @@ export class SupabaseProvider implements IDataProvider {
       const uniqueMap = new Map<string, Omit<TeacherDutySchedule, 'id' | 'created_at'>>();
       for (const item of schedules) {
         if (!item.teacher_id || !item.teacher_name) continue;
-        if (item.day_of_week < 1 || item.day_of_week > 5) continue;
-        const key = `${item.day_of_week}_${item.teacher_id}`;
+        const dayNum = Number(item.day_of_week);
+        if (dayNum < 1 || dayNum > 5) continue;
+        const key = `${dayNum}_${item.teacher_id}`;
         if (!uniqueMap.has(key)) {
-          uniqueMap.set(key, item);
+          uniqueMap.set(key, {
+            ...item,
+            day_of_week: dayNum,
+          });
         }
       }
       const uniqueSchedules = Array.from(uniqueMap.values());

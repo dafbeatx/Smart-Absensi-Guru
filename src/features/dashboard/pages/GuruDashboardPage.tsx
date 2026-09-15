@@ -1011,7 +1011,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
         const todayDayOfWeek = new Date().getDay(); // 1 = Senin, ..., 5 = Jumat
         if (todayDayOfWeek >= 1 && todayDayOfWeek <= 5) {
-          const todayPikets = (fetchedDuty || []).filter((s) => s && s.day_of_week === todayDayOfWeek);
+          const todayPikets = (fetchedDuty || []).filter((s) => s && Number(s.day_of_week) === Number(todayDayOfWeek));
           const myPiket = todayPikets.find(
             (s) =>
               s &&
