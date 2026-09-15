@@ -143,7 +143,7 @@ export const SystemHealthDashboardView: React.FC<SystemHealthDashboardViewProps>
       </div>
 
       {/* ── AI EXECUTIVE SUMMARY CARD ────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-[#023246] to-[#012332] text-white p-5 sm:p-7 rounded-3xl border border-[#287094]/40 shadow-xl relative overflow-hidden">
+      <div className="bg-linear-to-br from-[#023246] to-[#012332] text-white p-5 sm:p-7 rounded-3xl border border-[#287094]/40 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-[#287094]/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -204,7 +204,7 @@ export const SystemHealthDashboardView: React.FC<SystemHealthDashboardViewProps>
           </div>
 
           {/* Health Score Gauge */}
-          <div className="shrink-0 flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 border border-white/10 min-w-[130px]">
+          <div className="shrink-0 flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 border border-white/10 min-w-32.5">
             <span className="text-[10px] font-bold text-[#D4D4CE] uppercase tracking-wider">Health Score</span>
             <div className="text-4xl sm:text-5xl font-black text-white tracking-tight tabular-nums my-1">
               {score}
@@ -545,7 +545,7 @@ export const SystemHealthDashboardView: React.FC<SystemHealthDashboardViewProps>
                     value={egressInputVal}
                     onChange={(e) => setEgressInputVal(e.target.value)}
                     placeholder="misal: 1.107"
-                    className="flex-1 px-3 py-2 text-sm font-mono font-bold rounded-xl border border-slate-300 focus:outline-hidden focus:border-[#023246]"
+                    className="flex-1 px-3 py-2 text-sm font-mono font-bold rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#023246]/30 transition-all"
                   />
                   <select
                     value={egressInputUnit}
@@ -571,7 +571,7 @@ export const SystemHealthDashboardView: React.FC<SystemHealthDashboardViewProps>
                     value={burnRateInput}
                     onChange={(e) => setBurnRateInput(e.target.value)}
                     placeholder="30"
-                    className="w-28 px-3 py-2 text-sm font-mono font-bold rounded-xl border border-slate-300 focus:outline-hidden focus:border-[#023246]"
+                    className="w-28 px-3 py-2 text-sm font-mono font-bold rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#023246]/30 transition-all"
                   />
                   <span className="text-xs text-slate-500 font-semibold">MB / hari</span>
                 </div>
