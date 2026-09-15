@@ -17,10 +17,12 @@ export const SystemHealthDashboardView: React.FC<SystemHealthDashboardViewProps>
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isEgressModalOpen, setIsEgressModalOpen] = useState(false);
 
-  // Egress modal form state
-  const [egressInputVal, setEgressInputVal] = useState('1.107');
+  // Calculate current egress dynamically for form default
+  const currentEgressConfig = SystemHealthService.getEgressConfig();
+  const currentEgressGb = (SystemHealthService.calculateCurrentEgressMb(currentEgressConfig) / 1000).toFixed(3);
+  const [egressInputVal, setEgressInputVal] = useState(currentEgressGb);
   const [egressInputUnit, setEgressInputUnit] = useState<'GB' | 'MB'>('GB');
-  const [burnRateInput, setBurnRateInput] = useState('30');
+  const [burnRateInput, setBurnRateInput] = useState(String(currentEgressConfig.dailyBurnRateMb));
 
   useEffect(() => {
     let isMounted = true;

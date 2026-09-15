@@ -101,7 +101,7 @@ export class SystemHealthService {
   private static listeners: Array<(report: SystemHealthReport) => void> = [];
 
   /**
-   * Returns default or stored egress baseline (defaults to 1107 MB based on recorded usage)
+   * Returns default or stored egress baseline (defaults to 1107 MB recorded on 2026-09-01)
    */
   public static getEgressConfig(): EgressTrackerData {
     try {
@@ -116,10 +116,24 @@ export class SystemHealthService {
       logger.warn('SystemHealthService', 'Failed to read egress config from storage', e);
     }
     return {
-      baselineMb: 1107, // 1.107 GB recorded on Supabase dashboard
-      baselineDate: new Date().toISOString(),
+      baselineMb: 1107, // 1.107 GB recorded on Supabase dashboard on 2026-09-01
+      baselineDate: '2026-09-01T00:00:00.000Z', // Fixed date when baseline was recorded
       dailyBurnRateMb: 30, // ~30 MB/day after polling & WebP optimizations
     };
+  }
+
+  /**
+   * Calculates current estimated egress by accumulating daily burn rate since baseline date.
+   * This keeps the web UI in sync with Supabase dashboard without manual updates.
+   */
+  public static calculateCurrentEgressMb(config: EgressTrackerData): number {
+    const baselineDate = new Date(config.baselineDate);
+    const now = new Date();
+    const elapsedMs = Math.max(0, now.getTime() - baselineDate.getTime());
+    const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+    const accumulatedMb = Math.round(config.baselineMb + elapsedDays * config.dailyBurnRateMb);
+    // Cap at 5 GB limit
+    return Math.min(accumulatedMb, 5000);
   }
 
   /**
@@ -210,7 +224,7 @@ export class SystemHealthService {
     const daysRemaining = Math.max(1, daysInMonth - now.getDate());
 
     const egressConfig = this.getEgressConfig();
-    const egressUsedMb = egressConfig.baselineMb;
+    const egressUsedMb = this.calculateCurrentEgressMb(egressConfig);
     const egressLimitMb = 5000; // 5 GB Free Plan limit
     const egressPercent = Math.min(100, Math.round((egressUsedMb / egressLimitMb) * 100 * 10) / 10);
     const projectedMonthlyEgressMb = Math.round(egressUsedMb + daysRemaining * egressConfig.dailyBurnRateMb);

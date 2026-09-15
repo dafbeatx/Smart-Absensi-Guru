@@ -173,13 +173,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </div>
             <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-white/10 text-white font-mono">
-              {healthReport ? `${healthReport.overallScore}%` : '96%'}
+              {healthReport ? `${healthReport.overallScore}%` : '…'}
             </span>
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-[#D4D4CE]/80 pt-1">
-            <span>Supa: {healthReport ? `${(healthReport.supabase.egressUsedMb / 1000).toFixed(2)}GB` : '1.11GB'}</span>
-            <span>Vercel: {healthReport?.vercel.edgeLatencyMs ? `${healthReport.vercel.edgeLatencyMs}ms` : '45ms'}</span>
+            <span>Supa: {healthReport ? `${(healthReport.supabase.egressUsedMb / 1000).toFixed(2)}GB` : '…'}</span>
+            <span>Vercel: {healthReport?.vercel.edgeLatencyMs ? `${healthReport.vercel.edgeLatencyMs}ms` : '…'}</span>
           </div>
 
           {healthReport && healthReport.warnings.length > 0 && (
@@ -371,12 +371,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span className="text-xs font-black text-[#023246]">Kesehatan Web & AI</span>
                   </div>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    {healthReport ? `${healthReport.overallScore}% Prima` : '96% Prima'}
+                    {healthReport ? `${healthReport.overallScore}% Prima` : '… Prima'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                  <span>Egress: {healthReport ? `${(healthReport.supabase.egressUsedMb / 1000).toFixed(2)} GB` : '1.11 GB'}</span>
-                  <span>Vercel: {healthReport?.vercel.edgeLatencyMs ? `${healthReport.vercel.edgeLatencyMs} ms` : '45 ms'}</span>
+                  <span>Egress: {healthReport ? `${(healthReport.supabase.egressUsedMb / 1000).toFixed(2)} GB` : '…'}</span>
+                  <span>Vercel: {healthReport?.vercel.edgeLatencyMs ? `${healthReport.vercel.edgeLatencyMs} ms` : '…'}</span>
                 </div>
                 {healthReport && healthReport.warnings.length > 0 && (
                   <div className="pt-1 mt-1 border-t border-slate-200 flex items-center gap-1 text-[11px] text-amber-700 font-bold truncate">
