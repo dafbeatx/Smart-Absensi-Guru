@@ -512,4 +512,47 @@ KNOWLEDGE BASE LENGKAP SMART ABSENSI GURU (HARUS TEPAT & AKURAT):
       'Sistem absensi berjalan normal. Jika ada kendala spesifik seperti scan QR, sinyal GPS, jam kerja, atau jadwal piket, silakan tanyakan langsung di sini ya! 😊'
     );
   }
+
+  /**
+   * Generates AI cloud health diagnostics and recommendations for Supabase & Vercel
+   */
+  public static async diagnoseCloudHealth(summary: {
+    egressUsedMb: number;
+    egressLimitMb: number;
+    egressPercent: number;
+    supabaseLatencyMs: number;
+    vercelLatencyMs: number;
+    unoptimizedImagesCount: number;
+    pendingOfflineRecords: number;
+  }): Promise<{ headline?: string; aiAnalysis?: string; aiTips?: string[] } | null> {
+    const prompt = `Anda adalah "AI Cloud Infrastructure Health Inspector" untuk aplikasi Smart Absensi Guru.
+Berikut data kesehatan infrastruktur web saat ini:
+- Supabase PostgREST Egress: ${summary.egressUsedMb} MB dari batas ${summary.egressLimitMb} MB (${summary.egressPercent}%).
+- Latensi Database Supabase: ${summary.supabaseLatencyMs} ms.
+- Latensi Edge Vercel: ${summary.vercelLatencyMs} ms.
+- File Non-WebP di Storage: ${summary.unoptimizedImagesCount}.
+- Antrean Offline IndexedDB: ${summary.pendingOfflineRecords} data tertunda.
+
+Berikan analisis kesehatan dan rekomendasi pencegahan pembengkakan kuota dalam format JSON valid (tanpa markdown):
+{
+  "headline": "headline 1 kalimat tegas dan informatif tentang kesehatan website",
+  "aiAnalysis": "analisis 2-3 kalimat mengenai kondisi Supabase dan Vercel",
+  "aiTips": ["tips rekomendasi 1", "tips rekomendasi 2", "tips rekomendasi 3"]
+}`;
+
+    const apiOutput = await this.callGroqAPI([
+      { role: 'system', content: 'Anda adalah AI Cloud Infrastructure Health Inspector yang membalas HANYA format JSON valid tanpa markdown code block.' },
+      { role: 'user', content: prompt },
+    ]);
+
+    if (apiOutput) {
+      try {
+        const cleaned = apiOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleaned);
+      } catch (err) {
+        logger.warn('GroqAIService', 'Failed to parse AI Cloud Health JSON', err);
+      }
+    }
+    return null;
+  }
 }

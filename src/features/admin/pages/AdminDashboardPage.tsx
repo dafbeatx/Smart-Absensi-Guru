@@ -29,6 +29,7 @@ import { ComplaintRepository } from '../../../repositories/ComplaintRepository';
 import { AnalyticsService } from '../../../services/analytics.service';
 import { DevTestPage } from './DevTestPage';
 import { SarprasExecutiveView } from '../../sarpras/components/SarprasExecutiveView';
+import { SystemHealthDashboardView } from '../components/SystemHealthDashboardView';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord, SystemSettings } from '../../../types/database.types';
@@ -489,6 +490,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'SETTINGS', label: 'Pengaturan', icon: '⚙️', hasDropdown: true },
     { id: 'SARPRAS', label: 'Inventaris Sarpras', icon: '📦' },
     { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
+    { id: 'SYSTEM_HEALTH', label: 'Kesehatan Cloud & AI', icon: '🩺' },
     { id: 'TESTS', label: 'Tests / Diagnostik', icon: '🧪' },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
@@ -768,6 +770,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               currentUser={user}
               onBackToDashboard={() => setActiveTab('DASHBOARD')}
             />
+          )}
+
+          {/* TAB: KESEHATAN CLOUD SUPABASE, VERCEL & AI */}
+          {activeTab === 'SYSTEM_HEALTH' && (
+            <SystemHealthDashboardView onBackToDashboard={() => setActiveTab('DASHBOARD')} />
           )}
 
           {/* TAB: DEVELOPER TEST MODE */}

@@ -115,6 +115,10 @@ export class SupabaseProvider implements IDataProvider {
     this.client = createClient(url, key);
   }
 
+  public getClient(): SupabaseClient {
+    return this.client;
+  }
+
   // ─── AUTHENTICATION API ───────────────────────────────────────────────────
 
   public async login(dto: LoginDTO): Promise<LoginResponseDTO> {

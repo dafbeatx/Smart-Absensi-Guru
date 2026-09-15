@@ -31,6 +31,7 @@ import { runQuestionCorrectionTestSuite } from './__tests__/question-correction.
 import { runPushSubscriptionSecurityTestSuite } from './__tests__/push-subscription-security.test';
 import { runAuthHardeningSessionTestSuite } from './__tests__/auth-hardening-session.test';
 import { runHomeroomAuthorizationTestSuite } from './__tests__/homeroom-authorization.test';
+import { runSystemHealthTestSuite } from './__tests__/system-health-suite.test';
 
 export interface TestResultItem {
   testName: string;
@@ -99,6 +100,7 @@ export class MasterTestRunner {
       { name: 'Push Subscription Security & RLS Compliance', fn: runPushSubscriptionSecurityTestSuite },
       { name: 'Authentication Hardening & Database Session Store (Phase 4.2)', fn: runAuthHardeningSessionTestSuite },
       { name: 'Ruang Wali Kelas & Continuation Authorization Security (Phase 4.3)', fn: runHomeroomAuthorizationTestSuite },
+      { name: 'Cloud Infrastructure & AI Health Monitor (Supabase & Vercel)', fn: runSystemHealthTestSuite },
     ];
 
     let totalPassed = 0;
