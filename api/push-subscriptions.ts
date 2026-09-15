@@ -5,14 +5,19 @@
 import { createClient } from '@supabase/supabase-js';
 
 const DEFAULT_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHBmbWpzYnF4YnRpb3lwbmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzcyNDksImV4cCI6MjEwNDk1MzI0OX0.ewXX-KW3SMEF-KtOZ5P1MY5IpZSJQImDt5g9maTOWfE';
 
 const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY_TOREN2 ||
   process.env.VITE_SUPABASE_ANON_KEY ||
   DEFAULT_SUPABASE_ANON_KEY;
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fnppfmjsbqxbtioypnap.supabase.co';
+const SUPABASE_URL =
+  process.env.VITE_SUPABASE_URL_TOREN2 ||
+  process.env.VITE_SUPABASE_URL ||
+  'https://fnppfmjsbqxbtioypnap.supabase.co';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {

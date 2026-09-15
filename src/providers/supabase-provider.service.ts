@@ -88,14 +88,16 @@ export class SupabaseProvider implements IDataProvider {
   constructor() {
     const url =
       (typeof import.meta !== 'undefined' && import.meta.env
-        ? (import.meta.env.VITE_SUPABASE_URL as string)
-        : '') || 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
+        ? (import.meta.env.VITE_SUPABASE_URL_TOREN2 as string) ||
+          (import.meta.env.VITE_SUPABASE_URL as string)
+        : '') || 'https://fnppfmjsbqxbtioypnap.supabase.co';
 
     const key =
       (typeof import.meta !== 'undefined' && import.meta.env
-        ? (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
+        ? (import.meta.env.VITE_SUPABASE_ANON_KEY_TOREN2 as string) ||
+          (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
         : '') ||
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHBmbWpzYnF4YnRpb3lwbmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzcyNDksImV4cCI6MjEwNDk1MzI0OX0.ewXX-KW3SMEF-KtOZ5P1MY5IpZSJQImDt5g9maTOWfE';
 
     this.client = createClient(url, key);
   }
