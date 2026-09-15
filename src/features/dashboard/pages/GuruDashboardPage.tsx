@@ -10,6 +10,7 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
+import { AboutAppModal } from '../../guru/components/AboutAppModal';
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
 import { AnonymousComplaintModal } from '../../guru/components/AnonymousComplaintModal';
@@ -276,6 +277,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [correctionInitialDate, setCorrectionInitialDate] = useState<string | undefined>(undefined);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
@@ -4323,7 +4325,30 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   onClick={() => setIsTermsModalOpen(true)}
                   className="w-full mt-1 py-2 px-3 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
                 >
-                  <span>📋</span> Lihat Syarat & Ketentuan Lengkap
+                  <span>📋</span> Lihat Syarat &amp; Ketentuan Lengkap
+                </button>
+              </div>
+
+              {/* Tentang Aplikasi & Pengembang Section */}
+              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#023246]/5 border border-[#023246]/15 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">ℹ️</span>
+                    <span className="font-bold text-xs text-[#023246]">Tentang Aplikasi &amp; Pengembang</span>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-[#023246] bg-[#023246]/10 px-2 py-0.5 rounded-full">
+                    Dafa Maulana, S.Pd
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Inovasi mandiri Guru Informatika bersama AI Agent Google Gemini / Antigravity. Dari scan barcode hingga biometrik sidik jari (100% Zero Budget).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsAboutModalOpen(true)}
+                  className="w-full mt-1 py-2 px-3 bg-[#023246] hover:bg-[#1E5670] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
+                >
+                  <span>📖</span> Lihat Informasi &amp; Kisah Pengembang
                 </button>
               </div>
 
@@ -4489,6 +4514,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <TermsAndConditionsModal
         isOpen={isTermsModalOpen}
         onClose={() => setIsTermsModalOpen(false)}
+      />
+
+      {/* About App & Developer Modal */}
+      <AboutAppModal
+        isOpen={isAboutModalOpen}
+        onClose={() => setIsAboutModalOpen(false)}
       />
 
       {/* ── DAY DETAIL CALENDAR MODAL ───────────────────────────────────── */}
@@ -4676,6 +4707,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenExamCardModal={() => setIsExamCardModalOpen(true)}
         onOpenQuestionCorrectionModal={() => setIsQuestionCorrectionModalOpen(true)}
         onOpenHomeroomModal={() => setIsHomeroomModalOpen(true)}
+        onOpenAboutModal={() => setIsAboutModalOpen(true)}
       />
 
       {/* 🎓 Ruang Wali Kelas (Pendataan & Verifikasi Rencana Lanjutan Siswa Kelas 9) */}

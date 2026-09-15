@@ -30,6 +30,7 @@ interface MoreFeaturesModalProps {
   onOpenExamCardModal?: () => void;
   onOpenQuestionCorrectionModal?: () => void;
   onOpenHomeroomModal?: () => void;
+  onOpenAboutModal?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -59,6 +60,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenExamCardModal,
   onOpenQuestionCorrectionModal,
   onOpenHomeroomModal,
+  onOpenAboutModal,
 }) => {
   if (!isOpen) return null;
 
@@ -462,6 +464,20 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
             onOpenChangePin();
           },
         },
+        ...(onOpenAboutModal
+          ? [
+              {
+                id: 'about_app',
+                title: 'Tentang Aplikasi & Pengembang',
+                subtitle: 'Kisah Dafa Maulana, S.Pd & kolaborasi AI Agent Gemini',
+                icon: 'ℹ️',
+                action: () => {
+                  onClose();
+                  onOpenAboutModal();
+                },
+              },
+            ]
+          : []),
       ],
     },
   ];
