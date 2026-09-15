@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { ProviderFactory } from '../../providers/provider-factory';
 import { SoundService } from '../../services/audio.service';
 import { NotificationService } from '../../services/notification-permission.service';
@@ -119,7 +120,19 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
 
       // 2. PRESENSI GURU TERKINI & ACTIVE ALERTS (FOR ADMIN / KEPSEK / OPERATOR)
       if (user.role === 'ADMIN' || user.role === 'OPERATOR' || user.role === 'KEPSEK') {
-        const allTeachers: UserProfile[] = await provider.getAllUsers(authToken).catch(() => []);
+        let allTeachers: UserProfile[] = [];
+        try {
+          const cached = localStorage.getItem('smart_absensi_teachers');
+          if (cached) {
+            allTeachers = JSON.parse(cached);
+          }
+        } catch {
+          // ignore cache parse error
+        }
+        if (!Array.isArray(allTeachers) || allTeachers.length === 0) {
+          allTeachers = await provider.getAllUsers(authToken).catch(() => []);
+        }
+
         const todayAttendanceList: AttendanceRecord[] = await provider
           .getDailyAttendance(todayIso, authToken)
           .catch(() => []);
@@ -147,7 +160,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         });
 
         // Add active alert if teachers haven't absented yet (Skip on Off-Days / Weekends)
-        const sysSettings = await provider.getSettings().catch(() => null);
+        const sysSettings = useSettingsStore.getState().settings || (await provider.getSettings().catch(() => null));
         const offCheck = isDateOffDay(new Date(), sysSettings);
 
         const absentedUserIds = new Set(todayAttendanceList.map((a) => a.user_id));
@@ -351,18 +364,30 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
     }
   }, [user, token]);
 
-  // Setup periodic polling & real-time event listeners
+  // Setup relaxed periodic fallback (5 min) & real-time event listeners
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(loadNotifications, 20000); // polling refresh every 20s
+
+    // Relaxed fallback timer every 5 minutes (300,000ms), active only when document is visible
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        loadNotifications();
+      }
+    }, 300000);
 
     const handleRealtimeUpdate = () => {
       loadNotifications();
     };
 
+    let lastVisibilitySync = Date.now();
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadNotifications();
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        const now = Date.now();
+        // Cooldown: at least 60 seconds between visibility refetches
+        if (now - lastVisibilitySync > 60000) {
+          lastVisibilitySync = now;
+          loadNotifications();
+        }
       }
     };
 

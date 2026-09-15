@@ -85,6 +85,19 @@ import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
 
+  // In-memory TTL caches to eliminate redundant PostgREST queries and prevent Egress bloat
+  private cachedSettings: SystemSettings | null = null;
+  private cachedSettingsTimestamp: number = 0;
+
+  private cachedHolidays: HolidayRecord[] | null = null;
+  private cachedHolidaysTimestamp: number = 0;
+
+  private cachedUsers: UserProfile[] | null = null;
+  private cachedUsersTimestamp: number = 0;
+
+  private cachedAllLeaves: LeaveRequest[] | null = null;
+  private cachedAllLeavesTimestamp: number = 0;
+
   constructor() {
     const url =
       (typeof import.meta !== 'undefined' && import.meta.env
@@ -1106,6 +1119,9 @@ export class SupabaseProvider implements IDataProvider {
 
     if (error) throw new Error('Gagal mengajukan izin: ' + error.message);
 
+    this.cachedAllLeaves = null;
+    this.cachedAllLeavesTimestamp = 0;
+
     return {
       id: leaveId,
       user_id: activeUser.id,
@@ -1126,6 +1142,8 @@ export class SupabaseProvider implements IDataProvider {
     notes: string,
     _token: string
   ): Promise<boolean> {
+    this.cachedAllLeaves = null;
+    this.cachedAllLeavesTimestamp = 0;
     const activeUser = useAuthStore.getState().user;
     const { error } = await this.client
       .from('leaves')
@@ -1278,18 +1296,19 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getPendingLeaves(_token: string): Promise<LeaveRequest[]> {
     try {
+      // Exclude attachment_url from pending leaves query to eliminate massive base64 egress bloat
       const { data, error } = await this.client
         .from('leaves')
-        .select('*')
+        .select('id, user_id, type, start_date, end_date, reason, status, approval_deadline, approved_by, rejection_notes, created_at')
         .in('status', ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'])
         .order('created_at', { ascending: false });
 
       if (error) {
         logger.warn('SupabaseProvider', 'getPendingLeaves query error:', error.message);
-        // Fallback: try without filter (get all and filter client-side)
+        // Fallback: try without status in filter (get all lightweight columns and filter client-side)
         const { data: allData } = await this.client
           .from('leaves')
-          .select('*')
+          .select('id, user_id, type, start_date, end_date, reason, status, approval_deadline, approved_by, rejection_notes, created_at')
           .order('created_at', { ascending: false });
 
         const filtered = (allData || []).filter(
@@ -1298,15 +1317,15 @@ export class SupabaseProvider implements IDataProvider {
         return filtered.map((row) => ({
           id: row.id,
           user_id: row.user_id,
-          leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
+          leave_type: (row.type || (row as any).leave_type || 'IZIN') as LeaveType,
           start_date: row.start_date,
           end_date: row.end_date,
           reason: row.reason,
-          attachment_url: row.attachment_url || null,
+          attachment_url: null, // Excluded from summary/badge query to protect Egress
           approval_status: (row.status || 'PENDING') as ApprovalStatus,
           approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
           approved_by: row.approved_by || null,
-          approval_notes: row.rejection_notes || row.approval_notes || null,
+          approval_notes: row.rejection_notes || (row as any).approval_notes || null,
           created_at: row.created_at,
         }));
       }
@@ -1314,15 +1333,15 @@ export class SupabaseProvider implements IDataProvider {
       return (data || []).map((row) => ({
         id: row.id,
         user_id: row.user_id,
-        leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
+        leave_type: (row.type || (row as any).leave_type || 'IZIN') as LeaveType,
         start_date: row.start_date,
         end_date: row.end_date,
         reason: row.reason,
-        attachment_url: row.attachment_url || null,
+        attachment_url: null, // Excluded from summary/badge query to protect Egress
         approval_status: (row.status || 'PENDING') as ApprovalStatus,
         approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
         approved_by: row.approved_by || null,
-        approval_notes: row.rejection_notes || row.approval_notes || null,
+        approval_notes: row.rejection_notes || (row as any).approval_notes || null,
         created_at: row.created_at,
       }));
     } catch (err) {
@@ -1332,12 +1351,18 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getAllLeaves(_token: string): Promise<LeaveRequest[]> {
+    const now = Date.now();
+    // Cache for 30 seconds to prevent concurrent sequential requests from duplicating egress
+    if (this.cachedAllLeaves && now - this.cachedAllLeavesTimestamp < 30000) {
+      return this.cachedAllLeaves;
+    }
+
     const { data } = await this.client
       .from('leaves')
       .select('*')
       .order('created_at', { ascending: false });
 
-    return (data || []).map((row) => ({
+    const result = (data || []).map((row) => ({
       id: row.id,
       user_id: row.user_id,
       leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
@@ -1351,6 +1376,10 @@ export class SupabaseProvider implements IDataProvider {
       approval_notes: row.rejection_notes || row.approval_notes || null,
       created_at: row.created_at,
     }));
+
+    this.cachedAllLeaves = result;
+    this.cachedAllLeavesTimestamp = now;
+    return result;
   }
 
   public async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
@@ -1416,6 +1445,11 @@ export class SupabaseProvider implements IDataProvider {
   // ─── SYSTEM SETTINGS API ──────────────────────────────────────────────────
 
   public async getSettings(): Promise<SystemSettings> {
+    const now = Date.now();
+    if (this.cachedSettings && now - this.cachedSettingsTimestamp < 300000) {
+      return this.cachedSettings;
+    }
+
     const { data } = await this.client.from('system_settings').select('*');
 
     const map: Record<string, string> = {};
@@ -1423,7 +1457,7 @@ export class SupabaseProvider implements IDataProvider {
       map[row.key] = row.value;
     });
 
-    return {
+    const parsed: SystemSettings = {
       app_name: map.app_name || 'Smart Absensi Guru',
       institution_name: map.institution_name || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
       work_checkin_start: map.work_checkin_start || CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
@@ -1437,9 +1471,16 @@ export class SupabaseProvider implements IDataProvider {
       geofence_radius: map.geofence_radius ? parseInt(map.geofence_radius, 10) : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
       admin_reset_password: map.admin_reset_password || undefined,
     };
+
+    this.cachedSettings = parsed;
+    this.cachedSettingsTimestamp = now;
+    return parsed;
   }
 
   public async updateSettings(settings: SystemSettings, _token: string): Promise<boolean> {
+    this.cachedSettings = null;
+    this.cachedSettingsTimestamp = 0;
+
     const updates = [
       { key: 'app_name', value: settings.app_name || 'Smart Absensi Guru' },
       { key: 'institution_name', value: settings.institution_name || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam' },
@@ -1466,12 +1507,17 @@ export class SupabaseProvider implements IDataProvider {
   // ─── USER MANAGEMENT API (ADMIN) ──────────────────────────────────────────
 
   public async getAllUsers(_token: string): Promise<UserProfile[]> {
+    const now = Date.now();
+    if (this.cachedUsers && now - this.cachedUsersTimestamp < 60000) {
+      return this.cachedUsers;
+    }
+
     const { data } = await this.client
       .from('users')
-      .select('*')
+      .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at')
       .order('created_at', { ascending: false });
 
-    return (data || []).map((row) => ({
+    const result: UserProfile[] = (data || []).map((row) => ({
       id: row.id,
       nip: row.nip,
       full_name: row.full_name,
@@ -1482,9 +1528,16 @@ export class SupabaseProvider implements IDataProvider {
       is_active: row.account_status === 'ACTIVE',
       created_at: row.created_at,
     }));
+
+    this.cachedUsers = result;
+    this.cachedUsersTimestamp = now;
+    return result;
   }
 
   public async createUser(user: Partial<UserProfile>, _token: string): Promise<UserProfile> {
+    this.cachedUsers = null;
+    this.cachedUsersTimestamp = 0;
+
     const newId = user.id || `usr_${Date.now()}`;
     const defaultPin = (user as Partial<UserProfile> & { pin?: string }).pin || '123456';
     const hashedPin = await hashPin(defaultPin);
@@ -1517,6 +1570,9 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async updateUser(userId: string, updates: Partial<UserProfile>, _token: string): Promise<boolean> {
+    this.cachedUsers = null;
+    this.cachedUsersTimestamp = 0;
+
     const payload: Record<string, unknown> = {};
     if (updates.full_name !== undefined) payload.full_name = updates.full_name;
     if (updates.nip !== undefined) payload.nip = updates.nip;
@@ -1595,12 +1651,18 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async deleteUser(userId: string, _token: string): Promise<boolean> {
+    this.cachedUsers = null;
+    this.cachedUsersTimestamp = 0;
+
     const { error } = await this.client.from('users').delete().eq('id', userId);
     if (error) throw new Error('Gagal menghapus pengguna: ' + error.message);
     return true;
   }
 
   public async toggleUserStatus(userId: string, _token: string): Promise<boolean> {
+    this.cachedUsers = null;
+    this.cachedUsersTimestamp = 0;
+
     const { data: user } = await this.client.from('users').select('account_status').eq('id', userId).single();
     const newStatus = user?.account_status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
 
@@ -1612,8 +1674,13 @@ export class SupabaseProvider implements IDataProvider {
   // ─── ACADEMIC CALENDAR & HOLIDAYS API ──────────────────────────────────────
 
   public async getHolidays(_token?: string): Promise<HolidayRecord[]> {
+    const now = Date.now();
+    if (this.cachedHolidays && now - this.cachedHolidaysTimestamp < 600000) {
+      return this.cachedHolidays;
+    }
+
     const { data } = await this.client.from('holidays').select('*').order('date', { ascending: true });
-    return (data || []).map((row) => {
+    const result = (data || []).map((row) => {
       const isSchedule =
         row.category_type === 'SCHEDULE' ||
         row.is_holiday === false ||
@@ -1631,12 +1698,19 @@ export class SupabaseProvider implements IDataProvider {
         created_at: row.created_at,
       };
     });
+
+    this.cachedHolidays = result;
+    this.cachedHolidaysTimestamp = now;
+    return result;
   }
 
   public async createHoliday(
     holiday: Omit<HolidayRecord, 'id' | 'created_at'>,
     _token?: string
   ): Promise<HolidayRecord> {
+    this.cachedHolidays = null;
+    this.cachedHolidaysTimestamp = 0;
+
     const newId = `hol_${Date.now()}`;
     const isSchedule =
       holiday.category_type === 'SCHEDULE' ||
@@ -1692,6 +1766,9 @@ export class SupabaseProvider implements IDataProvider {
     holiday: Partial<HolidayRecord>,
     _token?: string
   ): Promise<HolidayRecord> {
+    this.cachedHolidays = null;
+    this.cachedHolidaysTimestamp = 0;
+
     let { error } = await this.client.from('holidays').update(holiday).eq('id', id);
 
     // Fallback retry if 'category_type' / 'is_holiday' / 'type' column is missing in Supabase schema cache
@@ -1724,6 +1801,9 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async deleteHoliday(id: string, _token?: string): Promise<boolean> {
+    this.cachedHolidays = null;
+    this.cachedHolidaysTimestamp = 0;
+
     const { error } = await this.client.from('holidays').delete().eq('id', id);
     if (error) throw new Error('Gagal menghapus hari libur: ' + error.message);
     return true;
@@ -4302,6 +4382,8 @@ export class SupabaseProvider implements IDataProvider {
 
       if (userId !== 'ALL') {
         query = query.eq('user_id', userId);
+      } else {
+        query = query.limit(500);
       }
 
       const { data, error } = await query;
@@ -4709,7 +4791,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data, error } = await this.client
         .from('gm_students')
-        .select('*')
+        .select('id, session_id, name, student_user_id, mcq_answers, essay_scores, mcq_score, essay_score, final_score, csi, lps, correct, wrong, remedial_status, created_at, updated_at')
         .eq('session_id', sessionId)
         .order('name', { ascending: true });
 

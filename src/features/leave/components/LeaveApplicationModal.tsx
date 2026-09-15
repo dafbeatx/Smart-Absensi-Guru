@@ -9,6 +9,7 @@ import { useToastStore } from '../../../store/useToastStore';
 import { NotificationService } from '../../../services/notification-permission.service';
 import { getTodayDateInJakarta } from '../../../services/analytics.service';
 import type { LeaveType } from '../../../types/database.types';
+import { convertToWebP } from '../../../utils/image.utils';
 
 export interface LeaveApplicationModalProps {
   isOpen: boolean;
@@ -51,30 +52,53 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
-      const maxSize = 5 * 1024 * 1024; // 5MB
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'];
+      const maxSize = 10 * 1024 * 1024; // 10MB input limit since we compress to <100KB
 
       if (!allowedTypes.includes(file.type)) {
-        showToast('error', 'Format File Tidak Didukung', 'Gunakan format PNG, JPG, JPEG, atau PDF.');
+        showToast('error', 'Format File Tidak Didukung', 'Gunakan format PNG, JPG, JPEG, WEBP, atau PDF.');
         handleRemoveFile();
         return;
       }
 
       if (file.size > maxSize) {
-        showToast('error', 'Ukuran File Melebihi Batas', 'Ukuran file lampiran maksimal adalah 5 MB.');
+        showToast('error', 'Ukuran File Melebihi Batas', 'Ukuran file lampiran maksimal adalah 10 MB.');
         handleRemoveFile();
         return;
       }
 
-      setFileName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAttachmentBase64(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        if (file.type.startsWith('image/')) {
+          // Auto convert to WebP (max 800x800, 70% quality) to reduce size to ~30-60KB
+          const webpFile = await convertToWebP(file, 800, 800, 0.7);
+          const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || 'lampiran';
+          setFileName(`${baseName}.webp`);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setAttachmentBase64(reader.result as string);
+          };
+          reader.readAsDataURL(webpFile);
+        } else {
+          // PDF document
+          setFileName(file.name);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setAttachmentBase64(reader.result as string);
+          };
+          reader.readAsDataURL(file);
+        }
+      } catch (err) {
+        console.warn('Failed to compress leave attachment, falling back to original:', err);
+        setFileName(file.name);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setAttachmentBase64(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     } else {
       setAttachmentBase64('');
       setFileName('');

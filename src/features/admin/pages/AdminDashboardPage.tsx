@@ -383,7 +383,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   useLiveAttendanceSync({
     onSync: handleLiveAttendanceSync,
-    heartbeatIntervalMs: 30000,
+    heartbeatIntervalMs: 180000,
     enabled: !!user?.id,
   });
 

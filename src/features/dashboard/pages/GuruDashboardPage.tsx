@@ -1216,7 +1216,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       NotificationService.subscribeUserToPush(effectiveUser.id).catch(() => {});
     }
 
-    const handleScannedEvent = () => loadAllData();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedLoadAllData = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadAllData();
+      }, 500);
+    };
+
+    const handleScannedEvent = () => debouncedLoadAllData();
     const handleTeachersInstantSync = () => {
       try {
         const saved = localStorage.getItem('smart_absensi_teachers');
@@ -1229,10 +1237,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       } catch {
         // ignore
       }
-      loadAllData();
+      debouncedLoadAllData();
     };
     const handleNotificationPushed = () => {
-      loadAllData();
+      debouncedLoadAllData();
       SoundService.playNotificationChime();
     };
 
@@ -1247,6 +1255,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     window.addEventListener('smart_absensi_settings_updated', handleScannedEvent);
     window.addEventListener('storage', handleTeachersInstantSync);
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_points_updated', handleScannedEvent);

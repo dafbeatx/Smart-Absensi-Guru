@@ -17,7 +17,7 @@ export interface UseLiveAttendanceSyncOptions {
    * Background heartbeat interval (ms) to ensure guaranteed data freshness even if
    * websocket realtime is temporarily disconnected or disabled on Supabase table publication.
    * Set to 0 to disable periodic heartbeat.
-   * @default 30000 (30 seconds)
+   * @default 180000 (3 minutes)
    */
   heartbeatIntervalMs?: number;
 
@@ -41,7 +41,7 @@ export interface UseLiveAttendanceSyncOptions {
 export function useLiveAttendanceSync({
   onSync,
   debounceMs = 2000,
-  heartbeatIntervalMs = 30000,
+  heartbeatIntervalMs = 180000,
   enabled = true,
 }: UseLiveAttendanceSyncOptions): void {
   const onSyncRef = useRef(onSync);
@@ -98,7 +98,7 @@ export function useLiveAttendanceSync({
     const handleVisibilityChange = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         const elapsed = Date.now() - lastSyncTimeRef.current;
-        if (elapsed > 5000) {
+        if (elapsed > 60000) {
           scheduleSync();
         }
       }
@@ -106,7 +106,7 @@ export function useLiveAttendanceSync({
 
     const handleWindowFocus = () => {
       const elapsed = Date.now() - lastSyncTimeRef.current;
-      if (elapsed > 5000) {
+      if (elapsed > 60000) {
         scheduleSync();
       }
     };
