@@ -116,7 +116,7 @@ export const RadarLocationVerificationModal: React.FC<RadarLocationVerificationM
             }`}>
               {action === 'CHECK_OUT' ? 'Pulang' : 'Masuk'}
             </span>
-            <p className="text-[9px] font-mono text-slate-400 mt-0.5 truncate max-w-[110px]">
+            <p className="text-[9px] font-mono text-slate-400 mt-0.5 truncate max-w-27.5">
               {teacherName}
             </p>
           </div>
@@ -138,8 +138,8 @@ export const RadarLocationVerificationModal: React.FC<RadarLocationVerificationM
           <div className="absolute inset-16 sm:inset-20 rounded-full border border-cyan-500/25 pointer-events-none" />
 
           {/* Crosshair Axes */}
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[1px] bg-cyan-500/20 pointer-events-none" />
-          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[1px] bg-cyan-500/20 pointer-events-none" />
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-cyan-500/20 pointer-events-none" />
+          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-cyan-500/20 pointer-events-none" />
 
           {/* Cardinal Direction Marks */}
           <span className="absolute top-1.5 text-[8px] font-mono font-bold text-cyan-400/60">U</span>
@@ -194,7 +194,7 @@ export const RadarLocationVerificationModal: React.FC<RadarLocationVerificationM
               }`}
             >
               {isGreen ? (
-                <CheckCircle2 className="w-3 h-3 text-white stroke-[3]" />
+                <CheckCircle2 className="w-3 h-3 text-white stroke-3" />
               ) : (
                 <Navigation className="w-2.5 h-2.5 -rotate-45" />
               )}
