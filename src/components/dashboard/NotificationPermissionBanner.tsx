@@ -17,23 +17,52 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
   const [isSubscribing, setIsSubscribing] = useState(false);
   const { showToast } = useToastStore();
 
-  const dismissKey = `smart_absensi_notif_banner_dismissed_${user?.id || 'guest'}`;
+  const effectiveUserId = user?.id || 'guest';
+  const dismissKey = `smart_absensi_notif_banner_dismissed_${effectiveUserId}`;
 
   useEffect(() => {
-    NotificationService.getDetailedStatus(user?.id).then((status) => {
-      setDetailedStatus(status);
-    });
-
+    // 1. Cek apakah sudah pernah di-dismiss pengguna
     if (typeof window !== 'undefined') {
-      const dismissed = localStorage.getItem(dismissKey);
-      if (dismissed === 'true') {
+      const dismissed =
+        localStorage.getItem(dismissKey) === 'true' ||
+        localStorage.getItem('smart_absensi_notif_banner_dismissed_all') === 'true';
+      if (dismissed) {
         setIsDismissed(true);
       }
     }
+
+    // 2. Jika browser sudah mengizinkan notifikasi secara native,
+    // langsung tandai granted dan jangan tampilkan banner
+    if (NotificationService.isPermissionGranted()) {
+      setDetailedStatus('granted');
+      NotificationService.getDetailedStatus(user?.id).then((status) => {
+        setDetailedStatus(status);
+        if (status === 'granted') {
+          NotificationService.subscribeUserToPush(user?.id).catch(() => {});
+        }
+      });
+      return;
+    }
+
+    // 3. Cek status detail izin browser
+    NotificationService.getDetailedStatus(user?.id).then((status) => {
+      setDetailedStatus(status);
+    });
   }, [user?.id, dismissKey]);
 
-  // Don't show if already fully subscribed or unsupported or user dismissed
-  if (detailedStatus === 'subscribed' || detailedStatus === 'unsupported' || isDismissed) {
+  // Sembunyikan banner jika:
+  // - Pengguna sudah menutup/menolak banner (isDismissed)
+  // - Browser tidak mendukung (unsupported)
+  // - Izin notifikasi browser sudah diizinkan (granted / subscribed)
+  // - Kegagalan sinkronisasi cloud backend (subscription_failed), karena ini kendala server bukan izin user
+  if (
+    isDismissed ||
+    detailedStatus === 'subscribed' ||
+    detailedStatus === 'granted' ||
+    detailedStatus === 'subscription_failed' ||
+    detailedStatus === 'unsupported' ||
+    NotificationService.isPermissionGranted()
+  ) {
     return null;
   }
 
@@ -44,18 +73,32 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
       const newStatus = await NotificationService.getDetailedStatus(user?.id);
       setDetailedStatus(newStatus);
 
-      if (granted) {
+      if (granted || newStatus === 'granted' || newStatus === 'subscribed') {
+        // Langsung sembunyikan banner & simpan ke localStorage secara persisten
+        setIsDismissed(true);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(dismissKey, 'true');
+          localStorage.setItem('smart_absensi_notif_banner_dismissed_all', 'true');
+        }
         showToast(
           'success',
           'Notifikasi Real-time Aktif!',
           'Anda akan menerima pemberitahuan otomatis di HP dan peramban ini.'
         );
       } else {
-        showToast(
-          'warning',
-          'Notifikasi Dibatasi Browser',
-          'Izin notifikasi diblokir pada browser ini. Ketuk ikon gembok di sebelah alamat web untuk mengizinkan.'
-        );
+        if (newStatus === 'denied') {
+          showToast(
+            'warning',
+            'Notifikasi Dibatasi Browser',
+            'Izin notifikasi diblokir pada browser ini. Ketuk ikon gembok di sebelah alamat web untuk mengizinkan.'
+          );
+        } else {
+          // Pengguna menutup dialog tanpa konfirmasi
+          setIsDismissed(true);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(dismissKey, 'true');
+          }
+        }
       }
     } finally {
       setIsSubscribing(false);
@@ -66,6 +109,7 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
     setIsDismissed(true);
     if (typeof window !== 'undefined') {
       localStorage.setItem(dismissKey, 'true');
+      localStorage.setItem('smart_absensi_notif_banner_dismissed_all', 'true');
     }
   };
 

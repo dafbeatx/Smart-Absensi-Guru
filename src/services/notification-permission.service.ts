@@ -218,7 +218,7 @@ class NotificationPermissionService {
       if (permission === 'granted') {
         // Otomatis daftarkan Web Push Subscription ke Google FCM / Supabase di background
         const effectiveUserId = userId || useAuthStore.getState().user?.id;
-        this.subscribeUserToPush(effectiveUserId).catch((err) =>
+        await this.subscribeUserToPush(effectiveUserId).catch((err) =>
           console.warn('Silent failure subscribing user to push:', err)
         );
 
