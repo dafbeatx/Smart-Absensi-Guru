@@ -40,7 +40,12 @@ export const runUsersPublicViewEgressTestSuite = async (): Promise<{
       sqlContent.includes('CREATE OR REPLACE VIEW public.users_public_view')
     );
 
-    const viewMatch = sqlContent.match(/CREATE OR REPLACE VIEW public\.users_public_view AS\s*SELECT([\s\S]*?)FROM public\.users;/i);
+    assert(
+      'SQL: View uses security_invoker = true (NOT security definer)',
+      sqlContent.includes('security_invoker = true') || sqlContent.includes('security_invoker=true')
+    );
+
+    const viewMatch = sqlContent.match(/CREATE OR REPLACE VIEW public\.users_public_view[\s\S]*?AS\s*SELECT([\s\S]*?)FROM public\.users;/i);
     const viewColumns = viewMatch ? viewMatch[1] : '';
     assert(
       'SQL: Excludes pin_hash, locked_until, and failed_login_count from View',
