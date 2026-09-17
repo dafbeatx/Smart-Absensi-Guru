@@ -12,6 +12,7 @@ import { AuthRepository } from './repositories/AuthRepository';
 import { TelegramService } from './services/telegram.service';
 import { getTodayDateInJakarta } from './utils/time.utils';
 import { PointRewardCelebrationOverlay } from './components/ui/PointRewardCelebrationOverlay';
+import { CookieConsentBanner } from './components/ui/CookieConsentBanner';
 import { usePointRewardStore } from './store/usePointRewardStore';
 import { useSettingsStore } from './store/useSettingsStore';
 
@@ -366,6 +367,9 @@ export const App: React.FC = () => {
         onClose={closeCelebration}
         data={celebrationData}
       />
+
+      {/* 🍪 Banner Persetujuan & Pengelolaan Cookie Mikro (Hemat Egress Mobile) */}
+      <CookieConsentBanner />
     </>
   );
 };

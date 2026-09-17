@@ -196,6 +196,18 @@ export const AboutAppView: React.FC<AboutAppViewProps> = ({
         </div>
       </div>
 
+      {/* ── MANAGE COOKIES & EGRESS BUTTON ──────────────────────────────── */}
+      <div className="pt-2">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('smart_absensi_open_cookie_settings'))}
+          className="w-full min-h-12 py-3 px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-98 text-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+        >
+          <span>🍪</span>
+          <span>Kelola Cookie &amp; Mode Hemat Egress</span>
+        </button>
+      </div>
+
       {/* ── BOTTOM RETURN BUTTON ─────────────────────────────────────────── */}
       {onBack && (
         <div className="pt-1">
