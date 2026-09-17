@@ -930,5 +930,295 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     assert('Leaderboard Avatar Matching: Guard', false, String(err));
   }
 
+  // 37. Leaderboard Strict Points Numeric Ordering (250 pts vs 200 pts Placement Integrity)
+  try {
+    const orderingLogs: TeacherPointLog[] = [
+      {
+        id: 'log_alpha_1',
+        user_id: 'usr_alpha_250',
+        date: '2026-09-09',
+        points: 250,
+        activity_type: 'CHECK_IN_ON_TIME',
+        title: 'Akumulasi Poin Kehadiran',
+        created_at: '2026-09-09T07:00:00.000Z',
+      },
+      {
+        id: 'log_beta_1',
+        user_id: 'usr_beta_200',
+        date: '2026-09-09',
+        points: 200,
+        activity_type: 'CHECK_IN_ON_TIME',
+        title: 'Akumulasi Poin Kehadiran',
+        created_at: '2026-09-09T07:05:00.000Z',
+      },
+      {
+        id: 'log_gamma_1',
+        user_id: 'usr_gamma_180',
+        date: '2026-09-09',
+        points: 180,
+        activity_type: 'CHECK_IN_ON_TIME',
+        title: 'Akumulasi Poin Kehadiran',
+        created_at: '2026-09-09T07:10:00.000Z',
+      },
+      {
+        id: 'log_delta_1',
+        user_id: 'usr_delta_150',
+        date: '2026-09-09',
+        points: 150,
+        activity_type: 'CHECK_IN_ON_TIME',
+        title: 'Akumulasi Poin Kehadiran',
+        created_at: '2026-09-09T07:15:00.000Z',
+      },
+    ];
+
+    const registeredTeachers: UserProfile[] = [
+      {
+        id: 'usr_alpha_250',
+        full_name: 'Guru Alpha (250 Poin)',
+        role: 'GURU',
+        position: 'Guru Matematika',
+        nip: '19850101001',
+        phone_number: '0811111111',
+        avatar_url: null,
+        is_active: true,
+        created_at: '2026-01-01',
+      },
+      {
+        id: 'usr_beta_200',
+        full_name: 'Guru Beta (200 Poin)',
+        role: 'GURU',
+        position: 'Guru Fisika',
+        nip: '19850101002',
+        phone_number: '0811111112',
+        avatar_url: null,
+        is_active: true,
+        created_at: '2026-01-01',
+      },
+      {
+        id: 'usr_gamma_180',
+        full_name: 'Guru Gamma (180 Poin)',
+        role: 'GURU',
+        position: 'Guru Kimia',
+        nip: '19850101003',
+        phone_number: '0811111113',
+        avatar_url: null,
+        is_active: true,
+        created_at: '2026-01-01',
+      },
+      {
+        id: 'usr_delta_150',
+        full_name: 'Guru Delta (150 Poin)',
+        role: 'GURU',
+        position: 'Guru Biologi',
+        nip: '19850101004',
+        phone_number: '0811111114',
+        avatar_url: null,
+        is_active: true,
+        created_at: '2026-01-01',
+      },
+    ];
+
+    const result = getTeacherDisciplineLeaderboard(
+      null,
+      null,
+      'CURRENT_MONTH',
+      orderingLogs,
+      registeredTeachers
+    );
+
+    const rankAlpha = result.leaderboard.find((t) => t.id === 'usr_alpha_250')?.rank;
+    const rankBeta = result.leaderboard.find((t) => t.id === 'usr_beta_200')?.rank;
+    const rankGamma = result.leaderboard.find((t) => t.id === 'usr_gamma_180')?.rank;
+    const rankDelta = result.leaderboard.find((t) => t.id === 'usr_delta_150')?.rank;
+
+    assert(
+      'Placement Integrity: Guru dengan 250 poin strictly Juara 1 dan lebih tinggi dari guru 200 poin',
+      rankAlpha === 1 && rankBeta === 2,
+      `Rank Alpha (250 pts): ${rankAlpha}, Rank Beta (200 pts): ${rankBeta}`
+    );
+
+    assert(
+      'Placement Integrity: Guru dengan 200 poin TIDAK PERNAH salah posisi menjadi Juara 3 saat 250 & 200 ada di daftar',
+      rankBeta !== 3 && rankBeta === 2 && rankGamma === 3 && (rankDelta === 4 || rankDelta === 5),
+      `Rank Beta: ${rankBeta} (expected 2), Rank Gamma: ${rankGamma} (expected 3), Rank Delta: ${rankDelta} (expected 4 or 5)`
+    );
+
+    assert(
+      'Placement Integrity: Peringkat berurutan ketat berdasarkan poin (250 > 200 > 180 > 150)',
+      rankAlpha !== undefined && rankBeta !== undefined && rankGamma !== undefined && rankDelta !== undefined &&
+      rankAlpha < rankBeta && rankBeta < rankGamma && rankGamma < rankDelta,
+      `Alpha (${rankAlpha}) < Beta (${rankBeta}) < Gamma (${rankGamma}) < Delta (${rankDelta})`
+    );
+
+    assert(
+      'Placement Integrity: Urutan Top 3 Podium (Juara 1, 2, 3) strictly berurutan 250, 200, 180 poin',
+      result.leaderboard[0].totalPoints === 250 &&
+        result.leaderboard[1].totalPoints === 200 &&
+        result.leaderboard[2].totalPoints === 180 &&
+        result.topTeacher.totalPoints === 250,
+      `Juara 1: ${result.leaderboard[0].totalPoints}, Juara 2: ${result.leaderboard[1].totalPoints}, Juara 3: ${result.leaderboard[2].totalPoints}`
+    );
+  } catch (err: unknown) {
+    assert('Leaderboard Strict Points Numeric Ordering: Guard', false, String(err));
+  }
+
+  // 38. Admin vs Guru Leaderboard Cross-Device Synchronization Protocol
+  try {
+    const adminProfile: UserProfile = {
+      id: 'usr_admin_master',
+      full_name: 'Dafa Maulana, S.Pd (Admin)',
+      role: 'ADMIN',
+      position: 'Administrator Sistem',
+      nip: null,
+      phone_number: '0895351251395',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01',
+    };
+
+    const guruProfile1: UserProfile = {
+      id: 'usr_guru_real_1',
+      full_name: 'Siti Rahmawati, M.Pd',
+      role: 'GURU',
+      position: 'Guru Seni Budaya',
+      nip: '199001012020012001',
+      phone_number: '081234567801',
+      avatar_url: 'https://example.com/siti.jpg',
+      is_active: true,
+      created_at: '2026-01-01',
+    };
+
+    const guruProfile2: UserProfile = {
+      id: 'usr_guru_real_2',
+      full_name: 'Budi Darmawan, S.Kom',
+      role: 'GURU',
+      position: 'Guru TIK',
+      nip: '199102022020021002',
+      phone_number: '081234567802',
+      avatar_url: 'https://example.com/budi.jpg',
+      is_active: true,
+      created_at: '2026-01-01',
+    };
+
+    const allRegisteredRoster: UserProfile[] = [adminProfile, guruProfile1, guruProfile2];
+
+    const sharedLogs: TeacherPointLog[] = [
+      {
+        id: 's_log_1',
+        user_id: 'usr_guru_real_1',
+        date: '2026-09-08',
+        points: 250,
+        activity_type: 'CHECK_IN_ON_TIME',
+        title: 'Presensi On Time',
+        created_at: '2026-09-08T07:00:00Z',
+      },
+      {
+        id: 's_log_2',
+        user_id: 'usr_guru_real_2',
+        date: '2026-09-08',
+        points: 200,
+        activity_type: 'CHECK_IN_ON_TIME',
+        title: 'Presensi On Time',
+        created_at: '2026-09-08T07:05:00Z',
+      },
+    ];
+
+    const guru1Score: TeacherAppreciationScore = {
+      totalPoints: 250,
+      level: '🏆 Pendidik Teladan Utama',
+      nextLevelPoints: 300,
+      levelProgressPercent: 83,
+      hadirTepatWaktuCount: 15,
+      terlambatCount: 0,
+      piketCount: 2,
+      moodCheckinCount: 0,
+      badges: [],
+      pointHistory: [],
+    };
+
+    // A. Evaluasi dari sisi Admin (currentUser: Admin, score: null)
+    const adminView = getTeacherDisciplineLeaderboard(
+      adminProfile,
+      null,
+      'CURRENT_MONTH',
+      sharedLogs,
+      allRegisteredRoster
+    );
+
+    // B. Evaluasi dari sisi Guru 1 (currentUser: Siti, score: guru1Score)
+    const guru1View = getTeacherDisciplineLeaderboard(
+      guruProfile1,
+      guru1Score,
+      'CURRENT_MONTH',
+      sharedLogs,
+      allRegisteredRoster
+    );
+
+    // C. Evaluasi dari sisi Kepsek (currentUser: null, score: null)
+    const kepsekView = getTeacherDisciplineLeaderboard(
+      null,
+      null,
+      'CURRENT_MONTH',
+      sharedLogs,
+      allRegisteredRoster
+    );
+
+    // 1. Verifikasi seluruh guru riil muncul di tampilan Admin
+    const sitiInAdmin = adminView.leaderboard.find((t) => t.id === 'usr_guru_real_1');
+    const budiInAdmin = adminView.leaderboard.find((t) => t.id === 'usr_guru_real_2');
+
+    assert(
+      'Cross-Device Sync: Guru riil terdaftar dari database (Siti & Budi) 100% muncul di tampilan Admin',
+      sitiInAdmin !== undefined && budiInAdmin !== undefined,
+      `Siti in Admin: ${sitiInAdmin?.name} (${sitiInAdmin?.totalPoints} pts), Budi in Admin: ${budiInAdmin?.name}`
+    );
+
+    // 2. Verifikasi urutan peringkat identik 100% antara Admin dan Guru
+    const rankSitiInAdmin = sitiInAdmin?.rank;
+    const rankSitiInGuru1 = guru1View.currentUserRank;
+    const rankSitiInKepsek = kepsekView.leaderboard.find((t) => t.id === 'usr_guru_real_1')?.rank;
+
+    assert(
+      'Cross-Device Sync: Peringkat Juara 1 Siti (250 pts) 100% identik di Admin, HP Guru, dan Kepsek',
+      rankSitiInAdmin === 1 && rankSitiInGuru1 === 1 && rankSitiInKepsek === 1,
+      `Admin Rank: ${rankSitiInAdmin}, Guru Rank: ${rankSitiInGuru1}, Kepsek Rank: ${rankSitiInKepsek}`
+    );
+
+    // 3. Verifikasi jumlah roster dan ID guru di semua tampilan persis sama
+    const adminIds = adminView.leaderboard.map((t) => t.id).join(',');
+    const guru1Ids = guru1View.leaderboard.map((t) => t.id).join(',');
+    const kepsekIds = kepsekView.leaderboard.map((t) => t.id).join(',');
+
+    assert(
+      'Cross-Device Sync: Urutan seluruh peserta klasemen 100% sinkron antara Admin, Guru, dan Kepsek',
+      adminIds === guru1Ids && guru1Ids === kepsekIds,
+      `Rosters match exactly: ${adminIds.slice(0, 50)}...`
+    );
+  } catch (err: unknown) {
+    assert('Admin vs Guru Cross-Device Sync: Guard', false, String(err));
+  }
+
+  // 39. Supabase Egress Protection: Reconciliation In-Memory Cache TTL
+  try {
+    TeacherPointReconciliationService.invalidateReconciliationCache();
+
+    const start1 = performance.now();
+    const run1 = await TeacherPointReconciliationService.reconcileAllTeachers();
+    const duration1 = performance.now() - start1;
+
+    // Pemanggilan kedua langsung mengeksekusi in-memory cache tanpa kueri ganda
+    const start2 = performance.now();
+    const run2 = await TeacherPointReconciliationService.reconcileAllTeachers();
+    const duration2 = performance.now() - start2;
+
+    assert(
+      'Egress Protection: Pemanggilan kedua reconcileAllTeachers dilayani langsung oleh cache in-memory TTL',
+      Array.isArray(run2) && run2.length === run1.length && duration2 < 10,
+      `Run 1: ${duration1.toFixed(2)}ms, Run 2 (Cached): ${duration2.toFixed(2)}ms`
+    );
+  } catch (err: unknown) {
+    assert('Supabase Egress Protection: Guard', false, String(err));
+  }
+
   return { passed, failed, results };
 };

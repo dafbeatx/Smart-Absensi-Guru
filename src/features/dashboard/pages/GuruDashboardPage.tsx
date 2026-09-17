@@ -352,7 +352,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
   const [pointHistory, setPointHistory] = useState<TeacherPointLog[]>([]);
-  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>([]);
+  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_teacher_point_history') : null;
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [allRegisteredTeachers, setAllRegisteredTeachers] = useState<UserProfile[]>(() => {
     try {
       const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_teachers') : null;

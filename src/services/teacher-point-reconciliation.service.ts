@@ -209,6 +209,7 @@ export class TeacherPointReconciliationService {
     }
 
     if (hasChanges) {
+      TeacherPointReconciliationService.invalidateReconciliationCache();
       return updatedLogs.sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() ||
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -218,13 +219,29 @@ export class TeacherPointReconciliationService {
     return currentPointLogs;
   }
 
+  private static lastReconcileAllTime = 0;
+  private static cachedReconciledLogs: TeacherPointLog[] = [];
+  public static readonly RECONCILE_CACHE_TTL_MS = 60000; // 60 detik cache TTL untuk memproteksi Egress Supabase
+
+  /**
+   * Reset cache rekonsiliasi saat ada transaksi poin baru
+   */
+  public static invalidateReconciliationCache(): void {
+    this.lastReconcileAllTime = 0;
+    this.cachedReconciledLogs = [];
+  }
+
   /**
    * Rekonsiliasi massal idempoten untuk seluruh guru sekolah.
-   * Dipanggil saat Admin atau Kepsek membuka dashboard atau klasemen,
-   * memastikan semua catatan presensi guru (masuk, pulang, piket, early bird)
-   * terkonversi menjadi poin di buku besar secara konsisten 100%.
+   * Dilengkapi proteksi In-Memory Cache TTL (60 detik) agar tidak membebani Egress Supabase
+   * saat modal klasemen dibuka berulang kali.
    */
-  public static async reconcileAllTeachers(token?: string): Promise<TeacherPointLog[]> {
+  public static async reconcileAllTeachers(token?: string, forceRefresh = false): Promise<TeacherPointLog[]> {
+    const nowMs = Date.now();
+    if (!forceRefresh && (nowMs - this.lastReconcileAllTime < this.RECONCILE_CACHE_TTL_MS) && this.cachedReconciledLogs.length > 0) {
+      return this.cachedReconciledLogs;
+    }
+
     const provider = ProviderFactory.getProvider();
     try {
       const now = new Date();
@@ -235,6 +252,8 @@ export class TeacherPointReconciliationService {
       const dutySchedules = await provider.getDutySchedules(token).catch(() => []);
 
       if (!Array.isArray(allAttendance) || allAttendance.length === 0) {
+        this.lastReconcileAllTime = Date.now();
+        this.cachedReconciledLogs = allLogs || [];
         return allLogs || [];
       }
 
@@ -278,10 +297,14 @@ export class TeacherPointReconciliationService {
         window.dispatchEvent(new CustomEvent('smart_absensi_points_updated'));
       }
 
+      this.lastReconcileAllTime = Date.now();
+      this.cachedReconciledLogs = currentLogs;
       return currentLogs;
     } catch (e) {
       logger.warn('TeacherPointReconciliationService', 'Gagal rekonsiliasi massal seluruh guru:', e);
       const fallbackLogs = await provider.getTeacherPointHistory('ALL', token).catch(() => []);
+      this.lastReconcileAllTime = Date.now();
+      this.cachedReconciledLogs = fallbackLogs || [];
       return fallbackLogs || [];
     }
   }

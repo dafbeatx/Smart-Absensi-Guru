@@ -4470,7 +4470,7 @@ export class SupabaseProvider implements IDataProvider {
           user_id: row.user_id,
           teacher_name: row.teacher_name || undefined,
           date: row.date,
-          points: row.points,
+          points: Number(row.points) || 0,
           activity_type: row.activity_type as TeacherPointActivityType,
           title: row.title,
           description: row.description || undefined,

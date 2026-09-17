@@ -583,7 +583,54 @@ export function getTeacherDisciplineLeaderboard(
     },
   ];
 
-  let teachers = isCurrent ? [...currentMonthTeachers] : [...previousMonthTeachers];
+  let teachers: TeacherLeaderboardItem[] = isCurrent ? [...currentMonthTeachers] : [...previousMonthTeachers];
+
+  // 1.5. Sinkronisasi Roster: Gabungkan seluruh guru terdaftar (allRegisteredTeachers) dari database / cache
+  // Memastikan bahwa tampilan Admin, Kepsek, dan Guru SELALU memuat daftar guru yang 100% IDENTIK & SINKRON
+  if (allRegisteredTeachers && allRegisteredTeachers.length > 0) {
+    for (const reg of allRegisteredTeachers) {
+      if (!reg || !reg.id) continue;
+      // Jangan masukkan akun role non-guru (misal KEPSEK murni tanpa penugasan mengajar)
+      if ((reg as any).role === 'KEPSEK' && !(reg as any).position?.toLowerCase().includes('guru')) {
+        continue;
+      }
+
+      const existingIdx = teachers.findIndex(
+        (t) =>
+          t.id === reg.id ||
+          (reg.nip && t.nip && reg.nip.replace(/\s+/g, '') === t.nip.replace(/\s+/g, '')) ||
+          (reg.full_name && t.name && reg.full_name.trim().toLowerCase() === t.name.trim().toLowerCase())
+      );
+
+      if (existingIdx !== -1) {
+        teachers[existingIdx] = {
+          ...teachers[existingIdx],
+          id: reg.id,
+          name: reg.full_name || teachers[existingIdx].name,
+          nip: reg.nip !== undefined ? reg.nip : teachers[existingIdx].nip,
+          position: (reg as any).position || teachers[existingIdx].position,
+          avatar_url: reg.avatar_url || teachers[existingIdx].avatar_url,
+        };
+      } else {
+        teachers.push({
+          id: reg.id,
+          name: reg.full_name || 'Guru Pengajar',
+          nip: reg.nip || null,
+          position: (reg as any).position || 'Guru Pengajar',
+          avatar_url: reg.avatar_url || null,
+          totalPoints: 0,
+          level: '🥉 Pendidik Berkomitmen',
+          rank: teachers.length + 1,
+          hadirTepatWaktuCount: 0,
+          terlambatCount: 0,
+          piketCount: 0,
+          earlyBirdCount: 0,
+          streakCount: 0,
+          topBadge: { icon: '🥉', title: 'Pendidik Berkomitmen' },
+        });
+      }
+    }
+  }
 
   // Pembaruan dinamis skor dan perolehan poin seluruh guru jika allPointLogs tersedia
   // Wajib difilter per-bulan berjalan / per-bulan target agar tidak terjadi akumulasi lintas bulan
@@ -595,7 +642,7 @@ export function getTeacherDisciplineLeaderboard(
       );
       if (logs.length === 0) return t;
 
-      const pts = Math.max(0, logs.reduce((sum, l) => sum + (l.points || 0), 0));
+      const pts = Math.max(0, logs.reduce((sum, l) => sum + (Number(l.points) || 0), 0));
       const onTime = logs.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
       const late = logs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
       const piket = logs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
@@ -624,34 +671,34 @@ export function getTeacherDisciplineLeaderboard(
     const matchedIdx = teachers.findIndex(
       (t) =>
         (currentUser.id && t.id === currentUser.id) ||
-        (currentUser.full_name && t.name && t.name.toLowerCase() === currentUser.full_name.toLowerCase()) ||
+        (currentUser.full_name && t.name && t.name.trim().toLowerCase() === currentUser.full_name.trim().toLowerCase()) ||
         (currentUser.nip && t.nip && t.nip.replace(/\s+/g, '') === currentUser.nip.replace(/\s+/g, ''))
     );
 
     if (matchedIdx !== -1) {
       if (isCurrent) {
-        // Jangan timpa poin jika currentUserScore kosong atau bernilai 0 sementara data guru sudah memiliki poin riil
-        const hasValidUserScore = Boolean(currentUserScore && currentUserScore.totalPoints > 0);
+        // Jangan timpa poin jika currentUserScore kosong atau bernilai negatif sementara data guru sudah memiliki poin riil
+        const hasValidUserScore = Boolean(currentUserScore && typeof currentUserScore.totalPoints === 'number' && currentUserScore.totalPoints >= 0);
         const resolvedTotalPoints = hasValidUserScore
-          ? currentUserScore!.totalPoints
-          : teachers[matchedIdx].totalPoints;
+          ? Math.max(Number(teachers[matchedIdx].totalPoints) || 0, Number(currentUserScore!.totalPoints) || 0)
+          : Number(teachers[matchedIdx].totalPoints) || 0;
         const resolvedLevel = hasValidUserScore && currentUserScore?.level
           ? currentUserScore.level
           : teachers[matchedIdx].level;
         const resolvedOnTime = hasValidUserScore && currentUserScore?.hadirTepatWaktuCount !== undefined
-          ? currentUserScore.hadirTepatWaktuCount
+          ? Math.max(teachers[matchedIdx].hadirTepatWaktuCount, currentUserScore.hadirTepatWaktuCount)
           : teachers[matchedIdx].hadirTepatWaktuCount;
         const resolvedLate = hasValidUserScore && currentUserScore?.terlambatCount !== undefined
           ? currentUserScore.terlambatCount
           : teachers[matchedIdx].terlambatCount;
         const resolvedPiket = hasValidUserScore && currentUserScore?.piketCount !== undefined
-          ? currentUserScore.piketCount
+          ? Math.max(teachers[matchedIdx].piketCount, currentUserScore.piketCount)
           : teachers[matchedIdx].piketCount;
         const resolvedEarlyBird = hasValidUserScore && currentUserScore?.earlyBirdCount !== undefined
-          ? currentUserScore.earlyBirdCount
+          ? Math.max(teachers[matchedIdx].earlyBirdCount ?? 0, currentUserScore.earlyBirdCount)
           : (teachers[matchedIdx].earlyBirdCount ?? 0);
         const resolvedStreak = hasValidUserScore && currentUserScore?.streakCount !== undefined
-          ? currentUserScore.streakCount
+          ? Math.max(teachers[matchedIdx].streakCount ?? 0, currentUserScore.streakCount)
           : (teachers[matchedIdx].streakCount ?? 0);
 
         teachers[matchedIdx] = {
@@ -670,6 +717,7 @@ export function getTeacherDisciplineLeaderboard(
       } else {
         teachers[matchedIdx] = {
           ...teachers[matchedIdx],
+          avatar_url: currentUser.avatar_url || teachers[matchedIdx].avatar_url,
           isCurrentUser: true,
         };
       }
@@ -677,19 +725,19 @@ export function getTeacherDisciplineLeaderboard(
       !currentUser ||
       ((currentUser as any).role !== 'KEPSEK' && (currentUser as any).role !== 'ADMIN')
     ) {
-      // Akun guru lain yang terdaftar secara dinamis
+      // Akun guru lain yang terdaftar secara dinamis dan belum ada di teachers
       teachers.push({
         id: currentUser.id || 'usr_current',
         name: currentUser.full_name || 'Guru Pendidik',
         nip: currentUser.nip || null,
         position: currentUser.position || 'Guru Pengajar',
         avatar_url: currentUser.avatar_url || null,
-        totalPoints: isCurrent ? (currentUserScore?.totalPoints ?? 0) : 380,
-        level: isCurrent ? (currentUserScore?.level || '🥉 Pendidik Berkomitmen') : '🥇 Pendidik Disiplin Emas',
-        rank: 0,
-        hadirTepatWaktuCount: isCurrent ? (currentUserScore?.hadirTepatWaktuCount ?? 0) : 17,
-        terlambatCount: isCurrent ? (currentUserScore?.terlambatCount ?? 0) : 1,
-        piketCount: isCurrent ? (currentUserScore?.piketCount ?? 0) : 2,
+        totalPoints: Number(currentUserScore?.totalPoints) || 0,
+        level: currentUserScore?.level || '🥉 Pendidik Berkomitmen',
+        rank: teachers.length + 1,
+        hadirTepatWaktuCount: currentUserScore?.hadirTepatWaktuCount ?? 0,
+        terlambatCount: currentUserScore?.terlambatCount ?? 0,
+        piketCount: currentUserScore?.piketCount ?? 0,
         earlyBirdCount: currentUserScore?.earlyBirdCount ?? 0,
         streakCount: currentUserScore?.streakCount ?? 0,
         topBadge: { icon: activeBadge.icon, title: activeBadge.title },
@@ -699,30 +747,37 @@ export function getTeacherDisciplineLeaderboard(
   }
 
   // 5-Level Deterministic Tie-Breaker Ranking Engine:
-  // 1. totalPoints terbesar
-  // 2. hadirTepatWaktuCount terbanyak
-  // 3. earlyBirdCount (Teladan Fajar ≤ 07:00 WIB) terbanyak
-  // 4. terlambatCount paling sedikit
-  // 5. Urutan rank bawaan / alfabetis nama (stabil & konsisten)
+  // 1. totalPoints terbesar (Strict Numeric Descending)
+  // 2. hadirTepatWaktuCount terbanyak (On-Time Descending)
+  // 3. earlyBirdCount (Teladan Fajar ≤ 07:00 WIB) terbanyak (Early Bird Descending)
+  // 4. terlambatCount paling sedikit (Late Count Ascending)
+  // 5. Alfabetis nama guru (A-Z) untuk konsistensi deterministik 100%
   teachers.sort((a, b) => {
-    if (b.totalPoints !== a.totalPoints) {
-      return b.totalPoints - a.totalPoints;
+    const aPoints = Number(a.totalPoints) || 0;
+    const bPoints = Number(b.totalPoints) || 0;
+    if (bPoints !== aPoints) {
+      return bPoints - aPoints;
     }
-    if (b.hadirTepatWaktuCount !== a.hadirTepatWaktuCount) {
-      return b.hadirTepatWaktuCount - a.hadirTepatWaktuCount;
+
+    const aOnTime = Number(a.hadirTepatWaktuCount) || 0;
+    const bOnTime = Number(b.hadirTepatWaktuCount) || 0;
+    if (bOnTime !== aOnTime) {
+      return bOnTime - aOnTime;
     }
-    const aEarly = a.earlyBirdCount || 0;
-    const bEarly = b.earlyBirdCount || 0;
+
+    const aEarly = Number(a.earlyBirdCount) || 0;
+    const bEarly = Number(b.earlyBirdCount) || 0;
     if (bEarly !== aEarly) {
       return bEarly - aEarly;
     }
-    if (a.terlambatCount !== b.terlambatCount) {
-      return a.terlambatCount - b.terlambatCount;
+
+    const aLate = Number(a.terlambatCount) || 0;
+    const bLate = Number(b.terlambatCount) || 0;
+    if (aLate !== bLate) {
+      return aLate - bLate;
     }
-    if (a.rank && b.rank && a.rank !== b.rank) {
-      return a.rank - b.rank;
-    }
-    return a.name.localeCompare(b.name);
+
+    return (a.name || '').localeCompare(b.name || '');
   });
 
   // Update peringkat rank dan standarisasi tingkat prestasi:

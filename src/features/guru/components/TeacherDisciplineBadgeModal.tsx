@@ -85,7 +85,20 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   const [tierFilter, setTierFilter] = useState<TierFilter>('ALL');
 
   // Point history modal state
-  const [allPointLogs, setAllPointLogs] = useState<TeacherPointLog[]>([]);
+  const [allPointLogs, setAllPointLogs] = useState<TeacherPointLog[]>(() => {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_teacher_point_history');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  });
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [pointHistoryTeacher, setPointHistoryTeacher] = useState<any>(null);
   const [teacherLogs, setTeacherLogs] = useState<TeacherPointLog[]>([]);
@@ -118,21 +131,25 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     const fetchPoints = async () => {
       try {
         const token = useAuthStore.getState().token || undefined;
-        const provider = ProviderFactory.getProvider();
-        const logs = await provider.getTeacherPointHistory('ALL', token);
-        if (logs && logs.length > 0) {
-          setAllPointLogs(logs);
-        }
-        // Rekonsiliasi idempoten seluruh guru agar poin kehadiran fisik selalu 100% mutakhir
+        // Rekonsiliasi idempoten seluruh guru (dilengkapi proteksi cache TTL 60s agar tidak membebani Egress Supabase)
         const reconciled = await TeacherPointReconciliationService.reconcileAllTeachers(token);
         if (reconciled && reconciled.length > 0) {
           setAllPointLogs(reconciled);
+        } else {
+          const provider = ProviderFactory.getProvider();
+          const logs = await provider.getTeacherPointHistory('ALL', token);
+          if (logs && logs.length > 0) {
+            setAllPointLogs(logs);
+          }
         }
 
-        // Sinkronisasi foto profil guru terbaru dari provider
-        const users = await provider.getAllUsers(token || '');
-        if (users && users.length > 0) {
-          setRegisteredTeachers(users);
+        // Sinkronisasi foto profil guru terbaru dari provider (hanya jika prop tidak disediakan)
+        if (!allRegisteredTeachersProp || allRegisteredTeachersProp.length === 0) {
+          const provider = ProviderFactory.getProvider();
+          const users = await provider.getAllUsers(token || '');
+          if (users && users.length > 0) {
+            setRegisteredTeachers(users);
+          }
         }
       } catch (e) {
         console.warn('Failed to load point logs or users in modal:', e);
