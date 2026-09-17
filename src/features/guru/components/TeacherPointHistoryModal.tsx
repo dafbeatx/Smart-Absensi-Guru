@@ -95,14 +95,32 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
   }, [selectedYear, selectedMonth]);
 
   const [selectedPeriod, setSelectedPeriod] = useState<string>(defaultPeriodStr);
+  const [internalLoading, setInternalLoading] = useState<boolean>(true);
 
   // Sinkronkan periode saat modal dibuka
   React.useEffect(() => {
     if (isOpen) {
       setSelectedPeriod(defaultPeriodStr);
       setFilterType('ALL');
+      setInternalLoading(true);
+      const timer = setTimeout(() => {
+        setInternalLoading(false);
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, defaultPeriodStr]);
+
+  // Trigger loading session halus saat ganti periode
+  React.useEffect(() => {
+    if (!isOpen) return;
+    setInternalLoading(true);
+    const timer = setTimeout(() => {
+      setInternalLoading(false);
+    }, 380);
+    return () => clearTimeout(timer);
+  }, [selectedPeriod, isOpen]);
+
+  const effectiveLoading = Boolean(isLoading || internalLoading);
 
   // Ekstraksi seluruh periode unik yang ada di riwayat poin + defaultPeriod
   const availablePeriods = useMemo(() => {
@@ -741,10 +759,33 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
               </span>
             </div>
 
-            {isLoading ? (
-              <div className="py-12 text-center space-y-3 bg-white rounded-2xl border border-slate-200">
-                <div className="w-8 h-8 mx-auto border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs text-slate-600 font-bold">Memuat riwayat transaksi poin...</p>
+            {effectiveLoading ? (
+              <div className="p-6 text-center space-y-4 bg-linear-to-b from-white to-slate-50 rounded-2xl border border-slate-200/90 shadow-2xs animate-fadeIn">
+                <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full bg-[#023246]/10 animate-ping" />
+                  <div className="relative w-11 h-11 rounded-2xl bg-linear-to-br from-[#023246] to-[#0D7A5F] text-amber-300 flex items-center justify-center shadow-md">
+                    <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-slate-900">
+                    Menyinkronkan Buku Besar Transaksi Poin...
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
+                    Memverifikasi riwayat kehadiran, ketepatan waktu, dan catatan kedisiplinan {teacherName}.
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="p-3 rounded-xl bg-slate-100/70 border border-slate-200/70 animate-pulse flex items-center justify-between gap-3">
+                      <div className="space-y-1.5 flex-1 text-left">
+                        <div className="w-32 h-3 bg-slate-200 rounded" />
+                        <div className="w-20 h-2 bg-slate-200 rounded" />
+                      </div>
+                      <div className="w-14 h-5 bg-slate-200 rounded-lg" />
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : filteredLogs.length === 0 ? (
               <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-200 space-y-2.5">

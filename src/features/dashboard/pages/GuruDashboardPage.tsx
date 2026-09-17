@@ -1406,7 +1406,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     // Hindari race-condition saat log poin seluruh guru sekolah belum selesai dimuat
     if (!allTeacherPointLogs || allTeacherPointLogs.length === 0) return;
 
-    const timing = evaluateDisciplinePeriodTiming(currentDate, selectedYear, selectedMonth);
+    const timing = evaluateDisciplinePeriodTiming(new Date(), selectedYear, selectedMonth);
     if (!timing.isEndOfMonth) return;
 
     const todayStr = getTodayDateInJakarta();
@@ -1424,7 +1424,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank, selectedYear, selectedMonth, allTeacherPointLogs, currentDate]);
+  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank, selectedYear, selectedMonth, allTeacherPointLogs]);
 
   // ── Teacher Challenge & Streak Engine (Duolingo Style) ─────────────────
   const streakInfo = useMemo(() => {
@@ -1525,7 +1525,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       rival?.name,
       { isTomorrowOff, settings, holidays: allHolidays }
     );
-  }, [effectiveUser?.id, isTomorrowOff, streakInfo, appreciationScore, disciplineLeaderboard, settings, allHolidays]);
+  }, [effectiveUser, isTomorrowOff, streakInfo, appreciationScore, disciplineLeaderboard, settings, allHolidays]);
 
   // Auto-open modal jika dibuka dari link notifikasi PWA (openChallenge=true)
   useEffect(() => {

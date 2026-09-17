@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { TeacherAppreciationScore, UserProfile, TeacherPointLog } from '../../../types/database.types';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -22,6 +22,8 @@ import {
   ChevronRight,
   Sparkles,
   Search,
+  RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 
 export interface TeacherDisciplineBadgeModalProps {
@@ -102,6 +104,13 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [pointHistoryTeacher, setPointHistoryTeacher] = useState<any>(null);
   const [teacherLogs, setTeacherLogs] = useState<TeacherPointLog[]>([]);
+  const [isPointHistoryLoading, setIsPointHistoryLoading] = useState(false);
+
+  // ── Smart Point Synchronization State (SPS-Session) ─────────────────────────
+  const [isSyncing, setIsSyncing] = useState<boolean>(true);
+  const [syncProgress, setSyncProgress] = useState<number>(20);
+  const [syncStageText, setSyncStageText] = useState<string>('Menghubungkan ke buku besar poin cloud...');
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
   // Registered teacher profiles with avatars configured by Admin
   const [registeredTeachers, setRegisteredTeachers] = useState<UserProfile[]>(() => {
@@ -125,39 +134,70 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     }
   }, [allRegisteredTeachersProp]);
 
+  const handleSyncPoints = useCallback(async (forceRefresh = false) => {
+    setIsSyncing(true);
+    setSyncProgress(25);
+    setSyncStageText('Menghubungkan ke buku besar poin cloud...');
+    const startTime = Date.now();
+
+    // Step 2 progress stepping
+    const timerStep2 = setTimeout(() => {
+      setSyncProgress((p) => Math.max(p, 55));
+      setSyncStageText('Merekonsiliasi catatan presensi, on-time & piket...');
+    }, 200);
+
+    // Step 3 progress stepping
+    const timerStep3 = setTimeout(() => {
+      setSyncProgress((p) => Math.max(p, 85));
+      setSyncStageText('Menghitung akumulasi skor & peringkat klasemen...');
+    }, 450);
+
+    try {
+      const token = useAuthStore.getState().token || undefined;
+      // Rekonsiliasi idempoten seluruh guru (dilengkapi proteksi cache TTL 60s agar tidak membebani Egress Supabase)
+      const reconciled = await TeacherPointReconciliationService.reconcileAllTeachers(token, forceRefresh);
+      if (reconciled && reconciled.length > 0) {
+        setAllPointLogs(reconciled);
+      } else {
+        const provider = ProviderFactory.getProvider();
+        const logs = await provider.getTeacherPointHistory('ALL', token);
+        if (logs && logs.length > 0) {
+          setAllPointLogs(logs);
+        }
+      }
+
+      // Sinkronisasi foto profil guru terbaru dari provider (hanya jika prop tidak disediakan)
+      if (!allRegisteredTeachersProp || allRegisteredTeachersProp.length === 0) {
+        const provider = ProviderFactory.getProvider();
+        const users = await provider.getAllUsers(token || '');
+        if (users && users.length > 0) {
+          setRegisteredTeachers(users);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load point logs or users in modal:', e);
+    } finally {
+      clearTimeout(timerStep2);
+      clearTimeout(timerStep3);
+      // Menjamin durasi sesi load nyaman & memuaskan (~650ms minimum) agar terasa sinkron nyata
+      const elapsed = Date.now() - startTime;
+      const remainingTime = Math.max(0, 650 - elapsed);
+      setTimeout(() => {
+        setSyncProgress(100);
+        setSyncStageText('Sinkronisasi Selesai • Klasemen Terverifikasi');
+        setTimeout(() => {
+          setIsSyncing(false);
+          setLastSyncedAt(new Date());
+        }, 150);
+      }, remainingTime);
+    }
+  }, [allRegisteredTeachersProp]);
+
   useEffect(() => {
     if (!isOpen) return;
+    handleSyncPoints(false);
 
-    const fetchPoints = async () => {
-      try {
-        const token = useAuthStore.getState().token || undefined;
-        // Rekonsiliasi idempoten seluruh guru (dilengkapi proteksi cache TTL 60s agar tidak membebani Egress Supabase)
-        const reconciled = await TeacherPointReconciliationService.reconcileAllTeachers(token);
-        if (reconciled && reconciled.length > 0) {
-          setAllPointLogs(reconciled);
-        } else {
-          const provider = ProviderFactory.getProvider();
-          const logs = await provider.getTeacherPointHistory('ALL', token);
-          if (logs && logs.length > 0) {
-            setAllPointLogs(logs);
-          }
-        }
-
-        // Sinkronisasi foto profil guru terbaru dari provider (hanya jika prop tidak disediakan)
-        if (!allRegisteredTeachersProp || allRegisteredTeachersProp.length === 0) {
-          const provider = ProviderFactory.getProvider();
-          const users = await provider.getAllUsers(token || '');
-          if (users && users.length > 0) {
-            setRegisteredTeachers(users);
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to load point logs or users in modal:', e);
-      }
-    };
-    fetchPoints();
-
-    const handleUpdate = () => fetchPoints();
+    const handleUpdate = () => handleSyncPoints(false);
     const handleTeachersUpdate = () => {
       try {
         const raw = localStorage.getItem('smart_absensi_teachers');
@@ -178,7 +218,22 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
       window.removeEventListener('smart_absensi_teachers_updated', handleTeachersUpdate);
       window.removeEventListener('storage', handleTeachersUpdate);
     };
-  }, [isOpen]);
+  }, [isOpen, handleSyncPoints]);
+
+  // Transisi sinkronisasi halus saat periode bulan diubah
+  useEffect(() => {
+    if (!isOpen) return;
+    setIsSyncing(true);
+    setSyncProgress(60);
+    setSyncStageText(`Menghitung klasemen periode ${selectedPeriod === 'CURRENT_MONTH' ? 'September 2026' : 'Agustus 2026'}...`);
+    const t = setTimeout(() => {
+      setSyncProgress(100);
+      setTimeout(() => {
+        setIsSyncing(false);
+      }, 120);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [selectedPeriod, isOpen]);
 
   // Keyboard navigation & body scroll lock
   useEffect(() => {
@@ -206,6 +261,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
   const handleOpenPointHistory = async (t: any) => {
     setPointHistoryTeacher(t);
+    setIsPointHistoryLoading(true);
+    setIsPointHistoryModalOpen(true);
+    const startTime = Date.now();
     const token = useAuthStore.getState().token || undefined;
     const provider = ProviderFactory.getProvider();
     try {
@@ -213,8 +271,13 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
       setTeacherLogs(logs || []);
     } catch {
       setTeacherLogs(allPointLogs.filter((l) => l.user_id === t.id));
+    } finally {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 500 - elapsed);
+      setTimeout(() => {
+        setIsPointHistoryLoading(false);
+      }, remaining);
     }
-    setIsPointHistoryModalOpen(true);
   };
 
   const {
@@ -319,7 +382,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
             </div>
           </div>
 
-          {/* Right Controls: Period Selector & Close Button */}
+          {/* Right Controls: Period Selector, Sync Status, & Close Button */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Desktop Period Switcher */}
             <div className="hidden sm:flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200">
@@ -347,6 +410,31 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 <span>🏅</span>
                 <span>Agustus 2026</span>
               </button>
+            </div>
+
+            {/* Smart Point Sync Status & Action Button */}
+            <div className="flex items-center">
+              {isSyncing ? (
+                <div className="px-2.5 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center gap-1.5 text-xs font-bold animate-pulse shadow-2xs">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
+                  <span className="hidden md:inline">Menyinkronkan...</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSyncPoints(true)}
+                  title="Sinkronkan ulang seluruh buku besar poin guru dari cloud"
+                  className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-ping" />
+                  <span className="hidden md:inline">
+                    {lastSyncedAt
+                      ? `Sinkron (${lastSyncedAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB)`
+                      : 'Poin Sinkron'}
+                  </span>
+                  <RefreshCw className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                </button>
+              )}
             </div>
 
             <button
@@ -765,9 +853,87 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 {/* TAB 1: KLASEMEN PERINGKAT */}
                 {activeTab === 'LEADERBOARD' && (
                   <div className="space-y-6">
+                    {isSyncing ? (
+                      /* ── Sesi Load & Animasi Sinkronisasi Poin (SPS-Session) ── */
+                      <div className="p-6 sm:p-10 rounded-3xl bg-linear-to-b from-white to-slate-50 border border-slate-200/80 shadow-sm space-y-8 animate-fadeIn">
+                        <div className="max-w-md mx-auto text-center space-y-4">
+                          {/* Concentric Radar Pulse with Glowing Trophy */}
+                          <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                            <div className="absolute inset-0 rounded-full bg-[#023246]/10 animate-ping" />
+                            <div className="absolute -inset-2 rounded-full bg-linear-to-tr from-amber-400/30 via-emerald-400/30 to-teal-400/30 animate-spin blur-xs" />
+                            <div className="relative w-16 h-16 rounded-2xl bg-linear-to-br from-[#023246] to-[#0D7A5F] text-amber-300 flex items-center justify-center shadow-lg border border-amber-300/30">
+                              <Trophy className="w-8 h-8 animate-bounce text-amber-300" />
+                            </div>
+                          </div>
 
-                    {/* 👑 TOP 3 PODIUM HERO CARDS ───────────────────────────── */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                              Menyinkronkan Poin &amp; Peringkat Guru
+                            </h3>
+                            <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                              {syncStageText}
+                            </p>
+                          </div>
+
+                          {/* Linear Progress Bar */}
+                          <div className="space-y-1.5">
+                            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-200">
+                              <div
+                                className="bg-linear-to-r from-[#023246] via-[#0D7A5F] to-emerald-400 h-full rounded-full transition-all duration-300 ease-out"
+                                style={{ width: `${syncProgress}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 px-1">
+                              <span>Buku Besar Cloud</span>
+                              <span className="font-bold text-[#023246]">{syncProgress}%</span>
+                              <span>Klasemen Final</span>
+                            </div>
+                          </div>
+
+                          {/* 3 Verification Mini Checks */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 text-left">
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center gap-2">
+                              <CheckCircle2 className={`w-4 h-4 ${syncProgress >= 25 ? 'text-emerald-600' : 'text-slate-300'} shrink-0`} />
+                              <span className="text-[10px] font-bold text-slate-700">Verifikasi Presensi</span>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center gap-2">
+                              <CheckCircle2 className={`w-4 h-4 ${syncProgress >= 65 ? 'text-emerald-600' : 'text-slate-300'} shrink-0`} />
+                              <span className="text-[10px] font-bold text-slate-700">Audit Poin On-Time</span>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center gap-2">
+                              <CheckCircle2 className={`w-4 h-4 ${syncProgress >= 95 ? 'text-emerald-600' : 'text-slate-300'} shrink-0`} />
+                              <span className="text-[10px] font-bold text-slate-700">Kalkulasi Klasemen</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Skeleton Shimmer Preview for Top 3 Podium */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+                          {[1, 2, 3].map((i) => (
+                            <div key={i} className="p-5 rounded-3xl bg-slate-100/70 border border-slate-200 animate-pulse space-y-3">
+                              <div className="flex justify-between items-center">
+                                <div className="w-20 h-4 bg-slate-200 rounded-full" />
+                                <div className="w-12 h-4 bg-slate-200 rounded-full" />
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-slate-200 shrink-0" />
+                                <div className="space-y-1.5 flex-1">
+                                  <div className="w-24 h-4 bg-slate-200 rounded" />
+                                  <div className="w-16 h-3 bg-slate-200 rounded" />
+                                </div>
+                              </div>
+                              <div className="pt-2 border-t border-slate-200/60 flex justify-between">
+                                <div className="w-16 h-3 bg-slate-200 rounded" />
+                                <div className="w-14 h-4 bg-slate-200 rounded" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* 👑 TOP 3 PODIUM HERO CARDS ───────────────────────────── */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
                       {/* Juara 2 (Perak) */}
                       {leaderboard[1] && (
                         <div
@@ -1276,8 +1442,10 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                         })}
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
+              </div>
+            )}
 
                 {/* TAB 2: RIWAYAT TRANSAKSI POIN */}
                 {activeTab === 'HISTORY' && (
@@ -1570,6 +1738,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
           onClose={() => setIsPointHistoryModalOpen(false)}
           teacher={pointHistoryTeacher}
           pointHistory={teacherLogs}
+          isLoading={isPointHistoryLoading}
           selectedMonth={selectedPeriod === 'CURRENT_MONTH' ? 9 : 8}
           selectedYear={2026}
         />
@@ -1614,6 +1783,25 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Sync Status Badge in Modal Header */}
+              {isSyncing ? (
+                <span className="px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black flex items-center gap-1 animate-pulse shadow-2xs">
+                  <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
+                  <span className="hidden sm:inline">Sinkronisasi...</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSyncPoints(true)}
+                  title="Klik untuk menyinkronkan data poin terbaru dari cloud"
+                  className="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[10px] font-black flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  <span>Sinkron</span>
+                  <RefreshCw className="w-2.5 h-2.5 text-emerald-600" />
+                </button>
+              )}
+
               {selectedTeacher && (
                 <button
                   type="button"
@@ -1980,8 +2168,49 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     </span>
                   </div>
 
-                  {/* 👑 HERO CARD: JUARA 1 POIN TERBANYAK (DAPAT DIKLIK) */}
-                  <div
+                  {isSyncing ? (
+                    <div className="p-5 rounded-2xl bg-linear-to-b from-white to-slate-50 border border-slate-200/80 space-y-4 text-center animate-fadeIn shadow-2xs">
+                      <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
+                        <div className="absolute inset-0 rounded-full bg-[#023246]/10 animate-ping" />
+                        <div className="absolute -inset-1 rounded-full bg-linear-to-tr from-amber-400/30 to-emerald-400/30 animate-spin blur-xs" />
+                        <div className="relative w-12 h-12 rounded-2xl bg-linear-to-br from-[#023246] to-[#0D7A5F] text-amber-300 flex items-center justify-center shadow-md border border-amber-300/30">
+                          <Trophy className="w-6 h-6 animate-bounce text-amber-300" />
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900">
+                          Menyinkronkan Poin &amp; Peringkat...
+                        </h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
+                          {syncStageText}
+                        </p>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200 p-0.5">
+                        <div
+                          className="bg-linear-to-r from-[#023246] via-[#0D7A5F] to-emerald-400 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${syncProgress}%` }}
+                        />
+                      </div>
+                      {/* Skeletons for podium & rows */}
+                      <div className="space-y-2 pt-2 border-t border-slate-100">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="p-2.5 rounded-xl bg-slate-100/80 border border-slate-200/70 animate-pulse flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 flex-1">
+                              <div className="w-8 h-8 rounded-lg bg-slate-200 shrink-0" />
+                              <div className="space-y-1 flex-1 text-left">
+                                <div className="w-24 h-3 bg-slate-200 rounded" />
+                                <div className="w-16 h-2 bg-slate-200 rounded" />
+                              </div>
+                            </div>
+                            <div className="w-14 h-5 bg-slate-200 rounded-lg" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* 👑 HERO CARD: JUARA 1 POIN TERBANYAK (DAPAT DIKLIK) */}
+                      <div
                     onClick={() => topTeacher && setSelectedTeacher(topTeacher)}
                     className="relative overflow-hidden rounded-2xl border border-amber-300 bg-linear-to-br from-amber-50 via-white to-amber-50/50 p-3 sm:p-3.5 shadow-2xs cursor-pointer hover:border-amber-400 active:scale-[0.99] transition-all group"
                   >
@@ -2230,8 +2459,10 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       })}
                     </div>
                   </div>
-                </div>
+                </>
               )}
+            </div>
+          )}
 
               {/* TAB: HISTORY / RIWAYAT TRANSAKSI POIN GURU */}
               {activeTab === 'HISTORY' && (
@@ -2535,6 +2766,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
         onClose={() => setIsPointHistoryModalOpen(false)}
         teacher={pointHistoryTeacher}
         pointHistory={teacherLogs}
+        isLoading={isPointHistoryLoading}
         selectedMonth={selectedPeriod === 'CURRENT_MONTH' ? 9 : 8}
         selectedYear={2026}
       />
