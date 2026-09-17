@@ -59,7 +59,7 @@ export const OfflineSyncIndicator: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 animate-bounce-subtle">
+    <div className="fixed bottom-22 sm:bottom-4 right-4 z-40 animate-bounce-subtle">
       <div
         className={`px-3 py-2 rounded-2xl border shadow-lg flex items-center gap-2.5 text-xs font-bold transition-all ${
           !stats.isOnline

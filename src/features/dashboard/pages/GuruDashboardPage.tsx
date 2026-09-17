@@ -4544,7 +4544,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           setCorrectionInitialDate(undefined);
         }}
         onSuccess={() => {
-          showToast('success', 'Pengajuan Terkirim', 'Permohonan koreksi absen akan ditinjau Admin.');
+          loadAllDataRef.current?.();
         }}
       />
 

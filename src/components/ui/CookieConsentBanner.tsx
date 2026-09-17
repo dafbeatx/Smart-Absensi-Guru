@@ -18,15 +18,19 @@ export const CookieConsentBanner: React.FC = () => {
   });
 
   useEffect(() => {
-    // 1. Cek apakah sudah pernah consent sebelumnya
+    // 1. Cek apakah sudah pernah consent atau di-dismiss di sesi ini
+    const isDismissedThisSession =
+      typeof sessionStorage !== 'undefined' &&
+      sessionStorage.getItem('smart_absensi_cookie_banner_dismissed') === 'true';
+
     const consent = CookieConsentService.getConsent();
-    if (!consent) {
+    if (!consent && !isDismissedThisSession) {
       // Jeda 800ms agar halaman utama selesai render dengan mulus di HP
       const timer = setTimeout(() => {
         setIsVisible(true);
       }, 800);
       return () => clearTimeout(timer);
-    } else {
+    } else if (consent) {
       setPrefs(consent);
     }
 
@@ -49,6 +53,13 @@ export const CookieConsentBanner: React.FC = () => {
       window.removeEventListener('smart_absensi_open_cookie_settings', handleOpenSettings);
     };
   }, []);
+
+  const handleDismissBanner = () => {
+    setIsVisible(false);
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('smart_absensi_cookie_banner_dismissed', 'true');
+    }
+  };
 
   const handleAcceptAll = () => {
     CookieConsentService.acceptAll();
@@ -73,16 +84,16 @@ export const CookieConsentBanner: React.FC = () => {
     <>
       {/* ── 1. FLOATING QUICK CONSENT BANNER (Mobile-First / Infinix Note 8 Optimized) ── */}
       {isVisible && !isManageModalOpen && (
-        <div className="fixed inset-x-0 bottom-0 z-99990 p-3 sm:p-4 pointer-events-none animate-fadeIn">
+        <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height,72px)+16px)] sm:bottom-4 z-40 p-3 sm:p-4 pointer-events-none animate-fadeIn">
           <div className="max-w-md mx-auto pointer-events-auto bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3.5 text-slate-800">
-            {/* Header with Icon & Egress Badge */}
+            {/* Header with Icon, Title, & Close Button */}
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-10 h-10 rounded-2xl bg-[#023246]/10 text-[#023246] flex items-center justify-center shrink-0 border border-[#023246]/20">
                   <Cookie className="w-5 h-5 text-[#023246]" />
                 </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
+                <div className="min-w-0">
+                  <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight truncate">
                     Privasi &amp; Penghematan Kuota (Egress)
                   </h4>
                   <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 inline-block mt-0.5">
@@ -90,6 +101,17 @@ export const CookieConsentBanner: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Close / Dismiss Button */}
+              <button
+                type="button"
+                onClick={handleDismissBanner}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+                aria-label="Tutup banner cookie"
+                title="Tutup banner"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             {/* Description */}
