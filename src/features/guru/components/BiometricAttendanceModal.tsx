@@ -140,6 +140,15 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
             const parsed = JSON.parse(raw);
             if (parsed?.check_in_time && !parsed?.check_out_time) return true;
           }
+          // SDC-AIR: Check if there is an active morning correction for today
+          if (user?.id) {
+            const corrKey = `smart_absensi_pending_correction_${user.id}_${todayStr}`;
+            const corrRaw = localStorage.getItem(corrKey);
+            if (corrRaw) {
+              const corrParsed = JSON.parse(corrRaw);
+              if (corrParsed?.checkInTime) return true;
+            }
+          }
         } catch {}
         return false;
       })();

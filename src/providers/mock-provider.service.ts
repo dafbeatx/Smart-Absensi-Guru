@@ -307,6 +307,59 @@ export class MockProvider implements IDataProvider {
     const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
     const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
 
+    // ── SMART DUAL-CHANNEL ATTENDANCE INTENT RESOLVER (SDC-AIR) ─────────────
+    let pendingCorrection: { targetIn: string; status: AttendanceStatus; reason: string } | null = null;
+    const leavesRaw = safeGetStorage('smart_absensi_leaves');
+    if (leavesRaw) {
+      try {
+        const leaves: LeaveRequest[] = JSON.parse(leavesRaw);
+        const match = leaves.find(
+          (l) => l.user_id === userId &&
+            (l.leave_type === 'KOREKSI_ABSEN' || (l as any).type === 'KOREKSI_ABSEN') &&
+            l.start_date <= dateStr &&
+            l.end_date >= dateStr &&
+            (l.approval_status === 'PENDING' || l.approval_status === 'APPROVED' || (l as any).status === 'PENDING' || (l as any).status === 'APPROVED')
+        );
+        if (match) {
+          const reasonText = match.reason || '';
+          const inMatch = reasonText.match(/Masuk\s*\(([0-2]?[0-9]:[0-5][0-9])/i);
+          const targetIn = inMatch ? `${inMatch[1]}:00` : '07:00:00';
+          let targetStat: AttendanceStatus = 'HADIR';
+          if (reasonText.includes('menjadi SAKIT')) targetStat = 'SAKIT';
+          else if (reasonText.includes('menjadi IZIN')) targetStat = 'IZIN';
+          else if (reasonText.includes('menjadi DINAS_LUAR')) targetStat = 'DINAS_LUAR';
+
+          pendingCorrection = { targetIn, status: targetStat, reason: reasonText };
+        }
+      } catch {}
+    }
+
+    if (!pendingCorrection) {
+      const draftRaw = safeGetStorage(`smart_absensi_pending_correction_${userId}_${dateStr}`);
+      if (draftRaw) {
+        try {
+          const parsedDraft = JSON.parse(draftRaw);
+          pendingCorrection = {
+            targetIn: parsedDraft.checkInTime ? `${parsedDraft.checkInTime}:00` : '07:00:00',
+            status: parsedDraft.targetStatus || 'HADIR',
+            reason: 'Pengajuan Koreksi Masuk',
+          };
+        } catch {}
+      }
+    }
+
+    const targetCheckoutStart = (settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START).slice(0, 5);
+    const checkoutStartMin = timeToMinutes(targetCheckoutStart);
+    const isCheckoutWindow = nowMinutes >= checkoutStartMin;
+    const isExplicitCheckout = dto.attempt_action === 'CHECK_OUT' ||
+      dto.qr_seed?.includes('CHECK_OUT') ||
+      dto.verification_method?.includes('PULANG');
+
+    const shouldReconcileAsCheckout = Boolean(
+      (pendingCorrection && (isCheckoutWindow || isExplicitCheckout)) ||
+      (isCheckoutWindow && isExplicitCheckout)
+    );
+
     if (existingSaved) {
       try {
         const parsed = JSON.parse(existingSaved);
@@ -320,6 +373,20 @@ export class MockProvider implements IDataProvider {
             check_out_time: timeStr,
             verification_method: vMethod,
             attendance_source: aSource,
+          };
+          action = 'CHECK_OUT';
+        } else if (shouldReconcileAsCheckout) {
+          // SDC-AIR Reconciliation with existing partial record
+          record = {
+            ...parsed,
+            check_in_time: pendingCorrection?.targetIn || parsed.check_in_time || '07:00:00',
+            check_out_time: timeStr,
+            status: pendingCorrection?.status || parsed.status || 'HADIR',
+            verification_method: vMethod,
+            attendance_source: aSource,
+            notes: pendingCorrection
+              ? `Koreksi Masuk Diajukan (${pendingCorrection.reason}) + Scan Pulang Aktual (${timeStr})`
+              : `Scan Pulang Aktual (${timeStr}) dengan Koreksi Masuk Default`,
           };
           action = 'CHECK_OUT';
         } else {
@@ -358,6 +425,27 @@ export class MockProvider implements IDataProvider {
         };
         action = 'CHECK_IN';
       }
+    } else if (shouldReconcileAsCheckout) {
+      // SDC-AIR Reconciliation without prior storage record
+      record = {
+        id: 'att_' + Date.now(),
+        user_id: userId,
+        date: dateStr,
+        check_in_time: pendingCorrection?.targetIn || '07:00:00',
+        check_out_time: timeStr,
+        status: pendingCorrection?.status || 'HADIR',
+        check_in_lat: dto.user_lat || -6.2088,
+        check_in_lng: dto.user_lng || 106.8456,
+        check_in_distance_meters: 12,
+        verification_method: vMethod,
+        attendance_source: aSource,
+        is_offline: false,
+        created_at: new Date().toISOString(),
+        notes: pendingCorrection
+          ? `Koreksi Masuk Diajukan (${pendingCorrection.reason}) + Scan Pulang Aktual (${timeStr})`
+          : `Scan Pulang Aktual (${timeStr}) dengan Koreksi Masuk Default`,
+      };
+      action = 'CHECK_OUT';
     } else {
       record = {
         id: 'att_' + Date.now(),

@@ -105,5 +105,67 @@ export const runAttendanceEngineTestSuite = async (): Promise<{
     assert('Attendance Repository - Correct Attendance Execution', false, String(err));
   }
 
+  // Test 7: SDC-AIR Intent Reconciliation (Guru submits morning correction, then scans checkout in afternoon)
+  try {
+    const { useAuthStore } = await import('../../store/useAuthStore');
+    const { getTodayDateInJakarta } = await import('../../utils/time.utils');
+    const testUserId = 'usr_sdc_air_test';
+    useAuthStore.setState({
+      user: {
+        id: testUserId,
+        nip: '199501012020011099',
+        full_name: 'Guru SDC Test',
+        phone_number: '081234567899',
+        role: 'GURU',
+        position: 'Guru Matematika',
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    const todayStr = getTodayDateInJakarta();
+    const provider = ProviderFactory.getProvider();
+
+    // 1. Guru mengajukan koreksi absen masuk pagi hari ini via LeaveRepository
+    const { LeaveRepository } = await import('../../repositories/LeaveRepository');
+    await LeaveRepository.submitLeave({
+      token: 'MOCK_TOKEN',
+      leave_type: 'KOREKSI_ABSEN',
+      start_date: todayStr,
+      end_date: todayStr,
+      reason: `[Pengajuan Koreksi Absen ${todayStr} [Target Koreksi: Jam Masuk (07:05 WIB)] menjadi HADIR]: Lupa absen masuk saat piket pagi`,
+    });
+
+    // 2. Di jam kepulangan, guru melakukan scan pulang dengan intent CHECK_OUT
+    const scanResult = await provider.scanAttendance({
+      token: 'MOCK_TOKEN',
+      user_id: testUserId,
+      qr_seed: 'SAG_PULANG_SEED_2026',
+      user_lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+      user_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+      device_uuid: 'dev_sdc_test_device',
+      attempt_action: 'CHECK_OUT',
+      verification_method: 'QR_GPS',
+      attendance_source: 'QR',
+    });
+
+    // 3. Verifikasi sistem merekonsiliasi transaksi ini sebagai CHECK_OUT, bukan CHECK_IN terlambat
+    const todayRecord = await provider.getTodayAttendance(testUserId, 'MOCK_TOKEN');
+
+    const isActionCheckout = scanResult.attendance_action === 'CHECK_OUT';
+    const isCheckInPopulated = todayRecord?.check_in_time === '07:05:00';
+    const isCheckOutPopulated = Boolean(todayRecord?.check_out_time);
+    const isStatusHadir = todayRecord?.status === 'HADIR';
+
+    assert(
+      'SDC-AIR - Rekonsiliasi Otomatis Scan Pulang Saat Koreksi Masuk Diajukan',
+      isActionCheckout && isCheckInPopulated && isCheckOutPopulated && isStatusHadir,
+      `Action: ${scanResult.attendance_action}, In: ${todayRecord?.check_in_time}, Out: ${todayRecord?.check_out_time}, Status: ${todayRecord?.status}`
+    );
+  } catch (err) {
+    assert('SDC-AIR - Rekonsiliasi Otomatis Scan Pulang Saat Koreksi Masuk Diajukan', false, String(err));
+  }
+
   return { passed, failed, results };
 };

@@ -611,6 +611,129 @@ export class SupabaseProvider implements IDataProvider {
       }
     }
 
+    // ── SMART DUAL-CHANNEL ATTENDANCE INTENT RESOLVER (SDC-AIR) ─────────────
+    // Cek apakah guru memiliki pengajuan koreksi masuk (KOREKSI_ABSEN) untuk hari ini
+    let pendingMorningCorrection: { targetCheckInTime: string; reason: string; status: AttendanceStatus } | null = null;
+    if (!existing || !existing.check_in_time) {
+      try {
+        const { data: correctionRows } = await this.client
+          .from('leaves')
+          .select('*')
+          .in('user_id', userSearchIds)
+          .lte('start_date', todayStr)
+          .gte('end_date', todayStr)
+          .or('type.eq.KOREKSI_ABSEN,leave_type.eq.KOREKSI_ABSEN')
+          .in('status', ['PENDING', 'APPROVED', 'APPROVED_BY_KEPSEK'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        const correction = correctionRows?.[0];
+        if (correction) {
+          const reasonText = correction.reason || '';
+          const inMatch = reasonText.match(/Masuk\s*\(([0-2]?[0-9]:[0-5][0-9])/i);
+          const targetIn = inMatch ? `${inMatch[1]}:00` : '07:00:00';
+          let targetStat: AttendanceStatus = 'HADIR';
+          if (reasonText.includes('menjadi SAKIT')) targetStat = 'SAKIT';
+          else if (reasonText.includes('menjadi IZIN')) targetStat = 'IZIN';
+          else if (reasonText.includes('menjadi DINAS_LUAR')) targetStat = 'DINAS_LUAR';
+
+          pendingMorningCorrection = {
+            targetCheckInTime: targetIn,
+            reason: reasonText,
+            status: targetStat,
+          };
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'Failed checking pending correction leaves:', err);
+      }
+    }
+
+    const isExplicitCheckout = dto.attempt_action === 'CHECK_OUT' ||
+      dto.qr_seed?.includes('CHECK_OUT') ||
+      dto.verification_method?.includes('PULANG');
+
+    const shouldReconcileAsCheckout = Boolean(
+      (pendingMorningCorrection && (isCheckoutWindow || isExplicitCheckout)) ||
+      (!existing?.check_in_time && isCheckoutWindow && isExplicitCheckout)
+    );
+
+    if (shouldReconcileAsCheckout) {
+      const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
+      const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
+      const resolvedCheckInTime = pendingMorningCorrection?.targetCheckInTime || '07:00:00';
+      const resolvedStatus: AttendanceStatus = pendingMorningCorrection?.status || 'HADIR';
+      const isEarlyCheckout = !isCheckoutWindow;
+      const checkoutLabel = isEarlyCheckout
+        ? `${displayTime} WIB (Absen Pulang & Koreksi Masuk • Sebelum Jam Dinas)`
+        : `${displayTime} WIB (Absen Pulang & Koreksi Masuk)`;
+
+      const targetRecordId = existing?.id || attId;
+      const reconciledPayload: Record<string, unknown> = {
+        id: targetRecordId,
+        user_id: userId,
+        date: todayStr,
+        check_in_time: resolvedCheckInTime,
+        check_out_time: dbTime,
+        status: resolvedStatus,
+        distance_meters: distanceMeters,
+        device_uuid: dto.device_uuid,
+        check_in_lat: userLat,
+        check_in_lng: userLng,
+        verification_method: vMethod,
+        attendance_source: aSource,
+        notes: pendingMorningCorrection
+          ? `Koreksi Masuk Diajukan (${pendingMorningCorrection.reason}) + Scan Pulang Aktual (${displayTime} WIB)`
+          : `Scan Pulang Aktual (${displayTime} WIB) dengan Koreksi Masuk Default`,
+      };
+
+      let { error: insertErr } = await this.client.from('attendance').upsert(
+        reconciledPayload,
+        { onConflict: 'id' }
+      );
+
+      if (insertErr && (insertErr.message.includes('column') || insertErr.message.includes('verification_method') || insertErr.message.includes('attendance_source') || insertErr.message.includes('notes'))) {
+        delete reconciledPayload.verification_method;
+        delete reconciledPayload.attendance_source;
+        delete reconciledPayload.notes;
+        const retryRes = await this.client.from('attendance').upsert(
+          reconciledPayload,
+          { onConflict: 'id' }
+        );
+        insertErr = retryRes.error;
+      }
+
+      if (insertErr) {
+        throw new Error('Gagal mencatat absensi pulang terpadu: ' + insertErr.message);
+      }
+
+      const checkoutPts = isEarlyCheckout ? 5 : 10;
+      this.recordTeacherPoint({
+        user_id: userId,
+        teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
+        date: todayStr,
+        points: checkoutPts,
+        activity_type: 'CHECK_OUT',
+        title: 'Presensi Pulang Tuntas Bertugas (Koreksi Masuk Tervalidasi)',
+        description: `Tercatat menyelesaikan dinas sekolah pada pukul ${displayTime} WIB dengan rekonsiliasi koreksi jam masuk.`,
+      }).catch((ePoint) => {
+        logger.warn('SupabaseProvider', 'Failed to auto-record teacher points on reconciled check-out:', ePoint);
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('smart_absensi_scanned'));
+        window.dispatchEvent(new Event('smart_absensi_records_updated'));
+      }
+
+      return {
+        attendance_id: targetRecordId,
+        status: resolvedStatus,
+        timestamp: checkoutLabel,
+        distance_meters: distanceMeters,
+        geofence_verified: true,
+        attendance_action: 'CHECK_OUT',
+      };
+    }
+
     const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
     const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
 

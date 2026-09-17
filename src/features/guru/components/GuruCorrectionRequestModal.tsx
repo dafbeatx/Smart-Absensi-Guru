@@ -182,6 +182,27 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
         reason: fullReason,
       });
 
+      if (user?.id) {
+        const inFormatted = formatTimeForInput(checkInTime, CONSTANTS.DEFAULTS.WORK_CHECKIN_START);
+        const draftPayload = {
+          date,
+          user_id: user.id,
+          targetStatus,
+          checkInTime: inFormatted,
+          scope: correctionScope,
+          reason: fullReason,
+          submittedAt: new Date().toISOString(),
+        };
+        try {
+          localStorage.setItem(`smart_absensi_pending_correction_${user.id}_${date}`, JSON.stringify(draftPayload));
+        } catch {}
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('smart_absensi_pending_correction_updated'));
+          window.dispatchEvent(new Event('smart_absensi_records_updated'));
+        }
+      }
+
       logger.info(
         'GuruCorrectionRequestModal',
         'Correction request submitted as pending leave request for date:',

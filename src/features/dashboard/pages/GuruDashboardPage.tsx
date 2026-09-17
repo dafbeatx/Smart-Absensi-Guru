@@ -2135,6 +2135,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
                 : settings.work_checkout_start;
 
+              const todayDateJakarta = getTodayDateInJakarta();
+              const pendingCorrectionToday = (() => {
+                try {
+                  if (!effectiveUser?.id) return null;
+                  const key = `smart_absensi_pending_correction_${effectiveUser.id}_${todayDateJakarta}`;
+                  const raw = localStorage.getItem(key);
+                  if (raw) return JSON.parse(raw);
+                } catch {}
+                return null;
+              })();
+
               let statusLabel = 'Belum Absen';
               let statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
               let ctaText = 'Absen Masuk Sekarang';
@@ -2166,6 +2177,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   ctaText = `Absen Pulang (Mulai ${checkoutStart} WIB)`;
                   ctaAction = handleOpenAttendanceChoice;
                 }
+              } else if (pendingCorrectionToday?.checkInTime) {
+                const nowTimeJakarta = getCurrentTimeInJakarta();
+                const isReadyToCheckout = nowTimeJakarta >= checkoutStart;
+
+                if (isReadyToCheckout) {
+                  statusLabel = 'Koreksi Diajukan • Siap Pulang';
+                  statusBadgeStyle = 'bg-blue-50 text-blue-800 border-blue-200';
+                  ctaText = 'Absen Pulang Sekarang';
+                  ctaAction = handleOpenAttendanceChoice;
+                } else {
+                  statusLabel = 'Koreksi Masuk Diajukan';
+                  statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
+                  ctaText = `Absen Pulang (Mulai ${checkoutStart} WIB)`;
+                  ctaAction = handleOpenAttendanceChoice;
+                }
               }
 
               return (
@@ -2184,7 +2210,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <div className="space-y-0.5">
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Check In</span>
                       <p className="text-xs sm:text-sm font-black text-[#023246]">
-                        {todayAttendance?.check_in_time ? todayAttendance.check_in_time.substring(0, 5) : '--:--'}
+                        {todayAttendance?.check_in_time
+                          ? todayAttendance.check_in_time.substring(0, 5)
+                          : pendingCorrectionToday?.checkInTime
+                          ? `${pendingCorrectionToday.checkInTime.substring(0, 5)}*`
+                          : '--:--'}
                       </p>
                     </div>
                     <div className="space-y-0.5">
@@ -2218,10 +2248,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         : 'bg-[#023246] hover:bg-[#034560] text-white active:scale-[0.98]'
                     }`}
                   >
-                    {!todayAttendance && !isTodayOff.isOff && (
-                      <Fingerprint className="w-5 h-5 text-cyan-300 shrink-0" />
-                    )}
-                    {todayAttendance && !todayAttendance.check_out_time && !isTodayOff.isOff && (
+                    {((!todayAttendance && !pendingCorrectionToday) || (todayAttendance && !todayAttendance.check_out_time) || (pendingCorrectionToday && !todayAttendance?.check_out_time)) && !isTodayOff.isOff && (
                       <Fingerprint className="w-5 h-5 text-cyan-300 shrink-0" />
                     )}
                     <span>{ctaText}</span>
