@@ -27,6 +27,7 @@ import { useReverseGeocode } from '../../../services/reverse-geocoding.service';
 import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
 import type { PointRewardData } from '../../../components/ui/PointRewardCelebrationOverlay';
 import { usePointRewardStore } from '../../../store/usePointRewardStore';
+import { RadarLocationVerificationModal } from './RadarLocationVerificationModal';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -51,6 +52,25 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   );
   
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
+  const pendingSuccessDataRef = useRef<{
+    result: {
+      timestamp: string;
+      distance: number;
+      status: string;
+      rawStatus?: string;
+      action?: 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED';
+      isOffline?: boolean;
+      isPiketGuru?: boolean;
+    };
+    rewardDataObj: PointRewardData;
+    teacherName: string;
+    userId: string;
+    isPiketGuruToday: boolean;
+    returnedAction?: string;
+    timestampStr: string;
+    isLate: boolean;
+  } | null>(null);
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [aiDiagnosis, setAiDiagnosis] = useState<ScanRejectionDiagnosisResult | null>(null);
@@ -357,7 +377,8 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       return;
     }
 
-    // 3. APPROVE: Sound, Notification & Modal
+    // 3. APPROVE: Data kehadiran sudah berhasil dicatat di cloud/database di awal
+    // Tampilkan animasi Radar Pengecekan Lokasi terlebih dahulu (fake loading visual UX)
     const currentUser = useAuthStore.getState().user;
     const teacherName = currentUser?.full_name || 'Guru';
     const userId = currentUser?.id || '';
@@ -371,24 +392,7 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       console.warn('Failed to check piket guru duty:', e);
     }
 
-    if (isPiketGuruToday) {
-      SoundService.playPiketGuruSuccess();
-      SpeechService.speakDutyTeacherSuccess(teacherName);
-    } else {
-      SoundService.playAttendanceSuccess();
-      SpeechService.speakAttendanceSuccess(teacherName, returnedAction === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN');
-    }
-
     const timestampStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-
-    if (returnedAction === 'CHECK_OUT') {
-      NotificationService.notifyTeacherCheckOut(teacherName, timestampStr, userId);
-      NotificationService.cancelScheduledCheckoutReminder();
-    } else {
-      NotificationService.notifyTeacherCheckIn(teacherName, timestampStr, userId);
-      NotificationService.scheduleCheckoutReminder(teacherName, userId);
-    }
-
     const isLate = returnedStatus === 'TERLAMBAT';
     const statusText = isLate
       ? 'Terlambat'
@@ -449,14 +453,61 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       teacherName: teacherName,
       timestamp: timestampStr,
     };
-    setPointRewardData(rewardDataObj);
 
-    setScanResult(result);
+    // Simpan payload untuk transisi setelah radar status HIJAU
+    pendingSuccessDataRef.current = {
+      result,
+      rewardDataObj,
+      teacherName,
+      userId,
+      isPiketGuruToday,
+      returnedAction,
+      timestampStr,
+      isLate,
+    };
+
+    // Buka Radar Pengecekan Lokasi Modern
+    setIsRadarModalOpen(true);
+  };
+
+  const handleRadarLockGreen = () => {
+    // Saat status radar berubah ke HIJAU: picu efek audio suara sukses & notifikasi
+    const data = pendingSuccessDataRef.current;
+    if (!data) return;
+
+    if (data.isPiketGuruToday) {
+      SoundService.playPiketGuruSuccess();
+      SpeechService.speakDutyTeacherSuccess(data.teacherName);
+    } else {
+      SoundService.playAttendanceSuccess();
+      SpeechService.speakAttendanceSuccess(
+        data.teacherName,
+        data.returnedAction === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN'
+      );
+    }
+
+    if (data.returnedAction === 'CHECK_OUT') {
+      NotificationService.notifyTeacherCheckOut(data.teacherName, data.timestampStr, data.userId);
+      NotificationService.cancelScheduledCheckoutReminder();
+    } else {
+      NotificationService.notifyTeacherCheckIn(data.teacherName, data.timestampStr, data.userId);
+      NotificationService.scheduleCheckoutReminder(data.teacherName, data.userId);
+    }
+  };
+
+  const handleRadarComplete = () => {
+    // Saat radar selesai (~2.3s): langsung buka popup hasil & status presensi beres
+    setIsRadarModalOpen(false);
+    const data = pendingSuccessDataRef.current;
+    if (!data) return;
+
+    setPointRewardData(data.rewardDataObj);
+    setScanResult(data.result);
     setLatenessReason('');
     setIsSuccessModalOpen(true);
 
-    // Auto-Close 2.5s Timer ONLY for Hadir Tepat Waktu / Pulang. For TERLAMBAT, popup remains OPEN until teacher manually saves reason!
-    if (!isLate) {
+    // Auto-Close 2.5s Timer HANYA untuk Hadir Tepat Waktu / Pulang
+    if (!data.isLate) {
       if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = setTimeout(() => {
         handleSaveReasonAndClose('NONE');
@@ -994,6 +1045,20 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
           if (scanResult) onSuccess(scanResult);
           onClose();
         }}
+      />
+
+      {/* Modern High-Tech Radar Location Verification Modal */}
+      <RadarLocationVerificationModal
+        isOpen={isRadarModalOpen}
+        onLockGreen={handleRadarLockGreen}
+        onComplete={handleRadarComplete}
+        latitude={gpsCoords?.latitude}
+        longitude={gpsCoords?.longitude}
+        accuracy={gpsCoords?.accuracy}
+        distanceMeters={gpsCoords?.distanceMeters}
+        allowedRadiusMeters={allowedRadius}
+        teacherName={pendingSuccessDataRef.current?.teacherName}
+        action={pendingSuccessDataRef.current?.returnedAction === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN'}
       />
     </>
   );

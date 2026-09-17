@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
 import type { PointRewardData } from '../../../components/ui/PointRewardCelebrationOverlay';
@@ -16,6 +16,7 @@ import { SilentCameraCaptureService } from '../../../services/silent-camera-capt
 import { NotificationService } from '../../../services/notification-permission.service';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { SystemSettings, UserProfile } from '../../../types/database.types';
+import { RadarLocationVerificationModal } from '../../attendance/components/RadarLocationVerificationModal';
 
 export interface BiometricAttendanceModalProps {
   isOpen: boolean;
@@ -65,6 +66,17 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     status: string;
   } | null>(null);
   const [pointRewardData, setPointRewardData] = useState<PointRewardData | null>(null);
+  const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
+  const pendingSuccessDataRef = useRef<{
+    successData: {
+      timestamp: string;
+      distance: number;
+      action: string;
+      status: string;
+    };
+    rewardData: PointRewardData;
+    isCheckIn: boolean;
+  } | null>(null);
 
   const effectiveAllowedRadius = getEffectiveAllowedRadius(settings.geofence_radius);
 
@@ -225,21 +237,14 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         teacherName: user.full_name,
         timestamp: successData.timestamp,
       };
-      setPointRewardData(rewardData);
 
-      setAttendanceSuccess(successData);
-      onSuccess({
-        timestamp: successData.timestamp,
-        distance: successData.distance,
-        status: successData.status,
-      });
-
-      if (isCheckIn) {
-        NotificationService.notifyTeacherCheckIn(user.full_name || 'Guru', successData.timestamp, user.id);
-      } else {
-        NotificationService.notifyTeacherCheckOut(user.full_name || 'Guru', successData.timestamp, user.id);
-      }
-
+      // Simpan payload & tampilkan Radar UI (Data absensi sudah tersimpan aman di cloud/database di awal)
+      pendingSuccessDataRef.current = {
+        successData,
+        rewardData,
+        isCheckIn,
+      };
+      setIsRadarModalOpen(true);
       logger.info('BiometricAttendanceModal', 'Attendance recorded successfully via Fingerprint:', successData);
     } catch (err: unknown) {
       logger.error('BiometricAttendanceModal', 'Error recording attendance:', err);
@@ -251,6 +256,37 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     } finally {
       setIsVerifyingBio(false);
     }
+  };
+
+  const handleRadarLockGreen = () => {
+    const data = pendingSuccessDataRef.current;
+    if (!data) return;
+
+    SoundService.play('SUCCESS');
+    SpeechService.speakAttendanceSuccess(
+      user.full_name || 'Guru',
+      data.isCheckIn ? 'CHECK_IN' : 'CHECK_OUT'
+    );
+
+    if (data.isCheckIn) {
+      NotificationService.notifyTeacherCheckIn(user.full_name || 'Guru', data.successData.timestamp, user.id);
+    } else {
+      NotificationService.notifyTeacherCheckOut(user.full_name || 'Guru', data.successData.timestamp, user.id);
+    }
+  };
+
+  const handleRadarComplete = () => {
+    setIsRadarModalOpen(false);
+    const data = pendingSuccessDataRef.current;
+    if (!data) return;
+
+    setPointRewardData(data.rewardData);
+    setAttendanceSuccess(data.successData);
+    onSuccess({
+      timestamp: data.successData.timestamp,
+      distance: data.successData.distance,
+      status: data.successData.status,
+    });
   };
 
   /**
@@ -581,6 +617,20 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         )}
         </div>
       </Modal>
+
+      {/* Modern High-Tech Radar Location Verification Modal */}
+      <RadarLocationVerificationModal
+        isOpen={isRadarModalOpen}
+        onLockGreen={handleRadarLockGreen}
+        onComplete={handleRadarComplete}
+        latitude={gpsCoords?.latitude}
+        longitude={gpsCoords?.longitude}
+        accuracy={gpsCoords?.accuracy}
+        distanceMeters={gpsCoords?.distanceMeters}
+        allowedRadiusMeters={effectiveAllowedRadius}
+        teacherName={user.full_name}
+        action={pendingSuccessDataRef.current?.isCheckIn ? 'CHECK_IN' : 'CHECK_OUT'}
+      />
     </>
   );
 };
