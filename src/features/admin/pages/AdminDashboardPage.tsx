@@ -44,7 +44,7 @@ import { OfflineSyncIndicator } from '../../../components/ui/OfflineSyncIndicato
 import { OfflineSyncService } from '../../../services/offline-sync.service';
 import { QuestionCorrectionModal } from '../../guru/components/QuestionCorrectionModal';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
-import { AboutAppModal } from '../../guru/components/AboutAppModal';
+import { AboutAppView } from '../../guru/components/AboutAppView';
 import { WebTrafficService } from '../../../services/web-traffic.service';
 
 export interface AdminDashboardPageProps {
@@ -69,7 +69,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
-  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
 
   const handleCloseQuestionCorrectionModal = useCallback(() => {
     setIsQuestionCorrectionModalOpen(false);
@@ -532,10 +531,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       setIsTestRunnerOpen(true);
       return;
     }
-    if (id === 'ABOUT') {
-      setIsAboutModalOpen(true);
-      return;
-    }
     setActiveTab(id);
   };
 
@@ -786,6 +781,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
           {/* TAB: DEVELOPER TEST MODE */}
           {activeTab === 'DEV_TEST' && <DevTestPage onBackToDashboard={() => setActiveTab('DASHBOARD')} />}
+
+          {/* TAB: TENTANG APLIKASI & PENGEMBANG (LAYER, BUKAN CARD POPUP) */}
+          {activeTab === 'ABOUT' && (
+            <AboutAppView
+              onBack={() => setActiveTab('DASHBOARD')}
+              backLabel="Kembali ke Dashboard Utama"
+              role="ADMIN"
+              className="max-w-4xl mx-auto"
+            />
+          )}
         </main>
       </div>
 
@@ -890,12 +895,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         currentUser={user}
         isFullscreen={true}
         allRegisteredTeachers={teachers}
-      />
-
-      {/* Modal Tentang Aplikasi & Profil Pengembang */}
-      <AboutAppModal
-        isOpen={isAboutModalOpen}
-        onClose={() => setIsAboutModalOpen(false)}
       />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}

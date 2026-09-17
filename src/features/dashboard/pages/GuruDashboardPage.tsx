@@ -10,7 +10,7 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
-import { AboutAppModal } from '../../guru/components/AboutAppModal';
+import { AboutAppView } from '../../guru/components/AboutAppView';
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
 import { AnonymousComplaintModal } from '../../guru/components/AnonymousComplaintModal';
@@ -59,6 +59,7 @@ import {
   Smile,
   Lock,
   FileText,
+  Info,
   ArrowLeft,
   ArrowRight,
   ChevronRight,
@@ -271,17 +272,37 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT'>('HOME');
+  const [aboutReturnTarget, setAboutReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [correctionInitialDate, setCorrectionInitialDate] = useState<string | undefined>(undefined);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
-  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
+
+  const handleOpenAboutLayer = useCallback((returnTo: 'HOME' | 'ALL_FEATURES' | 'PROFIL' = 'HOME') => {
+    setAboutReturnTarget(returnTo);
+    setActiveTab('BERANDA');
+    setBerandaLayer('ABOUT');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleBackFromAboutLayer = useCallback(() => {
+    if (aboutReturnTarget === 'PROFIL') {
+      setActiveTab('PROFIL');
+    } else if (aboutReturnTarget === 'ALL_FEATURES') {
+      setActiveTab('BERANDA');
+      setBerandaLayer('ALL_FEATURES');
+    } else {
+      setActiveTab('BERANDA');
+      setBerandaLayer('HOME');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [aboutReturnTarget]);
 
   const handleCloseQuestionCorrectionModal = useCallback(() => {
     setIsQuestionCorrectionModalOpen(false);
@@ -3534,6 +3555,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Ekspor
                     </span>
                   </button>
+
+                  {/* Tentang Aplikasi */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAboutLayer('ALL_FEATURES')}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <Info className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Tentang
+                    </span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -3642,6 +3677,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <span>Kembali ke Beranda Utama</span>
             </button>
           </section>
+        )}
+
+        {/* ── LAYER: TENTANG APLIKASI & PENGEMBANG (PINDAH LAYER, BUKAN CARD / POPUP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'ABOUT' && (
+          <AboutAppView
+            onBack={handleBackFromAboutLayer}
+            backLabel={
+              aboutReturnTarget === 'PROFIL'
+                ? 'Kembali ke Profil'
+                : aboutReturnTarget === 'ALL_FEATURES'
+                ? 'Kembali ke Semua Fitur'
+                : 'Kembali ke Beranda'
+            }
+            role="GURU"
+          />
         )}
 
         {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}
@@ -4352,7 +4402,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </p>
                 <button
                   type="button"
-                  onClick={() => setIsAboutModalOpen(true)}
+                  onClick={() => handleOpenAboutLayer('PROFIL')}
                   className="w-full mt-1 py-2 px-3 bg-[#023246] hover:bg-[#1E5670] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
                 >
                   <span>📖</span> Lihat Informasi &amp; Kisah Pengembang
@@ -4521,12 +4571,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <TermsAndConditionsModal
         isOpen={isTermsModalOpen}
         onClose={() => setIsTermsModalOpen(false)}
-      />
-
-      {/* About App & Developer Modal */}
-      <AboutAppModal
-        isOpen={isAboutModalOpen}
-        onClose={() => setIsAboutModalOpen(false)}
       />
 
       {/* ── DAY DETAIL CALENDAR MODAL ───────────────────────────────────── */}
@@ -4714,7 +4758,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenExamCardModal={() => setIsExamCardModalOpen(true)}
         onOpenQuestionCorrectionModal={() => setIsQuestionCorrectionModalOpen(true)}
         onOpenHomeroomModal={() => setIsHomeroomModalOpen(true)}
-        onOpenAboutModal={() => setIsAboutModalOpen(true)}
+        onOpenAboutModal={() => {
+          setIsMoreFeaturesModalOpen(false);
+          handleOpenAboutLayer('HOME');
+        }}
       />
 
       {/* 🎓 Ruang Wali Kelas (Pendataan & Verifikasi Rencana Lanjutan Siswa Kelas 9) */}
