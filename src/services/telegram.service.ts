@@ -238,13 +238,7 @@ export class TelegramService {
     parseMode: 'HTML' | 'Markdown' = 'HTML',
     targetChatId?: string | number
   ): Promise<{ success: boolean; error?: string }> {
-    const token = this.getBotToken();
     const chatId = targetChatId ? String(targetChatId).trim() : this.getChatId();
-
-    if (!token || !chatId) {
-      logger.info('TelegramService', 'Telegram credentials not configured');
-      return { success: false, error: 'NOT_CONFIGURED' };
-    }
 
     if (!photoBlob || photoBlob.size < 500) {
       logger.warn('TelegramService', 'Invalid or empty photoBlob provided to sendPhoto, fallback to text');
@@ -253,6 +247,47 @@ export class TelegramService {
 
     // Telegram Bot API caption hard limit is 1024 characters
     const safeCaption = caption.length > 1020 ? caption.slice(0, 1017) + '...' : caption;
+
+    // 1. Secure Path: Forward via Serverless Webhook Proxy (/api/telegram)
+    // Directly sends to Telegram cloud without touching Supabase (0 bytes Supabase egress/storage)
+    if (typeof window !== 'undefined') {
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(photoBlob);
+        });
+
+        const proxyRes = await fetch('/api/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'send_photo',
+            photoBase64: base64,
+            caption: safeCaption,
+            chatId: chatId || undefined,
+            parseMode,
+          }),
+        });
+
+        if (proxyRes.ok) {
+          const json = await proxyRes.json().catch(() => ({}));
+          if (json.success) {
+            logger.info('TelegramService', 'Auto-capture photo presensi terkirim via serverless proxy');
+            return { success: true };
+          }
+        }
+      } catch {
+        // Fallback to direct client API if proxy is unreachable
+      }
+    }
+
+    const token = this.getBotToken();
+    if (!token || !chatId) {
+      logger.info('TelegramService', 'Telegram credentials not configured');
+      return { success: false, error: 'NOT_CONFIGURED' };
+    }
 
     const endpoint = `https://api.telegram.org/bot${token}/sendPhoto`;
 

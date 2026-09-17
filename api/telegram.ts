@@ -145,6 +145,42 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ success: true, mode: 'proxy_sent' });
   }
 
+  // 0b. Secure Outbound Photo Proxy: Send silent attendance capture photo directly to Telegram without touching Supabase
+  if (update?.action === 'send_photo') {
+    const targetChat = update.chatId || update.chat_id || process.env.VITE_TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
+    const caption = update.caption || update.text || '';
+    const photoBase64 = update.photoBase64;
+    if (!targetChat || !photoBase64) {
+      return res.status(400).json({ error: 'Missing targetChat or photoBase64' });
+    }
+
+    try {
+      const cleanBase64 = String(photoBase64).replace(/^data:image\/\w+;base64,/, '');
+      const photoBuffer = Buffer.from(cleanBase64, 'base64');
+      const blob = new Blob([photoBuffer], { type: 'image/jpeg' });
+      const formData = new FormData();
+      formData.append('chat_id', String(targetChat));
+      formData.append('photo', blob, 'attendance_capture.jpg');
+      formData.append('caption', caption.length > 1020 ? caption.slice(0, 1017) + '...' : caption);
+      if (update.parseMode) formData.append('parse_mode', update.parseMode);
+
+      const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: 'POST',
+        body: formData,
+      });
+      const tgJson = await tgRes.json().catch(() => ({}));
+      if (tgRes.ok && tgJson.ok) {
+        return res.status(200).json({ success: true, mode: 'proxy_photo_sent' });
+      } else {
+        await sendTelegramMessage(token, targetChat, caption, update.parseMode || 'HTML');
+        return res.status(200).json({ success: true, mode: 'proxy_fallback_text' });
+      }
+    } catch {
+      await sendTelegramMessage(token, targetChat, caption, update.parseMode || 'HTML');
+      return res.status(200).json({ success: true, mode: 'proxy_fallback_text_on_err' });
+    }
+  }
+
   const message = update?.message || update?.edited_message;
 
   if (!message || !message.text) {
