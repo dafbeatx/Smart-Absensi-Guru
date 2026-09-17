@@ -224,11 +224,22 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       if (filters.length > 0) {
-        const { data: user } = await this.client
-          .from('users')
-          .select('*')
+        // Query via users_public_view with safe columns (excludes pin_hash, reducing Supabase egress)
+        let userQuery = await this.client
+          .from('users_public_view')
+          .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at')
           .or(filters.join(','))
           .maybeSingle();
+
+        if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
+          userQuery = await this.client
+            .from('users')
+            .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at')
+            .or(filters.join(','))
+            .maybeSingle();
+        }
+
+        const user = userQuery.data;
 
         if (user) {
           return {
@@ -392,11 +403,19 @@ export class SupabaseProvider implements IDataProvider {
     let userCheckError: { message: string } | null = null;
 
     if (scanUserFilters.length > 0) {
-      const res = await this.client
-        .from('users')
+      let res = await this.client
+        .from('users_public_view')
         .select('id, nip, full_name')
         .or(scanUserFilters.join(','))
         .limit(1);
+
+      if (res.error && (res.error.code === '42P01' || res.error.message?.includes('does not exist'))) {
+        res = await this.client
+          .from('users')
+          .select('id, nip, full_name')
+          .or(scanUserFilters.join(','))
+          .limit(1);
+      }
       userExists = res.data?.[0] || null;
       userCheckError = res.error;
     }
@@ -855,11 +874,20 @@ export class SupabaseProvider implements IDataProvider {
     // Resolve all possible user aliases (id, nip, full_name, phone_number)
     const userIdsToDelete = new Set<string>([targetUserId]);
     try {
-      const { data: userData } = await this.client
-        .from('users')
+      let userQuery = await this.client
+        .from('users_public_view')
         .select('id, nip, full_name, phone_number')
         .or(`id.eq.${targetUserId},nip.eq.${targetUserId}`)
         .maybeSingle();
+
+      if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
+        userQuery = await this.client
+          .from('users')
+          .select('id, nip, full_name, phone_number')
+          .or(`id.eq.${targetUserId},nip.eq.${targetUserId}`)
+          .maybeSingle();
+      }
+      const userData = userQuery.data;
 
       if (userData) {
         if (userData.id) userIdsToDelete.add(userData.id);
@@ -1516,10 +1544,20 @@ export class SupabaseProvider implements IDataProvider {
       return this.cachedUsers;
     }
 
-    const { data } = await this.client
-      .from('users')
+    // Query users_public_view (excludes pin_hash and internal security metadata to optimize egress)
+    let userQuery = await this.client
+      .from('users_public_view')
       .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at')
       .order('created_at', { ascending: false });
+
+    if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
+      userQuery = await this.client
+        .from('users')
+        .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at')
+        .order('created_at', { ascending: false });
+    }
+
+    const data = userQuery.data;
 
     const result: UserProfile[] = (data || []).map((row) => ({
       id: row.id,
@@ -1667,7 +1705,11 @@ export class SupabaseProvider implements IDataProvider {
     this.cachedUsers = null;
     this.cachedUsersTimestamp = 0;
 
-    const { data: user } = await this.client.from('users').select('account_status').eq('id', userId).single();
+    let userQuery = await this.client.from('users_public_view').select('account_status').eq('id', userId).maybeSingle();
+    if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
+      userQuery = await this.client.from('users').select('account_status').eq('id', userId).maybeSingle();
+    }
+    const user = userQuery.data;
     const newStatus = user?.account_status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
 
     const { error } = await this.client.from('users').update({ account_status: newStatus }).eq('id', userId);
@@ -2494,9 +2536,16 @@ export class SupabaseProvider implements IDataProvider {
       // 2. Validate foreign key: verify teacher_ids exist in public.users to prevent FK violation
       let validSchedules = uniqueSchedules;
       try {
-        const { data: validUsers, error: usersErr } = await this.client
-          .from('users')
+        let usersQuery = await this.client
+          .from('users_public_view')
           .select('id');
+        if (usersQuery.error && (usersQuery.error.code === '42P01' || usersQuery.error.message?.includes('does not exist'))) {
+          usersQuery = await this.client
+            .from('users')
+            .select('id');
+        }
+        const validUsers = usersQuery.data;
+        const usersErr = usersQuery.error;
         if (!usersErr && validUsers && validUsers.length > 0) {
           const validIdSet = new Set(validUsers.map((u) => u.id));
           validSchedules = uniqueSchedules.filter((s) => validIdSet.has(s.teacher_id));
@@ -2800,11 +2849,19 @@ export class SupabaseProvider implements IDataProvider {
 
       let teacherName = 'Guru';
       try {
-        const { data: userRow } = await this.client
-          .from('users')
+        let userRowQuery = await this.client
+          .from('users_public_view')
           .select('full_name')
           .eq('id', dto.teacher_user_id)
           .maybeSingle();
+        if (userRowQuery.error && (userRowQuery.error.code === '42P01' || userRowQuery.error.message?.includes('does not exist'))) {
+          userRowQuery = await this.client
+            .from('users')
+            .select('full_name')
+            .eq('id', dto.teacher_user_id)
+            .maybeSingle();
+        }
+        const userRow = userRowQuery.data;
         if (userRow?.full_name) teacherName = userRow.full_name;
       } catch {
         // Fallback to default

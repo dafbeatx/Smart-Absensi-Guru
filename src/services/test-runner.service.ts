@@ -32,6 +32,7 @@ import { runPushSubscriptionSecurityTestSuite } from './__tests__/push-subscript
 import { runAuthHardeningSessionTestSuite } from './__tests__/auth-hardening-session.test';
 import { runHomeroomAuthorizationTestSuite } from './__tests__/homeroom-authorization.test';
 import { runSystemHealthTestSuite } from './__tests__/system-health-suite.test';
+import { runUsersPublicViewEgressTestSuite } from './__tests__/users-public-view-egress.test';
 
 export interface TestResultItem {
   testName: string;
@@ -101,6 +102,7 @@ export class MasterTestRunner {
       { name: 'Authentication Hardening & Database Session Store (Phase 4.2)', fn: runAuthHardeningSessionTestSuite },
       { name: 'Ruang Wali Kelas & Continuation Authorization Security (Phase 4.3)', fn: runHomeroomAuthorizationTestSuite },
       { name: 'Cloud Infrastructure & AI Health Monitor (Supabase & Vercel)', fn: runSystemHealthTestSuite },
+      { name: 'Users Public View & Egress Bandwidth Protection (Phase 4.4)', fn: runUsersPublicViewEgressTestSuite },
     ];
 
     let totalPassed = 0;
