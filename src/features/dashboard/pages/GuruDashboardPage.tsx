@@ -4934,6 +4934,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         totalPoints={appreciationScore?.totalPoints ?? 0}
         user={effectiveUser}
         teacherData={disciplineLeaderboard?.leaderboard?.find((t) => t.isCurrentUser)}
+        topTeachers={disciplineLeaderboard?.leaderboard?.slice(0, 3)}
       />
 
       {/* 15b. Modal Syarat & Ketentuan Kebijakan Presensi Wajib Datang & Pulang */}

@@ -20,6 +20,7 @@ interface TopDisciplineCelebrationModalProps {
   totalPoints: number;
   user: UserProfile | null;
   teacherData?: TeacherLeaderboardItem | null;
+  topTeachers?: TeacherLeaderboardItem[] | null;
   onOpenCertificate?: () => void;
 }
 
@@ -31,6 +32,7 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
   totalPoints,
   user,
   teacherData,
+  topTeachers,
   onOpenCertificate,
 }) => {
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
@@ -172,6 +174,47 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
               </span>
             </div>
           </div>
+
+          {/* Klasemen Transparan 3 Besar Sekolah */}
+          {topTeachers && topTeachers.length > 0 && (
+            <div className="pt-2 border-t border-slate-100/90 space-y-1.5 text-left">
+              <div className="flex items-center justify-between text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                <span>Klasemen 3 Besar Bulan Ini</span>
+                <span className="text-emerald-700 font-bold">Terverifikasi Realtime</span>
+              </div>
+              <div className="space-y-1">
+                {topTeachers.slice(0, 3).map((item, idx) => {
+                  const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
+                  const isCurrentItem = item.isCurrentUser || (user?.id && item.id === user.id);
+                  return (
+                    <div
+                      key={item.id || idx}
+                      className={`px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between gap-2 border transition-all ${
+                        isCurrentItem
+                          ? 'bg-amber-50/90 border-amber-300 font-black text-slate-900 shadow-2xs'
+                          : 'bg-white border-slate-100 text-slate-700 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-sm shrink-0">{medal}</span>
+                        <span className="truncate text-[11px] font-bold">
+                          {item.name} {isCurrentItem ? '(Anda)' : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 text-right">
+                        <span className="text-[10px] text-slate-400 font-bold hidden sm:inline">
+                          {item.hadirTepatWaktuCount} On-Time
+                        </span>
+                        <span className={`text-[11px] font-black ${isCurrentItem ? 'text-amber-900' : 'text-slate-800'}`}>
+                          {item.totalPoints} Poin
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Pesan Inspiratif */}
           <div className="pt-1 text-[11px] text-slate-600 leading-relaxed italic border-t border-slate-100/80">
