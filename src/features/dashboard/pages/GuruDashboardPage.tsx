@@ -1002,6 +1002,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }
 
       // 7.6 Load Teacher Point History & Ledger with Auto-Reconciliation
+      let currentMyPointLogs: TeacherPointLog[] = [];
       try {
         let myPointLogs = await provider.getTeacherPointHistory(effectiveUser.id, authToken);
 
@@ -1014,7 +1015,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           undefined,
           authToken
         );
-        setPointHistory(myPointLogs || []);
+        currentMyPointLogs = myPointLogs || [];
+        setPointHistory(currentMyPointLogs);
 
         const allLogs = await provider.getTeacherPointHistory('ALL', authToken);
         setAllTeacherPointLogs(allLogs || []);
@@ -1022,13 +1024,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         console.warn('Failed to load/reconcile teacher point history:', err);
       }
 
-      // 7.7 Evaluasi Penalti TAP (Tidak Absen Pulang) jika Syarat & Ketentuan telah disetujui
+      // 7.7 Evaluasi Penalti Universal: TAP (Tidak Absen Pulang) & ALPA (Ketidakhadiran)
+      // Zero-Egress: menggunakan array loadedHistory dan currentMyPointLogs yang sudah ada di memori
       try {
-        await AttendancePolicyService.evaluateUncheckedOutPenalties(
+        const cachedHolidays = await provider.getHolidays(authToken).catch(() => []);
+        await AttendancePolicyService.evaluateAllPenalties(
           effectiveUser.id,
           effectiveUser.full_name,
           loadedHistory,
-          authToken
+          cachedHolidays,
+          currentMyPointLogs,
+          authToken,
+          effectiveUser.created_at
         );
       } catch (errPolicy) {
         console.warn('Failed to evaluate attendance policy penalties:', errPolicy);

@@ -34,6 +34,7 @@ import { runHomeroomAuthorizationTestSuite } from './__tests__/homeroom-authoriz
 import { runSystemHealthTestSuite } from './__tests__/system-health-suite.test';
 import { runUsersPublicViewEgressTestSuite } from './__tests__/users-public-view-egress.test';
 import { runZeroTrustSecretsTestSuite } from './__tests__/zero-trust-secrets.test';
+import { runAttendancePenaltiesTestSuite } from './__tests__/attendance-penalties.test';
 
 export interface TestResultItem {
   testName: string;
@@ -105,6 +106,7 @@ export class MasterTestRunner {
       { name: 'Cloud Infrastructure & AI Health Monitor (Supabase & Vercel)', fn: runSystemHealthTestSuite },
       { name: 'Users Public View & Egress Bandwidth Protection (Phase 4.4)', fn: runUsersPublicViewEgressTestSuite },
       { name: 'Zero-Trust Secret Management & Anti-Credential Leak Engine (Phase 4.5)', fn: runZeroTrustSecretsTestSuite },
+      { name: 'Universal Attendance Penalties Engine (TAP & ALPA Discipline)', fn: runAttendancePenaltiesTestSuite },
     ];
 
     let totalPassed = 0;

@@ -4,8 +4,15 @@ import type {
   TeacherPointLog,
   TeacherPointActivityType,
   TeacherDutySchedule,
+  HolidayRecord,
 } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
+
+export interface ReconcilePointsOptions {
+  includePenalties?: boolean;
+  holidays?: HolidayRecord[];
+  userCreatedAt?: string;
+}
 
 export class TeacherPointReconciliationService {
   /**
@@ -32,6 +39,7 @@ export class TeacherPointReconciliationService {
    * - Hadir Terlambat   -> +5 Poin  (CHECK_IN_LATE)
    * - Presensi Pulang    -> +10 Poin (CHECK_OUT)
    * - Petugas Piket      -> +10 Poin (DUTY_PIKET)
+   * - Penalti TAP (Opsional) -> -10 Poin (PENALTY_ALFA)
    *
    * Menjamin tidak ada transaksi ganda karena mengecek keberadaan
    * kombinasi (user_id + date + activity_type).
@@ -42,7 +50,8 @@ export class TeacherPointReconciliationService {
     attendanceList: AttendanceRecord[],
     currentPointLogs: TeacherPointLog[],
     dutySchedules?: TeacherDutySchedule[],
-    token?: string
+    token?: string,
+    options?: ReconcilePointsOptions
   ): Promise<TeacherPointLog[]> {
     if (!userId || !Array.isArray(attendanceList) || attendanceList.length === 0) {
       return currentPointLogs || [];
@@ -206,6 +215,48 @@ export class TeacherPointReconciliationService {
           }
         }
       }
+
+      // 4. Rekonsiliasi TAP (Tidak Absen Pulang pada hari yang telah lewat) jika opsi diaktifkan
+      if (options?.includePenalties) {
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+
+        for (const att of attendanceList) {
+          if (!att.date || att.date >= todayStr) continue;
+          if (att.status === 'BELUM_ABSEN' || att.status === 'IZIN' || att.status === 'SAKIT') continue;
+          if (att.check_in_time && !att.check_out_time) {
+            const penaltyIdempotencyKey = `PENALTY_TAP_${att.date}`;
+            const alreadyPenalized = updatedLogs.some(
+              (p) =>
+                p.user_id === userId &&
+                p.date === att.date &&
+                (p.title?.includes('Penalti TAP') || p.description?.includes(penaltyIdempotencyKey))
+            );
+
+            if (!alreadyPenalized) {
+              try {
+                const newLog = await provider.recordTeacherPoint(
+                  {
+                    user_id: userId,
+                    teacher_name: teacherName,
+                    date: att.date,
+                    points: -10,
+                    activity_type: 'PENALTY_ALFA',
+                    title: `Penalti TAP (Tidak Absen Pulang) - ${att.date}`,
+                    description: `Pengurangan 10 poin atas kelalaian presensi pulang sekolah (${penaltyIdempotencyKey}).`,
+                  },
+                  token
+                );
+                updatedLogs.unshift(newLog);
+                hasChanges = true;
+                logger.info('TeacherPointReconciliationService', `Reconciled TAP penalty for ${att.date}: -10`);
+              } catch (eTap) {
+                logger.warn('TeacherPointReconciliationService', `Gagal merekonsiliasi TAP ${att.date}:`, eTap);
+              }
+            }
+          }
+        }
+      }
     }
 
     if (hasChanges) {
@@ -250,6 +301,7 @@ export class TeacherPointReconciliationService {
       const allAttendance = await provider.getMonthlyAttendance('ALL', currentMonth, currentYear, token || '');
       const allLogs = await provider.getTeacherPointHistory('ALL', token);
       const dutySchedules = await provider.getDutySchedules(token).catch(() => []);
+      const holidays = await provider.getHolidays(token).catch(() => []);
 
       if (!Array.isArray(allAttendance) || allAttendance.length === 0) {
         this.lastReconcileAllTime = Date.now();
@@ -285,7 +337,8 @@ export class TeacherPointReconciliationService {
           userRecords,
           currentLogs,
           dutySchedules || [],
-          token
+          token,
+          { includePenalties: true, holidays }
         );
         if (reconciled !== currentLogs) {
           currentLogs = reconciled;
