@@ -33,6 +33,7 @@ import { runAuthHardeningSessionTestSuite } from './__tests__/auth-hardening-ses
 import { runHomeroomAuthorizationTestSuite } from './__tests__/homeroom-authorization.test';
 import { runSystemHealthTestSuite } from './__tests__/system-health-suite.test';
 import { runUsersPublicViewEgressTestSuite } from './__tests__/users-public-view-egress.test';
+import { runZeroTrustSecretsTestSuite } from './__tests__/zero-trust-secrets.test';
 
 export interface TestResultItem {
   testName: string;
@@ -103,6 +104,7 @@ export class MasterTestRunner {
       { name: 'Ruang Wali Kelas & Continuation Authorization Security (Phase 4.3)', fn: runHomeroomAuthorizationTestSuite },
       { name: 'Cloud Infrastructure & AI Health Monitor (Supabase & Vercel)', fn: runSystemHealthTestSuite },
       { name: 'Users Public View & Egress Bandwidth Protection (Phase 4.4)', fn: runUsersPublicViewEgressTestSuite },
+      { name: 'Zero-Trust Secret Management & Anti-Credential Leak Engine (Phase 4.5)', fn: runZeroTrustSecretsTestSuite },
     ];
 
     let totalPassed = 0;

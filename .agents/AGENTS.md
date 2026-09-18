@@ -35,5 +35,11 @@
 | Radius card           |        **12–16px** |
 | Lebar maksimal konten |          **480px** |
 
+## Zero-Trust Secret Management & Anti-Credential Leak Protocol
+- **The VITE_ Prefix Trap**: Dilarang keras menambahkan prefix `VITE_` pada kunci rahasia/private tokens (`GROQ_API_KEY`, `TELEGRAM_BOT_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `TURNSTILE_SECRET_KEY`, `VAPID_PRIVATE_KEY`). Prefix `VITE_` membocorkan nilai variabel secara publik ke bundle browser (`dist/assets/*.js`).
+- **Serverless Proxy Mandate**: Seluruh integrasi pihak ketiga yang membutuhkan secret key WAJIB melalui Vercel Serverless Functions di folder `api/` (misal `/api/ai` untuk Groq, `/api/telegram` untuk notifikasi/foto bot). Komponen atau service di `src/` dilarang keras melakukan fetch langsung dengan secret key dari browser.
+- **Strict Gitignore**: File `.env`, `.env.local`, dan file kredensial lainnya wajib selalu diabaikan oleh `.gitignore`.
+- **Rujukan Lengkap**: Wajib mematuhi panduan teknis mendalam di [.agents/rules/ZERO_TRUST_SECRETS_SECURITY.md](file:///c:/Smart-Absensi-Guru/.agents/rules/ZERO_TRUST_SECRETS_SECURITY.md).
+
 ## Windows CLI Execution Protocol
 - Pada lingkungan Windows PowerShell di mana eksekusi script `.ps1` diblokir, selalu jalankan perintah build dan pengujian melalui shell `cmd /c "npm run build"`.

@@ -127,11 +127,35 @@ Berikan analisis diagnosa mendalam dan berikan HANYA format JSON berikut (tanpa 
       return null;
     }
 
-    const apiKey = APP_CONFIG.GROQ_API_KEY;
     const configuredModel = APP_CONFIG.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
+    // 1. Zero-Trust Secure Path: Route through Serverless AI Proxy (/api/ai)
+    // The browser client never holds GROQ_API_KEY; Vercel server injects it securely.
+    if (typeof window !== 'undefined') {
+      try {
+        const proxyRes = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages,
+            model: configuredModel,
+          }),
+        });
+
+        if (proxyRes.ok) {
+          const proxyData = await proxyRes.json().catch(() => ({}));
+          if (proxyData.success && proxyData.content) {
+            return String(proxyData.content).trim();
+          }
+        }
+      } catch {
+        // Fallback: Proceed to direct client API or heuristic fallback if proxy is unreachable
+      }
+    }
+
+    // 2. Direct Client Fallback (Used if proxy is unreachable or in mock/test runtimes)
+    const apiKey = APP_CONFIG.GROQ_API_KEY;
     if (!apiKey || apiKey.includes('YOUR_') || apiKey.trim() === '') {
-      logger.warn('GroqAIService', 'GROQ API key is missing or default');
       return null;
     }
 
