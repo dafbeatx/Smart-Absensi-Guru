@@ -219,14 +219,14 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Tuliskan keterangan detail alasan ketidakhadiran Anda..."
-            className="w-full bg-white border border-slate-200 rounded-2xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-400"
+            className="w-full bg-white border border-slate-200 rounded-2xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder-slate-400"
           />
         </div>
 
         {/* Tugas / Pesan Titipan untuk Guru Piket (Wajib) */}
         <div className="space-y-2 p-3 rounded-2xl bg-amber-50/60 border border-amber-200/90 shadow-2xs">
           <div className="flex items-center justify-between">
-            <label className="block text-xs font-bold text-amber-950 flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
               <span>📋</span>
               <span>Tugas / Pesan untuk Guru Piket</span>
             </label>
@@ -239,7 +239,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             value={dutyTeacherNotes}
             onChange={(e) => setDutyTeacherNotes(e.target.value)}
             placeholder="Tuliskan materi/tugas kelas atau instruksi untuk guru piket/pengganti..."
-            className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all placeholder:text-slate-400"
+            className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all placeholder-slate-400"
           />
           {/* Quick Preset Chips */}
           <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
