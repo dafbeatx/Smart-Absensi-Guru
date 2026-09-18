@@ -643,11 +643,11 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const { data: correctionRows } = await this.client
           .from('leaves')
-          .select('id, user_id, type, leave_type, reason, status, start_date, end_date')
+          .select('id, user_id, type, reason, status, start_date, end_date')
           .in('user_id', userSearchIds)
           .lte('start_date', todayStr)
           .gte('end_date', todayStr)
-          .or('type.eq.KOREKSI_ABSEN,leave_type.eq.KOREKSI_ABSEN')
+          .eq('type', 'KOREKSI_ABSEN')
           .in('status', ['PENDING', 'APPROVED', 'APPROVED_BY_KEPSEK'])
           .order('created_at', { ascending: false })
           .limit(1);
@@ -1388,12 +1388,12 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const { data: leaveRow } = await this.client
           .from('leaves')
-          .select('id, user_id, type, leave_type, reason, start_date, end_date')
+          .select('id, user_id, type, reason, start_date, end_date')
           .eq('id', leaveId)
           .maybeSingle();
 
         if (leaveRow) {
-          const lType = leaveRow.type || leaveRow.leave_type || 'IZIN';
+          const lType = leaveRow.type || 'IZIN';
           let status: AttendanceStatus = 'IZIN';
           let checkInTime: string | null = null;
           let checkOutTime: string | null = null;
@@ -1576,7 +1576,7 @@ export class SupabaseProvider implements IDataProvider {
       const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const { data } = await this.client
         .from('leaves')
-        .select('id, user_id, type, leave_type, start_date, end_date, reason, attachment_url, status, approved_by, rejection_notes, duty_teacher_notes, created_at')
+        .select('id, user_id, type, start_date, end_date, reason, attachment_url, status, approved_by, rejection_notes, duty_teacher_notes, created_at')
         .or(`created_at.gte.${ninetyDaysAgo},status.eq.PENDING`)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -1584,7 +1584,7 @@ export class SupabaseProvider implements IDataProvider {
       const result = (data || []).map((row) => ({
         id: row.id,
         user_id: row.user_id,
-        leave_type: (row.type || (row as any).leave_type || 'IZIN') as LeaveType,
+        leave_type: (row.type || 'IZIN') as LeaveType,
         start_date: row.start_date,
         end_date: row.end_date,
         reason: row.reason,
@@ -1608,7 +1608,7 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const { data, error } = await this.client
           .from('leaves')
-          .select('id, user_id, type, leave_type, start_date, end_date, reason, attachment_url, status, approved_by, rejection_notes, duty_teacher_notes, created_at')
+          .select('id, user_id, type, start_date, end_date, reason, attachment_url, status, approved_by, rejection_notes, duty_teacher_notes, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(30);
@@ -1626,7 +1626,7 @@ export class SupabaseProvider implements IDataProvider {
         const fetchedLeaves: LeaveRequest[] = (data || []).map((row) => ({
           id: row.id,
           user_id: row.user_id,
-          leave_type: (row.type || (row as any).leave_type || 'IZIN') as LeaveType,
+          leave_type: (row.type || 'IZIN') as LeaveType,
           start_date: row.start_date,
           end_date: row.end_date,
           reason: row.reason,
@@ -2184,12 +2184,12 @@ export class SupabaseProvider implements IDataProvider {
         const { data, error } = await query.order('created_at', { ascending: false }).limit(30);
 
         if (error) {
-          // Fallback for older schemas where recipient_user_id might not exist
+          // Fallback for older schemas where extended columns might not exist
+          const fallbackCols = 'id, user_id, title, message, type, is_read, created_at';
           const fallback = await this.client
             .from('notifications')
-            .select(notifCols)
+            .select(fallbackCols)
             .gte('created_at', thirtyDaysAgo)
-            .or(`expires_at.is.null,expires_at.gte.${nowIso}`)
             .or(`user_id.eq.${userId},user_id.is.null`)
             .order('created_at', { ascending: false })
             .limit(30);
@@ -3035,11 +3035,11 @@ export class SupabaseProvider implements IDataProvider {
     const dedupeKey = `getTeachingSchedules_${filter?.teacher_user_id || 'ALL'}_${filter?.academic_year || ''}_${filter?.day_of_week ?? ''}`;
     return this.dedupeRequest(dedupeKey, async () => {
       try {
-        const scheduleCols = 'id, teacher_user_id, teacher_name, day_of_week, day, start_time, end_time, time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by';
+        const scheduleCols = 'id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by';
 
         let query = this.client
           .from('teaching_schedules')
-          .select(`${scheduleCols}, users:teacher_user_id(id, full_name)`)
+          .select(scheduleCols)
           .eq('is_active', true);
 
         if (filter?.teacher_user_id) {
@@ -3055,26 +3055,9 @@ export class SupabaseProvider implements IDataProvider {
         const { data, error } = await query.order('day_of_week', { ascending: true }).limit(50);
 
         if (error) {
-          logger.warn('SupabaseProvider', 'getTeachingSchedules joined query error, fallback select:', error.message);
-          let fallbackQuery = this.client.from('teaching_schedules').select(scheduleCols);
-          if (filter?.teacher_user_id) {
-            fallbackQuery = fallbackQuery.eq('teacher_user_id', filter.teacher_user_id);
-          }
-          if (filter?.academic_year) {
-            fallbackQuery = fallbackQuery.eq('academic_year', filter.academic_year);
-          }
-          if (filter?.day_of_week !== undefined) {
-            fallbackQuery = fallbackQuery.eq('day_of_week', filter.day_of_week);
-          }
-          const fallbackRes = await fallbackQuery.order('day_of_week', { ascending: true }).limit(50);
-          if (fallbackRes.error) {
-            logger.warn('SupabaseProvider', 'getTeachingSchedules fallback query error:', fallbackRes.error.message);
-            const mockProv = new (await import('./mock-provider.service')).MockProvider();
-            return mockProv.getTeachingSchedules(_token, filter);
-          }
-          // Honest data state: empty array is valid, do not fall back to mock data
-          const mapped = (fallbackRes.data || []).map((row: any) => this.mapDbRowToTeachingSlot(row));
-          return sortTeachingSlots(mapped);
+          logger.warn('SupabaseProvider', 'getTeachingSchedules query error, fallback to mock provider:', error.message);
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          return mockProv.getTeachingSchedules(_token, filter);
         }
 
         // Honest data state: if query succeeded, return mapped records (even if empty [])
@@ -3094,8 +3077,6 @@ export class SupabaseProvider implements IDataProvider {
   ): Promise<TeachingScheduleResult> {
     try {
       const dayOfWeek = normalizeDayOfWeek(dto.day_of_week !== undefined ? dto.day_of_week : dto.day);
-      const dayName = dto.day || getDayNameIndonesian(dayOfWeek);
-      const timeRange = formatTimeRange(dto.start_time, dto.end_time);
 
       // Pre-validate schedule conflicts
       const existing = await this.getTeachingSchedules(_token, {
@@ -3142,10 +3123,8 @@ export class SupabaseProvider implements IDataProvider {
         teacher_user_id: dto.teacher_user_id,
         teacher_name: teacherName,
         day_of_week: dayOfWeek,
-        day: dayName,
         start_time: dto.start_time,
         end_time: dto.end_time,
-        time: timeRange,
         class_name: dto.class_name,
         subject: dto.subject,
         room: dto.room,
@@ -3159,7 +3138,7 @@ export class SupabaseProvider implements IDataProvider {
       const { data, error } = await this.client
         .from('teaching_schedules')
         .insert([payload])
-        .select('id, teacher_user_id, teacher_name, day_of_week, day, start_time, end_time, time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by')
+        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by')
         .single();
 
       if (error) {
@@ -3190,7 +3169,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data: existingRow, error: fetchErr } = await this.client
         .from('teaching_schedules')
-        .select('id, teacher_user_id, teacher_name, day_of_week, day, start_time, end_time, time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until')
+        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until')
         .eq('id', dto.id)
         .maybeSingle();
 
@@ -3206,17 +3185,12 @@ export class SupabaseProvider implements IDataProvider {
         };
       }
 
-      const teacherUserId = dto.teacher_user_id || existingRow.teacher_user_id || (existingRow as any).user_id;
-      const dayOfWeek = normalizeDayOfWeek(
-        dto.day_of_week !== undefined
-          ? dto.day_of_week
-          : (dto.day || existingRow.day_of_week || existingRow.day)
-      );
-      const dayName = dto.day || getDayNameIndonesian(dayOfWeek);
-      const startTime = dto.start_time || existingRow.start_time || parseScheduleTime(existingRow.time)?.startTime || '07:00';
-      const endTime = dto.end_time || existingRow.end_time || parseScheduleTime(existingRow.time)?.endTime || '08:00';
+      const dayOfWeek = normalizeDayOfWeek(dto.day_of_week !== undefined ? dto.day_of_week : (dto.day ? dto.day : existingRow.day_of_week));
+      const startTime = dto.start_time || existingRow.start_time;
+      const endTime = dto.end_time || existingRow.end_time;
+      const teacherUserId = dto.teacher_user_id || existingRow.teacher_user_id;
       const className = dto.class_name || existingRow.class_name;
-      const room = dto.room !== undefined ? dto.room : existingRow.room;
+      const room = dto.room || existingRow.room;
       const academicYear = dto.academic_year || existingRow.academic_year || '2024/2025';
 
       // Conflict validation (ignoring current id)
@@ -3246,10 +3220,8 @@ export class SupabaseProvider implements IDataProvider {
       const updatePayload: Record<string, any> = {
         teacher_user_id: teacherUserId,
         day_of_week: dayOfWeek,
-        day: dayName,
         start_time: startTime,
         end_time: endTime,
-        time: formatTimeRange(startTime, endTime),
         class_name: className,
         subject: dto.subject !== undefined ? dto.subject : existingRow.subject,
         room,
@@ -3265,7 +3237,7 @@ export class SupabaseProvider implements IDataProvider {
         .from('teaching_schedules')
         .update(updatePayload)
         .eq('id', dto.id)
-        .select('id, teacher_user_id, teacher_name, day_of_week, day, start_time, end_time, time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by')
+        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by')
         .single();
 
       if (updateErr) {
