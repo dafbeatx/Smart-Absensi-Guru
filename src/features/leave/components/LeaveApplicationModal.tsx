@@ -29,6 +29,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const [startDate, setStartDate] = useState(() => getTodayDateInJakarta());
   const [endDate, setEndDate] = useState(() => getTodayDateInJakarta());
   const [reason, setReason] = useState('');
+  const [dutyTeacherNotes, setDutyTeacherNotes] = useState('');
   const [attachmentBase64, setAttachmentBase64] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +43,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       setEndDate(todayStr);
       setLeaveType('SAKIT');
       setReason('');
+      setDutyTeacherNotes('');
       setAttachmentBase64('');
       setFileName('');
       setErrorMsg(null);
@@ -123,6 +125,11 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       return;
     }
 
+    if (!dutyTeacherNotes || dutyTeacherNotes.trim().length < 5) {
+      setErrorMsg('Wajib memberikan instruksi / tugas kelas untuk Guru Piket (minimal 5 karakter).');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -134,9 +141,10 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
         reason,
         attachment_url: attachmentBase64 || undefined,
         attachment_base64: attachmentBase64,
+        duty_teacher_notes: dutyTeacherNotes.trim(),
       });
 
-      showToast('success', 'Pengajuan Berhasil!', 'Pengajuan izin Anda telah dikirim ke Kepala Sekolah.');
+      showToast('success', 'Pengajuan Berhasil!', 'Pengajuan izin & tugas piket telah disiarkan ke sistem sekolah.');
 
       setIsLoading(false);
       if (onSuccess) onSuccess();
@@ -207,12 +215,58 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
         <div className="space-y-1.5">
           <label className="block text-xs font-semibold text-slate-700">Keterangan / Alasan (Min 10 Karakter)</label>
           <textarea
-            rows={3}
+            rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Tuliskan keterangan detail alasan ketidakhadiran Anda..."
-            className="w-full bg-white border border-slate-200 rounded-2xl p-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+            className="w-full bg-white border border-slate-200 rounded-2xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-400"
           />
+        </div>
+
+        {/* Tugas / Pesan Titipan untuk Guru Piket (Wajib) */}
+        <div className="space-y-2 p-3 rounded-2xl bg-amber-50/60 border border-amber-200/90 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-amber-950 flex items-center gap-1.5">
+              <span>📋</span>
+              <span>Tugas / Pesan untuk Guru Piket</span>
+            </label>
+            <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+              Wajib Diisi
+            </span>
+          </div>
+          <textarea
+            rows={2}
+            value={dutyTeacherNotes}
+            onChange={(e) => setDutyTeacherNotes(e.target.value)}
+            placeholder="Tuliskan materi/tugas kelas atau instruksi untuk guru piket/pengganti..."
+            className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all placeholder:text-slate-400"
+          />
+          {/* Quick Preset Chips */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <span className="text-[10px] font-bold text-slate-500">Pilihan Cepat:</span>
+            {[
+              'Tugas Mandiri Kelas / LKS',
+              'Materi di Google Classroom',
+              'Mohon Awasi Ketertiban Kelas',
+              'Kuis / Latihan Harian',
+            ].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() =>
+                  setDutyTeacherNotes((prev) =>
+                    prev.trim() ? `${prev.trim()} • ${preset}` : preset
+                  )
+                }
+                className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-100 active:scale-95 transition-all cursor-pointer shadow-3xs"
+              >
+                + {preset}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-amber-800 leading-tight">
+            *Pesan ini akan otomatis dimunculkan pada <strong>Beranda Guru Piket</strong> yang bertugas pada hari izin Anda.
+          </p>
         </div>
 
         {/* Custom File Upload (hidden native input + styled UI) */}

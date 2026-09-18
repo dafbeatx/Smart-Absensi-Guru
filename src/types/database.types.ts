@@ -156,6 +156,7 @@ export interface LeaveRequest {
   approval_deadline: string;
   approved_by?: string | null;
   approval_notes?: string | null;
+  duty_teacher_notes?: string | null;
   created_at: string;
 }
 

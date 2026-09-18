@@ -535,6 +535,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isDutyTeacherToday, setIsDutyTeacherToday] = useState<boolean>(false);
   const [todayDutyDetails, setTodayDutyDetails] = useState<TeacherDutySchedule | null>(null);
   const [fellowDutyTeachers, setFellowDutyTeachers] = useState<TeacherDutySchedule[]>([]);
+  const [activeDutyLeavesToday, setActiveDutyLeavesToday] = useState<LeaveRequest[]>([]);
+  const [isCopiedDutyTaskId, setIsCopiedDutyTaskId] = useState<string | null>(null);
 
   // Pre-scan GPS Health Status & Realtime Coordinates State
   const [gpsHealth, setGpsHealth] = useState<{ status: 'READY' | 'REFINING' | 'OFF' | 'INVALID'; text: string; accuracy?: number }>({
@@ -1108,6 +1110,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         console.warn('Failed to check teacher duty schedule:', err);
       }
 
+      // 8b. Load Active Leave Requests for Today (Titipan Tugas Guru Piket)
+      try {
+        const todayStr = getTodayDateInJakarta();
+        const allLeavesList = await LeaveRepository.getAllLeaves(authToken || '');
+        const activeLeaves = (allLeavesList || []).filter((l) => {
+          if (!l || l.approval_status === 'REJECTED' || l.status === 'REJECTED') return false;
+          if (l.user_id === effectiveUser.id) return false;
+          const sDate = l.start_date;
+          const eDate = l.end_date || l.start_date;
+          return sDate <= todayStr && eDate >= todayStr;
+        });
+        setActiveDutyLeavesToday(activeLeaves);
+      } catch (errLeaves) {
+        console.warn('Failed to load active duty leaves today:', errLeaves);
+      }
+
       // 9. Automated Unabsented Working Days Detection & Direct Notification Push
       try {
         const todayStr = getTodayDateInJakarta();
@@ -1336,6 +1354,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     window.addEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_policy_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_settings_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_leaves_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_leave_updated', handleScannedEvent);
     window.addEventListener('storage', handleTeachersInstantSync);
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -1348,6 +1368,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       window.removeEventListener('smart_absensi_notifications_read_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_policy_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_settings_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_leaves_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_leave_updated', handleScannedEvent);
       window.removeEventListener('storage', handleTeachersInstantSync);
     };
   }, [effectiveUser?.id, token, selectedMonth, selectedYear, deviceUUID]);
@@ -2135,6 +2157,156 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               onOpenScanner={handleOpenScannerClick}
               onOpenPolicyModal={() => setIsPolicyModalOpen(true)}
             />
+
+            {/* 📋 KARTU TUGAS TITIPAN DARI GURU IZIN HARI INI (KHUSUS GURU PIKET) */}
+            {isDutyTeacherToday && activeDutyLeavesToday.length > 0 && (
+              <div
+                id="duty-teacher-tasks-banner"
+                className="bg-white rounded-3xl p-4 sm:p-4.5 border border-amber-200/90 shadow-sm space-y-3 animate-fadeIn"
+              >
+                {/* Header Widget */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-xs shrink-0 ring-2 ring-amber-100">
+                      <span className="text-lg">📋</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 text-[9.5px] font-black rounded-md tracking-wider uppercase border border-amber-300">
+                          TUGAS PIKET HARI INI
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-700">
+                          {activeDutyLeavesToday.length} Guru Izin
+                        </span>
+                      </div>
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug mt-0.5">
+                        Tugas Titipan dari Guru Izin
+                      </h4>
+                    </div>
+                  </div>
+                  <span className="text-[10.5px] font-bold text-slate-400 font-mono shrink-0">
+                    {new Date().toLocaleDateString('id-ID', { weekday: 'long' })}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Berikut instruksi dan materi kelas yang dititipkan oleh rekan pendidik yang sedang izin hari ini:
+                </p>
+
+                <div className="space-y-2.5">
+                  {activeDutyLeavesToday.map((leave) => {
+                    const teacher = allRegisteredTeachers.find(
+                      (t) => t.id === leave.user_id || (Boolean(t.full_name) && Boolean(leave.teacher_name) && t.full_name.toLowerCase() === leave.teacher_name?.toLowerCase())
+                    );
+                    const tName = leave.teacher_name || teacher?.full_name || leave.user_name || 'Rekan Guru';
+                    const tNpp = teacher?.nip || '-';
+                    const tPhone = (teacher as any)?.phone || null;
+                    const hasTask = Boolean(leave.duty_teacher_notes && leave.duty_teacher_notes.trim().length > 0);
+                    const taskText = leave.duty_teacher_notes?.trim() || 'Tidak ada catatan tugas khusus yang dititipkan.';
+                    const isCopied = isCopiedDutyTaskId === leave.id;
+
+                    const handleCopyTask = () => {
+                      const copyText = `*Tugas Titipan dari ${tName} (${leave.leave_type})*\nAlasan: ${leave.reason}\nInstruksi untuk Guru Piket:\n"${taskText}"`;
+                      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                        navigator.clipboard.writeText(copyText).then(() => {
+                          setIsCopiedDutyTaskId(leave.id);
+                          showToast('success', 'Tugas Disalin!', `Instruksi kelas dari ${tName} berhasil disalin.`);
+                          setTimeout(() => setIsCopiedDutyTaskId(null), 2500);
+                        }).catch(() => {
+                          showToast('info', 'Tugas Guru Izin', taskText);
+                        });
+                      } else {
+                        showToast('info', 'Tugas Guru Izin', taskText);
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={leave.id}
+                        className="p-3 sm:p-3.5 rounded-2xl bg-amber-50/40 border border-amber-200/90 shadow-2xs space-y-2"
+                      >
+                        {/* Top Row: Teacher Identity & Badge */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-7 h-7 rounded-xl bg-linear-to-br from-[#023246] to-[#18536B] text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                              {tName.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-black text-slate-900 truncate block">
+                                {tName}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono block">
+                                NPP: {tNpp}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[9.5px] font-extrabold border ${
+                                leave.leave_type === 'SAKIT'
+                                  ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                  : leave.leave_type === 'DINAS_LUAR'
+                                  ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                  : 'bg-amber-50 text-amber-900 border-amber-200'
+                              }`}
+                            >
+                              {leave.leave_type === 'SAKIT'
+                                ? '🤒 Sakit'
+                                : leave.leave_type === 'DINAS_LUAR'
+                                ? '💼 Dinas Luar'
+                                : '📝 Izin'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Reason Snippet */}
+                        <p className="text-[10.5px] text-slate-600 leading-tight">
+                          <span className="font-semibold text-slate-700">Keterangan:</span> {leave.reason}
+                        </p>
+
+                        {/* The Task Box */}
+                        <div className="p-2.5 rounded-xl bg-white border border-amber-200/80 shadow-3xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9.5px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                              <span>📌</span> Instruksi / Tugas Kelas
+                            </span>
+                            {hasTask && (
+                              <button
+                                type="button"
+                                onClick={handleCopyTask}
+                                className="text-[9.5px] font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1 cursor-pointer px-1.5 py-0.5 rounded hover:bg-amber-50 transition-colors"
+                                title="Salin instruksi tugas kelas"
+                              >
+                                {isCopied ? '✓ Tersalin' : '📋 Salin Tugas'}
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs font-semibold text-slate-800 leading-relaxed italic">
+                            "{taskText}"
+                          </p>
+                        </div>
+
+                        {/* Action Bar (WhatsApp Link if phone available) */}
+                        {tPhone && (
+                          <div className="pt-0.5 flex justify-end">
+                            <a
+                              href={`https://wa.me/${tPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                                `Halo Bapak/Ibu ${tName}, terkait tugas kelas yang dititipkan untuk piket hari ini: "${taskText}".`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10.5px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+                            >
+                              <span>💬</span> Konfirmasi via WhatsApp →
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* 🌟 BANNER TANTANGAN DISIPLIN (COMPACT - KLIK UNTUK PINDAH LAYER LENGKAP) ─── */}
             <div
@@ -3014,6 +3186,30 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   badge: 'Terminal RFID →',
                   badgeColor: 'text-cyan-800 bg-cyan-50 border-cyan-300',
                 });
+
+                if (activeDutyLeavesToday.length > 0) {
+                  items.push({
+                    id: 'duty_leaves_task',
+                    icon: <span className="text-base">📋</span>,
+                    title: `Tugas Titipan: ${activeDutyLeavesToday.length} Guru Izin`,
+                    description: activeDutyLeavesToday
+                      .map(
+                        (l) =>
+                          `${l.teacher_name || l.user_name || 'Guru'}: ${
+                            l.duty_teacher_notes
+                              ? `"${l.duty_teacher_notes.slice(0, 35)}..."`
+                              : l.reason
+                          }`
+                      )
+                      .join(' • '),
+                    action: () => {
+                      const el = document.getElementById('duty-teacher-tasks-banner');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    },
+                    badge: 'Lihat Tugas →',
+                    badgeColor: 'text-amber-900 bg-amber-50 border-amber-300',
+                  });
+                }
               }
 
               // 2. Status Izin Aktif

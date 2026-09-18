@@ -35,6 +35,7 @@ import { runSystemHealthTestSuite } from './__tests__/system-health-suite.test';
 import { runUsersPublicViewEgressTestSuite } from './__tests__/users-public-view-egress.test';
 import { runZeroTrustSecretsTestSuite } from './__tests__/zero-trust-secrets.test';
 import { runAttendancePenaltiesTestSuite } from './__tests__/attendance-penalties.test';
+import { runDutyTeacherLeaveTasksTestSuite } from './__tests__/duty-teacher-leave-tasks.test';
 
 export interface TestResultItem {
   testName: string;
@@ -107,6 +108,7 @@ export class MasterTestRunner {
       { name: 'Users Public View & Egress Bandwidth Protection (Phase 4.4)', fn: runUsersPublicViewEgressTestSuite },
       { name: 'Zero-Trust Secret Management & Anti-Credential Leak Engine (Phase 4.5)', fn: runZeroTrustSecretsTestSuite },
       { name: 'Universal Attendance Penalties Engine (TAP & ALPA Discipline)', fn: runAttendancePenaltiesTestSuite },
+      { name: 'Duty Teacher Leave Tasks & Broadcast Engine', fn: runDutyTeacherLeaveTasksTestSuite },
     ];
 
     let totalPassed = 0;

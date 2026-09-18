@@ -47,7 +47,7 @@ export interface AttendanceNotificationPayload {
   id?: string;
   title: string;
   body: string;
-  type: 'CHECK_IN' | 'CHECK_OUT' | 'LEAVE_REQUEST' | 'EVENT' | 'SYSTEM';
+  type: 'CHECK_IN' | 'CHECK_OUT' | 'LEAVE_REQUEST' | 'EVENT' | 'SYSTEM' | 'INFO' | 'PENGUMUMAN';
   teacherName?: string;
   time?: string;
   userId?: string;
@@ -73,7 +73,7 @@ const memoryNotificationList: AttendanceNotificationPayload[] = [];
 const memoryReadStore: Map<string, Set<string>> = new Map();
 const memoryPendingReads: Map<string, string[]> = new Map();
 
-class NotificationPermissionService {
+export class NotificationPermissionService {
   private activeCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
   private activeEarlyCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPushSaveResult: SavePushSubscriptionResult | null = null;
@@ -918,6 +918,48 @@ class NotificationPermissionService {
       tag: `leave_${Date.now()}`,
       url: '/?tab=LEAVES',
     }).catch(() => {});
+  }
+
+  /**
+   * Helper: Siarkan Pengumuman Izin Guru ke Seluruh Guru, Admin, & Kepala Sekolah
+   * Disertai pemberitahuan khusus kepada Guru Piket untuk memeriksa tugas kelas di Beranda.
+   */
+  public broadcastTeacherLeaveAnnouncement(
+    teacherName: string,
+    leaveType: string,
+    startDate: string,
+    endDate: string,
+    reason: string,
+    dutyNotes?: string
+  ): AttendanceNotificationPayload {
+    const todayIso = new Date().toISOString().substring(0, 10);
+    const dateRangeStr = startDate === endDate ? startDate : `${startDate} s.d. ${endDate}`;
+    const dutyPreview = dutyNotes && dutyNotes.trim().length > 0
+      ? ` Tugas untuk guru piket: "${dutyNotes.trim().slice(0, 80)}${dutyNotes.trim().length > 80 ? '...' : ''}"`
+      : ' Guru piket dimohon memantau instruksi kelas di Beranda.';
+
+    const payload: AttendanceNotificationPayload = {
+      id: `notif_leave_broadcast_${teacherName.replace(/\s+/g, '_')}_${todayIso}_${Date.now()}`,
+      title: `📢 Info Izin Guru: ${teacherName}`,
+      body: `Bapak/Ibu ${teacherName} mengajukan ${leaveType} (${dateRangeStr}) - ${reason}.${dutyPreview}`,
+      type: 'PENGUMUMAN',
+      teacherName,
+      roleTarget: 'ALL',
+      actionUrl: '/?tab=BERANDA',
+    };
+
+    this.sendNativeNotification(payload);
+
+    // Otomatis kirimkan Web Push ke seluruh guru dan staf
+    this.triggerServerWebPush({
+      targetRoles: ['GURU', 'ADMIN', 'KEPSEK'],
+      title: `📢 Info Izin Guru: ${teacherName}`,
+      body: `Bapak/Ibu ${teacherName} mengajukan ${leaveType} (${dateRangeStr}). Guru piket dimohon memeriksa tugas kelas.`,
+      tag: `leave_broadcast_${Date.now()}`,
+      url: '/?tab=BERANDA',
+    }).catch(() => {});
+
+    return payload;
   }
 
   /**

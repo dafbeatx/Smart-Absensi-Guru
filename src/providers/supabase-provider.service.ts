@@ -1256,18 +1256,27 @@ export class SupabaseProvider implements IDataProvider {
       status: 'PENDING',
     };
 
+    if (dto.duty_teacher_notes) {
+      newLeave.duty_teacher_notes = dto.duty_teacher_notes;
+    }
+
     if (finalAttachmentUrl) {
       newLeave.attachment_url = finalAttachmentUrl;
     }
 
     let { error } = await this.client.from('leaves').insert(newLeave);
 
-    // If table schema for leaves table does not have attachment_url column yet
-    if (error && (error.message.includes('attachment_url') || error.message.includes('schema cache'))) {
-      if (userProvidedAttachment) {
-        throw new Error('Gagal menyimpan lampiran izin: Kolom attachment_url belum ada pada tabel leaves di Supabase (Jalankan CREATE_TABLES.sql).');
+    // If table schema for leaves table does not have duty_teacher_notes or attachment_url column yet
+    if (error && (error.message.includes('duty_teacher_notes') || error.message.includes('attachment_url') || error.message.includes('schema cache'))) {
+      if (error.message.includes('duty_teacher_notes')) {
+        delete newLeave.duty_teacher_notes;
       }
-      delete newLeave.attachment_url;
+      if (error.message.includes('attachment_url')) {
+        if (userProvidedAttachment) {
+          throw new Error('Gagal menyimpan lampiran izin: Kolom attachment_url belum ada pada tabel leaves di Supabase (Jalankan CREATE_TABLES.sql).');
+        }
+        delete newLeave.attachment_url;
+      }
       const retryResult = await this.client.from('leaves').insert(newLeave);
       error = retryResult.error;
     }
@@ -1285,6 +1294,7 @@ export class SupabaseProvider implements IDataProvider {
       end_date: dto.end_date,
       reason: dto.reason,
       attachment_url: finalAttachmentUrl,
+      duty_teacher_notes: dto.duty_teacher_notes || null,
       approval_status: 'PENDING',
       approval_deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
       created_at: new Date().toISOString(),
@@ -1481,6 +1491,7 @@ export class SupabaseProvider implements IDataProvider {
           approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
           approved_by: row.approved_by || null,
           approval_notes: row.rejection_notes || (row as any).approval_notes || null,
+          duty_teacher_notes: (row as any).duty_teacher_notes || null,
           created_at: row.created_at,
         }));
       }
@@ -1497,6 +1508,7 @@ export class SupabaseProvider implements IDataProvider {
         approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
         approved_by: row.approved_by || null,
         approval_notes: row.rejection_notes || (row as any).approval_notes || null,
+        duty_teacher_notes: (row as any).duty_teacher_notes || null,
         created_at: row.created_at,
       }));
     } catch (err) {
@@ -1529,6 +1541,7 @@ export class SupabaseProvider implements IDataProvider {
       approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
       approved_by: row.approved_by || null,
       approval_notes: row.rejection_notes || row.approval_notes || null,
+      duty_teacher_notes: row.duty_teacher_notes || null,
       created_at: row.created_at,
     }));
 
@@ -1563,6 +1576,7 @@ export class SupabaseProvider implements IDataProvider {
         end_date: row.end_date,
         reason: row.reason,
         attachment_url: row.attachment_url || null,
+        duty_teacher_notes: row.duty_teacher_notes || null,
         approval_status: (row.status || 'PENDING') as ApprovalStatus,
         approval_deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
         approved_by: row.approved_by || null,

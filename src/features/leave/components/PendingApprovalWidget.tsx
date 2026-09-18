@@ -416,6 +416,17 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
                       "{req.reason}"
                     </p>
 
+                    {req.duty_teacher_notes && (
+                      <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11.5px] text-amber-950 space-y-0.5">
+                        <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block">
+                          📋 Tugas untuk Guru Piket:
+                        </span>
+                        <p className="font-semibold leading-relaxed">
+                          "{req.duty_teacher_notes}"
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 font-semibold pt-0.5">
                       <span>📅 Periode: <strong className="text-slate-900">{req.start_date} s/d {req.end_date}</strong></span>
                       {req.attachment_url && (
@@ -525,6 +536,16 @@ export const PendingApprovalWidget: React.FC<PendingApprovalWidgetProps> = ({
                 <span>{selectedRequest.start_date} s/d {selectedRequest.end_date}</span>
               </div>
               <p className="text-slate-600 italic pt-1">"{selectedRequest.reason}"</p>
+              {selectedRequest.duty_teacher_notes && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 mt-1.5 space-y-0.5 text-left">
+                  <span className="text-[10px] font-black uppercase text-amber-800 tracking-wide block">
+                    📋 Tugas untuk Guru Piket:
+                  </span>
+                  <p className="font-semibold leading-relaxed">
+                    "{selectedRequest.duty_teacher_notes}"
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

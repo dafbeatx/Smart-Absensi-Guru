@@ -890,6 +890,7 @@ export class MockProvider implements IDataProvider {
       end_date: dto.end_date,
       reason: dto.reason,
       attachment_url: dto.attachment_url || dto.attachment_base64 || null,
+      duty_teacher_notes: dto.duty_teacher_notes || null,
       approval_status: 'PENDING',
       approval_deadline: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
       created_at: new Date().toISOString(),

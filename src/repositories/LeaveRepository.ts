@@ -13,6 +13,7 @@ export interface SubmitLeaveDTO {
   reason: string;
   attachment_url?: string;
   attachment_base64?: string;
+  duty_teacher_notes?: string;
 }
 
 export class LeaveRepository {
@@ -35,11 +36,22 @@ export class LeaveRepository {
       reason: `Pengajuan ${dto.leave_type}: ${dto.reason}`,
     }).catch(() => {});
 
-    // Trigger Push Notification for Admin / Kepsek
+    // 1. Trigger Push Notification for Admin / Kepsek
     NotificationService.notifyTeacherLeaveRequest(activeUser.full_name || 'Guru', dto.leave_type, dto.reason);
+
+    // 2. Broadcast Announcement to ALL Teachers & Staff (termasuk Guru Piket)
+    NotificationService.broadcastTeacherLeaveAnnouncement(
+      activeUser.full_name || 'Guru',
+      dto.leave_type,
+      dto.start_date,
+      dto.end_date,
+      dto.reason,
+      dto.duty_teacher_notes
+    );
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('smart_absensi_leave_updated'));
+      window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
       window.dispatchEvent(new Event('smart_absensi_records_updated'));
     }
     return res;
