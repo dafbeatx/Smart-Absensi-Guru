@@ -54,7 +54,7 @@ export interface TeacherPointHistoryModalProps {
   selectedYear?: number;
 }
 
-type FilterType = 'ALL' | 'ON_TIME' | 'LATE' | 'CHECK_OUT' | 'DUTY' | 'OTHER';
+type FilterType = 'ALL' | 'ON_TIME' | 'LATE' | 'CHECK_OUT' | 'DUTY' | 'PENALTY' | 'OTHER';
 
 const MONTH_NAMES_ID: Record<string, string> = {
   '01': 'Januari',
@@ -206,12 +206,17 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
       if (filterType === 'LATE') return log.activity_type === 'CHECK_IN_LATE';
       if (filterType === 'CHECK_OUT') return log.activity_type === 'CHECK_OUT';
       if (filterType === 'DUTY') return log.activity_type === 'DUTY_PIKET';
+      if (filterType === 'PENALTY') {
+        return log.activity_type === 'PENALTY_ALFA' || (log.points || 0) < 0;
+      }
       if (filterType === 'OTHER') {
         return (
           log.activity_type !== 'CHECK_IN_ON_TIME' &&
           log.activity_type !== 'CHECK_IN_LATE' &&
           log.activity_type !== 'CHECK_OUT' &&
-          log.activity_type !== 'DUTY_PIKET'
+          log.activity_type !== 'DUTY_PIKET' &&
+          log.activity_type !== 'PENALTY_ALFA' &&
+          (log.points || 0) >= 0
         );
       }
       return true;
@@ -224,17 +229,28 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
     const lateCount = periodFilteredLogs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
     const checkOutCount = periodFilteredLogs.filter((l) => l.activity_type === 'CHECK_OUT').length;
     const dutyCount = periodFilteredLogs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
+    const penaltyCount = periodFilteredLogs.filter(
+      (l) => l.activity_type === 'PENALTY_ALFA' || (l.points || 0) < 0
+    ).length;
+    const penaltyPoints = periodFilteredLogs
+      .filter((l) => l.activity_type === 'PENALTY_ALFA' || (l.points || 0) < 0)
+      .reduce((sum, l) => sum + Math.abs(l.points || 0), 0);
+
     return {
       onTime: { count: onTimeCount, points: onTimeCount * 15 },
       late: { count: lateCount, points: lateCount * 5 },
       checkOut: { count: checkOutCount, points: checkOutCount * 10 },
       duty: { count: dutyCount, points: dutyCount * 10 },
+      penalty: { count: penaltyCount, points: penaltyPoints },
     };
   }, [periodFilteredLogs]);
 
   if (!isOpen) return null;
 
-  const getActivityBadge = (type: TeacherPointActivityType, points: number) => {
+  const getActivityBadge = (type: TeacherPointActivityType, points: number, title?: string) => {
+    const isNegative = points < 0;
+    const pointsText = points > 0 ? `+${points} Poin` : `${points} Poin`;
+
     switch (type) {
       case 'CHECK_IN_ON_TIME':
         return {
@@ -242,7 +258,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
           categoryLabel: 'Presensi Tepat Waktu',
           defaultTitle: 'Presensi Masuk Tepat Waktu',
           badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200/80',
-          pointsText: `+${points} Poin`,
+          pointsText,
           pointsClass: 'bg-emerald-50 text-emerald-900 border-emerald-300 ring-1 ring-emerald-400/30',
         };
       case 'CHECK_IN_LATE':
@@ -251,7 +267,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
           categoryLabel: 'Presensi Terlambat',
           defaultTitle: 'Presensi Masuk Terlambat',
           badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
-          pointsText: `+${points} Poin`,
+          pointsText,
           pointsClass: 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-400/30',
         };
       case 'CHECK_OUT':
@@ -260,7 +276,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
           categoryLabel: 'Presensi Pulang',
           defaultTitle: 'Presensi Pulang Tuntas Bertugas',
           badgeClass: 'bg-blue-50 text-blue-800 border-blue-200/80',
-          pointsText: `+${points} Poin`,
+          pointsText,
           pointsClass: 'bg-blue-50 text-blue-900 border-blue-300 ring-1 ring-blue-400/30',
         };
       case 'DUTY_PIKET':
@@ -269,7 +285,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
           categoryLabel: 'Tugas Piket Harian',
           defaultTitle: 'Tugas Piket Sekolah Terlaksana',
           badgeClass: 'bg-cyan-50 text-[#18536B] border-cyan-200/80',
-          pointsText: `+${points} Poin`,
+          pointsText,
           pointsClass: 'bg-cyan-50 text-[#023246] border-cyan-300 ring-1 ring-cyan-400/30',
         };
       case 'EARLY_BIRD_BONUS':
@@ -278,7 +294,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
           categoryLabel: '🌅 Teladan Fajar',
           defaultTitle: 'Hadir Sangat Awal (≤ 07:00 WIB)',
           badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
-          pointsText: `+${points} Poin`,
+          pointsText,
           pointsClass: 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-400/30',
         };
       case 'STREAK_MILESTONE':
@@ -287,26 +303,36 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
           categoryLabel: '🔥 Rekor 5 Hari',
           defaultTitle: 'Bonus Konsistensi Kehadiran',
           badgeClass: 'bg-orange-50 text-orange-800 border-orange-200/80',
-          pointsText: `+${points} Poin`,
+          pointsText,
           pointsClass: 'bg-orange-50 text-orange-900 border-orange-300 ring-1 ring-orange-400/30',
         };
-      case 'PENALTY_ALFA':
+      case 'PENALTY_ALFA': {
+        const isTap = title?.includes('TAP') || title?.toLowerCase().includes('pulang');
         return {
           icon: <AlertCircle className="w-3.5 h-3.5 text-rose-600" />,
-          categoryLabel: 'Penalti Tidak Hadir',
-          defaultTitle: 'Penalti Ketidakhadiran (ALFA)',
+          categoryLabel: isTap ? 'Penalti Kelalaian Pulang' : 'Penalti Tidak Hadir',
+          defaultTitle: isTap ? 'Penalti Tidak Absen Pulang (TAP)' : 'Penalti Ketidakhadiran (ALFA)',
           badgeClass: 'bg-rose-50 text-rose-800 border-rose-200/80',
-          pointsText: `${points} Poin`,
+          pointsText,
           pointsClass: 'bg-rose-50 text-rose-900 border-rose-300 ring-1 ring-rose-400/30',
         };
+      }
       default:
         return {
-          icon: <Sparkles className="w-3.5 h-3.5 text-indigo-600" />,
-          categoryLabel: 'Apresiasi Khusus',
-          defaultTitle: 'Penyesuaian Poin Disiplin',
-          badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-200/80',
-          pointsText: points >= 0 ? `+${points} Poin` : `${points} Poin`,
-          pointsClass: 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-1 ring-indigo-400/30',
+          icon: isNegative ? (
+            <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+          ) : (
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+          ),
+          categoryLabel: isNegative ? 'Penalti Disiplin' : 'Apresiasi Khusus',
+          defaultTitle: isNegative ? 'Penalti Kedisiplinan' : 'Penyesuaian Poin Disiplin',
+          badgeClass: isNegative
+            ? 'bg-rose-50 text-rose-800 border-rose-200/80'
+            : 'bg-indigo-50 text-indigo-800 border-indigo-200/80',
+          pointsText,
+          pointsClass: isNegative
+            ? 'bg-rose-50 text-rose-900 border-rose-300 ring-1 ring-rose-400/30'
+            : 'bg-indigo-50 text-indigo-900 border-indigo-300 ring-1 ring-indigo-400/30',
         };
     }
   };
@@ -745,6 +771,19 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
             >
               Piket ({stats.duty.count})
             </button>
+            {stats.penalty.count > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilterType('PENALTY')}
+                className={`px-3 py-1.5 rounded-xl text-[10.5px] sm:text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
+                  filterType === 'PENALTY'
+                    ? 'bg-rose-600 text-white shadow-xs font-black'
+                    : 'text-rose-600 hover:text-rose-800'
+                }`}
+              >
+                Penalti ({stats.penalty.count})
+              </button>
+            )}
           </div>
 
 
@@ -800,7 +839,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
             ) : (
               <div className="space-y-2">
                 {filteredLogs.map((log) => {
-                  const badge = getActivityBadge(log.activity_type, log.points);
+                  const badge = getActivityBadge(log.activity_type, log.points, log.title);
                   const { dayName, dayNum, monthShort } = parseDateParts(log.date);
                   const timeStr = log.created_at
                     ? new Date(log.created_at).toLocaleTimeString('id-ID', {

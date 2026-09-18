@@ -843,12 +843,16 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                 </div>
                                 <span
                                   className={`px-2.5 py-1 rounded-xl text-xs font-black border shrink-0 ${
-                                    log.points >= 15
+                                    log.points < 0
+                                      ? 'bg-rose-50 text-rose-800 border-rose-300 ring-1 ring-rose-400/30'
+                                      : log.points >= 15
                                       ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                      : log.points >= 10
+                                      ? 'bg-cyan-50 text-[#18536B] border-cyan-300'
                                       : 'bg-amber-50 text-amber-900 border-amber-300'
                                   }`}
                                 >
-                                  +{log.points} Poin
+                                  {log.points > 0 ? `+${log.points}` : log.points} Poin
                                 </span>
                               </div>
                             ))}
@@ -1523,14 +1527,16 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                               </div>
                               <span
                                 className={`px-3 py-1 rounded-xl text-xs font-black border shrink-0 ${
-                                  log.points >= 15
+                                  log.points < 0
+                                    ? 'bg-rose-50 text-rose-800 border-rose-300 ring-1 ring-rose-400/30'
+                                    : log.points >= 15
                                     ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
                                     : log.points >= 10
                                     ? 'bg-cyan-50 text-[#18536B] border-cyan-300'
                                     : 'bg-amber-50 text-amber-900 border-amber-300'
                                 }`}
                               >
-                                +{log.points} Poin
+                                {log.points > 0 ? `+${log.points}` : log.points} Poin
                               </span>
                             </div>
                           ))}
@@ -2589,14 +2595,16 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
                               <span
                                 className={`px-2.5 py-1 rounded-xl text-xs font-black border shrink-0 shadow-2xs ${
-                                  log.points >= 15
+                                  log.points < 0
+                                    ? 'bg-rose-50 text-rose-800 border-rose-300 ring-1 ring-rose-400/30'
+                                    : log.points >= 15
                                     ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
                                     : log.points >= 10
                                     ? 'bg-cyan-50 text-[#18536B] border-cyan-300'
                                     : 'bg-amber-50 text-amber-900 border-amber-300'
                                 }`}
                               >
-                                +{log.points} Poin
+                                {log.points > 0 ? `+${log.points}` : log.points} Poin
                               </span>
                             </div>
                           );
