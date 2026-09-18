@@ -73,7 +73,7 @@ export default async function handler(req: any, res: any) {
     // 3. Ambil rencana studi siswa
     const { data: plan } = await serverSupabase
       .from('student_continuation_plans')
-      .select('*')
+      .select('id, academic_year, graduation_year, continuation_type, status, submitted_at, verified_at, verified_by_name, revision_note, parent_agreement')
       .eq('student_id', studentId)
       .maybeSingle();
 
@@ -87,7 +87,7 @@ export default async function handler(req: any, res: any) {
       // 4. Ambil pilihan sekolah
       const { data: choicesData } = await serverSupabase
         .from('student_school_choices')
-        .select('*')
+        .select('id, continuation_plan_id, priority, school_name, school_type, major_name, notes')
         .eq('continuation_plan_id', plan.id)
         .order('priority', { ascending: true });
 
@@ -96,7 +96,7 @@ export default async function handler(req: any, res: any) {
       // 5. Ambil minat & bakat
       const { data: interestsData } = await serverSupabase
         .from('student_interests')
-        .select('*')
+        .select('id, continuation_plan_id, interest_field, career_goals, notes')
         .eq('continuation_plan_id', plan.id);
 
       interests = interestsData || [];
@@ -104,7 +104,7 @@ export default async function handler(req: any, res: any) {
       // 6. Ambil prestasi
       const { data: achievementsData } = await serverSupabase
         .from('student_achievements')
-        .select('*')
+        .select('id, continuation_plan_id, achievement_name, level, year, certificate_url')
         .eq('continuation_plan_id', plan.id)
         .order('year', { ascending: false });
 
@@ -122,7 +122,7 @@ export default async function handler(req: any, res: any) {
       // 8. Ambil riwayat verifikasi (audit log)
       const { data: logsData } = await serverSupabase
         .from('student_verification_logs')
-        .select('*')
+        .select('id, continuation_plan_id, action, previous_status, new_status, notes, verified_by, created_at')
         .eq('continuation_plan_id', plan.id)
         .order('created_at', { ascending: false });
 

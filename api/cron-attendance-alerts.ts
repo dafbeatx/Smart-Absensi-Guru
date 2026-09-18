@@ -133,7 +133,7 @@ export default async function handler(req: any, res: any) {
   try {
     const { data: events } = await supabase
       .from('school_events')
-      .select('*')
+      .select('id, title, description')
       .eq('event_date', todayDateStr);
 
     if (events && events.length > 0) {
@@ -162,7 +162,7 @@ export default async function handler(req: any, res: any) {
   // Fetch all active push subscriptions
   const { data: subscriptions, error: subErr } = await supabase
     .from('push_subscriptions')
-    .select('*');
+    .select('endpoint, p256dh, auth');
 
   if (subErr || !subscriptions || subscriptions.length === 0) {
     return res.status(200).json({

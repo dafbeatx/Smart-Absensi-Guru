@@ -234,8 +234,17 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   }, []);
 
   const handleSelectSession = async (session: ExamSessionRecord) => {
-    setActiveSession(session);
-    await loadSessionData(session);
+    let fullSession = session;
+    try {
+      const detailed = await ExamCorrectionRepository.getSessionById(session.id);
+      if (detailed) {
+        fullSession = detailed;
+      }
+    } catch (err) {
+      logger.warn('QuestionCorrectionModal', 'Failed to fetch detailed session, using preview', err);
+    }
+    setActiveSession(fullSession);
+    await loadSessionData(fullSession);
     setActiveTab('grading');
     resetGradingForm();
   };

@@ -49,7 +49,7 @@ export default async function handler(req: any, res: any) {
     // 2. Cari Pengguna di public.users
     const { data: user, error: userErr } = await serverSupabase
       .from('users')
-      .select('*')
+      .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at, pin_hash, failed_login_count, locked_until')
       .or(`phone_number.eq.${cleanIdentity},nip.eq.${cleanIdentity},id.eq.${cleanIdentity}`)
       .maybeSingle();
 

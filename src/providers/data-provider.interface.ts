@@ -186,6 +186,7 @@ export interface IDataProvider {
 
   // Exam Correction & Student Scores API (Koreksi Soal & Nilai Siswa)
   getExamSessions(token?: string): Promise<ExamSessionRecord[]>;
+  getExamSessionById?(sessionId: string, token?: string): Promise<ExamSessionRecord | null>;
   saveExamSession(session: CreateExamSessionDTO, token?: string): Promise<ExamSessionRecord>;
   deleteExamSession(sessionId: string, token?: string): Promise<boolean>;
   getGradedStudents(sessionId: string, token?: string): Promise<GradedStudentScoreRecord[]>;

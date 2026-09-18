@@ -67,6 +67,18 @@ export class ExamCorrectionRepository {
   }
 
   /**
+   * Retrieves full exam session detail by ID (including answer_key and student_list).
+   */
+  public static async getSessionById(sessionId: string, token?: string): Promise<ExamSessionRecord | null> {
+    const provider = ProviderFactory.getProvider();
+    if (typeof provider.getExamSessionById === 'function') {
+      return await provider.getExamSessionById(sessionId, token);
+    }
+    const sessions = await this.getSessions(token);
+    return sessions.find((s) => s.id === sessionId) || null;
+  }
+
+  /**
    * Saves or updates an exam session.
    */
   public static async saveSession(

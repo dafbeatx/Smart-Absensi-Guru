@@ -3037,6 +3037,11 @@ export class MockProvider implements IDataProvider {
     return [];
   }
 
+  public async getExamSessionById(sessionId: string, _token?: string): Promise<ExamSessionRecord | null> {
+    const sessions = await this.getExamSessions();
+    return sessions.find((s) => s.id === sessionId) || null;
+  }
+
   public async saveExamSession(dto: CreateExamSessionDTO, _token?: string): Promise<ExamSessionRecord> {
     const sessions = await this.getExamSessions();
     const existingIndex = dto.id ? sessions.findIndex((s) => s.id === dto.id) : -1;

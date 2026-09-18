@@ -98,6 +98,31 @@ export class SupabaseProvider implements IDataProvider {
   private cachedAllLeaves: LeaveRequest[] | null = null;
   private cachedAllLeavesTimestamp: number = 0;
 
+  // In-flight request deduplication map to prevent parallel duplicate queries
+  private inFlightRequests: Map<string, Promise<any>> = new Map();
+
+  // Realtime channel singletons to prevent duplicate subscriptions per client
+  private activeNotificationChannel: any = null;
+  private activeAttendanceChannel: any = null;
+
+  // Additional TTL caches for rarely changing datasets
+  private cachedDutySchedules: TeacherDutySchedule[] | null = null;
+  private cachedDutySchedulesTimestamp: number = 0;
+
+  private cachedInventorySarpras: InventorySarprasItem[] | null = null;
+  private cachedInventorySarprasTimestamp: number = 0;
+
+  private dedupeRequest<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    if (this.inFlightRequests.has(key)) {
+      return this.inFlightRequests.get(key) as Promise<T>;
+    }
+    const promise = fn().finally(() => {
+      this.inFlightRequests.delete(key);
+    });
+    this.inFlightRequests.set(key, promise);
+    return promise;
+  }
+
   constructor() {
     const url =
       (typeof import.meta !== 'undefined' && import.meta.env
@@ -167,7 +192,7 @@ export class SupabaseProvider implements IDataProvider {
     // 2. Jalur Fallback (untuk testing offline/unit test runner tanpa backend server)
     const { data: user, error } = await this.client
       .from('users')
-      .select('*')
+      .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, pin_hash, created_at')
       .or(`phone_number.eq.${dto.identity},nip.eq.${dto.identity}`)
       .single();
 
@@ -483,7 +508,7 @@ export class SupabaseProvider implements IDataProvider {
 
     const { data: existingRecords } = await this.client
       .from('attendance')
-      .select('*')
+      .select('id, user_id, date, status, check_in_time, check_out_time, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, created_at')
       .eq('date', todayStr)
       .in('user_id', userSearchIds)
       .order('created_at', { ascending: false })
@@ -618,7 +643,7 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const { data: correctionRows } = await this.client
           .from('leaves')
-          .select('*')
+          .select('id, user_id, type, leave_type, reason, status, start_date, end_date')
           .in('user_id', userSearchIds)
           .lte('start_date', todayStr)
           .gte('end_date', todayStr)
@@ -852,38 +877,40 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getTodayAttendance(userId: string, _token: string): Promise<AttendanceRecord | null> {
     const todayStr = getTodayDateInJakarta();
-    const sessionUser = useAuthStore.getState().user;
-    const searchIds = [userId];
-    if (sessionUser?.id && !searchIds.includes(sessionUser.id)) searchIds.push(sessionUser.id);
-    if (sessionUser?.phone_number && !searchIds.includes(sessionUser.phone_number)) searchIds.push(sessionUser.phone_number);
-    if (sessionUser?.nip && !searchIds.includes(sessionUser.nip)) searchIds.push(sessionUser.nip);
+    return this.dedupeRequest(`getTodayAttendance_${userId}_${todayStr}`, async () => {
+      const sessionUser = useAuthStore.getState().user;
+      const searchIds = [userId];
+      if (sessionUser?.id && !searchIds.includes(sessionUser.id)) searchIds.push(sessionUser.id);
+      if (sessionUser?.phone_number && !searchIds.includes(sessionUser.phone_number)) searchIds.push(sessionUser.phone_number);
+      if (sessionUser?.nip && !searchIds.includes(sessionUser.nip)) searchIds.push(sessionUser.nip);
 
-    const { data: records } = await this.client
-      .from('attendance')
-      .select('*')
-      .eq('date', todayStr)
-      .in('user_id', searchIds)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      const { data: records } = await this.client
+        .from('attendance')
+        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, created_at')
+        .eq('date', todayStr)
+        .in('user_id', searchIds)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-    const data = records?.[0] || null;
-    if (!data) return null;
+      const data = records?.[0] || null;
+      if (!data) return null;
 
-    return {
-      id: data.id,
-      user_id: data.user_id,
-      date: data.date,
-      check_in_time: data.check_in_time,
-      check_out_time: data.check_out_time,
-      status: data.status as AttendanceStatus,
-      check_in_lat: data.check_in_lat ? parseFloat(data.check_in_lat) : null,
-      check_in_lng: data.check_in_lng ? parseFloat(data.check_in_lng) : null,
-      check_in_distance_meters: data.distance_meters || 0,
-      verification_method: (data.verification_method as VerificationMethod) || 'QR_GPS',
-      attendance_source: (data.attendance_source as AttendanceSource) || 'QR',
-      is_offline: false,
-      created_at: data.created_at,
-    };
+      return {
+        id: data.id,
+        user_id: data.user_id,
+        date: data.date,
+        check_in_time: data.check_in_time,
+        check_out_time: data.check_out_time,
+        status: data.status as AttendanceStatus,
+        check_in_lat: data.check_in_lat ? parseFloat(data.check_in_lat) : null,
+        check_in_lng: data.check_in_lng ? parseFloat(data.check_in_lng) : null,
+        check_in_distance_meters: data.distance_meters || 0,
+        verification_method: (data.verification_method as VerificationMethod) || 'QR_GPS',
+        attendance_source: (data.attendance_source as AttendanceSource) || 'QR',
+        is_offline: false,
+        created_at: data.created_at,
+      };
+    });
   }
 
   public async getMonthlyAttendance(
@@ -909,35 +936,37 @@ export class SupabaseProvider implements IDataProvider {
     const lastDayNum = new Date(yearNum, monthNum, 0).getDate();
     const endDate = `${year}-${paddedMonth}-${String(lastDayNum).padStart(2, '0')}`;
 
-    let query = this.client
-      .from('attendance')
-      .select('*')
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: false });
+    return this.dedupeRequest(`getMonthlyAttendance_${userId}_${month}_${year}`, async () => {
+      let query = this.client
+        .from('attendance')
+        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, reason, created_at')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: false });
 
-    if (userId !== 'ALL') {
-      query = query.eq('user_id', userId);
-    }
+      if (userId !== 'ALL') {
+        query = query.eq('user_id', userId);
+      }
 
-    const { data } = await query;
+      const { data } = await query;
 
-    return (data || []).map((row) => ({
-      id: row.id,
-      user_id: row.user_id,
-      date: row.date,
-      check_in_time: row.check_in_time,
-      check_out_time: row.check_out_time,
-      status: row.status as AttendanceStatus,
-      check_in_lat: row.check_in_lat ? parseFloat(row.check_in_lat) : null,
-      check_in_lng: row.check_in_lng ? parseFloat(row.check_in_lng) : null,
-      check_in_distance_meters: row.distance_meters || 0,
-      verification_method: (row.verification_method as VerificationMethod) || 'QR_GPS',
-      attendance_source: (row.attendance_source as AttendanceSource) || 'QR',
-      is_offline: false,
-      notes: row.notes || row.reason || null,
-      created_at: row.created_at,
-    }));
+      return (data || []).map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        date: row.date,
+        check_in_time: row.check_in_time,
+        check_out_time: row.check_out_time,
+        status: row.status as AttendanceStatus,
+        check_in_lat: row.check_in_lat ? parseFloat(row.check_in_lat) : null,
+        check_in_lng: row.check_in_lng ? parseFloat(row.check_in_lng) : null,
+        check_in_distance_meters: row.distance_meters || 0,
+        verification_method: (row.verification_method as VerificationMethod) || 'QR_GPS',
+        attendance_source: (row.attendance_source as AttendanceSource) || 'QR',
+        is_offline: false,
+        notes: row.notes || row.reason || null,
+        created_at: row.created_at,
+      }));
+    });
   }
 
   public async correctAttendance(dto: CorrectAttendanceDTO): Promise<boolean> {
@@ -1106,27 +1135,31 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getDailyAttendance(date: string, _token: string): Promise<AttendanceRecord[]> {
     const targetDate = date || getTodayDateInJakarta();
-    const { data } = await this.client
-      .from('attendance')
-      .select('*')
-      .eq('date', targetDate);
+    return this.dedupeRequest(`getDailyAttendance_${targetDate}`, async () => {
+      const { data } = await this.client
+        .from('attendance')
+        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, reason, created_at')
+        .eq('date', targetDate)
+        .order('created_at', { ascending: false })
+        .limit(200);
 
-    return (data || []).map((row) => ({
-      id: row.id,
-      user_id: row.user_id,
-      date: row.date,
-      check_in_time: row.check_in_time,
-      check_out_time: row.check_out_time,
-      status: row.status as AttendanceStatus,
-      check_in_lat: row.check_in_lat ? parseFloat(row.check_in_lat) : null,
-      check_in_lng: row.check_in_lng ? parseFloat(row.check_in_lng) : null,
-      check_in_distance_meters: row.distance_meters || 0,
-      verification_method: (row.verification_method as VerificationMethod) || 'QR_GPS',
-      attendance_source: (row.attendance_source as AttendanceSource) || 'QR',
-      is_offline: false,
-      notes: row.notes || row.reason || null,
-      created_at: row.created_at,
-    }));
+      return (data || []).map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        date: row.date,
+        check_in_time: row.check_in_time,
+        check_out_time: row.check_out_time,
+        status: row.status as AttendanceStatus,
+        check_in_lat: row.check_in_lat ? parseFloat(row.check_in_lat) : null,
+        check_in_lng: row.check_in_lng ? parseFloat(row.check_in_lng) : null,
+        check_in_distance_meters: row.distance_meters || 0,
+        verification_method: (row.verification_method as VerificationMethod) || 'QR_GPS',
+        attendance_source: (row.attendance_source as AttendanceSource) || 'QR',
+        is_offline: false,
+        notes: row.notes || row.reason || null,
+        created_at: row.created_at,
+      }));
+    });
   }
 
   public async updateAttendanceNote(userId: string, date: string, note: string, _token: string): Promise<boolean> {
@@ -1149,6 +1182,16 @@ export class SupabaseProvider implements IDataProvider {
   public subscribeToAttendanceUpdates(
     callback: (event: { table: string; eventType: string }) => void
   ): () => void {
+    // Unsubscribe previous active channel to prevent duplicate listeners
+    if (this.activeAttendanceChannel) {
+      try {
+        this.client.removeChannel(this.activeAttendanceChannel);
+      } catch (e) {
+        logger.warn('SupabaseProvider', 'Error cleaning up previous activeAttendanceChannel:', e);
+      }
+      this.activeAttendanceChannel = null;
+    }
+
     const channelId = `realtime_live_tracking_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const channel = this.client
       .channel(channelId)
@@ -1179,9 +1222,14 @@ export class SupabaseProvider implements IDataProvider {
         logger.info('SupabaseProvider', `Realtime channel [${channelId}] status:`, status);
       });
 
+    this.activeAttendanceChannel = channel;
+
     return () => {
       try {
         this.client.removeChannel(channel);
+        if (this.activeAttendanceChannel === channel) {
+          this.activeAttendanceChannel = null;
+        }
       } catch (err) {
         logger.warn('SupabaseProvider', 'Error removing realtime channel:', err);
       }
@@ -1212,7 +1260,7 @@ export class SupabaseProvider implements IDataProvider {
       for (const bucketName of bucketsToTry) {
         const { error: uploadError } = await this.client.storage
           .from(bucketName)
-          .upload(fileName, bytes, { upsert: true, contentType });
+          .upload(fileName, bytes, { upsert: true, contentType, cacheControl: '2592000, public' });
 
         if (!uploadError) {
           const { data } = this.client.storage.from(bucketName).getPublicUrl(fileName);
@@ -1340,7 +1388,7 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const { data: leaveRow } = await this.client
           .from('leaves')
-          .select('*')
+          .select('id, user_id, type, leave_type, reason, start_date, end_date')
           .eq('id', leaveId)
           .maybeSingle();
 
@@ -1524,91 +1572,99 @@ export class SupabaseProvider implements IDataProvider {
       return this.cachedAllLeaves;
     }
 
-    const { data } = await this.client
-      .from('leaves')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    const result = (data || []).map((row) => ({
-      id: row.id,
-      user_id: row.user_id,
-      leave_type: (row.type || row.leave_type || 'IZIN') as LeaveType,
-      start_date: row.start_date,
-      end_date: row.end_date,
-      reason: row.reason,
-      attachment_url: row.attachment_url || null,
-      approval_status: (row.status || row.approval_status || 'PENDING') as ApprovalStatus,
-      approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
-      approved_by: row.approved_by || null,
-      approval_notes: row.rejection_notes || row.approval_notes || null,
-      duty_teacher_notes: row.duty_teacher_notes || null,
-      created_at: row.created_at,
-    }));
-
-    this.cachedAllLeaves = result;
-    this.cachedAllLeavesTimestamp = now;
-    return result;
-  }
-
-  public async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
-    try {
-      const { data, error } = await this.client
+    return this.dedupeRequest('getAllLeaves', async () => {
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const { data } = await this.client
         .from('leaves')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .select('id, user_id, type, leave_type, start_date, end_date, reason, attachment_url, status, approval_deadline, approved_by, rejection_notes, duty_teacher_notes, created_at')
+        .or(`created_at.gte.${ninetyDaysAgo},status.eq.PENDING`)
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-      if (error) {
-        logger.warn('SupabaseProvider', 'getUserLeaves query error:', error.message);
-        const saved = localStorage.getItem('smart_absensi_leaves');
-        if (saved) {
-          const list: LeaveRequest[] = JSON.parse(saved);
-          return list.filter((l) => l.user_id === userId || !l.user_id);
-        }
-        return [];
-      }
-
-      const fetchedLeaves: LeaveRequest[] = (data || []).map((row) => ({
+      const result = (data || []).map((row) => ({
         id: row.id,
         user_id: row.user_id,
-        leave_type: (row.type || 'IZIN') as LeaveType,
+        leave_type: (row.type || (row as any).leave_type || 'IZIN') as LeaveType,
         start_date: row.start_date,
         end_date: row.end_date,
         reason: row.reason,
         attachment_url: row.attachment_url || null,
-        duty_teacher_notes: row.duty_teacher_notes || null,
-        approval_status: (row.status || 'PENDING') as ApprovalStatus,
-        approval_deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+        approval_status: (row.status || (row as any).approval_status || 'PENDING') as ApprovalStatus,
+        approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
         approved_by: row.approved_by || null,
-        approval_notes: row.rejection_notes || null,
-        created_at: row.created_at || new Date().toISOString(),
+        approval_notes: row.rejection_notes || (row as any).approval_notes || null,
+        duty_teacher_notes: row.duty_teacher_notes || null,
+        created_at: row.created_at,
       }));
 
-      // Cache to localStorage for offline resilience
-      try {
-        const savedLocal = localStorage.getItem('smart_absensi_leaves');
-        const existingList: LeaveRequest[] = savedLocal ? JSON.parse(savedLocal) : [];
-        const otherUserLeaves = existingList.filter((l) => l.user_id && l.user_id !== userId);
-        const merged = [...fetchedLeaves, ...otherUserLeaves];
-        localStorage.setItem('smart_absensi_leaves', JSON.stringify(merged));
-      } catch {
-        // ignore cache write errors
-      }
+      this.cachedAllLeaves = result;
+      this.cachedAllLeavesTimestamp = Date.now();
+      return result;
+    });
+  }
 
-      return fetchedLeaves;
-    } catch (err) {
-      logger.error('SupabaseProvider', 'getUserLeaves exception:', err);
-      const saved = localStorage.getItem('smart_absensi_leaves');
-      if (saved) {
-        try {
-          const list: LeaveRequest[] = JSON.parse(saved);
-          return list.filter((l) => l.user_id === userId || !l.user_id);
-        } catch {
-          // ignore
+  public async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
+    return this.dedupeRequest(`getUserLeaves_${userId}`, async () => {
+      try {
+        const { data, error } = await this.client
+          .from('leaves')
+          .select('id, user_id, type, leave_type, start_date, end_date, reason, attachment_url, status, approval_deadline, approved_by, rejection_notes, duty_teacher_notes, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        if (error) {
+          logger.warn('SupabaseProvider', 'getUserLeaves query error:', error.message);
+          const saved = localStorage.getItem('smart_absensi_leaves');
+          if (saved) {
+            const list: LeaveRequest[] = JSON.parse(saved);
+            return list.filter((l) => l.user_id === userId || !l.user_id);
+          }
+          return [];
         }
+
+        const fetchedLeaves: LeaveRequest[] = (data || []).map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          leave_type: (row.type || (row as any).leave_type || 'IZIN') as LeaveType,
+          start_date: row.start_date,
+          end_date: row.end_date,
+          reason: row.reason,
+          attachment_url: row.attachment_url || null,
+          duty_teacher_notes: row.duty_teacher_notes || null,
+          approval_status: (row.status || 'PENDING') as ApprovalStatus,
+          approval_deadline: new Date(Date.now() + 86400000 * 3).toISOString(),
+          approved_by: row.approved_by || null,
+          approval_notes: row.rejection_notes || null,
+          created_at: row.created_at || new Date().toISOString(),
+        }));
+
+        // Cache to localStorage for offline resilience
+        try {
+          const savedLocal = localStorage.getItem('smart_absensi_leaves');
+          const existingList: LeaveRequest[] = savedLocal ? JSON.parse(savedLocal) : [];
+          const otherUserLeaves = existingList.filter((l) => l.user_id && l.user_id !== userId);
+          const merged = [...fetchedLeaves, ...otherUserLeaves];
+          localStorage.setItem('smart_absensi_leaves', JSON.stringify(merged));
+        } catch {
+          // ignore cache write errors
+        }
+
+        return fetchedLeaves;
+      } catch (err) {
+        logger.error('SupabaseProvider', 'getUserLeaves exception:', err);
+        const saved = localStorage.getItem('smart_absensi_leaves');
+        if (saved) {
+          try {
+            const list: LeaveRequest[] = JSON.parse(saved);
+            return list.filter((l) => l.user_id === userId || !l.user_id);
+          } catch {
+            // ignore
+          }
+        }
+        return [];
       }
-      return [];
-    }
+    });
   }
 
   // ─── SYSTEM SETTINGS API ──────────────────────────────────────────────────
@@ -1619,31 +1675,33 @@ export class SupabaseProvider implements IDataProvider {
       return this.cachedSettings;
     }
 
-    const { data } = await this.client.from('system_settings').select('*');
+    return this.dedupeRequest('getSettings', async () => {
+      const { data } = await this.client.from('system_settings').select('key, value');
 
-    const map: Record<string, string> = {};
-    (data || []).forEach((row) => {
-      map[row.key] = row.value;
+      const map: Record<string, string> = {};
+      (data || []).forEach((row) => {
+        map[row.key] = row.value;
+      });
+
+      const parsed: SystemSettings = {
+        app_name: map.app_name || 'Smart Absensi Guru',
+        institution_name: map.institution_name || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
+        work_checkin_start: map.work_checkin_start || CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
+        work_checkin_end: map.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
+        work_checkout_start: map.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
+        friday_checkout_start: map.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START,
+        saturday_is_holiday: map.saturday_is_holiday !== 'false',
+        sunday_is_holiday: map.sunday_is_holiday !== 'false',
+        geofence_lat: map.geofence_lat ? parseFloat(map.geofence_lat) : CONSTANTS.DEFAULTS.GEOFENCE_LAT,
+        geofence_lng: map.geofence_lng ? parseFloat(map.geofence_lng) : CONSTANTS.DEFAULTS.GEOFENCE_LNG,
+        geofence_radius: map.geofence_radius ? parseInt(map.geofence_radius, 10) : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+        admin_reset_password: map.admin_reset_password || undefined,
+      };
+
+      this.cachedSettings = parsed;
+      this.cachedSettingsTimestamp = Date.now();
+      return parsed;
     });
-
-    const parsed: SystemSettings = {
-      app_name: map.app_name || 'Smart Absensi Guru',
-      institution_name: map.institution_name || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam',
-      work_checkin_start: map.work_checkin_start || CONSTANTS.DEFAULTS.WORK_CHECKIN_START,
-      work_checkin_end: map.work_checkin_end || CONSTANTS.DEFAULTS.WORK_CHECKIN_END,
-      work_checkout_start: map.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START,
-      friday_checkout_start: map.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START,
-      saturday_is_holiday: map.saturday_is_holiday !== 'false',
-      sunday_is_holiday: map.sunday_is_holiday !== 'false',
-      geofence_lat: map.geofence_lat ? parseFloat(map.geofence_lat) : CONSTANTS.DEFAULTS.GEOFENCE_LAT,
-      geofence_lng: map.geofence_lng ? parseFloat(map.geofence_lng) : CONSTANTS.DEFAULTS.GEOFENCE_LNG,
-      geofence_radius: map.geofence_radius ? parseInt(map.geofence_radius, 10) : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
-      admin_reset_password: map.admin_reset_password || undefined,
-    };
-
-    this.cachedSettings = parsed;
-    this.cachedSettingsTimestamp = now;
-    return parsed;
   }
 
   public async updateSettings(settings: SystemSettings, _token: string): Promise<boolean> {
@@ -1797,7 +1855,11 @@ export class SupabaseProvider implements IDataProvider {
       for (const bucketName of bucketsToTry) {
         const { error: uploadError } = await this.client.storage
           .from(bucketName)
-          .upload(filePath, fileToUpload, { upsert: true, contentType: 'image/webp' });
+          .upload(filePath, fileToUpload, {
+            upsert: true,
+            contentType: 'image/webp',
+            cacheControl: '31536000, public, immutable',
+          });
 
         if (!uploadError) {
           const { data } = this.client.storage.from(bucketName).getPublicUrl(filePath);
@@ -1862,29 +1924,42 @@ export class SupabaseProvider implements IDataProvider {
       return this.cachedHolidays;
     }
 
-    const { data } = await this.client.from('holidays').select('*').order('date', { ascending: true });
-    const result = (data || []).map((row) => {
-      const isSchedule =
-        row.category_type === 'SCHEDULE' ||
-        row.is_holiday === false ||
-        (row.is_holiday === undefined &&
-          ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP', 'OTHER'].includes(row.type));
+    return this.dedupeRequest('getHolidays', async () => {
+      const curYear = new Date().getFullYear();
+      const minDate = `${curYear - 1}-01-01`;
+      const maxDate = `${curYear + 1}-12-31`;
 
-      return {
-        id: row.id,
-        date: row.date,
-        name: row.name,
-        type: (row.type || 'SCHOOL_HOLIDAY') as HolidayType,
-        category_type: (row.category_type || (isSchedule ? 'SCHEDULE' : 'HOLIDAY')) as 'HOLIDAY' | 'SCHEDULE',
-        is_holiday: row.is_holiday !== undefined ? Boolean(row.is_holiday) : !isSchedule,
-        description: row.description,
-        created_at: row.created_at,
-      };
+      const { data } = await this.client
+        .from('holidays')
+        .select('id, date, name, type, category_type, is_holiday, description, created_at')
+        .gte('date', minDate)
+        .lte('date', maxDate)
+        .order('date', { ascending: true })
+        .limit(150);
+
+      const result = (data || []).map((row) => {
+        const isSchedule =
+          row.category_type === 'SCHEDULE' ||
+          row.is_holiday === false ||
+          (row.is_holiday === undefined &&
+            ['RAPAT', 'UJIAN', 'UPACARA', 'WORKSHOP', 'OTHER'].includes(row.type));
+
+        return {
+          id: row.id,
+          date: row.date,
+          name: row.name,
+          type: (row.type || 'SCHOOL_HOLIDAY') as HolidayType,
+          category_type: (row.category_type || (isSchedule ? 'SCHEDULE' : 'HOLIDAY')) as 'HOLIDAY' | 'SCHEDULE',
+          is_holiday: row.is_holiday !== undefined ? Boolean(row.is_holiday) : !isSchedule,
+          description: row.description,
+          created_at: row.created_at,
+        };
+      });
+
+      this.cachedHolidays = result;
+      this.cachedHolidaysTimestamp = Date.now();
+      return result;
     });
-
-    this.cachedHolidays = result;
-    this.cachedHolidaysTimestamp = now;
-    return result;
   }
 
   public async createHoliday(
@@ -2011,7 +2086,7 @@ export class SupabaseProvider implements IDataProvider {
 
       const { data: binding, error } = await this.client
         .from('device_bindings')
-        .select('*')
+        .select('id, user_id, device_uuid')
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -2030,7 +2105,7 @@ export class SupabaseProvider implements IDataProvider {
           user_id: userId,
           device_uuid: currentDeviceUUID,
           bound_at: new Date().toISOString(),
-        }).select().maybeSingle();
+        });
 
         return {
           status: 'UNBOUND',
@@ -2068,7 +2143,8 @@ export class SupabaseProvider implements IDataProvider {
       const { data, error } = await this.client
         .from('notification_reads')
         .select('notification_id')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .limit(100);
 
       if (error) {
         logger.warn('SupabaseProvider', 'getNotificationReads query error:', error.message);
@@ -2086,40 +2162,51 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getNotifications(userId: string, token: string, userRole?: string): Promise<AppNotification[]> {
-    try {
-      // Query notifications targeted to user or broadcast
-      let query = this.client
-        .from('notifications')
-        .select('*');
-
+    return this.dedupeRequest(`getNotifications_${userId}`, async () => {
       try {
-        query = query.or(`recipient_user_id.eq.${userId},user_id.eq.${userId},recipient_user_id.is.null,user_id.is.null`);
-      } catch {
-        query = query.or(`user_id.eq.${userId},user_id.is.null`);
-      }
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const nowIso = new Date().toISOString();
+        const notifCols = 'id, user_id, recipient_user_id, audience_role, title, message, type, severity, category, action_url, action_type, action_date, action_target_id, payload, dedupe_key, revision, is_read, expires_at, resolved_at, created_by, created_at';
 
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) {
-        // Fallback for older schemas where recipient_user_id might not exist
-        const fallback = await this.client
+        // Query notifications targeted to user or broadcast
+        let query = this.client
           .from('notifications')
-          .select('*')
-          .or(`user_id.eq.${userId},user_id.is.null`)
-          .order('created_at', { ascending: false });
+          .select(notifCols)
+          .gte('created_at', thirtyDaysAgo)
+          .or(`expires_at.is.null,expires_at.gte.${nowIso}`);
 
-        if (fallback.error) {
-          logger.warn('SupabaseProvider', 'notifications query error:', fallback.error.message);
-          return [];
+        try {
+          query = query.or(`recipient_user_id.eq.${userId},user_id.eq.${userId},recipient_user_id.is.null,user_id.is.null`);
+        } catch {
+          query = query.or(`user_id.eq.${userId},user_id.is.null`);
         }
-        return await this.processRawNotifications(fallback.data || [], userId, token, userRole);
-      }
 
-      return await this.processRawNotifications(data || [], userId, token, userRole);
-    } catch (err) {
-      logger.error('SupabaseProvider', 'getNotifications exception:', err);
-      return [];
-    }
+        const { data, error } = await query.order('created_at', { ascending: false }).limit(30);
+
+        if (error) {
+          // Fallback for older schemas where recipient_user_id might not exist
+          const fallback = await this.client
+            .from('notifications')
+            .select(notifCols)
+            .gte('created_at', thirtyDaysAgo)
+            .or(`expires_at.is.null,expires_at.gte.${nowIso}`)
+            .or(`user_id.eq.${userId},user_id.is.null`)
+            .order('created_at', { ascending: false })
+            .limit(30);
+
+          if (fallback.error) {
+            logger.warn('SupabaseProvider', 'notifications query error:', fallback.error.message);
+            return [];
+          }
+          return await this.processRawNotifications(fallback.data || [], userId, token, userRole);
+        }
+
+        return await this.processRawNotifications(data || [], userId, token, userRole);
+      } catch (err) {
+        logger.error('SupabaseProvider', 'getNotifications exception:', err);
+        return [];
+      }
+    });
   }
 
   private async processRawNotifications(
@@ -2323,6 +2410,16 @@ export class SupabaseProvider implements IDataProvider {
     userId: string,
     callback: (event: { table: string; eventType: string; payload?: any }) => void
   ): () => void {
+    // Unsubscribe previous active channel to prevent duplicate listeners
+    if (this.activeNotificationChannel) {
+      try {
+        this.client.removeChannel(this.activeNotificationChannel);
+      } catch (e) {
+        logger.warn('SupabaseProvider', 'Error cleaning up previous activeNotificationChannel:', e);
+      }
+      this.activeNotificationChannel = null;
+    }
+
     const channelId = `realtime_notifications_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const channel = this.client
       .channel(channelId)
@@ -2339,7 +2436,12 @@ export class SupabaseProvider implements IDataProvider {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'notification_reads' },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notification_reads',
+          filter: `user_id=eq.${userId}`,
+        },
         (payload) => {
           logger.info('SupabaseProvider', 'Realtime change in notification_reads table:', payload.eventType);
           if (typeof window !== 'undefined') {
@@ -2352,9 +2454,14 @@ export class SupabaseProvider implements IDataProvider {
         logger.info('SupabaseProvider', `Realtime notifications channel [${channelId}] status:`, status);
       });
 
+    this.activeNotificationChannel = channel;
+
     return () => {
       try {
         this.client.removeChannel(channel);
+        if (this.activeNotificationChannel === channel) {
+          this.activeNotificationChannel = null;
+        }
       } catch (err) {
         logger.warn('SupabaseProvider', 'Error removing realtime notifications channel:', err);
       }
@@ -2380,43 +2487,45 @@ export class SupabaseProvider implements IDataProvider {
       updated_at: new Date().toISOString(),
     };
 
-    try {
-      const { data, error } = await this.client
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+    return this.dedupeRequest(`getNotificationPreferences_${userId}`, async () => {
+      try {
+        const { data, error } = await this.client
+          .from('notification_preferences')
+          .select('user_id, push_enabled, attendance_enabled, leave_enabled, schedule_enabled, announcement_enabled, critical_enabled, voice_enabled, sound_enabled, attendance_sound_enabled, chime_enabled, auto_greeting_enabled, quiet_hours_start, quiet_hours_end, updated_at')
+          .eq('user_id', userId)
+          .maybeSingle();
 
-      if (error) {
-        logger.warn('SupabaseProvider', 'getNotificationPreferences fallback to defaults:', error.message);
+        if (error) {
+          logger.warn('SupabaseProvider', 'getNotificationPreferences fallback to defaults:', error.message);
+          return defaultPrefs;
+        }
+
+        if (data) {
+          return {
+            user_id: data.user_id,
+            push_enabled: data.push_enabled ?? true,
+            attendance_enabled: data.attendance_enabled ?? true,
+            leave_enabled: data.leave_enabled ?? true,
+            schedule_enabled: data.schedule_enabled ?? true,
+            announcement_enabled: data.announcement_enabled ?? true,
+            critical_enabled: data.critical_enabled ?? true,
+            voice_enabled: data.voice_enabled ?? true,
+            sound_enabled: data.sound_enabled ?? true,
+            attendance_sound_enabled: data.attendance_sound_enabled ?? true,
+            chime_enabled: data.chime_enabled ?? true,
+            auto_greeting_enabled: data.auto_greeting_enabled ?? false,
+            quiet_hours_start: data.quiet_hours_start ?? null,
+            quiet_hours_end: data.quiet_hours_end ?? null,
+            updated_at: data.updated_at,
+          };
+        }
+
+        return defaultPrefs;
+      } catch (err: any) {
+        logger.warn('SupabaseProvider', 'getNotificationPreferences exception:', err.message);
         return defaultPrefs;
       }
-
-      if (data) {
-        return {
-          user_id: data.user_id,
-          push_enabled: data.push_enabled ?? true,
-          attendance_enabled: data.attendance_enabled ?? true,
-          leave_enabled: data.leave_enabled ?? true,
-          schedule_enabled: data.schedule_enabled ?? true,
-          announcement_enabled: data.announcement_enabled ?? true,
-          critical_enabled: data.critical_enabled ?? true,
-          voice_enabled: data.voice_enabled ?? true,
-          sound_enabled: data.sound_enabled ?? true,
-          attendance_sound_enabled: data.attendance_sound_enabled ?? true,
-          chime_enabled: data.chime_enabled ?? true,
-          auto_greeting_enabled: data.auto_greeting_enabled ?? false,
-          quiet_hours_start: data.quiet_hours_start ?? null,
-          quiet_hours_end: data.quiet_hours_end ?? null,
-          updated_at: data.updated_at,
-        };
-      }
-
-      return defaultPrefs;
-    } catch (err: any) {
-      logger.warn('SupabaseProvider', 'getNotificationPreferences exception:', err.message);
-      return defaultPrefs;
-    }
+    });
   }
 
   public async saveNotificationPreferences(
@@ -2495,7 +2604,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data, error } = await this.client
         .from('teacher_moods')
-        .select('*')
+        .select('id, user_id, date, mood, note, created_at')
         .eq('user_id', userId)
         .eq('date', date)
         .maybeSingle();
@@ -2532,127 +2641,145 @@ export class SupabaseProvider implements IDataProvider {
     const targetYear = year || today.substring(0, 4);
     const targetMonth = month !== undefined ? month : String(parseInt(today.substring(5, 7), 10));
 
-    const breakdown: Record<TeacherMoodType, number> = {
-      VERY_HAPPY: 0,
-      HAPPY: 0,
-      NEUTRAL: 0,
-      TIRED: 0,
-      STRESSED: 0,
-    };
+    return this.dedupeRequest(`getBurnoutAnalytics_${targetYear}_${targetMonth}`, async () => {
+      const breakdown: Record<TeacherMoodType, number> = {
+        VERY_HAPPY: 0,
+        HAPPY: 0,
+        NEUTRAL: 0,
+        TIRED: 0,
+        STRESSED: 0,
+      };
 
-    let totalLogs: TeacherMoodLog[] = [];
+      let totalLogs: TeacherMoodLog[] = [];
 
-    try {
-      let query = this.client.from('teacher_moods').select('*');
+      try {
+        let query = this.client
+          .from('teacher_moods')
+          .select('id, user_id, date, mood, note, created_at');
 
-      if (targetMonth === 'ALL') {
-        query = query.gte('date', `${targetYear}-01-01`).lte('date', `${targetYear}-12-31`);
-      } else {
-        const monthNum = parseInt(targetMonth, 10);
-        const monthPad = String(targetMonth).padStart(2, '0');
-        const lastDay = new Date(parseInt(targetYear, 10), monthNum, 0).getDate();
-        query = query.gte('date', `${targetYear}-${monthPad}-01`).lte('date', `${targetYear}-${monthPad}-${String(lastDay).padStart(2, '0')}`);
-      }
-
-      const { data, error } = await query;
-
-      if (!error && data && data.length > 0) {
-        totalLogs = data.map((d) => ({
-          id: d.id,
-          user_id: d.user_id,
-          date: d.date,
-          mood: d.mood as TeacherMoodType,
-          note: d.note,
-          created_at: d.created_at,
-        }));
-      }
-    } catch (err) {
-      logger.warn('SupabaseProvider', 'getBurnoutAnalytics Supabase query error, fallback to mock:', err);
-    }
-
-    if (totalLogs.length === 0 && typeof localStorage !== 'undefined') {
-      const raw = localStorage.getItem('smart_absensi_teacher_moods');
-      if (raw) {
-        try {
-          const parsed: TeacherMoodLog[] = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            if (targetMonth === 'ALL') {
-              totalLogs = parsed.filter((log) => log.date && log.date.startsWith(`${targetYear}-`));
-            } else {
-              const monthPad = String(targetMonth).padStart(2, '0');
-              totalLogs = parsed.filter((log) => log.date && log.date.startsWith(`${targetYear}-${monthPad}`));
-            }
-          }
-        } catch {}
-      }
-    }
-
-    if (totalLogs.length > 0) {
-      totalLogs.forEach((log) => {
-        if (breakdown[log.mood] !== undefined) {
-          breakdown[log.mood]++;
+        if (targetMonth === 'ALL') {
+          query = query.gte('date', `${targetYear}-01-01`).lte('date', `${targetYear}-12-31`);
+        } else {
+          const monthNum = parseInt(targetMonth, 10);
+          const monthPad = String(targetMonth).padStart(2, '0');
+          const lastDay = new Date(parseInt(targetYear, 10), monthNum, 0).getDate();
+          query = query.gte('date', `${targetYear}-${monthPad}-01`).lte('date', `${targetYear}-${monthPad}-${String(lastDay).padStart(2, '0')}`);
         }
-      });
-    }
 
-    const total = totalLogs.length;
-    const tiredAndStressed = breakdown.TIRED + breakdown.STRESSED;
-    const stressPercentage = total > 0 ? (tiredAndStressed / total) * 100 : 0;
+        const { data, error } = await query.order('date', { ascending: false }).limit(200);
 
-    let burnout_risk_level: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
-    let recommendation = total === 0
-      ? 'Belum ada data mood guru yang tercatat pada periode ini. Grafik dan rekomendasi akan muncul secara realtime begitu dewan guru mengisi mood check-in harian.'
-      : 'Tingkat kesejahteraan dewan guru dalam kondisi prima. Pertahankan iklim kerja kondusif dan apresiasi kinerja guru secara berkala.';
+        if (!error && data && data.length > 0) {
+          totalLogs = data.map((d) => ({
+            id: d.id,
+            user_id: d.user_id,
+            date: d.date,
+            mood: d.mood as TeacherMoodType,
+            note: d.note,
+            created_at: d.created_at,
+          }));
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'getBurnoutAnalytics Supabase query error, fallback to mock:', err);
+      }
 
-    if (stressPercentage >= 35) {
-      burnout_risk_level = 'HIGH';
-      recommendation = '⚠️ PERHATIAN KEPSEK: Indikasi burnout tinggi (>35% guru merasa lelah/stres). Disarankan melakukan evaluasi beban mengajar/JTM dan mengadakan sesi kebersamaan/refreshment.';
-    } else if (stressPercentage >= 15) {
-      burnout_risk_level = 'MEDIUM';
-      recommendation = '⚡ WASPADA: Terdapat peningkatan indikasi kelelahan kerja pada beberapa guru. Pertimbangkan sesi apresiasi ringan atau optimasi distribusi jadwal mengajar.';
-    }
+      if (totalLogs.length === 0 && typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('smart_absensi_teacher_moods');
+        if (raw) {
+          try {
+            const parsed: TeacherMoodLog[] = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              if (targetMonth === 'ALL') {
+                totalLogs = parsed.filter((log) => log.date && log.date.startsWith(`${targetYear}-`));
+              } else {
+                const monthPad = String(targetMonth).padStart(2, '0');
+                totalLogs = parsed.filter((log) => log.date && log.date.startsWith(`${targetYear}-${monthPad}`));
+              }
+            }
+          } catch {}
+        }
+      }
 
-    return {
-      total_responses: total,
-      burnout_risk_level,
-      burnout_score: Math.round(stressPercentage),
-      mood_breakdown: breakdown,
-      recommendation,
-    };
+      if (totalLogs.length > 0) {
+        totalLogs.forEach((log) => {
+          if (breakdown[log.mood] !== undefined) {
+            breakdown[log.mood]++;
+          }
+        });
+      }
+
+      const total = totalLogs.length;
+      const tiredAndStressed = breakdown.TIRED + breakdown.STRESSED;
+      const stressPercentage = total > 0 ? (tiredAndStressed / total) * 100 : 0;
+
+      let burnout_risk_level: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+      let recommendation = total === 0
+        ? 'Belum ada data mood guru yang tercatat pada periode ini. Grafik dan rekomendasi akan muncul secara realtime begitu dewan guru mengisi mood check-in harian.'
+        : 'Tingkat kesejahteraan dewan guru dalam kondisi prima. Pertahankan iklim kerja kondusif dan apresiasi kinerja guru secara berkala.';
+
+      if (stressPercentage >= 35) {
+        burnout_risk_level = 'HIGH';
+        recommendation = '⚠️ PERHATIAN KEPSEK: Indikasi burnout tinggi (>35% guru merasa lelah/stres). Disarankan melakukan evaluasi beban mengajar/JTM dan mengadakan sesi kebersamaan/refreshment.';
+      } else if (stressPercentage >= 15) {
+        burnout_risk_level = 'MEDIUM';
+        recommendation = '⚡ WASPADA: Terdapat peningkatan indikasi kelelahan kerja pada beberapa guru. Pertimbangkan sesi apresiasi ringan atau optimasi distribusi jadwal mengajar.';
+      }
+
+      return {
+        total_responses: total,
+        burnout_risk_level,
+        burnout_score: Math.round(stressPercentage),
+        mood_breakdown: breakdown,
+        recommendation,
+      };
+    });
   }
 
   // Teacher Duty Schedule API (Jadwal Piket Guru Senin - Jumat)
   public async getDutySchedules(_token?: string): Promise<TeacherDutySchedule[]> {
-    try {
-      const { data, error } = await this.client
-        .from('teacher_duty_schedules')
-        .select('*')
-        .order('day_of_week', { ascending: true });
-
-      if (!error && data) {
-        const normalized: TeacherDutySchedule[] = data.map((item: any) => ({
-          ...item,
-          day_of_week: Number(item.day_of_week),
-        }));
-
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('smart_absensi_duty_schedules', JSON.stringify(normalized));
-        }
-        return normalized;
-      }
-    } catch (err) {
-      logger.warn('SupabaseProvider', 'getDutySchedules error, falling back to local storage:', err);
+    const now = Date.now();
+    if (this.cachedDutySchedules && now - this.cachedDutySchedulesTimestamp < 300000) {
+      return this.cachedDutySchedules;
     }
 
-    // Fallback to local storage if DB query fails
-    const mockProv = new (await import('./mock-provider.service')).MockProvider();
-    return mockProv.getDutySchedules();
+    return this.dedupeRequest('getDutySchedules', async () => {
+      try {
+        const { data, error } = await this.client
+          .from('teacher_duty_schedules')
+          .select('id, day_of_week, teacher_id, teacher_name, notes, created_at')
+          .order('day_of_week', { ascending: true })
+          .limit(50);
+
+        if (!error && data) {
+          const normalized: TeacherDutySchedule[] = data.map((item: any) => ({
+            ...item,
+            day_of_week: Number(item.day_of_week),
+          }));
+
+          this.cachedDutySchedules = normalized;
+          this.cachedDutySchedulesTimestamp = Date.now();
+
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('smart_absensi_duty_schedules', JSON.stringify(normalized));
+          }
+          return normalized;
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'getDutySchedules error, falling back to local storage:', err);
+      }
+
+      // Fallback to local storage if DB query fails
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.getDutySchedules();
+    });
   }
 
   public async saveDutySchedules(
     schedules: Omit<TeacherDutySchedule, 'id' | 'created_at'>[],
     _token?: string
   ): Promise<boolean> {
+    this.cachedDutySchedules = null;
+    this.cachedDutySchedulesTimestamp = 0;
+
     try {
       // 1. Sanitize, validate, and deduplicate schedules by (day_of_week, teacher_id)
       const uniqueMap = new Map<string, Omit<TeacherDutySchedule, 'id' | 'created_at'>>();
@@ -2714,7 +2841,7 @@ export class SupabaseProvider implements IDataProvider {
         const { data: insertedData, error: insError } = await this.client
           .from('teacher_duty_schedules')
           .insert(dbPayload)
-          .select();
+          .select('id, day_of_week, teacher_id, teacher_name, notes, created_at');
 
         if (insError) {
           logger.error('SupabaseProvider', 'Failed to insert teacher_duty_schedules to Supabase:', insError);
@@ -2766,7 +2893,7 @@ export class SupabaseProvider implements IDataProvider {
           is_anonymous: dto.is_anonymous ?? true,
           created_at: new Date().toISOString(),
         })
-        .select()
+        .select('id, user_id, date, category, content, status, is_anonymous, created_at')
         .single();
 
       if (error) {
@@ -2789,9 +2916,10 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data, error } = await this.client
         .from('teacher_complaints')
-        .select('*')
+        .select('id, user_id, date, category, content, status, response, response_by, is_anonymous, created_at')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(30);
 
       if (error) {
         logger.warn('SupabaseProvider', 'getUserComplaints Supabase error, fallback to local storage:', error.message);
@@ -2810,14 +2938,15 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data, error } = await this.client
         .from('teacher_complaints')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, date, category, content, status, response, response_by, is_anonymous, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) {
         logger.warn('SupabaseProvider', 'getAllComplaints Supabase error, fallback to local storage:', error.message);
       } else if (data) {
         // Mask user_id for strict anonymity
-        return (data as TeacherComplaint[]).map((c) => ({
+        return (data as any[]).map((c) => ({
           ...c,
           user_id: 'ANONYMOUS',
         }));
@@ -2903,55 +3032,60 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string,
     filter?: { teacher_user_id?: string; academic_year?: string; day_of_week?: number }
   ): Promise<TeachingSlot[]> {
-    try {
-      let query = this.client
-        .from('teaching_schedules')
-        .select('*, users:teacher_user_id(id, full_name)')
-        .eq('is_active', true);
+    const dedupeKey = `getTeachingSchedules_${filter?.teacher_user_id || 'ALL'}_${filter?.academic_year || ''}_${filter?.day_of_week ?? ''}`;
+    return this.dedupeRequest(dedupeKey, async () => {
+      try {
+        const scheduleCols = 'id, teacher_user_id, teacher_name, day_of_week, day, start_time, end_time, time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by';
 
-      if (filter?.teacher_user_id) {
-        query = query.eq('teacher_user_id', filter.teacher_user_id);
-      }
-      if (filter?.academic_year) {
-        query = query.eq('academic_year', filter.academic_year);
-      }
-      if (filter?.day_of_week !== undefined) {
-        query = query.eq('day_of_week', filter.day_of_week);
-      }
+        let query = this.client
+          .from('teaching_schedules')
+          .select(`${scheduleCols}, users:teacher_user_id(id, full_name)`)
+          .eq('is_active', true);
 
-      const { data, error } = await query;
-
-      if (error) {
-        logger.warn('SupabaseProvider', 'getTeachingSchedules joined query error, fallback select:', error.message);
-        let fallbackQuery = this.client.from('teaching_schedules').select('*');
         if (filter?.teacher_user_id) {
-          fallbackQuery = fallbackQuery.eq('teacher_user_id', filter.teacher_user_id);
+          query = query.eq('teacher_user_id', filter.teacher_user_id);
         }
         if (filter?.academic_year) {
-          fallbackQuery = fallbackQuery.eq('academic_year', filter.academic_year);
+          query = query.eq('academic_year', filter.academic_year);
         }
         if (filter?.day_of_week !== undefined) {
-          fallbackQuery = fallbackQuery.eq('day_of_week', filter.day_of_week);
+          query = query.eq('day_of_week', filter.day_of_week);
         }
-        const fallbackRes = await fallbackQuery;
-        if (fallbackRes.error) {
-          logger.warn('SupabaseProvider', 'getTeachingSchedules fallback query error:', fallbackRes.error.message);
-          const mockProv = new (await import('./mock-provider.service')).MockProvider();
-          return mockProv.getTeachingSchedules(_token, filter);
-        }
-        // Honest data state: empty array is valid, do not fall back to mock data
-        const mapped = (fallbackRes.data || []).map((row: any) => this.mapDbRowToTeachingSlot(row));
-        return sortTeachingSlots(mapped);
-      }
 
-      // Honest data state: if query succeeded, return mapped records (even if empty [])
-      const mapped = (data || []).map((row: any) => this.mapDbRowToTeachingSlot(row));
-      return sortTeachingSlots(mapped);
-    } catch (err) {
-      logger.warn('SupabaseProvider', 'getTeachingSchedules DB exception:', err);
-      const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      return mockProv.getTeachingSchedules(_token, filter);
-    }
+        const { data, error } = await query.order('day_of_week', { ascending: true }).limit(50);
+
+        if (error) {
+          logger.warn('SupabaseProvider', 'getTeachingSchedules joined query error, fallback select:', error.message);
+          let fallbackQuery = this.client.from('teaching_schedules').select(scheduleCols);
+          if (filter?.teacher_user_id) {
+            fallbackQuery = fallbackQuery.eq('teacher_user_id', filter.teacher_user_id);
+          }
+          if (filter?.academic_year) {
+            fallbackQuery = fallbackQuery.eq('academic_year', filter.academic_year);
+          }
+          if (filter?.day_of_week !== undefined) {
+            fallbackQuery = fallbackQuery.eq('day_of_week', filter.day_of_week);
+          }
+          const fallbackRes = await fallbackQuery.order('day_of_week', { ascending: true }).limit(50);
+          if (fallbackRes.error) {
+            logger.warn('SupabaseProvider', 'getTeachingSchedules fallback query error:', fallbackRes.error.message);
+            const mockProv = new (await import('./mock-provider.service')).MockProvider();
+            return mockProv.getTeachingSchedules(_token, filter);
+          }
+          // Honest data state: empty array is valid, do not fall back to mock data
+          const mapped = (fallbackRes.data || []).map((row: any) => this.mapDbRowToTeachingSlot(row));
+          return sortTeachingSlots(mapped);
+        }
+
+        // Honest data state: if query succeeded, return mapped records (even if empty [])
+        const mapped = (data || []).map((row: any) => this.mapDbRowToTeachingSlot(row));
+        return sortTeachingSlots(mapped);
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'getTeachingSchedules DB exception:', err);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getTeachingSchedules(_token, filter);
+      }
+    });
   }
 
   public async createTeachingSchedule(
@@ -3025,7 +3159,7 @@ export class SupabaseProvider implements IDataProvider {
       const { data, error } = await this.client
         .from('teaching_schedules')
         .insert([payload])
-        .select('*')
+        .select('id, teacher_user_id, teacher_name, day_of_week, day, start_time, end_time, time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by')
         .single();
 
       if (error) {
@@ -3056,7 +3190,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data: existingRow, error: fetchErr } = await this.client
         .from('teaching_schedules')
-        .select('*')
+        .select('id, teacher_user_id, teacher_name, day_of_week, day, start_time, end_time, time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until')
         .eq('id', dto.id)
         .maybeSingle();
 
@@ -3072,7 +3206,7 @@ export class SupabaseProvider implements IDataProvider {
         };
       }
 
-      const teacherUserId = dto.teacher_user_id || existingRow.teacher_user_id || existingRow.user_id;
+      const teacherUserId = dto.teacher_user_id || existingRow.teacher_user_id || (existingRow as any).user_id;
       const dayOfWeek = normalizeDayOfWeek(
         dto.day_of_week !== undefined
           ? dto.day_of_week
@@ -3131,7 +3265,7 @@ export class SupabaseProvider implements IDataProvider {
         .from('teaching_schedules')
         .update(updatePayload)
         .eq('id', dto.id)
-        .select('*')
+        .select('id, teacher_user_id, teacher_name, day_of_week, day, start_time, end_time, time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by')
         .single();
 
       if (updateErr) {
@@ -3231,32 +3365,34 @@ export class SupabaseProvider implements IDataProvider {
 
   // ── STUDENT DIRECTORY & RFID ATTENDANCE API ──────────────────────────────
   public async getStudents(_token?: string): Promise<StudentItem[]> {
-    try {
-      // 1. Try fetching from public.students
-      const { data, error } = await this.client
-        .from('students')
-        .select('*')
-        .order('class_name', { ascending: true })
-        .order('full_name', { ascending: true });
+    return this.dedupeRequest('getStudents', async () => {
+      try {
+        // 1. Try fetching from public.students
+        const { data, error } = await this.client
+          .from('students')
+          .select('id, nisn, full_name, class_name, academic_year, gender, rfid_uid, card_status, attendance_rate, last_tap_at, address, notes, created_at, updated_at')
+          .order('class_name', { ascending: true })
+          .order('full_name', { ascending: true })
+          .limit(200);
 
-      if (!error && data && data.length > 0) {
-        return (data as any[]).map((row) => ({
-          id: row.id,
-          nisn: row.nisn || '',
-          fullName: row.full_name,
-          className: row.class_name,
-          academicYear: row.academic_year || '2026/2027',
-          gender: row.gender || 'L',
-          rfidUid: row.rfid_uid || undefined,
-          cardStatus: row.card_status || 'ACTIVE',
-          attendanceRate: row.attendance_rate != null ? Number(row.attendance_rate) : 100,
-          lastTapAt: row.last_tap_at || undefined,
-          address: row.address,
-          notes: row.notes,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
-        }));
-      }
+        if (!error && data && data.length > 0) {
+          return (data as any[]).map((row) => ({
+            id: row.id,
+            nisn: row.nisn || '',
+            fullName: row.full_name,
+            className: row.class_name,
+            academicYear: row.academic_year || '2026/2027',
+            gender: row.gender || 'L',
+            rfidUid: row.rfid_uid || undefined,
+            cardStatus: row.card_status || 'ACTIVE',
+            attendanceRate: row.attendance_rate != null ? Number(row.attendance_rate) : 100,
+            lastTapAt: row.last_tap_at || undefined,
+            address: row.address,
+            notes: row.notes,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+          }));
+        }
 
       // 2. If table doesn't exist yet or is empty, auto-read from gm_behaviors (Active Academic Year 2026/2027)
       const { data: activeBehaviors, error: bErr } = await this.client
@@ -3307,6 +3443,7 @@ export class SupabaseProvider implements IDataProvider {
 
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.getStudents();
+    });
   }
 
   public async saveStudents(
@@ -3614,7 +3751,7 @@ export class SupabaseProvider implements IDataProvider {
       // Check if already tapped today in gm_attendance
       const { data: existingRecords } = await this.client
         .from('gm_attendance')
-        .select('*')
+        .select('id, student_name, class_name, subject, academic_year, status, date, check_in_time, check_out_time, rfid_uid, created_at')
         .eq('student_name', student.fullName)
         .eq('class_name', student.className)
         .eq('date', todayDate)
@@ -3658,7 +3795,7 @@ export class SupabaseProvider implements IDataProvider {
       const { data: inserted, error: insertErr } = await this.client
         .from('gm_attendance')
         .insert([newAttendanceRow])
-        .select()
+        .select('id, student_name, class_name, subject, academic_year, status, date, check_in_time, check_out_time, rfid_uid, created_at')
         .single();
 
       if (insertErr) {
@@ -3703,10 +3840,11 @@ export class SupabaseProvider implements IDataProvider {
     try {
       let query = this.client
         .from('gm_attendance')
-        .select('*')
+        .select('id, student_name, class_name, subject, academic_year, status, date, check_in_time, check_out_time, rfid_uid, created_at')
         .eq('date', date)
         .eq('academic_year', academicYear)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (className && className !== 'ALL') {
         query = query.eq('class_name', className);
@@ -3749,10 +3887,11 @@ export class SupabaseProvider implements IDataProvider {
       // 1. Primary: Coba baca dari tabel relasional student_character_summary & students
       let querySummary = this.client
         .from('student_character_summary')
-        .select('*, students!inner(id, full_name, class_name, academic_year, avatar_url)')
+        .select('id, student_id, academic_year, total_points, merits_points, demerits_points, violation_count, commendation_count, updated_at, students!inner(id, full_name, class_name, academic_year, avatar_url)')
         .eq('academic_year', academicYear)
         .order('students(class_name)', { ascending: true })
-        .order('students(full_name)', { ascending: true });
+        .order('students(full_name)', { ascending: true })
+        .limit(200);
 
       if (className && className !== 'ALL') {
         querySummary = querySummary.eq('students.class_name', className);
@@ -3764,12 +3903,15 @@ export class SupabaseProvider implements IDataProvider {
         const logsByStudent: Record<string, StudentBehaviorLog[]> = {};
 
         if (studentIds.length > 0) {
+          const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
           const { data: rawLogs } = await this.client
             .from('student_behavior_logs')
-            .select('*')
+            .select('id, student_id, type, points, reason_text, reason_code, occurred_at, timezone, recorded_by_name, recorded_by_user_id, idempotency_key')
             .in('student_id', studentIds)
             .is('voided_at', null)
-            .order('occurred_at', { ascending: false });
+            .gte('occurred_at', ninetyDaysAgo)
+            .order('occurred_at', { ascending: false })
+            .limit(100);
 
           if (rawLogs) {
             rawLogs.forEach((l: any) => {
@@ -3800,7 +3942,7 @@ export class SupabaseProvider implements IDataProvider {
           const demerits = row.demerits_points ?? 0;
           const net = merits - demerits;
           return {
-            id: row.students?.id || row.student_id,
+            id: row.id,
             student_id: row.student_id,
             student_name: row.students?.full_name || '',
             class_name: row.students?.class_name || '',
@@ -3809,6 +3951,8 @@ export class SupabaseProvider implements IDataProvider {
             merits_points: merits,
             demerits_points: demerits,
             net_points: net,
+            violation_count: row.violation_count ?? 0,
+            commendation_count: row.commendation_count ?? 0,
             behavior_logs: logsByStudent[row.student_id] || [],
             avatar_url: row.students?.avatar_url || null,
             sync_status: 'SYNCED' as const,
@@ -3821,10 +3965,11 @@ export class SupabaseProvider implements IDataProvider {
       // 2. Fallback Kompatibilitas: Baca dari legacy gm_behaviors
       let query = this.client
         .from('gm_behaviors')
-        .select('*')
+        .select('id, student_name, class_name, academic_year, total_points, behavior_logs, created_at, updated_at')
         .eq('academic_year', academicYear)
         .order('class_name', { ascending: true })
-        .order('student_name', { ascending: true });
+        .order('student_name', { ascending: true })
+        .limit(100);
 
       if (className && className !== 'ALL') {
         query = query.eq('class_name', className);
@@ -3839,9 +3984,10 @@ export class SupabaseProvider implements IDataProvider {
           try {
             const { data: dbLogs } = await this.client
               .from('gm_behavior_logs')
-              .select('*')
+              .select('id, student_id, points_delta, reason, violation_date, created_at')
               .in('student_id', studentIds)
-              .order('violation_date', { ascending: false });
+              .order('violation_date', { ascending: false })
+              .limit(100);
 
             if (dbLogs) {
               dbLogs.forEach((l: any) => {
@@ -4070,7 +4216,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       let { data: existing, error: findErr } = await this.client
         .from('gm_behaviors')
-        .select('*')
+        .select('id, student_name, class_name, academic_year, total_points, behavior_logs')
         .eq('academic_year', academicYear)
         .ilike('student_name', cleanName)
         .ilike('class_name', cleanClass)
@@ -4282,10 +4428,11 @@ export class SupabaseProvider implements IDataProvider {
       // 1. Coba baca dari tabel relasional student_behavior_logs
       const { data: relLogs, error: relErr } = await this.client
         .from('student_behavior_logs')
-        .select('*, students!inner(full_name, class_name)')
+        .select('id, student_id, type, points, reason_text, reason_code, occurred_at, timezone, recorded_by_name, recorded_by_user_id, voided_at, void_reason, students!inner(full_name, class_name)')
         .ilike('students.full_name', cleanName)
         .ilike('students.class_name', cleanClass)
-        .order('occurred_at', { ascending: false });
+        .order('occurred_at', { ascending: false })
+        .limit(50);
 
       if (!relErr && relLogs && relLogs.length > 0) {
         return relLogs.map((l: any) => ({
@@ -4324,9 +4471,10 @@ export class SupabaseProvider implements IDataProvider {
         try {
           const { data: dbLogs } = await this.client
             .from('gm_behavior_logs')
-            .select('*')
+            .select('id, student_id, points_delta, reason, violation_date, created_at')
             .eq('student_id', data.id)
-            .order('violation_date', { ascending: false });
+            .order('violation_date', { ascending: false })
+            .limit(50);
 
           if (dbLogs && dbLogs.length > 0) {
             const mappedLogs: StudentBehaviorLog[] = dbLogs.map((l: any) => ({
@@ -4580,49 +4728,51 @@ export class SupabaseProvider implements IDataProvider {
 
   // TEACHER DISCIPLINE POINT HISTORY API
   public async getTeacherPointHistory(userId: string, _token?: string): Promise<TeacherPointLog[]> {
-    try {
-      let query = this.client
-        .from('teacher_point_history')
-        .select('*')
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
+    return this.dedupeRequest(`getTeacherPointHistory_${userId}`, async () => {
+      try {
+        let query = this.client
+          .from('teacher_point_history')
+          .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false });
 
-      if (userId !== 'ALL') {
-        query = query.eq('user_id', userId);
-      } else {
-        query = query.limit(500);
-      }
+        if (userId !== 'ALL') {
+          query = query.eq('user_id', userId).limit(30);
+        } else {
+          query = query.limit(100);
+        }
 
-      const { data, error } = await query;
+        const { data, error } = await query;
 
-      if (error) {
-        logger.warn('SupabaseProvider', 'getTeacherPointHistory Supabase error, falling back to mock provider:', error.message);
+        if (error) {
+          logger.warn('SupabaseProvider', 'getTeacherPointHistory Supabase error, falling back to mock provider:', error.message);
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          return mockProv.getTeacherPointHistory(userId);
+        }
+
+        if (data && data.length > 0) {
+          return data.map((row: any) => ({
+            id: row.id,
+            user_id: row.user_id,
+            teacher_name: row.teacher_name || undefined,
+            date: row.date,
+            points: Number(row.points) || 0,
+            activity_type: row.activity_type as TeacherPointActivityType,
+            title: row.title,
+            description: row.description || undefined,
+            created_at: row.created_at,
+          }));
+        }
+
+        // If database returned 0 rows, check fallback seed in mock provider
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getTeacherPointHistory(userId);
+      } catch (err) {
+        logger.error('SupabaseProvider', 'getTeacherPointHistory exception:', err);
         const mockProv = new (await import('./mock-provider.service')).MockProvider();
         return mockProv.getTeacherPointHistory(userId);
       }
-
-      if (data && data.length > 0) {
-        return data.map((row: any) => ({
-          id: row.id,
-          user_id: row.user_id,
-          teacher_name: row.teacher_name || undefined,
-          date: row.date,
-          points: Number(row.points) || 0,
-          activity_type: row.activity_type as TeacherPointActivityType,
-          title: row.title,
-          description: row.description || undefined,
-          created_at: row.created_at,
-        }));
-      }
-
-      // If database returned 0 rows, check fallback seed in mock provider
-      const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      return mockProv.getTeacherPointHistory(userId);
-    } catch (err) {
-      logger.error('SupabaseProvider', 'getTeacherPointHistory exception:', err);
-      const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      return mockProv.getTeacherPointHistory(userId);
-    }
+    });
   }
 
   public async recordTeacherPoint(
@@ -4655,7 +4805,7 @@ export class SupabaseProvider implements IDataProvider {
           .from('teacher_point_history')
           .update(payload)
           .eq('id', existingPoint.id)
-          .select()
+          .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
           .maybeSingle();
         if (error) throw error;
         savedRecord = data as TeacherPointLog;
@@ -4670,7 +4820,7 @@ export class SupabaseProvider implements IDataProvider {
         const { data, error } = await this.client
           .from('teacher_point_history')
           .insert({ id, ...payload })
-          .select()
+          .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
           .maybeSingle();
         if (error) throw error;
         savedRecord = data as TeacherPointLog;
@@ -4715,30 +4865,43 @@ export class SupabaseProvider implements IDataProvider {
   // SARANA DAN PRASARANA (SARPRAS) INVENTORY API
   // ============================================================================
   public async getInventorySarpras(_token?: string): Promise<InventorySarprasItem[]> {
-    try {
-      const { data, error } = await this.client
-        .from('inventory_sarpras')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const now = Date.now();
+    if (this.cachedInventorySarpras && now - this.cachedInventorySarprasTimestamp < 300000) {
+      return this.cachedInventorySarpras;
+    }
 
-      if (error) {
-        logger.warn('SupabaseProvider', 'getInventorySarpras error, falling back to mock provider:', error.message);
+    return this.dedupeRequest('getInventorySarpras', async () => {
+      try {
+        const { data, error } = await this.client
+          .from('inventory_sarpras')
+          .select('id, ruangan, nama_barang, jumlah_total, merek, tahun_perolehan, kondisi, yang_harus_dibeli, sumber_dana, keterangan, created_by, created_by_name, created_at, updated_at')
+          .order('created_at', { ascending: false })
+          .limit(200);
+
+        if (error) {
+          logger.warn('SupabaseProvider', 'getInventorySarpras error, falling back to mock provider:', error.message);
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          return mockProv.getInventorySarpras();
+        }
+
+        if (data && Array.isArray(data)) {
+          this.cachedInventorySarpras = data as InventorySarprasItem[];
+          this.cachedInventorySarprasTimestamp = Date.now();
+          return data as InventorySarprasItem[];
+        }
+        return [];
+      } catch (err) {
+        logger.error('SupabaseProvider', 'getInventorySarpras exception, falling back to mock provider:', err);
         const mockProv = new (await import('./mock-provider.service')).MockProvider();
         return mockProv.getInventorySarpras();
       }
-
-      if (data && Array.isArray(data)) {
-        return data as InventorySarprasItem[];
-      }
-      return [];
-    } catch (err) {
-      logger.error('SupabaseProvider', 'getInventorySarpras exception, falling back to mock provider:', err);
-      const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      return mockProv.getInventorySarpras();
-    }
+    });
   }
 
   public async createInventorySarpras(dto: CreateInventorySarprasDTO, _token?: string): Promise<InventorySarprasItem> {
+    this.cachedInventorySarpras = null;
+    this.cachedInventorySarprasTimestamp = 0;
+
     try {
       const activeUser = useAuthStore.getState().user;
       const payload = {
@@ -4758,7 +4921,7 @@ export class SupabaseProvider implements IDataProvider {
       const { data, error } = await this.client
         .from('inventory_sarpras')
         .insert(payload)
-        .select()
+        .select('id, ruangan, nama_barang, jumlah_total, merek, tahun_perolehan, kondisi, yang_harus_dibeli, sumber_dana, keterangan, created_by, created_by_name, created_at, updated_at')
         .single();
 
       if (error) {
@@ -4776,6 +4939,9 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async updateInventorySarpras(id: string, dto: UpdateInventorySarprasDTO, _token?: string): Promise<boolean> {
+    this.cachedInventorySarpras = null;
+    this.cachedInventorySarprasTimestamp = 0;
+
     try {
       const payload: Record<string, any> = {
         updated_at: new Date().toISOString(),
@@ -4810,6 +4976,9 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async deleteInventorySarpras(id: string, _token?: string): Promise<boolean> {
+    this.cachedInventorySarpras = null;
+    this.cachedInventorySarprasTimestamp = 0;
+
     try {
       const { error } = await this.client
         .from('inventory_sarpras')
@@ -4833,22 +5002,72 @@ export class SupabaseProvider implements IDataProvider {
   // ─── EXAM CORRECTION & GRADING API (Koreksi Soal & Nilai Siswa) ───────────────
 
   public async getExamSessions(_token?: string): Promise<ExamSessionRecord[]> {
-    try {
-      const { data, error } = await this.client
-        .from('gm_sessions')
-        .select('*')
-        .order('created_at', { ascending: false });
+    return this.dedupeRequest('getExamSessions', async () => {
+      try {
+        const { data, error } = await this.client
+          .from('gm_sessions')
+          .select('id, session_name, teacher, subject, class_name, class_code, owner_user_id, school_level, scoring_config, exam_type, academic_year, semester, kkm, created_at, updated_at')
+          .order('created_at', { ascending: false })
+          .limit(50);
 
-      if (error) {
-        logger.error('SupabaseProvider', 'getExamSessions error:', error.message);
-        throw new Error(`Gagal memuat sesi ujian: ${error.message}`);
+        if (error) {
+          logger.error('SupabaseProvider', 'getExamSessions error:', error.message);
+          throw new Error(`Gagal memuat sesi ujian: ${error.message}`);
+        }
+
+        if (!data || data.length === 0) {
+          return [];
+        }
+
+        const mapped: ExamSessionRecord[] = data.map((d: any) => ({
+          id: d.id,
+          session_name: d.session_name,
+          teacher: d.teacher,
+          subject: d.subject,
+          class_name: d.class_name,
+          class_code: d.class_code || normalizeClassCode(d.class_name),
+          owner_user_id: d.owner_user_id,
+          school_level: resolveSchoolLevel(d.class_name, d.school_level),
+          answer_key: [], // Zero-egress waste: answer_key is loaded on-demand via getExamSessionById
+          student_list: [], // Zero-egress waste: student_list is loaded on-demand via getExamSessionById
+          scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
+          exam_type: d.exam_type || 'Harian',
+          academic_year: d.academic_year || '2025/2026',
+          semester: d.semester || 'Ganjil',
+          kkm: Number(d.kkm) || 75,
+          created_at: d.created_at,
+          updated_at: d.updated_at,
+        }));
+
+        // Update local storage cache for instant offline read if network fails later
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('smart_absensi_exam_sessions', JSON.stringify(mapped));
+          }
+        } catch {}
+
+        return mapped;
+      } catch (err: any) {
+        logger.error('SupabaseProvider', 'getExamSessions exception:', err);
+        throw err;
       }
+    });
+  }
 
-      if (!data || data.length === 0) {
-        return [];
-      }
+  public async getExamSessionById(sessionId: string, _token?: string): Promise<ExamSessionRecord | null> {
+    return this.dedupeRequest(`getExamSessionById_${sessionId}`, async () => {
+      try {
+        const { data: d, error } = await this.client
+          .from('gm_sessions')
+          .select('id, session_name, teacher, subject, class_name, class_code, owner_user_id, school_level, answer_key, student_list, scoring_config, exam_type, academic_year, semester, kkm, created_at, updated_at')
+          .eq('id', sessionId)
+          .maybeSingle();
 
-      const mapped: ExamSessionRecord[] = data.map((d: any) => {
+        if (error || !d) {
+          if (error) logger.error('SupabaseProvider', 'getExamSessionById error:', error.message);
+          return null;
+        }
+
         let answerKey: string[] = [];
         if (Array.isArray(d.answer_key)) {
           answerKey = d.answer_key;
@@ -4892,20 +5111,11 @@ export class SupabaseProvider implements IDataProvider {
           created_at: d.created_at,
           updated_at: d.updated_at,
         };
-      });
-
-      // Update local storage cache for instant offline read if network fails later
-      try {
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem('smart_absensi_exam_sessions', JSON.stringify(mapped));
-        }
-      } catch {}
-
-      return mapped;
-    } catch (err: any) {
-      logger.error('SupabaseProvider', 'getExamSessions exception:', err);
-      throw err;
-    }
+      } catch (err: any) {
+        logger.error('SupabaseProvider', 'getExamSessionById exception:', err);
+        return null;
+      }
+    });
   }
 
   public async saveExamSession(dto: CreateExamSessionDTO, _token?: string): Promise<ExamSessionRecord> {

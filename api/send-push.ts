@@ -212,7 +212,7 @@ export default async function handler(req: any, res: any) {
     try {
       const { data: prefsList } = await supabase
         .from('notification_preferences')
-        .select('*')
+        .select('user_id, push_enabled, attendance_enabled, leave_enabled, schedule_enabled, announcement_enabled, quiet_hours_start, quiet_hours_end')
         .in('user_id', candidateUserIds);
 
       if (prefsList && prefsList.length > 0) {
@@ -252,7 +252,7 @@ export default async function handler(req: any, res: any) {
     // Ambil daftar Push Subscriptions dari tabel push_subscriptions
     const { data: subscriptions, error: subErr } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('user_id, endpoint, p256dh, auth')
       .in('user_id', eligibleUserIds);
 
     if (subErr) {
