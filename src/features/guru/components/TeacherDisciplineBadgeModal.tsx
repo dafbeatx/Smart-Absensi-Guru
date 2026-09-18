@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import type { TeacherAppreciationScore, UserProfile, TeacherPointLog } from '../../../types/database.types';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import { TeacherPointHistoryModal } from './TeacherPointHistoryModal';
 import {
   getTeacherDisciplineLeaderboard,
@@ -141,7 +140,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     }
   }, [allRegisteredTeachersProp]);
 
-  const handleSyncPoints = useCallback(async (forceRefresh = false) => {
+  const handleSyncPoints = useCallback(async (_forceRefresh = false) => {
     // Hindari eksekusi tumpang tindih yang membuat animasi maju-mundur
     if (isSyncingInProgressRef.current) return;
     isSyncingInProgressRef.current = true;
@@ -174,16 +173,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
     try {
       const token = useAuthStore.getState().token || undefined;
-      // Rekonsiliasi idempoten seluruh guru (dilengkapi proteksi cache TTL 60s agar tidak membebani Egress Supabase)
-      const reconciled = await TeacherPointReconciliationService.reconcileAllTeachers(token, forceRefresh);
-      if (reconciled && reconciled.length > 0) {
-        setAllPointLogs(reconciled);
-      } else {
-        const provider = ProviderFactory.getProvider();
-        const logs = await provider.getTeacherPointHistory('ALL', token);
-        if (logs && logs.length > 0) {
-          setAllPointLogs(logs);
-        }
+      // Pure Read-Only Point Ledger Fetch (Zero Writes / Zero Reconciliation on Read)
+      const provider = ProviderFactory.getProvider();
+      const logs = await provider.getTeacherPointHistory('ALL', token);
+      if (logs && logs.length > 0) {
+        setAllPointLogs(logs);
       }
 
       // Sinkronisasi foto profil guru terbaru dari provider (hanya jika prop tidak disediakan)

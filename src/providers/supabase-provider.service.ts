@@ -4802,9 +4802,9 @@ export class SupabaseProvider implements IDataProvider {
           .order('created_at', { ascending: false });
 
         if (userId !== 'ALL') {
-          query = query.eq('user_id', userId).limit(30);
+          query = query.eq('user_id', userId).limit(100);
         } else {
-          query = query.limit(100);
+          query = query.limit(1000);
         }
 
         const { data, error } = await query;
@@ -4829,13 +4829,11 @@ export class SupabaseProvider implements IDataProvider {
           }));
         }
 
-        // If database returned 0 rows, check fallback seed in mock provider
-        const mockProv = new (await import('./mock-provider.service')).MockProvider();
-        return mockProv.getTeacherPointHistory(userId);
+        // Honest data state: if database returns 0 rows, return empty array without falling back to mock seeds
+        return [];
       } catch (err) {
         logger.error('SupabaseProvider', 'getTeacherPointHistory exception:', err);
-        const mockProv = new (await import('./mock-provider.service')).MockProvider();
-        return mockProv.getTeacherPointHistory(userId);
+        return [];
       }
     });
   }
@@ -4866,6 +4864,25 @@ export class SupabaseProvider implements IDataProvider {
 
       let savedRecord: TeacherPointLog | null = null;
       if (existingPoint?.id) {
+        // Zero-Egress Protection: Lewati PATCH jika seluruh field poin sudah bernilai identik
+        if (
+          Number(existingPoint.points) === Number(payload.points) &&
+          existingPoint.title === payload.title &&
+          (existingPoint.description || null) === (payload.description || null)
+        ) {
+          return {
+            id: existingPoint.id,
+            user_id: existingPoint.user_id,
+            teacher_name: existingPoint.teacher_name || undefined,
+            date: existingPoint.date,
+            points: Number(existingPoint.points) || 0,
+            activity_type: existingPoint.activity_type as TeacherPointActivityType,
+            title: existingPoint.title,
+            description: existingPoint.description || undefined,
+            created_at: existingPoint.created_at,
+          };
+        }
+
         const { data, error } = await this.client
           .from('teacher_point_history')
           .update(payload)
