@@ -1260,7 +1260,7 @@ export class SupabaseProvider implements IDataProvider {
       for (const bucketName of bucketsToTry) {
         const { error: uploadError } = await this.client.storage
           .from(bucketName)
-          .upload(fileName, bytes, { upsert: true, contentType, cacheControl: '2592000, public' });
+          .upload(fileName, bytes, { upsert: false, contentType, cacheControl: '2592000' });
 
         if (!uploadError) {
           const { data } = this.client.storage.from(bucketName).getPublicUrl(fileName);
@@ -1856,9 +1856,9 @@ export class SupabaseProvider implements IDataProvider {
         const { error: uploadError } = await this.client.storage
           .from(bucketName)
           .upload(filePath, fileToUpload, {
-            upsert: true,
+            upsert: false,
             contentType: 'image/webp',
-            cacheControl: '31536000, public, immutable',
+            cacheControl: '31536000',
           });
 
         if (!uploadError) {
@@ -3508,7 +3508,7 @@ export class SupabaseProvider implements IDataProvider {
       const { data, error } = await this.client
         .from('students')
         .insert([rowPayload])
-        .select()
+        .select('id, nisn, full_name, class_name, academic_year, gender, rfid_uid, card_status, attendance_rate, address, notes, created_at, updated_at')
         .single();
 
       if (!error && data) {
@@ -3576,7 +3576,7 @@ export class SupabaseProvider implements IDataProvider {
         .from('students')
         .update(payload)
         .eq('id', id)
-        .select();
+        .select('id');
 
       if (!error && data && data.length > 0) {
         dbSuccess = true;
@@ -3587,7 +3587,7 @@ export class SupabaseProvider implements IDataProvider {
           .update(payload)
           .eq('class_name', updates.className)
           .ilike('full_name', updates.fullName)
-          .select();
+          .select('id');
 
         if (!fbErr && fallbackData && fallbackData.length > 0) {
           dbSuccess = true;
@@ -4332,7 +4332,7 @@ export class SupabaseProvider implements IDataProvider {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .select()
+          .select('id')
           .single();
 
         if (insertErr || !inserted) {
