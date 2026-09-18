@@ -29,7 +29,6 @@ import { KepsekRewardSuggestionModal } from '../components/KepsekRewardSuggestio
 import { TeacherExcellenceCertificateModal } from '../../guru/components/TeacherExcellenceCertificateModal';
 import { SarprasExecutiveView } from '../../sarpras/components/SarprasExecutiveView';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
-import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import {
   getTeacherDisciplineLeaderboard,
   type TeacherLeaderboardItem,
@@ -94,7 +93,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     return () => window.removeEventListener('smart_absensi_settings_updated', loadSettings);
   }, []);
 
-  // Memuat Buku Besar Poin Guru & Menentukan Juara 1 Bulan Ini
+  // Memuat Buku Besar Poin Guru (Pure Read-Only)
   useEffect(() => {
     const fetchPointLogs = async () => {
       try {
@@ -103,11 +102,6 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         const logs = await provider.getTeacherPointHistory('ALL', token);
         if (logs && logs.length > 0) {
           setAllTeacherPointLogs(logs);
-        }
-        // Rekonsiliasi idempoten seluruh guru agar poin kehadiran fisik selalu 100% mutakhir
-        const reconciled = await TeacherPointReconciliationService.reconcileAllTeachers(token);
-        if (reconciled && reconciled.length > 0) {
-          setAllTeacherPointLogs(reconciled);
         }
       } catch (err) {
         console.warn('Gagal memuat buku besar poin guru:', err);

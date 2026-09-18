@@ -116,8 +116,6 @@ import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeMod
 import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
-import { AttendancePolicyService } from '../../../services/attendance-policy.service';
-import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import { normalizeDayOfWeek } from '../../../utils/teaching-schedule.utils';
 import type {
@@ -1003,44 +1001,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setTeachingSlots([]);
       }
 
-      // 7.6 Load Teacher Point History & Ledger with Auto-Reconciliation
-      let currentMyPointLogs: TeacherPointLog[] = [];
+      // 7.6 Load Teacher Point History & Ledger (Pure Read-Only, No Side Effects on Load)
       try {
-        let myPointLogs = await provider.getTeacherPointHistory(effectiveUser.id, authToken);
-
-        // Auto-reconcile points from loadedHistory (termasuk tanggal 8 & 9 September 2026)
-        myPointLogs = await TeacherPointReconciliationService.reconcilePoints(
-          effectiveUser.id,
-          effectiveUser.full_name,
-          loadedHistory,
-          myPointLogs || [],
-          undefined,
-          authToken
-        );
-        currentMyPointLogs = myPointLogs || [];
-        setPointHistory(currentMyPointLogs);
+        const myPointLogs = await provider.getTeacherPointHistory(effectiveUser.id, authToken);
+        setPointHistory(myPointLogs || []);
 
         const allLogs = await provider.getTeacherPointHistory('ALL', authToken);
         setAllTeacherPointLogs(allLogs || []);
       } catch (err) {
-        console.warn('Failed to load/reconcile teacher point history:', err);
-      }
-
-      // 7.7 Evaluasi Penalti Universal: TAP (Tidak Absen Pulang) & ALPA (Ketidakhadiran)
-      // Zero-Egress: menggunakan array loadedHistory dan currentMyPointLogs yang sudah ada di memori
-      try {
-        const cachedHolidays = await provider.getHolidays(authToken).catch(() => []);
-        await AttendancePolicyService.evaluateAllPenalties(
-          effectiveUser.id,
-          effectiveUser.full_name,
-          loadedHistory,
-          cachedHolidays,
-          currentMyPointLogs,
-          authToken,
-          effectiveUser.created_at
-        );
-      } catch (errPolicy) {
-        console.warn('Failed to evaluate attendance policy penalties:', errPolicy);
+        console.warn('Failed to load teacher point history:', err);
       }
 
       // 8. Teacher Duty Schedule Check (Jadwal Piket Guru Senin - Jumat)

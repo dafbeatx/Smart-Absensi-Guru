@@ -939,7 +939,7 @@ export class SupabaseProvider implements IDataProvider {
     return this.dedupeRequest(`getMonthlyAttendance_${userId}_${month}_${year}`, async () => {
       let query = this.client
         .from('attendance')
-        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, reason, created_at')
+        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, created_at')
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: false });
@@ -963,7 +963,7 @@ export class SupabaseProvider implements IDataProvider {
         verification_method: (row.verification_method as VerificationMethod) || 'QR_GPS',
         attendance_source: (row.attendance_source as AttendanceSource) || 'QR',
         is_offline: false,
-        notes: row.notes || row.reason || null,
+        notes: row.notes || null,
         created_at: row.created_at,
       }));
     });
@@ -1138,7 +1138,7 @@ export class SupabaseProvider implements IDataProvider {
     return this.dedupeRequest(`getDailyAttendance_${targetDate}`, async () => {
       const { data } = await this.client
         .from('attendance')
-        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, reason, created_at')
+        .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, created_at')
         .eq('date', targetDate)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -1156,7 +1156,7 @@ export class SupabaseProvider implements IDataProvider {
         verification_method: (row.verification_method as VerificationMethod) || 'QR_GPS',
         attendance_source: (row.attendance_source as AttendanceSource) || 'QR',
         is_offline: false,
-        notes: row.notes || row.reason || null,
+        notes: row.notes || null,
         created_at: row.created_at,
       }));
     });
@@ -1166,7 +1166,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { error } = await this.client
         .from('attendance')
-        .update({ notes: note, reason: note })
+        .update({ notes: note })
         .eq('user_id', userId)
         .eq('date', date);
 
@@ -1512,7 +1512,7 @@ export class SupabaseProvider implements IDataProvider {
       // Exclude attachment_url from pending leaves query to eliminate massive base64 egress bloat
       const { data, error } = await this.client
         .from('leaves')
-        .select('id, user_id, type, start_date, end_date, reason, status, approval_deadline, approved_by, rejection_notes, created_at')
+        .select('id, user_id, type, start_date, end_date, reason, status, approved_by, rejection_notes, created_at')
         .in('status', ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'])
         .order('created_at', { ascending: false });
 
@@ -1521,7 +1521,7 @@ export class SupabaseProvider implements IDataProvider {
         // Fallback: try without status in filter (get all lightweight columns and filter client-side)
         const { data: allData } = await this.client
           .from('leaves')
-          .select('id, user_id, type, start_date, end_date, reason, status, approval_deadline, approved_by, rejection_notes, created_at')
+          .select('id, user_id, type, start_date, end_date, reason, status, approved_by, rejection_notes, created_at')
           .order('created_at', { ascending: false });
 
         const filtered = (allData || []).filter(
@@ -1536,7 +1536,7 @@ export class SupabaseProvider implements IDataProvider {
           reason: row.reason,
           attachment_url: null, // Excluded from summary/badge query to protect Egress
           approval_status: (row.status || 'PENDING') as ApprovalStatus,
-          approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
+          approval_deadline: (row as any).approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
           approved_by: row.approved_by || null,
           approval_notes: row.rejection_notes || (row as any).approval_notes || null,
           duty_teacher_notes: (row as any).duty_teacher_notes || null,
@@ -1553,7 +1553,7 @@ export class SupabaseProvider implements IDataProvider {
         reason: row.reason,
         attachment_url: null, // Excluded from summary/badge query to protect Egress
         approval_status: (row.status || 'PENDING') as ApprovalStatus,
-        approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
+        approval_deadline: (row as any).approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
         approved_by: row.approved_by || null,
         approval_notes: row.rejection_notes || (row as any).approval_notes || null,
         duty_teacher_notes: (row as any).duty_teacher_notes || null,
@@ -1576,7 +1576,7 @@ export class SupabaseProvider implements IDataProvider {
       const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const { data } = await this.client
         .from('leaves')
-        .select('id, user_id, type, leave_type, start_date, end_date, reason, attachment_url, status, approval_deadline, approved_by, rejection_notes, duty_teacher_notes, created_at')
+        .select('id, user_id, type, leave_type, start_date, end_date, reason, attachment_url, status, approved_by, rejection_notes, duty_teacher_notes, created_at')
         .or(`created_at.gte.${ninetyDaysAgo},status.eq.PENDING`)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -1590,7 +1590,7 @@ export class SupabaseProvider implements IDataProvider {
         reason: row.reason,
         attachment_url: row.attachment_url || null,
         approval_status: (row.status || (row as any).approval_status || 'PENDING') as ApprovalStatus,
-        approval_deadline: row.approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
+        approval_deadline: (row as any).approval_deadline || new Date(Date.now() + 86400000 * 3).toISOString(),
         approved_by: row.approved_by || null,
         approval_notes: row.rejection_notes || (row as any).approval_notes || null,
         duty_teacher_notes: row.duty_teacher_notes || null,
@@ -1608,7 +1608,7 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const { data, error } = await this.client
           .from('leaves')
-          .select('id, user_id, type, leave_type, start_date, end_date, reason, attachment_url, status, approval_deadline, approved_by, rejection_notes, duty_teacher_notes, created_at')
+          .select('id, user_id, type, leave_type, start_date, end_date, reason, attachment_url, status, approved_by, rejection_notes, duty_teacher_notes, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(30);
@@ -2166,7 +2166,7 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const nowIso = new Date().toISOString();
-        const notifCols = 'id, user_id, recipient_user_id, audience_role, title, message, type, severity, category, action_url, action_type, action_date, action_target_id, payload, dedupe_key, revision, is_read, expires_at, resolved_at, created_by, created_at';
+        const notifCols = 'id, user_id, recipient_user_id, audience_role, title, message, type, severity, action_url, action_type, action_date, action_target_id, payload, dedupe_key, revision, is_read, expires_at, resolved_at, created_by, created_at';
 
         // Query notifications targeted to user or broadcast
         let query = this.client
@@ -2916,7 +2916,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data, error } = await this.client
         .from('teacher_complaints')
-        .select('id, user_id, date, category, content, status, response, response_by, is_anonymous, created_at')
+        .select('id, user_id, date, category, content, status, admin_response, responded_by_role, is_anonymous, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(30);
@@ -2938,7 +2938,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data, error } = await this.client
         .from('teacher_complaints')
-        .select('id, date, category, content, status, response, response_by, is_anonymous, created_at')
+        .select('id, date, category, content, status, admin_response, responded_by_role, is_anonymous, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -4793,7 +4793,7 @@ export class SupabaseProvider implements IDataProvider {
       // Check if this point activity already exists today
       const { data: existingPoint } = await this.client
         .from('teacher_point_history')
-        .select('id')
+        .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
         .eq('user_id', log.user_id)
         .eq('date', log.date)
         .eq('activity_type', log.activity_type)
@@ -4822,7 +4822,44 @@ export class SupabaseProvider implements IDataProvider {
           .insert({ id, ...payload })
           .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
           .maybeSingle();
-        if (error) throw error;
+
+        if (error) {
+          // Tangani 409 duplicate key sebagai kondisi "sudah pernah diproses" (idempotent), bukan error
+          const isDuplicate =
+            error.code === '23505' ||
+            error.message?.includes('duplicate key') ||
+            error.message?.includes('unique') ||
+            error.details?.includes('already exists');
+          if (isDuplicate) {
+            logger.info('SupabaseProvider', 'recordTeacherPoint: transaksi sudah pernah diproses (idempotent duplicate key)', {
+              userId: log.user_id,
+              date: log.date,
+              activity: log.activity_type,
+            });
+            const { data: conflictRow } = await this.client
+              .from('teacher_point_history')
+              .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
+              .eq('user_id', log.user_id)
+              .eq('date', log.date)
+              .eq('activity_type', log.activity_type)
+              .maybeSingle();
+            if (conflictRow) {
+              return conflictRow as TeacherPointLog;
+            }
+            return {
+              id,
+              user_id: log.user_id,
+              teacher_name: log.teacher_name,
+              date: log.date,
+              points: log.points,
+              activity_type: log.activity_type,
+              title: log.title,
+              description: log.description,
+              created_at: new Date().toISOString(),
+            };
+          }
+          throw error;
+        }
         savedRecord = data as TeacherPointLog;
       }
 
@@ -4854,7 +4891,26 @@ export class SupabaseProvider implements IDataProvider {
         description: log.description,
         created_at: data?.created_at || new Date().toISOString(),
       };
-    } catch (err) {
+    } catch (err: any) {
+      const isDuplicate =
+        err?.code === '23505' ||
+        err?.message?.includes('duplicate key') ||
+        err?.message?.includes('unique') ||
+        err?.details?.includes('already exists');
+      if (isDuplicate) {
+        logger.info('SupabaseProvider', 'recordTeacherPoint caught duplicate key as already processed');
+        return {
+          id: 'pt_' + Date.now(),
+          user_id: log.user_id,
+          teacher_name: log.teacher_name,
+          date: log.date,
+          points: log.points,
+          activity_type: log.activity_type,
+          title: log.title,
+          description: log.description,
+          created_at: new Date().toISOString(),
+        };
+      }
       logger.error('SupabaseProvider', 'recordTeacherPoint exception, falling back to mock provider:', err);
       const mockProv = new (await import('./mock-provider.service')).MockProvider();
       return mockProv.recordTeacherPoint(log);
