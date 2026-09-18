@@ -1165,7 +1165,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
           missingAttNotifs.push(missingItem);
 
-          if (!isRead) {
+          // HANYA tembakkan OS notification/push untuk hari ini (BUKAN tanggal lampau) dan dibatasi 1x per hari
+          const todayAlertKey = `smart_absensi_missing_att_alert_fired_${effectiveUser.id}_${todayStr}`;
+          const alreadyFiredToday = typeof window !== 'undefined' && localStorage.getItem(todayAlertKey) === '1';
+
+          if (dateStr === todayStr && !isRead && !alreadyFiredToday) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(todayAlertKey, '1');
+            }
             NotificationService.notifyTeacherMissingAttendance(effectiveUser.full_name, dateStr, effectiveUser.id);
           }
         }
@@ -1222,7 +1229,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             return [paydayNotif, ...prev];
           });
 
-          if (!isPaydayRead) {
+          // Batasi penembakan native notification & push gajian maksimal 1x per hari
+          const paydayAlertKey = `smart_absensi_payday_fired_${effectiveUser.id}_${todayIsoStr}_${reminderInfo.status}`;
+          const alreadyFiredPayday = typeof window !== 'undefined' && localStorage.getItem(paydayAlertKey) === '1';
+
+          if (!isPaydayRead && !alreadyFiredPayday) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(paydayAlertKey, '1');
+            }
             NotificationService.notifyPayday(
               effectiveUser.full_name,
               todayIsoStr,
@@ -1269,14 +1283,46 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }
       debouncedLoadAllData();
     };
-    const handleNotificationPushed = () => {
-      debouncedLoadAllData();
-      SoundService.playNotificationChime();
+    const handleNotificationPushed = (e: Event) => {
+      try {
+        const customEv = e as CustomEvent<any>;
+        const payload = customEv?.detail;
+        if (payload && payload.id) {
+          setNotifications((prev) => {
+            if (prev.some((n) => n.id === payload.id)) return prev;
+            return [
+              {
+                id: payload.id,
+                user_id: payload.userId || effectiveUser.id,
+                title: payload.title,
+                message: payload.body || payload.message || '',
+                type: payload.type === 'LEAVE_REQUEST' ? 'WARNING' : payload.type === 'EVENT' ? 'INFO' : 'SUCCESS',
+                is_read: false,
+                action_type: payload.actionType,
+                action_date: payload.actionDate,
+                action_target_id: payload.actionTargetId,
+                created_at: payload.createdAt || new Date().toISOString(),
+              },
+              ...prev,
+            ];
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const handlePointsUpdated = async () => {
+      try {
+        const prov = ProviderFactory.getProvider();
+        const myPointLogs = await prov.getTeacherPointHistory(effectiveUser.id, token || '');
+        if (myPointLogs) setPointHistory(myPointLogs);
+      } catch {}
     };
 
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
-    window.addEventListener('smart_absensi_points_updated', handleScannedEvent);
+    window.addEventListener('smart_absensi_points_updated', handlePointsUpdated);
     window.addEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
     window.addEventListener('smart_absensi_teachers_updated', handleTeachersInstantSync);
     window.addEventListener('smart_absensi_holidays_updated', handleScannedEvent);
@@ -1288,7 +1334,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       if (debounceTimer) clearTimeout(debounceTimer);
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
-      window.removeEventListener('smart_absensi_points_updated', handleScannedEvent);
+      window.removeEventListener('smart_absensi_points_updated', handlePointsUpdated);
       window.removeEventListener('smart_absensi_notification_pushed', handleNotificationPushed);
       window.removeEventListener('smart_absensi_teachers_updated', handleTeachersInstantSync);
       window.removeEventListener('smart_absensi_holidays_updated', handleScannedEvent);
@@ -1710,9 +1756,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   const prevGuruUnreadRef = React.useRef<number>(0);
+  const isInitialUnreadMountRef = React.useRef<boolean>(true);
 
-  // Play audio chime when new unread notification arrives for Guru
+  // Play audio chime HANYA saat notifikasi baru tiba setelah inisialisasi awal (anti-chime mount/refresh)
   useEffect(() => {
+    if (isInitialUnreadMountRef.current) {
+      isInitialUnreadMountRef.current = false;
+      prevGuruUnreadRef.current = unreadCount;
+      return;
+    }
     if (unreadCount > prevGuruUnreadRef.current && prevGuruUnreadRef.current >= 0) {
       SoundService.playNotificationChime();
     }

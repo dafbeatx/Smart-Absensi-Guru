@@ -753,6 +753,8 @@ class NotificationPermissionService {
     }
   }
 
+  private static recentPushTags = new Map<string, number>();
+
   /**
    * Helper: Kirim Web Push Notification melalui Vercel Serverless Function (/api/send-push)
    * Mengirimkan notifikasi ke perangkat guru / admin / kepsek yang sedang offline/tertutup
@@ -769,6 +771,14 @@ class NotificationPermissionService {
     dedupeKey?: string;
   }): Promise<boolean> {
     if (typeof window === 'undefined') return false;
+    const dedupeKey = params.dedupeKey || params.tag || `${params.title}_${params.targetUserId || (params.targetRoles || []).join(',')}`;
+    const now = Date.now();
+    const lastTriggered = NotificationPermissionService.recentPushTags.get(dedupeKey);
+    if (lastTriggered && now - lastTriggered < 5 * 60 * 1000) {
+      return true; // Cooldown 5 menit untuk tag/tujuan yang sama
+    }
+    NotificationPermissionService.recentPushTags.set(dedupeKey, now);
+
     try {
       const token = useAuthStore.getState().token;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1063,8 +1073,6 @@ class NotificationPermissionService {
           }).catch(() => {});
         }
 
-        SoundService.playNotificationChime();
-
         if (typeof window !== 'undefined') {
           localStorage.setItem(earlyStorageKey, '1');
         }
@@ -1084,11 +1092,22 @@ class NotificationPermissionService {
     }
 
     // ──────── 2. PENGINGAT TEPAT WAKTU PULANG (13.00 / 11.00 WIB) ────────
+    const checkoutStorageKey = `smart_absensi_checkout_fired_${userId || 'guest'}_${todayStr}`;
+    const alreadyFiredCheckout = typeof window !== 'undefined' && localStorage.getItem(checkoutStorageKey) === '1';
+    if (alreadyFiredCheckout) {
+      return;
+    }
+
     const targetInfo = this.getCheckoutTargetTimeForDate(now);
     const targetTime = new Date();
     targetTime.setHours(targetInfo.hours, targetInfo.minutes, 0, 0);
 
-    const delayMs = Math.max(0, targetTime.getTime() - now.getTime());
+    const delayMs = targetTime.getTime() - now.getTime();
+    // Jika waktu kepulangan hari ini sudah lewat saat presensi masuk, jangan tembakkan alarm
+    if (delayMs <= 0) {
+      return;
+    }
+
     const notifTitle = '🔔 Waktu Pulang Sekolah Tiba!';
     const notifBody = `Waktu Pulang Sekolah Tiba! Bapak/Ibu ${teacherName}, jangan lupa scan QR / Absen Pulang sebelum meninggalkan area sekolah.`;
 
@@ -1111,21 +1130,20 @@ class NotificationPermissionService {
         roleTarget: 'GURU',
         actionUrl: '/?tab=BERANDA',
       });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(checkoutStorageKey, '1');
+      }
       this.saveCheckoutReminderState({ teacherName, userId, dateStr: todayStr, isFired: true });
     };
 
-    if (delayMs <= 0) {
-      fireReminder();
-    } else {
-      this.activeCheckoutTimer = setTimeout(fireReminder, delayMs);
-      this.saveCheckoutReminderState({
-        teacherName,
-        userId,
-        dateStr: todayStr,
-        isFired: false,
-        targetTimeIso: targetTime.toISOString(),
-      });
-    }
+    this.activeCheckoutTimer = setTimeout(fireReminder, delayMs);
+    this.saveCheckoutReminderState({
+      teacherName,
+      userId,
+      dateStr: todayStr,
+      isFired: false,
+      targetTimeIso: targetTime.toISOString(),
+    });
   }
 
   /**

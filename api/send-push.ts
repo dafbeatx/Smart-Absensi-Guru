@@ -160,6 +160,24 @@ export default async function handler(req: any, res: any) {
     }
   }
 
+  // Server-Side Deduplication & Anti-Spam Rate Limiter (10 menit TTL)
+  const dedupeKey = `${tag || title}_${targetUserId || (targetRoles || []).join(',')}`;
+  const nowMs = Date.now();
+  const PUSH_DEDUPE_WINDOW_MS = 10 * 60 * 1000;
+  const lastSent = (global as any).__recentPushCache?.get(dedupeKey);
+  if (lastSent && nowMs - lastSent < PUSH_DEDUPE_WINDOW_MS) {
+    return res.status(200).json({
+      ok: true,
+      sent: 0,
+      skipped: true,
+      message: 'Push notification disaring oleh rate-limiter server (duplikat dalam 10 menit).',
+    });
+  }
+  if (!(global as any).__recentPushCache) {
+    (global as any).__recentPushCache = new Map<string, number>();
+  }
+  (global as any).__recentPushCache.set(dedupeKey, nowMs);
+
   // Sanitasi URL tujuan internal agar aman dari open-redirect
   const effectiveUrl = action_url || url;
   const sanitizedUrl = effectiveUrl.startsWith('/') ? effectiveUrl : `/${effectiveUrl.replace(/^https?:\/\/[^/]+/, '')}`;

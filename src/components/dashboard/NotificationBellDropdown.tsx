@@ -172,14 +172,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
           : activeGuruTeachers.filter((t) => !absentedUserIds.has(t.id)).length;
 
         if (!offCheck.isOff && unabsentedCount > 0) {
-          // Dynamic Revision Key based on count & teacher ids hash
-          const unabsentedHash = activeGuruTeachers
-            .filter((t) => !absentedUserIds.has(t.id))
-            .map((t) => t.id)
-            .sort()
-            .join('')
-            .slice(0, 12);
-          const unabsentNotifId = `alert_unabsented_${todayIso}_${unabsentedCount}_${unabsentedHash}`;
+          const unabsentNotifId = `alert_unabsented_${todayIso}`;
 
           items.push({
             id: unabsentNotifId,
@@ -203,8 +196,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         );
 
         if (activePendingLeaves.length > 0) {
-          const pendingHash = activePendingLeaves.map((l) => l.id).sort().join('').slice(0, 12);
-          const pendingNotifId = `alert_pending_leaves_${todayIso}_${activePendingLeaves.length}_${pendingHash}`;
+          const pendingNotifId = `alert_pending_leaves_${todayIso}`;
           items.push({
             id: pendingNotifId,
             category: 'LEAVE_REQUEST',

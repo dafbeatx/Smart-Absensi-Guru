@@ -6,7 +6,6 @@ import { LeaveValidationService } from '../../../services/leave-validation.servi
 import { LeaveRepository } from '../../../repositories/LeaveRepository';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
-import { NotificationService } from '../../../services/notification-permission.service';
 import { getTodayDateInJakarta } from '../../../services/analytics.service';
 import type { LeaveType } from '../../../types/database.types';
 import { convertToWebP } from '../../../utils/image.utils';
@@ -138,10 +137,6 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       });
 
       showToast('success', 'Pengajuan Berhasil!', 'Pengajuan izin Anda telah dikirim ke Kepala Sekolah.');
-      
-      // Trigger Web Push Notification for Admin & Kepsek
-      const teacherName = useAuthStore.getState().user?.full_name || 'Guru';
-      NotificationService.notifyTeacherLeaveRequest(teacherName, leaveType, reason);
 
       setIsLoading(false);
       if (onSuccess) onSuccess();
