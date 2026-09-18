@@ -3035,7 +3035,7 @@ export class SupabaseProvider implements IDataProvider {
     const dedupeKey = `getTeachingSchedules_${filter?.teacher_user_id || 'ALL'}_${filter?.academic_year || ''}_${filter?.day_of_week ?? ''}`;
     return this.dedupeRequest(dedupeKey, async () => {
       try {
-        const scheduleCols = 'id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by';
+        const scheduleCols = 'id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, effective_from, effective_until, is_active, version, created_at, updated_at, created_by, updated_by';
 
         let query = this.client
           .from('teaching_schedules')
@@ -3055,7 +3055,10 @@ export class SupabaseProvider implements IDataProvider {
         const { data, error } = await query.order('day_of_week', { ascending: true }).limit(50);
 
         if (error) {
-          logger.warn('SupabaseProvider', 'getTeachingSchedules query error, fallback to mock provider:', error.message);
+          logger.warn('SupabaseProvider', 'getTeachingSchedules query error:', error.message);
+          if (error.code === 'PGRST205' || error.message?.includes('teaching_schedules')) {
+            return [];
+          }
           const mockProv = new (await import('./mock-provider.service')).MockProvider();
           return mockProv.getTeachingSchedules(_token, filter);
         }
@@ -3065,8 +3068,7 @@ export class SupabaseProvider implements IDataProvider {
         return sortTeachingSlots(mapped);
       } catch (err) {
         logger.warn('SupabaseProvider', 'getTeachingSchedules DB exception:', err);
-        const mockProv = new (await import('./mock-provider.service')).MockProvider();
-        return mockProv.getTeachingSchedules(_token, filter);
+        return [];
       }
     });
   }
@@ -3080,7 +3082,7 @@ export class SupabaseProvider implements IDataProvider {
 
       // Pre-validate schedule conflicts
       const existing = await this.getTeachingSchedules(_token, {
-        academic_year: dto.academic_year || '2024/2025',
+        academic_year: dto.academic_year || '2026/2027',
         day_of_week: dayOfWeek,
       });
       const conflict = validateScheduleConflict(
@@ -3127,18 +3129,50 @@ export class SupabaseProvider implements IDataProvider {
         end_time: dto.end_time,
         class_name: dto.class_name,
         subject: dto.subject,
-        room: dto.room,
-        academic_year: dto.academic_year || '2024/2025',
+        room: dto.room || 'Ruang Kelas',
+        academic_year: dto.academic_year || '2026/2027',
         is_active: dto.is_active ?? true,
         version: 1,
         effective_from: dto.effective_from || null,
         effective_until: dto.effective_until || null,
       };
 
+      // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
+      const token = _token || (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') || '';
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
+        try {
+          const resp = await fetch('/api/admin/teaching-schedules', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          });
+          const resData = await resp.json();
+          if (resp.ok && resData.success && resData.data) {
+            const created = this.mapDbRowToTeachingSlot(resData.data);
+            try {
+              const mockProv = new (await import('./mock-provider.service')).MockProvider();
+              await mockProv.createTeachingSchedule(dto);
+            } catch {
+              // Ignore mock sync error
+            }
+            return { success: true, data: created };
+          }
+          if (!resp.ok || !resData.success) {
+            return { success: false, error: resData.errorMessage || resData.error || 'Gagal menambahkan jadwal' };
+          }
+        } catch (fetchErr: any) {
+          logger.warn('SupabaseProvider', 'Serverless endpoint unavailable, attempting direct fallback:', fetchErr);
+        }
+      }
+
+      // Direct fallback (jika di-test tanpa HTTP serverless atau service_role)
       const { data, error } = await this.client
         .from('teaching_schedules')
         .insert([payload])
-        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by')
+        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, effective_from, effective_until, is_active, version, created_at, updated_at, created_by, updated_by')
         .single();
 
       if (error) {
@@ -3169,7 +3203,7 @@ export class SupabaseProvider implements IDataProvider {
     try {
       const { data: existingRow, error: fetchErr } = await this.client
         .from('teaching_schedules')
-        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until')
+        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, effective_from, effective_until, is_active, version')
         .eq('id', dto.id)
         .maybeSingle();
 
@@ -3191,7 +3225,7 @@ export class SupabaseProvider implements IDataProvider {
       const teacherUserId = dto.teacher_user_id || existingRow.teacher_user_id;
       const className = dto.class_name || existingRow.class_name;
       const room = dto.room || existingRow.room;
-      const academicYear = dto.academic_year || existingRow.academic_year || '2024/2025';
+      const academicYear = dto.academic_year || existingRow.academic_year || '2026/2027';
 
       // Conflict validation (ignoring current id)
       const allSchedules = await this.getTeachingSchedules(_token, {
@@ -3233,11 +3267,42 @@ export class SupabaseProvider implements IDataProvider {
       if (dto.effective_from !== undefined) updatePayload.effective_from = dto.effective_from;
       if (dto.effective_until !== undefined) updatePayload.effective_until = dto.effective_until;
 
+      // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
+      const token = _token || (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') || '';
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
+        try {
+          const resp = await fetch('/api/admin/teaching-schedules', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ ...updatePayload, id: dto.id }),
+          });
+          const resData = await resp.json();
+          if (resp.ok && resData.success && resData.data) {
+            const updated = this.mapDbRowToTeachingSlot(resData.data);
+            try {
+              const mockProv = new (await import('./mock-provider.service')).MockProvider();
+              await mockProv.updateTeachingSchedule(dto);
+            } catch {
+              // Ignore mock sync error
+            }
+            return { success: true, data: updated };
+          }
+          if (!resp.ok || !resData.success) {
+            return { success: false, error: resData.errorMessage || resData.error || 'Gagal memperbarui jadwal' };
+          }
+        } catch (fetchErr: any) {
+          logger.warn('SupabaseProvider', 'Serverless PUT endpoint unavailable, attempting direct fallback:', fetchErr);
+        }
+      }
+
       const { data: updatedRow, error: updateErr } = await this.client
         .from('teaching_schedules')
         .update(updatePayload)
         .eq('id', dto.id)
-        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, is_active, version, effective_from, effective_until, created_at, updated_at, created_by, updated_by')
+        .select('id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, effective_from, effective_until, is_active, version, created_at, updated_at, created_by, updated_by')
         .single();
 
       if (updateErr) {
@@ -3263,6 +3328,31 @@ export class SupabaseProvider implements IDataProvider {
 
   public async deleteTeachingSchedule(id: string, _token?: string): Promise<boolean> {
     try {
+      // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
+      const token = _token || (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') || '';
+      if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
+        try {
+          const resp = await fetch(`/api/admin/teaching-schedules?id=${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const resData = await resp.json();
+          if (resp.ok && resData.success) {
+            try {
+              const mockProv = new (await import('./mock-provider.service')).MockProvider();
+              await mockProv.deleteTeachingSchedule(id);
+            } catch {
+              // Ignore
+            }
+            return true;
+          }
+        } catch (fetchErr: any) {
+          logger.warn('SupabaseProvider', 'Serverless DELETE endpoint unavailable, attempting direct fallback:', fetchErr);
+        }
+      }
+
       const { error } = await this.client
         .from('teaching_schedules')
         .delete()
@@ -3300,23 +3390,22 @@ export class SupabaseProvider implements IDataProvider {
         const startTime = s.start_time || parsedTime?.startTime || '07:00';
         const endTime = s.end_time || parsedTime?.endTime || '08:00';
         const dayOfWeek = normalizeDayOfWeek(s.day_of_week !== undefined ? s.day_of_week : s.day);
-        const dayName = s.day || getDayNameIndonesian(dayOfWeek);
 
-        const dbRow = {
+        const dbRow: Record<string, any> = {
           teacher_user_id: s.teacher_user_id || s.user_id || 'UNKNOWN',
           teacher_name: s.teacher_name || 'Guru',
           day_of_week: dayOfWeek,
-          day: dayName,
           start_time: startTime,
           end_time: endTime,
-          time: formatTimeRange(startTime, endTime),
           class_name: s.className || s.class_name,
           subject: s.subject,
-          room: s.room,
-          academic_year: s.academic_year || '2024/2025',
+          room: s.room || 'Ruang Kelas',
+          academic_year: s.academic_year || '2026/2027',
           is_active: s.is_active ?? true,
           version: s.version || 1,
         };
+        if (s.effective_from) dbRow.effective_from = s.effective_from;
+        if (s.effective_until) dbRow.effective_until = s.effective_until;
 
         if (s.id && currentMap.has(s.id)) {
           await this.client.from('teaching_schedules').update(dbRow).eq('id', s.id);
@@ -3325,8 +3414,12 @@ export class SupabaseProvider implements IDataProvider {
         }
       }
 
-      const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      await mockProv.saveTeachingSchedules(schedules);
+      try {
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        await mockProv.saveTeachingSchedules(schedules);
+      } catch {
+        // Ignore mock sync error
+      }
       return true;
     } catch (err) {
       logger.warn('SupabaseProvider', 'saveTeachingSchedules DB exception:', err);

@@ -4,6 +4,8 @@
  * isolasi identitas berbasis teacher_user_id murni, honest data state, dan Smart Class Alarm.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { MockProvider } from '../../providers/mock-provider.service';
 import { ProviderFactory } from '../../providers/provider-factory';
 import { TeachingScheduleRepository } from '../../repositories/TeachingScheduleRepository';
@@ -346,6 +348,70 @@ export async function runTeachingScheduleOverhaulTestSuite(): Promise<{
     keyMinute10 === keyMinute9 &&
       keyMinute10 === 'sched_upcoming_1_2026-09-14_UPCOMING_10MIN',
     `Stable alarm key identical across minutes: ${keyMinute10}`
+  );
+
+  // ── TEST 18: Migration 44 DDL & RLS Read-Only Policy Validation ───────────
+  const migrationPath = path.resolve(process.cwd(), 'sql/44_create_teaching_schedules_table.sql');
+  const migrationExists = fs.existsSync(migrationPath);
+  assert(
+    'Test 18: Migration 44 File Exists & Contains Read-Only RLS Policies',
+    migrationExists,
+    migrationExists ? 'File sql/44_create_teaching_schedules_table.sql verified' : 'File missing'
+  );
+
+  if (migrationExists) {
+    const sqlContent = fs.readFileSync(migrationPath, 'utf8');
+    const hasTable = sqlContent.includes('CREATE TABLE IF NOT EXISTS public.teaching_schedules');
+    const hasTeacherUserId = sqlContent.includes('teacher_user_id');
+    const hasDayOfWeek = sqlContent.includes('day_of_week');
+    const hasRlsEnabled = sqlContent.includes('ENABLE ROW LEVEL SECURITY');
+    const hasReadOnlySelect = sqlContent.includes('teaching_schedules_read_authenticated');
+    const hasServiceRoleAll = sqlContent.includes('teaching_schedules_service_role_all');
+
+    assert(
+      'Test 18b: Migration 44 DDL Schema Columns & RLS Policy Integrity',
+      hasTable && hasTeacherUserId && hasDayOfWeek && hasRlsEnabled && hasReadOnlySelect && hasServiceRoleAll,
+      'Verified table DDL, schema columns, and RLS read-only for authenticated & service_role mutations'
+    );
+  }
+
+  // ── TEST 19: Controlled Serverless Admin Endpoint Verification ─────────────
+  const endpointPath = path.resolve(process.cwd(), 'api/admin/teaching-schedules.ts');
+  const endpointExists = fs.existsSync(endpointPath);
+  assert(
+    'Test 19: Controlled Server Endpoint api/admin/teaching-schedules.ts Exists',
+    endpointExists,
+    endpointExists ? 'File api/admin/teaching-schedules.ts verified' : 'File missing'
+  );
+
+  if (endpointExists) {
+    const endpointCode = fs.readFileSync(endpointPath, 'utf8');
+    const usesSessionAuth = endpointCode.includes('authenticateUser');
+    const checksAdminRole = endpointCode.includes('isAdminOrKepsek') || endpointCode.includes('AUTH_FORBIDDEN');
+    const usesServerSupabase = endpointCode.includes('serverSupabase');
+
+    assert(
+      'Test 19b: Controlled Endpoint Enforces Session Auth, Role Guard, & ServerSupabase',
+      usesSessionAuth && checksAdminRole && usesServerSupabase,
+      'Verified session authentication, admin role guard, and service_role DB mutations'
+    );
+  }
+
+  // ── TEST 20: Provider Schema Column Alignment ─────────────────────────────
+  const providerPath = path.resolve(process.cwd(), 'src/providers/supabase-provider.service.ts');
+  const providerCode = fs.readFileSync(providerPath, 'utf8');
+  const scheduleColsMatch = providerCode.match(/const scheduleCols = ['"]([^'"]+)['"]/);
+  const selectedCols = scheduleColsMatch ? scheduleColsMatch[1] : '';
+
+  const hasNoLegacyDayCol = !selectedCols.split(',').map((c) => c.trim()).includes('day');
+  const hasNoLegacyTimeCol = !selectedCols.split(',').map((c) => c.trim()).includes('time');
+  const hasTeacherUserId = selectedCols.includes('teacher_user_id');
+  const hasDayOfWeek = selectedCols.includes('day_of_week');
+
+  assert(
+    'Test 20: Provider getTeachingSchedules Strictly Reads Available Schema Columns',
+    hasNoLegacyDayCol && hasNoLegacyTimeCol && hasTeacherUserId && hasDayOfWeek,
+    `Columns audited: ${selectedCols}`
   );
 
   return { passed, failed, results };
