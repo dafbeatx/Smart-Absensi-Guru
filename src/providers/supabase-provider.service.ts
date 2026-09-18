@@ -1908,7 +1908,7 @@ export class SupabaseProvider implements IDataProvider {
         error.code === 'PGRST204')
     ) {
       logger.warn('SupabaseProvider', 'New columns missing on holidays table. Retrying insert with base columns...');
-      const { category_type, is_holiday, type, ...basicRec } = fullRec;
+      const { category_type: _category_type, is_holiday: _is_holiday, type: _type, ...basicRec } = fullRec;
       const retry = await this.client.from('holidays').insert({
         ...basicRec,
         type: fullRec.type,
@@ -1950,7 +1950,7 @@ export class SupabaseProvider implements IDataProvider {
     ) {
       logger.warn('SupabaseProvider', 'New columns missing on holidays table. Retrying update with base columns...');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { category_type, is_holiday, ...basicHoliday } = holiday as any;
+      const { category_type: _cat, is_holiday: _isHol, ...basicHoliday } = holiday as any;
       const retry = await this.client.from('holidays').update(basicHoliday).eq('id', id);
       error = retry.error;
     }

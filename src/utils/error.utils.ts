@@ -20,10 +20,6 @@ export function notifyWarning(title: string, message?: string): void {
   useToastStore.getState().showToast('warning', title, message || '');
 }
 
-export function notifyInfo(title: string, message?: string): void {
-  useToastStore.getState().showToast('info', title, message || '');
-}
-
 /**
  * Standard Application Error Handler:
  * - Logs error safely via logger.error
