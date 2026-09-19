@@ -437,6 +437,70 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 16: Error testing multi-subject daily distribution', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 17: Admin-Configured Numbered Exam Rooms (Ruang 1 s/d Ruang X)
+  // ---------------------------------------------------------------------------
+  try {
+    const roomConfig: ExamScheduleFormConfig = {
+      ...config,
+      startDate: '2026-10-05',
+      endDate: '2026-10-05',
+      sessionsPerDay: 1,
+      selectedClasses: ['7A', '7B', '8A'],
+      totalRooms: 3,
+      roomFormat: 'NUMERIC',
+      selectedSubjects: ['Matematika'],
+    };
+
+    const sched = ExamSchedulerService.generateSchedule(roomConfig, sampleTeachers, []);
+
+    // Check subjects room names
+    const subj7A = sched.subjectSchedules.find((s) => s.className === '7A');
+    const subj7B = sched.subjectSchedules.find((s) => s.className === '7B');
+    const subj8A = sched.subjectSchedules.find((s) => s.className === '8A');
+
+    // Check proctors room names
+    const proc7A = sched.proctorSchedules.find((p) => p.className === '7A');
+    const proc7B = sched.proctorSchedules.find((p) => p.className === '7B');
+    const proc8A = sched.proctorSchedules.find((p) => p.className === '8A');
+
+    // Also test DOUBLE_DIGIT format
+    const doubleDigitConfig: ExamScheduleFormConfig = {
+      ...roomConfig,
+      roomFormat: 'DOUBLE_DIGIT',
+    };
+    const doubleSched = ExamSchedulerService.generateSchedule(doubleDigitConfig, sampleTeachers, []);
+    const dSubj7A = doubleSched.subjectSchedules.find((s) => s.className === '7A');
+
+    // Also test custom mapping
+    const customMappingConfig: ExamScheduleFormConfig = {
+      ...roomConfig,
+      classRoomMapping: { '7A': 'Ruang 5', '7B': 'Ruang 6' },
+    };
+    const customSched = ExamSchedulerService.generateSchedule(customMappingConfig, sampleTeachers, []);
+    const cSubj7A = customSched.subjectSchedules.find((s) => s.className === '7A');
+    const cSubj7B = customSched.subjectSchedules.find((s) => s.className === '7B');
+
+    const isNumericValid =
+      subj7A?.roomName === 'Ruang 1' &&
+      subj7B?.roomName === 'Ruang 2' &&
+      subj8A?.roomName === 'Ruang 3' &&
+      proc7A?.roomName === 'Ruang 1' &&
+      proc7B?.roomName === 'Ruang 2' &&
+      proc8A?.roomName === 'Ruang 3';
+
+    const isDoubleDigitValid = dSubj7A?.roomName === 'Ruang 01';
+    const isCustomMappingValid = cSubj7A?.roomName === 'Ruang 5' && cSubj7B?.roomName === 'Ruang 6';
+
+    assert(
+      'Exam Scheduler 17: Admin-configured exam rooms assigns Ruang 1 - X, supports double-digit formatting, and custom class mapping',
+      isNumericValid && isDoubleDigitValid && isCustomMappingValid,
+      `Numeric: ${subj7A?.roomName}, ${subj7B?.roomName}, ${subj8A?.roomName} | DoubleDigit: ${dSubj7A?.roomName} | Custom: ${cSubj7A?.roomName}, ${cSubj7B?.roomName}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 17: Error testing admin-configured numbered exam rooms', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
 

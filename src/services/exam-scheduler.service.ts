@@ -162,11 +162,32 @@ export class ExamSchedulerService {
       ? config.selectedSubjects
       : ['PAI', 'PKn', 'Bahasa Indonesia', 'Matematika', 'IPA', 'IPS', 'Bahasa Inggris', 'Informatika', 'Seni Budaya', 'PJOK'];
 
+    // ── PREPARE ROOM ALLOCATION (RUANG 1 S/D RUANG X) ────────────────────────
+    const totalRooms = Math.max(1, config.totalRooms || classes.length || 1);
+    const roomFormat = config.roomFormat || 'NUMERIC';
+
+    const formatRoomName = (roomNumber: number): string => {
+      const numStr = roomFormat === 'DOUBLE_DIGIT' ? String(roomNumber).padStart(2, '0') : String(roomNumber);
+      return `Ruang ${numStr}`;
+    };
+
+    const classRoomMap = new Map<string, string>();
+    classes.forEach((cls, clsIdx) => {
+      if (config.classRoomMapping && config.classRoomMapping[cls]) {
+        classRoomMap.set(cls, config.classRoomMapping[cls]);
+      } else {
+        const roomNum = (clsIdx % totalRooms) + 1;
+        classRoomMap.set(cls, formatRoomName(roomNum));
+      }
+    });
+
     // ── 1. GENERATE SUBJECT SCHEDULES PER CLASS ──────────────────────────────
     const subjectSchedules: ExamSubjectScheduleItem[] = [];
 
     // Map each subject to the concrete slot for each class
     classes.forEach((cls) => {
+      const assignedRoom = classRoomMap.get(cls) || formatRoomName(1);
+
       subjects.forEach((subj, subjIdx) => {
         const slot = allSlots[subjIdx % totalSlots];
         const isLabRequired = /informatika|komputer|cbt|tik/i.test(subj);
@@ -180,6 +201,7 @@ export class ExamSchedulerService {
           endTime: slot.endTime,
           className: cls,
           subject: subj,
+          roomName: assignedRoom,
           isLabRequired,
         });
       });
@@ -257,7 +279,7 @@ export class ExamSchedulerService {
       const assignedInCurrentSlot = new Set<string>();
 
       itemsInSlot.forEach((subjItem) => {
-        const roomName = `Ruang ${subjItem.className}`;
+        const roomName = subjItem.roomName || classRoomMap.get(subjItem.className) || formatRoomName(1);
 
         // Find candidate proctors:
         // Rule 1: Not assigned in this slot yet

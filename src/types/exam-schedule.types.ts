@@ -34,6 +34,7 @@ export interface ExamSubjectScheduleItem {
   endTime: string;
   className: string;
   subject: string;
+  roomName?: string; // e.g. "Ruang 1", "Ruang 01"
   isLabRequired?: boolean;
 }
 
@@ -74,6 +75,9 @@ export interface ExamScheduleFormConfig {
   sessionSlots: SessionTimeSlot[];
   dayOverrides?: DaySessionOverride[];
   selectedClasses: string[];
+  totalRooms?: number; // Setting admin: Jumlah ruangan ujian (Ruang 1 s/d Ruang X)
+  roomFormat?: 'NUMERIC' | 'DOUBLE_DIGIT'; // 'Ruang 1' vs 'Ruang 01'
+  classRoomMapping?: Record<string, string>; // Mapping rombel/kelas ke nomor ruangan
   selectedSubjects: string[];
   selectedTeacherIds: string[];
   proctorsPerRoom: 1 | 2;

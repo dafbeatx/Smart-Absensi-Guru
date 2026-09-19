@@ -22,6 +22,7 @@ import {
   Sliders,
   FileText,
   ListFilter,
+  DoorOpen,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import type { UserProfile } from '../../../types/database.types';
@@ -304,6 +305,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     setToast({ text: `Semua hari disetel ${count} sesi.`, type: 'success' });
   };
   const [selectedClasses, setSelectedClasses] = useState<string[]>(DEFAULT_CLASSES);
+  const [totalRooms, setTotalRooms] = useState<number>(() => DEFAULT_CLASSES.length);
+  const [roomFormat, setRoomFormat] = useState<'NUMERIC' | 'DOUBLE_DIGIT'>('NUMERIC');
+  const [classRoomMapping, setClassRoomMapping] = useState<Record<string, string>>({});
   const [classDataSource, setClassDataSource] = useState<'LOCAL_CACHE' | 'TEACHING_SCHEDULE' | 'CLOUD' | 'FALLBACK'>('LOCAL_CACHE');
   const [classStudentCounts, setClassStudentCounts] = useState<Record<string, number>>({});
   const [totalStudentsInYear, setTotalStudentsInYear] = useState<number>(0);
@@ -486,6 +490,11 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       // 6. Load existing schedule if available
       const saved = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType);
       setScheduleData(saved);
+      if (saved?.config) {
+        if (saved.config.totalRooms) setTotalRooms(saved.config.totalRooms);
+        if (saved.config.roomFormat) setRoomFormat(saved.config.roomFormat);
+        if (saved.config.classRoomMapping) setClassRoomMapping(saved.config.classRoomMapping);
+      }
 
       // If user is a regular teacher, default tab to "my_schedule" or "subjects"
       if (!access.canManage) {
@@ -553,6 +562,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         sessionSlots,
         dayOverrides: sessionMode === 'PER_DAY' ? dayOverrides : undefined,
         selectedClasses,
+        totalRooms,
+        roomFormat,
+        classRoomMapping: Object.keys(classRoomMapping).length > 0 ? classRoomMapping : undefined,
         selectedSubjects,
         selectedTeacherIds,
         proctorsPerRoom,
@@ -1494,7 +1506,184 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                 </div>
               </div>
 
-              {/* 4. Pilihan Mata Pelajaran */}
+              {/* 4. Pengaturan Ruangan Ujian (Ruang 1 s/d Ruang X) */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <DoorOpen className="w-4 h-4 text-teal-600" />
+                      Pengaturan Ruangan Ujian (Ruang 1 s/d ...)
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Tentukan nomor ruangan ujian (mulai dari Ruang 1 hingga berapa) dan alokasi rombel peserta ke setiap ruangan.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="text-xs font-black text-teal-800 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-lg">
+                      {roomFormat === 'DOUBLE_DIGIT'
+                        ? `Ruang 01 s/d Ruang ${String(totalRooms).padStart(2, '0')}`
+                        : `Ruang 1 s/d Ruang ${totalRooms}`}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* Stepper Jumlah Ruangan */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
+                    <label className="text-[11px] font-bold text-slate-700 block">
+                      Jumlah Ruangan Ujian (Ruang 1 s/d ...)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTotalRooms((prev) => Math.max(1, prev - 1))}
+                        className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center transition-colors shrink-0"
+                        title="Kurangi 1 Ruang"
+                      >
+                        -
+                      </button>
+                      <div className="flex-1 text-center font-mono font-bold text-sm sm:text-base text-slate-900 bg-slate-50 py-1.5 rounded-lg border border-slate-200">
+                        Ruang 1 s/d {roomFormat === 'DOUBLE_DIGIT' ? String(totalRooms).padStart(2, '0') : totalRooms}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTotalRooms((prev) => Math.min(50, prev + 1))}
+                        className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center transition-colors shrink-0"
+                        title="Tambah 1 Ruang"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] pt-1">
+                      <span className="text-slate-500 font-medium">
+                        Total: <strong className="text-slate-800">{totalRooms} Ruangan</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setTotalRooms(Math.max(1, selectedClasses.length))}
+                        className="text-teal-700 font-bold hover:underline"
+                        title="Samakan jumlah ruangan dengan jumlah rombel terpilih"
+                      >
+                        🔄 Samakan dg Rombel ({selectedClasses.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Format Penomoran Ruangan */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
+                    <label className="text-[11px] font-bold text-slate-700 block">
+                      Format Penomoran Ruangan
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRoomFormat('NUMERIC')}
+                        className={`py-2 px-2.5 rounded-lg text-xs font-bold text-center transition-all ${
+                          roomFormat === 'NUMERIC'
+                            ? 'bg-teal-600 text-white shadow-2xs'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        Ruang 1, 2, 3...
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRoomFormat('DOUBLE_DIGIT')}
+                        className={`py-2 px-2.5 rounded-lg text-xs font-bold text-center transition-all ${
+                          roomFormat === 'DOUBLE_DIGIT'
+                            ? 'bg-teal-600 text-white shadow-2xs'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        Ruang 01, 02...
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Format penamaan ini berlaku untuk jadwal siswa, jadwal pengawas, dan kartu ujian.
+                    </p>
+                  </div>
+
+                  {/* Kebutuhan Pengawas */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5 flex flex-col justify-between shadow-2xs">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        Kebutuhan Guru Pengawas
+                      </label>
+                      <p className="text-sm font-black text-slate-900 mt-1">
+                        {totalRooms * proctorsPerRoom} Guru / Sesi
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {totalRooms} ruangan × {proctorsPerRoom} pengawas per ruangan
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-teal-800 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200 self-start">
+                      {selectedClasses.length === totalRooms
+                        ? '✓ 1 Rombel = 1 Ruangan'
+                        : `${selectedClasses.length} Rombel disebar ke ${totalRooms} Ruang`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pemetaan Rombel ke Ruang Ujian */}
+                {selectedClasses.length > 0 && (
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <span className="text-[11px] font-bold text-slate-700">
+                        Alokasi Ruangan per Kelas / Rombel:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setClassRoomMapping({})}
+                        className="text-[10px] text-slate-500 hover:text-teal-700 font-bold"
+                      >
+                        Reset Alokasi Berurutan
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                      {selectedClasses.map((cls, idx) => {
+                        const defaultRoomName = roomFormat === 'DOUBLE_DIGIT'
+                          ? `Ruang ${String((idx % totalRooms) + 1).padStart(2, '0')}`
+                          : `Ruang ${(idx % totalRooms) + 1}`;
+                        const currentAssigned = classRoomMapping[cls] || defaultRoomName;
+
+                        return (
+                          <div key={cls} className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center space-y-1.5">
+                            <span className="text-[11px] font-bold text-slate-700 block">
+                              Kelas {cls}
+                            </span>
+                            <select
+                              value={currentAssigned}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setClassRoomMapping((prev) => ({
+                                  ...prev,
+                                  [cls]: val,
+                                }));
+                              }}
+                              className="w-full bg-white border border-teal-300 rounded-md py-1 px-1 text-[11px] font-bold text-teal-800 text-center focus:outline-none focus:ring-1 focus:ring-teal-500 shadow-2xs cursor-pointer"
+                            >
+                              {Array.from({ length: totalRooms }, (_, rIdx) => {
+                                const rName = roomFormat === 'DOUBLE_DIGIT'
+                                  ? `Ruang ${String(rIdx + 1).padStart(2, '0')}`
+                                  : `Ruang ${rIdx + 1}`;
+                                return (
+                                  <option key={rName} value={rName}>
+                                    {rName}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 5. Pilihan Mata Pelajaran */}
               <div className="space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-100">
                   <div>
@@ -1851,13 +2040,18 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-1 flex-wrap sm:justify-end">
-                                  <span className="text-[10px] text-slate-400 font-semibold block mr-1">Peserta:</span>
-                                  {sess.classes.map((cls) => (
-                                    <span key={cls} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200">
-                                      {cls}
-                                    </span>
-                                  ))}
+                                <div className="flex items-center gap-1.5 flex-wrap sm:justify-end">
+                                  <span className="text-[10px] text-slate-400 font-semibold block mr-1">Rombel & Ruang:</span>
+                                  {sess.classes.map((cls) => {
+                                    const matchingItem = scheduleData.subjectSchedules.find(
+                                      (s) => s.date === day.date && s.sessionNumber === sess.sessionNumber && s.className === cls
+                                    );
+                                    return (
+                                      <span key={cls} className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-slate-700 border border-slate-200 shadow-2xs">
+                                        Kelas {cls} <strong className="text-teal-700 font-black">({matchingItem?.roomName || 'Ruang'})</strong>
+                                      </span>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             ))}
@@ -1908,12 +2102,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                               </td>
                               <td className="py-2.5 px-3.5 font-bold text-slate-900">{item.subject}</td>
                               <td className="py-2.5 px-3.5 text-center">
-                                {item.isLabRequired ? (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-teal-50 text-teal-800 border border-teal-200 shadow-2xs inline-block">
+                                  {item.roomName || `Ruang ${item.className}`}
+                                </span>
+                                {item.isLabRequired && (
+                                  <span className="block mt-0.5 text-[9px] font-bold text-purple-700">
                                     Lab Komputer (CBT)
                                   </span>
-                                ) : (
-                                  <span className="text-[11px] text-slate-500">Ruang {item.className}</span>
                                 )}
                               </td>
                               {accessInfo.canManage && (
@@ -1996,7 +2191,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                             <td className="py-2.5 px-3.5">
                               <span className="font-bold text-slate-900">{item.dayName}</span>, {item.date} • <span className="font-bold text-teal-700">Sesi {item.sessionNumber}</span> ({item.startTime}-{item.endTime})
                             </td>
-                            <td className="py-2.5 px-3.5 font-bold text-slate-800">{item.roomName}</td>
+                            <td className="py-2.5 px-3.5">
+                              <span className="font-black text-teal-900 text-xs block">{item.roomName}</span>
+                              <span className="text-[10px] text-slate-500 font-semibold">Kelas {item.className}</span>
+                            </td>
                             <td className="py-2.5 px-3.5 font-semibold text-slate-700">{item.subject}</td>
                             <td className="py-2.5 px-3.5 font-bold text-teal-700 flex items-center gap-1.5">
                               <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
@@ -2075,9 +2273,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-500">Lokasi Tugas:</span>
-                      <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                        {duty.roomName}
+                      <span className="text-slate-500 font-medium">Lokasi Tugas:</span>
+                      <span className="font-black text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                        {duty.roomName} ({duty.className})
                       </span>
                     </div>
                   </div>

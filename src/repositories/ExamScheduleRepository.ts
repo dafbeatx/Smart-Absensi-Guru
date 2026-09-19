@@ -135,7 +135,7 @@ export class ExamScheduleRepository {
         `${item.startTime} - ${item.endTime}`,
         item.className,
         item.subject,
-        item.isLabRequired ? 'Lab Komputer (CBT)' : 'Ruang Kelas Teori',
+        item.isLabRequired ? `${item.roomName || 'Ruang'} (Lab CBT)` : (item.roomName || 'Ruang Kelas'),
       ]);
     });
 
@@ -178,7 +178,7 @@ export class ExamScheduleRepository {
         item.date,
         `Sesi ${item.sessionNumber}`,
         `${item.startTime} - ${item.endTime}`,
-        item.roomName,
+        `${item.roomName} (${item.className})`,
         item.subject,
         item.mainProctorName,
         item.backupProctorName || '-',
