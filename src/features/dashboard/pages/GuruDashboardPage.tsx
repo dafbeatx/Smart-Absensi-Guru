@@ -34,6 +34,7 @@ import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricE
 import { StudentBehaviorModal } from '../../guru/components/StudentBehaviorModal';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
 import { AdministrationHubModal } from '../../administration/components/AdministrationHubModal';
+import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
 import {
   CustomizeQuickIconsModal,
   ALL_QUICK_ICONS,
@@ -390,6 +391,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   });
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [isAdministrationModalOpen, setIsAdministrationModalOpen] = useState(false);
+  const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
   const [isStudentBehaviorModalOpen, setIsStudentBehaviorModalOpen] = useState(false);
   const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
@@ -497,6 +499,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         break;
       case 'exam_card':
         setIsExamCardModalOpen(true);
+        break;
+      case 'jadwal_ujian_ngawas':
+      case 'exam_schedule':
+        setIsExamScheduleModalOpen(true);
         break;
       case 'student_good':
         setStudentBehaviorInitialTab('KEBAIKAN');
@@ -5134,8 +5140,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               setIsHomeroomModalOpen(true);
               break;
             case 'kalender':
-            case 'exam_schedule':
               setIsEventsCalendarModalOpen(true);
+              break;
+            case 'exam_schedule':
+              setIsExamScheduleModalOpen(true);
               break;
             case 'rekap':
               setIsRecapModalOpen(true);
@@ -5145,6 +5153,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           }
         }}
       />
+
+      {/* 📋 Modal Layer Jadwal Ujian & Pengawas AI (Hak Panitia & Layer Fullscreen) */}
+      {effectiveUser && (
+        <ExamScheduleAndProctorModal
+          isOpen={isExamScheduleModalOpen}
+          onClose={() => setIsExamScheduleModalOpen(false)}
+          currentUser={effectiveUser}
+        />
+      )}
 
       {/* 13. Terminal Presensi RFID Siswa 2 (Akses Cepat Guru Piket & Pengajar) */}
       <StudentRfidKioskModal

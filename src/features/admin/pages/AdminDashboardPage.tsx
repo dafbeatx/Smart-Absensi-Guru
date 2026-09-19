@@ -48,6 +48,7 @@ import { AboutAppView } from '../../guru/components/AboutAppView';
 import { WebTrafficService } from '../../../services/web-traffic.service';
 import { AdministrationHubView } from '../../administration/components/AdministrationHubView';
 import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal';
+import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -62,6 +63,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
+  const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [selectedCorrectionDate, setSelectedCorrectionDate] = useState<string | undefined>(undefined);
@@ -710,7 +712,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                   setActiveTab('SCHEDULE');
                 } else if (actionId === 'classroom' || actionId === 'direktori_siswa') {
                   setActiveTab('STUDENTS');
-                } else if (actionId === 'kalender' || actionId === 'exam_schedule') {
+                } else if (actionId === 'exam_schedule') {
+                  setIsExamScheduleModalOpen(true);
+                } else if (actionId === 'kalender') {
                   setActiveTab('CALENDAR');
                 } else if (actionId === 'rekap') {
                   setActiveTab('ATTENDANCE_TRACKING');
@@ -993,6 +997,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         isOpen={isExamCardModalOpen}
         onClose={() => setIsExamCardModalOpen(false)}
       />
+
+      {/* Modal Layer Jadwal Ujian & Roster Pengawas Guru AI (Hak Panitia & Admin) */}
+      {user && (
+        <ExamScheduleAndProctorModal
+          isOpen={isExamScheduleModalOpen}
+          onClose={() => setIsExamScheduleModalOpen(false)}
+          currentUser={user}
+        />
+      )}
 
       {/* Modal Peringkat Poin Terbanyak Guru (Fullscreen Workspace) */}
       <TeacherDisciplineBadgeModal

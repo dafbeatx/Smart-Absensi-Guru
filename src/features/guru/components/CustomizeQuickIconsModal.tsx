@@ -28,6 +28,7 @@ import {
   Boxes,
   QrCode,
   FolderCheck,
+  CalendarCheck,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
@@ -137,6 +138,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     description: 'Cetak kartu peserta ujian & barcode NISN siswa otomatis (A4)',
     icon: QrCode,
     colorClass: 'from-amber-600 to-yellow-800',
+  },
+  {
+    id: 'jadwal_ujian_ngawas',
+    title: 'Jadwal Ujian & Ngawas',
+    category: 'Akademik & Nilai',
+    description: 'Jadwal ujian ASTS/ASAS & pembagian tugas pengawas guru berbasis AI (Hak Panitia)',
+    icon: CalendarCheck,
+    colorClass: 'from-[#023246] to-[#18536B]',
   },
   {
     id: 'direktori_siswa',
@@ -249,7 +258,7 @@ export const QUICK_ICON_STEPS: QuickIconStep[] = [
     id: 3,
     title: 'Akademik & KBM',
     category: 'Akademik & Nilai',
-    itemIds: ['administrasi', 'exam_card', 'materials', 'classroom', 'koreksi_soal'],
+    itemIds: ['administrasi', 'exam_card', 'jadwal_ujian_ngawas', 'materials', 'classroom', 'koreksi_soal'],
   },
   {
     id: 4,

@@ -104,6 +104,7 @@ export interface MarkReadResult {
 export interface UserProfile {
   id: string;
   nip: string | null;
+  npp?: string | null;
   full_name: string;
   phone_number: string;
   role: RoleCode;
@@ -111,6 +112,7 @@ export interface UserProfile {
   avatar_url: string | null;
   is_active: boolean;
   must_change_pin?: boolean;
+  teaching_assignment?: string | string[];
   created_at: string;
 }
 

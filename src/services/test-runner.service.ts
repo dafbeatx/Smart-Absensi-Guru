@@ -38,6 +38,7 @@ import { runAttendancePenaltiesTestSuite } from './__tests__/attendance-penaltie
 import { runDutyTeacherLeaveTasksTestSuite } from './__tests__/duty-teacher-leave-tasks.test';
 import { runAdministrationModulesTestSuite } from './__tests__/administration-modules.test';
 import { runWhatsAppGroupNotificationTestSuite } from './__tests__/whatsapp-group-notification.test';
+import { runExamSchedulerTestSuite } from './__tests__/exam-scheduler.test';
 
 export interface TestResultItem {
   testName: string;
@@ -113,6 +114,7 @@ export class MasterTestRunner {
       { name: 'Duty Teacher Leave Tasks & Broadcast Engine', fn: runDutyTeacherLeaveTasksTestSuite },
       { name: 'Administration Hub & Academic Year Module Engine', fn: runAdministrationModulesTestSuite },
       { name: 'WhatsApp Group Attendance Notification Engine (Anti-Ban & Text-Only)', fn: runWhatsAppGroupNotificationTestSuite },
+      { name: 'Exam Scheduler, Proctor Balancer & Committee AI Engine (Phase 4.6)', fn: runExamSchedulerTestSuite },
     ];
 
     let totalPassed = 0;
