@@ -108,15 +108,27 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   // ── FORM QUESTIONNAIRE STATE (Parameters filled by Committee) ──────────────
   const [formAcademicYear, setFormAcademicYear] = useState<string>(() => AdministrationRepository.getActiveAcademicYear());
   const [formExamType, setFormExamType] = useState<ExamType>('ASTS');
-  const [formStartDate, setFormStartDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
-  const [formEndDate, setFormEndDate] = useState(() => {
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 5);
-    return nextWeek.toISOString().split('T')[0];
-  });
+
+  // Helper to compute smart default exam dates (Standard 5-day school week: Senin s/d Jumat)
+  const getSmartDefaultExamStartDate = (): string => {
+    const now = new Date();
+    const day = now.getDay(); // 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
+    const diff = day === 1 ? 0 : (8 - day) % 7;
+    const targetMonday = new Date(now);
+    targetMonday.setDate(now.getDate() + diff);
+    return targetMonday.toISOString().split('T')[0];
+  };
+
+  const getSmartDefaultExamEndDate = (startDateStr: string): string => {
+    const start = new Date(startDateStr);
+    const targetFriday = new Date(start);
+    targetFriday.setDate(start.getDate() + 4); // Senin + 4 hari = Jumat
+    return targetFriday.toISOString().split('T')[0];
+  };
+
+  const [includeSaturday, setIncludeSaturday] = useState<boolean>(false);
+  const [formStartDate, setFormStartDate] = useState<string>(() => getSmartDefaultExamStartDate());
+  const [formEndDate, setFormEndDate] = useState<string>(() => getSmartDefaultExamEndDate(getSmartDefaultExamStartDate()));
   const [sessionsPerDay, setSessionsPerDay] = useState<number>(2);
   const [sessionSlots, setSessionSlots] = useState<SessionTimeSlot[]>([
     { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:30' },
@@ -125,10 +137,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [sessionMode, setSessionMode] = useState<'UNIFORM' | 'PER_DAY'>('PER_DAY');
   const [dayOverrides, setDayOverrides] = useState<DaySessionOverride[]>([]);
 
-  // Valid exam dates (excluding Sundays)
+  // Valid exam dates (excluding Sundays, and excluding Saturdays unless includeSaturday is true)
   const validExamDates = useMemo(
-    () => ExamSchedulerService.getValidExamDates(formStartDate, formEndDate),
-    [formStartDate, formEndDate]
+    () => ExamSchedulerService.getValidExamDates(formStartDate, formEndDate, includeSaturday),
+    [formStartDate, formEndDate, includeSaturday]
   );
 
   // Initialize day overrides whenever validExamDates change
@@ -462,6 +474,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         semester: activeSemester,
         startDate: formStartDate,
         endDate: formEndDate,
+        includeSaturday,
         sessionsPerDay,
         sessionSlots,
         dayOverrides: sessionMode === 'PER_DAY' ? dayOverrides : undefined,
@@ -933,6 +946,52 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                     required
                   />
                 </div>
+              </div>
+
+              {/* Quick Range Selector & Saturday Toggle */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-500">⚡ Rentang Cepat:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const mon = getSmartDefaultExamStartDate();
+                      setFormStartDate(mon);
+                      setFormEndDate(getSmartDefaultExamEndDate(mon));
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white border border-teal-200 text-teal-700 hover:bg-teal-50 shadow-2xs transition-all"
+                  >
+                    🗓️ Senin - Jumat Pekan Ini
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const now = new Date();
+                      const day = now.getDay();
+                      const daysToNextNextMon = day === 1 ? 7 : (8 - day) % 7 + 7;
+                      const nextMon = new Date(now);
+                      nextMon.setDate(now.getDate() + daysToNextNextMon);
+                      const monStr = nextMon.toISOString().split('T')[0];
+                      setFormStartDate(monStr);
+                      setFormEndDate(getSmartDefaultExamEndDate(monStr));
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 shadow-2xs transition-all"
+                  >
+                    🗓️ Senin - Jumat Pekan Depan
+                  </button>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={includeSaturday}
+                    onChange={(e) => setIncludeSaturday(e.target.checked)}
+                    className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300"
+                  />
+                  <span className="text-[11px] font-bold text-slate-700">
+                    Sertakan Hari Sabtu {includeSaturday ? '(Aktif)' : '(Libur Pekan)'}
+                  </span>
+                </label>
               </div>
 
               {/* 2. Pengaturan Sesi Jam per Hari (Mendukung Jumlah Sesi Berbeda Setiap Hari) */}

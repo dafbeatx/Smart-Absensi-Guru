@@ -77,14 +77,22 @@ export const runExamSchedulerTestSuite = async (): Promise<{
   // TEST 1: Valid Exam Dates Generation (Sunday Exclusion)
   // ---------------------------------------------------------------------------
   try {
-    // Range with a Sunday (e.g. 2026-10-02 [Jumat] to 2026-10-06 [Selasa], Sunday is 2026-10-04)
-    const dates = ExamSchedulerService.getValidExamDates('2026-10-02', '2026-10-06');
-    const hasSunday = dates.some((d) => d.dayName.toLowerCase() === 'minggu');
+    // Range with a weekend (e.g. 2026-10-02 [Jumat] to 2026-10-06 [Selasa], Saturday is 2026-10-03, Sunday is 2026-10-04)
+    const defaultDates = ExamSchedulerService.getValidExamDates('2026-10-02', '2026-10-06');
+    const hasSunday = defaultDates.some((d) => d.dayName.toLowerCase() === 'minggu');
+    const hasSaturdayDefault = defaultDates.some((d) => d.dayName.toLowerCase() === 'sabtu');
+
+    const withSaturdayDates = ExamSchedulerService.getValidExamDates('2026-10-02', '2026-10-06', true);
+    const hasSaturdayWhenEnabled = withSaturdayDates.some((d) => d.dayName.toLowerCase() === 'sabtu');
 
     assert(
-      'Exam Scheduler 01: Generates valid exam dates and strictly skips Sundays',
-      dates.length > 0 && !hasSunday,
-      `Generated ${dates.length} days, days: ${dates.map((d) => d.dayName).join(', ')}`
+      'Exam Scheduler 01: Generates valid exam dates, skips weekends by default, and includes Saturday when requested',
+      defaultDates.length === 3 &&
+      !hasSunday &&
+      !hasSaturdayDefault &&
+      hasSaturdayWhenEnabled &&
+      withSaturdayDates.length === 4,
+      `Default days: ${defaultDates.map((d) => d.dayName).join(', ')} | With Saturday: ${withSaturdayDates.map((d) => d.dayName).join(', ')}`
     );
   } catch (err: any) {
     assert('Exam Scheduler 01: Error generating valid exam dates', false, err?.message);
@@ -362,6 +370,7 @@ export const runExamSchedulerTestSuite = async (): Promise<{
       ...config,
       startDate: '2026-10-02', // Jumat
       endDate: '2026-10-03',   // Sabtu
+      includeSaturday: true,
       sessionsPerDay: 2,
       selectedClasses: ['7A'],
       selectedSubjects: ['Mapel 1', 'Mapel 2', 'Mapel 3', 'Mapel 4'],

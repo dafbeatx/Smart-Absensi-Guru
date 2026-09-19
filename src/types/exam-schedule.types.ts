@@ -69,6 +69,7 @@ export interface ExamScheduleFormConfig {
   semester: string;
   startDate: string; // YYYY-MM-DD
   endDate: string;   // YYYY-MM-DD
+  includeSaturday?: boolean; // Default false (Sekolah 5 Hari Kerja: Senin s/d Jumat)
   sessionsPerDay: number;
   sessionSlots: SessionTimeSlot[];
   dayOverrides?: DaySessionOverride[];

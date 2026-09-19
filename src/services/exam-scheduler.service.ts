@@ -19,24 +19,38 @@ interface TeacherLoad {
 
 export class ExamSchedulerService {
   /**
-   * Generates date sequence (YYYY-MM-DD) between start and end date, skipping Sundays.
+   * Generates date sequence (YYYY-MM-DD) between start and end date.
+   * By default, skips Sundays and Saturdays (standard 5-day school week).
+   * If includeSaturday is true, Saturdays are included (6-day school week).
    */
-  public static getValidExamDates(startDateStr: string, endDateStr: string): Array<{ date: string; dayName: string }> {
+  public static getValidExamDates(
+    startDateStr: string,
+    endDateStr: string,
+    includeSaturday = false
+  ): Array<{ date: string; dayName: string }> {
     const dates: Array<{ date: string; dayName: string }> = [];
     const current = new Date(startDateStr);
     const end = new Date(endDateStr);
 
     // Guard against invalid ranges
     if (isNaN(current.getTime()) || isNaN(end.getTime()) || current > end) {
-      // Default to 5 business days starting today
+      // Default to 5 business days starting upcoming Monday
       const now = new Date();
-      for (let i = 0; i < 5; i++) {
-        const d = new Date(now);
-        d.setDate(now.getDate() + i);
-        if (d.getDay() !== 0) { // Skip Sunday
+      const day = now.getDay();
+      const diff = day === 1 ? 0 : (8 - day) % 7;
+      const startMonday = new Date(now);
+      startMonday.setDate(now.getDate() + diff);
+
+      for (let i = 0; i < 7 && dates.length < 5; i++) {
+        const d = new Date(startMonday);
+        d.setDate(startMonday.getDate() + i);
+        const dayOfWeek = d.getDay();
+        const isSunday = dayOfWeek === 0;
+        const isSaturday = dayOfWeek === 6;
+        if (!isSunday && (includeSaturday || !isSaturday)) {
           dates.push({
             date: d.toISOString().split('T')[0],
-            dayName: INDONESIAN_DAYS[d.getDay()],
+            dayName: INDONESIAN_DAYS[dayOfWeek],
           });
         }
       }
@@ -47,7 +61,9 @@ export class ExamSchedulerService {
     while (current <= end && iterations < 30) {
       iterations++;
       const dayOfWeek = current.getDay();
-      if (dayOfWeek !== 0) { // Skip Sunday
+      const isSunday = dayOfWeek === 0;
+      const isSaturday = dayOfWeek === 6;
+      if (!isSunday && (includeSaturday || !isSaturday)) {
         const dateStr = current.toISOString().split('T')[0];
         dates.push({
           date: dateStr,
@@ -68,7 +84,16 @@ export class ExamSchedulerService {
     allTeachers: UserProfile[],
     committeeMembers: ExamCommitteeMember[] = []
   ): ExamScheduleData {
-    const examDates = this.getValidExamDates(config.startDate, config.endDate);
+    const shouldIncludeSaturday =
+      config.includeSaturday ??
+      config.dayOverrides?.some(
+        (o) =>
+          o.dayName?.toLowerCase() === 'sabtu' ||
+          (o.date && new Date(o.date).getDay() === 6)
+      ) ??
+      false;
+
+    const examDates = this.getValidExamDates(config.startDate, config.endDate, shouldIncludeSaturday);
     const totalDays = Math.max(1, examDates.length);
 
     // Build ordered list of all actual daily slots (supporting per-day session count overrides)
