@@ -6,11 +6,12 @@
 import { ExamSchedulerService } from '../exam-scheduler.service';
 import { ExamCommitteeRepository } from '../../repositories/ExamCommitteeRepository';
 import { ExamScheduleRepository } from '../../repositories/ExamScheduleRepository';
+import { StudentRepository } from '../../repositories/StudentRepository';
 import type {
   ExamScheduleFormConfig,
   ExamCommitteeMember,
 } from '../../types/exam-schedule.types';
-import type { UserProfile } from '../../types/database.types';
+import type { UserProfile, StudentItem } from '../../types/database.types';
 
 export const runExamSchedulerTestSuite = async (): Promise<{
   passed: number;
@@ -254,6 +255,43 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     );
   } catch (err: any) {
     assert('Exam Scheduler 09-10: Error testing schedule persistence', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 11: Academic Year Aware Class Extraction with Zero Unnecessary Egress
+  // ---------------------------------------------------------------------------
+  try {
+    const mockStudents: StudentItem[] = [
+      { id: 'std_1', nisn: '001', fullName: 'Siswa 1', className: '7A', gender: 'L', academicYear: '2026/2027' },
+      { id: 'std_2', nisn: '002', fullName: 'Siswa 2', className: '7A', gender: 'P', academicYear: '2026/2027' },
+      { id: 'std_3', nisn: '003', fullName: 'Siswa 3', className: '8B', gender: 'L', academicYear: '2026/2027' },
+      { id: 'std_4', nisn: '004', fullName: 'Siswa 4', className: '9A', gender: 'P', academicYear: '2025/2026' }, // Older year
+    ];
+
+    await StudentRepository.saveStudents(mockStudents);
+
+    const currentYearResult = await StudentRepository.getDistinctClassesByAcademicYear('2026/2027', false);
+    assert(
+      'Exam Scheduler 11: Extracts distinct classes strictly for 2026/2027 using Local Cache (0 B Egress)',
+      currentYearResult.source === 'LOCAL_CACHE' &&
+      currentYearResult.classes.includes('7A') &&
+      currentYearResult.classes.includes('8B') &&
+      !currentYearResult.classes.includes('9A') &&
+      currentYearResult.classStudentCounts['7A'] === 2,
+      `Classes: ${currentYearResult.classes.join(', ')}, Source: ${currentYearResult.source}`
+    );
+
+    const oldYearResult = await StudentRepository.getDistinctClassesByAcademicYear('2025/2026', false);
+    assert(
+      'Exam Scheduler 12: Extracts distinct classes strictly for 2025/2026 without data leakage from other years',
+      oldYearResult.source === 'LOCAL_CACHE' &&
+      oldYearResult.classes.includes('9A') &&
+      !oldYearResult.classes.includes('7A') &&
+      oldYearResult.totalStudents === 1,
+      `Classes: ${oldYearResult.classes.join(', ')}, Total: ${oldYearResult.totalStudents}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 11-12: Error testing academic year class extraction', false, err?.message);
   }
 
   return { passed, failed, results };

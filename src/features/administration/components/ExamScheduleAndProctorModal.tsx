@@ -35,7 +35,7 @@ import type {
 import { ExamCommitteeRepository } from '../../../repositories/ExamCommitteeRepository';
 import { ExamScheduleRepository } from '../../../repositories/ExamScheduleRepository';
 import { ExamSchedulerService } from '../../../services/exam-scheduler.service';
-import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
+import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { normalizeClassCode } from '../../../utils/class.utils';
@@ -105,6 +105,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // ── FORM QUESTIONNAIRE STATE (Parameters filled by Committee) ──────────────
+  const [formAcademicYear, setFormAcademicYear] = useState<string>(() => AdministrationRepository.getActiveAcademicYear());
   const [formExamType, setFormExamType] = useState<ExamType>('ASTS');
   const [formStartDate, setFormStartDate] = useState(() => {
     const today = new Date();
@@ -121,6 +122,11 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     { sessionNumber: 2, sessionName: 'Sesi 2 (Siang)', startTime: '10:00', endTime: '12:00' },
   ]);
   const [selectedClasses, setSelectedClasses] = useState<string[]>(DEFAULT_CLASSES);
+  const [classDataSource, setClassDataSource] = useState<'LOCAL_CACHE' | 'TEACHING_SCHEDULE' | 'CLOUD' | 'FALLBACK'>('LOCAL_CACHE');
+  const [classStudentCounts, setClassStudentCounts] = useState<Record<string, number>>({});
+  const [totalStudentsInYear, setTotalStudentsInYear] = useState<number>(0);
+  const [isSyncingClasses, setIsSyncingClasses] = useState(false);
+  const [customClassInput, setCustomClassInput] = useState('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(DEFAULT_SUBJECTS);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
   const [proctorsPerRoom, setProctorsPerRoom] = useState<1 | 2>(1);
@@ -143,6 +149,50 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     const timer = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Load distinct classes strictly filtered by Academic Year (Zero Unnecessary Egress)
+  const loadClassesForYear = useCallback(async (year: string, forceRefresh: boolean = false) => {
+    if (forceRefresh) setIsSyncingClasses(true);
+    try {
+      const res = await StudentRepository.getDistinctClassesByAcademicYear(year, forceRefresh);
+      setAvailableClasses(res.classes);
+      setClassStudentCounts(res.classStudentCounts);
+      setClassDataSource(res.source);
+      setTotalStudentsInYear(res.totalStudents);
+      setSelectedClasses(res.classes);
+      if (forceRefresh) {
+        setToast({
+          text: `Data rombel TA ${year} berhasil disinkronkan (${res.classes.length} rombel, ${res.totalStudents} siswa).`,
+          type: 'success',
+        });
+      }
+    } catch (err) {
+      logger.error('ExamScheduleAndProctorModal', 'Failed to load distinct classes:', err);
+    } finally {
+      if (forceRefresh) setIsSyncingClasses(false);
+    }
+  }, []);
+
+  // Handle academic year change in exam questionnaire
+  const handleAcademicYearChange = useCallback((newYear: string) => {
+    setFormAcademicYear(newYear);
+    loadClassesForYear(newYear, false);
+  }, [loadClassesForYear]);
+
+  // Handle adding custom class / room
+  const handleAddCustomClass = useCallback(() => {
+    const clean = customClassInput.trim().toUpperCase();
+    if (!clean) return;
+    const norm = normalizeClassCode(clean) || clean;
+    if (!availableClasses.includes(norm)) {
+      setAvailableClasses((prev) => [...prev, norm]);
+    }
+    if (!selectedClasses.includes(norm)) {
+      setSelectedClasses((prev) => [...prev, norm]);
+    }
+    setCustomClassInput('');
+    setToast({ text: `Rombel ${norm} berhasil ditambahkan ke daftar!`, type: 'success' });
+  }, [customClassInput, availableClasses, selectedClasses]);
 
   // Load initial data
   const loadInitialData = useCallback(async () => {
@@ -179,16 +229,8 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         }))
       );
 
-      // 4. Load dynamic classes from directory
-      const stus = await StudentRepository.getStudents().catch(() => []);
-      if (Array.isArray(stus) && stus.length > 0) {
-        const set = new Set<string>(DEFAULT_CLASSES);
-        stus.forEach((s) => {
-          const norm = normalizeClassCode(s.className);
-          if (norm) set.add(norm);
-        });
-        setAvailableClasses(Array.from(set));
-      }
+      // 4. Load dynamic classes strictly filtered by active academic year (Zero Egress Priority)
+      await loadClassesForYear(formAcademicYear, false);
 
       // 5. Load existing schedule if available
       const saved = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType);
@@ -205,7 +247,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, activeAcademicYear, selectedExamType]);
+  }, [currentUser, activeAcademicYear, selectedExamType, formAcademicYear, loadClassesForYear]);
 
   useEffect(() => {
     if (isOpen) {
@@ -251,7 +293,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       const config: ExamScheduleFormConfig = {
         examType: formExamType,
         examTitle: `${formExamType === 'ASTS' ? 'Asesmen Sumatif Tengah Semester (ASTS)' : formExamType === 'ASAS' ? 'Asesmen Sumatif Akhir Semester (ASAS)' : `Ujian ${formExamType}`}`,
-        academicYear: activeAcademicYear,
+        academicYear: formAcademicYear,
         semester: activeSemester,
         startDate: formStartDate,
         endDate: formEndDate,
@@ -594,18 +636,33 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                 </span>
               </div>
 
-              {/* 1. Identitas Asesmen & Waktu */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* 1. Identitas Asesmen, Tahun Ajaran & Waktu */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Tahun Ajaran Pelaksanaan</label>
+                  <select
+                    value={formAcademicYear}
+                    onChange={(e) => handleAcademicYearChange(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                  >
+                    {AVAILABLE_ACADEMIC_YEARS.map((y) => (
+                      <option key={y.year} value={y.year}>
+                        TA {y.year} {y.isActive ? '(Tahun Aktif)' : '(Arsip)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Jenis Asesmen / Ujian</label>
                   <select
                     value={formExamType}
                     onChange={(e) => setFormExamType(e.target.value as ExamType)}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                   >
-                    <option value="ASTS">ASTS (Asesmen Sumatif Tengah Semester)</option>
-                    <option value="ASAS">ASAS (Asesmen Sumatif Akhir Semester)</option>
-                    <option value="ASAJ">ASAJ (Asesmen Sumatif Akhir Jenjang / US)</option>
+                    <option value="ASTS">ASTS (Asesmen Tengah Semester)</option>
+                    <option value="ASAS">ASAS (Asesmen Akhir Semester)</option>
+                    <option value="ASAJ">ASAJ (Asesmen Akhir Jenjang / US)</option>
                     <option value="HARIAN">Penilaian Harian Bersama / Kuis</option>
                   </select>
                 </div>
@@ -616,7 +673,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                     type="date"
                     value={formStartDate}
                     onChange={(e) => setFormStartDate(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono"
                     required
                   />
                 </div>
@@ -627,7 +684,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                     type="date"
                     value={formEndDate}
                     onChange={(e) => setFormEndDate(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono"
                     required
                   />
                 </div>
@@ -696,29 +753,65 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                 </div>
               </div>
 
-              {/* 3. Pilihan Kelas / Rombel Peserta */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-slate-700">
-                    Rombel / Kelas Peserta Ujian ({selectedClasses.length} Terpilih)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedClasses.length === availableClasses.length) {
-                        setSelectedClasses([]);
-                      } else {
-                        setSelectedClasses([...availableClasses]);
-                      }
-                    }}
-                    className="text-[11px] font-bold text-teal-700 hover:text-teal-800"
-                  >
-                    {selectedClasses.length === availableClasses.length ? 'Batal Semua' : 'Pilih Semua'}
-                  </button>
+              {/* 3. Pilihan Kelas / Rombel Peserta (Academic Year Aware & Zero-Egress Safe) */}
+              <div className="space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-100">
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                      <span>Rombel / Kelas Peserta Ujian</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-50 text-teal-700 border border-teal-200">
+                        TA {formAcademicYear}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        {selectedClasses.length} Terpilih
+                      </span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                      <span>
+                        {classDataSource === 'LOCAL_CACHE'
+                          ? `Terdeteksi ${availableClasses.length} rombel (${totalStudentsInYear} siswa terdaftar di TA ${formAcademicYear}) • 0 B Egress (Cache Lokal)`
+                          : classDataSource === 'TEACHING_SCHEDULE'
+                          ? `Terdeteksi ${availableClasses.length} rombel dari Jadwal KBM aktif TA ${formAcademicYear} • 0 B Egress`
+                          : classDataSource === 'CLOUD'
+                          ? `Tersinkron dari Cloud Supabase TA ${formAcademicYear} (${totalStudentsInYear} siswa)`
+                          : `Standar rombel sekolah TA ${formAcademicYear}`}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => loadClassesForYear(formAcademicYear, true)}
+                      disabled={isSyncingClasses}
+                      title="Sinkronkan rombel terbaru dari server (jika ada siswa baru ditambahkan)"
+                      className="text-[11px] font-bold text-slate-600 hover:text-teal-700 flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isSyncingClasses ? 'animate-spin text-teal-600' : ''}`} />
+                      <span>{isSyncingClasses ? 'Menyinkron...' : 'Sinkron Server'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedClasses.length === availableClasses.length) {
+                          setSelectedClasses([]);
+                        } else {
+                          setSelectedClasses([...availableClasses]);
+                        }
+                      }}
+                      className="text-[11px] font-bold text-teal-700 hover:text-teal-800 px-2 py-1"
+                    >
+                      {selectedClasses.length === availableClasses.length ? 'Batal Semua' : 'Pilih Semua'}
+                    </button>
+                  </div>
                 </div>
+
+                {/* List of class pills */}
                 <div className="flex flex-wrap gap-2">
                   {availableClasses.map((cls) => {
                     const isChecked = selectedClasses.includes(cls);
+                    const count = classStudentCounts[cls];
                     return (
                       <button
                         key={cls}
@@ -736,9 +829,40 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                       >
                         {isChecked && <Check className="w-3 h-3" />}
                         <span>Kelas {cls}</span>
+                        {count !== undefined && count > 0 && (
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
+                            isChecked ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            {count} siswa
+                          </span>
+                        )}
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Input Tambah Rombel Kustom */}
+                <div className="flex items-center gap-2 pt-1 max-w-sm">
+                  <input
+                    type="text"
+                    value={customClassInput}
+                    onChange={(e) => setCustomClassInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomClass();
+                      }
+                    }}
+                    placeholder="Tambah rombel/ruang kustom (mis. 9C, Lab 1)..."
+                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 flex-1 font-sans"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomClass}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors shrink-0"
+                  >
+                    + Tambah
+                  </button>
                 </div>
               </div>
 

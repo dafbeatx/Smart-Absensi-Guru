@@ -1,26 +1,30 @@
 import { ProviderFactory } from '../providers/provider-factory';
 import type { StudentItem } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
-import { areClassCodesEqual } from '../utils/class.utils';
+import { areClassCodesEqual, normalizeClassCode } from '../utils/class.utils';
 
 export const STUDENTS_STORAGE_KEY = 'smart_absensi_students';
 export const STUDENTS_UPDATED_EVENT = 'smart_absensi_students_updated';
 
+const memoryStore = new Map<string, string>();
+
 const safeGetStorage = (key: string): string | null => {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      return window.localStorage.getItem(key);
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {
+      const val = localStorage.getItem(key);
+      if (val !== null) return val;
     }
   } catch {
     // ignore
   }
-  return null;
+  return memoryStore.get(key) || null;
 };
 
 const safeSetStorage = (key: string, value: string): void => {
+  memoryStore.set(key, value);
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(key, value);
+    if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.setItem === 'function') {
+      localStorage.setItem(key, value);
     }
   } catch {
     // ignore
@@ -64,6 +68,121 @@ export class StudentRepository {
     const all = await this.getStudents(token);
     if (!className || className === 'ALL') return all;
     return all.filter((s) => areClassCodesEqual(s.className, className));
+  }
+
+  /**
+   * Retrieves distinct class names and student distribution strictly filtered by academic year.
+   * Prioritizes local caches (Zero Egress) to avoid consuming Supabase cloud bandwidth.
+   */
+  public static async getDistinctClassesByAcademicYear(
+    academicYear?: string,
+    forceRefreshServer: boolean = false
+  ): Promise<{
+    classes: string[];
+    classStudentCounts: Record<string, number>;
+    source: 'LOCAL_CACHE' | 'TEACHING_SCHEDULE' | 'CLOUD' | 'FALLBACK';
+    totalStudents: number;
+  }> {
+    const targetYear = academicYear || '2026/2027';
+
+    // 1. Prioritas Utama: Check Local Student Cache (0 Bytes Egress)
+    try {
+      const cached = safeGetStorage(STUDENTS_STORAGE_KEY);
+      if (cached && !forceRefreshServer) {
+        const students: StudentItem[] = JSON.parse(cached);
+        if (Array.isArray(students) && students.length > 0) {
+          const yearStudents = students.filter(
+            (s) => !s.academicYear || s.academicYear === targetYear
+          );
+          if (yearStudents.length > 0) {
+            const classCounts: Record<string, number> = {};
+            yearStudents.forEach((s) => {
+              const norm = normalizeClassCode(s.className);
+              if (norm) {
+                classCounts[norm] = (classCounts[norm] || 0) + 1;
+              }
+            });
+            const classes = Object.keys(classCounts).sort();
+            if (classes.length > 0) {
+              return {
+                classes,
+                classStudentCounts: classCounts,
+                source: 'LOCAL_CACHE',
+                totalStudents: yearStudents.length,
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Prioritas Kedua: Check Teaching Schedule Cache (0 Bytes Egress)
+    try {
+      const cachedSchedules = typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_teaching_schedules') : null;
+      if (cachedSchedules && !forceRefreshServer) {
+        const slots: any[] = JSON.parse(cachedSchedules);
+        if (Array.isArray(slots) && slots.length > 0) {
+          const yearSlots = slots.filter((slot) => !slot.academic_year || slot.academic_year === targetYear);
+          const set = new Set<string>();
+          yearSlots.forEach((s) => {
+            const norm = normalizeClassCode(s.class_name);
+            if (norm) set.add(norm);
+          });
+          const classes = Array.from(set).sort();
+          if (classes.length > 0) {
+            return {
+              classes,
+              classStudentCounts: {},
+              source: 'TEACHING_SCHEDULE',
+              totalStudents: 0,
+            };
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Jika diminta eksplisit (Sync Button) oleh Panitia: Ambil dari provider
+    if (forceRefreshServer) {
+      try {
+        const fresh = await this.getStudents();
+        if (Array.isArray(fresh) && fresh.length > 0) {
+          const yearStudents = fresh.filter(
+            (s) => !s.academicYear || s.academicYear === targetYear
+          );
+          const classCounts: Record<string, number> = {};
+          yearStudents.forEach((s) => {
+            const norm = normalizeClassCode(s.className);
+            if (norm) {
+              classCounts[norm] = (classCounts[norm] || 0) + 1;
+            }
+          });
+          const classes = Object.keys(classCounts).sort();
+          if (classes.length > 0) {
+            return {
+              classes,
+              classStudentCounts: classCounts,
+              source: 'CLOUD',
+              totalStudents: yearStudents.length,
+            };
+          }
+        }
+      } catch (err) {
+        logger.warn('StudentRepository', 'Server fetch for classes failed, using fallback:', err);
+      }
+    }
+
+    // 4. Default Fallback Rombel Umum Sekolah (Zero Network)
+    const fallbackClasses = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
+    return {
+      classes: fallbackClasses,
+      classStudentCounts: {},
+      source: 'FALLBACK',
+      totalStudents: 0,
+    };
   }
 
   /**
