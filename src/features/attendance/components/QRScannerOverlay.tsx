@@ -26,6 +26,7 @@ import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { useReverseGeocode } from '../../../services/reverse-geocoding.service';
 import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
 import { RadarLocationVerificationModal } from './RadarLocationVerificationModal';
+import { WhatsAppNotificationService } from '../../../services/whatsapp-notification.service';
 
 export interface QRScannerOverlayProps {
   isOpen: boolean;
@@ -456,12 +457,12 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     setLatenessReason('');
     setIsSuccessModalOpen(true);
 
-    // Auto-Close 2.5s Timer HANYA untuk Hadir Tepat Waktu / Pulang
+    // Auto-Close 10s Timer HANYA untuk Hadir Tepat Waktu / Pulang agar guru sempat klik tombol WhatsApp
     if (!data.isLate) {
       if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = setTimeout(() => {
         handleSaveReasonAndClose('NONE');
-      }, 2500);
+      }, 10000);
     }
   };
 
@@ -792,6 +793,37 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
 
           {/* Action Buttons */}
           <div className="pt-1 space-y-2">
+            {/* Tombol Utama: Kirim Laporan ke WhatsApp Grup */}
+            <button
+              type="button"
+              onClick={() => {
+                if (autoCloseTimerRef.current) {
+                  clearTimeout(autoCloseTimerRef.current);
+                  autoCloseTimerRef.current = null;
+                }
+                const currentUser = useAuthStore.getState().user;
+                WhatsAppNotificationService.openWhatsAppShare({
+                  teacherName: currentUser?.full_name || 'Guru',
+                  nip: currentUser?.nip || undefined,
+                  role: currentUser?.role || 'GURU',
+                  type: scanResult?.action === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN',
+                  timeStr: scanResult?.timestamp,
+                  dateStr: getTodayDateInJakarta(),
+                  method: 'Scan Barcode / QR Poster',
+                  distanceMeters: scanResult?.distance,
+                  status: scanResult?.status,
+                  isOffline: scanResult?.isOffline,
+                });
+              }}
+              className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-xs sm:text-sm tracking-wide rounded-2xl transition-all cursor-pointer shadow-lg hover:shadow-xl active:scale-98 flex items-center justify-center gap-2 border border-emerald-400"
+            >
+              <span className="text-base">💬</span>
+              <span>Kirim Laporan ke WhatsApp Grup</span>
+              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-extrabold uppercase">
+                1-Klik
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => handleSaveReasonAndClose('MOOD')}

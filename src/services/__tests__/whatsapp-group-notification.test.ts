@@ -137,5 +137,26 @@ export const runWhatsAppGroupNotificationTestSuite = async (): Promise<{
     'Execution completed without throwing unhandled exceptions'
   );
 
+  // Test 9: Click-to-Chat URL generator creates valid https://api.whatsapp.com link
+  const shareUrl = WhatsAppNotificationService.generateWhatsAppShareUrl(testPayload);
+  assert(
+    'WA Notif 09: generateWhatsAppShareUrl creates valid universal WhatsApp link with encoded text',
+    shareUrl.startsWith('https://api.whatsapp.com/send?text=') &&
+      shareUrl.includes(encodeURIComponent('Dafa Maulana, S.Pd')) &&
+      shareUrl.includes(encodeURIComponent('199508172023011005')),
+    `Generated URL sample: ${shareUrl.slice(0, 80)}...`
+  );
+
+  // Test 10: Click-to-Chat share text strictly adheres to 100% text-only privacy policy
+  const shareText = WhatsAppNotificationService.generateWhatsAppShareText(testPayload);
+  assert(
+    'WA Notif 10: Click-to-Chat share text strictly text-only without photo or image references',
+    !shareText.includes('data:image') &&
+      !shareText.includes('base64') &&
+      !shareText.includes('.jpg') &&
+      shareText.includes('*NOTIFIKASI PRESENSI GURU*'),
+    '100% text-only privacy policy strictly enforced'
+  );
+
   return { passed, failed, results };
 };

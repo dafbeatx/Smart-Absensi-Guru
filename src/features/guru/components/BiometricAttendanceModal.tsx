@@ -15,6 +15,7 @@ import { NotificationService } from '../../../services/notification-permission.s
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { SystemSettings, UserProfile } from '../../../types/database.types';
 import { RadarLocationVerificationModal } from '../../attendance/components/RadarLocationVerificationModal';
+import { WhatsAppNotificationService } from '../../../services/whatsapp-notification.service';
 
 export interface BiometricAttendanceModalProps {
   isOpen: boolean;
@@ -375,6 +376,31 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
                 <span className="font-extrabold text-slate-900">{attendanceSuccess.status}</span>
               </div>
             </div>
+
+            {/* Tombol Kirim Laporan ke WhatsApp Grup */}
+            <button
+              type="button"
+              onClick={() => {
+                WhatsAppNotificationService.openWhatsAppShare({
+                  teacherName: user.full_name || 'Guru',
+                  nip: user.nip || undefined,
+                  role: user.role || 'GURU',
+                  type: attendanceSuccess.action?.includes('Pulang') ? 'CHECK_OUT' : 'CHECK_IN',
+                  timeStr: attendanceSuccess.timestamp,
+                  dateStr: getTodayDateInJakarta(),
+                  method: 'Sidik Jari HP + Radar GPS',
+                  distanceMeters: attendanceSuccess.distance,
+                  status: attendanceSuccess.status,
+                });
+              }}
+              className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-xs sm:text-sm rounded-2xl transition-all cursor-pointer shadow-lg hover:shadow-xl active:scale-98 flex items-center justify-center gap-2 border border-emerald-400"
+            >
+              <span className="text-base">💬</span>
+              <span>Kirim Laporan ke WhatsApp Grup</span>
+              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-extrabold uppercase">
+                1-Klik
+              </span>
+            </button>
 
             <Button
               variant="primary"
