@@ -302,16 +302,24 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     syncBackendDataSequentially();
     syncBackendRef.current = syncBackendDataSequentially;
 
+    let scanDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const handleScannedEvent = () => {
-      fetchAttendanceRecords();
-      fetchPendingRequests();
-      fetchMyAttendance();
-      fetchComplaintsCount();
+      if (scanDebounceTimer) clearTimeout(scanDebounceTimer);
+      scanDebounceTimer = setTimeout(() => {
+        fetchAttendanceRecords();
+        fetchPendingRequests();
+        fetchMyAttendance();
+        fetchComplaintsCount();
+      }, 500);
     };
 
+    let leaveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const handleLeaveUpdated = () => {
-      fetchPendingRequests();
-      fetchAttendanceRecords();
+      if (leaveDebounceTimer) clearTimeout(leaveDebounceTimer);
+      leaveDebounceTimer = setTimeout(() => {
+        fetchPendingRequests();
+        fetchAttendanceRecords();
+      }, 500);
     };
 
     const handleComplaintsUpdated = () => {
@@ -351,6 +359,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     window.addEventListener('keydown', handleGlobalKeyDown);
 
     return () => {
+      if (scanDebounceTimer) clearTimeout(scanDebounceTimer);
+      if (leaveDebounceTimer) clearTimeout(leaveDebounceTimer);
       window.removeEventListener('smart_absensi_scanned', handleScannedEvent);
       window.removeEventListener('smart_absensi_records_updated', handleScannedEvent);
       window.removeEventListener('smart_absensi_leave_updated', handleLeaveUpdated);

@@ -371,7 +371,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
   const [pointHistory, setPointHistory] = useState<TeacherPointLog[]>([]);
-  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
+  const [allTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
     try {
       const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_teacher_point_history') : null;
       return saved ? JSON.parse(saved) : [];
@@ -696,7 +696,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   };
 
   useEffect(() => {
-    loadUserLeaves();
+    // loadUserLeaves is handled in loadAllData() on mount to prevent duplicate requests
     loadUserComplaints();
     checkDeviceStatus();
 
@@ -850,6 +850,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       let loadedLeaves: LeaveRequest[] = [];
       try {
         loadedLeaves = await provider.getUserLeaves(effectiveUser.id, authToken).catch(() => []);
+        setUserLeaves(loadedLeaves);
       } catch (err) {
         console.warn('Failed to load user leaves for unabsented check:', err);
       }
@@ -1005,9 +1006,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       try {
         const myPointLogs = await provider.getTeacherPointHistory(effectiveUser.id, authToken);
         setPointHistory(myPointLogs || []);
-
-        const allLogs = await provider.getTeacherPointHistory('ALL', authToken);
-        setAllTeacherPointLogs(allLogs || []);
       } catch (err) {
         console.warn('Failed to load teacher point history:', err);
       }

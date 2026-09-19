@@ -112,6 +112,18 @@ export class SupabaseProvider implements IDataProvider {
   private cachedInventorySarpras: InventorySarprasItem[] | null = null;
   private cachedInventorySarprasTimestamp: number = 0;
 
+  // Dedicated In-Memory TTL Caches to suppress excessive PostgREST egress & redundant round-trips
+  private cachedTodayAttendance: Map<string, { data: AttendanceRecord | null; timestamp: number }> = new Map();
+  private cachedMonthlyAttendance: Map<string, { data: AttendanceRecord[]; timestamp: number }> = new Map();
+  private cachedTeacherPointHistory: Map<string, { data: TeacherPointLog[]; timestamp: number }> = new Map();
+  private cachedUserLeaves: Map<string, { data: LeaveRequest[]; timestamp: number }> = new Map();
+  private cachedTodayTeacherMood: Map<string, { data: TeacherMoodLog | null; timestamp: number }> = new Map();
+  private cachedDeviceBinding: Map<string, { data: any; timestamp: number }> = new Map();
+  private cachedNotifications: Map<string, { data: AppNotification[]; timestamp: number }> = new Map();
+  private cachedNotificationReads: Map<string, { data: Set<string>; timestamp: number }> = new Map();
+  private cachedTeachingSchedules: Map<string, { data: TeachingSlot[]; timestamp: number }> = new Map();
+  private teachingSchedulesCooldownUntil: number = 0;
+
   private dedupeRequest<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (this.inFlightRequests.has(key)) {
       return this.inFlightRequests.get(key) as Promise<T>;
@@ -298,6 +310,7 @@ export class SupabaseProvider implements IDataProvider {
         console.warn('Failed to reset device binding in localStorage:', e);
       }
     }
+    this.cachedDeviceBinding.clear();
     try {
       await this.client.from('device_bindings').delete().eq('user_id', userId);
     } catch (e) {
@@ -619,6 +632,10 @@ export class SupabaseProvider implements IDataProvider {
           logger.warn('SupabaseProvider', 'Failed to auto-record teacher points on check-out:', ePoint);
         });
 
+        // Invalidate attendance caches upon check-out
+        this.cachedTodayAttendance.clear();
+        this.cachedMonthlyAttendance.clear();
+
         // Dispatch real-time UI refresh events for same-device dashboard sync
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('smart_absensi_scanned'));
@@ -859,6 +876,10 @@ export class SupabaseProvider implements IDataProvider {
       }
     })().catch(() => {});
 
+    // Invalidate attendance caches upon recording new check-in
+    this.cachedTodayAttendance.clear();
+    this.cachedMonthlyAttendance.clear();
+
     // Dispatch real-time UI refresh events for same-device dashboard sync
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('smart_absensi_scanned'));
@@ -877,7 +898,18 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getTodayAttendance(userId: string, _token: string): Promise<AttendanceRecord | null> {
     const todayStr = getTodayDateInJakarta();
-    return this.dedupeRequest(`getTodayAttendance_${userId}_${todayStr}`, async () => {
+    const cacheKey = `${userId}_${todayStr}`;
+    const cached = this.cachedTodayAttendance.get(cacheKey);
+    const now = Date.now();
+    if (cached) {
+      const isComplete = Boolean(cached.data?.check_in_time && cached.data?.check_out_time);
+      const ttl = isComplete ? 300000 : 60000;
+      if (now - cached.timestamp < ttl) {
+        return cached.data;
+      }
+    }
+
+    return this.dedupeRequest(`getTodayAttendance_${cacheKey}`, async () => {
       const sessionUser = useAuthStore.getState().user;
       const searchIds = [userId];
       if (sessionUser?.id && !searchIds.includes(sessionUser.id)) searchIds.push(sessionUser.id);
@@ -893,9 +925,12 @@ export class SupabaseProvider implements IDataProvider {
         .limit(1);
 
       const data = records?.[0] || null;
-      if (!data) return null;
+      if (!data) {
+        this.cachedTodayAttendance.set(cacheKey, { data: null, timestamp: Date.now() });
+        return null;
+      }
 
-      return {
+      const result: AttendanceRecord = {
         id: data.id,
         user_id: data.user_id,
         date: data.date,
@@ -910,6 +945,9 @@ export class SupabaseProvider implements IDataProvider {
         is_offline: false,
         created_at: data.created_at,
       };
+
+      this.cachedTodayAttendance.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
     });
   }
 
@@ -929,6 +967,12 @@ export class SupabaseProvider implements IDataProvider {
       paddedMonth = monthMap[month.toLowerCase()];
     }
 
+    const cacheKey = `${userId}_${paddedMonth}_${year}`;
+    const cached = this.cachedMonthlyAttendance.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 60000) {
+      return cached.data;
+    }
+
     const startDate = `${year}-${paddedMonth}-01`;
     // Find last day of month
     const yearNum = parseInt(year, 10) || new Date().getFullYear();
@@ -936,7 +980,7 @@ export class SupabaseProvider implements IDataProvider {
     const lastDayNum = new Date(yearNum, monthNum, 0).getDate();
     const endDate = `${year}-${paddedMonth}-${String(lastDayNum).padStart(2, '0')}`;
 
-    return this.dedupeRequest(`getMonthlyAttendance_${userId}_${month}_${year}`, async () => {
+    return this.dedupeRequest(`getMonthlyAttendance_${cacheKey}`, async () => {
       let query = this.client
         .from('attendance')
         .select('id, user_id, date, check_in_time, check_out_time, status, check_in_lat, check_in_lng, distance_meters, verification_method, attendance_source, notes, created_at')
@@ -950,7 +994,7 @@ export class SupabaseProvider implements IDataProvider {
 
       const { data } = await query;
 
-      return (data || []).map((row) => ({
+      const mapped: AttendanceRecord[] = (data || []).map((row) => ({
         id: row.id,
         user_id: row.user_id,
         date: row.date,
@@ -966,6 +1010,9 @@ export class SupabaseProvider implements IDataProvider {
         notes: row.notes || null,
         created_at: row.created_at,
       }));
+
+      this.cachedMonthlyAttendance.set(cacheKey, { data: mapped, timestamp: Date.now() });
+      return mapped;
     });
   }
 
@@ -1002,6 +1049,8 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     if (error) throw new Error('Gagal koreksi absensi: ' + error.message);
+    this.cachedTodayAttendance.clear();
+    this.cachedMonthlyAttendance.clear();
     return true;
   }
 
@@ -1130,6 +1179,8 @@ export class SupabaseProvider implements IDataProvider {
       window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
     }
 
+    this.cachedTodayAttendance.clear();
+    this.cachedMonthlyAttendance.clear();
     return true;
   }
 
@@ -1333,6 +1384,7 @@ export class SupabaseProvider implements IDataProvider {
 
     this.cachedAllLeaves = null;
     this.cachedAllLeavesTimestamp = 0;
+    this.cachedUserLeaves.clear();
 
     return {
       id: leaveId,
@@ -1357,6 +1409,9 @@ export class SupabaseProvider implements IDataProvider {
   ): Promise<boolean> {
     this.cachedAllLeaves = null;
     this.cachedAllLeavesTimestamp = 0;
+    this.cachedUserLeaves.clear();
+    this.cachedTodayAttendance.clear();
+    this.cachedMonthlyAttendance.clear();
     const activeUser = useAuthStore.getState().user;
     const { error } = await this.client
       .from('leaves')
@@ -1604,6 +1659,11 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
+    const cached = this.cachedUserLeaves.get(userId);
+    if (cached && Date.now() - cached.timestamp < 60000) {
+      return cached.data;
+    }
+
     return this.dedupeRequest(`getUserLeaves_${userId}`, async () => {
       try {
         const { data, error } = await this.client
@@ -1618,7 +1678,9 @@ export class SupabaseProvider implements IDataProvider {
           const saved = localStorage.getItem('smart_absensi_leaves');
           if (saved) {
             const list: LeaveRequest[] = JSON.parse(saved);
-            return list.filter((l) => l.user_id === userId || !l.user_id);
+            const filtered = list.filter((l) => l.user_id === userId || !l.user_id);
+            this.cachedUserLeaves.set(userId, { data: filtered, timestamp: Date.now() });
+            return filtered;
           }
           return [];
         }
@@ -1650,6 +1712,7 @@ export class SupabaseProvider implements IDataProvider {
           // ignore cache write errors
         }
 
+        this.cachedUserLeaves.set(userId, { data: fetchedLeaves, timestamp: Date.now() });
         return fetchedLeaves;
       } catch (err) {
         logger.error('SupabaseProvider', 'getUserLeaves exception:', err);
@@ -2074,71 +2137,93 @@ export class SupabaseProvider implements IDataProvider {
     currentDeviceUUID: string,
     _token: string
   ): Promise<{ status: 'ACTIVE' | 'UNBOUND' | 'DIFFERENT_DEVICE' | 'NEEDS_ADMIN_RESET' | 'UNAVAILABLE'; message: string; registered_uuid?: string }> {
-    try {
-      const sessionUser = useAuthStore.getState().user;
-      if (sessionUser && sessionUser.full_name.toLowerCase().includes('dafa maulana')) {
-        return {
-          status: 'ACTIVE',
-          message: '🚀 Akses Khusus Dafa Maulana, S.Pd: Multi-Perangkat Aktif (Bypass Pembatasan)',
-          registered_uuid: currentDeviceUUID,
-        };
-      }
+    const cacheKey = `${userId}_${currentDeviceUUID}`;
+    const cached = this.cachedDeviceBinding.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 300000) { // 5 minutes TTL
+      return cached.data;
+    }
 
-      const { data: binding, error } = await this.client
-        .from('device_bindings')
-        .select('id, user_id, device_uuid')
-        .eq('user_id', userId)
-        .maybeSingle();
+    return this.dedupeRequest(`checkDeviceBinding_${cacheKey}`, async () => {
+      try {
+        const sessionUser = useAuthStore.getState().user;
+        if (sessionUser && sessionUser.full_name.toLowerCase().includes('dafa maulana')) {
+          const res = {
+            status: 'ACTIVE' as const,
+            message: '🚀 Akses Khusus Dafa Maulana, S.Pd: Multi-Perangkat Aktif (Bypass Pembatasan)',
+            registered_uuid: currentDeviceUUID,
+          };
+          this.cachedDeviceBinding.set(cacheKey, { data: res, timestamp: Date.now() });
+          return res;
+        }
 
-      if (error) {
-        // Tabel belum ada atau belum ada RLS policy — TIDAK boleh return ACTIVE
-        logger.warn('SupabaseProvider', 'device_bindings query error (tabel mungkin belum dibuat):', error.message);
-        return {
-          status: 'UNAVAILABLE',
-          message: 'Status binding tidak dapat diverifikasi. Tabel device_bindings belum tersedia atau RLS policy error. Hubungi Admin.',
-        };
-      }
+        const { data: binding, error } = await this.client
+          .from('device_bindings')
+          .select('id, user_id, device_uuid')
+          .eq('user_id', userId)
+          .maybeSingle();
 
-      if (!binding) {
-        // Auto-register device pertama kali
-        await this.client.from('device_bindings').insert({
-          user_id: userId,
-          device_uuid: currentDeviceUUID,
-          bound_at: new Date().toISOString(),
-        });
+        if (error) {
+          // Tabel belum ada atau belum ada RLS policy — TIDAK boleh return ACTIVE
+          logger.warn('SupabaseProvider', 'device_bindings query error (tabel mungkin belum dibuat):', error.message);
+          return {
+            status: 'UNAVAILABLE',
+            message: 'Status binding tidak dapat diverifikasi. Tabel device_bindings belum tersedia atau RLS policy error. Hubungi Admin.',
+          };
+        }
 
-        return {
-          status: 'UNBOUND',
-          message: 'Perangkat belum terikat. Lakukan absensi pertama untuk mengikat HP ini.',
-          registered_uuid: currentDeviceUUID,
-        };
-      }
+        if (!binding) {
+          // Auto-register device pertama kali
+          await this.client.from('device_bindings').insert({
+            user_id: userId,
+            device_uuid: currentDeviceUUID,
+            bound_at: new Date().toISOString(),
+          });
 
-      if (binding.device_uuid === currentDeviceUUID) {
-        return {
-          status: 'ACTIVE',
-          message: 'Terikat Aktif dengan HP ini',
+          const res = {
+            status: 'UNBOUND' as const,
+            message: 'Perangkat belum terikat. Lakukan absensi pertama untuk mengikat HP ini.',
+            registered_uuid: currentDeviceUUID,
+          };
+          this.cachedDeviceBinding.set(cacheKey, { data: res, timestamp: Date.now() });
+          return res;
+        }
+
+        if (binding.device_uuid === currentDeviceUUID) {
+          const res = {
+            status: 'ACTIVE' as const,
+            message: 'Terikat Aktif dengan HP ini',
+            registered_uuid: binding.device_uuid,
+          };
+          this.cachedDeviceBinding.set(cacheKey, { data: res, timestamp: Date.now() });
+          return res;
+        }
+
+        const res = {
+          status: 'DIFFERENT_DEVICE' as const,
+          message: 'Terdeteksi Menggunakan HP Berbeda! Mohon ajukan reset device ke Admin/Operator jika Anda ganti HP.',
           registered_uuid: binding.device_uuid,
         };
+        this.cachedDeviceBinding.set(cacheKey, { data: res, timestamp: Date.now() });
+        return res;
+      } catch (err) {
+        logger.error('SupabaseProvider', 'checkDeviceBinding exception:', err);
+        return {
+          status: 'UNAVAILABLE',
+          message: 'Gagal memeriksa binding perangkat. Koneksi ke server bermasalah.',
+        };
       }
-
-      return {
-        status: 'DIFFERENT_DEVICE',
-        message: 'Terdeteksi Menggunakan HP Berbeda! Mohon ajukan reset device ke Admin/Operator jika Anda ganti HP.',
-        registered_uuid: binding.device_uuid,
-      };
-    } catch (err) {
-      logger.error('SupabaseProvider', 'checkDeviceBinding exception:', err);
-      return {
-        status: 'UNAVAILABLE',
-        message: 'Gagal memeriksa binding perangkat. Koneksi ke server bermasalah.',
-      };
-    }
+    });
   }
 
   public async getNotificationReads(userId: string, _token?: string): Promise<Set<string>> {
     const readsSet = new Set<string>();
     if (!userId) return readsSet;
+
+    const cached = this.cachedNotificationReads.get(userId);
+    if (cached && Date.now() - cached.timestamp < 45000) {
+      return new Set(cached.data);
+    }
+
     try {
       const { data, error } = await this.client
         .from('notification_reads')
@@ -2155,6 +2240,7 @@ export class SupabaseProvider implements IDataProvider {
           if (r.notification_id) readsSet.add(r.notification_id);
         });
       }
+      this.cachedNotificationReads.set(userId, { data: new Set(readsSet), timestamp: Date.now() });
     } catch (err: any) {
       logger.warn('SupabaseProvider', 'getNotificationReads exception:', err?.message || err);
     }
@@ -2162,6 +2248,12 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getNotifications(userId: string, token: string, userRole?: string): Promise<AppNotification[]> {
+    const cacheKey = `${userId}_${userRole || 'ALL'}`;
+    const cached = this.cachedNotifications.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 45000) {
+      return cached.data;
+    }
+
     return this.dedupeRequest(`getNotifications_${userId}`, async () => {
       try {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -2198,10 +2290,14 @@ export class SupabaseProvider implements IDataProvider {
             logger.warn('SupabaseProvider', 'notifications query error:', fallback.error.message);
             return [];
           }
-          return await this.processRawNotifications(fallback.data || [], userId, token, userRole);
+          const raw = await this.processRawNotifications(fallback.data || [], userId, token, userRole);
+          this.cachedNotifications.set(cacheKey, { data: raw, timestamp: Date.now() });
+          return raw;
         }
 
-        return await this.processRawNotifications(data || [], userId, token, userRole);
+        const finalNotifs = await this.processRawNotifications(data || [], userId, token, userRole);
+        this.cachedNotifications.set(cacheKey, { data: finalNotifs, timestamp: Date.now() });
+        return finalNotifs;
       } catch (err) {
         logger.error('SupabaseProvider', 'getNotifications exception:', err);
         return [];
@@ -2334,6 +2430,8 @@ export class SupabaseProvider implements IDataProvider {
         return isLegacyCall ? false : { success: false, synced: false, persisted: false, syncState: 'FAILED', error: error.message };
       }
 
+      this.cachedNotifications.clear();
+      this.cachedNotificationReads.clear();
       return isLegacyCall ? true : { success: true, synced: true, persisted: true, syncState: 'SYNCED' };
     } catch (error: any) {
       logger.warn('SupabaseProvider', 'markNotificationAsRead exception:', error?.message || error);
@@ -2368,7 +2466,7 @@ export class SupabaseProvider implements IDataProvider {
         effectiveUserId = useAuthStore.getState().user?.id || '';
       }
     } else if (dtoOrIds && typeof dtoOrIds === 'object') {
-      effectiveUserId = dtoOrIds.user_id || dtoOrIds.userId || '';
+      effectiveUserId = dtoOrIds.user_id || dtoOrIds.userId || useAuthStore.getState().user?.id || '';
       notificationIds = dtoOrIds.notification_ids || dtoOrIds.notificationIds || [];
     }
 
@@ -2399,6 +2497,8 @@ export class SupabaseProvider implements IDataProvider {
         return isLegacyCall ? false : { success: false, synced: false, persisted: false, syncState: 'FAILED', error: error.message };
       }
 
+      this.cachedNotifications.clear();
+      this.cachedNotificationReads.clear();
       return isLegacyCall ? true : { success: true, synced: true, persisted: true, syncState: 'SYNCED' };
     } catch (err: any) {
       logger.warn('SupabaseProvider', 'markNotificationsAsRead exception:', err?.message || err);
@@ -2428,6 +2528,8 @@ export class SupabaseProvider implements IDataProvider {
         { event: '*', schema: 'public', table: 'notifications' },
         (payload) => {
           logger.info('SupabaseProvider', 'Realtime change in notifications table:', payload.eventType);
+          this.cachedNotifications.clear();
+          this.cachedNotificationReads.clear();
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('smart_absensi_notifications_updated', { detail: payload }));
           }
@@ -2444,6 +2546,8 @@ export class SupabaseProvider implements IDataProvider {
         },
         (payload) => {
           logger.info('SupabaseProvider', 'Realtime change in notification_reads table:', payload.eventType);
+          this.cachedNotifications.clear();
+          this.cachedNotificationReads.clear();
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('smart_absensi_notifications_read_updated', { detail: payload }));
           }
@@ -2568,6 +2672,7 @@ export class SupabaseProvider implements IDataProvider {
     note?: string,
     _token?: string
   ): Promise<boolean> {
+    this.cachedTodayTeacherMood.clear();
     try {
       const { error } = await this.client
         .from('teacher_moods')
@@ -2601,39 +2706,55 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getTodayTeacherMood(userId: string, date: string, _token?: string): Promise<TeacherMoodLog | null> {
-    try {
-      const { data, error } = await this.client
-        .from('teacher_moods')
-        .select('id, user_id, date, mood, note, created_at')
-        .eq('user_id', userId)
-        .eq('date', date)
-        .maybeSingle();
-
-      if (!error && data) {
-        return {
-          id: data.id,
-          user_id: data.user_id,
-          date: data.date,
-          mood: data.mood as TeacherMoodType,
-          note: data.note || undefined,
-          created_at: data.created_at,
-        };
-      }
-    } catch (err) {
-      logger.warn('SupabaseProvider', 'getTodayTeacherMood error:', err);
-    }
-
-    // Fallback to local storage
-    if (typeof localStorage !== 'undefined') {
-      const raw = localStorage.getItem('smart_absensi_teacher_moods');
-      if (raw) {
-        try {
-          const logs: TeacherMoodLog[] = JSON.parse(raw);
-          return logs.find((l) => l.user_id === userId && l.date === date) || null;
-        } catch {}
+    const cacheKey = `${userId}_${date}`;
+    const cached = this.cachedTodayTeacherMood.get(cacheKey);
+    if (cached) {
+      const ttl = cached.data ? 600000 : 120000;
+      if (Date.now() - cached.timestamp < ttl) {
+        return cached.data;
       }
     }
-    return null;
+
+    return this.dedupeRequest(`getTodayTeacherMood_${cacheKey}`, async () => {
+      try {
+        const { data, error } = await this.client
+          .from('teacher_moods')
+          .select('id, user_id, date, mood, note, created_at')
+          .eq('user_id', userId)
+          .eq('date', date)
+          .maybeSingle();
+
+        if (!error && data) {
+          const res: TeacherMoodLog = {
+            id: data.id,
+            user_id: data.user_id,
+            date: data.date,
+            mood: data.mood as TeacherMoodType,
+            note: data.note || undefined,
+            created_at: data.created_at,
+          };
+          this.cachedTodayTeacherMood.set(cacheKey, { data: res, timestamp: Date.now() });
+          return res;
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'getTodayTeacherMood error:', err);
+      }
+
+      // Fallback to local storage
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('smart_absensi_teacher_moods');
+        if (raw) {
+          try {
+            const logs: TeacherMoodLog[] = JSON.parse(raw);
+            const found = logs.find((l) => l.user_id === userId && l.date === date) || null;
+            this.cachedTodayTeacherMood.set(cacheKey, { data: found, timestamp: Date.now() });
+            return found;
+          } catch {}
+        }
+      }
+      this.cachedTodayTeacherMood.set(cacheKey, { data: null, timestamp: Date.now() });
+      return null;
+    });
   }
 
   public async getBurnoutAnalytics(month?: string, year?: string, _token?: string): Promise<BurnoutAnalytics> {
@@ -2767,9 +2888,12 @@ export class SupabaseProvider implements IDataProvider {
         logger.warn('SupabaseProvider', 'getDutySchedules error, falling back to local storage:', err);
       }
 
-      // Fallback to local storage if DB query fails
+      // Fallback to local storage if DB query fails, and cache the fallback for 5 minutes to prevent hammering
       const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      return mockProv.getDutySchedules();
+      const fallback = await mockProv.getDutySchedules();
+      this.cachedDutySchedules = fallback;
+      this.cachedDutySchedulesTimestamp = Date.now();
+      return fallback;
     });
   }
 
@@ -3032,7 +3156,27 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string,
     filter?: { teacher_user_id?: string; academic_year?: string; day_of_week?: number }
   ): Promise<TeachingSlot[]> {
-    const dedupeKey = `getTeachingSchedules_${filter?.teacher_user_id || 'ALL'}_${filter?.academic_year || ''}_${filter?.day_of_week ?? ''}`;
+    const cacheKey = `${filter?.teacher_user_id || 'ALL'}_${filter?.academic_year || ''}_${filter?.day_of_week ?? ''}`;
+    const cached = this.cachedTeachingSchedules.get(cacheKey);
+    const now = Date.now();
+
+    // 1. In-Memory TTL Cache Check (5 minutes)
+    if (cached && now - cached.timestamp < 300000) {
+      return cached.data;
+    }
+
+    // 2. Cooldown Guard: If in temporary cooldown due to previous failure/misconfig, prevent hammering Supabase
+    if (now < this.teachingSchedulesCooldownUntil) {
+      if (cached) return cached.data;
+      try {
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getTeachingSchedules(_token, filter);
+      } catch {
+        return [];
+      }
+    }
+
+    const dedupeKey = `getTeachingSchedules_${cacheKey}`;
     return this.dedupeRequest(dedupeKey, async () => {
       try {
         const scheduleCols = 'id, teacher_user_id, teacher_name, day_of_week, start_time, end_time, class_name, subject, room, academic_year, effective_from, effective_until, is_active, version, created_at, updated_at, created_by, updated_by';
@@ -3052,22 +3196,39 @@ export class SupabaseProvider implements IDataProvider {
           query = query.eq('day_of_week', filter.day_of_week);
         }
 
-        const { data, error } = await query.order('day_of_week', { ascending: true }).limit(50);
+        const { data, error, status, statusText } = await query.order('day_of_week', { ascending: true }).limit(50);
 
         if (error) {
-          logger.warn('SupabaseProvider', 'getTeachingSchedules query error:', error.message);
-          if (error.code === 'PGRST205' || error.message?.includes('teaching_schedules')) {
+          // Log complete HTTP status, PGRST code, and error details per instructions
+          logger.error('SupabaseProvider', `getTeachingSchedules failed: HTTP ${status || 'unknown'} (${statusText || ''}) - PGRST Code: ${error.code || 'none'} - Message: ${error.message || ''} - Details: ${error.details || ''} - Hint: ${error.hint || ''}`);
+
+          // Set a temporary cooldown (120 seconds) to protect egress from thousands of repeating errors
+          this.teachingSchedulesCooldownUntil = Date.now() + 120000;
+
+          if (cached) return cached.data;
+
+          try {
+            const mockProv = new (await import('./mock-provider.service')).MockProvider();
+            return mockProv.getTeachingSchedules(_token, filter);
+          } catch {
             return [];
           }
-          const mockProv = new (await import('./mock-provider.service')).MockProvider();
-          return mockProv.getTeachingSchedules(_token, filter);
         }
 
-        // Honest data state: if query succeeded, return mapped records (even if empty [])
+        // On success: clear temporary cooldown
+        this.teachingSchedulesCooldownUntil = 0;
+
         const mapped = (data || []).map((row: any) => this.mapDbRowToTeachingSlot(row));
-        return sortTeachingSlots(mapped);
-      } catch (err) {
-        logger.warn('SupabaseProvider', 'getTeachingSchedules DB exception:', err);
+        const sorted = sortTeachingSlots(mapped);
+
+        // Store in 5-minute TTL cache
+        this.cachedTeachingSchedules.set(cacheKey, { data: sorted, timestamp: Date.now() });
+
+        return sorted;
+      } catch (err: any) {
+        logger.error('SupabaseProvider', 'getTeachingSchedules DB exception:', err);
+        this.teachingSchedulesCooldownUntil = Date.now() + 120000;
+        if (cached) return cached.data;
         return [];
       }
     });
@@ -3158,6 +3319,8 @@ export class SupabaseProvider implements IDataProvider {
             } catch {
               // Ignore mock sync error
             }
+            this.cachedTeachingSchedules.clear();
+            this.teachingSchedulesCooldownUntil = 0;
             return { success: true, data: created };
           }
           if (!resp.ok || !resData.success) {
@@ -3189,6 +3352,8 @@ export class SupabaseProvider implements IDataProvider {
         // Ignore mock sync error
       }
 
+      this.cachedTeachingSchedules.clear();
+      this.teachingSchedulesCooldownUntil = 0;
       return { success: true, data: created };
     } catch (err: any) {
       logger.error('SupabaseProvider', 'createTeachingSchedule exception:', err);
@@ -3288,6 +3453,8 @@ export class SupabaseProvider implements IDataProvider {
             } catch {
               // Ignore mock sync error
             }
+            this.cachedTeachingSchedules.clear();
+            this.teachingSchedulesCooldownUntil = 0;
             return { success: true, data: updated };
           }
           if (!resp.ok || !resData.success) {
@@ -3319,6 +3486,8 @@ export class SupabaseProvider implements IDataProvider {
         // Ignore mock sync error
       }
 
+      this.cachedTeachingSchedules.clear();
+      this.teachingSchedulesCooldownUntil = 0;
       return { success: true, data: updated };
     } catch (err: any) {
       logger.error('SupabaseProvider', 'updateTeachingSchedule exception:', err);
@@ -3346,6 +3515,8 @@ export class SupabaseProvider implements IDataProvider {
             } catch {
               // Ignore
             }
+            this.cachedTeachingSchedules.clear();
+            this.teachingSchedulesCooldownUntil = 0;
             return true;
           }
         } catch (fetchErr: any) {
@@ -3370,6 +3541,8 @@ export class SupabaseProvider implements IDataProvider {
         // Ignore
       }
 
+      this.cachedTeachingSchedules.clear();
+      this.teachingSchedulesCooldownUntil = 0;
       return true;
     } catch (err) {
       logger.error('SupabaseProvider', 'deleteTeachingSchedule exception:', err);
@@ -3420,10 +3593,15 @@ export class SupabaseProvider implements IDataProvider {
       } catch {
         // Ignore mock sync error
       }
+
+      this.cachedTeachingSchedules.clear();
+      this.teachingSchedulesCooldownUntil = 0;
       return true;
     } catch (err) {
       logger.warn('SupabaseProvider', 'saveTeachingSchedules DB exception:', err);
       const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      this.cachedTeachingSchedules.clear();
+      this.teachingSchedulesCooldownUntil = 0;
       return mockProv.saveTeachingSchedules(schedules);
     }
   }
@@ -4793,6 +4971,12 @@ export class SupabaseProvider implements IDataProvider {
 
   // TEACHER DISCIPLINE POINT HISTORY API
   public async getTeacherPointHistory(userId: string, _token?: string): Promise<TeacherPointLog[]> {
+    const cached = this.cachedTeacherPointHistory.get(userId);
+    const ttl = userId === 'ALL' ? 120000 : 60000;
+    if (cached && Date.now() - cached.timestamp < ttl) {
+      return cached.data;
+    }
+
     return this.dedupeRequest(`getTeacherPointHistory_${userId}`, async () => {
       try {
         let query = this.client
@@ -4807,16 +4991,17 @@ export class SupabaseProvider implements IDataProvider {
           query = query.limit(1000);
         }
 
-        const { data, error } = await query;
+        const { data, error, status } = await query;
 
         if (error) {
-          logger.warn('SupabaseProvider', 'getTeacherPointHistory Supabase error, falling back to mock provider:', error.message);
+          logger.warn('SupabaseProvider', `getTeacherPointHistory Supabase error (HTTP ${status || 'unknown'}, ${error.code}):`, error.message);
           const mockProv = new (await import('./mock-provider.service')).MockProvider();
           return mockProv.getTeacherPointHistory(userId);
         }
 
+        let result: TeacherPointLog[] = [];
         if (data && data.length > 0) {
-          return data.map((row: any) => ({
+          result = data.map((row: any) => ({
             id: row.id,
             user_id: row.user_id,
             teacher_name: row.teacher_name || undefined,
@@ -4829,8 +5014,8 @@ export class SupabaseProvider implements IDataProvider {
           }));
         }
 
-        // Honest data state: if database returns 0 rows, return empty array without falling back to mock seeds
-        return [];
+        this.cachedTeacherPointHistory.set(userId, { data: result, timestamp: Date.now() });
+        return result;
       } catch (err) {
         logger.error('SupabaseProvider', 'getTeacherPointHistory exception:', err);
         return [];
@@ -4946,6 +5131,9 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       const data = savedRecord;
+
+      this.cachedTeacherPointHistory.delete(log.user_id);
+      this.cachedTeacherPointHistory.delete('ALL');
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(

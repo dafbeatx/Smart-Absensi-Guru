@@ -367,8 +367,12 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
       }
     }, 300000);
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const handleRealtimeUpdate = () => {
-      loadNotifications();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadNotifications();
+      }, 1000);
     };
 
     let lastVisibilitySync = Date.now();
@@ -397,6 +401,7 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       clearInterval(interval);
       unsubRealtime();
       window.removeEventListener('smart_absensi_scanned', handleRealtimeUpdate);
