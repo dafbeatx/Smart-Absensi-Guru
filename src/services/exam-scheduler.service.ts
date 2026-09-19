@@ -70,8 +70,64 @@ export class ExamSchedulerService {
   ): ExamScheduleData {
     const examDates = this.getValidExamDates(config.startDate, config.endDate);
     const totalDays = Math.max(1, examDates.length);
-    const sessionsPerDay = Math.max(1, Math.min(4, config.sessionsPerDay || config.sessionSlots.length || 2));
-    const totalSlots = totalDays * sessionsPerDay;
+
+    // Build ordered list of all actual daily slots (supporting per-day session count overrides)
+    interface ConcreteSlot {
+      date: string;
+      dayName: string;
+      sessionNumber: number;
+      startTime: string;
+      endTime: string;
+    }
+
+    const allSlots: ConcreteSlot[] = [];
+
+    examDates.forEach((dateInfo) => {
+      // Check if there is an override for this specific date or dayName
+      const override = config.dayOverrides?.find(
+        (o) =>
+          (o.date && o.date === dateInfo.date) ||
+          (o.dayName && o.dayName.toLowerCase() === dateInfo.dayName.toLowerCase())
+      );
+
+      const countForThisDay = override !== undefined
+        ? override.sessionsCount
+        : (config.sessionsPerDay || config.sessionSlots?.length || 2);
+      const safeCount = Math.max(1, Math.min(4, countForThisDay));
+
+      for (let sNum = 1; sNum <= safeCount; sNum++) {
+        const customSlot = override?.sessionSlots?.find((s) => s.sessionNumber === sNum);
+        const baseSlot = config.sessionSlots?.find((s) => s.sessionNumber === sNum);
+        const isFriday = dateInfo.dayName.toLowerCase() === 'jumat';
+
+        let defStart = '07:30';
+        let defEnd = '09:30';
+        if (isFriday) {
+          if (sNum === 1) { defStart = '07:15'; defEnd = '08:45'; }
+          else if (sNum === 2) { defStart = '09:00'; defEnd = '10:30'; }
+          else if (sNum === 3) { defStart = '13:30'; defEnd = '15:00'; }
+          else { defStart = '15:15'; defEnd = '16:30'; }
+        } else {
+          if (sNum === 1) { defStart = '07:30'; defEnd = '09:30'; }
+          else if (sNum === 2) { defStart = '10:00'; defEnd = '12:00'; }
+          else if (sNum === 3) { defStart = '13:00'; defEnd = '15:00'; }
+          else { defStart = '15:30'; defEnd = '17:00'; }
+        }
+
+        const finalStart = customSlot?.startTime || (isFriday ? defStart : (baseSlot?.startTime || defStart));
+        const finalEnd = customSlot?.endTime || (isFriday ? defEnd : (baseSlot?.endTime || defEnd));
+
+        allSlots.push({
+          date: dateInfo.date,
+          dayName: dateInfo.dayName,
+          sessionNumber: sNum,
+          startTime: finalStart,
+          endTime: finalEnd,
+        });
+      }
+    });
+
+    const totalSlots = Math.max(1, allSlots.length);
 
     const classes = config.selectedClasses && config.selectedClasses.length > 0
       ? config.selectedClasses
@@ -84,30 +140,19 @@ export class ExamSchedulerService {
     // ── 1. GENERATE SUBJECT SCHEDULES PER CLASS ──────────────────────────────
     const subjectSchedules: ExamSubjectScheduleItem[] = [];
 
-    // Map each subject to a (dayIndex, sessionNumber) slot
+    // Map each subject to the concrete slot for each class
     classes.forEach((cls) => {
       subjects.forEach((subj, subjIdx) => {
-        const slotIdx = subjIdx % totalSlots;
-        const dayIdx = Math.floor(slotIdx / sessionsPerDay) % totalDays;
-        const sessionNum = (slotIdx % sessionsPerDay) + 1;
-
-        const dateInfo = examDates[dayIdx] || examDates[0];
-        const slotConfig = config.sessionSlots.find((s) => s.sessionNumber === sessionNum) || {
-          sessionNumber: sessionNum,
-          sessionName: `Sesi ${sessionNum}`,
-          startTime: sessionNum === 1 ? '07:30' : sessionNum === 2 ? '10:00' : '12:30',
-          endTime: sessionNum === 1 ? '09:30' : sessionNum === 2 ? '12:00' : '14:30',
-        };
-
+        const slot = allSlots[subjIdx % totalSlots];
         const isLabRequired = /informatika|komputer|cbt|tik/i.test(subj);
 
         subjectSchedules.push({
-          id: `subj_${cls}_${dateInfo.date}_s${sessionNum}_${subjIdx}`,
-          date: dateInfo.date,
-          dayName: dateInfo.dayName,
-          sessionNumber: sessionNum,
-          startTime: slotConfig.startTime,
-          endTime: slotConfig.endTime,
+          id: `subj_${cls}_${slot.date}_s${slot.sessionNumber}_${subjIdx}`,
+          date: slot.date,
+          dayName: slot.dayName,
+          sessionNumber: slot.sessionNumber,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
           className: cls,
           subject: subj,
           isLabRequired,

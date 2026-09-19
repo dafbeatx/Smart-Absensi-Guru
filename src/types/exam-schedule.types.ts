@@ -55,6 +55,13 @@ export interface ExamProctorItem {
   backupProctorName?: string;
 }
 
+export interface DaySessionOverride {
+  date: string; // YYYY-MM-DD
+  dayName: string; // e.g. "Senin", "Jumat"
+  sessionsCount: number; // 1, 2, 3, or 4
+  sessionSlots?: SessionTimeSlot[]; // Optional custom start/end times for this specific day
+}
+
 export interface ExamScheduleFormConfig {
   examType: ExamType;
   examTitle: string;
@@ -64,6 +71,7 @@ export interface ExamScheduleFormConfig {
   endDate: string;   // YYYY-MM-DD
   sessionsPerDay: number;
   sessionSlots: SessionTimeSlot[];
+  dayOverrides?: DaySessionOverride[];
   selectedClasses: string[];
   selectedSubjects: string[];
   selectedTeacherIds: string[];

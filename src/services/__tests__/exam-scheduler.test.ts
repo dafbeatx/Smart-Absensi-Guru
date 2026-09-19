@@ -354,5 +354,38 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 14: Error testing granular single subject slot deletion', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 15: Per-Day Dynamic Sessions Count (e.g. Jumat 1 Sesi, Sabtu 3 Sesi)
+  // ---------------------------------------------------------------------------
+  try {
+    const dynamicConfig: ExamScheduleFormConfig = {
+      ...config,
+      startDate: '2026-10-02', // Jumat
+      endDate: '2026-10-03',   // Sabtu
+      sessionsPerDay: 2,
+      selectedClasses: ['7A'],
+      selectedSubjects: ['Mapel 1', 'Mapel 2', 'Mapel 3', 'Mapel 4'],
+      dayOverrides: [
+        { date: '2026-10-02', dayName: 'Jumat', sessionsCount: 1 },
+        { date: '2026-10-03', dayName: 'Sabtu', sessionsCount: 3 },
+      ],
+    };
+
+    const dynamicSchedule = ExamSchedulerService.generateSchedule(dynamicConfig, sampleTeachers, []);
+    const jumatSlots = dynamicSchedule.subjectSchedules.filter((s) => s.date === '2026-10-02');
+    const sabtuSlots = dynamicSchedule.subjectSchedules.filter((s) => s.date === '2026-10-03');
+
+    assert(
+      'Exam Scheduler 15: Successfully supports variable session counts per day (Jumat 1 sesi, Sabtu 3 sesi)',
+      jumatSlots.length === 1 &&
+      sabtuSlots.length === 3 &&
+      jumatSlots[0].endTime === '08:45' &&
+      dynamicSchedule.summary.totalSessions === 4,
+      `Jumat slots: ${jumatSlots.length} (End: ${jumatSlots[0]?.endTime}), Sabtu slots: ${sabtuSlots.length}, Total sessions: ${dynamicSchedule.summary.totalSessions}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 15: Error testing per-day dynamic sessions count', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
