@@ -396,5 +396,47 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 15: Error testing per-day dynamic sessions count', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 16: Multi-Subject Daily Distribution & Chronological Session Ordering
+  // ---------------------------------------------------------------------------
+  try {
+    const multiSubjectConfig: ExamScheduleFormConfig = {
+      ...config,
+      startDate: '2026-10-05', // Senin
+      endDate: '2026-10-05',   // Senin (1 hari pelaksanaan)
+      sessionsPerDay: 3,
+      selectedClasses: ['7A', '7B'],
+      selectedSubjects: ['PAI', 'Matematika', 'Bahasa Arab'],
+      dayOverrides: [
+        { date: '2026-10-05', dayName: 'Senin', sessionsCount: 3 },
+      ],
+    };
+
+    const multiSched = ExamSchedulerService.generateSchedule(multiSubjectConfig, sampleTeachers, []);
+    const senin7ASlots = multiSched.subjectSchedules.filter((s) => s.className === '7A');
+
+    const sesi1 = senin7ASlots.find((s) => s.sessionNumber === 1);
+    const sesi2 = senin7ASlots.find((s) => s.sessionNumber === 2);
+    const sesi3 = senin7ASlots.find((s) => s.sessionNumber === 3);
+
+    const isDistinctSubjects =
+      sesi1?.subject === 'PAI' &&
+      sesi2?.subject === 'Matematika' &&
+      sesi3?.subject === 'Bahasa Arab';
+
+    const isDistinctTimes =
+      sesi1?.startTime !== sesi2?.startTime &&
+      sesi2?.startTime !== sesi3?.startTime;
+
+    assert(
+      'Exam Scheduler 16: Multi-subject daily distribution allocates distinct subjects per session on the same day',
+      senin7ASlots.length === 3 && isDistinctSubjects && isDistinctTimes,
+      `Sesi 1: ${sesi1?.subject} (${sesi1?.startTime}-${sesi1?.endTime}), Sesi 2: ${sesi2?.subject} (${sesi2?.startTime}-${sesi2?.endTime}), Sesi 3: ${sesi3?.subject} (${sesi3?.startTime}-${sesi3?.endTime})`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 16: Error testing multi-subject daily distribution', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
+

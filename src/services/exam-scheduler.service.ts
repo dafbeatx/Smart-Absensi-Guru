@@ -133,10 +133,10 @@ export class ExamSchedulerService {
           else if (sNum === 3) { defStart = '13:30'; defEnd = '15:00'; }
           else { defStart = '15:15'; defEnd = '16:30'; }
         } else {
-          if (sNum === 1) { defStart = '07:30'; defEnd = '09:30'; }
-          else if (sNum === 2) { defStart = '10:00'; defEnd = '12:00'; }
-          else if (sNum === 3) { defStart = '13:00'; defEnd = '15:00'; }
-          else { defStart = '15:30'; defEnd = '17:00'; }
+          if (sNum === 1) { defStart = '07:30'; defEnd = '09:00'; }
+          else if (sNum === 2) { defStart = '09:30'; defEnd = '11:00'; }
+          else if (sNum === 3) { defStart = '11:15'; defEnd = '12:45'; }
+          else { defStart = '13:15'; defEnd = '14:45'; }
         }
 
         const finalStart = customSlot?.startTime || (isFriday ? defStart : (baseSlot?.startTime || defStart));
@@ -183,6 +183,13 @@ export class ExamSchedulerService {
           isLabRequired,
         });
       });
+    });
+
+    // Sort chronologically: date ASC, sessionNumber ASC, className ASC
+    subjectSchedules.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      if (a.sessionNumber !== b.sessionNumber) return a.sessionNumber - b.sessionNumber;
+      return a.className.localeCompare(b.className);
     });
 
     // ── 2. PREPARE PROCTOR TEACHERS POOL ──────────────────────────────────────
@@ -335,6 +342,13 @@ export class ExamSchedulerService {
             });
         }
       }
+    });
+
+    // Sort proctor schedules chronologically: date ASC, sessionNumber ASC, roomName ASC
+    proctorSchedules.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      if (a.sessionNumber !== b.sessionNumber) return a.sessionNumber - b.sessionNumber;
+      return a.roomName.localeCompare(b.roomName);
     });
 
     // ── 4. COMPOSE SUMMARY & AI OBSERVATION ───────────────────────────────────

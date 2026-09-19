@@ -21,6 +21,7 @@ import {
   Check,
   Sliders,
   FileText,
+  ListFilter,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import type { UserProfile } from '../../../types/database.types';
@@ -129,13 +130,16 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [includeSaturday, setIncludeSaturday] = useState<boolean>(false);
   const [formStartDate, setFormStartDate] = useState<string>(() => getSmartDefaultExamStartDate());
   const [formEndDate, setFormEndDate] = useState<string>(() => getSmartDefaultExamEndDate(getSmartDefaultExamStartDate()));
-  const [sessionsPerDay, setSessionsPerDay] = useState<number>(2);
+  const [sessionsPerDay, setSessionsPerDay] = useState<number>(3);
   const [sessionSlots, setSessionSlots] = useState<SessionTimeSlot[]>([
-    { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:30' },
-    { sessionNumber: 2, sessionName: 'Sesi 2 (Siang)', startTime: '10:00', endTime: '12:00' },
+    { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:00' },
+    { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '09:30', endTime: '11:00' },
+    { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:15', endTime: '12:45' },
+    { sessionNumber: 4, sessionName: 'Sesi 4 (Tambahan)', startTime: '13:15', endTime: '14:45' },
   ]);
   const [sessionMode, setSessionMode] = useState<'UNIFORM' | 'PER_DAY'>('PER_DAY');
   const [dayOverrides, setDayOverrides] = useState<DaySessionOverride[]>([]);
+  const [subjectViewMode, setSubjectViewMode] = useState<'DAILY' | 'TABLE'>('DAILY');
 
   // Valid exam dates (excluding Sundays, and excluding Saturdays unless includeSaturday is true)
   const validExamDates = useMemo(
@@ -167,6 +171,76 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
     return dayOverrides.reduce((sum, d) => sum + (d.sessionsCount || sessionsPerDay), 0);
   }, [sessionMode, validExamDates, sessionsPerDay, dayOverrides]);
+
+  // Cumulative slot offsets for labeling subjects (e.g. Mapel #1, #2, #3...)
+  const slotOffsets = useMemo(() => {
+    let cumulative = 0;
+    const map = new Map<string, number>();
+    validExamDates.forEach((d) => {
+      map.set(d.date, cumulative);
+      const override = dayOverrides.find((o) => o.date === d.date);
+      const count = override?.sessionsCount ?? (d.dayName.toLowerCase() === 'jumat' ? 2 : sessionsPerDay);
+      cumulative += count;
+    });
+    return map;
+  }, [validExamDates, dayOverrides, sessionsPerDay]);
+
+  // Group subject schedules by day and session for clear multi-subject daily display
+  const dailyGroupedSchedules = useMemo(() => {
+    if (!scheduleData?.subjectSchedules) return [];
+    const dayMap = new Map<
+      string,
+      {
+        date: string;
+        dayName: string;
+        sessions: Array<{
+          sessionNumber: number;
+          startTime: string;
+          endTime: string;
+          subject: string;
+          classes: string[];
+          isLabRequired?: boolean;
+          scheduleItemIds: string[];
+        }>;
+      }
+    >();
+
+    scheduleData.subjectSchedules.forEach((item) => {
+      let dayEntry = dayMap.get(item.date);
+      if (!dayEntry) {
+        dayEntry = { date: item.date, dayName: item.dayName, sessions: [] };
+        dayMap.set(item.date, dayEntry);
+      }
+
+      let sessEntry = dayEntry.sessions.find(
+        (s) => s.sessionNumber === item.sessionNumber && s.subject === item.subject
+      );
+      if (!sessEntry) {
+        sessEntry = {
+          sessionNumber: item.sessionNumber,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          subject: item.subject,
+          classes: [item.className],
+          isLabRequired: item.isLabRequired,
+          scheduleItemIds: [item.id],
+        };
+        dayEntry.sessions.push(sessEntry);
+      } else {
+        if (!sessEntry.classes.includes(item.className)) {
+          sessEntry.classes.push(item.className);
+        }
+        sessEntry.scheduleItemIds.push(item.id);
+      }
+    });
+
+    const result = Array.from(dayMap.values());
+    result.sort((a, b) => a.date.localeCompare(b.date));
+    result.forEach((d) => {
+      d.sessions.sort((a, b) => a.sessionNumber - b.sessionNumber);
+    });
+    return result;
+  }, [scheduleData]);
 
   // Handlers for day overrides
   const handleDaySessionChange = (date: string, count: number) => {
@@ -438,13 +512,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     const slots: SessionTimeSlot[] = [];
     for (let i = 1; i <= num; i++) {
       if (i === 1) {
-        slots.push({ sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:30' });
+        slots.push({ sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:00' });
       } else if (i === 2) {
-        slots.push({ sessionNumber: 2, sessionName: 'Sesi 2 (Siang)', startTime: '10:00', endTime: '12:00' });
+        slots.push({ sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '09:30', endTime: '11:00' });
       } else if (i === 3) {
-        slots.push({ sessionNumber: 3, sessionName: 'Sesi 3 (Sore)', startTime: '13:00', endTime: '15:00' });
+        slots.push({ sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:15', endTime: '12:45' });
       } else {
-        slots.push({ sessionNumber: i, sessionName: `Sesi ${i}`, startTime: '15:30', endTime: '17:00' });
+        slots.push({ sessionNumber: i, sessionName: `Sesi ${i}`, startTime: '13:15', endTime: '14:45' });
       }
     }
     setSessionSlots(slots);
@@ -1075,23 +1149,86 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                       </button>
                     </div>
 
+                    {/* Master Session Time Slots (Adjustable by Committee) */}
+                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2.5 shadow-2xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <span>⏰</span>
+                          <span>Jam Pelaksanaan Tiap Sesi (Hari Biasa: Senin - Kamis & Sabtu)</span>
+                        </span>
+                        <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md font-bold border border-teal-200">
+                          Setiap sesi menguji 1 mata pelajaran berbeda
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                        {sessionSlots.map((slot, idx) => (
+                          <div key={slot.sessionNumber} className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80 space-y-1.5">
+                            <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block truncate">
+                              {slot.sessionName}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="time"
+                                value={slot.startTime}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSessionSlots((prev) => {
+                                    const next = [...prev];
+                                    next[idx].startTime = val;
+                                    return next;
+                                  });
+                                }}
+                                className="w-full bg-white border border-slate-300 rounded-md p-1 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              />
+                              <span className="text-[10px] text-slate-400 font-bold">s/d</span>
+                              <input
+                                type="time"
+                                value={slot.endTime}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSessionSlots((prev) => {
+                                    const next = [...prev];
+                                    next[idx].endTime = val;
+                                    return next;
+                                  });
+                                }}
+                                className="w-full bg-white border border-slate-300 rounded-md p-1 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-2 bg-amber-50/70 border border-amber-200 rounded-lg flex items-center justify-between text-[11px] text-amber-900 flex-wrap gap-1">
+                        <span className="font-bold flex items-center gap-1">
+                          <span>🕌</span>
+                          <span>Khusus Hari Jumat (Otomatis Selesai Sebelum Sholat Jumat):</span>
+                        </span>
+                        <span className="font-mono font-semibold">
+                          Sesi 1: 07:15 - 08:45 | Sesi 2: 09:00 - 10:30 WIB
+                        </span>
+                      </div>
+                    </div>
+
                     {/* Per-Day Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                       {validExamDates.map((dateInfo) => {
                         const override = dayOverrides.find((d) => d.date === dateInfo.date);
                         const currentCount = override?.sessionsCount ?? (dateInfo.dayName.toLowerCase() === 'jumat' ? 2 : sessionsPerDay);
                         const isFriday = dateInfo.dayName.toLowerCase() === 'jumat';
+                        const dayOffset = slotOffsets.get(dateInfo.date) || 0;
 
                         return (
                           <div
                             key={dateInfo.date}
-                            className={`p-3 rounded-xl border transition-all shadow-2xs ${
+                            className={`p-3 rounded-xl border transition-all shadow-2xs space-y-2 ${
                               isFriday
                                 ? 'bg-amber-50/60 border-amber-200'
                                 : 'bg-white border-slate-200'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-1 mb-2">
+                            <div className="flex items-center justify-between gap-1">
                               <div>
                                 <span className="text-xs font-black text-slate-900 block">
                                   {dateInfo.dayName}
@@ -1106,7 +1243,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                                 </span>
                               </div>
                               <span className="text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-lg">
-                                {currentCount} Sesi
+                                {currentCount} Sesi / Mapel
                               </span>
                             </div>
 
@@ -1128,18 +1265,43 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                               ))}
                             </div>
 
-                            {/* Time preview helper */}
-                            <p className="text-[10px] text-slate-500 mt-1.5 truncate">
-                              {isFriday && currentCount === 2
-                                ? '07:15 - 10:30 (Selesai sblm Jumatan)'
-                                : isFriday && currentCount === 1
-                                ? '07:15 - 08:45 (Sesi Pagi)'
-                                : currentCount === 3
-                                ? '07:30 - 15:00 (Pagi, Siang, Sore)'
-                                : currentCount === 2
-                                ? '07:30 - 12:00 (Pagi & Siang)'
-                                : '07:30 - 09:30 (1 Sesi)'}
-                            </p>
+                            {/* Session Breakdown List */}
+                            <div className="space-y-1 bg-slate-50/80 p-2 rounded-lg border border-slate-200/70">
+                              {Array.from({ length: currentCount }, (_, i) => i + 1).map((sNum) => {
+                                let sStart = '07:30';
+                                let sEnd = '09:00';
+                                if (isFriday) {
+                                  if (sNum === 1) { sStart = '07:15'; sEnd = '08:45'; }
+                                  else if (sNum === 2) { sStart = '09:00'; sEnd = '10:30'; }
+                                  else if (sNum === 3) { sStart = '13:30'; sEnd = '15:00'; }
+                                  else { sStart = '15:15'; sEnd = '16:30'; }
+                                } else {
+                                  const slot = sessionSlots.find((s) => s.sessionNumber === sNum);
+                                  if (slot) { sStart = slot.startTime; sEnd = slot.endTime; }
+                                  else if (sNum === 1) { sStart = '07:30'; sEnd = '09:00'; }
+                                  else if (sNum === 2) { sStart = '09:30'; sEnd = '11:00'; }
+                                  else if (sNum === 3) { sStart = '11:15'; sEnd = '12:45'; }
+                                  else { sStart = '13:15'; sEnd = '14:45'; }
+                                }
+
+                                return (
+                                  <div key={sNum} className="flex items-center justify-between text-[11px] bg-white px-2 py-1 rounded-md border border-slate-200/60 shadow-2xs">
+                                    <span className="font-bold text-teal-900">
+                                      Sesi {sNum}: <span className="font-mono text-slate-700 font-semibold">{sStart} - {sEnd}</span>
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                      Mapel #{dayOffset + sNum}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                              {isFriday && (
+                                <p className="text-[10px] text-amber-800 font-bold flex items-center gap-1 pt-0.5">
+                                  <span>🕌</span>
+                                  <span>Selesai 10:30 (Sebelum Jumatan)</span>
+                                </p>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1603,66 +1765,176 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                   </div>
                 </div>
 
-                {/* Subject Schedule Table */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
-                        <tr>
-                          <th className="py-3 px-3.5 text-center w-12">No</th>
-                          <th className="py-3 px-3.5">Hari & Tanggal</th>
-                          <th className="py-3 px-3 text-center">Sesi</th>
-                          <th className="py-3 px-3 text-center">Waktu</th>
-                          <th className="py-3 px-3.5">Kelas / Rombel</th>
-                          <th className="py-3 px-3.5 font-black text-slate-900">Mata Pelajaran</th>
-                          <th className="py-3 px-3.5 text-center">Ruangan</th>
-                          {accessInfo.canManage && (
-                            <th className="py-3 px-3 text-center w-14">Aksi</th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
-                        {scheduleData.subjectSchedules.map((item, idx) => (
-                          <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-2.5 px-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
-                            <td className="py-2.5 px-3.5">
-                              <span className="font-bold text-slate-900">{item.dayName}</span>, <span className="text-slate-600">{item.date}</span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-bold text-teal-700">Sesi {item.sessionNumber}</td>
-                            <td className="py-2.5 px-3 text-center font-mono text-slate-600">{item.startTime} - {item.endTime}</td>
-                            <td className="py-2.5 px-3.5">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-200">
-                                Kelas {item.className}
+                {/* View Mode Toggle */}
+                <div className="flex items-center justify-between gap-2 flex-wrap pb-1">
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setSubjectViewMode('DAILY')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        subjectViewMode === 'DAILY' ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>📅 Tampilan Harian (Sesi & Mapel)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSubjectViewMode('TABLE')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        subjectViewMode === 'TABLE' ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <ListFilter className="w-3.5 h-3.5" />
+                      <span>📋 Tabel Detail (Per Rombel)</span>
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    💡 Dalam 1 hari pelaksanaan terdapat beberapa sesi ujian dengan mata pelajaran yang berbeda.
+                  </span>
+                </div>
+
+                {subjectViewMode === 'DAILY' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {dailyGroupedSchedules.map((day) => {
+                      const isFriday = day.dayName.toLowerCase() === 'jumat';
+                      return (
+                        <div
+                          key={day.date}
+                          className={`p-4 rounded-2xl border transition-all shadow-xs space-y-3 ${
+                            isFriday ? 'bg-amber-50/50 border-amber-200' : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <div>
+                              <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                <span>{day.dayName}, {day.date}</span>
+                                {isFriday && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900">
+                                    Jumat
+                                  </span>
+                                )}
+                              </h4>
+                              <span className="text-[11px] text-slate-500">
+                                {day.sessions.length} Mata Pelajaran Diujikan
                               </span>
-                            </td>
-                            <td className="py-2.5 px-3.5 font-bold text-slate-900">{item.subject}</td>
-                            <td className="py-2.5 px-3.5 text-center">
-                              {item.isLabRequired ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                  Lab Komputer (CBT)
-                                </span>
-                              ) : (
-                                <span className="text-[11px] text-slate-500">Ruang {item.className}</span>
-                              )}
-                            </td>
+                            </div>
+                            <span className="text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-xl">
+                              {day.sessions.length} Sesi Ujian
+                            </span>
+                          </div>
+
+                          <div className="space-y-2.5">
+                            {day.sessions.map((sess) => (
+                              <div
+                                key={`${sess.sessionNumber}_${sess.subject}`}
+                                className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded-md bg-teal-600 text-white font-black text-[10px]">
+                                      Sesi {sess.sessionNumber}
+                                    </span>
+                                    <span className="font-mono text-xs font-bold text-slate-700">
+                                      ⏰ {sess.startTime} - {sess.endTime} WIB
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-black text-slate-900">
+                                      📖 {sess.subject}
+                                    </span>
+                                    {sess.isLabRequired && (
+                                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                        Lab Komputer (CBT)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 flex-wrap sm:justify-end">
+                                  <span className="text-[10px] text-slate-400 font-semibold block mr-1">Peserta:</span>
+                                  {sess.classes.map((cls) => (
+                                    <span key={cls} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white text-slate-700 border border-slate-200">
+                                      {cls}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {isFriday && (
+                            <p className="text-[11px] text-amber-800 font-semibold flex items-center gap-1.5 pt-1">
+                              <span>🕌</span>
+                              <span>Ujian hari Jumat selesai pukul 10:30 WIB agar siswa & dewan guru dapat mempersiapkan Sholat Jumat.</span>
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Subject Schedule Table */
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
+                          <tr>
+                            <th className="py-3 px-3.5 text-center w-12">No</th>
+                            <th className="py-3 px-3.5">Hari & Tanggal</th>
+                            <th className="py-3 px-3 text-center">Sesi</th>
+                            <th className="py-3 px-3 text-center">Waktu</th>
+                            <th className="py-3 px-3.5">Kelas / Rombel</th>
+                            <th className="py-3 px-3.5 font-black text-slate-900">Mata Pelajaran</th>
+                            <th className="py-3 px-3.5 text-center">Ruangan</th>
                             {accessInfo.canManage && (
-                              <td className="py-2.5 px-3 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteSingleSubject(item.id, item.subject, item.className)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                  title={`Hapus ujian ${item.subject} (${item.className})`}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
+                              <th className="py-3 px-3 text-center w-14">Aksi</th>
                             )}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {scheduleData.subjectSchedules.map((item, idx) => (
+                            <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2.5 px-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
+                              <td className="py-2.5 px-3.5">
+                                <span className="font-bold text-slate-900">{item.dayName}</span>, <span className="text-slate-600">{item.date}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-bold text-teal-700">Sesi {item.sessionNumber}</td>
+                              <td className="py-2.5 px-3 text-center font-mono text-slate-600">{item.startTime} - {item.endTime}</td>
+                              <td className="py-2.5 px-3.5">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-200">
+                                  Kelas {item.className}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3.5 font-bold text-slate-900">{item.subject}</td>
+                              <td className="py-2.5 px-3.5 text-center">
+                                {item.isLabRequired ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                    Lab Komputer (CBT)
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-slate-500">Ruang {item.className}</span>
+                                )}
+                              </td>
+                              {accessInfo.canManage && (
+                                <td className="py-2.5 px-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSingleSubject(item.id, item.subject, item.className)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                    title={`Hapus ujian ${item.subject} (${item.className})`}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>
