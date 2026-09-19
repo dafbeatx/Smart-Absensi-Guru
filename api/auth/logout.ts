@@ -2,7 +2,7 @@
 // Serverless Logout Engine for Smart Absensi Guru (SAGA)
 // Revokes stateful session token in database immediately upon logout
 
-import { serverSupabase, hashSessionToken } from '../_shared/session-auth';
+import { serverSupabase, hashSessionToken } from '../_shared/session-auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

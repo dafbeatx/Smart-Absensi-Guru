@@ -2,6 +2,8 @@
 // Vercel Serverless Function: Secure Server-Side Proxy for Groq AI Engine
 // Protects GROQ_API_KEY from ever being exposed to client-side browser bundles (Zero-Trust)
 
+import process from 'node:process';
+
 const DEFAULT_GROQ_MODELS = [
   'qwen/qwen3.8-27b',
   'groq/compound-mini',

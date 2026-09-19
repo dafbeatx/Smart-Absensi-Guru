@@ -3,7 +3,7 @@
 // Enforces database-verified homeroom assignments (public.homeroom_assignments)
 // Built strictly on top of server-verifiable session token (saga_sess_)
 
-import { authenticateUser, serverSupabase, type AuthenticatedUser } from './session-auth';
+import { authenticateUser, serverSupabase, type AuthenticatedUser } from './session-auth.js';
 
 export interface HomeroomAuthSuccessContext {
   ok: true;

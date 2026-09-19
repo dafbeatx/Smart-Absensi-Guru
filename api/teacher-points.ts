@@ -3,8 +3,8 @@
 // Enforces stateful session authentication (saga_sess_), role-based authorization,
 // server-calculated points for teachers, idempotency guarantees, and tenant isolation.
 
-import crypto from 'crypto';
-import { serverSupabase, authenticateUser } from './_shared/session-auth';
+import crypto from 'node:crypto';
+import { serverSupabase, authenticateUser } from './_shared/session-auth.js';
 
 // Whitelist katalog aktivitas resmi yang boleh dicatat secara otomatis oleh role GURU
 const GURU_ACTIVITY_CATALOG: Record<string, { points: number; title: string }> = {

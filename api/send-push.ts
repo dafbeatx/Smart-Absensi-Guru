@@ -3,6 +3,7 @@
 
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
+import process from 'node:process';
 
 // Setup VAPID details exclusively from environment secrets
 const VAPID_PUBLIC_KEY =

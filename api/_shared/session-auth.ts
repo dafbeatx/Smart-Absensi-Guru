@@ -3,7 +3,8 @@
 // Implements server-verifiable, stateful session security with SHA-256 token hashing
 
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
+import process from 'node:process';
 
 const DEFAULT_SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHBmbWpzYnF4YnRpb3lwbmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzcyNDksImV4cCI6MjEwNDk1MzI0OX0.ewXX-KW3SMEF-KtOZ5P1MY5IpZSJQImDt5g9maTOWfE';

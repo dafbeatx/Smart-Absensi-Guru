@@ -3,7 +3,7 @@
 // Enforces session authentication, role checks (admin/superadmin/kepsek),
 // and performs mutations via serverSupabase (service_role) to protect RLS boundaries.
 
-import { serverSupabase, authenticateUser } from '../_shared/session-auth';
+import { serverSupabase, authenticateUser } from '../_shared/session-auth.js';
 
 function normalizeDayOfWeek(day: any): number {
   if (typeof day === 'number' && day >= 1 && day <= 6) return day;
