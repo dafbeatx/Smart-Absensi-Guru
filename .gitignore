@@ -37,6 +37,7 @@ dist-electron
 .tempmediaStorage
 brain
 scratch/
+supabase/.temp/
 
 # =====================================
 # AI Internal Working Memory
