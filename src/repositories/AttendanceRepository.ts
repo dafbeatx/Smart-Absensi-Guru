@@ -6,6 +6,7 @@ import { indexedDBService } from '../services/indexed-db.service';
 import { useSyncQueueStore } from '../store/useSyncQueueStore';
 import { CONSTANTS } from '../config/constants';
 import { TelegramService } from '../services/telegram.service';
+import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
 import { getTodayDateInJakarta } from '../utils/time.utils';
 
 export interface ScanAttendanceDTO {
@@ -137,6 +138,20 @@ export class AttendanceRepository {
         photoPromise: dto.photoPromise,
       }).catch((e) => console.warn('Telegram offline attendance log error:', e));
 
+      // WhatsApp Group Notification: Strictly text-only per user privacy policy
+      WhatsAppNotificationService.sendAttendanceNotification({
+        teacherName: currentUser?.full_name || dto.user_id || 'Guru',
+        nip: currentUser?.nip || undefined,
+        role: currentUser?.role || 'GURU',
+        type: 'CHECK_IN',
+        timeStr: offlineTime,
+        dateStr: getTodayDateInJakarta(),
+        method: dto.verification_method || 'QR_CODE',
+        distanceMeters: effectiveDistance,
+        status: 'HADIR (MODE OFFLINE)',
+        isOffline: true,
+      }).catch((e) => console.warn('WhatsApp offline attendance notification error:', e));
+
       return {
         attendance_id: recordId,
         status: 'HADIR (MODE OFFLINE)',
@@ -177,6 +192,20 @@ export class AttendanceRepository {
         photoBlob: dto.photoBlob || null,
         photoPromise: dto.photoPromise,
       }).catch((e) => console.warn('Telegram attendance log error:', e));
+
+      // Dispatch WhatsApp Group notification: Strictly text-only per user privacy policy
+      WhatsAppNotificationService.sendAttendanceNotification({
+        teacherName: currentUser?.full_name || dto.user_id || 'Guru',
+        nip: currentUser?.nip || undefined,
+        role: currentUser?.role || 'GURU',
+        type: result.attendance_action || 'CHECK_IN',
+        timeStr: result.timestamp,
+        dateStr: getTodayDateInJakarta(),
+        method: dto.verification_method || 'QR_CODE',
+        distanceMeters: result.distance_meters,
+        status: result.status,
+        isOffline: result.is_offline,
+      }).catch((e) => console.warn('WhatsApp attendance notification error:', e));
 
       return result;
     } catch (err: unknown) {
@@ -279,6 +308,20 @@ export class AttendanceRepository {
           photoBlob: dto.photoBlob || null,
           photoPromise: dto.photoPromise,
         }).catch((e) => console.warn('Telegram offline attendance log error:', e));
+
+        // WhatsApp Group Notification: Strictly text-only per user privacy policy
+        WhatsAppNotificationService.sendAttendanceNotification({
+          teacherName: currentUser?.full_name || dto.user_id || 'Guru',
+          nip: currentUser?.nip || undefined,
+          role: currentUser?.role || 'GURU',
+          type: effAction,
+          timeStr: offlineTime,
+          dateStr: getTodayDateInJakarta(),
+          method: dto.verification_method || 'QR_CODE',
+          distanceMeters: effectiveDistance,
+          status: effStatus,
+          isOffline: true,
+        }).catch((e) => console.warn('WhatsApp offline attendance notification error:', e));
 
         return {
           attendance_id: recordId,

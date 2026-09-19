@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: smart-absensi-wa-gateway
+    env: node
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: GATEWAY_SECRET
+        generateValue: true
+      - key: TZ
+        value: Asia/Jakarta
