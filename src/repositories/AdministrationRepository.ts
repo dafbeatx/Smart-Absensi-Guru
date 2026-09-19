@@ -7,6 +7,11 @@ import {
   AVAILABLE_ACADEMIC_YEARS,
 } from '../types/administration.types';
 
+export {
+  DEFAULT_ADMINISTRATION_MODULES,
+  AVAILABLE_ACADEMIC_YEARS,
+};
+
 export const ADMIN_MODULES_STORAGE_PREFIX = 'smart_absensi_admin_modules';
 export const ADMIN_ACTIVE_YEAR_KEY = 'smart_absensi_active_academic_year';
 export const ADMIN_ACTIVE_SEMESTER_KEY = 'smart_absensi_active_semester';

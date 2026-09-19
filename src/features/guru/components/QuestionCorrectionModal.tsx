@@ -39,6 +39,7 @@ import type {
 } from '../../../types/database.types';
 import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
+import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel } from '../../../utils/scoring.utils';
 import { normalizeClassCode, areClassCodesEqual, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
@@ -109,9 +110,15 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [selectedSubject, setSelectedSubject] = useState('Informatika');
   const [customSubject, setCustomSubject] = useState('');
   const [selectedClass, setSelectedClass] = useState('8A');
+  const [customClass, setCustomClass] = useState('');
+  const [availableClasses, setAvailableClasses] = useState<string[]>(PREDEFINED_CLASSES);
   const [examType, setExamType] = useState('PTS / UTS');
-  const [academicYear, setAcademicYear] = useState('2025/2026');
-  const [semester, setSemester] = useState('Ganjil');
+  const [examFormat, setExamFormat] = useState<'PG_ONLY' | 'PG_AND_ESSAY'>('PG_ONLY');
+  const [academicYear, setAcademicYear] = useState(() => AdministrationRepository.getActiveAcademicYear());
+  const [semester, setSemester] = useState(() => {
+    const s = AdministrationRepository.getActiveSemester();
+    return s === 'GENAP' ? 'Genap' : 'Ganjil';
+  });
   const [kkm, setKkm] = useState(75);
   const [keyInput, setKeyInput] = useState('1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D 9.A 10.B');
 
@@ -188,8 +195,24 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     if (isOpen) {
       loadSessions();
       setTeacherName(currentUser?.full_name || '');
+      setAcademicYear(AdministrationRepository.getActiveAcademicYear());
+      setSemester(AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil');
+
+      // Populate classes dynamically from student directory
+      StudentRepository.getStudents()
+        .then((stus) => {
+          if (Array.isArray(stus) && stus.length > 0) {
+            const set = new Set<string>(PREDEFINED_CLASSES);
+            stus.forEach((s) => {
+              const norm = normalizeClassCode(s.className);
+              if (norm) set.add(norm);
+            });
+            setAvailableClasses(Array.from(set));
+          }
+        })
+        .catch(() => {});
     }
-  }, [isOpen, currentUser?.id, loadSessions]);
+  }, [isOpen, currentUser?.id, currentUser?.full_name, loadSessions]);
 
   // Escape key handler & prevent body scroll
   useEffect(() => {
@@ -283,12 +306,26 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const effectiveFinalScore = manualScore !== null ? manualScore : (calculation?.finalScore || 0);
 
   // Open Key Editor for a specific session
-  const handleOpenKeyEditor = (session: ExamSessionRecord, e?: React.MouseEvent) => {
+  const handleOpenKeyEditor = async (session: ExamSessionRecord, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setEditingSessionTarget(session);
-    const existing = Array.isArray(session.answer_key) ? session.answer_key : [];
-    if (existing.length > 0) {
-      setQuickKeyInput(existing.map((k, i) => `${i + 1}.${k}`).join(' '));
+    let keys = Array.isArray(session.answer_key) ? session.answer_key : [];
+    if (keys.length === 0 && session.id) {
+      try {
+        const detailed = await ExamCorrectionRepository.getSessionById(session.id);
+        if (detailed && Array.isArray(detailed.answer_key) && detailed.answer_key.length > 0) {
+          keys = detailed.answer_key;
+          setSessions((prev) => prev.map((s) => (s.id === session.id ? detailed : s)));
+          if (activeSession?.id === session.id) {
+            setActiveSession(detailed);
+          }
+        }
+      } catch (err) {
+        logger.warn('QuestionCorrectionModal', 'Failed to fetch detailed session for key editor', err);
+      }
+    }
+    if (keys.length > 0) {
+      setQuickKeyInput(keys.map((k, i) => `${i + 1}.${k}`).join(' '));
     } else {
       setQuickKeyInput('1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D 9.A 10.B');
     }
@@ -412,8 +449,37 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     return list.filter((s) => s.name.toLowerCase().includes(studentSearchQuery.toLowerCase()));
   }, [classStudents, activeSession, gradedStudents, studentSearchQuery]);
 
+  // Full, complete roster of students in the class (unfiltered by search query for reliable auto-advancement)
+  const allClassStudentNames = useMemo(() => {
+    const names = new Set<string>();
+    classStudents.forEach((s) => {
+      if (s.fullName?.trim()) names.add(s.fullName.trim());
+    });
+    if (activeSession?.student_list) {
+      activeSession.student_list.forEach((n) => {
+        if (n?.trim()) names.add(n.trim());
+      });
+    }
+    gradedStudents.forEach((g) => {
+      if (g.name?.trim()) names.add(g.name.trim());
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [classStudents, activeSession, gradedStudents]);
+
   const handleAnswerSelect = (questionNum: number, opt: string) => {
-    undoStack.current.push({ qNum: questionNum, prev: userAnswers[questionNum] });
+    const currentAns = userAnswers[questionNum];
+    undoStack.current.push({ qNum: questionNum, prev: currentAns });
+
+    // Toggle off if already selected
+    if (currentAns === opt) {
+      setUserAnswers((prev) => {
+        const updated = { ...prev };
+        delete updated[questionNum];
+        return updated;
+      });
+      return;
+    }
+
     setUserAnswers((prev) => ({ ...prev, [questionNum]: opt }));
 
     // Smooth auto-scroll to next question
@@ -460,7 +526,19 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     if (existing) {
       setUserAnswers(existing.mcq_answers || {});
       setEssayScores(existing.essay_scores || [0, 0, 0, 0, 0]);
-      setManualScore(null);
+      
+      // If student previously had a manual override, restore it
+      const calcForExisting = calculateStudentResult(
+        activeSession?.answer_key || [],
+        existing.mcq_answers || {},
+        existing.essay_scores || [0, 0, 0, 0, 0],
+        activeSession?.scoring_config
+      );
+      if (Number(existing.final_score) !== calcForExisting.finalScore) {
+        setManualScore(Number(existing.final_score) || 0);
+      } else {
+        setManualScore(null);
+      }
       setToastMessage({ text: `Memuat data nilai tersimpan: ${name}`, type: 'success' });
     } else {
       resetGradingForm();
@@ -487,8 +565,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         student_user_id: matchedStudent?.id,
         mcq_answers: userAnswers,
         essay_scores: essayScores,
-        mcq_score: manualScore !== null ? manualScore : Math.round(calculation.score),
-        essay_score: manualScore !== null ? manualScore : Math.round(calculation.essayScore),
+        mcq_score: Math.round(calculation.score),
+        essay_score: Math.round(calculation.essayScore),
         final_score: effectiveFinalScore,
         csi: calculation.csi,
         lps: calculation.lps,
@@ -508,18 +586,32 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         return [...prev, saved];
       });
 
-      setToastMessage({ text: `Nilai ${saved.name} (${effectiveFinalScore}) berhasil disimpan!`, type: 'success' });
+      // Reliable auto-advance to next ungraded student from full class list
+      const savedNameNorm = saved.name.toLowerCase().trim();
+      const updatedGradedSet = new Set([
+        ...gradedStudents.map((g) => g.name.toLowerCase().trim()),
+        savedNameNorm,
+      ]);
 
-      // Auto-advance to next ungraded student
-      const remainingUngraded = filteredStudents.filter(
-        (s) => !s.isGraded && s.name.toLowerCase().trim() !== selectedStudentName.toLowerCase().trim()
+      const remainingUngraded = allClassStudentNames.filter(
+        (name) => !updatedGradedSet.has(name.toLowerCase().trim())
       );
+
       if (remainingUngraded.length > 0) {
-        handleSelectStudent(remainingUngraded[0].name);
+        const nextStudent = remainingUngraded[0];
+        handleSelectStudent(nextStudent);
+        setToastMessage({
+          text: `Nilai ${saved.name} (${effectiveFinalScore}) disimpan! Lanjut ke: ${nextStudent}`,
+          type: 'success',
+        });
       } else {
         resetGradingForm();
         setSelectedStudentName('');
         setStudentSearchQuery('');
+        setToastMessage({
+          text: `Nilai ${saved.name} (${effectiveFinalScore}) disimpan! Seluruh siswa (${allClassStudentNames.length || gradedStudents.length + 1}) telah dinilai! 🎉`,
+          type: 'success',
+        });
       }
     } catch (err: any) {
       logger.error('QuestionCorrectionModal', 'Failed to save student score:', err);
@@ -531,9 +623,15 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const handleCreateSessionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalSubject = selectedSubject === 'CUSTOM' ? customSubject.trim() : selectedSubject;
+    const finalClass = selectedClass === 'CUSTOM' ? customClass.trim().toUpperCase() : selectedClass;
 
     if (!finalSubject) {
       setToastMessage({ text: 'Mata pelajaran wajib diisi!', type: 'error' });
+      return;
+    }
+
+    if (!finalClass) {
+      setToastMessage({ text: 'Kelas / rombel wajib diisi!', type: 'error' });
       return;
     }
 
@@ -544,29 +642,38 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
     const defaultSessionName = sessionName.trim()
       ? sessionName.trim()
-      : `${examType} - ${finalSubject} - ${selectedClass} (${academicYear})`;
+      : `${examType} - ${finalSubject} - ${finalClass} (${academicYear})`;
+
+    const isPgOnly = examFormat === 'PG_ONLY';
 
     try {
       const created = await ExamCorrectionRepository.saveSession({
         session_name: defaultSessionName,
         teacher: teacherName.trim() || currentUser?.full_name || 'Guru Pengampu',
         subject: finalSubject,
-        class_name: selectedClass,
-        class_code: normalizeClassCode(selectedClass),
+        class_name: finalClass,
+        class_code: normalizeClassCode(finalClass),
         owner_user_id: currentUser?.id,
-        school_level: resolveSchoolLevel(selectedClass),
+        school_level: resolveSchoolLevel(finalClass),
         answer_key: previewNewKeys,
         student_list: [],
         kkm: Number(kkm) || 75,
         academic_year: academicYear,
         semester: semester,
         exam_type: examType,
-        scoring_config: {
-          pgWeight: 0.7,
-          essayWeight: 0.3,
-          essayMaxScore: 20,
-          essayCount: 5,
-        },
+        scoring_config: isPgOnly
+          ? {
+              pgWeight: 1.0,
+              essayWeight: 0,
+              essayMaxScore: 0,
+              essayCount: 0,
+            }
+          : {
+              pgWeight: 0.7,
+              essayWeight: 0.3,
+              essayMaxScore: 20,
+              essayCount: 5,
+            },
       });
 
       setSessions((prev) => [created, ...prev]);
@@ -877,11 +984,38 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         onChange={(e) => setSelectedClass(e.target.value)}
                         className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       >
-                        {PREDEFINED_CLASSES.map((cls) => (
+                        {availableClasses.map((cls) => (
                           <option key={cls} value={cls}>
                             {cls === 'SMA' ? 'SMA (Umum)' : `Kelas ${cls}`} ({resolveSchoolLevel(cls)})
                           </option>
                         ))}
+                        <option value="CUSTOM">+ Ketik Kelas Lain...</option>
+                      </select>
+                    </div>
+
+                    {selectedClass === 'CUSTOM' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Nama Kelas Kustom</label>
+                        <input
+                          type="text"
+                          value={customClass}
+                          onChange={(e) => setCustomClass(e.target.value)}
+                          placeholder="Contoh: 10A, 11-IPA, 8C, XII-1..."
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 uppercase font-mono"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Format Lembar Soal</label>
+                      <select
+                        value={examFormat}
+                        onChange={(e) => setExamFormat(e.target.value as 'PG_ONLY' | 'PG_AND_ESSAY')}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-semibold"
+                      >
+                        <option value="PG_ONLY">Pilihan Ganda Saja (100% PG)</option>
+                        <option value="PG_AND_ESSAY">Kombinasi PG (70%) + Essay (30%)</option>
                       </select>
                     </div>
 
@@ -920,9 +1054,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         onChange={(e) => setAcademicYear(e.target.value)}
                         className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       >
-                        <option value="2024/2025">2024/2025</option>
-                        <option value="2025/2026">2025/2026</option>
-                        <option value="2026/2027">2026/2027</option>
+                        {AVAILABLE_ACADEMIC_YEARS.map((ay) => (
+                          <option key={ay.year} value={ay.year}>
+                            {ay.label || ay.year}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -1617,34 +1753,44 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   </div>
                 )}
 
-                {/* Optional Essay Inputs (Scale 0 - 4 each) */}
-                <div className="pt-2 border-t border-slate-200">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-2">
-                    Nilai Essay (5 Soal, maks 4/soal)
-                  </span>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {essayScores.map((score, idx) => (
-                      <div key={idx} className="text-center">
-                        <span className="text-[9px] text-slate-500 block mb-0.5">#{idx + 1}</span>
-                        <input
-                          type="number"
-                          min="0"
-                          max="4"
-                          value={score}
-                          onChange={(e) => {
-                            const val = Math.max(0, Math.min(4, parseInt(e.target.value, 10) || 0));
-                            setEssayScores((prev) => {
-                              const next = [...prev];
-                              next[idx] = val;
-                              return next;
-                            });
-                          }}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-center text-xs font-black text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                        />
-                      </div>
-                    ))}
+                {/* Essay Inputs (Only if Session has essay questions configured) */}
+                {((activeSession.scoring_config?.essayCount ?? 0) > 0 &&
+                  (activeSession.scoring_config?.essayMaxScore ?? 0) > 0) ? (
+                  <div className="pt-2 border-t border-slate-200">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-2">
+                      Nilai Essay ({activeSession.scoring_config?.essayCount || 5} Soal, maks 4/soal)
+                    </span>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {essayScores.map((score, idx) => (
+                        <div key={idx} className="text-center">
+                          <span className="text-[9px] text-slate-500 block mb-0.5">#{idx + 1}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="4"
+                            value={score}
+                            onChange={(e) => {
+                              const val = Math.max(0, Math.min(4, parseInt(e.target.value, 10) || 0));
+                              setEssayScores((prev) => {
+                                const next = [...prev];
+                                next[idx] = val;
+                                return next;
+                              });
+                            }}
+                            className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-center text-xs font-black text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="px-3 py-2 bg-teal-50/70 border border-teal-200 rounded-xl flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-teal-800">Format Ujian:</span>
+                      <span className="text-teal-700 font-semibold">Pilihan Ganda Murni (100% PG)</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Save Button / Read-only Notice */}
                 <div className="pt-2">

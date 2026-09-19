@@ -7,6 +7,7 @@ import type {
   SaveGradedStudentDTO,
 } from '../types/database.types';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { AdministrationRepository } from './AdministrationRepository';
 import { logger } from '../utils/logger.utils';
 
 export interface ClassRecapSummary {
@@ -221,7 +222,7 @@ export class ExamCorrectionRepository {
       ['Kelas / Rombel', `: ${session.class_name} (${session.school_level})`],
       ['Guru Pengampu', `: ${session.teacher}`],
       ['Nama Sesi Ujian', `: ${session.session_name}`],
-      ['Tahun Ajaran / Semester', `: ${session.academic_year || '2025/2026'} - ${session.semester || 'Ganjil'}`],
+      ['Tahun Ajaran / Semester', `: ${session.academic_year || AdministrationRepository.getActiveAcademicYear()} - ${session.semester || 'Ganjil'}`],
       ['Kriteria Ketuntasan Minimal (KKM)', `: ${kkm}`],
       ['Jumlah Butir Soal PG', `: ${session.answer_key?.length || 0}`],
       [''],
@@ -307,13 +308,13 @@ export class ExamCorrectionRepository {
 
     lines.push(`REKAP NILAI UJIAN - ${session.subject} - KELAS ${session.class_name}`);
     lines.push(`Guru: ${session.teacher}, KKM: ${kkm}`);
-    lines.push('No,Nama Siswa,Benar,Salah,Nilai PG,Nilai Essay,Skor Akhir,Status');
+    lines.push('No,Nama Siswa,Benar,Salah,Nilai PG,Nilai Essay,Skor Akhir,Status,CSI,LPS');
 
     students.forEach((s, idx) => {
       const score = Number(s.final_score) || 0;
       const status = score >= kkm ? 'TUNTAS' : 'REMEDIAL';
       const cleanName = `"${s.name.replace(/"/g, '""')}"`;
-      lines.push(`${idx + 1},${cleanName},${s.correct},${s.wrong},${s.mcq_score},${s.essay_score},${score},${status}`);
+      lines.push(`${idx + 1},${cleanName},${s.correct},${s.wrong},${s.mcq_score},${s.essay_score},${score},${status},${s.csi || 0},${s.lps || 0}`);
     });
 
     const csvContent = '\uFEFF' + lines.join('\n');

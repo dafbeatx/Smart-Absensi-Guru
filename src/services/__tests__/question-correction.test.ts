@@ -351,6 +351,75 @@ export const runQuestionCorrectionTestSuite = async (): Promise<{
       !guestAccess.isAllowedRole && !guestAccess.canEdit,
       `Guru: ${guruAccess.canEdit}, Kepsek ReadOnly: ${kepsekAccess.isReadOnly}, Siswa Allowed: ${siswaAccess.isAllowedRole}`
     );
+
+    // ── Test 19: Kalkulasi Ujian Pilihan Ganda Murni (essayCount = 0 / 100% PG)
+    const pgOnlyCalc = calculateStudentResult(
+      ['A', 'B', 'C', 'D', 'E'],
+      { 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E' },
+      [0, 0, 0, 0, 0],
+      {
+        pgWeight: 1.0,
+        essayWeight: 0,
+        essayMaxScore: 0,
+        essayCount: 0,
+      }
+    );
+    assert(
+      'Ujian PG Murni: Menghitung skor sempurna 100 tanpa penalti 30% essay',
+      pgOnlyCalc.finalScore === 100 && pgOnlyCalc.lps === 100 && pgOnlyCalc.score === 100,
+      `Skor PG Murni: ${pgOnlyCalc.finalScore}, LPS: ${pgOnlyCalc.lps}`
+    );
+
+    // ── Test 20: Ujian PG Murni dengan Skor Parsial (4/5 = 80%)
+    const pgOnlyPartial = calculateStudentResult(
+      ['A', 'B', 'C', 'D', 'E'],
+      { 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'A' },
+      [0, 0, 0, 0, 0],
+      {
+        pgWeight: 1.0,
+        essayWeight: 0,
+        essayMaxScore: 0,
+        essayCount: 0,
+      }
+    );
+    assert(
+      'Ujian PG Murni: Menghitung skor parsial 80% secara akurat (4/5 benar = 80)',
+      pgOnlyPartial.finalScore === 80 && pgOnlyPartial.correct === 4 && pgOnlyPartial.wrong === 1,
+      `Skor Parsial: ${pgOnlyPartial.finalScore}`
+    );
+
+    // ── Test 21: Ekspor CSV Memuat Header CSI dan LPS
+    const testSession: any = {
+      id: 'test_csv_session',
+      session_name: 'Simulasi CSV',
+      teacher: 'Guru Dafa',
+      subject: 'Informatika',
+      class_name: '8A',
+      school_level: 'SMP',
+      answer_key: ['A', 'B'],
+      student_list: [],
+      kkm: 75,
+    };
+    const testGraded: any[] = [
+      {
+        id: 'g1',
+        session_id: 'test_csv_session',
+        name: 'Citra Dewi',
+        correct: 2,
+        wrong: 0,
+        mcq_score: 100,
+        essay_score: 0,
+        final_score: 100,
+        csi: 100,
+        lps: 100,
+      },
+    ];
+    const csvWithMetrics = ExamCorrectionRepository.exportToCSV(testSession, testGraded);
+    assert(
+      'Ekspor CSV Metrics: Header dan data CSV menyertakan kolom CSI dan LPS',
+      csvWithMetrics.includes('CSI,LPS') && csvWithMetrics.includes(',100,100'),
+      `Preview CSV: ${csvWithMetrics.slice(0, 150)}`
+    );
   } catch (err: any) {
     assert('Fatal Execution: Question Correction Test Suite threw an uncaught error', false, err?.message);
   }

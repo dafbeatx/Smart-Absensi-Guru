@@ -5381,7 +5381,7 @@ export class SupabaseProvider implements IDataProvider {
       try {
         const { data, error } = await this.client
           .from('gm_sessions')
-          .select('id, session_name, teacher, subject, class_name, class_code, owner_user_id, school_level, scoring_config, exam_type, academic_year, semester, kkm, created_at, updated_at')
+          .select('id, session_name, teacher, subject, class_name, class_code, owner_user_id, school_level, answer_key, scoring_config, exam_type, academic_year, semester, kkm, created_at, updated_at')
           .order('created_at', { ascending: false })
           .limit(50);
 
@@ -5394,25 +5394,39 @@ export class SupabaseProvider implements IDataProvider {
           return [];
         }
 
-        const mapped: ExamSessionRecord[] = data.map((d: any) => ({
-          id: d.id,
-          session_name: d.session_name,
-          teacher: d.teacher,
-          subject: d.subject,
-          class_name: d.class_name,
-          class_code: d.class_code || normalizeClassCode(d.class_name),
-          owner_user_id: d.owner_user_id,
-          school_level: resolveSchoolLevel(d.class_name, d.school_level),
-          answer_key: [], // Zero-egress waste: answer_key is loaded on-demand via getExamSessionById
-          student_list: [], // Zero-egress waste: student_list is loaded on-demand via getExamSessionById
-          scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
-          exam_type: d.exam_type || 'Harian',
-          academic_year: d.academic_year || '2025/2026',
-          semester: d.semester || 'Ganjil',
-          kkm: Number(d.kkm) || 75,
-          created_at: d.created_at,
-          updated_at: d.updated_at,
-        }));
+        const mapped: ExamSessionRecord[] = data.map((d: any) => {
+          let parsedKey: string[] = [];
+          if (Array.isArray(d.answer_key)) {
+            parsedKey = d.answer_key;
+          } else if (typeof d.answer_key === 'string' && d.answer_key.trim()) {
+            try {
+              const p = JSON.parse(d.answer_key);
+              if (Array.isArray(p)) parsedKey = p;
+            } catch {
+              parsedKey = parseAnswerKey(d.answer_key);
+            }
+          }
+
+          return {
+            id: d.id,
+            session_name: d.session_name,
+            teacher: d.teacher,
+            subject: d.subject,
+            class_name: d.class_name,
+            class_code: d.class_code || normalizeClassCode(d.class_name),
+            owner_user_id: d.owner_user_id,
+            school_level: resolveSchoolLevel(d.class_name, d.school_level),
+            answer_key: parsedKey,
+            student_list: [], // student_list remains loaded on-demand via getExamSessionById
+            scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
+            exam_type: d.exam_type || 'Harian',
+            academic_year: d.academic_year || '2025/2026',
+            semester: d.semester || 'Ganjil',
+            kkm: Number(d.kkm) || 75,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+          };
+        });
 
         // Update local storage cache for instant offline read if network fails later
         try {
@@ -5527,7 +5541,14 @@ export class SupabaseProvider implements IDataProvider {
         logger.error('SupabaseProvider', 'saveExamSession update error:', error.message);
         throw new Error(`Gagal memperbarui sesi di cloud: ${error.message}`);
       }
+      savedId = dto.id;
     } else {
+      const generatedId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : undefined;
+      if (generatedId) {
+        recordPayload.id = generatedId;
+      }
       const { data, error } = await this.client
         .from('gm_sessions')
         .insert(recordPayload)
@@ -5537,7 +5558,7 @@ export class SupabaseProvider implements IDataProvider {
         logger.error('SupabaseProvider', 'saveExamSession insert error:', error.message);
         throw new Error(`Gagal membuat sesi baru di cloud: ${error.message}`);
       }
-      savedId = data.id;
+      savedId = data?.id || generatedId;
     }
 
     const result: ExamSessionRecord = {
@@ -5679,6 +5700,12 @@ export class SupabaseProvider implements IDataProvider {
         throw new Error(`Gagal menyimpan nilai ke cloud: ${updErr.message}`);
       }
     } else {
+      const generatedStudentId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : undefined;
+      if (generatedStudentId) {
+        studentPayload.id = generatedStudentId;
+      }
       const { data: inserted, error: insErr } = await this.client
         .from('gm_students')
         .insert(studentPayload)
@@ -5688,7 +5715,7 @@ export class SupabaseProvider implements IDataProvider {
         logger.error('SupabaseProvider', 'saveGradedStudent insert error:', insErr.message);
         throw new Error(`Gagal menyimpan nilai siswa ke cloud: ${insErr.message}`);
       }
-      savedId = inserted.id;
+      savedId = inserted?.id || generatedStudentId;
     }
 
     // 2. Insert or update per-question answers if answer_key provided

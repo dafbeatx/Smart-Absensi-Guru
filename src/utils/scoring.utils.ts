@@ -110,8 +110,13 @@ export function calculateStudentResult(
       : 0;
 
   // Final Score = weighted combination
+  // If exam has no essay (essayCount === 0 or essayMaxScore === 0), PG weight is 100% (1.0)
+  const hasEssay = (config.essayCount ?? 0) > 0 && (config.essayMaxScore ?? 0) > 0;
+  const pgWeight = hasEssay ? (config.pgWeight ?? 0.7) : 1.0;
+  const essayWeight = hasEssay ? (config.essayWeight ?? 0.3) : 0;
+
   const finalScore = Math.round(
-    pgScore * (config.pgWeight ?? 0.7) + essayScore * (config.essayWeight ?? 0.3)
+    pgScore * pgWeight + essayScore * essayWeight
   );
 
   const percentage = finalScore;
@@ -122,7 +127,9 @@ export function calculateStudentResult(
   const csi = Math.round(accuracy * 0.7 + completeness * 0.3);
 
   // LPS — Learning Performance Score (PG + Essay composite)
-  const lps = Math.round(pgScore * 0.6 + essayScore * 0.4);
+  const lps = hasEssay
+    ? Math.round(pgScore * 0.6 + essayScore * 0.4)
+    : Math.round(pgScore);
 
   return {
     correct,
