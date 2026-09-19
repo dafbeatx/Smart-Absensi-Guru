@@ -1,9 +1,9 @@
-// api/homeroom/document-download.ts
+// api/_shared/homeroom/document-download.ts
 // Serverless Homeroom Document Download Endpoint for Smart Absensi Guru (SAGA)
 // Emits short-lived (15 minutes) signed URLs from private storage bucket student-documents
 
-import { serverSupabase } from '../_shared/session-auth.js';
-import { authenticateHomeroomTeacher, normalizeClassName } from '../_shared/homeroom-auth.js';
+import { serverSupabase } from '../session-auth.js';
+import { authenticateHomeroomTeacher, normalizeClassName } from '../homeroom-auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

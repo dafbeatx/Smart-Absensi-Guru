@@ -42,6 +42,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/teaching-schedules",
+      "destination": "/api/admin/teaching-schedules"
+    },
+    {
+      "source": "/api/homeroom/:action",
+      "destination": "/api/homeroom?action=:action"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

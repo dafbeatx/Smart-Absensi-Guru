@@ -1,9 +1,9 @@
-// api/homeroom/students.ts
+// api/_shared/homeroom/students.ts
 // Serverless Homeroom Students Roster Endpoint for Smart Absensi Guru (SAGA)
 // Lists grade 9 students with their current continuation plan status for the authenticated teacher
 
-import { serverSupabase } from '../_shared/session-auth.js';
-import { authenticateHomeroomTeacher } from '../_shared/homeroom-auth.js';
+import { serverSupabase } from '../session-auth.js';
+import { authenticateHomeroomTeacher } from '../homeroom-auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

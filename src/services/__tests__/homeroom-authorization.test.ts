@@ -21,11 +21,12 @@
  */
 
 import crypto from 'crypto';
-import overviewHandler from '../../../api/homeroom/overview';
-import studentsHandler from '../../../api/homeroom/students';
-import studentDetailHandler from '../../../api/homeroom/student-detail';
-import verifyPlanHandler from '../../../api/homeroom/verify-plan';
-import documentDownloadHandler from '../../../api/homeroom/document-download';
+import overviewHandler from '../../../api/_shared/homeroom/overview';
+import studentsHandler from '../../../api/_shared/homeroom/students';
+import studentDetailHandler from '../../../api/_shared/homeroom/student-detail';
+import verifyPlanHandler from '../../../api/_shared/homeroom/verify-plan';
+import documentDownloadHandler from '../../../api/_shared/homeroom/document-download';
+import homeroomRouterHandler from '../../../api/homeroom';
 import {
   hashSessionToken,
   setServerSupabaseClient,
@@ -872,6 +873,32 @@ export async function runHomeroomAuthorizationTestSuite(): Promise<TestSuiteResu
         repoVerify.success === true &&
         typeof repoDocUrl === 'string',
       `AssignedClass: ${repoOverview.assignedClass}, StudentCount: ${repoStudents.length}`
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 17. Consolidated Homeroom Router Dispatch
+    // ─────────────────────────────────────────────────────────────────────────
+    const { req: reqRouterOverview, res: resRouterOverview } = createMockReqRes({
+      method: 'GET',
+      headers: { authorization: `Bearer ${tokenGuru9A}` },
+      query: { action: 'overview', class_name: '9A' },
+    });
+    await homeroomRouterHandler(reqRouterOverview, resRouterOverview);
+    const dataRouterOverview = resRouterOverview.getData();
+
+    const { req: reqRouter404, res: resRouter404 } = createMockReqRes({
+      method: 'GET',
+      headers: { authorization: `Bearer ${tokenGuru9A}` },
+      query: { action: 'unknown-action' },
+    });
+    await homeroomRouterHandler(reqRouter404, resRouter404);
+
+    assert(
+      'Homeroom 18: Consolidated Router /api/homeroom dispatches correctly and handles unknown actions with 404',
+      resRouterOverview.getStatusCode() === 200 &&
+        dataRouterOverview?.overview?.assignedClass === '9A' &&
+        resRouter404.getStatusCode() === 404,
+      `OverviewStatus: ${resRouterOverview.getStatusCode()}, UnknownStatus: ${resRouter404.getStatusCode()}`
     );
   } finally {
     resetServerSupabaseClient();
