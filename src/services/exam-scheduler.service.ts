@@ -190,7 +190,6 @@ export class ExamSchedulerService {
 
       subjects.forEach((subj, subjIdx) => {
         const slot = allSlots[subjIdx % totalSlots];
-        const isLabRequired = /informatika|komputer|cbt|tik/i.test(subj);
 
         subjectSchedules.push({
           id: `subj_${cls}_${slot.date}_s${slot.sessionNumber}_${subjIdx}`,
@@ -202,7 +201,7 @@ export class ExamSchedulerService {
           className: cls,
           subject: subj,
           roomName: assignedRoom,
-          isLabRequired,
+          isLabRequired: false,
         });
       });
     });

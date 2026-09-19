@@ -122,7 +122,7 @@ export class ExamScheduleRepository {
         'Waktu',
         'Kelas / Rombel',
         'Mata Pelajaran',
-        'Keterangan Ruang',
+        'Ruangan',
       ],
     ];
 
@@ -135,7 +135,7 @@ export class ExamScheduleRepository {
         `${item.startTime} - ${item.endTime}`,
         item.className,
         item.subject,
-        item.isLabRequired ? `${item.roomName || 'Ruang'} (Lab CBT)` : (item.roomName || 'Ruang Kelas'),
+        item.roomName || 'Ruang 1',
       ]);
     });
 

@@ -1868,7 +1868,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                   rows={2}
                   value={aiCustomPrompt}
                   onChange={(e) => setAiCustomPrompt(e.target.value)}
-                  placeholder="Contoh: Hari Jumat hanya 1 sesi sampai jam 10.30. Lab Komputer digunakan bergantian untuk kelas 7 dan 8..."
+                  placeholder="Contoh: Hari Jumat hanya 1 sesi sampai jam 10.30 WIB. Guru yang bertugas sebagai walikelas diprioritaskan tidak mengawas di kelas asuhannya..."
                   className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                 />
               </div>
@@ -2032,11 +2032,6 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                                     <span className="text-sm font-black text-slate-900">
                                       📖 {sess.subject}
                                     </span>
-                                    {sess.isLabRequired && (
-                                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                                        Lab Komputer (CBT)
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
 
@@ -2105,11 +2100,6 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                                 <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-teal-50 text-teal-800 border border-teal-200 shadow-2xs inline-block">
                                   {item.roomName || `Ruang ${item.className}`}
                                 </span>
-                                {item.isLabRequired && (
-                                  <span className="block mt-0.5 text-[9px] font-bold text-purple-700">
-                                    Lab Komputer (CBT)
-                                  </span>
-                                )}
                               </td>
                               {accessInfo.canManage && (
                                 <td className="py-2.5 px-3 text-center">

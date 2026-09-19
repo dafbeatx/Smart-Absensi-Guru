@@ -133,9 +133,9 @@ export const runExamSchedulerTestSuite = async (): Promise<{
 
     const infoItem = schedule.subjectSchedules.find((s) => s.subject === 'Informatika');
     assert(
-      'Exam Scheduler 03: Detects CBT / computer lab requirement for Informatika',
-      infoItem?.isLabRequired === true,
-      `isLabRequired was ${infoItem?.isLabRequired}`
+      'Exam Scheduler 03: All subjects including Informatika execute in standard numbered exam rooms without lab constraint',
+      infoItem !== undefined && infoItem?.roomName?.startsWith('Ruang') === true,
+      `Room was ${infoItem?.roomName}`
     );
   } catch (err: any) {
     assert('Exam Scheduler 02-03: Error generating subject schedule', false, err?.message);
