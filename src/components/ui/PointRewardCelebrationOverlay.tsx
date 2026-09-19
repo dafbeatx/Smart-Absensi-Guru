@@ -4,6 +4,8 @@ import { SoundService } from '../../services/audio.service';
 import { SpeechService } from '../../services/speech.service';
 
 export interface PointRewardData {
+  id?: string;
+  dedupeKey?: string;
   points: number;
   status: 'HADIR' | 'TERLAMBAT' | string;
   reason: string;

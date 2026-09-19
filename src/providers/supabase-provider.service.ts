@@ -4969,7 +4969,7 @@ export class SupabaseProvider implements IDataProvider {
     }
   }
 
-  // TEACHER DISCIPLINE POINT HISTORY API
+  // TEACHER DISCIPLINE POINT HISTORY API (STRICT SERVERLESS PROXY /api/teacher-points)
   public async getTeacherPointHistory(userId: string, _token?: string): Promise<TeacherPointLog[]> {
     const cached = this.cachedTeacherPointHistory.get(userId);
     const ttl = userId === 'ALL' ? 120000 : 60000;
@@ -4978,41 +4978,63 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     return this.dedupeRequest(`getTeacherPointHistory_${userId}`, async () => {
+      const activeToken =
+        _token ||
+        useAuthStore.getState().token ||
+        (typeof window !== 'undefined'
+          ? (() => {
+              try {
+                return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
+              } catch {
+                return null;
+              }
+            })()
+          : null);
+
+      if (!activeToken) {
+        logger.warn('SupabaseProvider', 'getTeacherPointHistory: token sesi tidak ditemukan (AUTH_REQUIRED).');
+        return [];
+      }
+
       try {
-        let query = this.client
-          .from('teacher_point_history')
-          .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
-          .order('date', { ascending: false })
-          .order('created_at', { ascending: false });
-
-        if (userId !== 'ALL') {
-          query = query.eq('user_id', userId).limit(100);
-        } else {
-          query = query.limit(1000);
+        const queryParams = new URLSearchParams();
+        if (userId && userId !== 'ALL') {
+          queryParams.set('user_id', userId);
         }
 
-        const { data, error, status } = await query;
+        const endpoint = `/api/teacher-points${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${activeToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-        if (error) {
-          logger.warn('SupabaseProvider', `getTeacherPointHistory Supabase error (HTTP ${status || 'unknown'}, ${error.code}):`, error.message);
-          const mockProv = new (await import('./mock-provider.service')).MockProvider();
-          return mockProv.getTeacherPointHistory(userId);
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          logger.warn(
+            'SupabaseProvider',
+            `getTeacherPointHistory API error (HTTP ${response.status}):`,
+            errBody.errorMessage || response.statusText
+          );
+          return [];
         }
 
-        let result: TeacherPointLog[] = [];
-        if (data && data.length > 0) {
-          result = data.map((row: any) => ({
-            id: row.id,
-            user_id: row.user_id,
-            teacher_name: row.teacher_name || undefined,
-            date: row.date,
-            points: Number(row.points) || 0,
-            activity_type: row.activity_type as TeacherPointActivityType,
-            title: row.title,
-            description: row.description || undefined,
-            created_at: row.created_at,
-          }));
-        }
+        const json = await response.json();
+        const data = json.data || [];
+
+        const result: TeacherPointLog[] = data.map((row: any) => ({
+          id: row.id,
+          user_id: row.user_id,
+          teacher_name: row.teacher_name || undefined,
+          date: row.date,
+          points: Number(row.points) || 0,
+          activity_type: row.activity_type as TeacherPointActivityType,
+          title: row.title,
+          description: row.description || undefined,
+          created_at: row.created_at,
+        }));
 
         this.cachedTeacherPointHistory.set(userId, { data: result, timestamp: Date.now() });
         return result;
@@ -5027,110 +5049,51 @@ export class SupabaseProvider implements IDataProvider {
     log: Omit<TeacherPointLog, 'id' | 'created_at'>,
     _token?: string
   ): Promise<TeacherPointLog> {
-    const payload: Record<string, unknown> = {
-      user_id: log.user_id,
-      teacher_name: log.teacher_name || null,
+    const activeToken =
+      _token ||
+      useAuthStore.getState().token ||
+      (typeof window !== 'undefined'
+        ? (() => {
+            try {
+              return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
+            } catch {
+              return null;
+            }
+          })()
+        : null);
+
+    if (!activeToken) {
+      throw new Error('AUTH_REQUIRED: Sesi login aktif diperlukan untuk mencatat poin guru.');
+    }
+
+    const idempotencyKey = `att:${log.user_id}:${log.date}:${log.activity_type}`;
+    const payload = {
+      recipient_user_id: log.user_id,
+      activity_type: log.activity_type,
       date: log.date,
       points: log.points,
-      activity_type: log.activity_type,
       title: log.title,
       description: log.description || null,
+      idempotency_key: idempotencyKey,
     };
 
     try {
-      // Check if this point activity already exists today
-      const { data: existingPoint } = await this.client
-        .from('teacher_point_history')
-        .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
-        .eq('user_id', log.user_id)
-        .eq('date', log.date)
-        .eq('activity_type', log.activity_type)
-        .maybeSingle();
+      const response = await fetch('/api/teacher-points', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${activeToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
-      let savedRecord: TeacherPointLog | null = null;
-      if (existingPoint?.id) {
-        // Zero-Egress Protection: Lewati PATCH jika seluruh field poin sudah bernilai identik
-        if (
-          Number(existingPoint.points) === Number(payload.points) &&
-          existingPoint.title === payload.title &&
-          (existingPoint.description || null) === (payload.description || null)
-        ) {
-          return {
-            id: existingPoint.id,
-            user_id: existingPoint.user_id,
-            teacher_name: existingPoint.teacher_name || undefined,
-            date: existingPoint.date,
-            points: Number(existingPoint.points) || 0,
-            activity_type: existingPoint.activity_type as TeacherPointActivityType,
-            title: existingPoint.title,
-            description: existingPoint.description || undefined,
-            created_at: existingPoint.created_at,
-          };
-        }
-
-        const { data, error } = await this.client
-          .from('teacher_point_history')
-          .update(payload)
-          .eq('id', existingPoint.id)
-          .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
-          .maybeSingle();
-        if (error) throw error;
-        savedRecord = data as TeacherPointLog;
-      } else {
-        const id = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
-          ? crypto.randomUUID()
-          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-              const r = (Math.random() * 16) | 0;
-              const v = c === 'x' ? r : (r & 0x3) | 0x8;
-              return v.toString(16);
-            });
-        const { data, error } = await this.client
-          .from('teacher_point_history')
-          .insert({ id, ...payload })
-          .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
-          .maybeSingle();
-
-        if (error) {
-          // Tangani 409 duplicate key sebagai kondisi "sudah pernah diproses" (idempotent), bukan error
-          const isDuplicate =
-            error.code === '23505' ||
-            error.message?.includes('duplicate key') ||
-            error.message?.includes('unique') ||
-            error.details?.includes('already exists');
-          if (isDuplicate) {
-            logger.info('SupabaseProvider', 'recordTeacherPoint: transaksi sudah pernah diproses (idempotent duplicate key)', {
-              userId: log.user_id,
-              date: log.date,
-              activity: log.activity_type,
-            });
-            const { data: conflictRow } = await this.client
-              .from('teacher_point_history')
-              .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at')
-              .eq('user_id', log.user_id)
-              .eq('date', log.date)
-              .eq('activity_type', log.activity_type)
-              .maybeSingle();
-            if (conflictRow) {
-              return conflictRow as TeacherPointLog;
-            }
-            return {
-              id,
-              user_id: log.user_id,
-              teacher_name: log.teacher_name,
-              date: log.date,
-              points: log.points,
-              activity_type: log.activity_type,
-              title: log.title,
-              description: log.description,
-              created_at: new Date().toISOString(),
-            };
-          }
-          throw error;
-        }
-        savedRecord = data as TeacherPointLog;
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.errorMessage || `Gagal mencatat poin guru (HTTP ${response.status})`);
       }
 
-      const data = savedRecord;
+      const json = await response.json();
+      const savedRecord = json.data;
 
       this.cachedTeacherPointHistory.delete(log.user_id);
       this.cachedTeacherPointHistory.delete('ALL');
@@ -5139,51 +5102,33 @@ export class SupabaseProvider implements IDataProvider {
         window.dispatchEvent(
           new CustomEvent('smart_absensi_points_updated', {
             detail: {
-              userId: log.user_id,
-              teacherName: log.teacher_name,
-              points: log.points,
-              activity_type: log.activity_type,
-              title: log.title,
-              description: log.description,
+              id: savedRecord.id,
+              dedupeKey: savedRecord.idempotency_key || savedRecord.id,
+              userId: savedRecord.user_id,
+              teacherName: savedRecord.teacher_name,
+              points: savedRecord.points,
+              activity_type: savedRecord.activity_type,
+              title: savedRecord.title,
+              description: savedRecord.description,
             },
           })
         );
       }
 
       return {
-        id: data?.id || 'pt_' + Date.now(),
-        user_id: log.user_id,
-        teacher_name: log.teacher_name,
-        date: log.date,
-        points: log.points,
-        activity_type: log.activity_type,
-        title: log.title,
-        description: log.description,
-        created_at: data?.created_at || new Date().toISOString(),
+        id: savedRecord.id,
+        user_id: savedRecord.user_id,
+        teacher_name: savedRecord.teacher_name,
+        date: savedRecord.date,
+        points: Number(savedRecord.points) || 0,
+        activity_type: savedRecord.activity_type as TeacherPointActivityType,
+        title: savedRecord.title,
+        description: savedRecord.description || undefined,
+        created_at: savedRecord.created_at,
       };
     } catch (err: any) {
-      const isDuplicate =
-        err?.code === '23505' ||
-        err?.message?.includes('duplicate key') ||
-        err?.message?.includes('unique') ||
-        err?.details?.includes('already exists');
-      if (isDuplicate) {
-        logger.info('SupabaseProvider', 'recordTeacherPoint caught duplicate key as already processed');
-        return {
-          id: 'pt_' + Date.now(),
-          user_id: log.user_id,
-          teacher_name: log.teacher_name,
-          date: log.date,
-          points: log.points,
-          activity_type: log.activity_type,
-          title: log.title,
-          description: log.description,
-          created_at: new Date().toISOString(),
-        };
-      }
-      logger.error('SupabaseProvider', 'recordTeacherPoint exception, falling back to mock provider:', err);
-      const mockProv = new (await import('./mock-provider.service')).MockProvider();
-      return mockProv.recordTeacherPoint(log);
+      logger.error('SupabaseProvider', 'recordTeacherPoint exception:', err);
+      throw err;
     }
   }
 

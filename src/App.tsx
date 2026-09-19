@@ -102,6 +102,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handlePointsUpdated = (e: Event) => {
       const customEvt = e as CustomEvent<{
+        id?: string;
+        dedupeKey?: string;
         userId?: string;
         teacherName?: string;
         points?: number;
@@ -122,6 +124,8 @@ export const App: React.FC = () => {
       const reason = detail.title || detail.description || 'Apresiasi Poin Kedisiplinan';
 
       usePointRewardStore.getState().triggerCelebration({
+        id: detail.id,
+        dedupeKey: detail.dedupeKey || detail.id,
         points: detail.points,
         status: 'HADIR',
         reason: reason,

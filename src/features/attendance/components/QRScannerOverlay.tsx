@@ -25,8 +25,6 @@ import { logger } from '../../../utils/logger.utils';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { useReverseGeocode } from '../../../services/reverse-geocoding.service';
 import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
-import type { PointRewardData } from '../../../components/ui/PointRewardCelebrationOverlay';
-import { usePointRewardStore } from '../../../store/usePointRewardStore';
 import { RadarLocationVerificationModal } from './RadarLocationVerificationModal';
 
 export interface QRScannerOverlayProps {
@@ -63,7 +61,6 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       isOffline?: boolean;
       isPiketGuru?: boolean;
     };
-    rewardDataObj: PointRewardData;
     teacherName: string;
     userId: string;
     isPiketGuruToday: boolean;
@@ -80,7 +77,6 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
-  const [pointRewardData, setPointRewardData] = useState<PointRewardData | null>(null);
   const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [scanResult, setScanResult] = useState<{
@@ -410,54 +406,9 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       isPiketGuru: isPiketGuruToday,
     };
 
-    // 🌟 Hitung perolehan poin disiplin kehadiran nyata
-    const isCheckIn = returnedAction === 'CHECK_IN' || !returnedAction;
-    const isCheckOut = returnedAction === 'CHECK_OUT';
-    let earnedPoints = 0;
-    let pointReason = '';
-    let attendancePoints = 0;
-    let dutyPoints = 0;
-    let checkoutPoints = 0;
-
-    if (isCheckIn) {
-      if (!isLate) {
-        attendancePoints = 15;
-        pointReason = 'Kehadiran Tepat Waktu (≤ 07:30 WIB)';
-      } else {
-        attendancePoints = 5;
-        pointReason = 'Kehadiran Masuk Sekolah (> 07:30 WIB)';
-      }
-      if (isPiketGuruToday) {
-        dutyPoints = 10;
-      }
-      earnedPoints = attendancePoints + dutyPoints;
-    } else if (isCheckOut) {
-      checkoutPoints = 10;
-      earnedPoints = 10;
-      pointReason = 'Presensi Pulang Sekolah (Tuntas Bertugas)';
-    } else {
-      // ALREADY_COMPLETED
-      earnedPoints = 10;
-      pointReason = 'Presensi Lengkap Hari Ini (Tuntas Bertugas)';
-    }
-
-    const rewardDataObj: PointRewardData = {
-      points: earnedPoints,
-      status: returnedStatus,
-      reason: pointReason,
-      breakdown: {
-        attendance: attendancePoints > 0 ? attendancePoints : undefined,
-        piket: dutyPoints > 0 ? dutyPoints : undefined,
-        checkout: checkoutPoints > 0 ? checkoutPoints : undefined,
-      },
-      teacherName: teacherName,
-      timestamp: timestampStr,
-    };
-
     // Simpan payload untuk transisi setelah radar status HIJAU
     pendingSuccessDataRef.current = {
       result,
-      rewardDataObj,
       teacherName,
       userId,
       isPiketGuruToday,
@@ -501,7 +452,6 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     const data = pendingSuccessDataRef.current;
     if (!data) return;
 
-    setPointRewardData(data.rewardDataObj);
     setScanResult(data.result);
     setLatenessReason('');
     setIsSuccessModalOpen(true);
@@ -548,9 +498,6 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
     } else if (openTarget === 'COMPLAINT') {
       setIsComplaintModalOpen(true);
     } else {
-      if (pointRewardData && pointRewardData.points > 0) {
-        usePointRewardStore.getState().triggerCelebration(pointRewardData);
-      }
       if (scanResult) onSuccess(scanResult);
       onClose();
     }
@@ -1010,17 +957,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         isOpen={isMoodModalOpen}
         onClose={() => {
           setIsMoodModalOpen(false);
-          if (pointRewardData && pointRewardData.points > 0) {
-            usePointRewardStore.getState().triggerCelebration(pointRewardData);
-          }
           if (scanResult) onSuccess(scanResult);
           onClose();
         }}
         onSaved={() => {
           setIsMoodModalOpen(false);
-          if (pointRewardData && pointRewardData.points > 0) {
-            usePointRewardStore.getState().triggerCelebration(pointRewardData);
-          }
           if (scanResult) onSuccess(scanResult);
           onClose();
         }}
@@ -1031,17 +972,11 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
         isOpen={isComplaintModalOpen}
         onClose={() => {
           setIsComplaintModalOpen(false);
-          if (pointRewardData && pointRewardData.points > 0) {
-            usePointRewardStore.getState().triggerCelebration(pointRewardData);
-          }
           if (scanResult) onSuccess(scanResult);
           onClose();
         }}
         onSuccess={() => {
           setIsComplaintModalOpen(false);
-          if (pointRewardData && pointRewardData.points > 0) {
-            usePointRewardStore.getState().triggerCelebration(pointRewardData);
-          }
           if (scanResult) onSuccess(scanResult);
           onClose();
         }}

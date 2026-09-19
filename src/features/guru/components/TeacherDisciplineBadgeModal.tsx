@@ -23,6 +23,7 @@ import {
   Search,
   RefreshCw,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 
 export interface TeacherDisciplineBadgeModalProps {
@@ -106,14 +107,17 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   const [isPointHistoryLoading, setIsPointHistoryLoading] = useState(false);
 
   // ── Smart Point Synchronization State (SPS-Session) ─────────────────────────
+  type SyncStatus = 'IDLE' | 'LOADING' | 'SUCCESS' | 'EMPTY' | 'ERROR' | 'TIMEOUT';
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('LOADING');
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState<boolean>(true);
-  const [syncProgress, setSyncProgress] = useState<number>(20);
+  const [syncProgress, setSyncProgress] = useState<number>(30);
   const [syncStageText, setSyncStageText] = useState<string>('Menghubungkan ke buku besar poin cloud...');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
   const isSyncingInProgressRef = useRef(false);
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const finishTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const hasSyncedOnceRef = useRef(false);
   const allRegisteredTeachersPropRef = useRef(allRegisteredTeachersProp);
   allRegisteredTeachersPropRef.current = allRegisteredTeachersProp;
@@ -145,76 +149,85 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     if (isSyncingInProgressRef.current) return;
     isSyncingInProgressRef.current = true;
 
-    if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortCtrl = new AbortController();
+    abortControllerRef.current = abortCtrl;
+
     if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
 
     setIsSyncing(true);
-    setSyncProgress(20);
+    setSyncStatus('LOADING');
+    setSyncProgress(35);
     setSyncStageText('Menghubungkan ke buku besar poin cloud...');
+    setSyncErrorMessage(null);
 
-    // Progress bar bergerak maju secara deterministik & mulus (anti-maju-mundur)
-    let currentProgress = 20;
-    syncIntervalRef.current = setInterval(() => {
-      if (currentProgress < 50) {
-        currentProgress += 6;
-      } else if (currentProgress < 80) {
-        currentProgress += 4;
-      } else if (currentProgress < 92) {
-        currentProgress += 1;
+    // Timeout pengaman 6 detik untuk mencegah loading macet
+    const timeoutTimer = setTimeout(() => {
+      if (isSyncingInProgressRef.current) {
+        abortCtrl.abort();
+        setSyncStatus('TIMEOUT');
+        setSyncStageText('Koneksi cloud memakan waktu lebih lama. Menampilkan data lokal.');
+        setIsSyncing(false);
+        isSyncingInProgressRef.current = false;
       }
-      setSyncProgress(currentProgress);
-
-      if (currentProgress >= 40 && currentProgress < 75) {
-        setSyncStageText('Merekonsiliasi catatan presensi, on-time & piket...');
-      } else if (currentProgress >= 75) {
-        setSyncStageText('Menghitung akumulasi skor & peringkat klasemen...');
-      }
-    }, 40);
+    }, 6000);
 
     try {
       const token = useAuthStore.getState().token || undefined;
-      // Pure Read-Only Point Ledger Fetch (Zero Writes / Zero Reconciliation on Read)
+      setSyncProgress(65);
+      setSyncStageText('Memuat riwayat perolehan poin seluruh guru...');
+
       const provider = ProviderFactory.getProvider();
       const logs = await provider.getTeacherPointHistory('ALL', token);
+
+      if (abortCtrl.signal.aborted) return;
+      clearTimeout(timeoutTimer);
+
       if (logs && logs.length > 0) {
         setAllPointLogs(logs);
+        setSyncStatus('SUCCESS');
+      } else {
+        setAllPointLogs([]);
+        setSyncStatus('EMPTY');
       }
+
+      setSyncProgress(85);
+      setSyncStageText('Memverifikasi peringkat & klasemen kedisiplinan...');
 
       // Sinkronisasi foto profil guru terbaru dari provider (hanya jika prop tidak disediakan)
       const propTeachers = allRegisteredTeachersPropRef.current;
       if (!propTeachers || propTeachers.length === 0) {
-        const provider = ProviderFactory.getProvider();
-        const users = await provider.getAllUsers(token || '');
-        if (users && users.length > 0) {
+        const users = await provider.getAllUsers(token || '').catch(() => []);
+        if (users && users.length > 0 && !abortCtrl.signal.aborted) {
           setRegisteredTeachers(users);
         }
       }
-    } catch (e) {
-      console.warn('Failed to load point logs or users in modal:', e);
-    } finally {
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-        syncIntervalRef.current = null;
-      }
 
-      // Langsung tuntaskan ke 100% dan tampilkan poin tanpa jeda yang bertele-tele
       setSyncProgress(100);
       setSyncStageText('Sinkronisasi Selesai • Klasemen Terverifikasi');
+      setLastSyncedAt(new Date());
+    } catch (e: any) {
+      clearTimeout(timeoutTimer);
+      if (abortCtrl.signal.aborted) return;
 
-      finishTimeoutRef.current = setTimeout(() => {
-        setIsSyncing(false);
-        setLastSyncedAt(new Date());
-        isSyncingInProgressRef.current = false;
-        hasSyncedOnceRef.current = true;
-      }, 150);
+      console.error('[TeacherDisciplineBadgeModal] sync error:', e);
+      setSyncStatus('ERROR');
+      setSyncErrorMessage(e?.message || 'Gagal memuat data poin guru dari cloud.');
+    } finally {
+      clearTimeout(timeoutTimer);
+      setIsSyncing(false);
+      isSyncingInProgressRef.current = false;
+      hasSyncedOnceRef.current = true;
     }
   }, []);
 
   useEffect(() => {
     if (!isOpen) {
       hasSyncedOnceRef.current = false;
-      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
       if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
       isSyncingInProgressRef.current = false;
       return;
     }
@@ -884,6 +897,31 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 {/* TAB 1: KLASEMEN PERINGKAT */}
                 {activeTab === 'LEADERBOARD' && (
                   <div className="space-y-6">
+                    {/* Banner Error / Timeout jika sinkronisasi gagal */}
+                    {(syncStatus === 'ERROR' || syncStatus === 'TIMEOUT') && (
+                      <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900">
+                        <div className="flex items-center gap-3">
+                          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                          <div>
+                            <p className="text-xs font-bold">
+                              {syncStatus === 'TIMEOUT' ? 'Waktu Sinkronisasi Habis' : 'Gagal Menyinkronkan dari Cloud'}
+                            </p>
+                            <p className="text-[11px] text-amber-700">
+                              {syncErrorMessage || 'Menampilkan data cache lokal yang tersedia saat ini.'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleSyncPoints(true)}
+                          className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Coba Lagi</span>
+                        </button>
+                      </div>
+                    )}
+
                     {isSyncing ? (
                       /* ── Sesi Load & Animasi Sinkronisasi Poin (SPS-Session) ── */
                       <div className="p-6 sm:p-10 rounded-3xl bg-linear-to-b from-white to-slate-50 border border-slate-200/80 shadow-sm space-y-8 animate-fadeIn">
@@ -960,6 +998,26 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             </div>
                           ))}
                         </div>
+                      </div>
+                    ) : leaderboard.length === 0 ? (
+                      <div className="p-12 text-center rounded-3xl bg-slate-50 border border-slate-200 space-y-4">
+                        <div className="w-16 h-16 rounded-2xl bg-slate-200 text-slate-500 mx-auto flex items-center justify-center">
+                          <Trophy className="w-8 h-8 text-slate-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-slate-800">Belum Ada Data Poin Tercatat</h3>
+                          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                            Belum ada riwayat perolehan poin kedisiplinan guru untuk periode ini. Data akan otomatis tercatat saat presensi dilakukan.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleSyncPoints(true)}
+                          className="px-4 py-2 rounded-xl bg-[#023246] hover:bg-[#03445e] text-white text-xs font-bold transition-all shadow-xs inline-flex items-center gap-2 cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Segarkan Data</span>
+                        </button>
                       </div>
                     ) : (
                       <>
@@ -2201,6 +2259,26 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     </span>
                   </div>
 
+                  {/* Banner Error / Timeout jika sinkronisasi gagal */}
+                  {(syncStatus === 'ERROR' || syncStatus === 'TIMEOUT') && (
+                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-2 text-amber-900">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <p className="text-[11px] font-bold truncate">
+                          {syncStatus === 'TIMEOUT' ? 'Waktu Sinkronisasi Habis' : 'Gagal Menyinkronkan dari Cloud'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSyncPoints(true)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Coba Lagi</span>
+                      </button>
+                    </div>
+                  )}
+
                   {isSyncing ? (
                     <div className="p-5 rounded-2xl bg-linear-to-b from-white to-slate-50 border border-slate-200/80 space-y-4 text-center animate-fadeIn shadow-2xs">
                       <div className="relative w-14 h-14 mx-auto flex items-center justify-center">
@@ -2246,6 +2324,26 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                           </div>
                         ))}
                       </div>
+                    </div>
+                  ) : leaderboard.length === 0 ? (
+                    <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                      <div className="w-12 h-12 rounded-xl bg-slate-200 text-slate-500 mx-auto flex items-center justify-center">
+                        <Trophy className="w-6 h-6 text-slate-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800">Belum Ada Data Poin</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs mx-auto">
+                          Belum ada riwayat perolehan poin disiplin guru untuk periode ini.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSyncPoints(true)}
+                        className="px-3 py-1.5 rounded-lg bg-[#023246] hover:bg-[#03445e] text-white text-[11px] font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Segarkan Data</span>
+                      </button>
                     </div>
                   ) : (
                     <>

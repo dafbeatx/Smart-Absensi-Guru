@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
-import type { PointRewardData } from '../../../components/ui/PointRewardCelebrationOverlay';
-import { usePointRewardStore } from '../../../store/usePointRewardStore';
 import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { BiometricService } from '../../../services/biometric.service';
@@ -65,7 +63,6 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     action: string;
     status: string;
   } | null>(null);
-  const [pointRewardData, setPointRewardData] = useState<PointRewardData | null>(null);
   const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
   const pendingSuccessDataRef = useRef<{
     successData: {
@@ -74,7 +71,6 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
       action: string;
       status: string;
     };
-    rewardData: PointRewardData;
     isCheckIn: boolean;
   } | null>(null);
 
@@ -198,50 +194,11 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         status: scanRes.status || 'HADIR',
       };
 
-      // Hitung perolehan poin kedisiplinan
       const isCheckIn = scanRes.attendance_action === 'CHECK_IN' || !scanRes.attendance_action;
-      const isCheckOut = scanRes.attendance_action === 'CHECK_OUT';
-      const isLate = (scanRes.status || '').toUpperCase() === 'TERLAMBAT';
-      let earnedPoints = 0;
-      let pointReason = '';
-      let attendancePoints = 0;
-      let checkoutPoints = 0;
-
-      if (isCheckIn) {
-        if (!isLate) {
-          attendancePoints = 15;
-          pointReason = 'Kehadiran Tepat Waktu (≤ 07:30 WIB)';
-        } else {
-          attendancePoints = 5;
-          pointReason = 'Kehadiran Masuk Sekolah (> 07:30 WIB)';
-        }
-        earnedPoints = attendancePoints;
-      } else if (isCheckOut) {
-        checkoutPoints = 10;
-        earnedPoints = 10;
-        pointReason = 'Presensi Pulang Sekolah (Tuntas Bertugas)';
-      } else {
-        // ALREADY_COMPLETED
-        earnedPoints = 10;
-        pointReason = 'Presensi Lengkap Hari Ini (Tuntas Bertugas)';
-      }
-
-      const rewardData: PointRewardData = {
-        points: earnedPoints,
-        status: scanRes.status || 'HADIR',
-        reason: pointReason,
-        breakdown: {
-          attendance: attendancePoints > 0 ? attendancePoints : undefined,
-          checkout: checkoutPoints > 0 ? checkoutPoints : undefined,
-        },
-        teacherName: user.full_name,
-        timestamp: successData.timestamp,
-      };
 
       // Simpan payload & tampilkan Radar UI (Data absensi sudah tersimpan aman di cloud/database di awal)
       pendingSuccessDataRef.current = {
         successData,
-        rewardData,
         isCheckIn,
       };
       setIsRadarModalOpen(true);
@@ -280,7 +237,6 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     const data = pendingSuccessDataRef.current;
     if (!data) return;
 
-    setPointRewardData(data.rewardData);
     setAttendanceSuccess(data.successData);
     onSuccess({
       timestamp: data.successData.timestamp,
@@ -374,9 +330,6 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
   };
 
   const handleModalClose = () => {
-    if (pointRewardData && pointRewardData.points > 0) {
-      usePointRewardStore.getState().triggerCelebration(pointRewardData);
-    }
     onClose();
   };
 
