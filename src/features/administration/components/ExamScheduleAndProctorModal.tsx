@@ -23,8 +23,10 @@ import {
   FileText,
   ListFilter,
   DoorOpen,
+  LayoutGrid,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
 import type { UserProfile } from '../../../types/database.types';
 import type {
   ExamType,
@@ -38,6 +40,8 @@ import type {
 import { ExamCommitteeRepository } from '../../../repositories/ExamCommitteeRepository';
 import { ExamScheduleRepository } from '../../../repositories/ExamScheduleRepository';
 import { ExamSchedulerService } from '../../../services/exam-scheduler.service';
+import { ExamMatrixBuilderService } from '../../../services/exam-matrix-builder.service';
+import { ExamWordExporterService } from '../../../services/exam-word-exporter.service';
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -74,6 +78,8 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
 }) => {
   // Navigation active tab
   const [activeTab, setActiveTab] = useState<'form' | 'subjects' | 'proctors' | 'my_schedule' | 'committee'>('form');
+  const [proctorViewMode, setProctorViewMode] = useState<'MATRIX' | 'TABLE'>('MATRIX');
+  const institutionName = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah';
 
   // Authorization state
   const [accessInfo, setAccessInfo] = useState<{
@@ -684,6 +690,12 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     );
   }, [scheduleData, currentUser]);
 
+  // Build Official Invigilation Matrix (Official School Layout)
+  const invigilationMatrix = useMemo(() => {
+    if (!scheduleData) return null;
+    return ExamMatrixBuilderService.buildMatrix(scheduleData, teachers, institutionName);
+  }, [scheduleData, teachers, institutionName]);
+
   if (!isOpen) return null;
 
   return createPortal(
@@ -767,6 +779,23 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
 
               <button
                 type="button"
+                onClick={() => {
+                  if (invigilationMatrix) {
+                    ExamWordExporterService.exportToWord(invigilationMatrix);
+                    setToast({ text: 'Dokumen Word (.doc) berhasil diunduh.', type: 'success' });
+                  } else {
+                    setToast({ text: 'Belum ada jadwal pengawas untuk diekspor.', type: 'error' });
+                  }
+                }}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-colors shadow-2xs"
+                title="Unduh Jadwal Pengawas Format Word (.doc)"
+              >
+                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                <span>Unduh Word</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => ExamScheduleRepository.exportToExcel(scheduleData)}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold transition-colors shadow-2xs"
                 title="Ekspor Jadwal ke Excel (.xlsx)"
@@ -777,9 +806,15 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
 
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => {
+                  if (invigilationMatrix) {
+                    ExamWordExporterService.printOfficialMatrix(invigilationMatrix);
+                  } else {
+                    window.print();
+                  }
+                }}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition-colors shadow-2xs"
-                title="Cetak Jadwal Resmi (Format A4)"
+                title="Cetak Jadwal Pengawas Format Resmi Sekolah (A4)"
               >
                 <Printer className="w-3.5 h-3.5 text-slate-600" />
                 <span>Cetak A4</span>
@@ -2125,9 +2160,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 3: ROSTER PENGAWAS GURU (RUANGAN) */}
-        {/* ========================================================================= */}
+        {/* ===============        {/* ========================================================================= */}
         {activeTab === 'proctors' && (
           <div className="max-w-6xl mx-auto space-y-4 animate-fadeIn">
             {!scheduleData ? (
@@ -2140,65 +2173,305 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
               </div>
             ) : (
               <div className="space-y-4">
-                {/* AI Allocation Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Tugas Mengawas</span>
-                    <span className="text-2xl font-black text-teal-700 mt-1 block">{scheduleData.summary.totalProctorsAssigned} Sesi</span>
+                {/* View Switcher & Action Toolbar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-600 shrink-0">Tampilan:</span>
+                    <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setProctorViewMode('MATRIX')}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                          proctorViewMode === 'MATRIX'
+                            ? 'bg-white text-[#023246] shadow-2xs font-extrabold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Format Resmi Sekolah (Matriks)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProctorViewMode('TABLE')}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                          proctorViewMode === 'TABLE'
+                            ? 'bg-white text-[#023246] shadow-2xs font-extrabold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <ListFilter className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Roster Pengawas (Detail)</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Rata-rata / Guru</span>
-                    <span className="text-2xl font-black text-slate-900 mt-1 block">{scheduleData.summary.averageSessionsPerTeacher} Sesi</span>
-                  </div>
-                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Integritas Ujian</span>
-                    <span className="text-xs font-bold text-emerald-700 mt-2 block">✓ 100% Bebas Mapel Sendiri</span>
-                  </div>
-                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Double-Booking</span>
-                    <span className="text-xs font-bold text-emerald-700 mt-2 block">✓ 0 Konflik Jadwal</span>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (invigilationMatrix) {
+                          ExamWordExporterService.exportToWord(invigilationMatrix);
+                          setToast({ text: 'Dokumen Word (.doc) berhasil diunduh.', type: 'success' });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors shadow-2xs"
+                      title="Unduh Dokumen Microsoft Word (.doc)"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Unduh Word (.doc)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (invigilationMatrix) {
+                          ExamWordExporterService.printOfficialMatrix(invigilationMatrix);
+                        } else {
+                          window.print();
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-colors shadow-2xs"
+                      title="Cetak Jadwal atau Simpan ke PDF (A4)"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-teal-700" />
+                      <span>Cetak / PDF (A4)</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Proctor Table */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
-                        <tr>
-                          <th className="py-3 px-3.5 text-center w-12">No</th>
-                          <th className="py-3 px-3.5">Hari, Tanggal & Sesi</th>
-                          <th className="py-3 px-3.5">Ruang / Rombel</th>
-                          <th className="py-3 px-3.5">Mata Pelajaran</th>
-                          <th className="py-3 px-3.5 font-black text-teal-900">Pengawas Utama</th>
-                          <th className="py-3 px-3.5 text-slate-600">Pengawas Cadangan / Piket</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
-                        {scheduleData.proctorSchedules.map((item, idx) => (
-                          <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-2.5 px-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
-                            <td className="py-2.5 px-3.5">
-                              <span className="font-bold text-slate-900">{item.dayName}</span>, {item.date} • <span className="font-bold text-teal-700">Sesi {item.sessionNumber}</span> ({item.startTime}-{item.endTime})
-                            </td>
-                            <td className="py-2.5 px-3.5">
-                              <span className="font-black text-teal-900 text-xs block">{item.roomName}</span>
-                              <span className="text-[10px] text-slate-500 font-semibold">Kelas {item.className}</span>
-                            </td>
-                            <td className="py-2.5 px-3.5 font-semibold text-slate-700">{item.subject}</td>
-                            <td className="py-2.5 px-3.5 font-bold text-teal-700 flex items-center gap-1.5">
-                              <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                              <span>{item.mainProctorName}</span>
-                            </td>
-                            <td className="py-2.5 px-3.5 text-slate-500 text-[11px]">
-                              {item.backupProctorName || '-'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                {/* MODE 1: FORMAT MATRIKS RESMI SEKOLAH (IDENTIK DENGAN FOTO FISIK) */}
+                {proctorViewMode === 'MATRIX' && invigilationMatrix && (
+                  <div className="space-y-6">
+                    {/* Paper Container Preview */}
+                    <div className="bg-white rounded-2xl border border-slate-300 shadow-sm p-4 sm:p-7 space-y-6 text-slate-800">
+                      {/* Paper Official Header */}
+                      <div className="text-center space-y-1 pb-4 border-b border-slate-300">
+                        <h2 className="text-base sm:text-lg font-black tracking-wide text-slate-900 uppercase">
+                          {invigilationMatrix.title}
+                        </h2>
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase">
+                          {invigilationMatrix.subTitle}
+                        </h3>
+                        <h4 className="text-sm sm:text-base font-extrabold text-teal-900 uppercase tracking-wide">
+                          {invigilationMatrix.institutionName}
+                        </h4>
+                        <p className="text-[11px] sm:text-xs font-semibold text-slate-600">
+                          Tahun Pelajaran {scheduleData.config.academicYear || activeAcademicYear}
+                        </p>
+                      </div>
+
+                      {/* Table 1: Matrix Jadwal Pengawas (Atas) */}
+                      <div className="space-y-2">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse border border-slate-400">
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-800 font-bold text-center">
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 w-10 text-center font-black">
+                                  No
+                                </th>
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-[130px] text-center font-black">
+                                  Hari / Tanggal
+                                </th>
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 min-w-[100px] text-center font-black">
+                                  Waktu
+                                </th>
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-[140px] text-left font-black">
+                                  Mata Pelajaran
+                                </th>
+                                <th
+                                  colSpan={invigilationMatrix.rooms.length}
+                                  className="border border-slate-400 py-2 px-2 text-center font-black bg-slate-200/90 text-slate-900"
+                                >
+                                  Kode Pengawas
+                                </th>
+                              </tr>
+                              <tr className="bg-slate-100 text-slate-800 font-bold text-center">
+                                {invigilationMatrix.rooms.map((col) => (
+                                  <th
+                                    key={col.key}
+                                    className="border border-slate-400 py-1.5 px-2 text-center text-[11px] font-black w-12 text-teal-950"
+                                  >
+                                    {col.label}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {invigilationMatrix.days.map((day) =>
+                                day.sessions.map((slot, idxSlot) => (
+                                  <tr key={`${day.date}-${slot.sessionNumber}`} className="hover:bg-slate-50/90 transition-colors">
+                                    {idxSlot === 0 && (
+                                      <>
+                                        <td
+                                          rowSpan={day.sessions.length}
+                                          className="border border-slate-400 py-2 px-2 text-center font-bold align-middle bg-white text-slate-700"
+                                        >
+                                          {day.dayNumber}
+                                        </td>
+                                        <td
+                                          rowSpan={day.sessions.length}
+                                          className="border border-slate-400 py-2 px-3 align-middle bg-white"
+                                        >
+                                          <div className="font-extrabold text-slate-900 text-xs">{day.dayFormatted}</div>
+                                        </td>
+                                      </>
+                                    )}
+                                    <td className="border border-slate-400 py-2 px-2 text-center font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                                      {slot.timeRange}
+                                    </td>
+                                    <td className="border border-slate-400 py-2 px-3 font-semibold text-slate-800">
+                                      <span className="text-slate-400 font-bold mr-1">{slot.subjectNumber}.</span>
+                                      <span>{slot.subjectTitle}</span>
+                                    </td>
+                                    {invigilationMatrix.rooms.map((col) => {
+                                      const code = slot.roomCodes[col.key];
+                                      return (
+                                        <td
+                                          key={col.key}
+                                          className="border border-slate-400 py-1.5 px-1.5 text-center align-middle"
+                                        >
+                                          {code ? (
+                                            <span
+                                              className="inline-flex items-center justify-center w-8 h-7 rounded bg-teal-50 text-teal-900 border border-teal-300 font-mono font-black text-xs shadow-2xs hover:bg-teal-600 hover:text-white transition-colors cursor-help"
+                                              title={`Ruang ${col.label}: Kode ${code}`}
+                                            >
+                                              {code}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-300 font-bold">-</span>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Table 2: Daftar Kode Pengawas Ruang (Bawah) */}
+                      <div className="pt-2 space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                          <h4 className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase">
+                            Daftar Kode Pengawas Ruang
+                          </h4>
+                          <span className="text-[11px] text-slate-500 font-semibold">
+                            Total {invigilationMatrix.teacherLegend.length} Guru Pengawas
+                          </span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse border border-slate-400">
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-800 font-bold">
+                                <th className="border border-slate-400 py-2 px-2.5 w-12 text-center font-black">No</th>
+                                <th className="border border-slate-400 py-2 px-3 text-left font-black">Nama Guru</th>
+                                <th className="border border-slate-400 py-2 px-3 text-left font-black">Mata Pelajaran</th>
+                                <th className="border border-slate-400 py-2 px-3 w-28 text-center font-black">Kode Pengawas</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {invigilationMatrix.teacherLegend.map((item, idx) => (
+                                <tr key={item.userId || idx} className="hover:bg-slate-50/90 transition-colors">
+                                  <td className="border border-slate-400 py-1.5 px-2.5 text-center text-slate-600 font-mono font-medium">
+                                    {item.no || idx + 1}
+                                  </td>
+                                  <td className="border border-slate-400 py-1.5 px-3 font-bold text-slate-900">
+                                    {item.fullName}
+                                  </td>
+                                  <td className="border border-slate-400 py-1.5 px-3 text-slate-700">
+                                    {item.subject}
+                                  </td>
+                                  <td className="border border-slate-400 py-1.5 px-3 text-center">
+                                    <span className="inline-block px-2.5 py-0.5 rounded font-mono font-black text-xs bg-slate-100 text-teal-900 border border-slate-300">
+                                      {item.code}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Official Footer Note */}
+                      <div className="pt-3 border-t border-slate-200 text-[11px] text-slate-500 space-y-1">
+                        <p className="font-bold text-slate-700">Catatan Pengawas:</p>
+                        <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                          <li>Pengawas hadir di ruang sekretariat panitia ujian 15 menit sebelum asesmen dimulai.</li>
+                          <li>Mengambil naskah asesmen, lembar jawaban, dan menandatangani berita acara pelaksanaan.</li>
+                          <li>Memastikan seluruh peserta ujian mematuhi tata tertib asesmen di ruang masing-masing.</li>
+                        </ol>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* MODE 2: ROSTER PENGAWAS DETAIL (VIEW LAMA) */}
+                {proctorViewMode === 'TABLE' && (
+                  <div className="space-y-4">
+                    {/* AI Allocation Stats */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Tugas Mengawas</span>
+                        <span className="text-2xl font-black text-teal-700 mt-1 block">{scheduleData.summary.totalProctorsAssigned} Sesi</span>
+                      </div>
+                      <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Rata-rata / Guru</span>
+                        <span className="text-2xl font-black text-slate-900 mt-1 block">{scheduleData.summary.averageSessionsPerTeacher} Sesi</span>
+                      </div>
+                      <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Integritas Ujian</span>
+                        <span className="text-xs font-bold text-emerald-700 mt-2 block">✓ 100% Bebas Mapel Sendiri</span>
+                      </div>
+                      <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Double-Booking</span>
+                        <span className="text-xs font-bold text-emerald-700 mt-2 block">✓ 0 Konflik Jadwal</span>
+                      </div>
+                    </div>
+
+                    {/* Proctor Table */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
+                            <tr>
+                              <th className="py-3 px-3.5 text-center w-12">No</th>
+                              <th className="py-3 px-3.5">Hari, Tanggal & Sesi</th>
+                              <th className="py-3 px-3.5">Ruang / Rombel</th>
+                              <th className="py-3 px-3.5">Mata Pelajaran</th>
+                              <th className="py-3 px-3.5 font-black text-teal-900">Pengawas Utama</th>
+                              <th className="py-3 px-3.5 text-slate-600">Pengawas Cadangan / Piket</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium">
+                            {scheduleData.proctorSchedules.map((item, idx) => (
+                              <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="py-2.5 px-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
+                                <td className="py-2.5 px-3.5">
+                                  <span className="font-bold text-slate-900">{item.dayName}</span>, {item.date} • <span className="font-bold text-teal-700">Sesi {item.sessionNumber}</span> ({item.startTime}-{item.endTime})
+                                </td>
+                                <td className="py-2.5 px-3.5">
+                                  <span className="font-black text-teal-900 text-xs block">{item.roomName}</span>
+                                  <span className="text-[10px] text-slate-500 font-semibold">Kelas {item.className}</span>
+                                </td>
+                                <td className="py-2.5 px-3.5 font-semibold text-slate-700">{item.subject}</td>
+                                <td className="py-2.5 px-3.5 font-bold text-teal-700 flex items-center gap-1.5">
+                                  <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                                  <span>{item.mainProctorName}</span>
+                                </td>
+                                <td className="py-2.5 px-3.5 text-slate-500 text-[11px]">
+                                  {item.backupProctorName || '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

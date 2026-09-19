@@ -39,6 +39,7 @@ import { runDutyTeacherLeaveTasksTestSuite } from './__tests__/duty-teacher-leav
 import { runAdministrationModulesTestSuite } from './__tests__/administration-modules.test';
 import { runWhatsAppGroupNotificationTestSuite } from './__tests__/whatsapp-group-notification.test';
 import { runExamSchedulerTestSuite } from './__tests__/exam-scheduler.test';
+import { runExamMatrixTestSuite } from './__tests__/exam-matrix-builder.test';
 
 export interface TestResultItem {
   testName: string;
@@ -115,6 +116,7 @@ export class MasterTestRunner {
       { name: 'Administration Hub & Academic Year Module Engine', fn: runAdministrationModulesTestSuite },
       { name: 'WhatsApp Group Attendance Notification Engine (Anti-Ban & Text-Only)', fn: runWhatsAppGroupNotificationTestSuite },
       { name: 'Exam Scheduler, Proctor Balancer & Committee AI Engine (Phase 4.6)', fn: runExamSchedulerTestSuite },
+      { name: 'Exam Invigilation Matrix & Word Exporter Engine (Official Paper Format)', fn: runExamMatrixTestSuite },
     ];
 
     let totalPassed = 0;
