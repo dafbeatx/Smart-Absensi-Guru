@@ -10,6 +10,7 @@ import type { UserProfile, RoleCode, TeacherPointLog } from '../../../types/data
 import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHistoryModal';
 import { convertToWebP } from '../../../utils/image.utils';
 import { handleAppError } from '../../../utils/error.utils';
+import { getTeacherDisciplineLeaderboard } from '../../../utils/teacher-appreciation.utils';
 
 export interface TeacherManagementTableProps {
   teachers: UserProfile[];
@@ -75,12 +76,28 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
   const teacherPointsMap = useMemo(() => {
     const map: Record<string, number> = {};
-    (allPointLogs || []).forEach((log) => {
-      // Siklus Poin Bulanan: Hanya hitung poin transaksi bulan berjalan (reset ke 0 pada tanggal 1 awal bulan)
-      if (log.date && log.date.startsWith(currentMonthPrefix)) {
-        map[log.user_id] = (map[log.user_id] || 0) + log.points;
-      }
-    });
+    const hasLogs = (allPointLogs || []).some(
+      (log) =>
+        (log.date && log.date.startsWith(currentMonthPrefix)) ||
+        (!log.date && log.created_at && log.created_at.startsWith(currentMonthPrefix))
+    );
+
+    if (hasLogs) {
+      (allPointLogs || []).forEach((log) => {
+        // Siklus Poin Bulanan: Hanya hitung poin transaksi bulan berjalan (reset ke 0 pada tanggal 1 awal bulan)
+        if (
+          (log.date && log.date.startsWith(currentMonthPrefix)) ||
+          (!log.date && log.created_at && log.created_at.startsWith(currentMonthPrefix))
+        ) {
+          map[log.user_id] = (map[log.user_id] || 0) + log.points;
+        }
+      });
+    } else {
+      const fallbackBoard = getTeacherDisciplineLeaderboard(null, null, 'CURRENT_MONTH');
+      (fallbackBoard.leaderboard || []).forEach((item) => {
+        map[item.id] = item.totalPoints;
+      });
+    }
     return map;
   }, [allPointLogs, currentMonthPrefix]);
 

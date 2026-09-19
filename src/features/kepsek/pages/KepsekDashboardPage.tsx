@@ -57,7 +57,20 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [isLoadingMyAttendance, setIsLoadingMyAttendance] = useState(false);
 
   // Leaderboard Poin & Juara 1 Apresiasi States (Hak Prerogatif Kepala Sekolah)
-  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>([]);
+  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_teacher_point_history');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  });
   const [championTeacher, setChampionTeacher] = useState<TeacherLeaderboardItem | null>(null);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
@@ -102,6 +115,9 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         const logs = await provider.getTeacherPointHistory('ALL', token);
         if (logs && logs.length > 0) {
           setAllTeacherPointLogs(logs);
+          try {
+            localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(logs));
+          } catch {}
         }
       } catch (err) {
         console.warn('Gagal memuat buku besar poin guru:', err);
@@ -1078,6 +1094,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         currentUser={user}
         isFullscreen={true}
         allRegisteredTeachers={teachers}
+        allPointLogs={allTeacherPointLogs}
       />
     </div>
   );

@@ -32,7 +32,7 @@ import { SarprasExecutiveView } from '../../sarpras/components/SarprasExecutiveV
 import { SystemHealthDashboardView } from '../components/SystemHealthDashboardView';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
-import type { UserProfile, LeaveRequest, AttendanceRecord, SystemSettings } from '../../../types/database.types';
+import type { UserProfile, LeaveRequest, AttendanceRecord, SystemSettings, TeacherPointLog } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import { useLiveAttendanceSync } from '../../../hooks/useLiveAttendanceSync';
 import { CONSTANTS } from '../../../config/constants';
@@ -69,6 +69,22 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
+
+  // Buku besar poin seluruh guru tersinkronisasi
+  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_teacher_point_history');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  });
 
   const handleCloseQuestionCorrectionModal = useCallback(() => {
     setIsQuestionCorrectionModalOpen(false);
@@ -294,6 +310,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
         // Step 5: Sync Anonymous Complaints
         await fetchComplaintsCount();
+
+        // Step 6: Sync All Teacher Points History & Ledger
+        try {
+          const ptLogs = await provider.getTeacherPointHistory('ALL', token);
+          if (ptLogs && ptLogs.length > 0) {
+            setAllTeacherPointLogs(ptLogs);
+            try {
+              localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(ptLogs));
+            } catch {}
+          }
+        } catch (err) {
+          console.warn('Failed to sync teacher points history in admin:', err);
+        }
       } catch (err) {
         console.warn('Backend sync sequence error:', err);
       }
@@ -340,14 +369,31 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       }
     };
 
+    const handlePointsUpdated = async () => {
+      try {
+        const token = useAuthStore.getState().token || '';
+        const ptLogs = await ProviderFactory.getProvider().getTeacherPointHistory('ALL', token);
+        if (ptLogs && ptLogs.length > 0) {
+          setAllTeacherPointLogs(ptLogs);
+          try {
+            localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(ptLogs));
+          } catch {}
+        }
+      } catch (err) {
+        console.warn('Failed to refresh point history in admin:', err);
+      }
+    };
+
     window.addEventListener('smart_absensi_scanned', handleScannedEvent);
     window.addEventListener('smart_absensi_records_updated', handleScannedEvent);
     window.addEventListener('smart_absensi_leave_updated', handleLeaveUpdated);
     window.addEventListener('smart_absensi_leaves_updated', handleLeaveUpdated);
     window.addEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
     window.addEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
+    window.addEventListener('smart_absensi_points_updated', handlePointsUpdated);
     window.addEventListener('storage', handleComplaintsUpdated);
     window.addEventListener('storage', handleLeaveUpdated);
+    window.addEventListener('storage', handlePointsUpdated);
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -367,8 +413,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       window.removeEventListener('smart_absensi_leaves_updated', handleLeaveUpdated);
       window.removeEventListener('smart_absensi_teachers_updated', handleTeachersUpdatedEvent);
       window.removeEventListener('smart_absensi_complaints_updated', handleComplaintsUpdated);
+      window.removeEventListener('smart_absensi_points_updated', handlePointsUpdated);
       window.removeEventListener('storage', handleComplaintsUpdated);
       window.removeEventListener('storage', handleLeaveUpdated);
+      window.removeEventListener('storage', handlePointsUpdated);
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
   }, [user?.id, teachers.length]);
@@ -905,6 +953,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         currentUser={user}
         isFullscreen={true}
         allRegisteredTeachers={teachers}
+        allPointLogs={allTeacherPointLogs}
       />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}

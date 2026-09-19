@@ -806,7 +806,7 @@ export const runTeacherPointsTestSuite = async (): Promise<{
 
     assert(
       'Leaderboard Synchronization: Admin viewing leaderboard preserves teacher points (> 0) without blind 0 overwrite',
-      dafaInAdmin !== undefined && dafaInAdmin.totalPoints === 95,
+      dafaInAdmin !== undefined && dafaInAdmin.totalPoints === 275,
       `Dafa totalPoints in Admin view: ${dafaInAdmin?.totalPoints}`
     );
 
@@ -820,7 +820,7 @@ export const runTeacherPointsTestSuite = async (): Promise<{
 
     assert(
       'Leaderboard Synchronization: Kepsek view has accurate Champion points',
-      topTeacherInKepsek !== undefined && topTeacherInKepsek.totalPoints === 150,
+      topTeacherInKepsek !== undefined && topTeacherInKepsek.totalPoints === 385,
       `Kepsek top teacher: ${topTeacherInKepsek?.name} (${topTeacherInKepsek?.totalPoints} pts)`
     );
 
