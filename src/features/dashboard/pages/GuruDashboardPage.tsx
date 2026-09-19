@@ -371,7 +371,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isDisciplineBadgeModalOpen, setIsDisciplineBadgeModalOpen] = useState(false);
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
   const [pointHistory, setPointHistory] = useState<TeacherPointLog[]>([]);
-  const [allTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
+  const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
     try {
       const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_teacher_point_history') : null;
       return saved ? JSON.parse(saved) : [];
@@ -1010,6 +1010,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         console.warn('Failed to load teacher point history:', err);
       }
 
+      try {
+        const allLogs = await provider.getTeacherPointHistory('ALL', authToken);
+        if (allLogs && allLogs.length > 0) {
+          setAllTeacherPointLogs(allLogs);
+          try {
+            localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(allLogs));
+          } catch {}
+        }
+      } catch (err) {
+        console.warn('Failed to load all teacher point history:', err);
+      }
+
       // 8. Teacher Duty Schedule Check (Jadwal Piket Guru Senin - Jumat)
       try {
         const fetchedDuty = await DutyScheduleRepository.getDutySchedules(authToken);
@@ -1309,6 +1321,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         const prov = ProviderFactory.getProvider();
         const myPointLogs = await prov.getTeacherPointHistory(effectiveUser.id, token || '');
         if (myPointLogs) setPointHistory(myPointLogs);
+        const allLogs = await prov.getTeacherPointHistory('ALL', token || '');
+        if (allLogs && allLogs.length > 0) {
+          setAllTeacherPointLogs(allLogs);
+          try {
+            localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(allLogs));
+          } catch {}
+        }
       } catch {}
     };
 
@@ -1434,6 +1453,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const disciplineLeaderboard = useMemo(() => {
     return getTeacherDisciplineLeaderboard(effectiveUser, appreciationScore, 'CURRENT_MONTH', allTeacherPointLogs, allRegisteredTeachers);
   }, [effectiveUser, appreciationScore, allTeacherPointLogs, allRegisteredTeachers]);
+
+  const currentUserLeaderboardItem = useMemo(() => {
+    if (!disciplineLeaderboard?.leaderboard) return null;
+    return disciplineLeaderboard.leaderboard.find(
+      (item) =>
+        item.id === effectiveUser?.id ||
+        (effectiveUser?.nip && item.nip && item.nip.replace(/\s+/g, '') === effectiveUser.nip.replace(/\s+/g, ''))
+    );
+  }, [disciplineLeaderboard?.leaderboard, effectiveUser?.id, effectiveUser?.nip]);
+
+  const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? appreciationScore?.totalPoints ?? 0;
 
   // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
   // Piagam resmi dan selebrasi penghargaan hanya aktif jika telah memasuki akhir bulan
@@ -2317,7 +2347,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     {(dailyQuests || []).filter((q) => q?.status === 'COMPLETED').length}/{(dailyQuests || []).length} Misi
                   </span>
                   <span className="text-[8.5px] text-cyan-200/80 font-mono block mt-0.5">
-                    #{(disciplineLeaderboard?.currentUserRank) ?? 1} • {(appreciationScore?.totalPoints) ?? 0} PTS
+                    #{(disciplineLeaderboard?.currentUserRank) ?? 1} • {effectiveTotalPoints} PTS
                   </span>
                 </div>
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 group-hover:bg-white/20 text-white flex items-center justify-center transition-all">
@@ -2634,10 +2664,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       </p>
                       <div className="flex items-center gap-1.5 mt-1">
                         <div className="flex items-end gap-0.5 h-3.5 w-6 bg-amber-100/80 p-0.5 rounded">
-                          <div className="w-1 bg-amber-500 rounded-xs h-2.5" />
-                          <div className="w-1 bg-amber-500 rounded-xs h-3" />
-                          <div className="w-1 bg-amber-500 rounded-xs h-2" />
-                          <div className="w-1 bg-amber-500 rounded-xs h-3" />
+                          {(() => {
+                            const onTime = disciplineLeaderboard?.topTeacher?.hadirTepatWaktuCount ?? 0;
+                            const h1 = Math.min(12, Math.max(3, Math.round((onTime / 7) * 10)));
+                            const h2 = Math.min(12, Math.max(4, Math.round((onTime / 7) * 12)));
+                            const h3 = Math.min(12, Math.max(3, Math.round((onTime / 7) * 9)));
+                            const h4 = Math.min(12, Math.max(5, Math.round((onTime / 7) * 11)));
+                            return (
+                              <>
+                                <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h1}px` }} />
+                                <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h2}px` }} />
+                                <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h3}px` }} />
+                                <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h4}px` }} />
+                              </>
+                            );
+                          })()}
                         </div>
                         <span className="text-[9px] font-bold text-amber-900">
                           📊 {disciplineLeaderboard?.topTeacher?.hadirTepatWaktuCount ?? 0} Hari On-Time
@@ -2666,7 +2707,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </span>
                   <p className="text-[10.5px] sm:text-xs font-black text-slate-800 truncate">
                     #{disciplineLeaderboard?.currentUserRank ?? 1} dari {disciplineLeaderboard?.totalTeachers ?? 12} Guru{' '}
-                    <span className="text-emerald-600 font-bold">({appreciationScore?.totalPoints ?? 0} Poin)</span>
+                    <span className="text-emerald-600 font-bold">({effectiveTotalPoints} Poin)</span>
                   </p>
                 </div>
 
@@ -3241,7 +3282,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               items.push({
                 id: 'appreciation',
                 icon: <span className="text-base">⭐</span>,
-                title: `Poin Apresiasi: ${appreciationScore.totalPoints} Poin`,
+                title: `Poin Apresiasi: ${effectiveTotalPoints} Poin`,
                 description: `${appreciationScore.level} • Dedikasi pengajar bulan ini`,
                 action: () => setIsDisciplineBadgeModalOpen(true),
                 badge: 'Peringkat & Layer →',
@@ -3884,7 +3925,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               onOpenLeaderboard={() => setIsDisciplineBadgeModalOpen(true)}
               onOpenQuestAction={handleOpenQuestAction}
               userRank={(disciplineLeaderboard?.currentUserRank) ?? 1}
-              totalPoints={(appreciationScore?.totalPoints) ?? 0}
+              totalPoints={effectiveTotalPoints}
             />
 
             {/* Shortcut Kartu Piagam & Peringkat Guru */}
@@ -3899,7 +3940,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       Peringkat &amp; Piagam Penghargaan
                     </h3>
                     <p className="text-[10.5px] text-slate-500 font-medium">
-                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({(appreciationScore?.totalPoints) ?? 0} PTS)
+                      Peringkat #{(disciplineLeaderboard?.currentUserRank) ?? 1} dari {(disciplineLeaderboard?.totalTeachers) ?? 12} Guru ({effectiveTotalPoints} PTS)
                     </p>
                   </div>
                 </div>
@@ -4574,7 +4615,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                   </div>
                   <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl shadow-2xs">
-                    {appreciationScore.totalPoints} Poin
+                    {effectiveTotalPoints} Poin
                   </span>
                 </div>
 
@@ -5112,8 +5153,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         isOpen={isDisciplineBadgeModalOpen}
         onClose={() => setIsDisciplineBadgeModalOpen(false)}
         currentUser={effectiveUser}
-        currentUserScore={appreciationScore}
+        currentUserScore={appreciationScore ? { ...appreciationScore, totalPoints: effectiveTotalPoints } : undefined}
         allRegisteredTeachers={allRegisteredTeachers}
+        allPointLogs={allTeacherPointLogs}
       />
 
       {/* 14b. Modal Riwayat Pendapatan Poin Transparan Disiplin Guru */}
@@ -5122,7 +5164,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={() => setIsPointHistoryModalOpen(false)}
         teacher={{
           ...effectiveUser,
-          totalPoints: appreciationScore?.totalPoints ?? 0,
+          totalPoints: effectiveTotalPoints,
         }}
         pointHistory={pointHistory}
         selectedMonth={selectedMonth}
@@ -5136,7 +5178,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         user={effectiveUser}
         streakInfo={streakInfo}
         quests={dailyQuests}
-        appreciationScore={appreciationScore}
+        appreciationScore={{ ...appreciationScore, totalPoints: effectiveTotalPoints }}
         onOpenQuestAction={handleOpenQuestAction}
         userRank={disciplineLeaderboard.currentUserRank}
         totalTeachers={disciplineLeaderboard.totalTeachers}
@@ -5153,7 +5195,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           setIsDisciplineBadgeModalOpen(true);
         }}
         rank={disciplineLeaderboard?.currentUserRank ?? 99}
-        totalPoints={appreciationScore?.totalPoints ?? 0}
+        totalPoints={effectiveTotalPoints}
         user={effectiveUser}
         teacherData={disciplineLeaderboard?.leaderboard?.find((t) => t.isCurrentUser)}
         topTeachers={disciplineLeaderboard?.leaderboard?.slice(0, 3)}

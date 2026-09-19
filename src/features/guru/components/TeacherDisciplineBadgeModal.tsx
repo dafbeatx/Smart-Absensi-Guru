@@ -33,6 +33,7 @@ export interface TeacherDisciplineBadgeModalProps {
   currentUserScore?: TeacherAppreciationScore;
   isFullscreen?: boolean;
   allRegisteredTeachers?: UserProfile[];
+  allPointLogs?: TeacherPointLog[];
 }
 
 type TabKey = 'LEADERBOARD' | 'HISTORY' | 'RULES' | 'BADGES' | 'MESSAGE';
@@ -75,9 +76,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   currentUserScore,
   isFullscreen = false,
   allRegisteredTeachers: allRegisteredTeachersProp,
+  allPointLogs: allPointLogsProp,
 }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('LEADERBOARD');
   const [selectedPeriod, setSelectedPeriod] = useState<DisciplinePeriodType>('CURRENT_MONTH');
+  const [historyFilterScope, setHistoryFilterScope] = useState<'CURRENT_MONTH' | 'ALL'>('CURRENT_MONTH');
 
   // Layer detail state: when teacher card is clicked, open clear detail chart view
   const [selectedTeacher, setSelectedTeacher] = useState<TeacherLeaderboardItem | null>(null);
@@ -88,6 +91,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
   // Point history modal state
   const [allPointLogs, setAllPointLogs] = useState<TeacherPointLog[]>(() => {
+    if (allPointLogsProp && allPointLogsProp.length > 0) {
+      return allPointLogsProp;
+    }
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       try {
         const saved = localStorage.getItem('smart_absensi_teacher_point_history');
@@ -101,6 +107,13 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     }
     return [];
   });
+
+  useEffect(() => {
+    if (allPointLogsProp && allPointLogsProp.length > 0) {
+      setAllPointLogs(allPointLogsProp);
+    }
+  }, [allPointLogsProp]);
+
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [pointHistoryTeacher, setPointHistoryTeacher] = useState<any>(null);
   const [teacherLogs, setTeacherLogs] = useState<TeacherPointLog[]>([]);
@@ -363,6 +376,127 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
       return matchSearch && matchTier;
     });
   }, [leaderboard, searchQuery, tierFilter]);
+
+  // Item leaderboard currentUser yang telah dihitung tersinkronisasi
+  const currentUserLeaderboardItem = useMemo(() => {
+    return leaderboard.find((t) => t.isCurrentUser) || null;
+  }, [leaderboard]);
+
+  // Total poin terverifikasi & terpadu untuk currentUser
+  const resolvedUserTotalPoints = useMemo(() => {
+    if (currentUserLeaderboardItem && typeof currentUserLeaderboardItem.totalPoints === 'number') {
+      return currentUserLeaderboardItem.totalPoints;
+    }
+    if (currentUserScore && typeof currentUserScore.totalPoints === 'number') {
+      return currentUserScore.totalPoints;
+    }
+    return 0;
+  }, [currentUserLeaderboardItem, currentUserScore]);
+
+  const resolvedUserOnTimeCount = useMemo(() => {
+    if (currentUserLeaderboardItem && typeof currentUserLeaderboardItem.hadirTepatWaktuCount === 'number') {
+      return currentUserLeaderboardItem.hadirTepatWaktuCount;
+    }
+    return currentUserScore?.hadirTepatWaktuCount ?? 0;
+  }, [currentUserLeaderboardItem, currentUserScore]);
+
+  // Seluruh log milik currentUser
+  const myAllLogs = useMemo(() => {
+    if (!currentUser?.id) return [];
+    return allPointLogs.filter((l) => l.user_id === currentUser.id);
+  }, [allPointLogs, currentUser]);
+
+  // Log milik currentUser yang difilter sesuai periode / scope
+  const targetMonthPrefix = selectedPeriod === 'CURRENT_MONTH' ? '2026-09' : '2026-08';
+  const myFilteredLogs = useMemo(() => {
+    if (historyFilterScope === 'ALL') {
+      return myAllLogs;
+    }
+    return myAllLogs.filter((l) => l.date && l.date.startsWith(targetMonthPrefix));
+  }, [myAllLogs, historyFilterScope, targetMonthPrefix]);
+
+  const historyDisplayPoints = useMemo(() => {
+    if (historyFilterScope === 'ALL') {
+      return Math.max(0, myAllLogs.reduce((sum, l) => sum + (Number(l.points) || 0), 0));
+    }
+    // Jika ada log di bulan berjalan, gunakan akumulasi log tersebut agar persis sama dengan baris transaksi
+    if (myFilteredLogs.length > 0) {
+      return Math.max(0, myFilteredLogs.reduce((sum, l) => sum + (Number(l.points) || 0), 0));
+    }
+    return resolvedUserTotalPoints;
+  }, [historyFilterScope, myAllLogs, myFilteredLogs, resolvedUserTotalPoints]);
+
+  const historyPositivePoints = useMemo(() => {
+    return myFilteredLogs
+      .filter((l) => Number(l.points) > 0)
+      .reduce((sum, l) => sum + Number(l.points), 0);
+  }, [myFilteredLogs]);
+
+  const historyPenaltyPoints = useMemo(() => {
+    return myFilteredLogs
+      .filter((l) => Number(l.points) < 0)
+      .reduce((sum, l) => sum + Math.abs(Number(l.points)), 0);
+  }, [myFilteredLogs]);
+
+  // Resolusi Lencana (Katalog Lencana Terpadu & Fallback Dinamis)
+  const resolvedBadges = useMemo(() => {
+    if (currentUserScore?.badges && currentUserScore.badges.length > 0) {
+      return currentUserScore.badges;
+    }
+
+    const totalMasuk = currentUserLeaderboardItem
+      ? currentUserLeaderboardItem.hadirTepatWaktuCount + currentUserLeaderboardItem.terlambatCount
+      : (currentUserScore ? currentUserScore.hadirTepatWaktuCount + currentUserScore.terlambatCount : 0);
+    const onTimeCount = currentUserLeaderboardItem
+      ? currentUserLeaderboardItem.hadirTepatWaktuCount
+      : (currentUserScore?.hadirTepatWaktuCount ?? 0);
+    const terlambatCount = currentUserLeaderboardItem
+      ? currentUserLeaderboardItem.terlambatCount
+      : (currentUserScore?.terlambatCount ?? 0);
+    const piketCount = currentUserLeaderboardItem
+      ? currentUserLeaderboardItem.piketCount
+      : (currentUserScore?.piketCount ?? 0);
+    const onTimePercentage = totalMasuk > 0 ? (onTimeCount / totalMasuk) * 100 : 0;
+
+    return [
+      {
+        id: 'badge_discipline',
+        title: 'Guru Terdisiplin Waktu',
+        category: 'DISCIPLINE' as const,
+        icon: '🎖️',
+        description: 'Menjaga persentase kehadiran tepat waktu di atas 70% pada bulan berjalan.',
+        isUnlocked: onTimeCount >= 1 && onTimePercentage >= 70,
+        progressPercent: Math.min(100, Math.round(onTimePercentage)),
+      },
+      {
+        id: 'badge_duty',
+        title: 'Piket Responsif & Teladan',
+        category: 'DUTY' as const,
+        icon: '🛡️',
+        description: 'Aktif bertugas sebagai Guru Piket harian dan membina ketertiban sekolah.',
+        isUnlocked: piketCount > 0,
+        progressPercent: piketCount > 0 ? 100 : 0,
+      },
+      {
+        id: 'badge_perfect',
+        title: '100% Kehadiran Sempurna',
+        category: 'PERFECT' as const,
+        icon: '🌟',
+        description: 'Tercatat hadir tepat waktu tanpa ada keterlambatan di bulan berjalan.',
+        isUnlocked: totalMasuk >= 3 && terlambatCount === 0,
+        progressPercent: terlambatCount === 0 && totalMasuk > 0 ? 100 : Math.max(0, 100 - terlambatCount * 25),
+      },
+      {
+        id: 'badge_dedication',
+        title: 'Dedikasi & Konsistensi Pendidik',
+        category: 'DEDICATION' as const,
+        icon: '💚',
+        description: 'Konsisten hadir di sekolah memenuhi jam kerja dan amanah mengajar siswa.',
+        isUnlocked: totalMasuk >= 3,
+        progressPercent: Math.min(100, Math.round((totalMasuk / 5) * 100)),
+      },
+    ];
+  }, [currentUserScore, currentUserLeaderboardItem]);
 
   if (!isOpen) return null;
 
@@ -1570,9 +1704,14 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                               className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex items-center justify-between gap-3 text-xs"
                             >
                               <div className="min-w-0 flex-1">
-                                <h6 className="font-black text-slate-900 truncate text-xs sm:text-sm">
-                                  {log.title}
-                                </h6>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-black text-slate-900 truncate text-xs sm:text-sm">
+                                    {log.teacher_name || registeredTeachers.find((r) => r.id === log.user_id)?.full_name || 'Guru Pengajar'}
+                                  </span>
+                                  <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 text-[10px] font-bold rounded border border-slate-200">
+                                    {log.title}
+                                  </span>
+                                </div>
                                 <p className="text-[11px] text-slate-500 truncate mt-0.5">
                                   {log.date} • {log.description || 'Poin kedisiplinan guru'}
                                 </p>
@@ -2417,7 +2556,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </div>
 
                   {/* Posisi Anda Saat Ini (Dapat Diklik untuk melihat grafik Anda) */}
-                  {currentUserScore && (
+                  {(currentUserLeaderboardItem || currentUserScore) && (
                     <div
                       onClick={() => {
                         const me = leaderboard.find((t) => t.isCurrentUser);
@@ -2457,10 +2596,10 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="text-right">
                           <span className="text-xs font-black text-emerald-700 block">
-                            {currentUserScore?.totalPoints ?? 0} Poin
+                            {resolvedUserTotalPoints} Poin
                           </span>
                           <span className="text-[9px] text-slate-500 font-semibold block">
-                            {currentUserScore?.hadirTepatWaktuCount ?? 0} On-Time
+                            {resolvedUserOnTimeCount} On-Time
                           </span>
                         </div>
                         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
@@ -2608,44 +2747,73 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   <div className="p-3.5 rounded-2xl bg-linear-to-br from-[#023246] to-[#0A455E] text-white border border-[#023246]/40 shadow-sm flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <span className="text-[10px] text-cyan-200 uppercase tracking-wider font-extrabold block">
-                        Buku Catatan Poin Disiplin
+                        Buku Catatan Poin Disiplin • {historyFilterScope === 'CURRENT_MONTH' ? (selectedPeriod === 'CURRENT_MONTH' ? 'September 2026' : 'Agustus 2026') : 'Semua Riwayat'}
                       </span>
                       <h4 className="text-xs sm:text-sm font-black text-white truncate mt-0.5">
                         {currentUser?.full_name || 'Profil Anda'}
                       </h4>
-                      <p className="text-[10px] text-slate-300 font-medium">
-                        Akumulasi perolehan poin kehadiran &amp; piket
+                      <p className="text-[10px] text-slate-300 font-medium truncate">
+                        {myFilteredLogs.length} Transaksi Tercatat ({historyPositivePoints > 0 ? `+${historyPositivePoints}` : '0'}{historyPenaltyPoints > 0 ? ` / -${historyPenaltyPoints}` : ''})
                       </p>
                     </div>
 
                     <div className="text-right shrink-0">
                       <div className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-xs flex items-center gap-1 justify-end">
                         <span>⭐</span>
-                        <span>{currentUserScore?.totalPoints ?? 0} Poin</span>
+                        <span>{historyDisplayPoints} Poin</span>
                       </div>
                       <span className="text-[9px] font-bold text-amber-300 block mt-1">
-                        Total Poin Aktif
+                        Total Poin {historyFilterScope === 'CURRENT_MONTH' ? 'Bulan Ini' : 'Kumulatif'}
                       </span>
                     </div>
                   </div>
 
+                  {/* Filter Toggle: Bulan Berjalan vs Semua Riwayat */}
+                  <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/70 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilterScope('CURRENT_MONTH')}
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] sm:text-[10.5px] transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        historyFilterScope === 'CURRENT_MONTH'
+                          ? 'bg-white text-[#023246] shadow-2xs font-black'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>📅</span>
+                      <span className="truncate">{selectedPeriod === 'CURRENT_MONTH' ? 'September 2026' : 'Agustus 2026'} ({myAllLogs.filter((l) => l.date && l.date.startsWith(targetMonthPrefix)).length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilterScope('ALL')}
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] sm:text-[10.5px] transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        historyFilterScope === 'ALL'
+                          ? 'bg-white text-[#023246] shadow-2xs font-black'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>🌐</span>
+                      <span className="truncate">Semua Waktu ({myAllLogs.length})</span>
+                    </button>
+                  </div>
+
                   {/* List Riwayat Transaksi Poin Guru Login */}
                   {(() => {
-                    const myLogs = allPointLogs.filter((l) => l.user_id === currentUser?.id);
-                    if (myLogs.length === 0) {
+                    if (myFilteredLogs.length === 0) {
                       return (
                         <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
                           <div className="text-2xl">📋</div>
                           <h5 className="text-xs font-bold text-slate-700">Belum Ada Transaksi Poin</h5>
                           <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                            Poin akan otomatis tercatat setiap kali presensi masuk (tepat waktu +15, telat +5) atau bertugas piket (+10).
+                            {historyFilterScope === 'CURRENT_MONTH'
+                              ? 'Belum ada transaksi poin pada periode ini. Klik "Semua Waktu" untuk melihat riwayat kumulatif.'
+                              : 'Poin akan otomatis tercatat setiap kali presensi masuk (tepat waktu +15, telat +5), presensi pulang (+10), atau bertugas piket (+10).'}
                           </p>
                         </div>
                       );
                     }
                     return (
-                      <div className="space-y-2">
-                        {myLogs.map((log) => {
+                      <div className="space-y-2 max-h-80 overflow-y-auto pr-0.5">
+                        {myFilteredLogs.map((log) => {
                           const dateParts = (() => {
                             try {
                               const p = log.date.split('-');
@@ -2798,7 +2966,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </div>
 
                   <div className="space-y-2">
-                    {(currentUserScore?.badges || []).map((badge) => (
+                    {resolvedBadges.map((badge) => (
                       <div
                         key={badge.id}
                         className={`p-3 rounded-xl border transition-all ${
