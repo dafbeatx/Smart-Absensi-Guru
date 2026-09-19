@@ -120,6 +120,12 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
     try {
       const data = await StudentBehaviorRepository.getBehaviors('ALL', targetYear);
       setStudents(data || []);
+      setSelectedStudent((prev) => {
+        if (!prev) return null;
+        const targetId = prev.student_id || prev.id;
+        const found = (data || []).find((s) => (s.student_id || s.id) === targetId);
+        return found || prev;
+      });
     } catch (err) {
       console.warn('Gagal memuat data perilaku siswa:', err);
     } finally {
@@ -326,7 +332,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
           );
         } else {
           setSuccessMessage(
-            `Sukses! Catatan pelanggaran (+${finalPoints} Pts) dicatat untuk ${selectedStudent.student_name}.${teacherAwardMsg} [${syncNotice}]`
+            `Sukses! Catatan pelanggaran (-${finalPoints} Pts) dicatat untuk ${selectedStudent.student_name}.${teacherAwardMsg} [${syncNotice}]`
           );
         }
 
@@ -1080,7 +1086,11 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
                                 : 'bg-rose-500/10 text-rose-700 border border-rose-200'
                             }`}
                           >
-                            {isVoided ? '0 Pts' : `+${Math.abs(log.points)} Pts`}
+                            {isVoided
+                              ? '0 Pts'
+                              : isGood
+                              ? `+${Math.abs(log.points)} Pts`
+                              : `-${Math.abs(log.points)} Pts`}
                           </span>
                         </div>
                       </div>

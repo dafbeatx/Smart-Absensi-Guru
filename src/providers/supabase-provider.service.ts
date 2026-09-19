@@ -4127,80 +4127,131 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<StudentBehaviorRecord[]> {
     try {
-      // 1. Primary: Coba baca dari tabel relasional student_character_summary & students
-      let querySummary = this.client
-        .from('student_character_summary')
-        .select('id, student_id, academic_year, total_points, merits_points, demerits_points, violation_count, commendation_count, updated_at, students!inner(id, full_name, class_name, academic_year, avatar_url)')
-        .eq('academic_year', academicYear)
-        .order('students(class_name)', { ascending: true })
-        .order('students(full_name)', { ascending: true })
-        .limit(200);
+      // 1. Primary: Ambil seluruh master siswa aktif dari public.students
+      let queryStudents = this.client
+        .from('students')
+        .select('id, full_name, class_name, academic_year, avatar_url, created_at, updated_at')
+        .order('class_name', { ascending: true })
+        .order('full_name', { ascending: true })
+        .limit(300);
 
       if (className && className !== 'ALL') {
-        querySummary = querySummary.eq('students.class_name', className);
+        queryStudents = queryStudents.eq('class_name', className);
+      }
+      if (academicYear && academicYear !== 'ALL') {
+        queryStudents = queryStudents.eq('academic_year', academicYear);
       }
 
-      const { data: summaryData, error: summaryErr } = await querySummary;
-      if (!summaryErr && summaryData && summaryData.length > 0) {
-        const studentIds = summaryData.map((s: any) => s.student_id);
-        const logsByStudent: Record<string, StudentBehaviorLog[]> = {};
+      const { data: studentsData, error: studentsErr } = await queryStudents;
+      if (!studentsErr && studentsData && studentsData.length > 0) {
+        const studentIds = studentsData.map((s: any) => s.id).filter(Boolean);
 
+        // Baca data akumulasi poin dari student_character_summary (kolom schema valid)
+        const summariesByStudentId: Record<string, any> = {};
         if (studentIds.length > 0) {
-          const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-          const { data: rawLogs } = await this.client
-            .from('student_behavior_logs')
-            .select('id, student_id, type, points, reason_text, reason_code, occurred_at, timezone, recorded_by_name, recorded_by_user_id, idempotency_key')
-            .in('student_id', studentIds)
-            .is('voided_at', null)
-            .gte('occurred_at', ninetyDaysAgo)
-            .order('occurred_at', { ascending: false })
-            .limit(100);
+          try {
+            let sumQuery = this.client
+              .from('student_character_summary')
+              .select('student_id, academic_year, merits_points, demerits_points, net_points, updated_at')
+              .in('student_id', studentIds);
 
-          if (rawLogs) {
-            rawLogs.forEach((l: any) => {
-              if (!logsByStudent[l.student_id]) logsByStudent[l.student_id] = [];
-              logsByStudent[l.student_id].push({
-                id: l.id,
-                student_id: l.student_id,
-                type: l.type,
-                points: l.points,
-                reason: l.reason_text,
-                reason_code: l.reason_code,
-                timestamp: l.occurred_at,
-                violation_date: l.occurred_at,
-                occurred_at: l.occurred_at,
-                timezone: l.timezone || 'Asia/Jakarta',
-                recordedBy: l.recorded_by_name || 'Guru',
-                recorded_by_user_id: l.recorded_by_user_id,
-                recorded_by_name: l.recorded_by_name,
-                idempotency_key: l.idempotency_key,
-                sync_status: 'SYNCED',
+            if (academicYear && academicYear !== 'ALL') {
+              sumQuery = sumQuery.eq('academic_year', academicYear);
+            }
+
+            const { data: sumData } = await sumQuery;
+            if (sumData) {
+              sumData.forEach((sum: any) => {
+                summariesByStudentId[sum.student_id] = sum;
               });
-            });
+            }
+          } catch (sumErr) {
+            logger.warn('SupabaseProvider', 'Failed fetching student_character_summary:', sumErr);
           }
         }
 
-        return summaryData.map((row: any) => {
-          const merits = row.merits_points ?? 0;
-          const demerits = row.demerits_points ?? 0;
-          const net = merits - demerits;
+        // Ambil riwayat catatan termasuk log yang dibatalkan (audit trail)
+        const logsByStudent: Record<string, StudentBehaviorLog[]> = {};
+        if (studentIds.length > 0) {
+          try {
+            const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+            let logQuery = this.client
+              .from('student_behavior_logs')
+              .select('id, student_id, type, points, reason_text, reason_code, occurred_at, timezone, recorded_by_name, recorded_by_user_id, idempotency_key, voided_at, voided_by_user_id, void_reason')
+              .in('student_id', studentIds)
+              .gte('occurred_at', ninetyDaysAgo)
+              .order('occurred_at', { ascending: false })
+              .limit(200);
+
+            if (academicYear && academicYear !== 'ALL') {
+              logQuery = logQuery.eq('academic_year', academicYear);
+            }
+
+            const { data: rawLogs } = await logQuery;
+            if (rawLogs) {
+              rawLogs.forEach((l: any) => {
+                if (!logsByStudent[l.student_id]) logsByStudent[l.student_id] = [];
+                logsByStudent[l.student_id].push({
+                  id: l.id,
+                  student_id: l.student_id,
+                  type: l.type,
+                  points: l.points,
+                  reason: l.reason_text,
+                  reason_code: l.reason_code,
+                  timestamp: l.occurred_at,
+                  violation_date: l.occurred_at,
+                  occurred_at: l.occurred_at,
+                  timezone: l.timezone || 'Asia/Jakarta',
+                  recordedBy: l.recorded_by_name || 'Guru',
+                  recorded_by_user_id: l.recorded_by_user_id,
+                  recorded_by_name: l.recorded_by_name,
+                  idempotency_key: l.idempotency_key,
+                  voided_at: l.voided_at,
+                  voided_by_user_id: l.voided_by_user_id,
+                  void_reason: l.void_reason,
+                  sync_status: 'SYNCED',
+                });
+              });
+            }
+          } catch (logErr) {
+            logger.warn('SupabaseProvider', 'Failed fetching student_behavior_logs:', logErr);
+          }
+        }
+
+        return studentsData.map((row: any) => {
+          const sum = summariesByStudentId[row.id];
+          const studentLogs = logsByStudent[row.id] || [];
+
+          let merits = sum ? (sum.merits_points ?? 0) : 0;
+          let demerits = sum ? (sum.demerits_points ?? 0) : 0;
+
+          // Jika belum ada row di summary tapi sudah ada log
+          if (!sum && studentLogs.length > 0) {
+            studentLogs.forEach((l) => {
+              if (l.voided_at) return;
+              const p = Math.abs(l.points || 0);
+              if (l.type === 'GOOD') merits += p;
+              else demerits += p;
+            });
+          }
+
+          const net = sum?.net_points != null ? sum.net_points : (merits - demerits);
+
           return {
             id: row.id,
-            student_id: row.student_id,
-            student_name: row.students?.full_name || '',
-            class_name: row.students?.class_name || '',
+            student_id: row.id,
+            student_name: row.full_name || '',
+            class_name: row.class_name || '',
             academic_year: row.academic_year || academicYear,
             total_points: net,
             merits_points: merits,
             demerits_points: demerits,
             net_points: net,
-            violation_count: row.violation_count ?? 0,
-            commendation_count: row.commendation_count ?? 0,
-            behavior_logs: logsByStudent[row.student_id] || [],
-            avatar_url: row.students?.avatar_url || null,
+            behavior_logs: studentLogs,
+            avatar_url: row.avatar_url || null,
             sync_status: 'SYNCED' as const,
             created_at: row.created_at,
-            updated_at: row.updated_at,
+            updated_at: sum?.updated_at || row.updated_at,
           };
         });
       }
@@ -4654,7 +4705,60 @@ export class SupabaseProvider implements IDataProvider {
       logger.warn('SupabaseProvider', 'RPC void_student_behavior exception:', rpcEx);
     }
 
-    // Fallback ke MockProvider untuk voiding offline/mock
+    // 2. Fallback: Coba batalkan pada tabel legacy gm_behaviors
+    try {
+      const { data: gmRows } = await this.client
+        .from('gm_behaviors')
+        .select('id, academic_year, behavior_logs')
+        .limit(200);
+
+      if (gmRows && gmRows.length > 0) {
+        for (const row of gmRows) {
+          const logs: any[] = Array.isArray(row.behavior_logs) ? row.behavior_logs : [];
+          const targetLog = logs.find((l: any) => l.id === logId);
+          if (targetLog && !targetLog.voided_at) {
+            targetLog.voided_at = new Date().toISOString();
+            targetLog.void_reason = voidReason.trim();
+            targetLog.voided_by_user_id = useAuthStore.getState().user?.id || 'usr_guru';
+
+            let m = 0;
+            let d = 0;
+            logs.forEach((l: any) => {
+              if (l.voided_at) return;
+              const p = Math.abs(l.points || 0);
+              if (l.type === 'GOOD') m += p;
+              else d += p;
+            });
+            const net = m - d;
+
+            await this.client
+              .from('gm_behaviors')
+              .update({
+                total_points: net,
+                behavior_logs: logs,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', row.id);
+
+            return {
+              success: true,
+              message: 'Catatan berhasil dibatalkan dan saldo poin siswa telah diperbarui.',
+              summary: {
+                student_id: row.id,
+                academic_year: row.academic_year || '2026/2027',
+                merits_points: m,
+                demerits_points: d,
+                net_points: net,
+              },
+            };
+          }
+        }
+      }
+    } catch (gmErr) {
+      logger.warn('SupabaseProvider', 'Fallback void on gm_behaviors failed:', gmErr);
+    }
+
+    // 3. Fallback ke MockProvider untuk voiding offline/mock
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.voidStudentBehavior(logId, voidReason);
   }
