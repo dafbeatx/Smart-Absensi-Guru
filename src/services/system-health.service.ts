@@ -249,7 +249,7 @@ export class SystemHealthService {
       try {
         const client = provider.getClient();
         const t0 = performance.now();
-        const { count, error } = await client.from('gm_users').select('id', { count: 'exact', head: true });
+        const { count, error } = await client.from('users_public_view').select('id', { count: 'exact', head: true });
         supabaseLatency = Math.round(performance.now() - t0);
 
         if (error) {
@@ -262,7 +262,7 @@ export class SystemHealthService {
         // Attendance rows count this month
         const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const { count: attCount } = await client
-          .from('gm_attendance')
+          .from('attendance')
           .select('id', { count: 'exact', head: true })
           .gte('date', `${currentYearMonth}-01`);
         if (attCount !== null && attCount !== undefined) {
@@ -270,7 +270,7 @@ export class SystemHealthService {
         }
 
         // Leaves count
-        const { count: leaveCount } = await client.from('gm_leave_requests').select('id', { count: 'exact', head: true });
+        const { count: leaveCount } = await client.from('leaves').select('id', { count: 'exact', head: true });
         if (leaveCount !== null && leaveCount !== undefined) {
           totalPendingLeaves = leaveCount;
         }
