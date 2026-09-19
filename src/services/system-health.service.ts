@@ -109,6 +109,16 @@ export class SystemHealthService {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (typeof parsed.baselineMb === 'number') {
+          // Auto-upgrade if stored value is outdated (< 2900 MB verified on 2026-09-19)
+          if (parsed.baselineMb < 2900) {
+            const upgraded: EgressTrackerData = {
+              baselineMb: 2900,
+              baselineDate: '2026-09-19T00:00:00.000Z',
+              dailyBurnRateMb: parsed.dailyBurnRateMb || 30,
+            };
+            safeSetStorage(EGRESS_STORAGE_KEY, JSON.stringify(upgraded));
+            return upgraded;
+          }
           return parsed;
         }
       }
@@ -116,8 +126,8 @@ export class SystemHealthService {
       logger.warn('SystemHealthService', 'Failed to read egress config from storage', e);
     }
     return {
-      baselineMb: 1107, // 1.107 GB recorded on Supabase dashboard on 2026-09-01
-      baselineDate: '2026-09-01T00:00:00.000Z', // Fixed date when baseline was recorded
+      baselineMb: 2900, // 2.90 GB recorded on Supabase dashboard on 2026-09-19
+      baselineDate: '2026-09-19T00:00:00.000Z', // Calibrated date
       dailyBurnRateMb: 30, // ~30 MB/day after polling & WebP optimizations
     };
   }

@@ -29,8 +29,8 @@ export const runSystemHealthTestSuite = async (): Promise<{
     // ── Test 1: Inisialisasi Egress Tracker Default
     const defaultConfig = SystemHealthService.getEgressConfig();
     assert(
-      'Egress Tracker 1: Baseline default terkonfigurasi pada 1.107 MB (1.1 GB baseline)',
-      defaultConfig.baselineMb === 1107,
+      'Egress Tracker 1: Baseline default terkonfigurasi pada 2.900 MB (2.90 GB baseline)',
+      defaultConfig.baselineMb === 2900,
       `Baseline: ${defaultConfig.baselineMb} MB`
     );
     assert(
@@ -40,16 +40,16 @@ export const runSystemHealthTestSuite = async (): Promise<{
     );
 
     // ── Test 2: Pembaruan Egress Baseline
-    SystemHealthService.updateEgressConfig(1200, 35);
+    SystemHealthService.updateEgressConfig(3000, 35);
     const updatedConfig = SystemHealthService.getEgressConfig();
     assert(
-      'Egress Tracker 3: updateEgressConfig berhasil memperbarui baseline ke 1.200 MB',
-      updatedConfig.baselineMb === 1200,
+      'Egress Tracker 3: updateEgressConfig berhasil memperbarui baseline ke 3.000 MB',
+      updatedConfig.baselineMb === 3000,
       `New Baseline: ${updatedConfig.baselineMb} MB`
     );
 
-    // Kembalikan ke baseline awal
-    SystemHealthService.updateEgressConfig(1107, 30);
+    // Kembalikan ke baseline terkalibrasi
+    SystemHealthService.updateEgressConfig(2900, 30);
 
     // ── Test 3: Kalkulasi LocalStorage Usage
     const usageKb = SystemHealthService.getLocalStorageUsageKb();
@@ -130,9 +130,9 @@ export const runSystemHealthTestSuite = async (): Promise<{
 
     // ── Test 8: AI Generative Fallback
     const aiDiag = await GroqAIService.diagnoseCloudHealth({
-      egressUsedMb: 1107,
+      egressUsedMb: 2900,
       egressLimitMb: 5000,
-      egressPercent: 22.1,
+      egressPercent: 58.0,
       supabaseLatencyMs: 95,
       vercelLatencyMs: 45,
       unoptimizedImagesCount: 0,
