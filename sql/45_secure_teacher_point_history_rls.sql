@@ -39,24 +39,34 @@ CREATE INDEX IF NOT EXISTS idx_teacher_point_history_date
 -- Unique index dibuat secara kondisional aman (hanya jika data bebas duplikasi)
 DO $$
 DECLARE
-  v_dup_count INT;
+  v_has_col BOOLEAN;
+  v_dup_count INT := 0;
 BEGIN
-  SELECT COUNT(*) INTO v_dup_count
-  FROM (
-    SELECT idempotency_key
-    FROM public.teacher_point_history
-    WHERE idempotency_key IS NOT NULL
-    GROUP BY idempotency_key
-    HAVING COUNT(*) > 1
-  ) sub;
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' 
+      AND table_name = 'teacher_point_history' 
+      AND column_name = 'idempotency_key'
+  ) INTO v_has_col;
 
-  IF v_dup_count = 0 THEN
-    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_point_history_idempotency 
-             ON public.teacher_point_history(idempotency_key) 
-             WHERE idempotency_key IS NOT NULL';
-    RAISE NOTICE 'Unique index idx_teacher_point_history_idempotency berhasil dibuat.';
-  ELSE
-    RAISE WARNING 'Ditemukan % duplikasi idempotency_key. Unique index dilewati untuk mencegah kegagalan migrasi.', v_dup_count;
+  IF v_has_col THEN
+    EXECUTE '
+      SELECT COUNT(*) FROM (
+        SELECT idempotency_key
+        FROM public.teacher_point_history
+        WHERE idempotency_key IS NOT NULL
+        GROUP BY idempotency_key
+        HAVING COUNT(*) > 1
+      ) sub' INTO v_dup_count;
+
+    IF v_dup_count = 0 THEN
+      EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_point_history_idempotency 
+               ON public.teacher_point_history(idempotency_key) 
+               WHERE idempotency_key IS NOT NULL';
+      RAISE NOTICE 'Unique index idx_teacher_point_history_idempotency berhasil dibuat.';
+    ELSE
+      RAISE WARNING 'Ditemukan % duplikasi idempotency_key. Unique index dilewati untuk mencegah kegagalan migrasi.', v_dup_count;
+    END IF;
   END IF;
 END $$;
 
