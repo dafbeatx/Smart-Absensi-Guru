@@ -36,6 +36,7 @@ import { runUsersPublicViewEgressTestSuite } from './__tests__/users-public-view
 import { runZeroTrustSecretsTestSuite } from './__tests__/zero-trust-secrets.test';
 import { runAttendancePenaltiesTestSuite } from './__tests__/attendance-penalties.test';
 import { runDutyTeacherLeaveTasksTestSuite } from './__tests__/duty-teacher-leave-tasks.test';
+import { runAdministrationModulesTestSuite } from './__tests__/administration-modules.test';
 
 export interface TestResultItem {
   testName: string;
@@ -109,6 +110,7 @@ export class MasterTestRunner {
       { name: 'Zero-Trust Secret Management & Anti-Credential Leak Engine (Phase 4.5)', fn: runZeroTrustSecretsTestSuite },
       { name: 'Universal Attendance Penalties Engine (TAP & ALPA Discipline)', fn: runAttendancePenaltiesTestSuite },
       { name: 'Duty Teacher Leave Tasks & Broadcast Engine', fn: runDutyTeacherLeaveTasksTestSuite },
+      { name: 'Administration Hub & Academic Year Module Engine', fn: runAdministrationModulesTestSuite },
     ];
 
     let totalPassed = 0;

@@ -46,6 +46,8 @@ import { QuestionCorrectionModal } from '../../guru/components/QuestionCorrectio
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { AboutAppView } from '../../guru/components/AboutAppView';
 import { WebTrafficService } from '../../../services/web-traffic.service';
+import { AdministrationHubView } from '../../administration/components/AdministrationHubView';
+import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -59,6 +61,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
+  const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [selectedCorrectionDate, setSelectedCorrectionDate] = useState<string | undefined>(undefined);
@@ -486,6 +489,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       badgeVariant: 'RED',
     },
     {
+      id: 'ADMINISTRATION',
+      label: 'Administrasi',
+      icon: '📁',
+    },
+    {
       id: 'TRAFFIC',
       label: 'Trafik Fitur Guru',
       icon: '📊',
@@ -676,6 +684,40 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 <PendingApprovalWidget requests={allLeaves.length > 0 ? allLeaves : pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
               </div>
             </div>
+          )}
+
+          {/* TAB: PUSAT ADMINISTRASI & UJIAN */}
+          {activeTab === 'ADMINISTRATION' && (
+            <AdministrationHubView
+              userId={user?.id || 'admin_user'}
+              userRole={user?.role || 'ADMIN'}
+              userName={user?.full_name || 'Administrator'}
+              onOpenModule={(actionId) => {
+                if (actionId === 'koreksi_soal') {
+                  if (user) {
+                    WebTrafficService.recordFeatureVisit({
+                      user_id: user.id,
+                      user_name: user.full_name,
+                      user_npp: user.nip,
+                      user_role: user.role,
+                      feature_id: 'koreksi_soal',
+                    });
+                  }
+                  setIsQuestionCorrectionModalOpen(true);
+                } else if (actionId === 'exam_card') {
+                  setIsExamCardModalOpen(true);
+                } else if (actionId === 'jadwal') {
+                  setActiveTab('SCHEDULE');
+                } else if (actionId === 'classroom' || actionId === 'direktori_siswa') {
+                  setActiveTab('STUDENTS');
+                } else if (actionId === 'kalender' || actionId === 'exam_schedule') {
+                  setActiveTab('CALENDAR');
+                } else if (actionId === 'rekap') {
+                  setActiveTab('ATTENDANCE_TRACKING');
+                }
+              }}
+              onBackToDashboard={() => setActiveTab('DASHBOARD')}
+            />
           )}
 
           {/* TAB: TRAFIK & MONITORING WEB GURU */}
@@ -945,6 +987,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           currentUser={user}
         />
       )}
+
+      {/* Modal Cetak Kartu Peserta Ujian & Barcode Siswa (A4) */}
+      <StudentExamCardModal
+        isOpen={isExamCardModalOpen}
+        onClose={() => setIsExamCardModalOpen(false)}
+      />
 
       {/* Modal Peringkat Poin Terbanyak Guru (Fullscreen Workspace) */}
       <TeacherDisciplineBadgeModal

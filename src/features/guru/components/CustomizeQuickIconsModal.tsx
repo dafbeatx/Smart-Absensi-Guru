@@ -27,6 +27,7 @@ import {
   Layers,
   Boxes,
   QrCode,
+  FolderCheck,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
@@ -120,6 +121,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     description: 'Aplikasi koreksi lembar ujian & rekap nilai siswa (Link)',
     icon: ClipboardCheck,
     colorClass: 'from-[#18536B] to-[#023246]',
+  },
+  {
+    id: 'administrasi',
+    title: 'Administrasi',
+    category: 'Akademik & Nilai',
+    description: 'Pusat administrasi KBM, ujian, modul ajar, dan berkas sekolah',
+    icon: FolderCheck,
+    colorClass: 'from-[#023246] to-[#18536B]',
   },
   {
     id: 'exam_card',
@@ -240,7 +249,7 @@ export const QUICK_ICON_STEPS: QuickIconStep[] = [
     id: 3,
     title: 'Akademik & KBM',
     category: 'Akademik & Nilai',
-    itemIds: ['exam_card', 'materials', 'classroom', 'koreksi_soal'], // 4 items
+    itemIds: ['administrasi', 'exam_card', 'materials', 'classroom', 'koreksi_soal'],
   },
   {
     id: 4,

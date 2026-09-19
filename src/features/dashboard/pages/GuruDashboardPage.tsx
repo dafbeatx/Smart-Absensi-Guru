@@ -33,6 +33,7 @@ import { OfflineSyncIndicator } from '../../../components/ui/OfflineSyncIndicato
 import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricEnrollmentPromptModal';
 import { StudentBehaviorModal } from '../../guru/components/StudentBehaviorModal';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
+import { AdministrationHubModal } from '../../administration/components/AdministrationHubModal';
 import {
   CustomizeQuickIconsModal,
   ALL_QUICK_ICONS,
@@ -388,6 +389,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
   });
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
+  const [isAdministrationModalOpen, setIsAdministrationModalOpen] = useState(false);
   const [isStudentBehaviorModalOpen, setIsStudentBehaviorModalOpen] = useState(false);
   const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
@@ -471,6 +473,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         break;
       case 'rekap':
         setIsRecapModalOpen(true);
+        break;
+      case 'administrasi':
+        setIsAdministrationModalOpen(true);
         break;
       case 'koreksi':
         handleOpenCorrectionModal();
@@ -5048,6 +5053,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenExamCardModal={() => setIsExamCardModalOpen(true)}
         onOpenQuestionCorrectionModal={() => setIsQuestionCorrectionModalOpen(true)}
         onOpenHomeroomModal={() => setIsHomeroomModalOpen(true)}
+        onOpenAdministrationModal={() => {
+          setIsMoreFeaturesModalOpen(false);
+          setIsAdministrationModalOpen(true);
+        }}
         onOpenAboutModal={() => {
           setIsMoreFeaturesModalOpen(false);
           handleOpenAboutLayer('HOME');
@@ -5093,6 +5102,48 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={() => setIsStudentBehaviorModalOpen(false)}
         initialTab={studentBehaviorInitialTab}
         currentTeacherName={effectiveUser?.full_name || 'Guru'}
+      />
+
+      {/* 📁 Modal Pusat Administrasi Sekolah & KBM */}
+      <AdministrationHubModal
+        isOpen={isAdministrationModalOpen}
+        onClose={() => setIsAdministrationModalOpen(false)}
+        currentUser={effectiveUser}
+        onOpenModule={(actionId) => {
+          setIsAdministrationModalOpen(false);
+          switch (actionId) {
+            case 'koreksi_soal':
+              setIsQuestionCorrectionModalOpen(true);
+              break;
+            case 'exam_card':
+              setIsExamCardModalOpen(true);
+              break;
+            case 'materials':
+              setIsTeachingMaterialsModalOpen(true);
+              break;
+            case 'jadwal':
+              setIsScheduleModalOpen(true);
+              break;
+            case 'classroom':
+              setIsClassroomModalOpen(true);
+              break;
+            case 'direktori_siswa':
+              setIsStudentDirectoryModalOpen(true);
+              break;
+            case 'homeroom_plan':
+              setIsHomeroomModalOpen(true);
+              break;
+            case 'kalender':
+            case 'exam_schedule':
+              setIsEventsCalendarModalOpen(true);
+              break;
+            case 'rekap':
+              setIsRecapModalOpen(true);
+              break;
+            default:
+              break;
+          }
+        }}
       />
 
       {/* 13. Terminal Presensi RFID Siswa 2 (Akses Cepat Guru Piket & Pengajar) */}

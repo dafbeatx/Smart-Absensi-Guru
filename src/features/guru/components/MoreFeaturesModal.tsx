@@ -30,6 +30,7 @@ interface MoreFeaturesModalProps {
   onOpenExamCardModal?: () => void;
   onOpenQuestionCorrectionModal?: () => void;
   onOpenHomeroomModal?: () => void;
+  onOpenAdministrationModal?: () => void;
   onOpenAboutModal?: () => void;
 }
 
@@ -60,6 +61,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenExamCardModal,
   onOpenQuestionCorrectionModal,
   onOpenHomeroomModal,
+  onOpenAdministrationModal,
   onOpenAboutModal,
 }) => {
   if (!isOpen) return null;
@@ -83,6 +85,28 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
     {
       category: 'Akademik & KBM',
       items: [
+        ...(onOpenAdministrationModal
+          ? [
+              {
+                id: 'administrasi',
+                title: 'Administrasi Sekolah & KBM',
+                subtitle: 'Pusat berkas ujian, bahan ajar, jadwal, dan perangkat berbasis tahun ajaran',
+                icon: '📁',
+                badge: 'Pusat Berkas',
+                action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'administrasi',
+                  });
+                  onClose();
+                  onOpenAdministrationModal();
+                },
+              },
+            ]
+          : []),
         ...(onOpenHomeroomModal
           ? [
               {
