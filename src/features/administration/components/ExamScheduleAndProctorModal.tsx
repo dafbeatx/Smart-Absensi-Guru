@@ -128,6 +128,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [isSyncingClasses, setIsSyncingClasses] = useState(false);
   const [customClassInput, setCustomClassInput] = useState('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(DEFAULT_SUBJECTS);
+  const [availableSubjects, setAvailableSubjects] = useState<string[]>(DEFAULT_SUBJECTS);
+  const [customSubjectInput, setCustomSubjectInput] = useState('');
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
   const [proctorsPerRoom, setProctorsPerRoom] = useState<1 | 2>(1);
   const [excludeOwnSubject, setExcludeOwnSubject] = useState(true);
@@ -149,6 +152,37 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     const timer = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Load subjects from cache (Zero Egress)
+  const loadSubjectsForYear = useCallback((year: string) => {
+    try {
+      const subjectsSet = new Set<string>(DEFAULT_SUBJECTS);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const cached = localStorage.getItem('smart_absensi_teaching_schedules');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((slot: any) => {
+              if (!slot.academic_year || slot.academic_year === year) {
+                const s = (slot.subject || slot.subject_name || '').trim();
+                if (s && s.length > 1) {
+                  subjectsSet.add(s);
+                }
+              }
+            });
+          }
+        }
+      }
+      const combined = Array.from(subjectsSet);
+      setAvailableSubjects(combined);
+      setSelectedSubjects((prev) => {
+        const merged = new Set([...prev, ...DEFAULT_SUBJECTS]);
+        return Array.from(merged).filter((s) => combined.includes(s));
+      });
+    } catch (err) {
+      logger.warn('ExamScheduleAndProctorModal', 'Failed to extract subjects from cache:', err);
+    }
+  }, []);
 
   // Load distinct classes strictly filtered by Academic Year (Zero Unnecessary Egress)
   const loadClassesForYear = useCallback(async (year: string, forceRefresh: boolean = false) => {
@@ -174,10 +208,42 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   }, []);
 
   // Handle academic year change in exam questionnaire
-  const handleAcademicYearChange = useCallback((newYear: string) => {
+  const handleAcademicYearChange = useCallback(async (newYear: string) => {
     setFormAcademicYear(newYear);
     loadClassesForYear(newYear, false);
-  }, [loadClassesForYear]);
+    loadSubjectsForYear(newYear);
+    const saved = await ExamScheduleRepository.getSchedule(newYear, formExamType);
+    setScheduleData(saved);
+  }, [loadClassesForYear, loadSubjectsForYear, formExamType]);
+
+  // Handle exam type change
+  const handleExamTypeChange = useCallback(async (newType: ExamType) => {
+    setFormExamType(newType);
+    setSelectedExamType(newType);
+    const saved = await ExamScheduleRepository.getSchedule(formAcademicYear, newType);
+    setScheduleData(saved);
+  }, [formAcademicYear]);
+
+  // Handle adding custom subject to exam
+  const handleAddCustomSubject = useCallback(() => {
+    const clean = customSubjectInput.trim();
+    if (!clean) return;
+    if (!availableSubjects.some((s) => s.toLowerCase() === clean.toLowerCase())) {
+      setAvailableSubjects((prev) => [...prev, clean]);
+    }
+    if (!selectedSubjects.some((s) => s.toLowerCase() === clean.toLowerCase())) {
+      setSelectedSubjects((prev) => [...prev, clean]);
+    }
+    setCustomSubjectInput('');
+    setToast({ text: `Mata pelajaran "${clean}" berhasil ditambahkan ke daftar ujian!`, type: 'success' });
+  }, [customSubjectInput, availableSubjects, selectedSubjects]);
+
+  // Handle removing custom subject from list
+  const handleRemoveCustomSubject = useCallback((subjToRemove: string) => {
+    setAvailableSubjects((prev) => prev.filter((s) => s !== subjToRemove));
+    setSelectedSubjects((prev) => prev.filter((s) => s !== subjToRemove));
+    setToast({ text: `Mata pelajaran "${subjToRemove}" dihapus dari daftar pilihan.`, type: 'success' });
+  }, []);
 
   // Handle adding custom class / room
   const handleAddCustomClass = useCallback(() => {
@@ -232,7 +298,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       // 4. Load dynamic classes strictly filtered by active academic year (Zero Egress Priority)
       await loadClassesForYear(formAcademicYear, false);
 
-      // 5. Load existing schedule if available
+      // 5. Load subjects for academic year (Zero Egress Priority)
+      loadSubjectsForYear(formAcademicYear);
+
+      // 6. Load existing schedule if available
       const saved = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType);
       setScheduleData(saved);
 
@@ -247,7 +316,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, activeAcademicYear, selectedExamType, formAcademicYear, loadClassesForYear]);
+  }, [currentUser, activeAcademicYear, selectedExamType, formAcademicYear, loadClassesForYear, loadSubjectsForYear]);
 
   useEffect(() => {
     if (isOpen) {
@@ -358,18 +427,52 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
   };
 
-  // Delete Schedule
+  // Delete Schedule (Full)
   const handleDeleteSchedule = async () => {
-    if (!window.confirm(`Yakin ingin menghapus seluruh jadwal ujian & pengawas ${selectedExamType} (${activeAcademicYear})?`)) {
-      return;
-    }
+    const targetYear = scheduleData?.config.academicYear || formAcademicYear || activeAcademicYear;
+    const targetType = scheduleData?.config.examType || formExamType || selectedExamType;
     try {
-      await ExamScheduleRepository.deleteSchedule(activeAcademicYear, selectedExamType);
+      await ExamScheduleRepository.deleteSchedule(targetYear, targetType);
       setScheduleData(null);
+      setIsConfirmDeleteOpen(false);
       setActiveTab('form');
-      setToast({ text: 'Jadwal berhasil dihapus.', type: 'success' });
-    } catch {
-      setToast({ text: 'Gagal menghapus jadwal.', type: 'error' });
+      setToast({
+        text: `Jadwal ujian ${targetType} (TA ${targetYear}) berhasil dihapus.`,
+        type: 'success',
+      });
+    } catch (err) {
+      logger.error('ExamScheduleAndProctorModal', 'Failed to delete schedule:', err);
+      setToast({ text: 'Gagal menghapus jadwal ujian.', type: 'error' });
+    }
+  };
+
+  // Delete Single Subject Slot from active schedule
+  const handleDeleteSingleSubject = async (scheduleItemId: string, subjectName: string, className: string) => {
+    if (!scheduleData) return;
+    const confirmed = window.confirm(`Hapus jadwal ujian ${subjectName} untuk kelas ${className}?`);
+    if (!confirmed) return;
+
+    try {
+      const updatedSubjectSchedules = scheduleData.subjectSchedules.filter((s) => s.id !== scheduleItemId);
+      const updatedSchedule: ExamScheduleData = {
+        ...scheduleData,
+        subjectSchedules: updatedSubjectSchedules,
+        summary: {
+          ...scheduleData.summary,
+          totalSubjects: new Set(updatedSubjectSchedules.map((s) => s.subject)).size,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+
+      await ExamScheduleRepository.saveSchedule(updatedSchedule);
+      setScheduleData(updatedSchedule);
+      setToast({
+        text: `Jadwal ${subjectName} (${className}) berhasil dihapus dari jadwal aktif.`,
+        type: 'success',
+      });
+    } catch (err) {
+      logger.error('ExamScheduleAndProctorModal', 'Failed to delete single subject slot:', err);
+      setToast({ text: 'Gagal menghapus slot ujian mata pelajaran.', type: 'error' });
     }
   };
 
@@ -454,6 +557,18 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         <div className="flex items-center gap-2 shrink-0 ml-2">
           {scheduleData && (
             <>
+              {accessInfo.canManage && (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmDeleteOpen(true)}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors shadow-2xs"
+                  title="Hapus Seluruh Jadwal Ujian Ini"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Hapus Jadwal</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => ExamScheduleRepository.exportToExcel(scheduleData)}
@@ -597,11 +712,12 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
             </button>
             <button
               type="button"
-              onClick={handleDeleteSchedule}
-              className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
-              title="Hapus Jadwal"
+              onClick={() => setIsConfirmDeleteOpen(true)}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200 flex items-center gap-1 transition-colors"
+              title="Hapus Seluruh Jadwal Ujian Ini"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Hapus Jadwal</span>
             </button>
           </div>
         )}
@@ -636,6 +752,38 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                 </span>
               </div>
 
+              {/* Alert Banner if schedule already exists */}
+              {scheduleData && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                    <div>
+                      <span className="font-bold text-slate-900 block">Jadwal Ujian Tersimpan Ditemukan</span>
+                      <span className="text-slate-600">
+                        Jadwal {scheduleData.config.examTitle || scheduleData.config.examType} (TA {scheduleData.config.academicYear}) sudah tersimpan di sistem. Anda dapat melihat hasil di tab Jadwal Ujian / Roster Pengawas, atau menghapus jadwal saat ini untuk menyusun ulang.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('subjects')}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-800 text-xs font-bold hover:bg-amber-100 transition-colors shadow-2xs"
+                    >
+                      Lihat Jadwal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmDeleteOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-2xs flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus Jadwal Ini</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* 1. Identitas Asesmen, Tahun Ajaran & Waktu */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div>
@@ -657,7 +805,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                   <label className="block text-xs font-bold text-slate-700 mb-1">Jenis Asesmen / Ujian</label>
                   <select
                     value={formExamType}
-                    onChange={(e) => setFormExamType(e.target.value as ExamType)}
+                    onChange={(e) => handleExamTypeChange(e.target.value as ExamType)}
                     className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                   >
                     <option value="ASTS">ASTS (Asesmen Tengah Semester)</option>
@@ -867,48 +1015,102 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
               </div>
 
               {/* 4. Pilihan Mata Pelajaran */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-slate-700">
-                    Mata Pelajaran yang Diujikan ({selectedSubjects.length} Mapel)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedSubjects.length === DEFAULT_SUBJECTS.length) {
-                        setSelectedSubjects([]);
-                      } else {
-                        setSelectedSubjects([...DEFAULT_SUBJECTS]);
-                      }
-                    }}
-                    className="text-[11px] font-bold text-teal-700 hover:text-teal-800"
-                  >
-                    {selectedSubjects.length === DEFAULT_SUBJECTS.length ? 'Batal Semua' : 'Pilih Semua'}
-                  </button>
+              <div className="space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-100">
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                      <span>Mata Pelajaran yang Diujikan</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        {selectedSubjects.length} dari {availableSubjects.length} Terpilih
+                      </span>
+                    </label>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Pilih mapel kurikulum atau tambahkan mapel kustom (mis. Bahasa Daerah, Fiqih, BTQ, Tahfidz).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedSubjects.length === availableSubjects.length) {
+                          setSelectedSubjects([]);
+                        } else {
+                          setSelectedSubjects([...availableSubjects]);
+                        }
+                      }}
+                      className="text-[11px] font-bold text-teal-700 hover:text-teal-800 px-2 py-1"
+                    >
+                      {selectedSubjects.length === availableSubjects.length ? 'Batal Semua' : 'Pilih Semua'}
+                    </button>
+                  </div>
                 </div>
+
+                {/* List of subject pills */}
                 <div className="flex flex-wrap gap-1.5">
-                  {DEFAULT_SUBJECTS.map((sub) => {
+                  {availableSubjects.map((sub) => {
                     const isChecked = selectedSubjects.includes(sub);
+                    const isCustom = !DEFAULT_SUBJECTS.includes(sub);
                     return (
-                      <button
+                      <div
                         key={sub}
-                        type="button"
-                        onClick={() => {
-                          setSelectedSubjects((prev) =>
-                            isChecked ? prev.filter((s) => s !== sub) : [...prev, sub]
-                          );
-                        }}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                        className={`inline-flex items-center rounded-lg text-xs font-medium transition-all ${
                           isChecked
                             ? 'bg-slate-900 text-white font-bold shadow-2xs'
                             : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        {isChecked && <Check className="w-3 h-3 text-emerald-400" />}
-                        <span>{sub}</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubjects((prev) =>
+                              isChecked ? prev.filter((s) => s !== sub) : [...prev, sub]
+                            );
+                          }}
+                          className="px-2.5 py-1.5 flex items-center gap-1.5"
+                        >
+                          {isChecked && <Check className="w-3 h-3 text-emerald-400" />}
+                          <span>{sub}</span>
+                        </button>
+                        {isCustom && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveCustomSubject(sub);
+                            }}
+                            title={`Hapus ${sub} dari daftar pilihan`}
+                            className="pr-2 pl-0.5 py-1.5 text-slate-400 hover:text-rose-400 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
+                </div>
+
+                {/* Input Tambah Mapel Kustom */}
+                <div className="flex items-center gap-2 pt-1 max-w-sm">
+                  <input
+                    type="text"
+                    value={customSubjectInput}
+                    onChange={(e) => setCustomSubjectInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomSubject();
+                      }
+                    }}
+                    placeholder="Tambah mapel kustom (mis. Bahasa Sunda, BTQ, Fiqih)..."
+                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 flex-1 font-sans"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomSubject}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors shrink-0"
+                  >
+                    + Tambah Mapel
+                  </button>
                 </div>
               </div>
 
@@ -1054,8 +1256,32 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                       {scheduleData.summary.totalDays} Hari Pelaksanaan • {scheduleData.summary.totalClasses} Rombel • {scheduleData.summary.totalSubjects} Mata Pelajaran
                     </span>
                   </div>
-                  <div className="text-[11px] bg-white px-3 py-1.5 rounded-xl border border-teal-200 font-semibold text-slate-700">
-                    Periode: {scheduleData.config.startDate} s.d. {scheduleData.config.endDate}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-[11px] bg-white px-3 py-1.5 rounded-xl border border-teal-200 font-semibold text-slate-700">
+                      Periode: {scheduleData.config.startDate} s.d. {scheduleData.config.endDate}
+                    </div>
+                    {accessInfo.canManage && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('form')}
+                          className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition-colors shadow-2xs flex items-center gap-1.5"
+                          title="Ubah parameter atau buat jadwal baru"
+                        >
+                          <Sliders className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Ubah Parameter</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsConfirmDeleteOpen(true)}
+                          className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-2xs flex items-center gap-1.5"
+                          title="Hapus seluruh jadwal ujian ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus Jadwal</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1072,6 +1298,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                           <th className="py-3 px-3.5">Kelas / Rombel</th>
                           <th className="py-3 px-3.5 font-black text-slate-900">Mata Pelajaran</th>
                           <th className="py-3 px-3.5 text-center">Ruangan</th>
+                          {accessInfo.canManage && (
+                            <th className="py-3 px-3 text-center w-14">Aksi</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium">
@@ -1098,6 +1327,18 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                                 <span className="text-[11px] text-slate-500">Ruang {item.className}</span>
                               )}
                             </td>
+                            {accessInfo.canManage && (
+                              <td className="py-2.5 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSingleSubject(item.id, item.subject, item.className)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                  title={`Hapus ujian ${item.subject} (${item.className})`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -1352,6 +1593,46 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
           </div>
         )}
       </div>
+
+      {/* Modal Konfirmasi Hapus Jadwal */}
+      {isConfirmDeleteOpen && (
+        <div className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900">
+                Hapus Seluruh Jadwal Ujian?
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Apakah Anda yakin ingin menghapus seluruh jadwal ujian mata pelajaran dan pembagian tugas pengawas untuk{' '}
+                <span className="font-bold text-slate-800">
+                  {scheduleData?.config.examTitle || scheduleData?.config.examType || formExamType} (TA {scheduleData?.config.academicYear || formAcademicYear})
+                </span>?
+                Tindakan ini akan mengosongkan data jadwal dari penyimpanan dan mengembalikan status ke formulir awal.
+              </p>
+            </div>
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmDeleteOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSchedule}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-md flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Ya, Hapus Jadwal</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );

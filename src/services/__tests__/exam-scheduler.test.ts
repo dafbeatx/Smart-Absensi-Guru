@@ -294,5 +294,65 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 11-12: Error testing academic year class extraction', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 13: Custom Subjects Inclusion in AI Exam Scheduler
+  // ---------------------------------------------------------------------------
+  try {
+    const customConfig: ExamScheduleFormConfig = {
+      ...config,
+      selectedSubjects: ['Matematika', 'Bahasa Sunda', 'BTQ', 'Fiqih'],
+      selectedClasses: ['7A', '8A'],
+    };
+
+    const customGenerated = ExamSchedulerService.generateSchedule(customConfig, sampleTeachers, []);
+    const scheduledSubjects = new Set(customGenerated.subjectSchedules.map((s) => s.subject));
+
+    assert(
+      'Exam Scheduler 13: Successfully generates exam schedule with custom added subjects (Bahasa Sunda, BTQ, Fiqih)',
+      scheduledSubjects.has('Bahasa Sunda') &&
+      scheduledSubjects.has('BTQ') &&
+      scheduledSubjects.has('Fiqih') &&
+      customGenerated.summary.totalSubjects === 4,
+      `Subjects: ${Array.from(scheduledSubjects).join(', ')}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 13: Error testing custom subjects scheduling', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 14: Granular Single Subject Exam Slot Deletion & Persistence
+  // ---------------------------------------------------------------------------
+  try {
+    const baseSchedule = ExamSchedulerService.generateSchedule(config, sampleTeachers, []);
+    await ExamScheduleRepository.saveSchedule(baseSchedule);
+
+    const initialCount = baseSchedule.subjectSchedules.length;
+    const itemToDelete = baseSchedule.subjectSchedules[0];
+
+    const updatedList = baseSchedule.subjectSchedules.filter((s) => s.id !== itemToDelete.id);
+    const updatedSchedule = {
+      ...baseSchedule,
+      subjectSchedules: updatedList,
+      summary: {
+        ...baseSchedule.summary,
+        totalSubjects: new Set(updatedList.map((s) => s.subject)).size,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await ExamScheduleRepository.saveSchedule(updatedSchedule);
+    const reloaded = await ExamScheduleRepository.getSchedule(config.academicYear, config.examType);
+
+    assert(
+      'Exam Scheduler 14: Successfully removes a single subject slot and persists the updated schedule',
+      reloaded !== null &&
+      reloaded.subjectSchedules.length === initialCount - 1 &&
+      !reloaded.subjectSchedules.some((s) => s.id === itemToDelete.id),
+      `Initial: ${initialCount}, After deletion: ${reloaded?.subjectSchedules.length}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 14: Error testing granular single subject slot deletion', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
