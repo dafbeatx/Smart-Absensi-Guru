@@ -2268,13 +2268,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                                 <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 w-10 text-center font-black">
                                   No
                                 </th>
-                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-[130px] text-center font-black">
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-32.5 text-center font-black">
                                   Hari / Tanggal
                                 </th>
-                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 min-w-[100px] text-center font-black">
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 min-w-25 text-center font-black">
                                   Waktu
                                 </th>
-                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-[140px] text-left font-black">
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-35 text-left font-black">
                                   Mata Pelajaran
                                 </th>
                                 <th
