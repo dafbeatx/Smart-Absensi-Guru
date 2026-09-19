@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { MasterTestRunner } from '../../services/test-runner.service';
 import type { MasterTestSummary } from '../../services/test-runner.service';
 
 interface TestRunnerModalProps {
@@ -16,6 +15,7 @@ export const TestRunnerModal: React.FC<TestRunnerModalProps> = ({ isOpen, onClos
   const handleRunTests = async () => {
     setIsRunning(true);
     try {
+      const { MasterTestRunner } = await import('../../services/test-runner.service');
       const res = await MasterTestRunner.runAll();
       setSummary(res);
     } catch (err) {

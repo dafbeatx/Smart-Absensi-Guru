@@ -3,7 +3,6 @@ import { useAuthStore } from './store/useAuthStore';
 import { LoginPage } from './features/auth/pages/LoginPage';
 import { ForceChangePinModal } from './features/auth/components/ForceChangePinModal';
 import { ToastContainer } from './components/ui/Toast';
-import { TestRunnerModal } from './components/dev/TestRunnerModal';
 import { AIAssistantDrawer } from './components/ui/AIAssistantDrawer';
 import { AppInstallModal } from './components/ui/AppInstallModal';
 import { QueueMonitor } from './components/ui/QueueMonitor';
@@ -66,6 +65,14 @@ const QRScannerOverlay = lazyRetry(
       default: m.QRScannerOverlay,
     })),
   'QRScannerOverlay'
+);
+
+const TestRunnerModal = lazyRetry(
+  () =>
+    import('./components/dev/TestRunnerModal').then((m) => ({
+      default: m.TestRunnerModal,
+    })),
+  'TestRunnerModal'
 );
 
 
@@ -324,10 +331,14 @@ export const App: React.FC = () => {
       <ForceChangePinModal />
 
       {/* Dev Suite Unit Test Runner Modal */}
-      <TestRunnerModal
-        isOpen={isTestRunnerOpen}
-        onClose={() => setIsTestRunnerOpen(false)}
-      />
+      {isTestRunnerOpen && (
+        <Suspense fallback={null}>
+          <TestRunnerModal
+            isOpen={isTestRunnerOpen}
+            onClose={() => setIsTestRunnerOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Preview Mode QR Scanner Blocked Modal */}
       {isPreviewScannerBlocked && (
