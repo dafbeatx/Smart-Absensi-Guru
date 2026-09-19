@@ -565,4 +565,78 @@ export class SystemHealthService {
 
     return report;
   }
+
+  /**
+   * Menyimpan snapshot penggunaan cloud ke tabel usage_snapshots di Supabase
+   * Mengikuti arsitektur monitoring mandiri yang aman tanpa membocorkan secret keys.
+   */
+  public static async recordUsageSnapshot(
+    report: SystemHealthReport,
+    recordedBy: string = 'SYSTEM',
+    notes?: string
+  ): Promise<void> {
+    try {
+      const provider = ProviderFactory.getProvider();
+      if (provider instanceof SupabaseProvider) {
+        const client = provider.getClient();
+        await client.from('usage_snapshots').insert({
+          project_ref: 'fnppfmjsbqxbtioypnap',
+          egress_gb: Number((report.supabase.egressUsedMb / 1000).toFixed(3)),
+          egress_limit_gb: Number((report.supabase.egressLimitMb / 1000).toFixed(3)),
+          egress_percentage: report.supabase.egressPercent,
+          storage_gb: Number((report.supabase.totalStorageBytes / (1024 * 1024 * 1024)).toFixed(3)),
+          database_size_mb: 14.0,
+          total_users: report.supabase.totalUsers,
+          total_monthly_attendance: report.supabase.totalMonthlyAttendance,
+          total_pending_leaves: report.supabase.totalPendingLeaves,
+          health_score: report.overallScore,
+          health_status: report.overallStatus,
+          recorded_by: recordedBy,
+          notes: notes || null,
+        });
+        logger.info('SystemHealthService', 'Usage snapshot successfully recorded to Supabase');
+      }
+    } catch (err) {
+      logger.warn('SystemHealthService', 'Failed to record usage snapshot:', err);
+    }
+  }
+
+  /**
+   * Mengambil riwayat snapshot penggunaan dari database Supabase
+   */
+  public static async getUsageSnapshots(limit = 10): Promise<Array<{
+    id: string;
+    captured_at: string;
+    project_ref: string;
+    egress_gb: number;
+    egress_limit_gb: number;
+    egress_percentage: number;
+    storage_gb: number;
+    database_size_mb: number;
+    total_users: number;
+    total_monthly_attendance: number;
+    total_pending_leaves: number;
+    health_score: number;
+    health_status: string;
+    recorded_by: string;
+    notes?: string;
+  }>> {
+    try {
+      const provider = ProviderFactory.getProvider();
+      if (provider instanceof SupabaseProvider) {
+        const client = provider.getClient();
+        const { data, error } = await client
+          .from('usage_snapshots')
+          .select('*')
+          .order('captured_at', { ascending: false })
+          .limit(limit);
+        if (!error && data) {
+          return data;
+        }
+      }
+    } catch (err) {
+      logger.warn('SystemHealthService', 'Failed to fetch usage snapshots:', err);
+    }
+    return [];
+  }
 }

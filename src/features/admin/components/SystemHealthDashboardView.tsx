@@ -55,6 +55,8 @@ export const SystemHealthDashboardView: React.FC<SystemHealthDashboardViewProps>
     try {
       const freshReport = await SystemHealthService.runHealthScan();
       setReport(freshReport);
+      // Simpan snapshot penggunaan ke database internal usage_snapshots
+      await SystemHealthService.recordUsageSnapshot(freshReport, 'AI_SCAN', 'Pindai proaktif AI manual');
     } catch (err) {
       console.error('Error running AI health scan:', err);
     } finally {
@@ -62,14 +64,20 @@ export const SystemHealthDashboardView: React.FC<SystemHealthDashboardViewProps>
     }
   };
 
-  const handleSaveEgress = () => {
+  const handleSaveEgress = async () => {
     const rawVal = parseFloat(egressInputVal) || 0;
     const mbVal = egressInputUnit === 'GB' ? Math.round(rawVal * 1000) : Math.round(rawVal);
     const burnRate = parseInt(burnRateInput, 10) || 30;
 
     SystemHealthService.updateEgressConfig(mbVal, burnRate);
     setIsEgressModalOpen(false);
-    handleRunAiScan();
+    const freshReport = await SystemHealthService.runHealthScan();
+    setReport(freshReport);
+    await SystemHealthService.recordUsageSnapshot(
+      freshReport,
+      'ADMIN_CALIBRATION',
+      `Kalibrasi manual admin: ${rawVal} ${egressInputUnit}`
+    );
   };
 
   if (isLoading && !report) {
