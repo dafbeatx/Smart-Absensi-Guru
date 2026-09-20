@@ -130,11 +130,49 @@ export class ExamCommitteeRepository {
     const isAdmin = ['ADMIN', 'OPERATOR'].includes(userRole);
 
     if (isAdmin) {
+      const isActualCommittee = await this.isUserCommittee(user, academicYear);
+      let roleName = userRole === 'ADMIN' ? 'Administrator' : 'Operator Sekolah';
+
+      if (isActualCommittee) {
+        const members = await this.getCommitteeMembers(academicYear);
+        const member = members.find(
+          (m) =>
+            m.isActive &&
+            (m.userId === user.id ||
+              (user.nip && m.npp === user.nip) ||
+              (user.npp && m.npp === user.npp) ||
+              (m.fullName && user.full_name && m.fullName.trim().toLowerCase() === user.full_name.trim().toLowerCase()))
+        );
+        if (member) {
+          roleName =
+            member.role === 'KETUA'
+              ? 'Ketua Panitia Ujian'
+              : member.role === 'SEKRETARIS'
+              ? 'Sekretaris Panitia Ujian'
+              : member.role === 'BENDAHARA'
+              ? 'Bendahara Panitia Ujian'
+              : member.role === 'ANGGOTA'
+              ? 'Anggota Panitia Ujian'
+              : 'Panitia Ujian';
+        } else if (user.position && user.position.toLowerCase().includes('panitia')) {
+          const pos = user.position.toLowerCase();
+          roleName = pos.includes('ketua')
+            ? 'Ketua Panitia Ujian'
+            : pos.includes('sekretaris')
+            ? 'Sekretaris Panitia Ujian'
+            : pos.includes('bendahara')
+            ? 'Bendahara Panitia Ujian'
+            : pos.includes('anggota')
+            ? 'Anggota Panitia Ujian'
+            : user.position;
+        }
+      }
+
       return {
         canManage: true,
-        isCommittee: true,
+        isCommittee: isActualCommittee,
         isAdmin: true,
-        roleLabel: userRole === 'ADMIN' ? 'Administrator' : 'Operator Sekolah',
+        roleLabel: roleName,
       };
     }
 
@@ -205,31 +243,55 @@ export class ExamCommitteeRepository {
   } | null> {
     if (!user) return null;
     const targetYear = academicYear || AdministrationRepository.getActiveAcademicYear();
-    const access = await this.checkCommitteeAccess(user, targetYear);
-    if (!access.isCommittee) return null;
+
+    const isCommittee = await this.isUserCommittee(user, targetYear);
+    if (!isCommittee) return null;
 
     const members = await this.getCommitteeMembers(targetYear);
     const member = members.find(
       (m) =>
-        m.userId === user.id ||
-        (user.nip && m.npp === user.nip) ||
-        (user.npp && m.npp === user.npp) ||
-        (m.fullName && user.full_name && m.fullName.trim().toLowerCase() === user.full_name.trim().toLowerCase())
+        m.isActive &&
+        (m.userId === user.id ||
+          (user.nip && m.npp === user.nip) ||
+          (user.npp && m.npp === user.npp) ||
+          (m.fullName && user.full_name && m.fullName.trim().toLowerCase() === user.full_name.trim().toLowerCase()))
     );
 
     let roleCode: CommitteeRole | 'CUSTOM' = member?.role || 'ANGGOTA';
-    if (!member && user.position && user.position.toLowerCase().includes('panitia')) {
+    let roleLabel = 'Anggota Panitia Ujian';
+
+    if (member) {
+      roleLabel =
+        member.role === 'KETUA'
+          ? 'Ketua Panitia Ujian'
+          : member.role === 'SEKRETARIS'
+          ? 'Sekretaris Panitia Ujian'
+          : member.role === 'BENDAHARA'
+          ? 'Bendahara Panitia Ujian'
+          : member.role === 'ANGGOTA'
+          ? 'Anggota Panitia Ujian'
+          : 'Panitia Ujian';
+    } else if (user.position && user.position.toLowerCase().includes('panitia')) {
       const pos = user.position.toLowerCase();
-      if (pos.includes('ketua')) roleCode = 'KETUA';
-      else if (pos.includes('sekretaris')) roleCode = 'SEKRETARIS';
-      else if (pos.includes('bendahara')) roleCode = 'BENDAHARA';
-      else roleCode = 'ANGGOTA';
+      if (pos.includes('ketua')) {
+        roleCode = 'KETUA';
+        roleLabel = 'Ketua Panitia Ujian';
+      } else if (pos.includes('sekretaris')) {
+        roleCode = 'SEKRETARIS';
+        roleLabel = 'Sekretaris Panitia Ujian';
+      } else if (pos.includes('bendahara')) {
+        roleCode = 'BENDAHARA';
+        roleLabel = 'Bendahara Panitia Ujian';
+      } else {
+        roleCode = 'ANGGOTA';
+        roleLabel = 'Anggota Panitia Ujian';
+      }
     }
 
     return {
       isCommittee: true,
       role: roleCode,
-      roleLabel: access.roleLabel,
+      roleLabel: roleLabel,
       academicYear: targetYear,
     };
   }

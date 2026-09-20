@@ -119,6 +119,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           m.role === 'BENDAHARA' ? 'Bendahara Panitia' : 'Anggota Panitia';
         map[m.userId] = { role: m.role, label };
         if (m.npp) map[`npp_${m.npp}`] = { role: m.role, label };
+        if (m.fullName) map[`name_${m.fullName.trim().toLowerCase()}`] = { role: m.role, label };
       }
     });
     return map;
@@ -276,7 +277,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setRole(t.role);
     setAvatarUrl(t.avatar_url || null);
 
-    const comm = teacherCommitteeMap[t.id] || (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined);
+    const comm =
+      teacherCommitteeMap[t.id] ||
+      (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined) ||
+      (t.full_name ? teacherCommitteeMap[`name_${t.full_name.trim().toLowerCase()}`] : undefined);
     setCommitteeRole(comm ? comm.role : 'NONE');
 
     setIsEditModalOpen(true);
@@ -653,7 +657,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           </div>
         ) : (
           filteredTeachers.map((t) => {
-            const comm = teacherCommitteeMap[t.id] || (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined);
+            const comm =
+              teacherCommitteeMap[t.id] ||
+              (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined) ||
+              (t.full_name ? teacherCommitteeMap[`name_${t.full_name.trim().toLowerCase()}`] : undefined);
             return (
               <div key={t.id} className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
                 {/* Header: Avatar, Name, NPP & Active Badge */}
@@ -804,7 +811,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredTeachers.map((t) => {
-              const comm = teacherCommitteeMap[t.id] || (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined);
+              const comm =
+                teacherCommitteeMap[t.id] ||
+                (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined) ||
+                (t.full_name ? teacherCommitteeMap[`name_${t.full_name.trim().toLowerCase()}`] : undefined);
               return (
                 <tr key={t.id} className="hover:bg-slate-50/50">
                   <td className="p-3">
@@ -1005,7 +1015,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               onChange={(e) => setCommitteeRole(e.target.value as CommitteeRole | 'NONE')}
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="NONE">Bukan Panitia Ujian</option>
+              <option value="NONE">- Tidak Ada SK Kepanitiaan -</option>
               <option value="KETUA">Ketua Panitia Ujian</option>
               <option value="SEKRETARIS">Sekretaris Panitia Ujian</option>
               <option value="BENDAHARA">Bendahara Panitia Ujian</option>
@@ -1093,7 +1103,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               onChange={(e) => setCommitteeRole(e.target.value as CommitteeRole | 'NONE')}
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="NONE">Bukan Panitia Ujian</option>
+              <option value="NONE">- Tidak Ada SK Kepanitiaan -</option>
               <option value="KETUA">Ketua Panitia Ujian</option>
               <option value="SEKRETARIS">Sekretaris Panitia Ujian</option>
               <option value="BENDAHARA">Bendahara Panitia Ujian</option>
