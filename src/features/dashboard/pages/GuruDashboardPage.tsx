@@ -75,6 +75,7 @@ import {
   CheckCircle2,
   CalendarDays,
   Award,
+  Coffee,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -2434,22 +2435,53 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 }
               }
 
+              const cleanGpsText = gpsHealth.text
+                .replace(/[📍🟢🟡🔴⚠️]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
               return (
-                <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3.5">
+                <section className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+                  {/* Header: Title + Status Badge */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Log Presensi Hari Ini
-                    </span>
-                    <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full border shrink-0 ${statusBadgeStyle}`}>
-                      {statusLabel}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-teal-50 border border-teal-200/80 text-teal-800 flex items-center justify-center shrink-0 shadow-2xs">
+                        <Clock className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                          Log Presensi Hari Ini
+                        </h4>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full border shrink-0 ${statusBadgeStyle} shadow-2xs`}>
+                      {isTodayOff.isOff && <Coffee className="w-3.5 h-3.5 text-slate-500" />}
+                      {todayAttendance?.check_out_time && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                      {todayAttendance?.check_in_time && !todayAttendance.check_out_time && <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />}
+                      <span>{statusLabel}</span>
                     </span>
                   </div>
 
-                  {/* 4 Kolom Log Jam seperti Referensi */}
-                  <div className="grid grid-cols-4 gap-1.5 bg-slate-50/90 rounded-2xl p-2.5 border border-slate-200/70 text-center">
-                    <div className="space-y-0.5">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Check In</span>
-                      <p className="text-xs sm:text-sm font-black text-[#023246]">
+                  {/* 4 Kolom Log Jam & Jadwal Sekolah */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {/* Check In */}
+                    <div className={`p-2.5 rounded-xl border transition-all ${
+                      todayAttendance?.check_in_time
+                        ? 'bg-emerald-50/50 border-emerald-200/80'
+                        : pendingCorrectionToday?.checkInTime
+                        ? 'bg-amber-50/50 border-amber-200/80'
+                        : 'bg-slate-50/70 border-slate-200/70'
+                    }`}>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Check In
+                      </span>
+                      <p className={`text-base sm:text-lg font-black font-mono mt-0.5 tracking-tight ${
+                        todayAttendance?.check_in_time
+                          ? 'text-emerald-700'
+                          : pendingCorrectionToday?.checkInTime
+                          ? 'text-amber-700'
+                          : 'text-slate-400'
+                      }`}>
                         {todayAttendance?.check_in_time
                           ? todayAttendance.check_in_time.substring(0, 5)
                           : pendingCorrectionToday?.checkInTime
@@ -2457,74 +2489,115 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                           : '--:--'}
                       </p>
                     </div>
-                    <div className="space-y-0.5">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Check Out</span>
-                      <p className="text-xs sm:text-sm font-black text-[#023246]">
+
+                    {/* Check Out */}
+                    <div className={`p-2.5 rounded-xl border transition-all ${
+                      todayAttendance?.check_out_time
+                        ? 'bg-teal-50/50 border-teal-200/80'
+                        : 'bg-slate-50/70 border-slate-200/70'
+                    }`}>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Check Out
+                      </span>
+                      <p className={`text-base sm:text-lg font-black font-mono mt-0.5 tracking-tight ${
+                        todayAttendance?.check_out_time ? 'text-teal-700' : 'text-slate-400'
+                      }`}>
                         {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
                       </p>
                     </div>
-                    <div className="space-y-0.5">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Batas In</span>
-                      <p className="text-xs sm:text-sm font-bold text-slate-600">
-                        {settings.work_checkin_end?.substring(0, 5) || '07:15'}
+
+                    {/* Batas In */}
+                    <div className="p-2.5 rounded-xl border border-slate-200/60 bg-slate-50/40">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Batas Masuk
+                      </span>
+                      <p className="text-base sm:text-lg font-bold font-mono text-slate-600 mt-0.5 tracking-tight">
+                        {settings.work_checkin_end?.substring(0, 5) || '07:30'}
                       </p>
                     </div>
-                    <div className="space-y-0.5">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Mulai Out</span>
-                      <p className="text-xs sm:text-sm font-bold text-slate-600">
+
+                    {/* Mulai Out */}
+                    <div className="p-2.5 rounded-xl border border-slate-200/60 bg-slate-50/40">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Mulai Pulang
+                      </span>
+                      <p className="text-base sm:text-lg font-bold font-mono text-slate-600 mt-0.5 tracking-tight">
                         {checkoutStart}
                       </p>
                     </div>
                   </div>
 
-                  {/* Tombol CTA Utama Biru Navy */}
-                  <button
-                    type="button"
-                    disabled={isCtaDisabled}
-                    onClick={ctaAction}
-                    className={`w-full h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs ${
-                      isCtaDisabled
-                        ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                        : 'bg-[#023246] hover:bg-[#034560] text-white active:scale-[0.98]'
-                    }`}
-                  >
-                    {((!todayAttendance && !pendingCorrectionToday) || (todayAttendance && !todayAttendance.check_out_time) || (pendingCorrectionToday && !todayAttendance?.check_out_time)) && !isTodayOff.isOff && (
-                      <Fingerprint className="w-5 h-5 text-cyan-300 shrink-0" />
-                    )}
-                    <span>{ctaText}</span>
-                  </button>
+                  {/* Main Action Area: Holiday Announcement vs Primary CTA */}
+                  {isTodayOff.isOff ? (
+                    <div className="p-3.5 sm:p-4 rounded-2xl bg-linear-to-r from-slate-50 to-indigo-50/40 border border-slate-200/80 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200/70 text-indigo-600 flex items-center justify-center shrink-0 shadow-2xs">
+                        <Coffee className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs sm:text-sm font-bold text-slate-800">
+                          {isTodayOff.reason || 'Hari Libur'}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          Tidak ada kegiatan KBM atau kewajiban presensi hari ini. Selamat beristirahat!
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isCtaDisabled}
+                      onClick={ctaAction}
+                      className="w-full h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs bg-[#023246] hover:bg-[#034560] text-white active:scale-[0.98]"
+                    >
+                      {((!todayAttendance && !pendingCorrectionToday) ||
+                        (todayAttendance && !todayAttendance.check_out_time) ||
+                        (pendingCorrectionToday && !todayAttendance?.check_out_time)) && (
+                        <Fingerprint className="w-5 h-5 text-cyan-300 shrink-0" />
+                      )}
+                      <span>{ctaText}</span>
+                    </button>
+                  )}
 
                   {/* Fast Action Links & GPS Row */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5 border-t border-slate-100">
-                    <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100 flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={handleOpenBiometricModal}
-                        className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1 cursor-pointer py-0.5"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-[#023246] bg-slate-50 hover:bg-slate-100/80 px-2.5 py-1.5 rounded-xl border border-slate-200/70 transition-colors cursor-pointer active:scale-95 shadow-2xs"
                       >
-                        <span>👆 Sidik Jari</span>
+                        <Fingerprint className="w-3.5 h-3.5 text-teal-700" />
+                        <span>Sidik Jari</span>
                       </button>
-                      <span className="text-slate-300">•</span>
                       <button
                         type="button"
                         onClick={handleOpenScannerClick}
-                        className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1 cursor-pointer py-0.5"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-[#023246] bg-slate-50 hover:bg-slate-100/80 px-2.5 py-1.5 rounded-xl border border-slate-200/70 transition-colors cursor-pointer active:scale-95 shadow-2xs"
                       >
-                        <span>📷 Scan QR</span>
+                        <QrCode className="w-3.5 h-3.5 text-teal-700" />
+                        <span>Scan QR</span>
                       </button>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => setIsLocationModalOpen(true)}
-                      className="text-slate-600 hover:text-[#023246] font-semibold flex items-center gap-1.5 cursor-pointer py-0.5 truncate max-w-42.5"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/80 px-2.5 py-1.5 rounded-xl border border-slate-200/70 transition-colors cursor-pointer active:scale-95 shadow-2xs min-w-0"
+                      title="Klik untuk melihat peta radar lokasi GPS"
                     >
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 ${
-                          gpsHealth.status === 'READY' ? 'bg-emerald-500' : 'bg-amber-500'
+                          gpsHealth.status === 'READY'
+                            ? 'bg-emerald-500'
+                            : gpsHealth.status === 'INVALID'
+                            ? 'bg-rose-500'
+                            : 'bg-amber-500'
                         }`}
                       />
-                      <span className="truncate">GPS: {gpsHealth.text.replace('📍 ', '')}</span>
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate text-[11px] font-medium max-w-32 sm:max-w-44">
+                        {cleanGpsText}
+                      </span>
                     </button>
                   </div>
                 </section>
