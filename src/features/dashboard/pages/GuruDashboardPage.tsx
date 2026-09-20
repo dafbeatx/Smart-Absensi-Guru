@@ -2437,6 +2437,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
               const cleanGpsText = gpsHealth.text
                 .replace(/[📍🟢🟡🔴⚠️]/g, '')
+                .replace(/\.{2,}$/, '')
                 .replace(/\s+/g, ' ')
                 .trim();
 
@@ -2462,20 +2463,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </span>
                   </div>
 
-                  {/* 4 Kolom Log Jam & Jadwal Sekolah */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {/* 4 Kolom Log Jam & Jadwal Sekolah (Presisi Horizontal & Vertikal 100%) */}
+                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                     {/* Check In */}
-                    <div className={`p-2.5 rounded-xl border transition-all ${
+                    <div className={`py-2.5 px-1 rounded-xl border text-center flex flex-col items-center justify-center transition-all ${
                       todayAttendance?.check_in_time
-                        ? 'bg-emerald-50/50 border-emerald-200/80'
+                        ? 'bg-emerald-50/60 border-emerald-200/80'
                         : pendingCorrectionToday?.checkInTime
-                        ? 'bg-amber-50/50 border-amber-200/80'
-                        : 'bg-slate-50/70 border-slate-200/70'
+                        ? 'bg-amber-50/60 border-amber-200/80'
+                        : 'bg-slate-50/80 border-slate-200/70'
                     }`}>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      <span className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap text-center block leading-none">
                         Check In
                       </span>
-                      <p className={`text-base sm:text-lg font-black font-mono mt-0.5 tracking-tight ${
+                      <p className={`text-sm sm:text-base font-black font-mono mt-1.5 leading-none tracking-tight text-center ${
                         todayAttendance?.check_in_time
                           ? 'text-emerald-700'
                           : pendingCorrectionToday?.checkInTime
@@ -2491,15 +2492,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
 
                     {/* Check Out */}
-                    <div className={`p-2.5 rounded-xl border transition-all ${
+                    <div className={`py-2.5 px-1 rounded-xl border text-center flex flex-col items-center justify-center transition-all ${
                       todayAttendance?.check_out_time
-                        ? 'bg-teal-50/50 border-teal-200/80'
-                        : 'bg-slate-50/70 border-slate-200/70'
+                        ? 'bg-teal-50/60 border-teal-200/80'
+                        : 'bg-slate-50/80 border-slate-200/70'
                     }`}>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      <span className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap text-center block leading-none">
                         Check Out
                       </span>
-                      <p className={`text-base sm:text-lg font-black font-mono mt-0.5 tracking-tight ${
+                      <p className={`text-sm sm:text-base font-black font-mono mt-1.5 leading-none tracking-tight text-center ${
                         todayAttendance?.check_out_time ? 'text-teal-700' : 'text-slate-400'
                       }`}>
                         {todayAttendance?.check_out_time ? todayAttendance.check_out_time.substring(0, 5) : '--:--'}
@@ -2507,21 +2508,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
 
                     {/* Batas In */}
-                    <div className="p-2.5 rounded-xl border border-slate-200/60 bg-slate-50/40">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Batas Masuk
+                    <div className="py-2.5 px-1 rounded-xl border border-slate-200/60 bg-slate-50/50 text-center flex flex-col items-center justify-center">
+                      <span className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap text-center block leading-none">
+                        Batas In
                       </span>
-                      <p className="text-base sm:text-lg font-bold font-mono text-slate-600 mt-0.5 tracking-tight">
+                      <p className="text-sm sm:text-base font-bold font-mono text-slate-600 mt-1.5 leading-none tracking-tight text-center">
                         {settings.work_checkin_end?.substring(0, 5) || '07:30'}
                       </p>
                     </div>
 
                     {/* Mulai Out */}
-                    <div className="p-2.5 rounded-xl border border-slate-200/60 bg-slate-50/40">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Mulai Pulang
+                    <div className="py-2.5 px-1 rounded-xl border border-slate-200/60 bg-slate-50/50 text-center flex flex-col items-center justify-center">
+                      <span className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap text-center block leading-none">
+                        Mulai Out
                       </span>
-                      <p className="text-base sm:text-lg font-bold font-mono text-slate-600 mt-0.5 tracking-tight">
+                      <p className="text-sm sm:text-base font-bold font-mono text-slate-600 mt-1.5 leading-none tracking-tight text-center">
                         {checkoutStart}
                       </p>
                     </div>
@@ -2529,14 +2530,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                   {/* Main Action Area: Holiday Announcement vs Primary CTA */}
                   {isTodayOff.isOff ? (
-                    <div className="p-3.5 sm:p-4 rounded-2xl bg-linear-to-r from-slate-50 to-indigo-50/40 border border-slate-200/80 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200/70 text-indigo-600 flex items-center justify-center shrink-0 shadow-2xs">
+                    <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 flex items-center gap-3 shadow-2xs">
+                      <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200/80 text-teal-800 flex items-center justify-center shrink-0 shadow-2xs">
                         <Coffee className="w-5 h-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs sm:text-sm font-bold text-slate-800">
+                        <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
                           {isTodayOff.reason || 'Hari Libur'}
-                        </p>
+                        </h5>
                         <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
                           Tidak ada kegiatan KBM atau kewajiban presensi hari ini. Selamat beristirahat!
                         </p>
@@ -2558,48 +2559,53 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </button>
                   )}
 
-                  {/* Fast Action Links & GPS Row */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100 flex-wrap gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handleOpenBiometricModal}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-[#023246] bg-slate-50 hover:bg-slate-100/80 px-2.5 py-1.5 rounded-xl border border-slate-200/70 transition-colors cursor-pointer active:scale-95 shadow-2xs"
-                      >
-                        <Fingerprint className="w-3.5 h-3.5 text-teal-700" />
-                        <span>Sidik Jari</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleOpenScannerClick}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-[#023246] bg-slate-50 hover:bg-slate-100/80 px-2.5 py-1.5 rounded-xl border border-slate-200/70 transition-colors cursor-pointer active:scale-95 shadow-2xs"
-                      >
-                        <QrCode className="w-3.5 h-3.5 text-teal-700" />
-                        <span>Scan QR</span>
-                      </button>
-                    </div>
-
+                  {/* Quick Attendance Methods: Balanced 50-50 Grid */}
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setIsLocationModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/80 px-2.5 py-1.5 rounded-xl border border-slate-200/70 transition-colors cursor-pointer active:scale-95 shadow-2xs min-w-0"
-                      title="Klik untuk melihat peta radar lokasi GPS"
+                      onClick={handleOpenBiometricModal}
+                      className="h-10 rounded-xl bg-slate-50/90 hover:bg-teal-50/60 border border-slate-200/80 hover:border-teal-300 text-slate-700 hover:text-teal-900 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-2xs"
                     >
+                      <Fingerprint className="w-4 h-4 text-teal-700 shrink-0" />
+                      <span>Sidik Jari</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenScannerClick}
+                      className="h-10 rounded-xl bg-slate-50/90 hover:bg-teal-50/60 border border-slate-200/80 hover:border-teal-300 text-slate-700 hover:text-teal-900 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-2xs"
+                    >
+                      <QrCode className="w-4 h-4 text-teal-700 shrink-0" />
+                      <span>Scan QR</span>
+                    </button>
+                  </div>
+
+                  {/* Dedicated Full-Width GPS Diagnostic Status Bar */}
+                  <button
+                    type="button"
+                    onClick={() => setIsLocationModalOpen(true)}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50/70 hover:bg-slate-100/70 border border-slate-200/70 text-xs transition-colors cursor-pointer active:scale-[0.99] shadow-2xs"
+                    title="Klik untuk melihat peta radar lokasi GPS"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 ${
                           gpsHealth.status === 'READY'
                             ? 'bg-emerald-500'
                             : gpsHealth.status === 'INVALID'
                             ? 'bg-rose-500'
-                            : 'bg-amber-500'
+                            : 'bg-amber-500 animate-pulse'
                         }`}
                       />
                       <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate text-[11px] font-medium max-w-32 sm:max-w-44">
-                        {cleanGpsText}
+                      <span className="text-[11px] font-medium text-slate-600 truncate">
+                        Status GPS: <strong className="text-slate-800 font-bold">{cleanGpsText}</strong>
                       </span>
-                    </button>
-                  </div>
+                    </div>
+                    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-teal-800 hover:text-teal-950 shrink-0 ml-2">
+                      <span>Radar Peta</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </button>
                 </section>
               );
             })()}
