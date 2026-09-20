@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Award } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
@@ -688,8 +689,9 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                         {t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'ADMIN WEBSITE' : t.role}
                       </span>
                       {comm && (
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[9px] font-black bg-purple-100 text-purple-800 border border-purple-200">
-                          🏷️ {comm.label}
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black bg-indigo-50 text-indigo-900 border border-indigo-200/80">
+                          <Award className="w-2.5 h-2.5 text-indigo-600 shrink-0" />
+                          <span>{comm.label}</span>
                         </span>
                       )}
                     </div>
@@ -828,8 +830,9 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                         {t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'ADMIN WEBSITE' : t.role}
                       </span>
                       {comm && (
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[9.5px] font-black bg-purple-100 text-purple-800 border border-purple-200">
-                          🏷️ {comm.label}
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-black bg-indigo-50 text-indigo-900 border border-indigo-200/80">
+                          <Award className="w-3 h-3 text-indigo-600 shrink-0" />
+                          <span>{comm.label}</span>
                         </span>
                       )}
                     </div>
@@ -996,20 +999,20 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <Input label="Jabatan / Bidang Studi" value={position} onChange={(e) => setPosition(e.target.value)} required />
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700">Tugas Kepanitiaan Ujian (Opsional)</label>
+            <label className="block text-xs font-semibold text-slate-700">SK Panitia Ujian (SK Kepala Sekolah)</label>
             <select
               value={committeeRole}
               onChange={(e) => setCommitteeRole(e.target.value as CommitteeRole | 'NONE')}
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="NONE">⚪ Bukan Panitia Ujian</option>
-              <option value="KETUA">⭐ Ketua Panitia Ujian</option>
-              <option value="SEKRETARIS">📝 Sekretaris Panitia Ujian</option>
-              <option value="BENDAHARA">💰 Bendahara Panitia Ujian</option>
-              <option value="ANGGOTA">👥 Anggota Panitia Ujian</option>
+              <option value="NONE">Bukan Panitia Ujian</option>
+              <option value="KETUA">Ketua Panitia Ujian</option>
+              <option value="SEKRETARIS">Sekretaris Panitia Ujian</option>
+              <option value="BENDAHARA">Bendahara Panitia Ujian</option>
+              <option value="ANGGOTA">Anggota Panitia Ujian</option>
             </select>
             <p className="text-[10px] text-slate-500">
-              Menentukan hak akses penyusunan jadwal ujian ASTS/ASAS dan badge kepanitiaan di beranda guru.
+              Penugasan kepanitiaan ujian ASTS/ASAS berdasarkan Surat Keputusan (SK) Kepala Sekolah. Menentukan hak akses panel jadwal ujian dan kartu tugas pada beranda guru.
             </p>
           </div>
 
@@ -1084,20 +1087,20 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <Input label="Jabatan / Bidang Studi" value={position} onChange={(e) => setPosition(e.target.value)} required />
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700">Tugas Kepanitiaan Ujian (Opsional)</label>
+            <label className="block text-xs font-semibold text-slate-700">SK Panitia Ujian (SK Kepala Sekolah)</label>
             <select
               value={committeeRole}
               onChange={(e) => setCommitteeRole(e.target.value as CommitteeRole | 'NONE')}
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="NONE">⚪ Bukan Panitia Ujian</option>
-              <option value="KETUA">⭐ Ketua Panitia Ujian</option>
-              <option value="SEKRETARIS">📝 Sekretaris Panitia Ujian</option>
-              <option value="BENDAHARA">💰 Bendahara Panitia Ujian</option>
-              <option value="ANGGOTA">👥 Anggota Panitia Ujian</option>
+              <option value="NONE">Bukan Panitia Ujian</option>
+              <option value="KETUA">Ketua Panitia Ujian</option>
+              <option value="SEKRETARIS">Sekretaris Panitia Ujian</option>
+              <option value="BENDAHARA">Bendahara Panitia Ujian</option>
+              <option value="ANGGOTA">Anggota Panitia Ujian</option>
             </select>
             <p className="text-[10px] text-slate-500">
-              Menentukan hak akses penyusunan jadwal ujian ASTS/ASAS dan badge kepanitiaan di beranda guru.
+              Penugasan kepanitiaan ujian ASTS/ASAS berdasarkan Surat Keputusan (SK) Kepala Sekolah. Menentukan hak akses panel jadwal ujian dan kartu tugas pada beranda guru.
             </p>
           </div>
 

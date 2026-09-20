@@ -2102,13 +2102,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 {getTimeBasedGreeting()}, {effectiveUser.full_name}
               </h1>
               {committeeInfo?.isCommittee && (
-                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-linear-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-[9px] sm:text-[10px] tracking-wide shadow-xs border border-amber-300 leading-tight">
-                    <span>⭐</span>
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-950/60 text-cyan-200 border border-cyan-400/40 text-[9.5px] sm:text-[10px] font-extrabold tracking-wide leading-tight">
+                    <Award className="w-3 h-3 text-amber-300 shrink-0" />
                     <span>{committeeInfo.roleLabel}</span>
                   </span>
-                  <span className="text-[9.5px] text-cyan-200/90 font-mono">
-                    • TA {committeeInfo.academicYear}
+                  <span className="text-[9.5px] text-cyan-200/80 font-mono">
+                    • SK Kepala Sekolah
                   </span>
                 </div>
               )}
@@ -2190,86 +2190,101 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
           <>
-            {/* 🏛️ KARTU TUGAS KEPANITIAAN UJIAN (MUNCUL JIKA DITETAPKAN SEBAGAI PANITIA OLEH ADMIN) */}
+            {/* 🏛️ KARTU TUGAS KEPANITIAAN UJIAN (SK KEPALA SEKOLAH) */}
             {committeeInfo?.isCommittee && (
               <div
                 id="committee-assignment-banner"
-                className="bg-linear-to-br from-[#023246] via-[#0A4158] to-[#18536B] rounded-3xl p-4 sm:p-4.5 text-white shadow-md border border-cyan-500/30 space-y-3 animate-fadeIn relative overflow-hidden"
+                className="bg-white rounded-3xl p-4 sm:p-4.5 border border-indigo-200/90 shadow-xs space-y-3 animate-fadeIn"
               >
-                {/* Decorative background glow */}
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-400/10 rounded-full blur-2xl pointer-events-none" />
-
-                {/* Header Widget */}
-                <div className="flex items-start justify-between gap-2.5 relative z-10">
+                {/* Header: Icon, Badge, Position Title, and Active Status */}
+                <div className="flex items-start justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center text-lg font-black shadow-md shrink-0 ring-2 ring-amber-300/60">
-                      🏆
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200/80 text-indigo-700 flex items-center justify-center shrink-0 shadow-2xs">
+                      <Award className="w-5 h-5 text-indigo-600" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="px-2 py-0.5 bg-amber-400 text-slate-950 text-[9px] sm:text-[9.5px] font-black rounded-md tracking-wider uppercase shadow-2xs">
-                          SK PANITIA UJIAN
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 text-[9.5px] font-black tracking-wider uppercase border border-indigo-200/80">
+                          SK KEPANITIAAN UJIAN
                         </span>
-                        <span className="text-[10px] text-cyan-200 font-bold font-mono">
+                        <span className="text-[10px] text-slate-500 font-mono font-bold">
                           T.A. {committeeInfo.academicYear}
                         </span>
                       </div>
-                      <h3 className="text-sm sm:text-base font-black text-white leading-tight mt-0.5 truncate">
+                      <h3 className="text-sm sm:text-base font-black text-slate-900 leading-tight mt-0.5 truncate">
                         {committeeInfo.roleLabel}
                       </h3>
                     </div>
                   </div>
 
-                  <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold shrink-0 flex items-center gap-1.5 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     Aktif
                   </span>
                 </div>
 
-                {/* Description of Role and Duties */}
-                <div className="bg-black/25 rounded-2xl p-3 border border-white/10 text-xs space-y-1.5 relative z-10">
-                  <p className="text-slate-200 text-[11px] sm:text-xs leading-relaxed">
+                {/* SK Kepala Sekolah Official Note */}
+                <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200/80 space-y-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Surat Keputusan (SK) Kepala Sekolah</span>
+                  </div>
+                  <p className="text-xs text-slate-700 leading-relaxed font-medium">
                     {committeeInfo.role === 'KETUA' ? (
                       <>
-                        Bapak/Ibu <strong className="text-amber-300">{effectiveUser.full_name}</strong> ditetapkan oleh Admin Sekolah sebagai <strong className="text-white">Ketua Panitia Ujian</strong>. Anda memiliki wewenang penuh dalam perencanaan jadwal ASTS/ASAS, pengesahan alokasi ruang ujian, dan pembagian tugas pengawas ujian.
+                        Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Ketua Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Berwenang memimpin kepanitiaan, perencanaan jadwal, koordinasi ruang rombel, dan pengesahan pengawas ujian.
                       </>
                     ) : committeeInfo.role === 'SEKRETARIS' ? (
                       <>
-                        Bapak/Ibu <strong className="text-amber-300">{effectiveUser.full_name}</strong> ditetapkan oleh Admin Sekolah sebagai <strong className="text-white">Sekretaris Panitia Ujian</strong>. Anda berwenang menyusun jadwal sesi ujian, administrasi pengawas, pencetakan kartu ujian, dan kelengkapan berita acara.
+                        Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Sekretaris Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab menyusun jadwal sesi ujian, administrasi pengawas, cetak kartu peserta, dan berita acara.
                       </>
                     ) : committeeInfo.role === 'BENDAHARA' ? (
                       <>
-                        Bapak/Ibu <strong className="text-amber-300">{effectiveUser.full_name}</strong> ditetapkan oleh Admin Sekolah sebagai <strong className="text-white">Bendahara Panitia Ujian</strong>. Anda mengelola administrasi logistik, pengadaan lembar ujian, dan operasional kepanitiaan ujian.
+                        Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Bendahara Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab atas pengelolaan administrasi logistik, perlengkapan ujian, dan operasional kepanitiaan.
                       </>
                     ) : (
                       <>
-                        Bapak/Ibu <strong className="text-amber-300">{effectiveUser.full_name}</strong> ditetapkan oleh Admin Sekolah sebagai <strong className="text-white">Anggota Panitia Ujian</strong>. Anda memiliki hak akses khusus untuk meninjau draf jadwal ujian, ruang rombel, dan penugasan pengawas ujian sekolah.
+                        Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Anggota Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertugas mendukung kelancaran teknis, distribusi ruangan, dan ketertiban ruang ujian.
                       </>
                     )}
                   </p>
                 </div>
 
-                {/* Quick Action Buttons for Committee */}
-                <div className="pt-0.5 flex flex-wrap items-center gap-2 relative z-10">
+                {/* Touch-Friendly Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
                   <button
                     type="button"
                     onClick={() => setIsExamScheduleModalOpen(true)}
-                    className="flex-1 py-2 px-3 bg-linear-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="h-11 px-3.5 bg-[#023246] hover:bg-[#03445e] active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-between gap-2 cursor-pointer"
                   >
-                    <span>📋</span>
-                    <span>Buka Panel Jadwal &amp; Pengawas AI</span>
-                    <ChevronRight className="w-3.5 h-3.5 ml-auto" />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Calendar className="w-4 h-4 text-cyan-300 shrink-0" />
+                      <span className="truncate">Jadwal &amp; Pengawas AI</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-cyan-300/70 shrink-0" />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsQuestionCorrectionModalOpen(true)}
-                    className="py-2 px-3 bg-white/10 hover:bg-white/20 active:scale-[0.98] text-white font-bold text-xs rounded-xl border border-white/15 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    title="Koreksi Lembar Jawaban Siswa"
-                  >
-                    <span>📝</span>
-                    <span>Koreksi Ujian</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsExamCardModalOpen(true)}
+                      className="h-11 px-2.5 bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="Cetak Kartu Ujian & Barcode Siswa"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="truncate">Kartu Ujian</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsQuestionCorrectionModalOpen(true)}
+                      className="h-11 px-2.5 bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                      title="Koreksi Lembar Jawaban Siswa"
+                    >
+                      <FileEdit className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="truncate">Koreksi Soal</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -4930,10 +4945,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <h2 className="font-black text-[#023246] text-base sm:text-lg">{effectiveUser.full_name}</h2>
                   <p className="text-[11px] sm:text-xs text-slate-500 font-semibold">{effectiveUser.position || 'Guru Pengajar'}</p>
                   {committeeInfo?.isCommittee && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 font-black text-xs shadow-2xs">
-                      <span>🏆</span>
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 font-extrabold text-xs shadow-2xs">
+                      <Award className="w-4 h-4 text-indigo-600 shrink-0" />
                       <span>{committeeInfo.roleLabel}</span>
-                      <span className="text-[10px] text-amber-700 font-mono">• TA {committeeInfo.academicYear}</span>
+                      <span className="text-[10px] text-indigo-600/80 font-mono">• SK Kepala Sekolah</span>
                     </div>
                   )}
                 </div>
