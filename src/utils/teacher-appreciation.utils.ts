@@ -664,42 +664,56 @@ export function getTeacherDisciplineLeaderboard(
   // Wajib difilter per-bulan berjalan / per-bulan target agar tidak terjadi akumulasi lintas bulan
   if (allPointLogs && allPointLogs.length > 0) {
     const targetMonthPrefix = isCurrent ? '2026-09' : '2026-08';
-    teachers = teachers.map((t) => {
-      const logs = allPointLogs.filter(
-        (l) =>
-          l.user_id === t.id &&
-          ((l.date && l.date.startsWith(targetMonthPrefix)) ||
-            (!l.date && l.created_at && l.created_at.startsWith(targetMonthPrefix)))
-      );
-      if (logs.length === 0) {
+    const hasMonthLogs = allPointLogs.some(
+      (l) =>
+        (l.date && l.date.startsWith(targetMonthPrefix)) ||
+        (!l.date && l.created_at && l.created_at.startsWith(targetMonthPrefix))
+    );
+
+    // Jika tidak ada satu pun log pada bulan target (misal saat membuka rekap Agustus tetapi log hanya memuat September),
+    // jangan menghapus data rekap master (previousMonthTeachers / currentMonthTeachers)
+    if (hasMonthLogs) {
+      teachers = teachers.map((t) => {
+        const logs = allPointLogs.filter(
+          (l) =>
+            l.user_id === t.id &&
+            ((l.date && l.date.startsWith(targetMonthPrefix)) ||
+              (!l.date && l.created_at && l.created_at.startsWith(targetMonthPrefix)))
+        );
+        if (logs.length === 0) {
+          // Untuk bulan lampau (Agustus), pertahankan skor final baseline jika tidak ada log spesifik
+          if (!isCurrent) {
+            return t;
+          }
+          return {
+            ...t,
+            totalPoints: 0,
+            hadirTepatWaktuCount: 0,
+            terlambatCount: 0,
+            piketCount: 0,
+            earlyBirdCount: 0,
+            streakCount: 0,
+          };
+        }
+
+        const pts = Math.max(0, logs.reduce((sum, l) => sum + (Number(l.points) || 0), 0));
+        const onTime = logs.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
+        const late = logs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
+        const piket = logs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
+        const earlyBird = logs.filter((l) => l.activity_type === 'EARLY_BIRD_BONUS').length;
+        const streak = logs.filter((l) => l.activity_type === 'STREAK_MILESTONE').length;
+
         return {
           ...t,
-          totalPoints: 0,
-          hadirTepatWaktuCount: 0,
-          terlambatCount: 0,
-          piketCount: 0,
-          earlyBirdCount: 0,
-          streakCount: 0,
+          totalPoints: pts,
+          hadirTepatWaktuCount: onTime,
+          terlambatCount: late,
+          piketCount: piket,
+          earlyBirdCount: earlyBird,
+          streakCount: streak,
         };
-      }
-
-      const pts = Math.max(0, logs.reduce((sum, l) => sum + (Number(l.points) || 0), 0));
-      const onTime = logs.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
-      const late = logs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
-      const piket = logs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
-      const earlyBird = logs.filter((l) => l.activity_type === 'EARLY_BIRD_BONUS').length;
-      const streak = logs.filter((l) => l.activity_type === 'STREAK_MILESTONE').length;
-
-      return {
-        ...t,
-        totalPoints: pts,
-        hadirTepatWaktuCount: onTime,
-        terlambatCount: late,
-        piketCount: piket,
-        earlyBirdCount: earlyBird,
-        streakCount: streak,
-      };
-    });
+      });
+    }
   }
 
   if (currentUser) {

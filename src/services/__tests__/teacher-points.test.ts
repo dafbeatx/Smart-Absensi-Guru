@@ -1220,5 +1220,57 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     assert('Supabase Egress Protection: Guard', false, String(err));
   }
 
+  // 40. August Points Retention: Leaderboard with only September logs passed must not zero-out August points
+  try {
+    const septemberOnlyLogs: TeacherPointLog[] = [
+      {
+        id: 'sept_test_01',
+        user_id: 'usr_guru_005',
+        date: '2026-09-01',
+        points: 15,
+        activity_type: 'CHECK_IN_ON_TIME',
+        title: 'Presensi Masuk',
+        created_at: '2026-09-01T07:00:00.000Z',
+      },
+      {
+        id: 'sept_test_02',
+        user_id: 'usr_admin_001',
+        date: '2026-09-02',
+        points: 15,
+        activity_type: 'CHECK_IN_ON_TIME',
+        title: 'Presensi Masuk',
+        created_at: '2026-09-02T07:00:00.000Z',
+      },
+    ];
+
+    const prevBoard = getTeacherDisciplineLeaderboard(null, null, 'PREVIOUS_MONTH', septemberOnlyLogs);
+    const fitriInPrev = prevBoard.leaderboard.find((t) => t.id === 'usr_guru_005');
+    const dafaInPrev = prevBoard.leaderboard.find((t) => t.id === 'usr_admin_001');
+
+    assert(
+      'August Points Retention: Leaderboard bulan lalu (Agustus 2026) tidak hilang / 0 saat menerima logs September',
+      fitriInPrev !== undefined && fitriInPrev.totalPoints === 415 && dafaInPrev !== undefined && dafaInPrev.totalPoints === 400,
+      `Fitri: ${fitriInPrev?.totalPoints} pts (expected 415), Dafa: ${dafaInPrev?.totalPoints} pts (expected 400)`
+    );
+  } catch (err: unknown) {
+    assert('August Points Retention: Guard', false, String(err));
+  }
+
+  // 41. Point History & Seed Engine: August official recap entries exist and are loaded properly
+  try {
+    const mockProv = new MockProvider();
+    const allHistoryLogs = await mockProv.getTeacherPointHistory('ALL');
+    const augustLogs = allHistoryLogs.filter((l) => l.date && l.date.startsWith('2026-08'));
+    const fitriAugLog = augustLogs.find((l) => l.user_id === 'usr_guru_005');
+
+    assert(
+      'Point History Seed: Rekap resmi bulan Agustus 2026 termuat dan tersedia di buku besar transaksi',
+      augustLogs.length > 0 && fitriAugLog !== undefined && fitriAugLog.points === 415,
+      `Total August logs: ${augustLogs.length}, Fitri August points: ${fitriAugLog?.points}`
+    );
+  } catch (err: unknown) {
+    assert('Point History Seed: Guard', false, String(err));
+  }
+
   return { passed, failed, results };
 };

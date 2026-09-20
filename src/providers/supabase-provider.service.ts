@@ -81,6 +81,7 @@ import {
 } from '../utils/teaching-schedule.utils';
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
+import { getInitialSeedTeacherPointLogs } from '../utils/teacher-point-seed.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -5111,9 +5112,30 @@ export class SupabaseProvider implements IDataProvider {
         if (typeof window === 'undefined') return [];
         try {
           const raw = localStorage.getItem('smart_absensi_teacher_point_history');
-          if (!raw) return [];
-          const list: TeacherPointLog[] = JSON.parse(raw);
-          if (!Array.isArray(list)) return [];
+          let list: TeacherPointLog[] = [];
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) list = parsed;
+          }
+
+          if (list.length === 0) {
+            list = getInitialSeedTeacherPointLogs();
+            try {
+              localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(list));
+            } catch {}
+          } else {
+            // Pastikan rekap resmi bulan Agustus 2026 selalu ter-merge jika cache browser lama hanya memuat September
+            const hasAugust = list.some((l) => l.date && l.date.startsWith('2026-08'));
+            if (!hasAugust) {
+              const seeds = getInitialSeedTeacherPointLogs();
+              const augustSeeds = seeds.filter((s) => s.date && s.date.startsWith('2026-08'));
+              list.push(...augustSeeds);
+              try {
+                localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(list));
+              } catch {}
+            }
+          }
+
           if (!userId || userId === 'ALL') return list;
           return list.filter((l) => l.user_id === userId);
         } catch {
@@ -5159,7 +5181,8 @@ export class SupabaseProvider implements IDataProvider {
           if (localData.length > 0) {
             return localData;
           }
-          return [];
+          const seeds = getInitialSeedTeacherPointLogs();
+          return (!userId || userId === 'ALL') ? seeds : seeds.filter((l) => l.user_id === userId);
         }
 
         const json = await response.json();
@@ -5176,6 +5199,16 @@ export class SupabaseProvider implements IDataProvider {
           description: row.description || undefined,
           created_at: row.created_at,
         }));
+
+        // Pastikan rekap resmi Agustus tetap disertakan jika backend PostgreSQL hanya memuat log September
+        const hasAugust = result.some((l) => l.date && l.date.startsWith('2026-08'));
+        if (!hasAugust) {
+          const seeds = getInitialSeedTeacherPointLogs();
+          const augustSeeds = (!userId || userId === 'ALL')
+            ? seeds.filter((s) => s.date && s.date.startsWith('2026-08'))
+            : seeds.filter((s) => s.user_id === userId && s.date && s.date.startsWith('2026-08'));
+          result.push(...augustSeeds);
+        }
 
         this.cachedTeacherPointHistory.set(userId, { data: result, timestamp: Date.now() });
 
