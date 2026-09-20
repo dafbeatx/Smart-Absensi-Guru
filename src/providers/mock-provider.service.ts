@@ -2732,11 +2732,11 @@ export class MockProvider implements IDataProvider {
       console.warn('Failed to parse teacher point history:', e);
     }
 
-    if (allLogs.length === 0) {
+    if (allLogs.length < 200) {
       allLogs = this.generateSeedTeacherPointLogs();
       safeSetStorage(KEY, JSON.stringify(allLogs));
     } else {
-      // Auto-reconcile with updated seeds to ensure missing dates (e.g. 2026-09-08 & 2026-09-09) are seamlessly merged
+      // Auto-reconcile with updated seeds to ensure missing entries are seamlessly merged
       const seeds = this.generateSeedTeacherPointLogs();
       let hasNewSeed = false;
       for (const seed of seeds) {

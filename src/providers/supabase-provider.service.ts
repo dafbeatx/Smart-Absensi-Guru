@@ -81,7 +81,7 @@ import {
 } from '../utils/teaching-schedule.utils';
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
-import { getInitialSeedTeacherPointLogs } from '../utils/teacher-point-seed.utils';
+import { getInitialSeedTeacherPointLogs, getSafeInitialTeacherPointLogs } from '../utils/teacher-point-seed.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -5109,49 +5109,10 @@ export class SupabaseProvider implements IDataProvider {
           : null);
 
       const getFromLocalStorage = (): TeacherPointLog[] => {
-        if (typeof window === 'undefined') return [];
-        try {
-          const raw = localStorage.getItem('smart_absensi_teacher_point_history');
-          let list: TeacherPointLog[] = [];
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) list = parsed;
-          }
-
-          if (list.length === 0) {
-            list = getInitialSeedTeacherPointLogs();
-            try {
-              localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(list));
-            } catch {}
-          } else {
-            // Pastikan rekap resmi bulan Agustus 2026 selalu ter-merge jika cache browser lama hanya memuat September
-            const hasAugust = list.some((l) => l.date && l.date.startsWith('2026-08'));
-            if (!hasAugust) {
-              const seeds = getInitialSeedTeacherPointLogs();
-              const augustSeeds = seeds.filter((s) => s.date && s.date.startsWith('2026-08'));
-              list.push(...augustSeeds);
-              try {
-                localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(list));
-              } catch {}
-            }
-          }
-
-          if (!userId || userId === 'ALL') return list;
-          return list.filter((l) => l.user_id === userId);
-        } catch {
-          return [];
-        }
+        const list = getSafeInitialTeacherPointLogs();
+        if (!userId || userId === 'ALL') return list;
+        return list.filter((l) => l.user_id === userId);
       };
-
-      // If token is absent or not a stateful server-verifiable session (e.g. older SB_JWT_ or mock token),
-      // read directly from local storage cache to avoid triggering a 401 response.
-      if (!activeToken || !activeToken.startsWith('saga_sess_')) {
-        const localData = getFromLocalStorage();
-        if (localData.length > 0) {
-          this.cachedTeacherPointHistory.set(userId, { data: localData, timestamp: Date.now() });
-        }
-        return localData;
-      }
 
       try {
         const queryParams = new URLSearchParams();
@@ -5160,12 +5121,16 @@ export class SupabaseProvider implements IDataProvider {
         }
 
         const endpoint = `/api/teacher-points${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (activeToken) {
+          headers['Authorization'] = `Bearer ${activeToken}`;
+        }
+
         const response = await fetch(endpoint, {
           method: 'GET',
-          headers: {
-            Authorization: `Bearer ${activeToken}`,
-            'Content-Type': 'application/json',
-          },
+          headers,
         });
 
         if (!response.ok) {

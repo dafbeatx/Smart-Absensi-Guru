@@ -110,6 +110,7 @@ import {
   getTeacherDisciplineLeaderboard,
   formatShortTeacherName,
 } from '../../../utils/teacher-appreciation.utils';
+import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-seed.utils';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHistoryModal';
 import { TopDisciplineCelebrationModal } from '../../guru/components/TopDisciplineCelebrationModal';
@@ -374,12 +375,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isCelebrationModalOpen, setIsCelebrationModalOpen] = useState(false);
   const [pointHistory, setPointHistory] = useState<TeacherPointLog[]>([]);
   const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
-    try {
-      const saved = typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_teacher_point_history') : null;
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return getSafeInitialTeacherPointLogs();
   });
   const [allRegisteredTeachers, setAllRegisteredTeachers] = useState<UserProfile[]>(() => {
     try {
@@ -1469,10 +1465,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     if (!disciplineLeaderboard?.leaderboard) return null;
     return disciplineLeaderboard.leaderboard.find(
       (item) =>
+        item.isCurrentUser ||
         item.id === effectiveUser?.id ||
-        (effectiveUser?.nip && item.nip && item.nip.replace(/\s+/g, '') === effectiveUser.nip.replace(/\s+/g, ''))
+        (effectiveUser?.nip && item.nip && item.nip.replace(/\s+/g, '') === effectiveUser.nip.replace(/\s+/g, '')) ||
+        (effectiveUser?.full_name && item.name && effectiveUser.full_name.trim().toLowerCase() === item.name.trim().toLowerCase())
     );
-  }, [disciplineLeaderboard?.leaderboard, effectiveUser?.id, effectiveUser?.nip]);
+  }, [disciplineLeaderboard?.leaderboard, effectiveUser?.id, effectiveUser?.nip, effectiveUser?.full_name]);
 
   const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? appreciationScore?.totalPoints ?? 0;
 

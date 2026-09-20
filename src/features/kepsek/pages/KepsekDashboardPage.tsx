@@ -33,6 +33,7 @@ import {
   getTeacherDisciplineLeaderboard,
   type TeacherLeaderboardItem,
 } from '../../../utils/teacher-appreciation.utils';
+import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-seed.utils';
 import type { TeacherPointLog } from '../../../types/database.types';
 
 export interface KepsekDashboardPageProps {
@@ -58,18 +59,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
   // Leaderboard Poin & Juara 1 Apresiasi States (Hak Prerogatif Kepala Sekolah)
   const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('smart_absensi_teacher_point_history');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return [];
+    return getSafeInitialTeacherPointLogs();
   });
   const [championTeacher, setChampionTeacher] = useState<TeacherLeaderboardItem | null>(null);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);

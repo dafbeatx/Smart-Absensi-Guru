@@ -26,26 +26,29 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
-  // 2. Session Authentication (saga_sess_ Enforcement)
+  // 2. Session Authentication & Role Authorization
   const auth = await authenticateUser(req);
-  if (!auth.ok) {
-    return res.status(auth.status).json({
-      success: false,
-      errorCode: auth.errorCode,
-      errorMessage: auth.errorMessage,
-    });
-  }
-
-  const callerUser = auth.user;
-  const callerRole = (callerUser.role || '').toUpperCase().trim();
   const authorizedRoles = ['ADMIN', 'GURU', 'KEPSEK', 'KEPALA SEKOLAH', 'OPERATOR'];
 
-  if (!authorizedRoles.includes(callerRole)) {
-    return res.status(403).json({
-      success: false,
-      errorCode: 'AUTH_FORBIDDEN',
-      errorMessage: 'Akses Ditolak: Anda tidak memiliki wewenang untuk mengakses buku besar poin guru.',
-    });
+  // Mutasi/Pencatatan Poin (POST) WAJIB lolos autentikasi dan otorisasi role
+  if (req.method === 'POST') {
+    if (!auth.ok) {
+      return res.status(auth.status).json({
+        success: false,
+        errorCode: auth.errorCode,
+        errorMessage: auth.errorMessage,
+      });
+    }
+
+    const callerUser = auth.user;
+    const callerRole = (callerUser?.role || '').toUpperCase().trim();
+    if (!authorizedRoles.includes(callerRole)) {
+      return res.status(403).json({
+        success: false,
+        errorCode: 'AUTH_FORBIDDEN',
+        errorMessage: 'Akses Ditolak: Anda tidak memiliki wewenang untuk mencatat poin guru.',
+      });
+    }
   }
 
   // ── GET: Read Point History (Admin, Guru, Kepsek can view all school teacher points) ────

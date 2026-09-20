@@ -32,6 +32,7 @@ import { SarprasExecutiveView } from '../../sarpras/components/SarprasExecutiveV
 import { SystemHealthDashboardView } from '../components/SystemHealthDashboardView';
 import { isDevTestModeEnabled } from '../../../utils/dev-test.utils';
 import { isDateOffDay, getTodayDateInJakarta } from '../../../utils/time.utils';
+import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-seed.utils';
 import type { UserProfile, LeaveRequest, AttendanceRecord, SystemSettings, TeacherPointLog } from '../../../types/database.types';
 import { useCrossDeviceSync } from '../../../hooks/useCrossDeviceSync';
 import { useLiveAttendanceSync } from '../../../hooks/useLiveAttendanceSync';
@@ -77,18 +78,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   // Buku besar poin seluruh guru tersinkronisasi
   const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('smart_absensi_teacher_point_history');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return [];
+    return getSafeInitialTeacherPointLogs();
   });
 
   const handleCloseQuestionCorrectionModal = useCallback(() => {
