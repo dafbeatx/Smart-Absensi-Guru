@@ -442,15 +442,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       loadCommittee();
     };
 
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.includes('committee') || e.key.includes('exam')) {
+        loadCommittee();
+      }
+    };
+
     window.addEventListener(EXAM_COMMITTEE_CHANGED_EVENT, handleCommitteeChanged);
     window.addEventListener(ADMIN_YEAR_CHANGED_EVENT, handleCommitteeChanged);
     window.addEventListener('smart_absensi_teachers_updated', handleCommitteeChanged);
+    window.addEventListener('storage', handleStorage);
 
     return () => {
       isMounted = false;
       window.removeEventListener(EXAM_COMMITTEE_CHANGED_EVENT, handleCommitteeChanged);
       window.removeEventListener(ADMIN_YEAR_CHANGED_EVENT, handleCommitteeChanged);
       window.removeEventListener('smart_absensi_teachers_updated', handleCommitteeChanged);
+      window.removeEventListener('storage', handleStorage);
     };
   }, [effectiveUser?.id, effectiveUser?.position, effectiveUser?.full_name, effectiveUser?.nip]);
 

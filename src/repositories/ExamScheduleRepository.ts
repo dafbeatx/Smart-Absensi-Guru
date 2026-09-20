@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { ExamScheduleData } from '../types/exam-schedule.types';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { logger } from '../utils/logger.utils';
+import { ProviderFactory } from '../providers/provider-factory';
 
 export const EXAM_SCHEDULE_STORAGE_PREFIX = 'smart_absensi_exam_schedule_';
 export const EXAM_SCHEDULE_UPDATED_EVENT = 'smart_absensi_exam_schedule_updated';
@@ -41,6 +42,18 @@ export class ExamScheduleRepository {
     academicYear: string,
     examType: string
   ): Promise<ExamScheduleData | null> {
+    // 1. Fetch from cloud provider
+    try {
+      const provider = ProviderFactory.getProvider();
+      const remoteSchedule = await provider.getExamSchedule(academicYear, examType);
+      if (remoteSchedule) {
+        return remoteSchedule;
+      }
+    } catch (err) {
+      logger.warn('ExamScheduleRepository', 'Cloud schedule fetch error, falling back to local:', err);
+    }
+
+    // 2. Fallback to local storage
     try {
       const key = this.getStorageKey(academicYear, examType);
       const raw = safeGetStorage(key);
@@ -60,6 +73,14 @@ export class ExamScheduleRepository {
     try {
       const key = this.getStorageKey(schedule.config.academicYear, schedule.config.examType);
       safeSetStorage(key, JSON.stringify(schedule));
+
+      // Persist to Supabase Cloud Provider
+      try {
+        const provider = ProviderFactory.getProvider();
+        await provider.saveExamSchedule(schedule);
+      } catch (cloudErr) {
+        logger.warn('ExamScheduleRepository', 'Failed to save schedule to cloud provider:', cloudErr);
+      }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
@@ -83,6 +104,14 @@ export class ExamScheduleRepository {
         localStorage.removeItem(key);
       }
       memoryScheduleStore.delete(key);
+
+      // Delete from Supabase Cloud Provider
+      try {
+        const provider = ProviderFactory.getProvider();
+        await provider.deleteExamSchedule(academicYear, examType);
+      } catch (cloudErr) {
+        logger.warn('ExamScheduleRepository', 'Failed to delete schedule from cloud provider:', cloudErr);
+      }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(

@@ -55,6 +55,10 @@ import type {
   VerifyPlanDTO,
   VerifyPlanResult,
 } from '../types/homeroom.types';
+import type {
+  ExamCommitteeMember,
+  ExamScheduleData,
+} from '../types/exam-schedule.types';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
 import { NotificationService } from '../services/notification-permission.service';
@@ -3277,6 +3281,79 @@ export class MockProvider implements IDataProvider {
 
   public async getHomeroomDocumentUrl(_documentId: string, _token: string): Promise<string> {
     return 'https://example.com/mock-student-documents/sample-verification-doc.pdf';
+  }
+
+  // Exam Committee & Cross-Device Synchronization API (Mock Provider)
+  private mockExamCommittees = new Map<string, ExamCommitteeMember[]>();
+  private mockExamSchedules = new Map<string, ExamScheduleData>();
+
+  public async getExamCommitteeMembers(academicYear?: string, _token?: string): Promise<ExamCommitteeMember[]> {
+    const targetYear = academicYear || '2026/2027';
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('smart_absensi_exam_committee');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            return parsed.filter((m: ExamCommitteeMember) => !targetYear || m.academicYear === targetYear);
+          }
+        }
+      }
+    } catch {}
+    return this.mockExamCommittees.get(targetYear) || [];
+  }
+
+  public async saveExamCommitteeMembers(
+    members: ExamCommitteeMember[],
+    academicYear?: string,
+    _token?: string
+  ): Promise<boolean> {
+    const targetYear = academicYear || '2026/2027';
+    this.mockExamCommittees.set(targetYear, members);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('smart_absensi_exam_committee');
+        let all: ExamCommitteeMember[] = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(all)) all = [];
+        all = all.filter((m) => m.academicYear !== targetYear);
+        all.push(...members);
+        localStorage.setItem('smart_absensi_exam_committee', JSON.stringify(all));
+      }
+    } catch {}
+    return true;
+  }
+
+  public async getExamSchedule(academicYear: string, examType: string, _token?: string): Promise<ExamScheduleData | null> {
+    const key = `${academicYear}_${examType}`.replace(/[^\w]/g, '_');
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(`smart_absensi_exam_schedule_${key}`);
+        if (raw) return JSON.parse(raw);
+      }
+    } catch {}
+    return this.mockExamSchedules.get(key) || null;
+  }
+
+  public async saveExamSchedule(schedule: ExamScheduleData, _token?: string): Promise<boolean> {
+    const key = `${schedule.config.academicYear}_${schedule.config.examType}`.replace(/[^\w]/g, '_');
+    this.mockExamSchedules.set(key, schedule);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`smart_absensi_exam_schedule_${key}`, JSON.stringify(schedule));
+      }
+    } catch {}
+    return true;
+  }
+
+  public async deleteExamSchedule(academicYear: string, examType: string, _token?: string): Promise<boolean> {
+    const key = `${academicYear}_${examType}`.replace(/[^\w]/g, '_');
+    this.mockExamSchedules.delete(key);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(`smart_absensi_exam_schedule_${key}`);
+      }
+    } catch {}
+    return true;
   }
 }
 

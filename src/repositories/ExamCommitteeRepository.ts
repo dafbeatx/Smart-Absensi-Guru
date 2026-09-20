@@ -2,6 +2,7 @@ import type { ExamCommitteeMember, CommitteeRole } from '../types/exam-schedule.
 import type { UserProfile } from '../types/database.types';
 import { AdministrationRepository } from './AdministrationRepository';
 import { logger } from '../utils/logger.utils';
+import { ProviderFactory } from '../providers/provider-factory';
 
 export const EXAM_COMMITTEE_STORAGE_KEY = 'smart_absensi_exam_committee';
 export const EXAM_COMMITTEE_CHANGED_EVENT = 'smart_absensi_exam_committee_changed';
@@ -33,6 +34,19 @@ export class ExamCommitteeRepository {
    */
   public static async getCommitteeMembers(academicYear?: string): Promise<ExamCommitteeMember[]> {
     const targetYear = academicYear || AdministrationRepository.getActiveAcademicYear();
+
+    // 1. Fetch from cloud provider (Dual-layer Supabase persistence)
+    try {
+      const provider = ProviderFactory.getProvider();
+      const remoteMembers = await provider.getExamCommitteeMembers(targetYear);
+      if (Array.isArray(remoteMembers) && remoteMembers.length > 0) {
+        return remoteMembers;
+      }
+    } catch (err) {
+      logger.warn('ExamCommitteeRepository', 'Cloud fetch failed, using local cache:', err);
+    }
+
+    // 2. Fallback to local storage
     try {
       const raw = safeGetStorage(EXAM_COMMITTEE_STORAGE_KEY);
       if (raw) {
@@ -42,7 +56,7 @@ export class ExamCommitteeRepository {
         }
       }
     } catch (err) {
-      logger.error('ExamCommitteeRepository', 'Failed to parse committee members:', err);
+      logger.error('ExamCommitteeRepository', 'Failed to parse local committee members:', err);
     }
     return [];
   }
@@ -65,6 +79,14 @@ export class ExamCommitteeRepository {
       allMembers.push(...membersForYear);
 
       safeSetStorage(EXAM_COMMITTEE_STORAGE_KEY, JSON.stringify(allMembers));
+
+      // Persist to Supabase Cloud Provider
+      try {
+        const provider = ProviderFactory.getProvider();
+        await provider.saveExamCommitteeMembers(membersForYear, targetYear);
+      } catch (cloudErr) {
+        logger.warn('ExamCommitteeRepository', 'Failed to push committee to cloud provider:', cloudErr);
+      }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(

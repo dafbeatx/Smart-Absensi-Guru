@@ -67,6 +67,10 @@ import type {
   VerifyPlanDTO,
   VerifyPlanResult,
 } from '../types/homeroom.types';
+import type {
+  ExamCommitteeMember,
+  ExamScheduleData,
+} from '../types/exam-schedule.types';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
 import { logger } from '../utils/logger.utils';
@@ -124,6 +128,8 @@ export class SupabaseProvider implements IDataProvider {
   private cachedNotificationReads: Map<string, { data: Set<string>; timestamp: number }> = new Map();
   private cachedTeachingSchedules: Map<string, { data: TeachingSlot[]; timestamp: number }> = new Map();
   private teachingSchedulesCooldownUntil: number = 0;
+  private cachedExamCommittees: Map<string, { data: ExamCommitteeMember[]; timestamp: number }> = new Map();
+  private cachedExamSchedules: Map<string, { data: ExamScheduleData | null; timestamp: number }> = new Map();
 
   private dedupeRequest<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (this.inFlightRequests.has(key)) {
@@ -5939,6 +5945,302 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     return json.downloadUrl;
+  }
+
+  // ── EXAM COMMITTEE & SCHEDULE CLOUD SYNC API ──────────────────────────────
+  public async getExamCommitteeMembers(academicYear?: string, _token?: string): Promise<ExamCommitteeMember[]> {
+    const targetYear = academicYear || '2026/2027';
+    const now = Date.now();
+    const cached = this.cachedExamCommittees.get(targetYear);
+    if (cached && now - cached.timestamp < 300000) {
+      return cached.data;
+    }
+
+    return this.dedupeRequest(`getExamCommittee_${targetYear}`, async () => {
+      // 1. Try relational table public.exam_committees
+      try {
+        const { data, error } = await this.client
+          .from('exam_committees')
+          .select('*')
+          .eq('academic_year', targetYear);
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const normalized: ExamCommitteeMember[] = data.map((row: any) => ({
+            id: row.id,
+            userId: row.user_id,
+            fullName: row.full_name,
+            npp: row.npp || undefined,
+            role: row.role,
+            academicYear: row.academic_year,
+            isActive: row.is_active ?? true,
+            createdAt: row.created_at,
+          }));
+
+          this.cachedExamCommittees.set(targetYear, { data: normalized, timestamp: Date.now() });
+
+          // Update local storage cache
+          try {
+            if (typeof localStorage !== 'undefined') {
+              const raw = localStorage.getItem('smart_absensi_exam_committee');
+              let all: ExamCommitteeMember[] = raw ? JSON.parse(raw) : [];
+              if (!Array.isArray(all)) all = [];
+              all = all.filter((m) => m.academicYear !== targetYear);
+              all.push(...normalized);
+              localStorage.setItem('smart_absensi_exam_committee', JSON.stringify(all));
+            }
+          } catch {}
+
+          return normalized;
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'Table exam_committees query error, falling back to system_settings:', err);
+      }
+
+      // 2. Fallback to system_settings table (Fail-safe KV storage)
+      try {
+        const settingKey = `exam_committee_${targetYear}`;
+        const { data: kvData } = await this.client
+          .from('system_settings')
+          .select('value')
+          .eq('key', settingKey)
+          .maybeSingle();
+
+        if (kvData?.value) {
+          const parsed: ExamCommitteeMember[] = JSON.parse(kvData.value);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.cachedExamCommittees.set(targetYear, { data: parsed, timestamp: Date.now() });
+            return parsed;
+          }
+        }
+
+        // Also check legacy/global key
+        const { data: globalKv } = await this.client
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'smart_absensi_exam_committee')
+          .maybeSingle();
+
+        if (globalKv?.value) {
+          const parsed: ExamCommitteeMember[] = JSON.parse(globalKv.value);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const filtered = parsed.filter((m) => !targetYear || m.academicYear === targetYear);
+            if (filtered.length > 0) {
+              this.cachedExamCommittees.set(targetYear, { data: filtered, timestamp: Date.now() });
+              return filtered;
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'system_settings committee query error:', err);
+      }
+
+      // 3. Auto Cloud Migration: If remote has no data yet, check local storage (e.g. from Laptop Admin)
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const raw = localStorage.getItem('smart_absensi_exam_committee');
+          if (raw) {
+            const parsed: ExamCommitteeMember[] = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const localForYear = parsed.filter((m) => !targetYear || m.academicYear === targetYear);
+              if (localForYear.length > 0) {
+                logger.info('SupabaseProvider', 'Auto-migrating local committee data to cloud for year:', targetYear);
+                // Asynchronously push to cloud without blocking
+                this.saveExamCommitteeMembers(localForYear, targetYear).catch((e) => {
+                  logger.warn('SupabaseProvider', 'Failed auto-migrating local committee to cloud:', e);
+                });
+                this.cachedExamCommittees.set(targetYear, { data: localForYear, timestamp: Date.now() });
+                return localForYear;
+              }
+            }
+          }
+        }
+      } catch {}
+
+      return [];
+    });
+  }
+
+  public async saveExamCommitteeMembers(
+    members: ExamCommitteeMember[],
+    academicYear?: string,
+    _token?: string
+  ): Promise<boolean> {
+    const targetYear = academicYear || '2026/2027';
+    this.cachedExamCommittees.delete(targetYear);
+
+    // 1. Update local storage immediately for fast local response
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('smart_absensi_exam_committee');
+        let all: ExamCommitteeMember[] = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(all)) all = [];
+        all = all.filter((m) => m.academicYear !== targetYear);
+        all.push(...members);
+        localStorage.setItem('smart_absensi_exam_committee', JSON.stringify(all));
+      }
+    } catch {}
+
+    // 2. Save to system_settings KV (Guaranteed zero-downtime multi-device cloud sync)
+    try {
+      const settingKey = `exam_committee_${targetYear}`;
+      await this.client.from('system_settings').upsert({
+        key: settingKey,
+        value: JSON.stringify(members),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+
+      await this.client.from('system_settings').upsert({
+        key: 'smart_absensi_exam_committee',
+        value: JSON.stringify(members),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Failed to save committee to system_settings:', err);
+    }
+
+    // 3. Save to public.exam_committees table if exists
+    try {
+      await this.client.from('exam_committees').delete().eq('academic_year', targetYear);
+      if (members.length > 0) {
+        const rows = members.map((m) => ({
+          id: m.id || `comm_${m.userId}_${Date.now()}`,
+          academic_year: targetYear,
+          user_id: m.userId,
+          full_name: m.fullName,
+          npp: m.npp || null,
+          role: m.role,
+          is_active: m.isActive ?? true,
+          updated_at: new Date().toISOString(),
+        }));
+        await this.client.from('exam_committees').upsert(rows, { onConflict: 'id' });
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Table exam_committees insert skipped or table not yet created:', err);
+    }
+
+    // 4. Broadcast window event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_exam_committee_changed', {
+          detail: { academicYear: targetYear, members },
+        })
+      );
+    }
+
+    return true;
+  }
+
+  public async getExamSchedule(academicYear: string, examType: string, _token?: string): Promise<ExamScheduleData | null> {
+    const cleanYear = academicYear.replace(/[^\w]/g, '_');
+    const cleanType = examType.replace(/[^\w]/g, '_');
+    const storageKey = `exam_schedule_${cleanYear}_${cleanType}`;
+
+    const now = Date.now();
+    const cached = this.cachedExamSchedules.get(storageKey);
+    if (cached && now - cached.timestamp < 300000) {
+      return cached.data;
+    }
+
+    return this.dedupeRequest(`getExamSchedule_${storageKey}`, async () => {
+      // 1. Try system_settings KV
+      try {
+        const { data: kvData } = await this.client
+          .from('system_settings')
+          .select('value')
+          .eq('key', storageKey)
+          .maybeSingle();
+
+        if (kvData?.value) {
+          const parsed: ExamScheduleData = JSON.parse(kvData.value);
+          this.cachedExamSchedules.set(storageKey, { data: parsed, timestamp: Date.now() });
+
+          // Update local cache
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`, JSON.stringify(parsed));
+            }
+          } catch {}
+
+          return parsed;
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'Failed to fetch exam schedule from system_settings:', err);
+      }
+
+      // 2. Check local storage fallback
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const raw = localStorage.getItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`);
+          if (raw) {
+            const parsed: ExamScheduleData = JSON.parse(raw);
+            // Auto-migrate to cloud
+            this.saveExamSchedule(parsed).catch((e) => {
+              logger.warn('SupabaseProvider', 'Failed auto-migrating local exam schedule to cloud:', e);
+            });
+            this.cachedExamSchedules.set(storageKey, { data: parsed, timestamp: Date.now() });
+            return parsed;
+          }
+        }
+      } catch {}
+
+      return null;
+    });
+  }
+
+  public async saveExamSchedule(schedule: ExamScheduleData, _token?: string): Promise<boolean> {
+    const cleanYear = schedule.config.academicYear.replace(/[^\w]/g, '_');
+    const cleanType = schedule.config.examType.replace(/[^\w]/g, '_');
+    const storageKey = `exam_schedule_${cleanYear}_${cleanType}`;
+
+    this.cachedExamSchedules.delete(storageKey);
+
+    // 1. Local storage
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`, JSON.stringify(schedule));
+      }
+    } catch {}
+
+    // 2. Cloud system_settings
+    try {
+      await this.client.from('system_settings').upsert({
+        key: storageKey,
+        value: JSON.stringify(schedule),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Failed to save exam schedule to system_settings:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_exam_schedule_updated', { detail: schedule })
+      );
+    }
+
+    return true;
+  }
+
+  public async deleteExamSchedule(academicYear: string, examType: string, _token?: string): Promise<boolean> {
+    const cleanYear = academicYear.replace(/[^\w]/g, '_');
+    const cleanType = examType.replace(/[^\w]/g, '_');
+    const storageKey = `exam_schedule_${cleanYear}_${cleanType}`;
+
+    this.cachedExamSchedules.delete(storageKey);
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`);
+      }
+    } catch {}
+
+    try {
+      await this.client.from('system_settings').delete().eq('key', storageKey);
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Failed to delete exam schedule from system_settings:', err);
+    }
+
+    return true;
   }
 }
 

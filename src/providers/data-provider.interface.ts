@@ -49,6 +49,10 @@ import type {
   VerifyPlanDTO,
   VerifyPlanResult,
 } from '../types/homeroom.types';
+import type {
+  ExamCommitteeMember,
+  ExamScheduleData,
+} from '../types/exam-schedule.types';
 
 export interface IDataProvider {
   // Auth API
@@ -199,6 +203,15 @@ export interface IDataProvider {
   getStudentPlanDetail(studentId: string, token: string): Promise<StudentPlanDetail>;
   verifyStudentPlan(dto: VerifyPlanDTO, token: string): Promise<VerifyPlanResult>;
   getHomeroomDocumentUrl(documentId: string, token: string): Promise<string>;
+
+  // Exam Committee & Cross-Device Synchronization API (SK Panitia Ujian)
+  getExamCommitteeMembers(academicYear?: string, token?: string): Promise<ExamCommitteeMember[]>;
+  saveExamCommitteeMembers(members: ExamCommitteeMember[], academicYear?: string, token?: string): Promise<boolean>;
+
+  // Exam Schedule Persistence API
+  getExamSchedule(academicYear: string, examType: string, token?: string): Promise<ExamScheduleData | null>;
+  saveExamSchedule(schedule: ExamScheduleData, token?: string): Promise<boolean>;
+  deleteExamSchedule(academicYear: string, examType: string, token?: string): Promise<boolean>;
 }
 
 
