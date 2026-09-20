@@ -24,6 +24,9 @@ import {
   ListFilter,
   DoorOpen,
   LayoutGrid,
+  BookOpen,
+  Layers,
+  Info,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -47,6 +50,34 @@ import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { normalizeClassCode } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
+
+const formatIndonesianDateLabel = (dateStr: string) => {
+  try {
+    const [y, m, d] = dateStr.split('-');
+    if (y && m && d) {
+      const months = [
+        '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      const mIdx = parseInt(m, 10);
+      return `${parseInt(d, 10)} ${months[mIdx] || m} ${y}`;
+    }
+  } catch {}
+  return dateStr;
+};
+
+const getSessionDurationText = (start?: string, end?: string) => {
+  if (!start || !end) return '';
+  try {
+    const [h1, m1] = start.split(':').map(Number);
+    const [h2, m2] = end.split(':').map(Number);
+    if (!isNaN(h1) && !isNaN(m1) && !isNaN(h2) && !isNaN(m2)) {
+      const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+      if (diff > 0) return `${diff} mnt`;
+    }
+  } catch {}
+  return '';
+};
 
 interface ExamScheduleAndProctorModalProps {
   isOpen: boolean;
@@ -1990,32 +2021,37 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                 </div>
 
                 {/* View Mode Toggle */}
-                <div className="flex items-center justify-between gap-2 flex-wrap pb-1">
-                  <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs shadow-2xs">
+                <div className="flex items-center justify-between gap-3 flex-wrap pb-1">
+                  <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200 shadow-2xs">
                     <button
                       type="button"
                       onClick={() => setSubjectViewMode('DAILY')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                        subjectViewMode === 'DAILY' ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                        subjectViewMode === 'DAILY'
+                          ? 'bg-white text-teal-900 shadow-xs font-black'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>📅 Tampilan Harian (Sesi & Mapel)</span>
+                      <Calendar className="w-3.5 h-3.5 text-teal-600" />
+                      <span>Tampilan Harian (Sesi & Mapel)</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setSubjectViewMode('TABLE')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                        subjectViewMode === 'TABLE' ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                        subjectViewMode === 'TABLE'
+                          ? 'bg-white text-teal-900 shadow-xs font-black'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <ListFilter className="w-3.5 h-3.5" />
-                      <span>📋 Tabel Detail (Per Rombel)</span>
+                      <ListFilter className="w-3.5 h-3.5 text-teal-600" />
+                      <span>Tabel Detail (Per Rombel)</span>
                     </button>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    💡 Dalam 1 hari pelaksanaan terdapat beberapa sesi ujian dengan mata pelajaran yang berbeda.
-                  </span>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                    <Info className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                    <span>Dalam 1 hari pelaksanaan terdapat beberapa sesi ujian dengan mata pelajaran berbeda.</span>
+                  </div>
                 </div>
 
                 {subjectViewMode === 'DAILY' ? (
@@ -2025,73 +2061,125 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                       return (
                         <div
                           key={day.date}
-                          className={`p-4 rounded-2xl border transition-all shadow-xs space-y-3 ${
-                            isFriday ? 'bg-amber-50/50 border-amber-200' : 'bg-white border-slate-200'
+                          className={`rounded-2xl border transition-all shadow-xs overflow-hidden flex flex-col justify-between ${
+                            isFriday
+                              ? 'bg-amber-50/30 border-amber-200/90'
+                              : 'bg-white border-slate-200/90'
                           }`}
                         >
-                          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                            <div>
-                              <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                                <span>{day.dayName}, {day.date}</span>
+                          {/* Card Header: Day & Date + Sesi & Mapel counts */}
+                          <div className={`p-4 border-b flex items-start justify-between gap-3 ${
+                            isFriday ? 'bg-amber-100/40 border-amber-200/80' : 'bg-slate-50/80 border-slate-100'
+                          }`}>
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-base font-black text-slate-900 tracking-tight">
+                                  {day.dayName}
+                                </h4>
                                 {isFriday && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900">
-                                    Jumat
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900">
+                                    <Sparkles className="w-2.5 h-2.5" />
+                                    Khusus Jumat
                                   </span>
                                 )}
-                              </h4>
-                              <span className="text-[11px] text-slate-500">
-                                {day.sessions.length} Mata Pelajaran Diujikan
+                              </div>
+                              <p className="text-xs font-medium text-slate-500">
+                                {formatIndonesianDateLabel(day.date)}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-white text-teal-800 border border-teal-200/80 shadow-2xs">
+                                <Layers className="w-3 h-3 text-teal-600" />
+                                <span>{day.sessions.length} Sesi</span>
+                              </span>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 shadow-2xs">
+                                <BookOpen className="w-3 h-3 text-slate-500" />
+                                <span>{day.sessions.length} Mapel</span>
                               </span>
                             </div>
-                            <span className="text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-xl">
-                              {day.sessions.length} Sesi Ujian
-                            </span>
                           </div>
 
-                          <div className="space-y-2.5">
-                            {day.sessions.map((sess) => (
-                              <div
-                                key={`${sess.sessionNumber}_${sess.subject}`}
-                                className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
-                              >
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 rounded-md bg-teal-600 text-white font-black text-[10px]">
-                                      Sesi {sess.sessionNumber}
-                                    </span>
-                                    <span className="font-mono text-xs font-bold text-slate-700">
-                                      ⏰ {sess.startTime} - {sess.endTime} WIB
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-black text-slate-900">
-                                      📖 {sess.subject}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-1.5 flex-wrap sm:justify-end">
-                                  <span className="text-[10px] text-slate-400 font-semibold block mr-1">Rombel & Ruang:</span>
-                                  {sess.classes.map((cls) => {
-                                    const matchingItem = scheduleData.subjectSchedules.find(
-                                      (s) => s.date === day.date && s.sessionNumber === sess.sessionNumber && s.className === cls
-                                    );
-                                    return (
-                                      <span key={cls} className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-slate-700 border border-slate-200 shadow-2xs">
-                                        Kelas {cls} <strong className="text-teal-700 font-black">({matchingItem?.roomName || 'Ruang'})</strong>
+                          {/* Sessions List */}
+                          <div className="p-4 space-y-3 flex-1">
+                            {day.sessions.map((sess) => {
+                              const durationText = getSessionDurationText(sess.startTime, sess.endTime);
+                              return (
+                                <div
+                                  key={`${sess.sessionNumber}_${sess.subject}`}
+                                  className="rounded-xl p-3.5 bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all space-y-3"
+                                >
+                                  {/* Session Header Row: Sesi Badge + Subject Title + Time */}
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="shrink-0 px-2 py-0.5 rounded-md bg-teal-700 text-white font-black text-[10px] uppercase tracking-wider shadow-2xs">
+                                        Sesi {sess.sessionNumber}
                                       </span>
-                                    );
-                                  })}
+                                      <h5 className="text-sm sm:text-base font-black text-slate-900 truncate tracking-tight">
+                                        {sess.subject}
+                                      </h5>
+                                    </div>
+
+                                    <div className="inline-flex items-center gap-1.5 shrink-0 bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 shadow-2xs self-start sm:self-auto">
+                                      <Clock className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                                      <span className="font-mono">{sess.startTime} - {sess.endTime} WIB</span>
+                                      {durationText && (
+                                        <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded ml-0.5">
+                                          {durationText}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Room & Class Allocation Section */}
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold px-0.5">
+                                      <span className="flex items-center gap-1.5 text-slate-600">
+                                        <DoorOpen className="w-3.5 h-3.5 text-teal-600" />
+                                        <span>Alokasi Rombel & Ruang Ujian:</span>
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 font-medium">
+                                        {sess.classes.length} Rombel
+                                      </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                                      {sess.classes.map((cls) => {
+                                        const matchingItem = scheduleData.subjectSchedules.find(
+                                          (s) => s.date === day.date && s.sessionNumber === sess.sessionNumber && s.className === cls
+                                        );
+                                        return (
+                                          <div
+                                            key={cls}
+                                            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/90 shadow-2xs hover:border-teal-300 transition-colors"
+                                          >
+                                            <span className="text-xs font-bold text-slate-800 truncate">
+                                              Kelas {cls}
+                                            </span>
+                                            <span className="shrink-0 ml-1.5 px-2 py-0.5 rounded text-[10px] font-black text-teal-800 bg-teal-50 border border-teal-200/70">
+                                              {matchingItem?.roomName || `Ruang ${cls}`}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
 
+                          {/* Friday Footer Notice */}
                           {isFriday && (
-                            <p className="text-[11px] text-amber-800 font-semibold flex items-center gap-1.5 pt-1">
-                              <span>🕌</span>
-                              <span>Ujian hari Jumat selesai pukul 10:30 WIB agar siswa & dewan guru dapat mempersiapkan Sholat Jumat.</span>
-                            </p>
+                            <div className="p-3 mx-4 mb-4 rounded-xl bg-amber-100/60 border border-amber-200/90 flex items-start gap-2.5 text-xs text-amber-900 font-medium">
+                              <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                              <div className="space-y-0.5">
+                                <p className="font-bold text-amber-950">Jadwal Khusus Hari Jumat</p>
+                                <p className="text-[11px] text-amber-800 leading-relaxed">
+                                  Seluruh sesi ujian diselesaikan maksimal pukul 10:30 WIB untuk persiapan Ibadah Sholat Jumat.
+                                </p>
+                              </div>
+                            </div>
                           )}
                         </div>
                       );
