@@ -5,13 +5,14 @@ export interface NotificationVariables {
   waktu?: string;
   status?: string;
   alasan?: string;
+  tugas?: string;
   link?: string;
   [key: string]: string | undefined;
 }
 
 export const DEFAULT_TEMPLATES: Record<string, string> = {
   LEAVE_SUBMIT:
-    '📩 *Pengajuan {{jenis}}*\n👤 *{{nama}}*\n📅 Tanggal: {{tanggal}} ({{waktu}})\n📝 Alasan: {{alasan}}\n🔗 {{link}}',
+    '📩 *Pengajuan {{jenis}}*\n👤 *{{nama}}*\n📅 Tanggal: {{tanggal}} ({{waktu}})\n📝 Alasan: {{alasan}}\n📋 Tugas Piket: {{tugas}}\n🔗 {{link}}',
 
   LEAVE_APPROVE:
     '🟢 *Pengajuan {{jenis}} Disetujui*\n👤 *{{nama}}*\n📅 Tanggal: {{tanggal}}\n📝 Catatan Kepsek: {{alasan}}\n🔗 {{link}}',

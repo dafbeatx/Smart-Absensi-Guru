@@ -24,6 +24,18 @@ export interface WhatsAppAttendanceParams {
   isOffline?: boolean;
 }
 
+export interface WhatsAppLeaveParams {
+  teacherName: string;
+  nip?: string;
+  npp?: string;
+  role?: string;
+  leaveType: 'SAKIT' | 'IZIN' | 'DINAS_LUAR' | 'CUTI' | string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  dutyTeacherNotes?: string;
+}
+
 export class WhatsAppNotificationService {
   private static readonly PROXY_ENDPOINT = '/api/whatsapp';
 
@@ -156,6 +168,148 @@ export class WhatsAppNotificationService {
     const url = this.generateWhatsAppShareUrl(params, targetPhone);
     if (typeof window !== 'undefined') {
       window.open(url, '_blank');
+    }
+  }
+
+  /**
+   * Generates formatted text for WhatsApp Click-to-Chat for Leave / Absence requests.
+   * Includes teacher identity, type (Izin, Sakit, Dinas, Cuti), dates, reason, and duty teacher notes.
+   */
+  public static generateWhatsAppLeaveShareText(params: WhatsAppLeaveParams): string {
+    const rawType = String(params.leaveType || 'IZIN').toUpperCase();
+    let badgeTitle = 'PERMOHONAN IZIN';
+    let typeEmoji = '📝';
+    let typeLabel = 'Izin Resmi / Keperluan Pribadi';
+
+    if (rawType === 'SAKIT') {
+      badgeTitle = 'SURAT KETERANGAN SAKIT';
+      typeEmoji = '🤒';
+      typeLabel = 'Izin Sakit';
+    } else if (rawType === 'DINAS_LUAR') {
+      badgeTitle = 'PEMBERITAHUAN DINAS LUAR';
+      typeEmoji = '💼';
+      typeLabel = 'Tugas / Dinas Luar Sekolah';
+    } else if (rawType === 'CUTI') {
+      badgeTitle = 'PERMOHONAN CUTI RESMI';
+      typeEmoji = '🏖️';
+      typeLabel = 'Cuti Tahunan / Resmi';
+    }
+
+    const nppDisplay = (params.npp || params.nip || '').trim() || '-';
+    const roleDisplay =
+      params.role === 'ADMIN'
+        ? 'Administrator'
+        : params.role === 'KEPSEK'
+        ? 'Kepala Sekolah'
+        : 'Guru / Tenaga Pendidik';
+
+    const startDate = params.startDate;
+    const endDate = params.endDate || params.startDate;
+    const dateDisplay =
+      startDate === endDate
+        ? startDate
+        : `${startDate} s.d. ${endDate}`;
+
+    const dutyNotes = (params.dutyTeacherNotes || '').trim() || 'Siswa belajar mandiri / mengerjakan materi buku paket.';
+
+    return [
+      `📢 *${badgeTitle}*`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `${typeEmoji} *Jenis:* ${typeLabel}`,
+      `👤 *Nama:* ${params.teacherName || 'Guru'}`,
+      `🆔 *NPP:* ${nppDisplay}`,
+      `💼 *Jabatan:* ${roleDisplay}`,
+      `📅 *Tanggal:* ${dateDisplay}`,
+      `📝 *Keterangan / Alasan:*`,
+      `${params.reason || '-'}`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `📋 *TUGAS UNTUK GURU PIKET:*`,
+      `"${dutyNotes}"`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `_Smart Absensi Guru • Terverifikasi Otomatis_`,
+    ].join('\n');
+  }
+
+  /**
+   * Generates WhatsApp universal Click-to-Chat link pre-filled with leave request and piket task.
+   */
+  public static generateWhatsAppLeaveShareUrl(params: WhatsAppLeaveParams, targetPhone?: string): string {
+    const text = this.generateWhatsAppLeaveShareText(params);
+    const encoded = encodeURIComponent(text);
+    if (targetPhone && targetPhone.trim()) {
+      const cleanPhone = targetPhone.replace(/\D/g, '');
+      return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encoded}`;
+    }
+    return `https://api.whatsapp.com/send?text=${encoded}`;
+  }
+
+  /**
+   * Directly launches WhatsApp with the pre-filled leave & piket task text in 1 click.
+   */
+  public static openWhatsAppLeaveShare(params: WhatsAppLeaveParams, targetPhone?: string): void {
+    const url = this.generateWhatsAppLeaveShareUrl(params, targetPhone);
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+    }
+  }
+
+  /**
+   * Dispatches text-only leave notification with piket tasks to the School WhatsApp Group via serverless proxy.
+   * Fire-and-forget: never throws unhandled errors or blocks the UI flow.
+   */
+  public static async sendLeaveNotification(params: WhatsAppLeaveParams): Promise<boolean> {
+    try {
+      const sanitizedPayload = {
+        teacherName: params.teacherName || 'Guru',
+        npp: params.npp || params.nip || undefined,
+        role: params.role || 'GURU',
+        leaveType: params.leaveType || 'IZIN',
+        startDate: params.startDate,
+        endDate: params.endDate || params.startDate,
+        reason: params.reason || '',
+        dutyTeacherNotes: params.dutyTeacherNotes || '',
+      };
+
+      const response = await fetch(this.PROXY_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'send_leave_notification',
+          leave: sanitizedPayload,
+        }),
+      });
+
+      if (!response.ok) {
+        logger.warn(
+          'WhatsAppNotificationService',
+          `Serverless proxy returned status ${response.status}. Notifikasi izin WA grup dilewati.`
+        );
+        return false;
+      }
+
+      const resData = await response.json().catch(() => ({}));
+      if (resData.status === 'ignored') {
+        logger.info(
+          'WhatsAppNotificationService',
+          'WhatsApp Gateway belum dikonfigurasi di Vercel env. Notifikasi izin dilewati dengan aman.'
+        );
+        return true;
+      }
+
+      logger.info(
+        'WhatsAppNotificationService',
+        'Notifikasi izin & tugas guru piket berhasil dikirim ke Grup WhatsApp Sekolah'
+      );
+      return true;
+    } catch (err: any) {
+      logger.warn(
+        'WhatsAppNotificationService',
+        'Kendala pengiriman notifikasi izin WhatsApp ke grup:',
+        err?.message || err
+      );
+      return false;
     }
   }
 

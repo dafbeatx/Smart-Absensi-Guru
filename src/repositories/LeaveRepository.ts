@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { logger } from '../utils/logger.utils';
 import { AuditLogger } from '../services/audit-logger.service';
 import { NotificationService } from '../services/notification-permission.service';
+import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
 
 export interface SubmitLeaveDTO {
   token: string;
@@ -48,6 +49,18 @@ export class LeaveRepository {
       dto.reason,
       dto.duty_teacher_notes
     );
+
+    // 3. Dispatch WhatsApp Group Notification (Proxy to School Group if Gateway configured)
+    WhatsAppNotificationService.sendLeaveNotification({
+      teacherName: activeUser.full_name || 'Guru',
+      npp: activeUser.npp || activeUser.nip || undefined,
+      role: activeUser.role || 'GURU',
+      leaveType: dto.leave_type,
+      startDate: dto.start_date,
+      endDate: dto.end_date,
+      reason: dto.reason,
+      dutyTeacherNotes: dto.duty_teacher_notes,
+    }).catch((e) => console.warn('WhatsApp leave group notification error:', e));
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('smart_absensi_leave_updated'));
@@ -145,7 +158,7 @@ export class LeaveRepository {
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('smart_absensi_leaves', JSON.stringify(leaves));
-          } catch (e) {}
+          } catch {}
         }
         return leaves.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       }

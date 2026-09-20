@@ -15,6 +15,17 @@ export interface WhatsAppAttendancePayload {
   isOffline?: boolean;
 }
 
+export interface WhatsAppLeavePayload {
+  teacherName: string;
+  npp?: string;
+  role?: string;
+  leaveType?: string;
+  startDate?: string;
+  endDate?: string;
+  reason?: string;
+  dutyTeacherNotes?: string;
+}
+
 /**
  * Format attendance record into a clean, aesthetic WhatsApp text notification.
  * Note: Never include any photo or image URLs.
@@ -67,6 +78,62 @@ export function formatWhatsAppAttendanceMessage(payload: WhatsAppAttendancePaylo
     `🔍 *Metode:* ${methodDisplay}`,
     `━━━━━━━━━━━━━━━━━━━━`,
     `_Smart Absensi Guru • Terverifikasi Sistem_`,
+  ].join('\n');
+}
+
+/**
+ * Format leave/absence record and duty teacher tasks into a clean WhatsApp notification.
+ * Strictly text-only: never includes document or medical certificate photos.
+ */
+export function formatWhatsAppLeaveMessage(payload: WhatsAppLeavePayload): string {
+  const rawType = String(payload.leaveType || 'IZIN').toUpperCase();
+  let badgeTitle = 'PERMOHONAN IZIN';
+  let typeEmoji = '📝';
+  let typeLabel = 'Izin Resmi / Keperluan Pribadi';
+
+  if (rawType === 'SAKIT') {
+    badgeTitle = 'SURAT KETERANGAN SAKIT';
+    typeEmoji = '🤒';
+    typeLabel = 'Izin Sakit';
+  } else if (rawType === 'DINAS_LUAR') {
+    badgeTitle = 'PEMBERITAHUAN DINAS LUAR';
+    typeEmoji = '💼';
+    typeLabel = 'Tugas / Dinas Luar Sekolah';
+  } else if (rawType === 'CUTI') {
+    badgeTitle = 'PERMOHONAN CUTI RESMI';
+    typeEmoji = '🏖️';
+    typeLabel = 'Cuti Tahunan / Resmi';
+  }
+
+  const nppDisplay = payload.npp && payload.npp.trim() !== '' ? payload.npp.trim() : '-';
+  const roleDisplay =
+    payload.role === 'ADMIN'
+      ? 'Administrator'
+      : payload.role === 'KEPSEK'
+      ? 'Kepala Sekolah'
+      : 'Guru / Tenaga Pendidik';
+
+  const startDate = payload.startDate || new Date().toISOString().substring(0, 10);
+  const endDate = payload.endDate || startDate;
+  const dateDisplay = startDate === endDate ? startDate : `${startDate} s.d. ${endDate}`;
+
+  const dutyNotes = (payload.dutyTeacherNotes || '').trim() || 'Siswa belajar mandiri / mengerjakan materi buku paket.';
+
+  return [
+    `📢 *${badgeTitle}*`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `${typeEmoji} *Jenis:* ${typeLabel}`,
+    `👤 *Nama:* ${payload.teacherName || 'Guru'}`,
+    `🆔 *NPP:* ${nppDisplay}`,
+    `💼 *Jabatan:* ${roleDisplay}`,
+    `📅 *Tanggal:* ${dateDisplay}`,
+    `📝 *Keterangan / Alasan:*`,
+    `${payload.reason || '-'}`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `📋 *TUGAS UNTUK GURU PIKET:*`,
+    `"${dutyNotes}"`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `_Smart Absensi Guru • Terverifikasi Otomatis_`,
   ].join('\n');
 }
 
@@ -131,6 +198,8 @@ export default async function handler(req: any, res: any) {
   let messageText = '';
   if (action === 'send_attendance_notification') {
     messageText = formatWhatsAppAttendanceMessage(body.attendance || body);
+  } else if (action === 'send_leave_notification') {
+    messageText = formatWhatsAppLeaveMessage(body.leave || body);
   } else if (action === 'send_raw_message' || action === 'test_connection') {
     messageText = body.text || '🔔 *Tes Koneksi WhatsApp Gateway Smart-Absensi-Guru* (Berhasil Terhubung)';
   } else {

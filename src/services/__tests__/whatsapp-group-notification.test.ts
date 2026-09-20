@@ -4,7 +4,10 @@
  */
 
 import { WhatsAppNotificationService } from '../whatsapp-notification.service';
-import { formatWhatsAppAttendanceMessage } from '../../../api/whatsapp';
+import {
+  formatWhatsAppAttendanceMessage,
+  formatWhatsAppLeaveMessage,
+} from '../../../api/whatsapp';
 
 export const runWhatsAppGroupNotificationTestSuite = async (): Promise<{
   passed: number;
@@ -156,6 +159,86 @@ export const runWhatsAppGroupNotificationTestSuite = async (): Promise<{
       !shareText.includes('.jpg') &&
       shareText.includes('*NOTIFIKASI PRESENSI GURU*'),
     '100% text-only privacy policy strictly enforced'
+  );
+
+  // =========================================================================
+  // Leave & Duty Teacher Tasks WhatsApp Notifications (User Request)
+  // =========================================================================
+  const leaveTestPayload = {
+    teacherName: 'Siti Rahmawati, M.Pd.',
+    npp: 'NPP-198502152011012003',
+    role: 'GURU',
+    leaveType: 'IZIN',
+    startDate: '2026-09-21',
+    endDate: '2026-09-21',
+    reason: 'Menghadiri rapat dinas MGMP Matematika',
+    dutyTeacherNotes: 'Tugas Kelas 8A: Buka LKS halaman 52, kerjakan nomor 1-10 di buku tugas.',
+  };
+
+  // Test 11: generateWhatsAppLeaveShareText includes all required elements & duty teacher tasks
+  const leaveShareText = WhatsAppNotificationService.generateWhatsAppLeaveShareText(leaveTestPayload);
+  assert(
+    'WA Notif 11: generateWhatsAppLeaveShareText includes Teacher Name, NPP, Dates, and Duty Teacher Tasks',
+    leaveShareText.includes('Siti Rahmawati, M.Pd.') &&
+      leaveShareText.includes('NPP-198502152011012003') &&
+      leaveShareText.includes('2026-09-21') &&
+      leaveShareText.includes('Menghadiri rapat dinas MGMP Matematika') &&
+      leaveShareText.includes('TUGAS UNTUK GURU PIKET') &&
+      leaveShareText.includes('Tugas Kelas 8A: Buka LKS halaman 52'),
+    `Leave share text preview: ${leaveShareText.slice(0, 150)}...`
+  );
+
+  // Test 12: generateWhatsAppLeaveShareUrl creates valid universal link with encoded leave details
+  const leaveShareUrl = WhatsAppNotificationService.generateWhatsAppLeaveShareUrl(leaveTestPayload);
+  assert(
+    'WA Notif 12: generateWhatsAppLeaveShareUrl produces valid WhatsApp deep link encoded with duty teacher tasks',
+    leaveShareUrl.startsWith('https://api.whatsapp.com/send?text=') &&
+      leaveShareUrl.includes(encodeURIComponent('Siti Rahmawati, M.Pd.')) &&
+      leaveShareUrl.includes(encodeURIComponent('Tugas Kelas 8A: Buka LKS halaman 52')),
+    `Generated Leave URL sample: ${leaveShareUrl.slice(0, 90)}...`
+  );
+
+  // Test 13: formatWhatsAppLeaveMessage produces clean text-only message for SAKIT and includes duty teacher notes
+  const sickPayload = {
+    teacherName: 'Ahmad Fauzi, S.Pd.',
+    npp: 'NPP-198904122015021004',
+    role: 'GURU',
+    leaveType: 'SAKIT',
+    startDate: '2026-09-21',
+    endDate: '2026-09-22',
+    reason: 'Demam tinggi dan flu berat',
+    dutyTeacherNotes: 'Siswa kelas 9B menonton video pembelajaran Bab 4 di LCD proyektor.',
+  };
+  const sickFormattedMsg = formatWhatsAppLeaveMessage(sickPayload);
+  assert(
+    'WA Notif 13: formatWhatsAppLeaveMessage handles SAKIT type with medical indicator and includes piket tasks',
+    sickFormattedMsg.includes('SURAT KETERANGAN SAKIT') &&
+      sickFormattedMsg.includes('Ahmad Fauzi, S.Pd.') &&
+      sickFormattedMsg.includes('2026-09-21 s.d. 2026-09-22') &&
+      sickFormattedMsg.includes('Siswa kelas 9B menonton video pembelajaran Bab 4') &&
+      !sickFormattedMsg.includes('data:image') &&
+      !sickFormattedMsg.includes('.jpg'),
+    'formatWhatsAppLeaveMessage verified'
+  );
+
+  // Test 14: sendLeaveNotification executes asynchronously without crashing caller flow
+  let threwLeaveException = false;
+  try {
+    const sendLeavePromise = WhatsAppNotificationService.sendLeaveNotification(leaveTestPayload);
+    assert(
+      'WA Notif 14: sendLeaveNotification executes asynchronously and returns a promise',
+      sendLeavePromise instanceof Promise,
+      'Returns a Promise without uncaught synchronous exceptions'
+    );
+    await sendLeavePromise;
+  } catch {
+    threwLeaveException = true;
+  }
+
+  assert(
+    'WA Notif 15: Non-blocking error safety for sendLeaveNotification',
+    !threwLeaveException,
+    'Leave notification proxy dispatch absorbed safely'
   );
 
   return { passed, failed, results };
