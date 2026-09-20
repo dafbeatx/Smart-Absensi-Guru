@@ -3610,10 +3610,10 @@ export class SupabaseProvider implements IDataProvider {
   public async getStudents(_token?: string): Promise<StudentItem[]> {
     return this.dedupeRequest('getStudents', async () => {
       try {
-        // 1. Try fetching from public.students
+        // 1. Try fetching from public.students (safe columns without last_tap_at which may not exist yet)
         const { data, error } = await this.client
           .from('students')
-          .select('id, nisn, full_name, class_name, academic_year, gender, rfid_uid, card_status, attendance_rate, last_tap_at, address, notes, created_at, updated_at')
+          .select('id, nisn, full_name, class_name, academic_year, gender, rfid_uid, card_status, attendance_rate, address, notes, created_at, updated_at')
           .order('class_name', { ascending: true })
           .order('full_name', { ascending: true })
           .limit(200);
@@ -3815,11 +3815,23 @@ export class SupabaseProvider implements IDataProvider {
       payload.updated_at = new Date().toISOString();
 
       // First try update by ID
-      const { data, error } = await this.client
+      let { data, error } = await this.client
         .from('students')
         .update(payload)
         .eq('id', id)
         .select('id');
+
+      // If last_tap_at does not exist in schema, retry without it
+      if (error && error.message?.includes('last_tap_at')) {
+        delete payload.last_tap_at;
+        const retryRes = await this.client
+          .from('students')
+          .update(payload)
+          .eq('id', id)
+          .select('id');
+        data = retryRes.data;
+        error = retryRes.error;
+      }
 
       if (!error && data && data.length > 0) {
         dbSuccess = true;
@@ -5095,9 +5107,28 @@ export class SupabaseProvider implements IDataProvider {
             })()
           : null);
 
-      if (!activeToken) {
-        logger.warn('SupabaseProvider', 'getTeacherPointHistory: token sesi tidak ditemukan (AUTH_REQUIRED).');
-        return [];
+      const getFromLocalStorage = (): TeacherPointLog[] => {
+        if (typeof window === 'undefined') return [];
+        try {
+          const raw = localStorage.getItem('smart_absensi_teacher_point_history');
+          if (!raw) return [];
+          const list: TeacherPointLog[] = JSON.parse(raw);
+          if (!Array.isArray(list)) return [];
+          if (!userId || userId === 'ALL') return list;
+          return list.filter((l) => l.user_id === userId);
+        } catch {
+          return [];
+        }
+      };
+
+      // If token is absent or not a stateful server-verifiable session (e.g. older SB_JWT_ or mock token),
+      // read directly from local storage cache to avoid triggering a 401 response.
+      if (!activeToken || !activeToken.startsWith('saga_sess_')) {
+        const localData = getFromLocalStorage();
+        if (localData.length > 0) {
+          this.cachedTeacherPointHistory.set(userId, { data: localData, timestamp: Date.now() });
+        }
+        return localData;
       }
 
       try {
@@ -5117,11 +5148,17 @@ export class SupabaseProvider implements IDataProvider {
 
         if (!response.ok) {
           const errBody = await response.json().catch(() => ({}));
-          logger.warn(
-            'SupabaseProvider',
-            `getTeacherPointHistory API error (HTTP ${response.status}):`,
-            errBody.errorMessage || response.statusText
-          );
+          if (response.status !== 401) {
+            logger.warn(
+              'SupabaseProvider',
+              `getTeacherPointHistory API error (HTTP ${response.status}):`,
+              errBody.errorMessage || response.statusText
+            );
+          }
+          const localData = getFromLocalStorage();
+          if (localData.length > 0) {
+            return localData;
+          }
           return [];
         }
 
@@ -5141,10 +5178,17 @@ export class SupabaseProvider implements IDataProvider {
         }));
 
         this.cachedTeacherPointHistory.set(userId, { data: result, timestamp: Date.now() });
+
+        if (typeof window !== 'undefined' && (userId === 'ALL' || !userId)) {
+          try {
+            localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(result));
+          } catch {}
+        }
+
         return result;
       } catch (err) {
-        logger.error('SupabaseProvider', 'getTeacherPointHistory exception:', err);
-        return [];
+        logger.warn('SupabaseProvider', 'getTeacherPointHistory network issue, reading local cache:', err);
+        return getFromLocalStorage();
       }
     });
   }
