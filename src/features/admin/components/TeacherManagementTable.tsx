@@ -11,6 +11,15 @@ import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHist
 import { convertToWebP } from '../../../utils/image.utils';
 import { handleAppError } from '../../../utils/error.utils';
 import { getTeacherDisciplineLeaderboard } from '../../../utils/teacher-appreciation.utils';
+import {
+  ExamCommitteeRepository,
+  EXAM_COMMITTEE_CHANGED_EVENT,
+} from '../../../repositories/ExamCommitteeRepository';
+import {
+  AdministrationRepository,
+  ADMIN_YEAR_CHANGED_EVENT,
+} from '../../../repositories/AdministrationRepository';
+import type { ExamCommitteeMember, CommitteeRole } from '../../../types/exam-schedule.types';
 
 export interface TeacherManagementTableProps {
   teachers: UserProfile[];
@@ -66,6 +75,53 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       window.removeEventListener('smart_absensi_points_updated', handlePointsUpdated);
     };
   }, []);
+
+  // Exam Committee Management State
+  const [committeeMembers, setCommitteeMembers] = useState<ExamCommitteeMember[]>([]);
+  const [committeeRole, setCommitteeRole] = useState<CommitteeRole | 'NONE'>('NONE');
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadCommittee = async () => {
+      try {
+        const activeYear = AdministrationRepository.getActiveAcademicYear();
+        const members = await ExamCommitteeRepository.getCommitteeMembers(activeYear);
+        if (isMounted) {
+          setCommitteeMembers(members || []);
+        }
+      } catch (err) {
+        console.warn('Failed to load committee members in TeacherManagementTable:', err);
+      }
+    };
+    loadCommittee();
+
+    const handleCommitteeChanged = () => {
+      loadCommittee();
+    };
+
+    window.addEventListener(EXAM_COMMITTEE_CHANGED_EVENT, handleCommitteeChanged);
+    window.addEventListener(ADMIN_YEAR_CHANGED_EVENT, handleCommitteeChanged);
+    return () => {
+      isMounted = false;
+      window.removeEventListener(EXAM_COMMITTEE_CHANGED_EVENT, handleCommitteeChanged);
+      window.removeEventListener(ADMIN_YEAR_CHANGED_EVENT, handleCommitteeChanged);
+    };
+  }, []);
+
+  const teacherCommitteeMap = useMemo(() => {
+    const map: Record<string, { role: CommitteeRole; label: string }> = {};
+    (committeeMembers || []).forEach((m) => {
+      if (m.isActive) {
+        const label =
+          m.role === 'KETUA' ? 'Ketua Panitia' :
+          m.role === 'SEKRETARIS' ? 'Sekretaris Panitia' :
+          m.role === 'BENDAHARA' ? 'Bendahara Panitia' : 'Anggota Panitia';
+        map[m.userId] = { role: m.role, label };
+        if (m.npp) map[`npp_${m.npp}`] = { role: m.role, label };
+      }
+    });
+    return map;
+  }, [committeeMembers]);
 
   const currentMonthPrefix = useMemo(() => {
     const now = new Date();
@@ -161,6 +217,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       }
       window.dispatchEvent(new CustomEvent('smart_absensi_teachers_updated'));
 
+      if (committeeRole !== 'NONE') {
+        await ExamCommitteeRepository.setTeacherCommitteeRole(savedUser, committeeRole);
+      }
+
       await AuditLogger.log({
         actorId: user?.id || 'op_1',
         actorRole: user?.role || 'ADMIN',
@@ -180,10 +240,26 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       setNip('');
       setPhone('');
       setPosition('');
+      setCommitteeRole('NONE');
       setAvatarUrl(null);
     } catch (err: unknown) {
       handleAppError(err, 'TeacherManagementTable.handleAddTeacher', 'Gagal Menambahkan Pengguna Baru');
     }
+  };
+
+  const handleOpenAddModal = () => {
+    if (effectiveReadOnly) {
+      showToast('warning', 'Akses Ditolak', 'Peran Kepala Sekolah / Mode Lihat Saja tidak dapat menambah akun guru.');
+      return;
+    }
+    setFullName('');
+    setNip('');
+    setPhone('');
+    setPosition('');
+    setRole('GURU');
+    setAvatarUrl(null);
+    setCommitteeRole('NONE');
+    setIsAddModalOpen(true);
   };
 
   const handleOpenEditModal = (t: UserProfile) => {
@@ -198,6 +274,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setPosition(t.position || '');
     setRole(t.role);
     setAvatarUrl(t.avatar_url || null);
+
+    const comm = teacherCommitteeMap[t.id] || (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined);
+    setCommitteeRole(comm ? comm.role : 'NONE');
+
     setIsEditModalOpen(true);
   };
 
@@ -329,6 +409,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       if (user && selectedTeacher && (user.id === selectedTeacher.id || (Boolean(user.nip) && user.nip === selectedTeacher.nip))) {
         useAuthStore.getState().updateUserProfile(updates);
       }
+
+      // Update committee role in ExamCommitteeRepository
+      await ExamCommitteeRepository.setTeacherCommitteeRole(
+        { ...selectedTeacher, ...updates } as UserProfile,
+        committeeRole
+      );
 
       await AuditLogger.log({
         actorId: user?.id || 'op_1',
@@ -527,7 +613,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
         </div>
 
         {!effectiveReadOnly && (
-          <Button variant="primary" onClick={() => setIsAddModalOpen(true)}>
+          <Button variant="primary" onClick={handleOpenAddModal}>
             + Tambah Pengguna Baru
           </Button>
         )}
@@ -565,43 +651,52 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
             Tidak ada pengguna terdaftar yang sesuai pencarian.
           </div>
         ) : (
-          filteredTeachers.map((t) => (
-            <div key={t.id} className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
-              {/* Header: Avatar, Name, NPP & Active Badge */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
-                    {t.avatar_url ? (
-                      <img src={t.avatar_url} alt={t.full_name} className="w-full h-full object-cover" />
-                    ) : (
-                      t.full_name.charAt(0)
-                    )}
+          filteredTeachers.map((t) => {
+            const comm = teacherCommitteeMap[t.id] || (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined);
+            return (
+              <div key={t.id} className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+                {/* Header: Avatar, Name, NPP & Active Badge */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
+                      {t.avatar_url ? (
+                        <img src={t.avatar_url} alt={t.full_name} className="w-full h-full object-cover" />
+                      ) : (
+                        t.full_name.charAt(0)
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-extrabold text-slate-900 text-xs sm:text-sm truncate">{t.full_name}</p>
+                      <p className="text-[10px] font-mono text-slate-500">NPP: {t.nip || '-'}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-extrabold text-slate-900 text-xs sm:text-sm truncate">{t.full_name}</p>
-                    <p className="text-[10px] font-mono text-slate-500">NPP: {t.nip || '-'}</p>
-                  </div>
-                </div>
 
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black shrink-0 ${
-                  t.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
-                }`}>
-                  {t.is_active ? 'Aktif' : 'Non-Aktif'}
-                </span>
-              </div>
-
-              {/* Body: Role & Position */}
-              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-100 text-xs">
-                <div className="space-y-0.5 min-w-0">
-                  <span className={`inline-block px-2 py-0.5 rounded-md text-[9px] font-black ${
-                    t.role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black shrink-0 ${
+                    t.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
                   }`}>
-                    {t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'ADMIN WEBSITE' : t.role}
+                    {t.is_active ? 'Aktif' : 'Non-Aktif'}
                   </span>
-                  <p className="text-[11px] font-semibold text-slate-600 truncate">{t.position || 'Tenaga Pendidik'}</p>
                 </div>
-                <span className="text-[11px] font-mono font-medium text-slate-500">💬 {t.phone_number || '-'}</span>
-              </div>
+
+                {/* Body: Role & Position */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-100 text-xs">
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className={`inline-block px-2 py-0.5 rounded-md text-[9px] font-black ${
+                        t.role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'ADMIN WEBSITE' : t.role}
+                      </span>
+                      {comm && (
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[9px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                          🏷️ {comm.label}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] font-semibold text-slate-600 truncate">{t.position || 'Tenaga Pendidik'}</p>
+                  </div>
+                  <span className="text-[11px] font-mono font-medium text-slate-500">💬 {t.phone_number || '-'}</span>
+                </div>
 
               {/* Point Discipline Badge & History Trigger */}
               <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
@@ -687,8 +782,9 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                 </div>
               )}
             </div>
-          ))
-        )}
+          );
+        })
+      )}
       </div>
 
       {/* ── DESKTOP DATA TABLE (>=640px) ────────────────────────────────── */}
@@ -705,31 +801,40 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredTeachers.map((t) => (
-              <tr key={t.id} className="hover:bg-slate-50/50">
-                <td className="p-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
-                      {t.avatar_url ? (
-                        <img src={t.avatar_url} alt={t.full_name} className="w-full h-full object-cover" />
-                      ) : (
-                        t.full_name.charAt(0)
+            {filteredTeachers.map((t) => {
+              const comm = teacherCommitteeMap[t.id] || (t.nip ? teacherCommitteeMap[`npp_${t.nip}`] : undefined);
+              return (
+                <tr key={t.id} className="hover:bg-slate-50/50">
+                  <td className="p-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border border-slate-200 shadow-2xs">
+                        {t.avatar_url ? (
+                          <img src={t.avatar_url} alt={t.full_name} className="w-full h-full object-cover" />
+                        ) : (
+                          t.full_name.charAt(0)
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900">{t.full_name}</p>
+                        <p className="text-[10px] text-slate-400">NPP: {t.nip || '-'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                        t.role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'ADMIN WEBSITE' : t.role}
+                      </span>
+                      {comm && (
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[9.5px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                          🏷️ {comm.label}
+                        </span>
                       )}
                     </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{t.full_name}</p>
-                      <p className="text-[10px] text-slate-400">NPP: {t.nip || '-'}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="p-3">
-                  <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                    t.role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
-                  }`}>
-                    {t.role === 'ADMIN' || t.role === 'OPERATOR' ? 'ADMIN WEBSITE' : t.role}
-                  </span>
-                  <p className="text-[11px] text-slate-500 font-medium">{t.position}</p>
-                </td>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">{t.position}</p>
+                  </td>
                 <td className="p-3 text-slate-600 font-medium">{t.phone_number}</td>
                 <td className="p-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -830,7 +935,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                   )}
                 </td>
               </tr>
-            ))}
+            );
+          })}
           </tbody>
         </table>
       </div>
@@ -888,6 +994,24 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
           <Input label="Jabatan / Bidang Studi" value={position} onChange={(e) => setPosition(e.target.value)} required />
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700">Tugas Kepanitiaan Ujian (Opsional)</label>
+            <select
+              value={committeeRole}
+              onChange={(e) => setCommitteeRole(e.target.value as CommitteeRole | 'NONE')}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="NONE">⚪ Bukan Panitia Ujian</option>
+              <option value="KETUA">⭐ Ketua Panitia Ujian</option>
+              <option value="SEKRETARIS">📝 Sekretaris Panitia Ujian</option>
+              <option value="BENDAHARA">💰 Bendahara Panitia Ujian</option>
+              <option value="ANGGOTA">👥 Anggota Panitia Ujian</option>
+            </select>
+            <p className="text-[10px] text-slate-500">
+              Menentukan hak akses penyusunan jadwal ujian ASTS/ASAS dan badge kepanitiaan di beranda guru.
+            </p>
+          </div>
 
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-slate-700">Role Pengguna</label>
@@ -958,6 +1082,24 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
           <Input label="Jabatan / Bidang Studi" value={position} onChange={(e) => setPosition(e.target.value)} required />
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700">Tugas Kepanitiaan Ujian (Opsional)</label>
+            <select
+              value={committeeRole}
+              onChange={(e) => setCommitteeRole(e.target.value as CommitteeRole | 'NONE')}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="NONE">⚪ Bukan Panitia Ujian</option>
+              <option value="KETUA">⭐ Ketua Panitia Ujian</option>
+              <option value="SEKRETARIS">📝 Sekretaris Panitia Ujian</option>
+              <option value="BENDAHARA">💰 Bendahara Panitia Ujian</option>
+              <option value="ANGGOTA">👥 Anggota Panitia Ujian</option>
+            </select>
+            <p className="text-[10px] text-slate-500">
+              Menentukan hak akses penyusunan jadwal ujian ASTS/ASAS dan badge kepanitiaan di beranda guru.
+            </p>
+          </div>
 
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-slate-700">Role Pengguna</label>

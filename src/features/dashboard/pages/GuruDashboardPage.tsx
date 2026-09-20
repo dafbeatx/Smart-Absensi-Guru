@@ -125,6 +125,15 @@ import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import { normalizeDayOfWeek } from '../../../utils/teaching-schedule.utils';
+import {
+  ExamCommitteeRepository,
+  EXAM_COMMITTEE_CHANGED_EVENT,
+} from '../../../repositories/ExamCommitteeRepository';
+import {
+  AdministrationRepository,
+  ADMIN_YEAR_CHANGED_EVENT,
+} from '../../../repositories/AdministrationRepository';
+import type { CommitteeRole } from '../../../types/exam-schedule.types';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -400,6 +409,50 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
+
+  // Exam Committee State (Hak Panitia Ujian & Role Title)
+  const [committeeInfo, setCommitteeInfo] = useState<{
+    isCommittee: boolean;
+    role: CommitteeRole | 'CUSTOM';
+    roleLabel: string;
+    academicYear: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadCommittee = async () => {
+      if (!effectiveUser?.id) {
+        if (isMounted) setCommitteeInfo(null);
+        return;
+      }
+      try {
+        const activeYear = AdministrationRepository.getActiveAcademicYear();
+        const roleData = await ExamCommitteeRepository.getTeacherCommitteeRole(effectiveUser, activeYear);
+        if (isMounted) {
+          setCommitteeInfo(roleData);
+        }
+      } catch (err) {
+        console.warn('Failed to load committee role in GuruDashboardPage:', err);
+      }
+    };
+
+    loadCommittee();
+
+    const handleCommitteeChanged = () => {
+      loadCommittee();
+    };
+
+    window.addEventListener(EXAM_COMMITTEE_CHANGED_EVENT, handleCommitteeChanged);
+    window.addEventListener(ADMIN_YEAR_CHANGED_EVENT, handleCommitteeChanged);
+    window.addEventListener('smart_absensi_teachers_updated', handleCommitteeChanged);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener(EXAM_COMMITTEE_CHANGED_EVENT, handleCommitteeChanged);
+      window.removeEventListener(ADMIN_YEAR_CHANGED_EVENT, handleCommitteeChanged);
+      window.removeEventListener('smart_absensi_teachers_updated', handleCommitteeChanged);
+    };
+  }, [effectiveUser?.id, effectiveUser?.position, effectiveUser?.full_name, effectiveUser?.nip]);
 
   // 8 Quick Icons Customization State & Hak Akses Wakasek Sarpras (M. Iqbal Gustiawan)
   const isSarprasOfficer = isUserSarprasOfficer(effectiveUser);
@@ -2048,6 +2101,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               <h1 className="font-black text-white text-sm sm:text-base leading-tight truncate">
                 {getTimeBasedGreeting()}, {effectiveUser.full_name}
               </h1>
+              {committeeInfo?.isCommittee && (
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-linear-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-[9px] sm:text-[10px] tracking-wide shadow-xs border border-amber-300 leading-tight">
+                    <span>⭐</span>
+                    <span>{committeeInfo.roleLabel}</span>
+                  </span>
+                  <span className="text-[9.5px] text-cyan-200/90 font-mono">
+                    • TA {committeeInfo.academicYear}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2126,6 +2190,90 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
           <>
+            {/* 🏛️ KARTU TUGAS KEPANITIAAN UJIAN (MUNCUL JIKA DITETAPKAN SEBAGAI PANITIA OLEH ADMIN) */}
+            {committeeInfo?.isCommittee && (
+              <div
+                id="committee-assignment-banner"
+                className="bg-linear-to-br from-[#023246] via-[#0A4158] to-[#18536B] rounded-3xl p-4 sm:p-4.5 text-white shadow-md border border-cyan-500/30 space-y-3 animate-fadeIn relative overflow-hidden"
+              >
+                {/* Decorative background glow */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-400/10 rounded-full blur-2xl pointer-events-none" />
+
+                {/* Header Widget */}
+                <div className="flex items-start justify-between gap-2.5 relative z-10">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center text-lg font-black shadow-md shrink-0 ring-2 ring-amber-300/60">
+                      🏆
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 bg-amber-400 text-slate-950 text-[9px] sm:text-[9.5px] font-black rounded-md tracking-wider uppercase shadow-2xs">
+                          SK PANITIA UJIAN
+                        </span>
+                        <span className="text-[10px] text-cyan-200 font-bold font-mono">
+                          T.A. {committeeInfo.academicYear}
+                        </span>
+                      </div>
+                      <h3 className="text-sm sm:text-base font-black text-white leading-tight mt-0.5 truncate">
+                        {committeeInfo.roleLabel}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Aktif
+                  </span>
+                </div>
+
+                {/* Description of Role and Duties */}
+                <div className="bg-black/25 rounded-2xl p-3 border border-white/10 text-xs space-y-1.5 relative z-10">
+                  <p className="text-slate-200 text-[11px] sm:text-xs leading-relaxed">
+                    {committeeInfo.role === 'KETUA' ? (
+                      <>
+                        Bapak/Ibu <strong className="text-amber-300">{effectiveUser.full_name}</strong> ditetapkan oleh Admin Sekolah sebagai <strong className="text-white">Ketua Panitia Ujian</strong>. Anda memiliki wewenang penuh dalam perencanaan jadwal ASTS/ASAS, pengesahan alokasi ruang ujian, dan pembagian tugas pengawas ujian.
+                      </>
+                    ) : committeeInfo.role === 'SEKRETARIS' ? (
+                      <>
+                        Bapak/Ibu <strong className="text-amber-300">{effectiveUser.full_name}</strong> ditetapkan oleh Admin Sekolah sebagai <strong className="text-white">Sekretaris Panitia Ujian</strong>. Anda berwenang menyusun jadwal sesi ujian, administrasi pengawas, pencetakan kartu ujian, dan kelengkapan berita acara.
+                      </>
+                    ) : committeeInfo.role === 'BENDAHARA' ? (
+                      <>
+                        Bapak/Ibu <strong className="text-amber-300">{effectiveUser.full_name}</strong> ditetapkan oleh Admin Sekolah sebagai <strong className="text-white">Bendahara Panitia Ujian</strong>. Anda mengelola administrasi logistik, pengadaan lembar ujian, dan operasional kepanitiaan ujian.
+                      </>
+                    ) : (
+                      <>
+                        Bapak/Ibu <strong className="text-amber-300">{effectiveUser.full_name}</strong> ditetapkan oleh Admin Sekolah sebagai <strong className="text-white">Anggota Panitia Ujian</strong>. Anda memiliki hak akses khusus untuk meninjau draf jadwal ujian, ruang rombel, dan penugasan pengawas ujian sekolah.
+                      </>
+                    )}
+                  </p>
+                </div>
+
+                {/* Quick Action Buttons for Committee */}
+                <div className="pt-0.5 flex flex-wrap items-center gap-2 relative z-10">
+                  <button
+                    type="button"
+                    onClick={() => setIsExamScheduleModalOpen(true)}
+                    className="flex-1 py-2 px-3 bg-linear-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>📋</span>
+                    <span>Buka Panel Jadwal &amp; Pengawas AI</span>
+                    <ChevronRight className="w-3.5 h-3.5 ml-auto" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsQuestionCorrectionModalOpen(true)}
+                    className="py-2 px-3 bg-white/10 hover:bg-white/20 active:scale-[0.98] text-white font-bold text-xs rounded-xl border border-white/15 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Koreksi Lembar Jawaban Siswa"
+                  >
+                    <span>📝</span>
+                    <span>Koreksi Ujian</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 📢 BANNER PENGINGAT JADWAL AGENDA HARI INI (RAPAT / UTS / UAS / UPACARA) */}
             {todaySchedule && (
               <div
@@ -4781,6 +4929,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div>
                   <h2 className="font-black text-[#023246] text-base sm:text-lg">{effectiveUser.full_name}</h2>
                   <p className="text-[11px] sm:text-xs text-slate-500 font-semibold">{effectiveUser.position || 'Guru Pengajar'}</p>
+                  {committeeInfo?.isCommittee && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 font-black text-xs shadow-2xs">
+                      <span>🏆</span>
+                      <span>{committeeInfo.roleLabel}</span>
+                      <span className="text-[10px] text-amber-700 font-mono">• TA {committeeInfo.academicYear}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

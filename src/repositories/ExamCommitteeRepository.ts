@@ -1,4 +1,4 @@
-import type { ExamCommitteeMember } from '../types/exam-schedule.types';
+import type { ExamCommitteeMember, CommitteeRole } from '../types/exam-schedule.types';
 import type { UserProfile } from '../types/database.types';
 import { AdministrationRepository } from './AdministrationRepository';
 import { logger } from '../utils/logger.utils';
@@ -82,10 +82,32 @@ export class ExamCommitteeRepository {
   /**
    * Checks whether a specific user is an authorized committee member.
    */
-  public static async isUserCommittee(userId?: string, academicYear?: string): Promise<boolean> {
-    if (!userId) return false;
+  public static async isUserCommittee(userOrId?: string | UserProfile, academicYear?: string): Promise<boolean> {
+    if (!userOrId) return false;
     const members = await this.getCommitteeMembers(academicYear);
-    return members.some((m) => m.userId === userId && m.isActive);
+
+    if (typeof userOrId === 'string') {
+      return members.some((m) => m.userId === userOrId && m.isActive);
+    }
+
+    const u = userOrId;
+    const matched = members.some((m) => {
+      if (!m.isActive) return false;
+      if (m.userId === u.id) return true;
+      if (u.nip && m.npp && u.nip === m.npp) return true;
+      if (u.npp && m.npp && u.npp === m.npp) return true;
+      if (m.fullName && u.full_name && m.fullName.trim().toLowerCase() === u.full_name.trim().toLowerCase()) return true;
+      return false;
+    });
+
+    if (matched) return true;
+
+    // Fallback: check if position explicitly contains panitia
+    if (u.position && u.position.toLowerCase().includes('panitia')) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -116,15 +138,42 @@ export class ExamCommitteeRepository {
       };
     }
 
-    const isCommittee = await this.isUserCommittee(user.id, academicYear);
+    const isCommittee = await this.isUserCommittee(user, academicYear);
 
     if (isCommittee) {
       const members = await this.getCommitteeMembers(academicYear);
-      const member = members.find((m) => m.userId === user.id);
-      const roleName = member?.role === 'KETUA' ? 'Ketua Panitia Ujian'
-        : member?.role === 'SEKRETARIS' ? 'Sekretaris Panitia Ujian'
-        : member?.role === 'BENDAHARA' ? 'Bendahara Panitia Ujian'
-        : 'Panitia Ujian';
+      const member = members.find(
+        (m) =>
+          m.userId === user.id ||
+          (user.nip && m.npp === user.nip) ||
+          (user.npp && m.npp === user.npp) ||
+          (m.fullName && user.full_name && m.fullName.trim().toLowerCase() === user.full_name.trim().toLowerCase())
+      );
+
+      let roleName = 'Panitia Ujian';
+      if (member) {
+        roleName =
+          member.role === 'KETUA'
+            ? 'Ketua Panitia Ujian'
+            : member.role === 'SEKRETARIS'
+            ? 'Sekretaris Panitia Ujian'
+            : member.role === 'BENDAHARA'
+            ? 'Bendahara Panitia Ujian'
+            : member.role === 'ANGGOTA'
+            ? 'Anggota Panitia Ujian'
+            : 'Panitia Ujian';
+      } else if (user.position && user.position.toLowerCase().includes('panitia')) {
+        const pos = user.position.toLowerCase();
+        roleName = pos.includes('ketua')
+          ? 'Ketua Panitia Ujian'
+          : pos.includes('sekretaris')
+          ? 'Sekretaris Panitia Ujian'
+          : pos.includes('bendahara')
+          ? 'Bendahara Panitia Ujian'
+          : pos.includes('anggota')
+          ? 'Anggota Panitia Ujian'
+          : user.position;
+      }
 
       return {
         canManage: true,
@@ -140,5 +189,96 @@ export class ExamCommitteeRepository {
       isAdmin: false,
       roleLabel: userRole === 'KEPSEK' ? 'Kepala Sekolah (Peninjau)' : 'Guru Pengajar',
     };
+  }
+
+  /**
+   * Returns committee member details if user is in committee, or null otherwise.
+   */
+  public static async getTeacherCommitteeRole(
+    user?: UserProfile,
+    academicYear?: string
+  ): Promise<{
+    isCommittee: boolean;
+    role: CommitteeRole | 'CUSTOM';
+    roleLabel: string;
+    academicYear: string;
+  } | null> {
+    if (!user) return null;
+    const targetYear = academicYear || AdministrationRepository.getActiveAcademicYear();
+    const access = await this.checkCommitteeAccess(user, targetYear);
+    if (!access.isCommittee) return null;
+
+    const members = await this.getCommitteeMembers(targetYear);
+    const member = members.find(
+      (m) =>
+        m.userId === user.id ||
+        (user.nip && m.npp === user.nip) ||
+        (user.npp && m.npp === user.npp) ||
+        (m.fullName && user.full_name && m.fullName.trim().toLowerCase() === user.full_name.trim().toLowerCase())
+    );
+
+    let roleCode: CommitteeRole | 'CUSTOM' = member?.role || 'ANGGOTA';
+    if (!member && user.position && user.position.toLowerCase().includes('panitia')) {
+      const pos = user.position.toLowerCase();
+      if (pos.includes('ketua')) roleCode = 'KETUA';
+      else if (pos.includes('sekretaris')) roleCode = 'SEKRETARIS';
+      else if (pos.includes('bendahara')) roleCode = 'BENDAHARA';
+      else roleCode = 'ANGGOTA';
+    }
+
+    return {
+      isCommittee: true,
+      role: roleCode,
+      roleLabel: access.roleLabel,
+      academicYear: targetYear,
+    };
+  }
+
+  /**
+   * Helper to set or unset a teacher's committee status directly (e.g. from TeacherManagementTable).
+   */
+  public static async setTeacherCommitteeRole(
+    teacher: UserProfile,
+    role: CommitteeRole | 'NONE',
+    academicYear?: string
+  ): Promise<boolean> {
+    const targetYear = academicYear || AdministrationRepository.getActiveAcademicYear();
+    const currentMembers = await this.getCommitteeMembers(targetYear);
+    let updatedMembers: ExamCommitteeMember[];
+
+    if (role === 'NONE') {
+      updatedMembers = currentMembers.filter(
+        (m) =>
+          m.userId !== teacher.id &&
+          !(teacher.nip && m.npp === teacher.nip) &&
+          !(m.fullName && teacher.full_name && m.fullName.trim().toLowerCase() === teacher.full_name.trim().toLowerCase())
+      );
+    } else {
+      const existingIdx = currentMembers.findIndex(
+        (m) =>
+          m.userId === teacher.id ||
+          (teacher.nip && m.npp === teacher.nip) ||
+          (m.fullName && teacher.full_name && m.fullName.trim().toLowerCase() === teacher.full_name.trim().toLowerCase())
+      );
+
+      const newMember: ExamCommitteeMember = {
+        id: existingIdx >= 0 ? currentMembers[existingIdx].id : `comm_${teacher.id}_${Date.now()}`,
+        userId: teacher.id,
+        fullName: teacher.full_name || 'Guru',
+        npp: teacher.nip || teacher.npp || undefined,
+        role: role,
+        academicYear: targetYear,
+        isActive: true,
+        createdAt: existingIdx >= 0 ? currentMembers[existingIdx].createdAt : new Date().toISOString(),
+      };
+
+      if (existingIdx >= 0) {
+        updatedMembers = currentMembers.map((m, idx) => (idx === existingIdx ? newMember : m));
+      } else {
+        updatedMembers = [...currentMembers, newMember];
+      }
+    }
+
+    return this.saveCommitteeMembers(updatedMembers, targetYear);
   }
 }
