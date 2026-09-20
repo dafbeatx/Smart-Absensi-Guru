@@ -2618,7 +2618,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               const alpaCount = attendanceHistory.filter((r) => r.status === 'ALFA').length;
               const totalRecorded = hadirCount + terlambatCount + izinCount + alpaCount;
               const totalHadir = hadirCount + terlambatCount;
-              const attendanceRate = totalRecorded > 0 ? Math.round((totalHadir / totalRecorded) * 100) : 100;
+
+              // Perhitungan Cerdas Berbasis Hari Kerja Efektif (Smart Working Days Engine)
+              const workingDaysInfo = getMonthWorkingDays(selectedMonth, selectedYear, true, settings);
+              const totalMonthWorkingDays = Math.max(workingDaysInfo.totalMonthWorkingDays, 20);
+              const elapsedWorkingDays = workingDaysInfo.isCurrentMonth
+                ? Math.max(workingDaysInfo.elapsedWorkingDays, totalRecorded)
+                : totalMonthWorkingDays;
+              const remainingWorkingDays = Math.max(0, totalMonthWorkingDays - elapsedWorkingDays);
+
+              // 1. Kepatuhan Berjalan s.d. Hari Ini (Disiplin Terlaksana)
+              const complianceRate = elapsedWorkingDays > 0
+                ? Math.min(100, Math.round((totalHadir / elapsedWorkingDays) * 100))
+                : 100;
+
+              // 2. Akumulasi Terhadap Target Sebulan Penuh
+              const monthlyProgressRate = totalMonthWorkingDays > 0
+                ? Math.min(100, Math.round((totalHadir / totalMonthWorkingDays) * 100))
+                : 0;
+
               const monthNames = [
                 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
                 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -2655,107 +2673,149 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </button>
                   </div>
 
-                  {/* Attendance Performance Bar (Visual Proportion) */}
-                  {totalRecorded > 0 && (
-                    <div className="space-y-1.5 bg-slate-50/70 p-2.5 rounded-2xl border border-slate-200/70">
-                      <div className="flex items-center justify-between text-[11px] font-bold px-0.5">
-                        <span className="text-slate-600">
-                          Tingkat Kehadiran: <strong className="text-teal-900 font-black">{attendanceRate}%</strong>
-                        </span>
-                        <span className="text-slate-400 font-medium text-[10px]">
-                          {totalRecorded} hari tercatat
+                  {/* Smart Attendance Performance Bar (Transparan & Cerdas) */}
+                  <div className="space-y-2 bg-slate-50/70 p-3 rounded-2xl border border-slate-200/70">
+                    <div className="flex items-center justify-between text-xs font-bold px-0.5 gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-slate-700">
+                        <span className="text-slate-600">Kehadiran s.d. Hari Ini:</span>
+                        <strong className="text-teal-900 font-black text-sm">{complianceRate}%</strong>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          ({totalHadir}/{elapsedWorkingDays} hari kerja berlalu)
                         </span>
                       </div>
+                      <div className="text-right ml-auto">
+                        <span className="text-[11px] font-bold text-slate-600">
+                          Target Sebulan: <strong className="text-teal-950 font-black">{totalHadir}/{totalMonthWorkingDays}</strong> Hari ({monthlyProgressRate}%)
+                        </span>
+                        {remainingWorkingDays > 0 && (
+                          <span className="text-[10px] text-slate-400 block font-normal">
+                            (Sisa {remainingWorkingDays} hari lagi)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Multi-segment Timeline Progress Bar terhadap Hari Kerja Sebulan Penuh */}
+                    <div className="space-y-1.5">
                       <div className="h-2 w-full bg-slate-200/80 rounded-full overflow-hidden flex gap-0.5 p-0.5">
                         {hadirCount > 0 && (
                           <div
-                            style={{ width: `${(hadirCount / totalRecorded) * 100}%` }}
+                            style={{ width: `${(hadirCount / totalMonthWorkingDays) * 100}%` }}
                             className="h-full bg-emerald-500 rounded-full transition-all"
-                            title={`Hadir: ${hadirCount}`}
+                            title={`Hadir Tepat Waktu: ${hadirCount} hari`}
                           />
                         )}
                         {terlambatCount > 0 && (
                           <div
-                            style={{ width: `${(terlambatCount / totalRecorded) * 100}%` }}
+                            style={{ width: `${(terlambatCount / totalMonthWorkingDays) * 100}%` }}
                             className="h-full bg-amber-500 rounded-full transition-all"
-                            title={`Terlambat: ${terlambatCount}`}
+                            title={`Terlambat: ${terlambatCount} hari`}
                           />
                         )}
                         {izinCount > 0 && (
                           <div
-                            style={{ width: `${(izinCount / totalRecorded) * 100}%` }}
+                            style={{ width: `${(izinCount / totalMonthWorkingDays) * 100}%` }}
                             className="h-full bg-sky-500 rounded-full transition-all"
-                            title={`Izin/Sakit: ${izinCount}`}
+                            title={`Izin/Sakit: ${izinCount} hari`}
                           />
                         )}
                         {alpaCount > 0 && (
                           <div
-                            style={{ width: `${(alpaCount / totalRecorded) * 100}%` }}
+                            style={{ width: `${(alpaCount / totalMonthWorkingDays) * 100}%` }}
                             className="h-full bg-rose-500 rounded-full transition-all"
-                            title={`Alpa: ${alpaCount}`}
+                            title={`Alpa: ${alpaCount} hari`}
+                          />
+                        )}
+                        {remainingWorkingDays > 0 && (
+                          <div
+                            style={{ width: `${(remainingWorkingDays / totalMonthWorkingDays) * 100}%` }}
+                            className="h-full bg-slate-300/60 rounded-full transition-all"
+                            title={`Sisa Hari Kerja: ${remainingWorkingDays} hari tersisa`}
                           />
                         )}
                       </div>
-                    </div>
-                  )}
 
-                  {/* 4 Metric Cards */}
+                      {/* Legend Timeline Ringkas & Rapi */}
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 px-0.5 pt-0.5 flex-wrap gap-1">
+                        <span className="inline-flex items-center gap-1 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          <span>Hadir ({hadirCount})</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span>Terlambat ({terlambatCount})</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
+                          <span>Izin ({izinCount})</span>
+                        </span>
+                        {remainingWorkingDays > 0 && (
+                          <span className="inline-flex items-center gap-1 font-medium text-slate-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
+                            <span>Sisa ({remainingWorkingDays})</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4 Metric Cards (Bebas Truncation / Tidak Terpotong) */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
                     {/* Hadir */}
                     <div
                       onClick={() => setIsRecapModalOpen(true)}
-                      className="group bg-linear-to-b from-emerald-50/70 to-emerald-50/20 hover:from-emerald-50 hover:to-emerald-50/50 p-3 rounded-2xl border border-emerald-200/70 hover:border-emerald-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs flex flex-col justify-between"
+                      className="group bg-linear-to-b from-emerald-50/70 to-emerald-50/20 hover:from-emerald-50 hover:to-emerald-50/50 p-3 rounded-2xl border border-emerald-200/70 hover:border-emerald-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs text-center flex flex-col items-center justify-between"
                     >
-                      <div className="flex items-center justify-between gap-1">
-                        <div className="w-6 h-6 rounded-lg bg-emerald-100/90 text-emerald-700 flex items-center justify-center shrink-0 shadow-2xs">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-[10px] font-bold text-emerald-700 truncate">Tepat Waktu</span>
+                      <div className="w-7 h-7 rounded-xl bg-emerald-100/90 text-emerald-700 flex items-center justify-center shrink-0 shadow-2xs">
+                        <CheckCircle2 className="w-4 h-4" />
                       </div>
-                      <div className="my-1.5">
+                      <div className="my-1">
                         <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-none font-mono tracking-tight group-hover:text-emerald-950 transition-colors">
                           {hadirCount}
                         </p>
                       </div>
-                      <div className="text-xs font-bold text-slate-700 truncate">Hadir</div>
+                      <div className="space-y-0.5 text-center">
+                        <span className="text-xs font-bold text-slate-800 block leading-tight">Hadir</span>
+                        <span className="text-[9.5px] sm:text-[10px] font-semibold text-emerald-700 block leading-none">Tepat Waktu</span>
+                      </div>
                     </div>
 
                     {/* Terlambat */}
                     <div
                       onClick={() => setIsRecapModalOpen(true)}
-                      className="group bg-linear-to-b from-amber-50/70 to-amber-50/20 hover:from-amber-50 hover:to-amber-50/50 p-3 rounded-2xl border border-amber-200/70 hover:border-amber-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs flex flex-col justify-between"
+                      className="group bg-linear-to-b from-amber-50/70 to-amber-50/20 hover:from-amber-50 hover:to-amber-50/50 p-3 rounded-2xl border border-amber-200/70 hover:border-amber-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs text-center flex flex-col items-center justify-between"
                     >
-                      <div className="flex items-center justify-between gap-1">
-                        <div className="w-6 h-6 rounded-lg bg-amber-100/90 text-amber-700 flex items-center justify-center shrink-0 shadow-2xs">
-                          <Clock className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-[10px] font-bold text-amber-700 truncate">&gt; 07:30 WIB</span>
+                      <div className="w-7 h-7 rounded-xl bg-amber-100/90 text-amber-700 flex items-center justify-center shrink-0 shadow-2xs">
+                        <Clock className="w-4 h-4" />
                       </div>
-                      <div className="my-1.5">
+                      <div className="my-1">
                         <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-none font-mono tracking-tight group-hover:text-amber-950 transition-colors">
                           {terlambatCount}
                         </p>
                       </div>
-                      <div className="text-xs font-bold text-slate-700 truncate">Terlambat</div>
+                      <div className="space-y-0.5 text-center">
+                        <span className="text-xs font-bold text-slate-800 block leading-tight">Terlambat</span>
+                        <span className="text-[9.5px] sm:text-[10px] font-semibold text-amber-700 block leading-none">&gt; 07:30 WIB</span>
+                      </div>
                     </div>
 
                     {/* Izin/Sakit */}
                     <div
                       onClick={() => setIsRecapModalOpen(true)}
-                      className="group bg-linear-to-b from-sky-50/70 to-sky-50/20 hover:from-sky-50 hover:to-sky-50/50 p-3 rounded-2xl border border-sky-200/70 hover:border-sky-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs flex flex-col justify-between"
+                      className="group bg-linear-to-b from-sky-50/70 to-sky-50/20 hover:from-sky-50 hover:to-sky-50/50 p-3 rounded-2xl border border-sky-200/70 hover:border-sky-300 transition-all cursor-pointer active:scale-[0.98] shadow-2xs text-center flex flex-col items-center justify-between"
                     >
-                      <div className="flex items-center justify-between gap-1">
-                        <div className="w-6 h-6 rounded-lg bg-sky-100/90 text-sky-700 flex items-center justify-center shrink-0 shadow-2xs">
-                          <FileText className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-[10px] font-bold text-sky-700 truncate">Surat Resmi</span>
+                      <div className="w-7 h-7 rounded-xl bg-sky-100/90 text-sky-700 flex items-center justify-center shrink-0 shadow-2xs">
+                        <FileText className="w-4 h-4" />
                       </div>
-                      <div className="my-1.5">
+                      <div className="my-1">
                         <p className="text-2xl sm:text-3xl font-black text-slate-900 leading-none font-mono tracking-tight group-hover:text-sky-950 transition-colors">
                           {izinCount}
                         </p>
                       </div>
-                      <div className="text-xs font-bold text-slate-700 truncate">Izin / Sakit</div>
+                      <div className="space-y-0.5 text-center">
+                        <span className="text-xs font-bold text-slate-800 block leading-tight">Izin / Sakit</span>
+                        <span className="text-[9.5px] sm:text-[10px] font-semibold text-sky-700 block leading-none">Surat Resmi</span>
+                      </div>
                     </div>
 
                     {/* Alpa */}
@@ -2765,25 +2825,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         alpaCount > 0
                           ? 'bg-linear-to-b from-rose-50/70 to-rose-50/20 hover:from-rose-50 border-rose-200/80 hover:border-rose-300'
                           : 'bg-linear-to-b from-slate-50/70 to-slate-50/20 hover:from-slate-50 border-slate-200/80 hover:border-slate-300'
-                      } p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] shadow-2xs flex flex-col justify-between`}
+                      } p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] shadow-2xs text-center flex flex-col items-center justify-between`}
                     >
-                      <div className="flex items-center justify-between gap-1">
-                        <div
-                          className={`w-6 h-6 rounded-lg ${
-                            alpaCount > 0 ? 'bg-rose-100/90 text-rose-700' : 'bg-slate-200/70 text-slate-500'
-                          } flex items-center justify-center shrink-0 shadow-2xs`}
-                        >
-                          {alpaCount > 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}
-                        </div>
-                        <span
-                          className={`text-[10px] font-bold ${
-                            alpaCount > 0 ? 'text-rose-700' : 'text-slate-400'
-                          } truncate`}
-                        >
-                          Tanpa Ket.
-                        </span>
+                      <div
+                        className={`w-7 h-7 rounded-xl ${
+                          alpaCount > 0 ? 'bg-rose-100/90 text-rose-700' : 'bg-slate-200/70 text-slate-500'
+                        } flex items-center justify-center shrink-0 shadow-2xs`}
+                      >
+                        {alpaCount > 0 ? <AlertTriangle className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
                       </div>
-                      <div className="my-1.5">
+                      <div className="my-1">
                         <p
                           className={`text-2xl sm:text-3xl font-black leading-none font-mono tracking-tight ${
                             alpaCount > 0 ? 'text-rose-600' : 'text-slate-400'
@@ -2792,7 +2843,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                           {alpaCount}
                         </p>
                       </div>
-                      <div className="text-xs font-bold text-slate-700 truncate">Alpa</div>
+                      <div className="space-y-0.5 text-center">
+                        <span className="text-xs font-bold text-slate-800 block leading-tight">Alpa</span>
+                        <span
+                          className={`text-[9.5px] sm:text-[10px] font-semibold ${
+                            alpaCount > 0 ? 'text-rose-700' : 'text-slate-400'
+                          } block leading-none`}
+                        >
+                          Tanpa Ket.
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </section>
