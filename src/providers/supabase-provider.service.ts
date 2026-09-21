@@ -4149,7 +4149,7 @@ export class SupabaseProvider implements IDataProvider {
       // 1. Primary: Ambil seluruh master siswa aktif dari public.students
       let queryStudents = this.client
         .from('students')
-        .select('id, full_name, class_name, academic_year, avatar_url, created_at, updated_at')
+        .select('id, full_name, class_name, academic_year, created_at, updated_at')
         .order('class_name', { ascending: true })
         .order('full_name', { ascending: true })
         .limit(300);

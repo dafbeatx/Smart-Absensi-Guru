@@ -433,9 +433,13 @@ export class TeacherChallengeService {
     const motivation = this.generateNightlyMotivation(user, streakInfo, score, userRank, rivalName);
     if (!motivation) return;
 
-    // Kirim notifikasi via NotificationService
+    // Tandai sudah terkirim malam ini sebelum dispatch untuk mencegah race condition
+    localStorage.setItem(`${this.NIGHTLY_NOTIF_KEY}_${user.id}`, todayStr);
+
+    // Kirim notifikasi via NotificationService dengan ID deterministik berbasis tanggal dan user
     try {
       NotificationService.sendNativeNotification({
+        id: `nightly_challenge_${user.id}_${todayStr}`,
         title: motivation.title,
         body: motivation.message,
         type: 'EVENT',
@@ -445,8 +449,6 @@ export class TeacherChallengeService {
         actionUrl: '/?tab=BERANDA&openChallenge=true',
       });
 
-      // Tandai sudah terkirim malam ini
-      localStorage.setItem(`${this.NIGHTLY_NOTIF_KEY}_${user.id}`, todayStr);
       logger.info('TeacherChallengeService', `Nightly challenge motivation sent to ${user.full_name}: ${motivation.title}`);
     } catch (err) {
       console.warn('Failed to dispatch nightly challenge notification:', err);

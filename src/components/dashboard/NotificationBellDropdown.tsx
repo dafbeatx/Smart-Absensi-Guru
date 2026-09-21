@@ -299,13 +299,16 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         });
       }
 
-      // Deduplicate items by ID
+      // Deduplicate items by ID and Content Fingerprint (mencegah notifikasi berulang)
       const uniqueItems: DynamicNotificationItem[] = [];
       const seenIds = new Set<string>();
+      const seenFingerprints = new Set<string>();
 
       items.forEach((item) => {
-        if (!seenIds.has(item.id)) {
+        const fingerprint = `${(item.title || '').trim()}::${(item.message || '').trim()}::${(item.time || '').trim()}`;
+        if (!seenIds.has(item.id) && !seenFingerprints.has(fingerprint)) {
           seenIds.add(item.id);
+          seenFingerprints.add(fingerprint);
           uniqueItems.push(item);
         }
       });

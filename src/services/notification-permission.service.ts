@@ -268,14 +268,24 @@ export class NotificationPermissionService {
       isRead: false,
     };
 
-    memoryNotificationList.unshift(newNotif);
-    if (memoryNotificationList.length > 50) memoryNotificationList.length = 50;
+    // Helper fungsi pencocokan konten identik (mencegah duplikasi notifikasi)
+    const isDuplicate = (item: AttendanceNotificationPayload) =>
+      item.id === newNotif.id ||
+      (item.title === newNotif.title &&
+        item.body === newNotif.body &&
+        item.time === newNotif.time &&
+        (item.userId || '') === (newNotif.userId || ''));
+
+    // Bersihkan duplikat di memory cache
+    const memFiltered = memoryNotificationList.filter((item) => !isDuplicate(item));
+    memoryNotificationList.length = 0;
+    memoryNotificationList.push(newNotif, ...memFiltered.slice(0, 49));
 
     if (typeof localStorage !== 'undefined') {
       try {
         const saved = localStorage.getItem('smart_absensi_notifications_cache');
         const existing: AttendanceNotificationPayload[] = saved ? JSON.parse(saved) : [];
-        const updated = [newNotif, ...existing.filter((item) => item.id !== newNotif.id)].slice(0, 50);
+        const updated = [newNotif, ...existing.filter((item) => !isDuplicate(item))].slice(0, 50);
         localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(updated));
 
         // Also save to namespaced cache if user / role available
@@ -286,7 +296,7 @@ export class NotificationPermissionService {
           const namespacedKey = this.getCacheKey(uId, uRole);
           const nsSaved = localStorage.getItem(namespacedKey);
           const nsExisting: AttendanceNotificationPayload[] = nsSaved ? JSON.parse(nsSaved) : [];
-          const nsUpdated = [newNotif, ...nsExisting.filter((item) => item.id !== newNotif.id)].slice(0, 50);
+          const nsUpdated = [newNotif, ...nsExisting.filter((item) => !isDuplicate(item))].slice(0, 50);
           localStorage.setItem(namespacedKey, JSON.stringify(nsUpdated));
         }
       } catch (e) {
