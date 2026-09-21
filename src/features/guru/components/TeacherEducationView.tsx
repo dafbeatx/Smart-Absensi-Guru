@@ -116,7 +116,7 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
             Panduan Presensi &amp; Solusi Kendala Guru
           </h2>
 
-          <p className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed max-w-xl">
+          <p className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed max-w-xl text-left">
             Solusi praktis mengatasi GPS loncat, cara presensi instan dengan sidik jari HP, transparansi keamanan data, serta cara meraih poin apresiasi kedisiplinan.
           </p>
         </div>
@@ -180,92 +180,123 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
       {/* ── TAB 1: SCAN QR & TIPS GPS ──────────────────────────────────────── */}
       {activeTab === 'QR' && (
         <div className="space-y-4">
-          {/* Cara Kerja */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-2">
-            <h4 className="font-black text-[#023246] text-sm sm:text-base flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#023246] text-white flex items-center justify-center text-xs">1</span>
-              Bagaimana Cara Kerja Presensi QR?
-            </h4>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-              Bapak/Ibu Guru cukup membuka kamera pemindai di aplikasi, lalu mengarahkan ke <strong>QR Code resmi</strong> yang ditampilkan di layar monitor sekolah atau poster QR di gerbang sekolah.
-            </p>
+          {/* Card: Cara Kerja */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-start gap-3 mb-3">
+                <span className="text-2xl p-2 bg-emerald-50 rounded-xl">📷</span>
+                <h3 className="text-base font-bold text-slate-800 leading-snug">
+                  Bagaimana Cara Kerja Presensi QR?
+                </h3>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed text-left">
+                Bapak/Ibu Guru cukup membuka kamera pemindai di aplikasi, lalu mengarahkan ke <span className="font-semibold text-slate-800">QR Code resmi</span> yang ditampilkan di layar monitor sekolah atau poster QR di pintu gerbang.
+              </p>
+            </div>
           </div>
 
-          {/* Mengapa Sering Ditolak / Maps Loncat */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-amber-50/70 border border-amber-200 shadow-2xs space-y-2.5">
-            <h4 className="font-black text-amber-900 text-sm sm:text-base flex items-center gap-2">
-              <span className="text-xl">⚠️</span>
-              Mengapa Kadang Ditolak atau Maps Terlihat Loncat-loncat?
-            </h4>
-            <p className="text-xs sm:text-sm text-amber-900/90 leading-relaxed font-medium">
-              Sistem memeriksa dua hal sebelum menerima presensi: <strong>jarak fisik Anda ke titik sekolah</strong> dan <strong>tingkat akurasi GPS HP Anda</strong>.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-              <div className="p-3 bg-white/90 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed font-medium">
-                🏢 <strong>Di Bawah Kanopi / Gedung:</strong> HP membaca sinyal menara BTS operator seluler yang jaraknya bisa 1–3 km dari sekolah jika sinyal satelit terhalang.
+          {/* Card: Mengapa Sering Ditolak / Maps Loncat */}
+          <div className="bg-amber-50/60 rounded-2xl p-5 border border-amber-200/80 shadow-sm space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl p-2 bg-amber-100 rounded-xl">⚠️</span>
+              <div>
+                <h3 className="text-base font-bold text-amber-950 leading-snug">
+                  Mengapa Kadang Ditolak atau Maps Terlihat Loncat-loncat?
+                </h3>
+                <p className="text-xs text-amber-800/80 font-medium pt-0.5">
+                  Sistem memeriksa jarak fisik dan akurasi GPS sebelum menyetujui absensi.
+                </p>
               </div>
-              <div className="p-3 bg-white/90 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed font-medium">
-                🎯 <strong>Akurasi Masih Buram:</strong> Bila akurasi GPS masih &gt; 50 meter, sistem menolak sementara demi memastikan keabsahan lokasi Anda.
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div className="bg-white rounded-xl p-4 border border-amber-100 shadow-2xs">
+                <h4 className="text-xs font-bold text-slate-800 mb-1">🏢 Di Bawah Kanopi / Gedung</h4>
+                <p className="text-xs text-slate-600 leading-relaxed text-left">
+                  HP sering beralih membaca sinyal menara BTS seluler yang letaknya <span className="font-semibold text-amber-800">1–3 km</span> dari sekolah saat satelit terhalang.
+                </p>
+              </div>
+              <div className="bg-white rounded-xl p-4 border border-amber-100 shadow-2xs">
+                <h4 className="text-xs font-bold text-slate-800 mb-1">🎯 Akurasi Masih Buram</h4>
+                <p className="text-xs text-slate-600 leading-relaxed text-left">
+                  Bila perkiraan radius HP masih <span className="font-semibold text-amber-800">&gt; 50 meter</span>, sistem menolak sementara demi memastikan keabsahan lokasi Anda.
+                </p>
               </div>
             </div>
           </div>
 
-          {/* 4 Langkah Ampuh */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-[#0D7A5F]/5 border border-[#0D7A5F]/20 space-y-3.5">
-            <div className="flex items-center justify-between">
-              <h4 className="font-black text-[#0D7A5F] text-sm sm:text-base flex items-center gap-2">
+          {/* Grid 4 Langkah Ampuh (Sesuai Panduan Layout Rapi) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-sm sm:text-base font-bold text-slate-800 leading-snug flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[#0D7A5F]" />
-                4 Langkah Ampuh Agar Presensi Selalu Diterima:
-              </h4>
-              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <span>4 Langkah Ampuh Agar Presensi Selalu Diterima</span>
+              </h3>
+              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
                 Terbukti Efektif
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Langkah 1 */}
-              <div className="p-3.5 bg-white rounded-2xl border border-emerald-200/80 shadow-2xs space-y-1.5">
-                <div className="font-black text-[#023246] text-xs sm:text-sm flex items-center gap-1.5">
-                  <span className="text-base">📶</span>
-                  <span>1. Nyalakan Wi-Fi di HP (Trik Paling Ampuh!)</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Card Item 1 */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl p-2 bg-blue-50 rounded-xl">📶</span>
+                    <h3 className="text-base font-bold text-slate-800 leading-snug">
+                      1. Nyalakan Wi-Fi di HP <span className="text-xs text-blue-600 font-normal block sm:inline">(Trik Paling Ampuh!)</span>
+                    </h3>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Cukup aktifkan tombol Wi-Fi di HP. Anda <span className="font-semibold text-slate-800">tidak harus tersambung</span> ke internet sekolah. HP akan mendeteksi sinyal router di sekitar sehingga GPS langsung terkunci presisi <span className="font-semibold text-emerald-600">&lt; 15 meter</span> dalam 2 detik.
+                  </p>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Cukup <strong>aktifkan tombol Wi-Fi di HP</strong>. Anda <strong>tidak harus tersambung</strong> ke internet sekolah. HP akan mendeteksi sinyal router di sekitar sehingga GPS langsung terkunci presisi &lt; 15 meter dalam 2 detik.
-                </p>
               </div>
 
-              {/* Langkah 2 */}
-              <div className="p-3.5 bg-white rounded-2xl border border-emerald-200/80 shadow-2xs space-y-1.5">
-                <div className="font-black text-[#023246] text-xs sm:text-sm flex items-center gap-1.5">
-                  <span className="text-base">🎯</span>
-                  <span>2. Aktifkan &quot;Lokasi Tepat&quot;</span>
+              {/* Card Item 2 */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl p-2 bg-emerald-50 rounded-xl">🎯</span>
+                    <h3 className="text-base font-bold text-slate-800 leading-snug">
+                      2. Aktifkan &quot;Lokasi Tepat&quot; <span className="text-xs text-emerald-700 font-normal block sm:inline">(Precise Location)</span>
+                    </h3>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    • <strong>iPhone (Safari):</strong> Buka Pengaturan &gt; Privasi &amp; Keamanan &gt; Layanan Lokasi &gt; Situs Web Safari &gt; aktifkan <span className="font-semibold text-slate-800">Lokasi Tepat</span>.<br />
+                    • <strong>Android (Chrome):</strong> Buka Pengaturan &gt; Lokasi &gt; aktifkan <span className="font-semibold text-slate-800">Akurasi Lokasi Google</span>.
+                  </p>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  • <strong>iPhone (Safari):</strong> Buka Pengaturan &gt; Privasi &amp; Keamanan &gt; Layanan Lokasi &gt; Situs Web Safari &gt; aktifkan <strong>Lokasi Tepat</strong>.<br />
-                  • <strong>Android (Chrome):</strong> Buka Pengaturan &gt; Lokasi &gt; aktifkan <strong>Akurasi Lokasi Google</strong>.
-                </p>
               </div>
 
-              {/* Langkah 3 */}
-              <div className="p-3.5 bg-white rounded-2xl border border-emerald-200/80 shadow-2xs space-y-1.5">
-                <div className="font-black text-[#023246] text-xs sm:text-sm flex items-center gap-1.5">
-                  <span className="text-base">⏳</span>
-                  <span>3. Buka Aplikasi 5 Detik Sebelum Scan</span>
+              {/* Card Item 3 */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl p-2 bg-amber-50 rounded-xl">⏳</span>
+                    <h3 className="text-base font-bold text-slate-800 leading-snug">
+                      3. Buka Aplikasi 5 Detik Sebelum Scan <span className="text-xs text-amber-700 font-normal block sm:inline">(Kunci Satelit)</span>
+                    </h3>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Beri waktu sejenak bagi HP untuk mengunci sinyal GPS. Saat indikator di sudut layar berubah <span className="font-semibold text-emerald-600">🟢 GPS Siap</span>, pemindaian QR dijamin langsung sukses.
+                  </p>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Beri waktu sejenak bagi HP untuk mengunci satelit. Saat indikator di sudut layar berubah 🟢 <strong>GPS Siap</strong>, pemindaian QR dijamin langsung sukses.
-                </p>
               </div>
 
-              {/* Langkah 4 */}
-              <div className="p-3.5 bg-white rounded-2xl border border-emerald-200/80 shadow-2xs space-y-1.5">
-                <div className="font-black text-[#023246] text-xs sm:text-sm flex items-center gap-1.5">
-                  <span className="text-base">🚪</span>
-                  <span>4. Gunakan Poster QR Pintu Gerbang</span>
+              {/* Card Item 4 */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl p-2 bg-purple-50 rounded-xl">🚪</span>
+                    <h3 className="text-base font-bold text-slate-800 leading-snug">
+                      4. Gunakan Poster QR Gerbang <span className="text-xs text-purple-700 font-normal block sm:inline">(Solusi Cadangan)</span>
+                    </h3>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Jika sedang buru-buru atau sinyal di dalam ruangan lemah, pindai <span className="font-semibold text-slate-800">Poster QR Pintu Gerbang</span> sekolah yang memiliki toleransi radius lebih luas (<span className="font-semibold text-emerald-600">500 meter</span>).
+                  </p>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Jika sedang buru-buru atau sinyal seluler di ruang guru lemah, pindai <strong>Poster QR Pintu Gerbang</strong> yang memiliki toleransi radius lebih luas (500 meter).
-                </p>
               </div>
             </div>
           </div>
@@ -275,61 +306,88 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
       {/* ── TAB 2: SIDIK JARI HP (BIOMETRIK) ────────────────────────────────── */}
       {activeTab === 'BIOMETRIC' && (
         <div className="space-y-4">
-          {/* Penjelasan */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-2">
-            <h4 className="font-black text-[#023246] text-sm sm:text-base flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#023246] text-white flex items-center justify-center text-xs">1</span>
-              Apa itu Presensi Sidik Jari HP?
-            </h4>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-              Fitur canggih yang memungkinkan Bapak/Ibu melakukan absensi masuk atau pulang <strong>hanya dengan menyentuh sensor sidik jari atau Face ID di HP masing-masing</strong>. Anda tidak perlu antre di monitor atau membuka kamera sama sekali.
-            </p>
+          {/* Card: Apa itu Presensi Sidik Jari */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-start gap-3 mb-3">
+                <span className="text-2xl p-2 bg-sky-50 rounded-xl">👆</span>
+                <h3 className="text-base font-bold text-slate-800 leading-snug">
+                  Apa itu Presensi Sidik Jari HP?
+                </h3>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed text-left">
+                Fitur canggih yang memungkinkan Bapak/Ibu melakukan absensi masuk atau pulang <span className="font-semibold text-slate-800">hanya dengan menyentuh sensor sidik jari atau Face ID di HP masing-masing</span>. Anda tidak perlu antre di monitor atau membuka kamera sama sekali.
+              </p>
+            </div>
           </div>
 
-          {/* Jaminan Keamanan */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-emerald-50 border border-emerald-200/90 shadow-2xs space-y-2.5">
-            <h4 className="font-black text-emerald-950 text-sm sm:text-base flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-700" />
-              Apakah Data Sidik Jari Saya Aman dari Kebocoran?
-            </h4>
-            <p className="text-xs sm:text-sm text-emerald-900 font-bold leading-relaxed">
-              100% SANGAT AMAN! Data sidik jari Anda TIDAK PERNAH dikirim ke internet, server sekolah, maupun database manapun.
-            </p>
-            <p className="text-xs text-emerald-900/90 leading-relaxed font-medium">
-              Sistem menggunakan protokol keamanan perbankan (<em>WebAuthn Passkey</em>). Chip sensor HP Anda hanya memberikan konfirmasi digital <em>&quot;Ya, ini pemilik HP yang sah&quot;</em> tanpa membagikan bentuk fisik sidik jari ke aplikasi.
-            </p>
+          {/* Card: Jaminan Keamanan */}
+          <div className="bg-emerald-50/60 rounded-2xl p-5 border border-emerald-100 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-start gap-3 mb-3">
+                <span className="text-2xl p-2 bg-emerald-100 rounded-xl">🔒</span>
+                <div>
+                  <h3 className="text-base font-bold text-emerald-950 leading-snug">
+                    Apakah Data Sidik Jari Saya Aman dari Kebocoran?
+                  </h3>
+                  <p className="text-xs text-emerald-800 font-medium pt-0.5">
+                    100% Sangat Aman &amp; Terlindungi Enkripsi Perbankan
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-emerald-900/90 leading-relaxed text-left">
+                Data sidik jari Anda <span className="font-semibold text-emerald-950">TIDAK PERNAH dikirim ke internet, server sekolah, maupun database manapun</span>. Sistem menggunakan protokol keamanan perbankan (<em>WebAuthn Passkey</em>). Chip sensor HP Anda hanya memberikan konfirmasi digital <em>&quot;Ya, ini pemilik HP yang sah&quot;</em> tanpa membagikan bentuk fisik sidik jari ke aplikasi.
+              </p>
+            </div>
           </div>
 
-          {/* 3 Langkah Pakai */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-3">
-            <h4 className="font-black text-[#023246] text-sm sm:text-base flex items-center gap-2">
-              <span className="text-xl">📝</span>
+          {/* Card: 3 Langkah Praktis */}
+          <div className="space-y-3">
+            <h3 className="text-sm sm:text-base font-bold text-slate-800 leading-snug px-1">
               3 Langkah Praktis Menggunakannya:
-            </h4>
+            </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
-                <span className="w-7 h-7 rounded-xl bg-sky-100 text-sky-800 font-black text-xs flex items-center justify-center">1</span>
-                <h5 className="font-black text-[#023246] text-xs">Daftarkan Sekali di HP</h5>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Buka menu Profil di HP ini, lalu sentuh sensor fingerprint untuk pendaftaran awal.
-                </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-base font-black px-2.5 py-1 bg-sky-100 text-sky-800 rounded-xl">1</span>
+                    <h4 className="text-sm font-bold text-slate-800 leading-snug">
+                      Daftarkan Sekali di HP
+                    </h4>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Buka menu <span className="font-semibold text-slate-800">Profil</span> di HP ini, lalu sentuh sensor fingerprint untuk pendaftaran awal.
+                  </p>
+                </div>
               </div>
 
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
-                <span className="w-7 h-7 rounded-xl bg-sky-100 text-sky-800 font-black text-xs flex items-center justify-center">2</span>
-                <h5 className="font-black text-[#023246] text-xs">Tiba di Sekolah</h5>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Saat tiba di area sekolah, buka aplikasi Smart Absensi Guru di HP Anda.
-                </p>
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-base font-black px-2.5 py-1 bg-sky-100 text-sky-800 rounded-xl">2</span>
+                    <h4 className="text-sm font-bold text-slate-800 leading-snug">
+                      Tiba di Area Sekolah
+                    </h4>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Saat tiba di lingkungan sekolah, buka aplikasi Smart Absensi Guru di HP Anda.
+                  </p>
+                </div>
               </div>
 
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
-                <span className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs flex items-center justify-center">3</span>
-                <h5 className="font-black text-[#023246] text-xs">Sentuh Sensor HP</h5>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Cukup tempelkan jari pada sensor HP Anda, presensi langsung sukses tercatat!
-                </p>
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-base font-black px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-xl">3</span>
+                    <h4 className="text-sm font-bold text-slate-800 leading-snug">
+                      Sentuh Sensor HP
+                    </h4>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Cukup tempelkan jari pada sensor HP Anda, presensi langsung <span className="font-semibold text-emerald-700">sukses tercatat seketika</span>!
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -339,7 +397,7 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
                 <Button
                   onClick={onOpenBiometricEnroll}
                   variant="primary"
-                  className="w-full sm:w-auto px-6 py-3 font-black text-xs min-h-11 rounded-xl shadow-xs"
+                  className="w-full sm:w-auto px-6 py-3 font-bold text-xs min-h-11 rounded-xl shadow-xs"
                 >
                   <Smartphone className="w-4 h-4 mr-1.5" />
                   {isBioEnrolled ? 'Uji Coba Sidik Jari Sekarang' : 'Daftarkan Sidik Jari di HP Ini Sekarang'}
@@ -353,76 +411,100 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
       {/* ── TAB 3: CARA PENGUMPULAN POIN & LENCANA ────────────────────────── */}
       {activeTab === 'POINTS' && (
         <div className="space-y-4">
-          {/* Pengenalan Poin */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-2">
-            <h4 className="font-black text-[#023246] text-sm sm:text-base flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#023246] text-white flex items-center justify-center text-xs">1</span>
-              Apa itu Poin Disiplin Guru?
-            </h4>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-              Poin Disiplin adalah sistem <strong>penghargaan dan apresiasi otomatis</strong> atas kedisiplinan dan dedikasi Bapak/Ibu Guru. Setiap aktivitas presensi yang tepat waktu dan tertib akan dihitung menjadi poin performa guru.
-            </p>
+          {/* Card: Pengenalan Poin */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-start gap-3 mb-3">
+                <span className="text-2xl p-2 bg-amber-50 rounded-xl">⭐</span>
+                <h3 className="text-base font-bold text-slate-800 leading-snug">
+                  Apa itu Poin Disiplin Guru?
+                </h3>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed text-left">
+                Poin Disiplin adalah sistem <span className="font-semibold text-slate-800">penghargaan dan apresiasi otomatis</span> atas kedisiplinan dan dedikasi Bapak/Ibu Guru. Setiap aktivitas presensi yang tepat waktu dan tertib akan dihitung menjadi poin performa guru.
+              </p>
+            </div>
           </div>
 
-          {/* Sumber Poin */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-[#FFFDF7] border border-amber-200/90 shadow-2xs space-y-3">
-            <h4 className="font-black text-amber-950 text-sm sm:text-base flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-600" />
-              Dari Mana Saja Poin Dikumpulkan?
-            </h4>
+          {/* Grid 4 Sumber Poin */}
+          <div className="space-y-3">
+            <h3 className="text-sm sm:text-base font-bold text-slate-800 leading-snug px-1 flex items-center gap-2">
+              <Award className="w-4 h-4 text-amber-600" />
+              <span>Dari Mana Saja Poin Dikumpulkan?</span>
+            </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3.5 bg-white rounded-2xl border border-amber-200/70 shadow-2xs space-y-1">
-                <div className="font-black text-[#023246] text-xs sm:text-sm flex items-center gap-1.5">
-                  <span>⏰</span>
-                  <span>Presensi Masuk Tepat Waktu (+Poin Harian)</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl p-2 bg-emerald-50 rounded-xl">⏰</span>
+                    <h4 className="text-base font-bold text-slate-800 leading-snug">
+                      Presensi Masuk Tepat Waktu <span className="text-xs text-emerald-600 font-normal block sm:inline">(+Poin Harian)</span>
+                    </h4>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Melakukan absensi masuk sebelum batas toleransi jam kerja memberikan <span className="font-semibold text-slate-800">poin penuh</span> setiap hari kerja.
+                  </p>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Melakukan absensi masuk sebelum batas toleransi jam kerja memberikan poin penuh setiap hari kerja.
-                </p>
               </div>
 
-              <div className="p-3.5 bg-white rounded-2xl border border-amber-200/70 shadow-2xs space-y-1">
-                <div className="font-black text-[#023246] text-xs sm:text-sm flex items-center gap-1.5">
-                  <span>🏃</span>
-                  <span>Presensi Pulang Tertib (+Poin)</span>
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl p-2 bg-blue-50 rounded-xl">🏃</span>
+                    <h4 className="text-base font-bold text-slate-800 leading-snug">
+                      Presensi Pulang Tertib <span className="text-xs text-blue-600 font-normal block sm:inline">(+Poin Kehadiran)</span>
+                    </h4>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Melengkapi absensi pulang saat jam kerja berakhir memastikan status hadir penuh dan rekam jejak tertib.
+                  </p>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Melengkapi absensi pulang saat jam kerja berakhir memastikan status hadir penuh dan rekam jejak tertib.
-                </p>
               </div>
 
-              <div className="p-3.5 bg-white rounded-2xl border border-amber-200/70 shadow-2xs space-y-1">
-                <div className="font-black text-[#023246] text-xs sm:text-sm flex items-center gap-1.5">
-                  <span>🔥</span>
-                  <span>Tantangan Konsistensi (Streak)</span>
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl p-2 bg-amber-50 rounded-xl">🔥</span>
+                    <h4 className="text-base font-bold text-slate-800 leading-snug">
+                      Tantangan Konsistensi <span className="text-xs text-amber-600 font-normal block sm:inline">(Streak Presensi)</span>
+                    </h4>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Hadir tepat waktu berturut-turut membuka <span className="font-semibold text-slate-800">Lencana Disiplin</span> (Perunggu, Perak, Emas, hingga Teladan Utama) dengan bonus poin spesial.
+                  </p>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Hadir tepat waktu berturut-turut membuka <strong>Lencana Disiplin</strong> (Perunggu, Perak, Emas, hingga Teladan Utama) dengan bonus poin spesial.
-                </p>
               </div>
 
-              <div className="p-3.5 bg-white rounded-2xl border border-amber-200/70 shadow-2xs space-y-1">
-                <div className="font-black text-[#023246] text-xs sm:text-sm flex items-center gap-1.5">
-                  <span>📚</span>
-                  <span>Ketuntasan Jurnal &amp; Administrasi</span>
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl p-2 bg-purple-50 rounded-xl">📚</span>
+                    <h4 className="text-base font-bold text-slate-800 leading-snug">
+                      Ketuntasan Jurnal <span className="text-xs text-purple-600 font-normal block sm:inline">(Administrasi Mengajar)</span>
+                    </h4>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed text-left">
+                    Mengisi jurnal kelas harian dan kelengkapan administrasi mengajar memperkaya rekam jejak profesional guru.
+                  </p>
                 </div>
-                <p className="text-slate-600 text-xs leading-relaxed font-medium">
-                  Mengisi jurnal kelas harian dan kelengkapan administrasi mengajar memperkaya rekam jejak profesional guru.
-                </p>
               </div>
             </div>
           </div>
 
-          {/* Manfaat Poin */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-indigo-50 border border-indigo-200/80 shadow-2xs space-y-2">
-            <h4 className="font-black text-indigo-950 text-sm sm:text-base flex items-center gap-2">
-              <span className="text-xl">🎖️</span>
-              Untuk Apa Poin Tersebut?
-            </h4>
-            <p className="text-xs sm:text-sm text-indigo-900 leading-relaxed font-medium">
-              Poin dan lencana ini dipantau langsung oleh <strong>Kepala Sekolah</strong> pada <em>Dashboard Apresiasi Guru</em> sebagai dasar pertimbangan resmi penerbitan <strong>Piagam Penghargaan Guru Teladan</strong> dan apresiasi berkala dari sekolah.
-            </p>
+          {/* Card: Manfaat Poin */}
+          <div className="bg-indigo-50/60 rounded-2xl p-5 border border-indigo-100 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-start gap-3 mb-3">
+                <span className="text-2xl p-2 bg-indigo-100 rounded-xl">🎖️</span>
+                <h3 className="text-base font-bold text-indigo-950 leading-snug">
+                  Untuk Apa Poin Tersebut?
+                </h3>
+              </div>
+              <p className="text-sm text-indigo-900/90 leading-relaxed text-left">
+                Poin dan lencana ini dipantau langsung oleh <span className="font-semibold text-indigo-950">Kepala Sekolah</span> pada <em>Dashboard Apresiasi Guru</em> sebagai dasar pertimbangan resmi penerbitan <span className="font-semibold text-indigo-950">Piagam Penghargaan Guru Teladan</span> dan apresiasi berkala dari sekolah.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -431,105 +513,113 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
       {activeTab === 'SECURITY' && (
         <div className="space-y-4">
           {/* Banner Jaminan Privasi */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-emerald-50 border border-emerald-300 shadow-2xs space-y-2">
-            <div className="flex items-center gap-2.5">
-              <span className="text-3xl">🛡️</span>
+          <div className="bg-emerald-50/60 rounded-2xl p-5 border border-emerald-200/80 shadow-sm space-y-2">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl p-2 bg-emerald-100 rounded-xl">🛡️</span>
               <div>
-                <h4 className="font-black text-emerald-950 text-sm sm:text-base">
+                <h3 className="text-base font-bold text-emerald-950 leading-snug">
                   Jaminan Privasi &amp; Keamanan Data Guru
-                </h4>
-                <p className="text-xs text-emerald-800 font-bold">
+                </h3>
+                <p className="text-xs text-emerald-800 font-semibold pt-0.5">
                   100% Aman, Bebas Sadap, &amp; Tidak Melacak Aktivitas Pribadi
                 </p>
               </div>
             </div>
-            <p className="text-xs sm:text-sm text-emerald-900/90 leading-relaxed font-medium">
-              Aplikasi <strong>Smart Absensi Guru</strong> dirancang dengan memprioritaskan rasa aman, kenyamanan, dan perlindungan privasi seluruh Dewan Guru dan Tenaga Kependidikan.
+            <p className="text-sm text-emerald-900/90 leading-relaxed text-left">
+              Aplikasi <span className="font-semibold text-emerald-950">Smart Absensi Guru</span> dirancang dengan memprioritaskan rasa aman, kenyamanan, dan perlindungan privasi seluruh Dewan Guru dan Tenaga Kependidikan.
             </p>
           </div>
 
-          {/* 4 Pilar Keamanan */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Grid 4 Pilar Keamanan */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Pilar 1: GPS */}
-            <div className="p-4 bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🔒</span>
-                <h5 className="font-black text-[#023246] text-xs sm:text-sm">
-                  1. Mengapa Aplikasi Meminta Izin Lokasi (GPS)?
-                </h5>
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-start gap-3 mb-3">
+                  <span className="text-2xl p-2 bg-blue-50 rounded-xl">🔒</span>
+                  <h4 className="text-base font-bold text-slate-800 leading-snug">
+                    1. Mengapa Aplikasi Meminta Izin Lokasi (GPS)?
+                  </h4>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed text-left space-y-1.5">
+                  • GPS <span className="font-semibold text-slate-800">hanya aktif selama 2–3 detik saat menekan tombol absen</span> untuk memastikan Anda berada di lingkungan sekolah.<br />
+                  • Sistem <span className="font-semibold text-slate-800">tidak pernah melacak perjalanan, rumah, atau aktivitas di luar sekolah</span>. Begitu proses absen selesai, GPS langsung nonaktif otomatis.
+                </p>
               </div>
-              <ul className="list-disc list-inside text-xs text-slate-600 space-y-1.5 pl-1 font-medium leading-relaxed">
-                <li>GPS <strong>HANYA aktif selama 2–3 detik saat Anda menekan tombol absen</strong> untuk memastikan Anda berada di lingkungan sekolah.</li>
-                <li>Sistem <strong>TIDAK PERNAH melacak perjalanan, rumah, atau aktivitas Anda di luar jam sekolah</strong>. Begitu proses absen selesai, pelacakan GPS otomatis mati seketika.</li>
-              </ul>
             </div>
 
             {/* Pilar 2: Kamera */}
-            <div className="p-4 bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📷</span>
-                <h5 className="font-black text-[#023246] text-xs sm:text-sm">
-                  2. Mengapa Aplikasi Meminta Izin Kamera?
-                </h5>
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-start gap-3 mb-3">
+                  <span className="text-2xl p-2 bg-purple-50 rounded-xl">📷</span>
+                  <h4 className="text-base font-bold text-slate-800 leading-snug">
+                    2. Mengapa Aplikasi Meminta Izin Kamera?
+                  </h4>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed text-left space-y-1.5">
+                  • Kamera <span className="font-semibold text-slate-800">hanya digunakan sebagai pemindai kode QR</span> (sama seperti kasir memindai barcode belanjaan di minimarket).<br />
+                  • Kamera <span className="font-semibold text-slate-800">otomatis tertutup seketika</span> setelah kode QR berhasil dibaca.
+                </p>
               </div>
-              <ul className="list-disc list-inside text-xs text-slate-600 space-y-1.5 pl-1 font-medium leading-relaxed">
-                <li>Kamera <strong>HANYA digunakan sebagai pemindai kode QR</strong> (sama persis seperti alat kasir memindai barcode belanjaan di minimarket).</li>
-                <li>Kamera <strong>otomatis tertutup seketika</strong> setelah kode QR berhasil dibaca oleh aplikasi.</li>
-              </ul>
             </div>
 
             {/* Pilar 3: Sidik Jari */}
-            <div className="p-4 bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">👆</span>
-                <h5 className="font-black text-[#023246] text-xs sm:text-sm">
-                  3. Apakah Sidik Jari (Fingerprint) Aman?
-                </h5>
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-start gap-3 mb-3">
+                  <span className="text-2xl p-2 bg-emerald-50 rounded-xl">👆</span>
+                  <h4 className="text-base font-bold text-slate-800 leading-snug">
+                    3. Apakah Sidik Jari (Fingerprint) Aman?
+                  </h4>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed text-left space-y-1.5">
+                  • <span className="font-semibold text-emerald-700">100% Sangat Aman.</span> Menggunakan teknologi enkripsi standar perbankan (<em>WebAuthn Passkey</em>).<br />
+                  • Sidik jari Anda <span className="font-semibold text-slate-800">tidak pernah dikirim ke internet, server sekolah, maupun database</span>. Sensor HP hanya memberi sinyal validasi digital.
+                </p>
               </div>
-              <ul className="list-disc list-inside text-xs text-slate-600 space-y-1.5 pl-1 font-medium leading-relaxed">
-                <li><strong>100% Sangat Aman.</strong> Menggunakan teknologi enkripsi standar keamanan perbankan (<em>WebAuthn Passkey</em>).</li>
-                <li>Sidik jari Anda <strong>TIDAK PERNAH dikirim ke internet, server sekolah, maupun database manapun</strong>. Sensor HP hanya memberi sinyal <em>&quot;Ya, ini pemilik HP yang sah&quot;</em>.</li>
-              </ul>
             </div>
 
             {/* Pilar 4: Web PWA */}
-            <div className="p-4 bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📱</span>
-                <h5 className="font-black text-[#023246] text-xs sm:text-sm">
-                  4. Kenapa Memakai Web/PWA (Bukan Play Store)?
-                </h5>
+            <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-start gap-3 mb-3">
+                  <span className="text-2xl p-2 bg-sky-50 rounded-xl">📱</span>
+                  <h4 className="text-base font-bold text-slate-800 leading-snug">
+                    4. Kenapa Memakai Web/PWA (Bukan Play Store)?
+                  </h4>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed text-left space-y-1.5">
+                  • Berbasis PWA resmi sekolah agar <span className="font-semibold text-slate-800">sangat ringan (hanya beberapa MB), hemat memori HP, dan hemat kuota</span>.<br />
+                  • Dijamin <span className="font-semibold text-slate-800">100% bebas dari iklan komersial, malware, atau virus</span>.
+                </p>
               </div>
-              <ul className="list-disc list-inside text-xs text-slate-600 space-y-1.5 pl-1 font-medium leading-relaxed">
-                <li>Aplikasi berbasis PWA resmi sekolah agar <strong>sangat ringan (hanya beberapa MB), hemat memori HP, dan tidak menguras kuota</strong>.</li>
-                <li>Dijamin <strong>100% bebas dari iklan komersial, malware, atau virus</strong>.</li>
-              </ul>
             </div>
           </div>
 
           {/* Bagian Salin Pesan untuk Grup WA Guru */}
-          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-sky-50/80 border border-sky-200 space-y-3 shadow-2xs">
+          <div className="bg-sky-50/60 rounded-2xl p-5 border border-sky-100 shadow-sm space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-xl">📢</span>
-                <h5 className="font-black text-sky-950 text-xs sm:text-sm">
+                <h4 className="font-bold text-sky-950 text-sm sm:text-base leading-snug">
                   Pesan Resmi untuk Grup WhatsApp Guru
-                </h5>
+                </h4>
               </div>
               <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-300 shrink-0">
                 Siap Dibagikan
               </span>
             </div>
 
-            <p className="text-xs text-slate-600 font-medium leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed text-left">
               Anda dapat menyalin atau langsung membagikan teks pengumuman resmi ini ke grup WhatsApp Dewan Guru agar seluruh guru paham dan merasa tenang:
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+            <div className="flex flex-col sm:flex-row gap-3 pt-1">
               <button
                 type="button"
                 onClick={handleCopyText}
-                className={`flex-1 py-3 px-4 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer min-h-11 ${
+                className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer min-h-11 ${
                   copied
                     ? 'bg-emerald-600 text-white'
                     : 'bg-[#023246] hover:bg-[#0D7A5F] text-white active:scale-98'
@@ -542,7 +632,7 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
               <button
                 type="button"
                 onClick={handleShareWhatsApp}
-                className="py-3 px-5 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-98 cursor-pointer min-h-11 shrink-0"
+                className="py-3 px-5 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs active:scale-98 cursor-pointer min-h-11 shrink-0"
               >
                 <Share2 className="w-4 h-4" />
                 <span>Bagikan ke WhatsApp</span>
