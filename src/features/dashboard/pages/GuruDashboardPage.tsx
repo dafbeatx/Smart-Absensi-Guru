@@ -32,7 +32,7 @@ import { AttendancePermissionBlockedModal } from '../../guru/components/Attendan
 import { WebTrafficService } from '../../../services/web-traffic.service';
 import { OfflineSyncIndicator } from '../../../components/ui/OfflineSyncIndicator';
 import { BiometricEnrollmentPromptModal } from '../../guru/components/BiometricEnrollmentPromptModal';
-import { StudentBehaviorModal } from '../../guru/components/StudentBehaviorModal';
+import { StudentBehaviorView } from '../../guru/components/StudentBehaviorView';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
 import { AdministrationHubModal } from '../../administration/components/AdministrationHubModal';
 import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
@@ -287,7 +287,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR'>('HOME');
+  const [studentBehaviorReturnTarget, setStudentBehaviorReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [aboutReturnTarget, setAboutReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
   const [educationReturnTarget, setEducationReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('PROFIL');
   const [profilSubView, setProfilSubView] = useState<'MAIN' | 'EDUCATION'>('MAIN');
@@ -438,7 +439,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [isAdministrationModalOpen, setIsAdministrationModalOpen] = useState(false);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
-  const [isStudentBehaviorModalOpen, setIsStudentBehaviorModalOpen] = useState(false);
   const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [activeEmergencies, setActiveEmergencies] = useState<ClassroomEmergencyAlert[]>([]);
@@ -604,11 +604,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         break;
       case 'student_good':
         setStudentBehaviorInitialTab('KEBAIKAN');
-        setIsStudentBehaviorModalOpen(true);
+        setStudentBehaviorReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+        setBerandaLayer('STUDENT_BEHAVIOR');
         break;
       case 'student_discipline':
         setStudentBehaviorInitialTab('KEDISIPLINAN');
-        setIsStudentBehaviorModalOpen(true);
+        setStudentBehaviorReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+        setBerandaLayer('STUDENT_BEHAVIOR');
         break;
       case 'emergency':
         setIsEmergencyModalOpen(true);
@@ -1677,10 +1679,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       setIsComplaintModalOpen(true);
     } else if (actionType === 'MERIT') {
       setStudentBehaviorInitialTab('KEBAIKAN');
-      setIsStudentBehaviorModalOpen(true);
+      setStudentBehaviorReturnTarget('HOME');
+      setBerandaLayer('STUDENT_BEHAVIOR');
     } else if (actionType === 'DEMERIT') {
       setStudentBehaviorInitialTab('KEDISIPLINAN');
-      setIsStudentBehaviorModalOpen(true);
+      setStudentBehaviorReturnTarget('HOME');
+      setBerandaLayer('STUDENT_BEHAVIOR');
     }
   }, []);
 
@@ -3328,7 +3332,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         });
                       }
                       setStudentBehaviorInitialTab('KEBAIKAN');
-                      setIsStudentBehaviorModalOpen(true);
+                      setStudentBehaviorReturnTarget('HOME');
+                      setBerandaLayer('STUDENT_BEHAVIOR');
                     }}
                     className="p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-emerald-50 to-teal-50/70 hover:from-emerald-100/70 hover:to-teal-100/70 active:scale-[0.98] border border-emerald-200/80 flex items-center gap-2 transition-all cursor-pointer group shadow-2xs"
                   >
@@ -3369,7 +3374,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         });
                       }
                       setStudentBehaviorInitialTab('KEDISIPLINAN');
-                      setIsStudentBehaviorModalOpen(true);
+                      setStudentBehaviorReturnTarget('HOME');
+                      setBerandaLayer('STUDENT_BEHAVIOR');
                     }}
                     className="p-2 sm:p-2.5 rounded-2xl bg-linear-to-r from-rose-50 to-amber-50/60 hover:from-rose-100/70 hover:to-amber-100/70 active:scale-[0.98] border border-rose-200/80 flex items-center gap-2 transition-all cursor-pointer group shadow-2xs"
                   >
@@ -4118,7 +4124,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     type="button"
                     onClick={() => {
                       setStudentBehaviorInitialTab('KEBAIKAN');
-                      setIsStudentBehaviorModalOpen(true);
+                      setStudentBehaviorReturnTarget('ALL_FEATURES');
+                      setBerandaLayer('STUDENT_BEHAVIOR');
                     }}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                   >
@@ -4144,7 +4151,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     type="button"
                     onClick={() => {
                       setStudentBehaviorInitialTab('KEDISIPLINAN');
-                      setIsStudentBehaviorModalOpen(true);
+                      setStudentBehaviorReturnTarget('ALL_FEATURES');
+                      setBerandaLayer('STUDENT_BEHAVIOR');
                     }}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                   >
@@ -4465,6 +4473,22 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             defaultTab={educationViewTab}
             onOpenBiometricEnroll={handleOpenBiometricModal}
             isBioEnrolled={isBioEnrolled}
+          />
+        )}
+
+        {/* ── LAYER: POIN KARAKTER SISWA (DEDICATED PAGE / VIEW) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'STUDENT_BEHAVIOR' && (
+          <StudentBehaviorView
+            onBack={() => {
+              setBerandaLayer(studentBehaviorReturnTarget);
+            }}
+            backLabel={
+              studentBehaviorReturnTarget === 'ALL_FEATURES'
+                ? 'Kembali ke Semua Fitur'
+                : 'Kembali ke Beranda'
+            }
+            initialTab={studentBehaviorInitialTab}
+            currentTeacherName={effectiveUser?.full_name || 'Guru'}
           />
         )}
 
@@ -5611,8 +5635,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenTeachingMaterialsModal={() => setIsTeachingMaterialsModalOpen(true)}
         onOpenEventsCalendarModal={() => setIsEventsCalendarModalOpen(true)}
         onOpenStudentBehaviorModal={(tab) => {
+          setIsMoreFeaturesModalOpen(false);
           setStudentBehaviorInitialTab(tab || 'KEBAIKAN');
-          setIsStudentBehaviorModalOpen(true);
+          setStudentBehaviorReturnTarget('HOME');
+          setBerandaLayer('STUDENT_BEHAVIOR');
         }}
         onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
         onOpenSarprasModal={() => setIsSarprasModalOpen(true)}
@@ -5662,13 +5688,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         dutyTeachersToday={fellowDutyTeachers.concat(todayDutyDetails ? [todayDutyDetails] : [])}
       />
 
-      {/* Poin Kedisiplinan & Poin Kebaikan Siswa (Sinkron GradeMaster OS) */}
-      <StudentBehaviorModal
-        isOpen={isStudentBehaviorModalOpen}
-        onClose={() => setIsStudentBehaviorModalOpen(false)}
-        initialTab={studentBehaviorInitialTab}
-        currentTeacherName={effectiveUser?.full_name || 'Guru'}
-      />
+
 
       {/* 📁 Modal Pusat Administrasi Sekolah & KBM */}
       <AdministrationHubModal
