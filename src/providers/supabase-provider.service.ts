@@ -86,6 +86,7 @@ import {
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
 import { getInitialSeedTeacherPointLogs, getSafeInitialTeacherPointLogs } from '../utils/teacher-point-seed.utils';
+import { resolveBehaviorLogType } from '../utils/student-behavior.utils';
 
 export class SupabaseProvider implements IDataProvider {
   private client: SupabaseClient;
@@ -4323,27 +4324,32 @@ export class SupabaseProvider implements IDataProvider {
           const rawDbLogs = dbLogsByStudentId[row.id] || [];
           const existingLogs: StudentBehaviorLog[] = Array.isArray(row.behavior_logs) ? row.behavior_logs : [];
 
-          const convertedRelationalLogs: StudentBehaviorLog[] = rawDbLogs.map((l: any) => ({
-            id: l.id,
-            type: l.points_delta < 0 ? ('GOOD' as const) : ('BAD' as const),
-            points: Math.abs(l.points_delta),
-            reason: l.reason || 'Catatan Sikap',
-            timestamp: l.violation_date || l.created_at,
-            violation_date: l.violation_date || l.created_at,
-            occurred_at: l.violation_date || l.created_at,
-            timezone: 'Asia/Jakarta',
-            recordedBy: 'Guru',
-            sync_status: 'SYNCED' as const,
-          }));
+          const convertedRelationalLogs: StudentBehaviorLog[] = rawDbLogs.map((l: any) => {
+            const resolvedType = resolveBehaviorLogType(undefined, l.reason, l.points_delta);
+            return {
+              id: l.id,
+              type: resolvedType,
+              points: Math.abs(l.points_delta),
+              reason: l.reason || 'Catatan Sikap',
+              timestamp: l.violation_date || l.created_at,
+              violation_date: l.violation_date || l.created_at,
+              occurred_at: l.violation_date || l.created_at,
+              timezone: 'Asia/Jakarta',
+              recordedBy: 'Guru',
+              sync_status: 'SYNCED' as const,
+            };
+          });
 
           const seenKeys = new Set<string>();
           const allMergedLogs: StudentBehaviorLog[] = [];
 
           [...convertedRelationalLogs, ...existingLogs].forEach((log) => {
-            const key = log.id || `${log.timestamp}_${log.reason}_${log.points}_${log.type}`;
+            const resolvedType = resolveBehaviorLogType(log.type, log.reason, (log as any).points_delta);
+            const normPoints = Math.abs(log.points || 0);
+            const key = log.id || `${log.timestamp || log.violation_date}_${(log.reason || '').trim().toLowerCase()}_${normPoints}_${resolvedType}`;
             if (!seenKeys.has(key)) {
               seenKeys.add(key);
-              allMergedLogs.push({ ...log, sync_status: 'SYNCED' });
+              allMergedLogs.push({ ...log, type: resolvedType, points: normPoints, sync_status: 'SYNCED' });
             }
           });
 
@@ -4361,10 +4367,12 @@ export class SupabaseProvider implements IDataProvider {
           });
 
           if (allMergedLogs.length === 0 && typeof row.total_points === 'number' && row.total_points !== 0) {
+            // Di GradeMaster OS, total_points positif adalah POIN PELANGGARAN (demerits),
+            // sedangkan bernilai negatif adalah POIN KEBAIKAN (merits).
             if (row.total_points > 0) {
-              meritsTotal = row.total_points;
+              demeritsTotal = row.total_points;
             } else {
-              demeritsTotal = Math.abs(row.total_points);
+              meritsTotal = Math.abs(row.total_points);
             }
           }
 
@@ -4855,25 +4863,30 @@ export class SupabaseProvider implements IDataProvider {
             .limit(50);
 
           if (dbLogs && dbLogs.length > 0) {
-            const mappedLogs: StudentBehaviorLog[] = dbLogs.map((l: any) => ({
-              id: l.id,
-              type: l.points_delta < 0 ? ('GOOD' as const) : ('BAD' as const),
-              points: Math.abs(l.points_delta),
-              reason: l.reason || 'Catatan Sikap',
-              timestamp: l.violation_date || l.created_at,
-              violation_date: l.violation_date || l.created_at,
-              occurred_at: l.violation_date || l.created_at,
-              recordedBy: 'Guru',
-              sync_status: 'SYNCED' as const,
-            }));
+            const mappedLogs: StudentBehaviorLog[] = dbLogs.map((l: any) => {
+              const resolvedType = resolveBehaviorLogType(undefined, l.reason, l.points_delta);
+              return {
+                id: l.id,
+                type: resolvedType,
+                points: Math.abs(l.points_delta),
+                reason: l.reason || 'Catatan Sikap',
+                timestamp: l.violation_date || l.created_at,
+                violation_date: l.violation_date || l.created_at,
+                occurred_at: l.violation_date || l.created_at,
+                recordedBy: 'Guru',
+                sync_status: 'SYNCED' as const,
+              };
+            });
 
             const seenKeys = new Set<string>();
             const merged: StudentBehaviorLog[] = [];
             [...mappedLogs, ...existingLogs].forEach((l) => {
-              const key = l.id || `${l.timestamp}_${l.reason}_${l.points}_${l.type}`;
+              const resolvedType = resolveBehaviorLogType(l.type, l.reason, (l as any).points_delta);
+              const normPoints = Math.abs(l.points || 0);
+              const key = l.id || `${l.timestamp || l.violation_date}_${(l.reason || '').trim().toLowerCase()}_${normPoints}_${resolvedType}`;
               if (!seenKeys.has(key)) {
                 seenKeys.add(key);
-                merged.push({ ...l, sync_status: 'SYNCED' });
+                merged.push({ ...l, type: resolvedType, points: normPoints, sync_status: 'SYNCED' });
               }
             });
 
@@ -4888,7 +4901,15 @@ export class SupabaseProvider implements IDataProvider {
 
       if (existingLogs.length > 0) {
         return existingLogs
-          .map((l) => ({ ...l, sync_status: 'SYNCED' as const }))
+          .map((l) => {
+            const resolvedType = resolveBehaviorLogType(l.type, l.reason, (l as any).points_delta);
+            return {
+              ...l,
+              type: resolvedType,
+              points: Math.abs(l.points || 0),
+              sync_status: 'SYNCED' as const,
+            };
+          })
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       }
     } catch (err) {

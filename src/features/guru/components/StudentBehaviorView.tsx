@@ -12,6 +12,7 @@ import {
 } from '../../../repositories/StudentBehaviorRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { resolveBehaviorLogType } from '../../../utils/student-behavior.utils';
 import {
   Sparkles,
   AlertTriangle,
@@ -212,9 +213,12 @@ export const StudentBehaviorView: React.FC<StudentBehaviorViewProps> = ({
     students.forEach((s) => {
       if (Array.isArray(s.behavior_logs)) {
         s.behavior_logs.forEach((log) => {
+          const resolvedType = resolveBehaviorLogType(log.type, log.reason);
           logs.push({
             ...log,
             id: log.id,
+            type: resolvedType,
+            points: Math.abs(log.points || 0),
             student_id: s.student_id || s.id,
             student_name: s.student_name,
             class_name: s.class_name,
