@@ -4237,42 +4237,46 @@ export class SupabaseProvider implements IDataProvider {
           }
         }
 
-        return studentsData.map((row: any) => {
-          const sum = summariesByStudentId[row.id];
-          const studentLogs = logsByStudent[row.id] || [];
+        const hasRelationalData = Object.keys(summariesByStudentId).length > 0 || Object.keys(logsByStudent).length > 0;
 
-          let merits = sum ? (sum.merits_points ?? 0) : 0;
-          let demerits = sum ? (sum.demerits_points ?? 0) : 0;
+        if (hasRelationalData) {
+          return studentsData.map((row: any) => {
+            const sum = summariesByStudentId[row.id];
+            const studentLogs = logsByStudent[row.id] || [];
 
-          // Jika belum ada row di summary tapi sudah ada log
-          if (!sum && studentLogs.length > 0) {
-            studentLogs.forEach((l) => {
-              if (l.voided_at) return;
-              const p = Math.abs(l.points || 0);
-              if (l.type === 'GOOD') merits += p;
-              else demerits += p;
-            });
-          }
+            let merits = sum ? (sum.merits_points ?? 0) : 0;
+            let demerits = sum ? (sum.demerits_points ?? 0) : 0;
 
-          const net = sum?.net_points != null ? sum.net_points : (merits - demerits);
+            // Jika belum ada row di summary tapi sudah ada log
+            if (!sum && studentLogs.length > 0) {
+              studentLogs.forEach((l) => {
+                if (l.voided_at) return;
+                const p = Math.abs(l.points || 0);
+                if (l.type === 'GOOD') merits += p;
+                else demerits += p;
+              });
+            }
 
-          return {
-            id: row.id,
-            student_id: row.id,
-            student_name: row.full_name || '',
-            class_name: row.class_name || '',
-            academic_year: row.academic_year || academicYear,
-            total_points: net,
-            merits_points: merits,
-            demerits_points: demerits,
-            net_points: net,
-            behavior_logs: studentLogs,
-            avatar_url: row.avatar_url || null,
-            sync_status: 'SYNCED' as const,
-            created_at: row.created_at,
-            updated_at: sum?.updated_at || row.updated_at,
-          };
-        });
+            const net = sum?.net_points != null ? sum.net_points : (merits - demerits);
+
+            return {
+              id: row.id,
+              student_id: row.id,
+              student_name: row.full_name || '',
+              class_name: row.class_name || '',
+              academic_year: row.academic_year || academicYear,
+              total_points: net,
+              merits_points: merits,
+              demerits_points: demerits,
+              net_points: net,
+              behavior_logs: studentLogs,
+              avatar_url: row.avatar_url || null,
+              sync_status: 'SYNCED' as const,
+              created_at: row.created_at,
+              updated_at: sum?.updated_at || row.updated_at,
+            };
+          });
+        }
       }
 
       // 2. Fallback Kompatibilitas: Baca dari legacy gm_behaviors
@@ -4282,7 +4286,7 @@ export class SupabaseProvider implements IDataProvider {
         .eq('academic_year', academicYear)
         .order('class_name', { ascending: true })
         .order('student_name', { ascending: true })
-        .limit(100);
+        .limit(500);
 
       if (className && className !== 'ALL') {
         query = query.eq('class_name', className);
@@ -4300,7 +4304,7 @@ export class SupabaseProvider implements IDataProvider {
               .select('id, student_id, points_delta, reason, violation_date, created_at')
               .in('student_id', studentIds)
               .order('violation_date', { ascending: false })
-              .limit(100);
+              .limit(500);
 
             if (dbLogs) {
               dbLogs.forEach((l: any) => {
@@ -4355,6 +4359,14 @@ export class SupabaseProvider implements IDataProvider {
               demeritsTotal += p;
             }
           });
+
+          if (allMergedLogs.length === 0 && typeof row.total_points === 'number' && row.total_points !== 0) {
+            if (row.total_points > 0) {
+              meritsTotal = row.total_points;
+            } else {
+              demeritsTotal = Math.abs(row.total_points);
+            }
+          }
 
           const netTotal = meritsTotal - demeritsTotal;
 

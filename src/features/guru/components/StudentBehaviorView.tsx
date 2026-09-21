@@ -127,7 +127,15 @@ export const StudentBehaviorView: React.FC<StudentBehaviorViewProps> = ({
       setSelectedStudent((prev) => {
         if (!prev) return null;
         const targetId = prev.student_id || prev.id;
-        const found = (data || []).find((s) => (s.student_id || s.id) === targetId);
+        const targetName = (prev.student_name || '').trim().toUpperCase();
+        const targetClass = (prev.class_name || '').trim().toUpperCase();
+        const found = (data || []).find(
+          (s) =>
+            (s.student_id && s.student_id === targetId) ||
+            (s.id && s.id === targetId) ||
+            ((s.student_name || '').trim().toUpperCase() === targetName &&
+              (s.class_name || '').trim().toUpperCase() === targetClass)
+        );
         return found || prev;
       });
     } catch (err) {
