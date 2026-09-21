@@ -29,8 +29,7 @@ Sehubungan dengan penerapan sistem presensi digital sekolah, kami ingin menyampa
 • Sistem *TIDAK PERNAH melacak perjalanan, rumah, atau aktivitas di luar sekolah*. Begitu selesai absen, pelacakan GPS otomatis mati seketika.
 
 📷 *2. Mengapa Aplikasi Meminta Izin Kamera?*
-• Kamera *HANYA digunakan sebagai pemindai kode QR* (seperti kasir memindai barcode belanjaan).
-• Aplikasi *100% BEBAS AUTO-CAPTURE* (tidak mengambil foto wajah diam-diam, tidak merekam video, dan tidak bisa mengakses galeri HP).
+• Kamera *HANYA digunakan sebagai pemindai kode QR* (seperti kasir memindai barcode belanjaan) dan langsung otomatis tertutup setelah kode terbaca.
 
 👆 *3. Apakah Sidik Jari (Fingerprint) Aman?*
 • *100% Sangat Aman.* Sistem menggunakan teknologi enkripsi standar perbankan (WebAuthn).
@@ -388,8 +387,7 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
                   </h5>
                 </div>
                 <ul className="list-disc list-inside text-xs text-slate-600 space-y-1 pl-1 font-medium leading-relaxed">
-                  <li>Kamera <strong>HANYA digunakan sebagai pemindai kode QR</strong> (sama persis seperti alat kasir memindai barcode belanjaan di minimarket).</li>
-                  <li>Aplikasi <strong>100% BEBAS DARI AUTO-CAPTURE</strong> (tidak memotret wajah diam-diam, tidak merekam video, dan sama sekali tidak bisa membuka galeri HP Anda).</li>
+                  <li>Kamera <strong>HANYA digunakan sebagai pemindai kode QR</strong> (sama persis seperti alat kasir memindai barcode belanjaan di minimarket) dan otomatis tertutup setelah kode berhasil dibaca.</li>
                 </ul>
               </div>
 
