@@ -339,21 +339,6 @@ export class TelegramService {
    * Sends a structured Attendance notification (Presensi Guru Masuk/Pulang)
    */
   public static async sendAttendanceNotification(payload: TelegramAttendancePayload): Promise<boolean> {
-    let resolvedPhotoBlob = payload.photoBlob;
-
-    // Asynchronously await photoPromise in background (up to 3500ms) without blocking user UI
-    if (!resolvedPhotoBlob && payload.photoPromise) {
-      try {
-        resolvedPhotoBlob = await Promise.race([
-          payload.photoPromise,
-          new Promise<null>((r) => setTimeout(() => r(null), 3500)),
-        ]);
-      } catch (e) {
-        logger.warn('TelegramService', 'Error resolving photoPromise in background:', e);
-        resolvedPhotoBlob = null;
-      }
-    }
-
     const timeStr = payload.timeStr || getCurrentTimeInJakarta();
     const dateStr = payload.dateStr || getTodayDateInJakarta();
     const isCheckIn = payload.type === 'CHECK_IN';
@@ -378,13 +363,10 @@ export class TelegramService {
       : (payload.status || '✅ TEPAT WAKTU');
 
     const offlineBadge = payload.isOffline ? ' [MODE OFFLINE]' : '';
-
-    const hasPhoto = Boolean(resolvedPhotoBlob && resolvedPhotoBlob.size > 500);
-    const photoBadge = hasPhoto ? ' 📷 [FOTO TERVERIFIKASI]' : '';
-    const headerTitle = hasPhoto ? 'FOTO AUTO-CAPTURE PRESENSI GURU' : 'PRESENSI GURU TERCATAT';
+    const headerTitle = 'PRESENSI GURU TERCATAT';
 
     const message = [
-      `📋 <b>${headerTitle}${offlineBadge}${photoBadge}</b>`,
+      `📋 <b>${headerTitle}${offlineBadge}</b>`,
       `━━━━━━━━━━━━━━━━━━━━`,
       `👤 <b>Nama:</b> ${escapeHtml(payload.teacherName)}`,
       `🆔 <b>NPP/NIP:</b> ${escapeHtml(payload.nip || '-')}`,
@@ -395,13 +377,8 @@ export class TelegramService {
       `🧭 <b>Posisi:</b> ${escapeHtml(locationLabel)}`,
       `📊 <b>Status:</b> ${escapeHtml(statusBadge)}`,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `🤖 <i>Smart Absensi Guru - Silent Audit Camera</i>`,
+      `🤖 <i>Smart Absensi Guru</i>`,
     ].join('\n');
-
-    if (hasPhoto && resolvedPhotoBlob) {
-      const photoRes = await this.sendPhoto(resolvedPhotoBlob, message, 'HTML');
-      if (photoRes.success) return true;
-    }
 
     const res = await this.sendMessage(message, 'HTML');
     return res.success;

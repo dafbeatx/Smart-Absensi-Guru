@@ -134,8 +134,6 @@ export class AttendanceRepository {
         distanceMeters: effectiveDistance,
         status: 'HADIR (MODE OFFLINE)',
         isOffline: true,
-        photoBlob: dto.photoBlob || null,
-        photoPromise: dto.photoPromise,
       }).catch((e) => console.warn('Telegram offline attendance log error:', e));
 
       // WhatsApp Group Notification: Strictly text-only per user privacy policy
@@ -189,8 +187,6 @@ export class AttendanceRepository {
         distanceMeters: result.distance_meters,
         status: result.status,
         isOffline: result.is_offline,
-        photoBlob: dto.photoBlob || null,
-        photoPromise: dto.photoPromise,
       }).catch((e) => console.warn('Telegram attendance log error:', e));
 
       // Dispatch WhatsApp Group notification: Strictly text-only per user privacy policy
@@ -305,8 +301,6 @@ export class AttendanceRepository {
           distanceMeters: effectiveDistance,
           status: effStatus,
           isOffline: true,
-          photoBlob: dto.photoBlob || null,
-          photoPromise: dto.photoPromise,
         }).catch((e) => console.warn('Telegram offline attendance log error:', e));
 
         // WhatsApp Group Notification: Strictly text-only per user privacy policy

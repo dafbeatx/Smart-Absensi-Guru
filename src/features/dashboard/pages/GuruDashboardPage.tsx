@@ -10,6 +10,7 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
+import { TeacherEducationModal } from '../../guru/components/TeacherEducationModal';
 import { AboutAppView } from '../../guru/components/AboutAppView';
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
@@ -293,6 +294,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [correctionInitialDate, setCorrectionInitialDate] = useState<string | undefined>(undefined);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [isEducationModalOpen, setIsEducationModalOpen] = useState(false);
+  const [educationModalTab, setEducationModalTab] = useState<'QR' | 'BIOMETRIC' | 'POINTS'>('QR');
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
@@ -2607,7 +2610,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               }
 
               const cleanGpsText = gpsHealth.text
-                .replace(/[📍🟢🟡🔴⚠️]/g, '')
+                .replace(/[📍🟢🟡🔴]|⚠️/gu, '')
                 .replace(/\.{2,}$/, '')
                 .replace(/\s+/g, ' ')
                 .trim();
@@ -4962,6 +4965,75 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
               </div>
 
+              {/* Teacher Education & Guidance Card */}
+              <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-[#0D7A5F]/5 border border-[#0D7A5F]/20 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📚</span>
+                    <div>
+                      <h3 className="font-extrabold text-xs text-[#023246]">Pusat Edukasi &amp; Panduan Presensi</h3>
+                      <p className="text-[10px] text-slate-500 font-medium">Tips agar tidak ditolak GPS, sidik jari HP, &amp; cara raih poin</p>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                    Wajib Tahu ✨
+                  </span>
+                </div>
+
+                {/* Quick 3-Card Shortcut */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEducationModalTab('QR');
+                      setIsEducationModalOpen(true);
+                    }}
+                    className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
+                  >
+                    <span className="text-base">📷</span>
+                    <span className="text-[10px] font-black text-[#023246] leading-tight block">Scan QR &amp; GPS</span>
+                    <span className="text-[9px] text-emerald-700 font-semibold block leading-tight">Trik Wi-Fi &amp; GPS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEducationModalTab('BIOMETRIC');
+                      setIsEducationModalOpen(true);
+                    }}
+                    className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
+                  >
+                    <span className="text-base">👆</span>
+                    <span className="text-[10px] font-black text-[#023246] leading-tight block">Sidik Jari HP</span>
+                    <span className="text-[9px] text-emerald-700 font-semibold block leading-tight">Privasi 100% Aman</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEducationModalTab('POINTS');
+                      setIsEducationModalOpen(true);
+                    }}
+                    className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
+                  >
+                    <span className="text-base">🏆</span>
+                    <span className="text-[10px] font-black text-[#023246] leading-tight block">Poin Disiplin</span>
+                    <span className="text-[9px] text-emerald-700 font-semibold block leading-tight">Lencana &amp; Reward</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEducationModalTab('QR');
+                    setIsEducationModalOpen(true);
+                  }}
+                  className="w-full py-2 px-3 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer min-h-10"
+                >
+                  <span>📖</span> Buka Panduan Lengkap &amp; Solusi Kendala
+                </button>
+              </div>
+
               {/* Device Binding Status Section */}
               <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between text-xs gap-2">
@@ -5300,6 +5372,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <TermsAndConditionsModal
         isOpen={isTermsModalOpen}
         onClose={() => setIsTermsModalOpen(false)}
+      />
+
+      {/* Teacher Education & Guidance Modal */}
+      <TeacherEducationModal
+        isOpen={isEducationModalOpen}
+        onClose={() => setIsEducationModalOpen(false)}
+        defaultTab={educationModalTab}
       />
 
       {/* ── DAY DETAIL CALENDAR MODAL ───────────────────────────────────── */}

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 /**
  * SMART ABSENSI GURU - WHATSAPP GATEWAY MICROSERVICE (BAILEYS)
  * Standalone, 100% Free & Anti-Ban WhatsApp Notification Bot.

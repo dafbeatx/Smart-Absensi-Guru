@@ -39,8 +39,7 @@ export class AttendanceEngine {
     userId: string,
     token: string,
     deviceUUID: string,
-    onStepChange?: (step: AttendanceEngineStep) => void,
-    photoPromise?: Promise<Blob | null>
+    onStepChange?: (step: AttendanceEngineStep) => void
   ): Promise<AttendanceEngineResult> {
     const notify = (step: AttendanceEngineStep) => {
       if (onStepChange) onStepChange(step);
@@ -104,7 +103,6 @@ export class AttendanceEngine {
             user_lat: gpsCoords.latitude,
             user_lng: gpsCoords.longitude,
             device_uuid: deviceUUID,
-            photoPromise,
           });
 
           notify('SUCCESS');
@@ -182,8 +180,7 @@ export class AttendanceEngine {
     userId: string,
     token: string,
     deviceUUID: string,
-    onStepChange?: (step: AttendanceEngineStep) => void,
-    photoPromise?: Promise<Blob | null>
+    onStepChange?: (step: AttendanceEngineStep) => void
   ): Promise<AttendanceEngineResult> {
     const notify = (step: AttendanceEngineStep) => {
       if (onStepChange) onStepChange(step);
@@ -259,7 +256,6 @@ export class AttendanceEngine {
             gps_accuracy: gpsCoords.accuracy,
             verification_method: 'BIOMETRIC_GPS',
             attendance_source: 'BIOMETRIC',
-            photoPromise,
           });
 
           notify('SUCCESS');

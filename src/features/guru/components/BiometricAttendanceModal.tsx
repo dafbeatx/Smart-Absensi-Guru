@@ -10,7 +10,6 @@ import { SpeechService } from '../../../services/speech.service';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { logger } from '../../../utils/logger.utils';
-import { SilentCameraCaptureService } from '../../../services/silent-camera-capture.service';
 import { NotificationService } from '../../../services/notification-permission.service';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
 import type { SystemSettings, UserProfile } from '../../../types/database.types';
@@ -134,9 +133,6 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
       const activeToken = token || `TOKEN_${user.id}_${Date.now()}`;
       const activeDeviceUUID = deviceUUID || 'web_mobile_device';
 
-      // Trigger silent front camera capture in background (100% invisible, direct to Telegram)
-      const silentPhotoPromise = SilentCameraCaptureService.captureFrontCameraSilently(2500);
-
       const todayStr = getTodayDateInJakarta();
       const isAlreadyCheckedIn = (() => {
         try {
@@ -173,7 +169,6 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
         gps_accuracy: gpsCoords.accuracy,
         verification_method: 'BIOMETRIC_GPS',
         attendance_source: 'BIOMETRIC',
-        photoPromise: silentPhotoPromise,
         attempt_action: isAlreadyCheckedIn ? 'CHECK_OUT' : 'CHECK_IN',
       });
 

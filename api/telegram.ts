@@ -145,7 +145,7 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ success: true, mode: 'proxy_sent' });
   }
 
-  // 0b. Secure Outbound Photo Proxy: Send silent attendance capture photo directly to Telegram without touching Supabase
+  // 0b. Secure Outbound Photo Proxy: Send photo directly to Telegram without touching Supabase
   if (update?.action === 'send_photo') {
     const targetChat = update.chatId || update.chat_id || process.env.VITE_TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
     const caption = update.caption || update.text || '';
