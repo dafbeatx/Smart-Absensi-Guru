@@ -79,7 +79,7 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
   };
 
   return (
-    <section className={`space-y-3.5 pb-12 animate-fadeIn max-w-[480px] sm:max-w-xl md:max-w-2xl mx-auto ${className}`}>
+    <section className={`space-y-3.5 pb-12 animate-fadeIn max-w-120 sm:max-w-xl md:max-w-2xl mx-auto ${className}`}>
       {/* ── TOP BAR NAVIGATION ───────────────────────────────────────────── */}
       <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs flex items-center justify-between gap-2.5">
         {onBack ? (
