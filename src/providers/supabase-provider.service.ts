@@ -1900,9 +1900,9 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async uploadAvatar(userId: string, file: File): Promise<string> {
+    let fileToUpload = file;
     try {
       // Auto-convert to WebP format (max 400x400px, 80% quality) to save Supabase Storage (~20-30KB per photo)
-      let fileToUpload = file;
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         try {
           fileToUpload = await convertToWebP(file, 400, 400, 0.8);
@@ -1956,7 +1956,7 @@ export class SupabaseProvider implements IDataProvider {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = (err) => reject(err);
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(fileToUpload);
       });
     }
   }

@@ -8,7 +8,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { getTodayDateInJakarta } from '../../../services/analytics.service';
 import type { LeaveType } from '../../../types/database.types';
-import { convertToWebP } from '../../../utils/image.utils';
+import { convertToWebP, isImageFile, formatFileSize } from '../../../utils/image.utils';
 import {
   WhatsAppNotificationService,
   type WhatsAppLeaveParams,
@@ -36,6 +36,8 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
   const [dutyTeacherNotes, setDutyTeacherNotes] = useState('');
   const [attachmentBase64, setAttachmentBase64] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [compressedSizeInfo, setCompressedSizeInfo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submittedLeave, setSubmittedLeave] = useState<WhatsAppLeaveParams | null>(null);
@@ -52,6 +54,8 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       setDutyTeacherNotes('');
       setAttachmentBase64('');
       setFileName('');
+      setIsProcessingFile(false);
+      setCompressedSizeInfo(null);
       setErrorMsg(null);
       setSubmittedLeave(null);
       setIsCopied(false);
@@ -79,44 +83,61 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
         return;
       }
 
+      setIsProcessingFile(true);
+      setCompressedSizeInfo(null);
+
       try {
-        if (file.type.startsWith('image/')) {
-          // Auto convert to WebP (max 800x800, 70% quality) to reduce size to ~30-60KB
+        if (isImageFile(file)) {
+          // Auto convert to WebP (max 800x800, 70% quality) to reduce size to ~20-50KB
           const webpFile = await convertToWebP(file, 800, 800, 0.7);
+          const originalKb = formatFileSize(file.size);
+          const compressedKb = formatFileSize(webpFile.size);
+          setCompressedSizeInfo(`Dikompresi: ${originalKb} → ${compressedKb} (WebP)`);
+
           const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || 'lampiran';
-          setFileName(`${baseName}.webp`);
+          setFileName(`${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.webp`);
+
           const reader = new FileReader();
           reader.onloadend = () => {
             setAttachmentBase64(reader.result as string);
+            setIsProcessingFile(false);
+          };
+          reader.onerror = () => {
+            setIsProcessingFile(false);
+            showToast('error', 'Gagal Membaca File', 'Terjadi kesalahan saat memproses berkas WebP.');
           };
           reader.readAsDataURL(webpFile);
         } else {
           // PDF document
           setFileName(file.name);
+          setCompressedSizeInfo(`PDF Dokumen (${formatFileSize(file.size)})`);
           const reader = new FileReader();
           reader.onloadend = () => {
             setAttachmentBase64(reader.result as string);
+            setIsProcessingFile(false);
+          };
+          reader.onerror = () => {
+            setIsProcessingFile(false);
+            showToast('error', 'Gagal Membaca File', 'Terjadi kesalahan saat membaca dokumen PDF.');
           };
           reader.readAsDataURL(file);
         }
       } catch (err) {
-        console.warn('Failed to compress leave attachment, falling back to original:', err);
-        setFileName(file.name);
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setAttachmentBase64(reader.result as string);
-        };
-        reader.readAsDataURL(file);
+        setIsProcessingFile(false);
+        console.warn('Failed to compress leave attachment:', err);
+        showToast('error', 'Gagal Mengompresi Gambar', 'Format gambar tidak dapat dikompresi ke WebP.');
+        handleRemoveFile();
       }
     } else {
-      setAttachmentBase64('');
-      setFileName('');
+      handleRemoveFile();
     }
   };
 
   const handleRemoveFile = () => {
     setAttachmentBase64('');
     setFileName('');
+    setCompressedSizeInfo(null);
+    setIsProcessingFile(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -448,38 +469,56 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
               accept="image/*,.pdf"
               onChange={handleFileChange}
               className="hidden"
+              disabled={isProcessingFile || isLoading}
             />
-            {fileName ? (
-              <div className="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <span className="text-emerald-600 text-sm">📎</span>
-                <span className="text-xs font-semibold text-emerald-800 truncate flex-1">{fileName}</span>
-                <button
-                  type="button"
-                  onClick={handleRemoveFile}
-                  className="text-red-500 hover:text-red-700 text-xs font-bold px-1.5 py-0.5 rounded hover:bg-red-50 transition-all"
-                >
-                  ✕
-                </button>
+            {isProcessingFile ? (
+              <div className="flex items-center justify-center gap-2.5 p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold animate-pulse">
+                <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                <span>Mengompresi gambar ke .webp hemat kuota...</span>
+              </div>
+            ) : fileName ? (
+              <div className="flex flex-col gap-1 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-600 text-sm">📎</span>
+                  <span className="text-xs font-semibold text-emerald-800 truncate flex-1">{fileName}</span>
+                  <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-200/60 px-1.5 py-0.5 rounded uppercase">
+                    {fileName.endsWith('.pdf') ? 'PDF' : 'WebP'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRemoveFile}
+                    className="text-red-500 hover:text-red-700 text-xs font-bold px-1.5 py-0.5 rounded hover:bg-red-50 transition-all cursor-pointer"
+                    title="Hapus berkas"
+                  >
+                    ✕
+                  </button>
+                </div>
+                {compressedSizeInfo && (
+                  <p className="text-[10px] text-emerald-700 font-medium pl-6">
+                    ✨ {compressedSizeInfo}
+                  </p>
+                )}
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-300 rounded-xl text-xs text-slate-500 font-semibold hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50/50 transition-all cursor-pointer"
+                disabled={isProcessingFile || isLoading}
+                className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-300 rounded-xl text-xs text-slate-500 font-semibold hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50/50 transition-all cursor-pointer disabled:opacity-50"
               >
-                <span>📄</span> Pilih Berkas (Gambar / PDF)
+                <span>📄</span> Pilih Berkas (Foto Kamera / Galeri / PDF)
               </button>
             )}
             <p className="text-[10px] text-slate-500 italic">
-              *Pengunggahan berkas bersifat opsional. Jika tidak ada lampiran surat dokter/dinas, bidang ini dapat dikosongkan.
+              *Foto otomatis dikompresi ke format <strong>.webp</strong> agar hemat kuota dan upload instan di sinyal lemah.
             </p>
           </div>
 
           <div className="pt-2 flex items-center gap-2">
-            <Button type="button" variant="secondary" className="w-1/2" onClick={onClose}>
+            <Button type="button" variant="secondary" className="w-1/2" onClick={onClose} disabled={isLoading || isProcessingFile}>
               Batal
             </Button>
-            <Button type="submit" variant="primary" className="w-1/2" isLoading={isLoading}>
+            <Button type="submit" variant="primary" className="w-1/2" isLoading={isLoading} disabled={isLoading || isProcessingFile}>
               Kirim Pengajuan
             </Button>
           </div>

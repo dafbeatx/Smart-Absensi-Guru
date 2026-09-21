@@ -9,7 +9,7 @@ import { useToastStore } from '../../../store/useToastStore';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import type { UserProfile, RoleCode, TeacherPointLog } from '../../../types/database.types';
 import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHistoryModal';
-import { convertToWebP } from '../../../utils/image.utils';
+import { convertToWebP, formatFileSize } from '../../../utils/image.utils';
 import { handleAppError } from '../../../utils/error.utils';
 import { getTeacherDisciplineLeaderboard } from '../../../utils/teacher-appreciation.utils';
 import {
@@ -168,6 +168,11 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [newPin, setNewPin] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false);
+  const [isResettingPin, setIsResettingPin] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
 
   const filteredTeachers = (teachers || []).filter((t) => {
     if (!t) return false;
@@ -204,6 +209,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       created_at: new Date().toISOString(),
     };
 
+    setIsSubmittingAdd(true);
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
@@ -246,6 +252,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       setAvatarUrl(null);
     } catch (err: unknown) {
       handleAppError(err, 'TeacherManagementTable.handleAddTeacher', 'Gagal Menambahkan Pengguna Baru');
+    } finally {
+      setIsSubmittingAdd(false);
     }
   };
 
@@ -303,6 +311,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       avatar_url: avatarUrl,
     };
 
+    setIsSavingPhoto(true);
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
@@ -336,6 +345,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       setIsPhotoModalOpen(false);
     } catch (err: unknown) {
       handleAppError(err, 'TeacherManagementTable.handleSavePhotoDirectly', 'Gagal Menyimpan Foto Profil');
+    } finally {
+      setIsSavingPhoto(false);
     }
   };
 
@@ -353,8 +364,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     try {
       // Auto convert to WebP (max 400x400px, 80% quality)
       const webpFile = await convertToWebP(file, 400, 400, 0.8);
-      const originalKb = (file.size / 1024).toFixed(1);
-      const compressedKb = (webpFile.size / 1024).toFixed(1);
+      const originalSizeStr = formatFileSize(file.size);
+      const compressedSizeStr = formatFileSize(webpFile.size);
 
       const provider = ProviderFactory.getProvider();
       let uploadedUrl = '';
@@ -372,11 +383,11 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       showToast(
         'success',
         'Foto Berhasil Dikompresi (WebP)!',
-        `Ukuran foto diperkecil dari ${originalKb} KB menjadi ${compressedKb} KB (Hemat Storage Supabase).`
+        `Ukuran foto diperkecil dari ${originalSizeStr} menjadi ${compressedSizeStr} (Hemat Storage Supabase).`
       );
     } catch (err) {
       console.warn('Failed to upload avatar:', err);
-      showToast('error', 'Gagal Unggah Foto', 'Gagal memproses & mengompresi foto profil.');
+      showToast('error', 'Gagal Unggah Foto', 'Gagal memproses & mengompresi foto profil ke format WebP.');
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -395,6 +406,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       avatar_url: avatarUrl,
     };
 
+    setIsSubmittingEdit(true);
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
@@ -434,12 +446,15 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       setIsEditModalOpen(false);
     } catch (err: unknown) {
       handleAppError(err, 'TeacherManagementTable.handleEditTeacherSubmit', 'Gagal Memperbarui Data Pengguna');
+    } finally {
+      setIsSubmittingEdit(false);
     }
   };
 
   const handleResetPin = async () => {
     if (effectiveReadOnly || !selectedTeacher || newPin.length !== 6) return;
 
+    setIsResettingPin(true);
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
@@ -471,6 +486,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       setNewPin('');
     } catch (err: unknown) {
       handleAppError(err, 'TeacherManagementTable.handleResetPin', 'Gagal Melakukan Reset PIN');
+    } finally {
+      setIsResettingPin(false);
     }
   };
 
@@ -539,6 +556,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const handleDeleteTeacher = async () => {
     if (effectiveReadOnly || !selectedTeacher) return;
 
+    setIsDeletingUser(true);
     try {
       const provider = ProviderFactory.getProvider();
       const token = useAuthStore.getState().token || '';
@@ -567,6 +585,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       setSelectedTeacher(null);
     } catch (err: unknown) {
       handleAppError(err, 'TeacherManagementTable.handleDeleteTeacher', 'Gagal Menghapus Pengguna');
+    } finally {
+      setIsDeletingUser(false);
     }
   };
 
@@ -991,8 +1011,15 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               </div>
             </div>
 
-            <label className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-2xs shrink-0">
-              {isUploadingAvatar ? 'Memproses...' : '📷 Unggah Foto'}
+            <label className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-2xs shrink-0 flex items-center gap-1.5">
+              {isUploadingAvatar ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Mengompresi ke WebP...</span>
+                </>
+              ) : (
+                '📷 Unggah Foto'
+              )}
               <input
                 type="file"
                 accept="image/*"
@@ -1045,8 +1072,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           </div>
 
           <div className="pt-2 flex gap-2">
-            <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsAddModalOpen(false)}>Batal</Button>
-            <Button type="submit" variant="primary" className="w-1/2">Simpan Akun</Button>
+            <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsAddModalOpen(false)} disabled={isSubmittingAdd || isUploadingAvatar}>Batal</Button>
+            <Button type="submit" variant="primary" className="w-1/2" isLoading={isSubmittingAdd} disabled={isSubmittingAdd || isUploadingAvatar}>Simpan Akun</Button>
           </div>
         </form>
       </Modal>
@@ -1079,8 +1106,15 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               </div>
             </div>
 
-            <label className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-2xs shrink-0">
-              {isUploadingAvatar ? 'Memproses...' : '📷 Ganti Foto'}
+            <label className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-2xs shrink-0 flex items-center gap-1.5">
+              {isUploadingAvatar ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Mengompresi ke WebP...</span>
+                </>
+              ) : (
+                '📷 Ganti Foto'
+              )}
               <input
                 type="file"
                 accept="image/*"
@@ -1133,8 +1167,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           </div>
 
           <div className="pt-2 flex gap-2">
-            <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsEditModalOpen(false)}>Batal</Button>
-            <Button type="submit" variant="primary" className="w-1/2">Simpan Perubahan</Button>
+            <Button type="button" variant="secondary" className="w-1/2" onClick={() => setIsEditModalOpen(false)} disabled={isSubmittingEdit || isUploadingAvatar}>Batal</Button>
+            <Button type="submit" variant="primary" className="w-1/2" isLoading={isSubmittingEdit} disabled={isSubmittingEdit || isUploadingAvatar}>Simpan Perubahan</Button>
           </div>
         </form>
       </Modal>
@@ -1147,8 +1181,8 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           </p>
           <Input label="PIN 6-Digit Baru" type="password" maxLength={6} value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="Contoh: 654321" />
           <div className="flex gap-2">
-            <Button variant="secondary" className="w-1/2" onClick={() => setIsResetPinOpen(false)}>Batal</Button>
-            <Button variant="primary" className="w-1/2" onClick={handleResetPin}>Simpan PIN Baru</Button>
+            <Button variant="secondary" className="w-1/2" onClick={() => setIsResetPinOpen(false)} disabled={isResettingPin}>Batal</Button>
+            <Button variant="primary" className="w-1/2" onClick={handleResetPin} isLoading={isResettingPin} disabled={isResettingPin || newPin.length !== 6}>Simpan PIN Baru</Button>
           </div>
         </div>
       </Modal>
@@ -1171,10 +1205,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
             </div>
 
             <div className="flex gap-2">
-              <Button variant="secondary" className="w-1/2" onClick={() => setIsDeleteModalOpen(false)}>
+              <Button variant="secondary" className="w-1/2" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeletingUser}>
                 Batal
               </Button>
-              <Button variant="danger" className="w-1/2" onClick={handleDeleteTeacher}>
+              <Button variant="danger" className="w-1/2" onClick={handleDeleteTeacher} isLoading={isDeletingUser} disabled={isDeletingUser}>
                 Ya, Hapus Pengguna
               </Button>
             </div>
@@ -1222,7 +1256,14 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
 
             <div className="flex flex-col sm:flex-row gap-2 pt-1">
               <label className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-extrabold text-xs rounded-xl cursor-pointer transition-all shadow-2xs text-center flex items-center justify-center gap-1.5">
-                <span>{isUploadingAvatar ? '⏳ Memproses...' : '📷 Pilih & Kompresi Foto'}</span>
+                {isUploadingAvatar ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                    <span>Mengompresi ke WebP...</span>
+                  </>
+                ) : (
+                  <span>📷 Pilih & Kompresi Foto</span>
+                )}
                 <input
                   type="file"
                   accept="image/*"
@@ -1237,6 +1278,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                   type="button"
                   onClick={() => setAvatarUrl(null)}
                   className="py-2.5 px-3 bg-red-50 hover:bg-red-100 text-red-700 font-extrabold text-xs rounded-xl border border-red-200 transition-all text-center active:scale-95"
+                  disabled={isSavingPhoto || isUploadingAvatar}
                 >
                   🗑️ Hapus Foto
                 </button>
@@ -1244,10 +1286,16 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
             </div>
 
             <div className="flex gap-2 pt-2 border-t border-slate-100">
-              <Button variant="secondary" className="w-1/2" onClick={() => setIsPhotoModalOpen(false)}>
+              <Button variant="secondary" className="w-1/2" onClick={() => setIsPhotoModalOpen(false)} disabled={isSavingPhoto || isUploadingAvatar}>
                 Batal
               </Button>
-              <Button variant="primary" className="w-1/2 bg-emerald-600 hover:bg-emerald-700 font-bold" onClick={handleSavePhotoDirectly}>
+              <Button
+                variant="primary"
+                className="w-1/2 bg-emerald-600 hover:bg-emerald-700 font-bold"
+                onClick={handleSavePhotoDirectly}
+                isLoading={isSavingPhoto}
+                disabled={isSavingPhoto || isUploadingAvatar}
+              >
                 💾 Simpan Foto Profil
               </Button>
             </div>
