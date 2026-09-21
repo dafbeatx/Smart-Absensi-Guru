@@ -698,7 +698,7 @@ export const StudentBehaviorView: React.FC<StudentBehaviorViewProps> = ({
                     placeholder="Cari nama siswa atau NISN..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 text-xs font-medium rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
+                    className="w-full pl-10 pr-3 py-2.5 text-xs font-medium rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
                   />
                 </div>
 
@@ -722,7 +722,7 @@ export const StudentBehaviorView: React.FC<StudentBehaviorViewProps> = ({
                           setSelectedStudent(s);
                           setSuccessMessage(null);
                         }}
-                        className="w-full p-2.5 bg-white hover:bg-emerald-50/50 active:bg-emerald-100/50 border border-slate-200/80 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer group shadow-2xs"
+                        className="w-full p-2.5 bg-white hover:bg-emerald-50 active:scale-[0.99] border border-slate-200/80 rounded-xl flex items-center justify-between text-left transition-all cursor-pointer group shadow-2xs"
                       >
                         <div className="min-w-0 pr-2">
                           <p className="text-xs font-bold text-slate-800 group-hover:text-[#023246] truncate">
@@ -918,7 +918,7 @@ export const StudentBehaviorView: React.FC<StudentBehaviorViewProps> = ({
                     setPointsAmount(parsed);
                   }
                 }}
-                className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
+                className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#023246]/20"
               />
             </div>
           </div>
@@ -927,7 +927,11 @@ export const StudentBehaviorView: React.FC<StudentBehaviorViewProps> = ({
           <button
             type="submit"
             disabled={isSubmitting || !selectedStudent}
-            className={`w-full h-12 rounded-2xl text-xs sm:text-sm font-extrabold text-white shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`w-full h-12 rounded-2xl text-xs sm:text-sm font-extrabold text-white shadow-md flex items-center justify-center gap-2 transition-all ${
+              isSubmitting || !selectedStudent
+                ? 'opacity-50 cursor-not-allowed'
+                : 'cursor-pointer active:scale-[0.98]'
+            } ${
               activeTab === 'KEBAIKAN'
                 ? 'bg-linear-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 shadow-emerald-700/20'
                 : 'bg-linear-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 shadow-rose-700/20'
@@ -1161,7 +1165,11 @@ export const StudentBehaviorView: React.FC<StudentBehaviorViewProps> = ({
                 type="button"
                 disabled={isVoiding || voidReasonText.trim().length < 3}
                 onClick={handleConfirmVoid}
-                className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-xl cursor-pointer shadow-xs"
+                className={`px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs ${
+                  isVoiding || voidReasonText.trim().length < 3
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'cursor-pointer'
+                }`}
               >
                 {isVoiding ? 'Memproses...' : 'Konfirmasi Batalkan'}
               </button>
