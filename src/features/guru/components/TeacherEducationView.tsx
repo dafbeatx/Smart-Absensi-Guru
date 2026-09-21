@@ -101,7 +101,7 @@ Terima kasih atas kerja sama dan dedikasi Bapak/Ibu dalam memajukan digitalisasi
       </div>
 
       {/* ── HERO BANNER ─────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-[#023246] via-[#18536B] to-[#0D7A5F] text-white p-5 sm:p-6 rounded-2xl sm:rounded-3xl shadow-sm relative overflow-hidden">
+      <div className="bg-linear-to-br from-[#023246] via-[#18536B] to-[#0D7A5F] text-white p-5 sm:p-6 rounded-2xl sm:rounded-3xl shadow-sm relative overflow-hidden">
         <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-10 pointer-events-none select-none">
           <span className="text-8xl sm:text-9xl font-black">EDUKASI</span>
         </div>
