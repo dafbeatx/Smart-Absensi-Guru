@@ -10,7 +10,7 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { LeaveApplicationModal } from '../../leave/components/LeaveApplicationModal';
 import { GuruCorrectionRequestModal } from '../../guru/components/GuruCorrectionRequestModal';
 import { TermsAndConditionsModal } from '../../guru/components/TermsAndConditionsModal';
-import { TeacherEducationModal } from '../../guru/components/TeacherEducationModal';
+import { TeacherEducationView } from '../../guru/components/TeacherEducationView';
 import { AboutAppView } from '../../guru/components/AboutAppView';
 import { TeachingScheduleModal } from '../../guru/components/TeachingScheduleModal';
 import { MoodCheckinModal } from '../../guru/components/MoodCheckinModal';
@@ -287,15 +287,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION'>('HOME');
   const [aboutReturnTarget, setAboutReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
+  const [educationReturnTarget, setEducationReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('PROFIL');
+  const [profilSubView, setProfilSubView] = useState<'MAIN' | 'EDUCATION'>('MAIN');
+  const [educationViewTab, setEducationViewTab] = useState<'QR' | 'BIOMETRIC' | 'POINTS' | 'SECURITY'>('QR');
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [correctionInitialDate, setCorrectionInitialDate] = useState<string | undefined>(undefined);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
-  const [isEducationModalOpen, setIsEducationModalOpen] = useState(false);
-  const [educationModalTab, setEducationModalTab] = useState<'QR' | 'BIOMETRIC' | 'POINTS' | 'SECURITY'>('QR');
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
@@ -320,6 +321,39 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [aboutReturnTarget]);
+
+  const handleOpenEducationLayer = useCallback(
+    (
+      tab: 'QR' | 'BIOMETRIC' | 'POINTS' | 'SECURITY' = 'QR',
+      returnTo: 'HOME' | 'ALL_FEATURES' | 'PROFIL' = 'PROFIL'
+    ) => {
+      setEducationViewTab(tab);
+      setEducationReturnTarget(returnTo);
+      if (returnTo === 'PROFIL') {
+        setActiveTab('PROFIL');
+        setProfilSubView('EDUCATION');
+      } else {
+        setActiveTab('BERANDA');
+        setBerandaLayer('EDUCATION');
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    []
+  );
+
+  const handleBackFromEducation = useCallback(() => {
+    if (educationReturnTarget === 'PROFIL') {
+      setActiveTab('PROFIL');
+      setProfilSubView('MAIN');
+    } else if (educationReturnTarget === 'ALL_FEATURES') {
+      setActiveTab('BERANDA');
+      setBerandaLayer('ALL_FEATURES');
+    } else {
+      setActiveTab('BERANDA');
+      setBerandaLayer('HOME');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [educationReturnTarget]);
 
   const handleCloseQuestionCorrectionModal = useCallback(() => {
     setIsQuestionCorrectionModalOpen(false);
@@ -4419,6 +4453,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           />
         )}
 
+        {/* ── LAYER: PUSAT EDUKASI & PANDUAN PRESENSI (DEDICATED PAGE / VIEW) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'EDUCATION' && (
+          <TeacherEducationView
+            onBack={handleBackFromEducation}
+            backLabel={
+              educationReturnTarget === 'ALL_FEATURES'
+                ? 'Kembali ke Semua Fitur'
+                : 'Kembali ke Beranda'
+            }
+            defaultTab={educationViewTab}
+            onOpenBiometricEnroll={handleOpenBiometricModal}
+            isBioEnrolled={isBioEnrolled}
+          />
+        )}
+
         {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}
         {activeTab === 'RIWAYAT' && (
           <section className="space-y-3 sm:space-y-4">
@@ -4940,6 +4989,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
         {/* ── TAB 4: PROFIL ───────────────────────────────────────────────── */}
         {activeTab === 'PROFIL' && (
+          profilSubView === 'EDUCATION' ? (
+            <TeacherEducationView
+              onBack={handleBackFromEducation}
+              backLabel="Kembali ke Profil"
+              defaultTab={educationViewTab}
+              onOpenBiometricEnroll={handleOpenBiometricModal}
+              isBioEnrolled={isBioEnrolled}
+            />
+          ) : (
           <section className="space-y-3 sm:space-y-4">
             <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card space-y-4">
               <div className="text-center space-y-2 pb-3.5 border-b border-slate-100">
@@ -4984,10 +5042,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setEducationModalTab('QR');
-                      setIsEducationModalOpen(true);
-                    }}
+                    onClick={() => handleOpenEducationLayer('QR', 'PROFIL')}
                     className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
                   >
                     <span className="text-base">📷</span>
@@ -4997,10 +5052,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setEducationModalTab('BIOMETRIC');
-                      setIsEducationModalOpen(true);
-                    }}
+                    onClick={() => handleOpenEducationLayer('BIOMETRIC', 'PROFIL')}
                     className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
                   >
                     <span className="text-base">👆</span>
@@ -5010,10 +5062,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setEducationModalTab('POINTS');
-                      setIsEducationModalOpen(true);
-                    }}
+                    onClick={() => handleOpenEducationLayer('POINTS', 'PROFIL')}
                     className="p-2 rounded-xl bg-white hover:bg-emerald-50/70 border border-emerald-200/80 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
                   >
                     <span className="text-base">🏆</span>
@@ -5023,10 +5072,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setEducationModalTab('SECURITY');
-                      setIsEducationModalOpen(true);
-                    }}
+                    onClick={() => handleOpenEducationLayer('SECURITY', 'PROFIL')}
                     className="p-2 rounded-xl bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-300 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
                   >
                     <span className="text-base">🛡️</span>
@@ -5037,10 +5083,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setEducationModalTab('QR');
-                    setIsEducationModalOpen(true);
-                  }}
+                  onClick={() => handleOpenEducationLayer('QR', 'PROFIL')}
                   className="w-full py-2 px-3 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer min-h-10"
                 >
                   <span>📖</span> Buka Panduan Lengkap &amp; Solusi Kendala
@@ -5245,6 +5288,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
             </div>
           </section>
+          )
         )}
       </main>
 
@@ -5302,7 +5346,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('PROFIL')}
+            onClick={() => {
+              setActiveTab('PROFIL');
+              setProfilSubView('MAIN');
+            }}
             className={`flex flex-col items-center gap-1 text-[10px] w-14 py-1 transition-all cursor-pointer min-h-11 justify-center active:scale-95 ${
               activeTab === 'PROFIL' ? 'text-[#023246] font-black' : 'text-slate-400 font-semibold hover:text-slate-600'
             }`}
@@ -5385,13 +5432,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       <TermsAndConditionsModal
         isOpen={isTermsModalOpen}
         onClose={() => setIsTermsModalOpen(false)}
-      />
-
-      {/* Teacher Education & Guidance Modal */}
-      <TeacherEducationModal
-        isOpen={isEducationModalOpen}
-        onClose={() => setIsEducationModalOpen(false)}
-        defaultTab={educationModalTab}
       />
 
       {/* ── DAY DETAIL CALENDAR MODAL ───────────────────────────────────── */}
