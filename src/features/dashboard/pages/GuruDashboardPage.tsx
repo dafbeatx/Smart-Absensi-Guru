@@ -295,7 +295,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isEducationModalOpen, setIsEducationModalOpen] = useState(false);
-  const [educationModalTab, setEducationModalTab] = useState<'QR' | 'BIOMETRIC' | 'POINTS'>('QR');
+  const [educationModalTab, setEducationModalTab] = useState<'QR' | 'BIOMETRIC' | 'POINTS' | 'SECURITY'>('QR');
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAttendanceChoiceModalOpen, setIsAttendanceChoiceModalOpen] = useState(false);
@@ -4980,8 +4980,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </span>
                 </div>
 
-                {/* Quick 3-Card Shortcut */}
-                <div className="grid grid-cols-3 gap-2">
+                {/* Quick 4-Card Shortcut */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -5019,6 +5019,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <span className="text-base">🏆</span>
                     <span className="text-[10px] font-black text-[#023246] leading-tight block">Poin Disiplin</span>
                     <span className="text-[9px] text-emerald-700 font-semibold block leading-tight">Lencana &amp; Reward</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEducationModalTab('SECURITY');
+                      setIsEducationModalOpen(true);
+                    }}
+                    className="p-2 rounded-xl bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-300 transition-all cursor-pointer flex flex-col items-center gap-1 shadow-2xs active:scale-95 text-center"
+                  >
+                    <span className="text-base">🛡️</span>
+                    <span className="text-[10px] font-black text-emerald-900 leading-tight block">Privasi &amp; Aman</span>
+                    <span className="text-[9px] text-emerald-700 font-bold block leading-tight">Bebas Sadap/Lacak</span>
                   </button>
                 </div>
 
