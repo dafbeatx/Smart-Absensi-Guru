@@ -211,8 +211,28 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           }
         })
         .catch(() => {});
+
+      // Auto-prepopulate subject from teacher's teaching assignment if available
+      if (currentUser?.teaching_assignment) {
+        const rawMapel = Array.isArray(currentUser.teaching_assignment)
+          ? currentUser.teaching_assignment[0]
+          : currentUser.teaching_assignment.split(',')[0].trim();
+
+        if (rawMapel) {
+          const matched = PREDEFINED_SUBJECTS.find(
+            (sub) => sub.toLowerCase() === rawMapel.toLowerCase()
+          );
+          if (matched) {
+            setSelectedSubject(matched);
+            setCustomSubject('');
+          } else {
+            setSelectedSubject('CUSTOM');
+            setCustomSubject(rawMapel);
+          }
+        }
+      }
     }
-  }, [isOpen, currentUser?.id, currentUser?.full_name, loadSessions]);
+  }, [isOpen, currentUser?.id, currentUser?.full_name, currentUser?.teaching_assignment, loadSessions]);
 
   // Escape key handler & prevent body scroll
   useEffect(() => {
@@ -240,6 +260,28 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen, isKeyEditorModalOpen, isCreatingSession, onClose]);
+
+  const handleOpenCreateSession = () => {
+    if (currentUser?.teaching_assignment) {
+      const rawMapel = Array.isArray(currentUser.teaching_assignment)
+        ? currentUser.teaching_assignment[0]
+        : currentUser.teaching_assignment.split(',')[0].trim();
+
+      if (rawMapel) {
+        const matched = PREDEFINED_SUBJECTS.find(
+          (sub) => sub.toLowerCase() === rawMapel.toLowerCase()
+        );
+        if (matched) {
+          setSelectedSubject(matched);
+          setCustomSubject('');
+        } else {
+          setSelectedSubject('CUSTOM');
+          setCustomSubject(rawMapel);
+        }
+      }
+    }
+    setIsCreatingSession(true);
+  };
 
   // Load students of class when active session is chosen
   const loadSessionData = useCallback(async (session: ExamSessionRecord) => {
@@ -911,7 +953,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         {activeTab === 'sessions' && !isCreatingSession && !isReadOnly && (
           <button
             type="button"
-            onClick={() => setIsCreatingSession(true)}
+            onClick={handleOpenCreateSession}
             className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs shrink-0 min-h-9"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -948,7 +990,14 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 <form onSubmit={handleCreateSessionSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Mata Pelajaran</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-slate-700">Mata Pelajaran</label>
+                        {currentUser?.teaching_assignment && (
+                          <span className="text-[10px] text-teal-700 font-semibold bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                            📖 Mapel Guru
+                          </span>
+                        )}
+                      </div>
                       <select
                         value={selectedSubject}
                         onChange={(e) => setSelectedSubject(e.target.value)}
@@ -1337,7 +1386,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     {!isReadOnly && (
                       <button
                         type="button"
-                        onClick={() => setIsCreatingSession(true)}
+                        onClick={handleOpenCreateSession}
                         className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition-colors"
                       >
                         <Plus className="w-4 h-4" /> Buat Sesi Baru

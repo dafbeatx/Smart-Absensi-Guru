@@ -1512,6 +1512,7 @@ export class MockProvider implements IDataProvider {
       position: user.position || '',
       avatar_url: user.avatar_url || null,
       is_active: user.is_active !== undefined ? user.is_active : true,
+      teaching_assignment: user.teaching_assignment || undefined,
       created_at: new Date().toISOString(),
     };
     const allUsers = await this.getAllUsers(_token);

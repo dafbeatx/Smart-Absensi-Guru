@@ -272,14 +272,14 @@ export class SupabaseProvider implements IDataProvider {
         // Query via users_public_view with safe columns (excludes pin_hash, reducing Supabase egress)
         let userQuery = await this.client
           .from('users_public_view')
-          .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at')
+          .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at, teaching_assignment')
           .or(filters.join(','))
           .maybeSingle();
 
         if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
           userQuery = await this.client
             .from('users')
-            .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at')
+            .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at, teaching_assignment')
             .or(filters.join(','))
             .maybeSingle();
         }
@@ -296,6 +296,7 @@ export class SupabaseProvider implements IDataProvider {
             position: user.position,
             avatar_url: user.avatar_url || null,
             is_active: user.account_status === 'ACTIVE',
+            teaching_assignment: user.teaching_assignment || undefined,
             created_at: user.created_at,
           };
         }
@@ -1813,13 +1814,13 @@ export class SupabaseProvider implements IDataProvider {
     // Query users_public_view (excludes pin_hash and internal security metadata to optimize egress)
     let userQuery = await this.client
       .from('users_public_view')
-      .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at')
+      .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at, teaching_assignment')
       .order('created_at', { ascending: false });
 
     if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
       userQuery = await this.client
         .from('users')
-        .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at')
+        .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at, teaching_assignment')
         .order('created_at', { ascending: false });
     }
 
@@ -1834,6 +1835,7 @@ export class SupabaseProvider implements IDataProvider {
       position: row.position,
       avatar_url: row.avatar_url || null,
       is_active: row.account_status === 'ACTIVE',
+      teaching_assignment: row.teaching_assignment || undefined,
       created_at: row.created_at,
     }));
 
@@ -1850,6 +1852,10 @@ export class SupabaseProvider implements IDataProvider {
     const defaultPin = (user as Partial<UserProfile> & { pin?: string }).pin || '123456';
     const hashedPin = await hashPin(defaultPin);
 
+    const formattedAssignment = user.teaching_assignment
+      ? (Array.isArray(user.teaching_assignment) ? user.teaching_assignment.join(', ') : user.teaching_assignment)
+      : null;
+
     const newUser = {
       id: newId,
       nip: user.nip ? user.nip.trim() : null,
@@ -1859,6 +1865,7 @@ export class SupabaseProvider implements IDataProvider {
       role: user.role || 'GURU',
       position: user.position || 'Pendidik',
       account_status: 'ACTIVE',
+      teaching_assignment: formattedAssignment,
     };
 
     const { error } = await this.client.from('users').insert(newUser);
@@ -1873,6 +1880,7 @@ export class SupabaseProvider implements IDataProvider {
       position: newUser.position,
       avatar_url: null,
       is_active: true,
+      teaching_assignment: user.teaching_assignment,
       created_at: new Date().toISOString(),
     };
   }
@@ -1889,6 +1897,11 @@ export class SupabaseProvider implements IDataProvider {
     if (updates.position !== undefined) payload.position = updates.position;
     if (updates.avatar_url !== undefined) payload.avatar_url = updates.avatar_url;
     if (updates.is_active !== undefined) payload.account_status = updates.is_active ? 'ACTIVE' : 'INACTIVE';
+    if (updates.teaching_assignment !== undefined) {
+      payload.teaching_assignment = updates.teaching_assignment
+        ? (Array.isArray(updates.teaching_assignment) ? updates.teaching_assignment.join(', ') : updates.teaching_assignment)
+        : null;
+    }
 
     const { error } = await this.client.from('users').update(payload).eq('id', userId);
     if (error) throw new Error('Gagal memperbarui data pengguna: ' + error.message);

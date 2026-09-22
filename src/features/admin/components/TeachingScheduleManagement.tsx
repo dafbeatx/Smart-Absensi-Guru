@@ -157,14 +157,38 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
   const handleOpenAddModal = () => {
     setEditingId(null);
-    setFormTeacherId(teachers[0]?.id || '');
+    const firstTeacher = teachers[0];
+    const initialTeacherId = firstTeacher?.id || '';
+    setFormTeacherId(initialTeacherId);
     setFormDay('Senin');
     setFormTimeStart('07:30');
     setFormTimeEnd('08:50');
     setFormClassName('Kelas VII-A');
-    setFormSubject(subjects[0]?.name || '');
+
+    if (firstTeacher?.teaching_assignment) {
+      const firstSubject = Array.isArray(firstTeacher.teaching_assignment)
+        ? firstTeacher.teaching_assignment[0]
+        : firstTeacher.teaching_assignment.split(',')[0].trim();
+      setFormSubject(firstSubject || subjects[0]?.name || '');
+    } else {
+      setFormSubject(subjects[0]?.name || '');
+    }
+
     setFormRoom('Ruang Teori 7A');
     setIsModalOpen(true);
+  };
+
+  const handleTeacherChange = (teacherId: string) => {
+    setFormTeacherId(teacherId);
+    const selectedT = (teachers || []).find((t) => t.id === teacherId);
+    if (selectedT?.teaching_assignment) {
+      const firstSubject = Array.isArray(selectedT.teaching_assignment)
+        ? selectedT.teaching_assignment[0]
+        : selectedT.teaching_assignment.split(',')[0].trim();
+      if (firstSubject) {
+        setFormSubject(firstSubject);
+      }
+    }
   };
 
   const handleOpenEditModal = (slot: ExtendedTeachingSlot) => {
@@ -308,15 +332,23 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
   // Teacher Options for SearchableSelect
   const teacherOptions: SelectOption[] = useMemo(() => {
-    return (teachers || []).filter(Boolean).map((t) => ({
-      value: t.id,
-      label: t.full_name || 'Guru Pengajar',
-      subtitle: t.position || 'Guru Pengajar',
-      avatarText: getInitials(t.full_name),
-      avatarUrl: t.avatar_url || undefined,
-      badge: t.role === 'KEPSEK' ? 'Kepsek' : t.role === 'ADMIN' ? 'Admin' : undefined,
-      badgeClass: t.role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700',
-    }));
+    return (teachers || []).filter(Boolean).map((t) => {
+      const mapel = t.teaching_assignment
+        ? (Array.isArray(t.teaching_assignment) ? t.teaching_assignment.join(', ') : t.teaching_assignment)
+        : '';
+      const subtitleParts = [t.position || 'Guru Pengajar'];
+      if (mapel) subtitleParts.push(`Mapel: ${mapel}`);
+
+      return {
+        value: t.id,
+        label: t.full_name || 'Guru Pengajar',
+        subtitle: subtitleParts.join(' • '),
+        avatarText: getInitials(t.full_name),
+        avatarUrl: t.avatar_url || undefined,
+        badge: t.role === 'KEPSEK' ? 'Kepsek' : t.role === 'ADMIN' ? 'Admin' : undefined,
+        badgeClass: t.role === 'KEPSEK' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700',
+      };
+    });
   }, [teachers]);
 
   // Subject Options for SearchableSelect
@@ -562,7 +594,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
                 placeholder="-- Pilih Guru Pengajar --"
                 options={teacherOptions}
                 value={formTeacherId}
-                onChange={setFormTeacherId}
+                onChange={handleTeacherChange}
                 required
                 emptyText="Nama guru tidak ditemukan"
               />

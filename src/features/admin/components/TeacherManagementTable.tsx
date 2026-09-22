@@ -191,6 +191,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [nip, setNip] = useState('');
   const [phone, setPhone] = useState('');
   const [position, setPosition] = useState('');
+  const [teachingAssignment, setTeachingAssignment] = useState('');
   const [role, setRole] = useState<RoleCode>('GURU');
   const [newPin, setNewPin] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -208,7 +209,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     const matchesSearch =
       name.includes(query) ||
       (t.nip && t.nip.includes(searchQuery)) ||
-      String(t.phone_number || '').includes(searchQuery);
+      String(t.phone_number || '').includes(searchQuery) ||
+      (t.teaching_assignment && (
+        Array.isArray(t.teaching_assignment)
+          ? t.teaching_assignment.join(' ').toLowerCase().includes(query)
+          : String(t.teaching_assignment).toLowerCase().includes(query)
+      ));
 
     const matchesRole =
       filterRole === 'ALL' ||
@@ -230,6 +236,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       phone_number: phone,
       role,
       position,
+      teaching_assignment: teachingAssignment.trim() || undefined,
       avatar_url: avatarUrl,
       is_active: true,
       must_change_pin: true,
@@ -275,6 +282,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       setNip('');
       setPhone('');
       setPosition('');
+      setTeachingAssignment('');
       setCommitteeRole('NONE');
       setAvatarUrl(null);
     } catch (err: unknown) {
@@ -293,6 +301,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setNip('');
     setPhone('');
     setPosition('');
+    setTeachingAssignment('');
     setRole('GURU');
     setAvatarUrl(null);
     setCommitteeRole('NONE');
@@ -309,6 +318,11 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setNip(t.nip && !t.nip.startsWith('NIP_') ? t.nip : '');
     setPhone(t.phone_number || '');
     setPosition(t.position || '');
+    setTeachingAssignment(
+      Array.isArray(t.teaching_assignment)
+        ? t.teaching_assignment.join(', ')
+        : (t.teaching_assignment || '')
+    );
     setRole(t.role);
     setAvatarUrl(t.avatar_url || null);
 
@@ -429,6 +443,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
       nip: nip.trim() ? nip.trim() : null,
       phone_number: phone,
       position: position,
+      teaching_assignment: teachingAssignment.trim() || undefined,
       role: role,
       avatar_url: avatarUrl,
     };
@@ -761,6 +776,14 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                           <span>{comm.label}</span>
                         </span>
                       )}
+                      {t.teaching_assignment && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                          <span>📖</span>
+                          <span className="truncate max-w-[150px]">
+                            {Array.isArray(t.teaching_assignment) ? t.teaching_assignment.join(', ') : t.teaching_assignment}
+                          </span>
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] font-semibold text-slate-600 truncate">{t.position || 'Tenaga Pendidik'}</p>
                   </div>
@@ -903,6 +926,12 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-black bg-indigo-50 text-indigo-900 border border-indigo-200/80">
                           <Award className="w-3 h-3 text-indigo-600 shrink-0" />
                           <span>{comm.label}</span>
+                        </span>
+                      )}
+                      {t.teaching_assignment && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                          <span>📖</span>
+                          <span>{Array.isArray(t.teaching_assignment) ? t.teaching_assignment.join(', ') : t.teaching_assignment}</span>
                         </span>
                       )}
                     </div>
@@ -1073,7 +1102,18 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <Input label="Nama Lengkap & Gelar" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
           <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-          <Input label="Jabatan / Bidang Studi" value={position} onChange={(e) => setPosition(e.target.value)} required />
+          <Input label="Jabatan / Posisi" value={position} onChange={(e) => setPosition(e.target.value)} required />
+          <div className="space-y-1">
+            <Input
+              label="Mata Pelajaran yang Diampu (Opsional)"
+              value={teachingAssignment}
+              onChange={(e) => setTeachingAssignment(e.target.value)}
+              placeholder="Contoh: Matematika, IPA, Bahasa Indonesia"
+            />
+            <p className="text-[10px] text-slate-500">
+              Opsional. Otomatis dimuat saat pembuatan jadwal pelajaran atau pembuatan soal ujian guru ini.
+            </p>
+          </div>
 
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-slate-700">SK Panitia Ujian (SK Kepala Sekolah)</label>
@@ -1168,7 +1208,18 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <Input label="Nama Lengkap & Gelar" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
           <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-          <Input label="Jabatan / Bidang Studi" value={position} onChange={(e) => setPosition(e.target.value)} required />
+          <Input label="Jabatan / Posisi" value={position} onChange={(e) => setPosition(e.target.value)} required />
+          <div className="space-y-1">
+            <Input
+              label="Mata Pelajaran yang Diampu (Opsional)"
+              value={teachingAssignment}
+              onChange={(e) => setTeachingAssignment(e.target.value)}
+              placeholder="Contoh: Matematika, IPA, Bahasa Indonesia"
+            />
+            <p className="text-[10px] text-slate-500">
+              Opsional. Otomatis dimuat saat pembuatan jadwal pelajaran atau pembuatan soal ujian guru ini.
+            </p>
+          </div>
 
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-slate-700">SK Panitia Ujian (SK Kepala Sekolah)</label>
