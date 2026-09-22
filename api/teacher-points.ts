@@ -29,6 +29,8 @@ export default async function handler(req: any, res: any) {
   // 2. Session Authentication & Role Authorization
   let auth = await authenticateUser(req);
   const authorizedRoles = ['ADMIN', 'GURU', 'KEPSEK', 'KEPALA SEKOLAH', 'OPERATOR'];
+  let callerUser: any = null;
+  let callerRole = '';
 
   // Mutasi/Pencatatan Poin (POST) WAJIB lolos autentikasi dan otorisasi role
   if (req.method === 'POST') {
@@ -80,8 +82,8 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const callerUser = auth.user;
-    const callerRole = (callerUser?.role || '').toUpperCase().trim();
+    callerUser = auth.user;
+    callerRole = (callerUser?.role || '').toUpperCase().trim();
     if (!authorizedRoles.includes(callerRole)) {
       return res.status(403).json({
         success: false,
