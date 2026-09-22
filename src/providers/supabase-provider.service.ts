@@ -132,6 +132,26 @@ export class SupabaseProvider implements IDataProvider {
   private cachedExamCommittees: Map<string, { data: ExamCommitteeMember[]; timestamp: number }> = new Map();
   private cachedExamSchedules: Map<string, { data: ExamScheduleData | null; timestamp: number }> = new Map();
 
+  // Schema migration resilience: auto-detect if teaching_assignment column exists in Supabase
+  // Prevents 400 errors when the SQL migration (52) hasn't been run yet
+  private _hasTeachingAssignmentCol: boolean | null = null;
+
+  private get userSelectCols(): string {
+    const base = 'id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at';
+    return this._hasTeachingAssignmentCol === false ? base : `${base}, teaching_assignment`;
+  }
+
+  private get userSelectColsNoAvatar(): string {
+    const base = 'id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at';
+    return this._hasTeachingAssignmentCol === false ? base : `${base}, teaching_assignment`;
+  }
+
+  private isTeachingAssignmentSchemaError(error: any): boolean {
+    if (!error) return false;
+    const msg = error.message || '';
+    return msg.includes('teaching_assignment') && (msg.includes('schema cache') || msg.includes('does not exist') || msg.includes('column'));
+  }
+
   private dedupeRequest<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (this.inFlightRequests.has(key)) {
       return this.inFlightRequests.get(key) as Promise<T>;
@@ -272,19 +292,41 @@ export class SupabaseProvider implements IDataProvider {
         // Query via users_public_view with safe columns (excludes pin_hash, reducing Supabase egress)
         let userQuery = await this.client
           .from('users_public_view')
-          .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at, teaching_assignment')
+          .select(this.userSelectCols)
           .or(filters.join(','))
           .maybeSingle();
 
         if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
           userQuery = await this.client
             .from('users')
-            .select('id, nip, full_name, phone_number, role, position, avatar_url, account_status, created_at, teaching_assignment')
+            .select(this.userSelectCols)
             .or(filters.join(','))
             .maybeSingle();
         }
 
-        const user = userQuery.data;
+        // Fallback: if teaching_assignment column doesn't exist yet, retry without it
+        if (userQuery.error && this.isTeachingAssignmentSchemaError(userQuery.error)) {
+          this._hasTeachingAssignmentCol = false;
+          userQuery = await this.client
+            .from('users_public_view')
+            .select(this.userSelectCols)
+            .or(filters.join(','))
+            .maybeSingle();
+          if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
+            userQuery = await this.client
+              .from('users')
+              .select(this.userSelectCols)
+              .or(filters.join(','))
+              .maybeSingle();
+          }
+        }
+
+        // Mark column as available if query succeeded with it
+        if (!userQuery.error && this._hasTeachingAssignmentCol === null) {
+          this._hasTeachingAssignmentCol = true;
+        }
+
+        const user = userQuery.data as any;
 
         if (user) {
           return {
@@ -1814,17 +1856,36 @@ export class SupabaseProvider implements IDataProvider {
     // Query users_public_view (excludes pin_hash and internal security metadata to optimize egress)
     let userQuery = await this.client
       .from('users_public_view')
-      .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at, teaching_assignment')
+      .select(this.userSelectColsNoAvatar)
       .order('created_at', { ascending: false });
 
     if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
       userQuery = await this.client
         .from('users')
-        .select('id, nip, full_name, phone_number, role, position, account_status, avatar_url, created_at, teaching_assignment')
+        .select(this.userSelectColsNoAvatar)
         .order('created_at', { ascending: false });
     }
 
-    const data = userQuery.data;
+    // Fallback: if teaching_assignment column doesn't exist yet, retry without it
+    if (userQuery.error && this.isTeachingAssignmentSchemaError(userQuery.error)) {
+      this._hasTeachingAssignmentCol = false;
+      userQuery = await this.client
+        .from('users_public_view')
+        .select(this.userSelectColsNoAvatar)
+        .order('created_at', { ascending: false });
+      if (userQuery.error && (userQuery.error.code === '42P01' || userQuery.error.message?.includes('does not exist'))) {
+        userQuery = await this.client
+          .from('users')
+          .select(this.userSelectColsNoAvatar)
+          .order('created_at', { ascending: false });
+      }
+    }
+
+    if (!userQuery.error && this._hasTeachingAssignmentCol === null) {
+      this._hasTeachingAssignmentCol = true;
+    }
+
+    const data = userQuery.data as any[];
 
     const result: UserProfile[] = (data || []).map((row) => ({
       id: row.id,
@@ -1856,7 +1917,7 @@ export class SupabaseProvider implements IDataProvider {
       ? (Array.isArray(user.teaching_assignment) ? user.teaching_assignment.join(', ') : user.teaching_assignment)
       : null;
 
-    const newUser = {
+    const newUser: Record<string, unknown> = {
       id: newId,
       nip: user.nip ? user.nip.trim() : null,
       full_name: user.full_name || 'Guru Baru',
@@ -1865,22 +1926,34 @@ export class SupabaseProvider implements IDataProvider {
       role: user.role || 'GURU',
       position: user.position || 'Pendidik',
       account_status: 'ACTIVE',
-      teaching_assignment: formattedAssignment,
     };
 
-    const { error } = await this.client.from('users').insert(newUser);
-    if (error) throw new Error('Gagal menambahkan pengguna baru: ' + error.message);
+    // Only include teaching_assignment if the column is known to exist
+    if (this._hasTeachingAssignmentCol !== false) {
+      newUser.teaching_assignment = formattedAssignment;
+    }
+
+    let insertResult = await this.client.from('users').insert(newUser);
+
+    // Fallback: if teaching_assignment column doesn't exist yet, retry without it
+    if (insertResult.error && this.isTeachingAssignmentSchemaError(insertResult.error)) {
+      this._hasTeachingAssignmentCol = false;
+      delete newUser.teaching_assignment;
+      insertResult = await this.client.from('users').insert(newUser);
+    }
+
+    if (insertResult.error) throw new Error('Gagal menambahkan pengguna baru: ' + insertResult.error.message);
 
     return {
       id: newId,
-      nip: newUser.nip,
-      full_name: newUser.full_name,
-      phone_number: newUser.phone_number,
-      role: newUser.role as 'ADMIN' | 'OPERATOR' | 'KEPSEK' | 'GURU',
-      position: newUser.position,
+      nip: newUser.nip as string | null,
+      full_name: newUser.full_name as string,
+      phone_number: newUser.phone_number as string,
+      role: (newUser.role as string) as 'ADMIN' | 'OPERATOR' | 'KEPSEK' | 'GURU',
+      position: newUser.position as string,
       avatar_url: null,
       is_active: true,
-      teaching_assignment: user.teaching_assignment,
+      teaching_assignment: this._hasTeachingAssignmentCol !== false ? user.teaching_assignment : undefined,
       created_at: new Date().toISOString(),
     };
   }
@@ -1897,14 +1970,22 @@ export class SupabaseProvider implements IDataProvider {
     if (updates.position !== undefined) payload.position = updates.position;
     if (updates.avatar_url !== undefined) payload.avatar_url = updates.avatar_url;
     if (updates.is_active !== undefined) payload.account_status = updates.is_active ? 'ACTIVE' : 'INACTIVE';
-    if (updates.teaching_assignment !== undefined) {
+    if (updates.teaching_assignment !== undefined && this._hasTeachingAssignmentCol !== false) {
       payload.teaching_assignment = updates.teaching_assignment
         ? (Array.isArray(updates.teaching_assignment) ? updates.teaching_assignment.join(', ') : updates.teaching_assignment)
         : null;
     }
 
-    const { error } = await this.client.from('users').update(payload).eq('id', userId);
-    if (error) throw new Error('Gagal memperbarui data pengguna: ' + error.message);
+    let updateResult = await this.client.from('users').update(payload).eq('id', userId);
+
+    // Fallback: if teaching_assignment column doesn't exist yet, retry without it
+    if (updateResult.error && this.isTeachingAssignmentSchemaError(updateResult.error)) {
+      this._hasTeachingAssignmentCol = false;
+      delete payload.teaching_assignment;
+      updateResult = await this.client.from('users').update(payload).eq('id', userId);
+    }
+
+    if (updateResult.error) throw new Error('Gagal memperbarui data pengguna: ' + updateResult.error.message);
 
     const activeUser = useAuthStore.getState().user;
     if (activeUser && (activeUser.id === userId || (activeUser.nip && activeUser.nip === userId))) {
