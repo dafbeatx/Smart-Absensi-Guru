@@ -445,51 +445,119 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
     // 3. Extract Dates
     const { startDate, endDate } = this.extractDatesFromPrompt(prompt, includeSaturday);
 
-    // 4. Extract Sessions per Day (ignoring Friday-specific clause)
-    const textWithoutFriday = text.replace(/jumat[^\.\,]*?\d+\s*sesi/gi, '');
+    // 4. Detect per-day session/subject count overrides from Indonesian prompt
+    // Supports: "Rabu 3 sesi", "Kamis 3 mata pelajaran", "Senin 2 mapel",
+    //           "Rabu dan Kamis terdiri dari 3 mata pelajaran", etc.
+    const dayNameMap: Record<string, string> = {
+      senin: 'Senin', selasa: 'Selasa', rabu: 'Rabu',
+      kamis: 'Kamis', jumat: 'Jumat', sabtu: 'Sabtu',
+    };
+    const perDaySessionOverrides = new Map<string, number>();
 
-    let sessionsPerDay = 2; // Default 2 sessions
-    if (textWithoutFriday.includes('4 sesi') || textWithoutFriday.includes('empat sesi')) {
+    // Pattern 1: "<Hari> <N> sesi/mapel/mata pelajaran" or "<Hari> terdiri dari <N> ..."
+    const dayCountPatterns = [
+      /\b(senin|selasa|rabu|kamis|jumat|sabtu)\s+(?:terdiri\s+dari\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi,
+      /\b(senin|selasa|rabu|kamis|jumat|sabtu)\s+(?:hanya\s+|cukup\s+)?(\d+)\s*sesi/gi,
+    ];
+    for (const pattern of dayCountPatterns) {
+      let dm: RegExpExecArray | null;
+      while ((dm = pattern.exec(text)) !== null) {
+        const dayKey = dm[1].toLowerCase();
+        const count = parseInt(dm[2], 10);
+        if (count >= 1 && count <= 4 && dayNameMap[dayKey]) {
+          perDaySessionOverrides.set(dayKey, count);
+        }
+      }
+    }
+
+    // Pattern 2: "<Hari> dan <Hari> <N> sesi/mapel" (conjunction)
+    const conjPattern = /\b(senin|selasa|rabu|kamis|jumat|sabtu)\s+dan\s+(senin|selasa|rabu|kamis|jumat|sabtu)\s+(?:terdiri\s+dari\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi;
+    let conjMatch: RegExpExecArray | null;
+    while ((conjMatch = conjPattern.exec(text)) !== null) {
+      const d1 = conjMatch[1].toLowerCase();
+      const d2 = conjMatch[2].toLowerCase();
+      const cnt = parseInt(conjMatch[3], 10);
+      if (cnt >= 1 && cnt <= 4) {
+        if (dayNameMap[d1]) perDaySessionOverrides.set(d1, cnt);
+        if (dayNameMap[d2]) perDaySessionOverrides.set(d2, cnt);
+      }
+    }
+
+    // Pattern 3: "khusus hari <Hari> <N> sesi" 
+    const khususPattern = /khusus\s+(?:hari\s+)?(senin|selasa|rabu|kamis|jumat|sabtu)\s+(?:hanya\s+)?(\d+)\s*sesi/gi;
+    let khususMatch: RegExpExecArray | null;
+    while ((khususMatch = khususPattern.exec(text)) !== null) {
+      const dayKey = khususMatch[1].toLowerCase();
+      const count = parseInt(khususMatch[2], 10);
+      if (count >= 1 && count <= 4 && dayNameMap[dayKey]) {
+        perDaySessionOverrides.set(dayKey, count);
+      }
+    }
+
+    // 4b. Extract global sessionsPerDay (strip all day-specific clauses first)
+    let textWithoutDayOverrides = text;
+    for (const dayKey of Object.keys(dayNameMap)) {
+      textWithoutDayOverrides = textWithoutDayOverrides.replace(
+        new RegExp(`${dayKey}[^.;,\\n]*?\\d+\\s*(?:sesi|mata\\s*pelajaran|mapel)`, 'gi'), ''
+      );
+    }
+
+    let sessionsPerDay = 2;
+    if (textWithoutDayOverrides.includes('4 sesi') || textWithoutDayOverrides.includes('empat sesi')) {
       sessionsPerDay = 4;
-    } else if (textWithoutFriday.includes('3 sesi') || textWithoutFriday.includes('tiga sesi')) {
+    } else if (textWithoutDayOverrides.includes('3 sesi') || textWithoutDayOverrides.includes('tiga sesi')) {
       sessionsPerDay = 3;
-    } else if (textWithoutFriday.includes('2 sesi') || textWithoutFriday.includes('dua sesi')) {
+    } else if (textWithoutDayOverrides.includes('2 sesi') || textWithoutDayOverrides.includes('dua sesi')) {
       sessionsPerDay = 2;
-    } else if (textWithoutFriday.includes('1 sesi') || textWithoutFriday.includes('satu sesi')) {
+    } else if (textWithoutDayOverrides.includes('1 sesi') || textWithoutDayOverrides.includes('satu sesi')) {
       sessionsPerDay = 1;
     }
 
-    // 5. Default session time slots
+    // Raise sessionsPerDay to cover the maximum per-day override (for sessionSlots generation)
+    const maxPerDayOverride = perDaySessionOverrides.size > 0
+      ? Math.max(...Array.from(perDaySessionOverrides.values()))
+      : sessionsPerDay;
+    const effectiveMaxSessions = Math.max(sessionsPerDay, maxPerDayOverride);
+
+    // 5. Default session time slots (sized to cover the max sessions needed)
     const sessionSlots: SessionTimeSlot[] = [
       { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:00' },
       { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '09:30', endTime: '11:00' },
       { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:15', endTime: '12:45' },
       { sessionNumber: 4, sessionName: 'Sesi 4 (Tambahan)', startTime: '13:15', endTime: '14:45' },
-    ].slice(0, Math.max(sessionsPerDay, 2));
+    ].slice(0, Math.max(effectiveMaxSessions, 2));
 
-    // 6. Day Overrides (e.g. Friday special sessions)
+    // 6. Day Overrides — apply per-day overrides detected from prompt
     const validDates = ExamSchedulerService.getValidExamDates(startDate, endDate, includeSaturday);
     const dayOverrides: DaySessionOverride[] = [];
 
-    // Check if Friday override is requested (e.g. "jumat 1 sesi" or "jumat 2 sesi")
-    let fridaySessions = sessionsPerDay >= 3 ? 2 : 1; // standard Friday is 1 or 2
-    if (text.includes('jumat 1 sesi') || text.includes('jumat satu sesi') || text.includes('jumat cukup 1')) {
-      fridaySessions = 1;
-    } else if (text.includes('jumat 2 sesi') || text.includes('jumat dua sesi')) {
-      fridaySessions = 2;
-    } else if (text.includes('jumat 3 sesi')) {
-      fridaySessions = 3;
-    } else if (hasCustomMatrix && customMatrix.detectedSubjects.length > 10) {
-      // 12 subjects across 6 days require 2 sessions on Friday so all 12 get a slot
-      fridaySessions = 2;
+    // Determine Friday sessions (default or from per-day override)
+    let fridaySessions = perDaySessionOverrides.get('jumat') ??
+      (sessionsPerDay >= 3 ? 2 : 1);
+    if (!perDaySessionOverrides.has('jumat')) {
+      if (text.includes('jumat 1 sesi') || text.includes('jumat satu sesi') || text.includes('jumat cukup 1')) {
+        fridaySessions = 1;
+      } else if (text.includes('jumat 2 sesi') || text.includes('jumat dua sesi')) {
+        fridaySessions = 2;
+      } else if (text.includes('jumat 3 sesi')) {
+        fridaySessions = 3;
+      } else if (hasCustomMatrix && customMatrix.detectedSubjects.length > 10) {
+        fridaySessions = 2;
+      }
     }
 
     validDates.forEach((d) => {
-      const isFriday = d.dayName.toLowerCase() === 'jumat';
+      const dayKey = d.dayName.toLowerCase();
+      const isFriday = dayKey === 'jumat';
+      // Priority: per-day override from prompt → Friday default → global sessionsPerDay
+      const overrideCount = perDaySessionOverrides.get(dayKey);
+      const sessionsForDay = overrideCount !== undefined
+        ? overrideCount
+        : (isFriday ? fridaySessions : sessionsPerDay);
       dayOverrides.push({
         date: d.date,
         dayName: d.dayName,
-        sessionsCount: isFriday ? fridaySessions : sessionsPerDay,
+        sessionsCount: sessionsForDay,
       });
     });
 

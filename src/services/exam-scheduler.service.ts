@@ -297,12 +297,14 @@ export class ExamSchedulerService {
     // ── 1. GENERATE SUBJECT SCHEDULES PER CLASS ──────────────────────────────
     const subjectSchedules: ExamSubjectScheduleItem[] = [];
 
-    // Map each subject to the concrete slot for each class
+    // Distribute subjects sequentially across slots (respects per-day session count overrides)
     classes.forEach((cls) => {
       const assignedRoom = classRoomMap.get(cls) || formatRoomName(1);
 
       subjects.forEach((subj, subjIdx) => {
-        const slot = allSlots[subjIdx % totalSlots];
+        // Sequential fill: slot index wraps only when subjects exceed total slots
+        const slotIdx = subjIdx < allSlots.length ? subjIdx : (subjIdx % allSlots.length);
+        const slot = allSlots[slotIdx];
 
         subjectSchedules.push({
           id: `subj_${cls}_${slot.date}_s${slot.sessionNumber}_${subjIdx}`,
