@@ -894,6 +894,29 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     return ExamMatrixBuilderService.buildMatrix(scheduleData, teachers, effectiveInstitutionName);
   }, [scheduleData, teachers, effectiveInstitutionName]);
 
+  // Resolves official school signatories (Kepala Sekolah & Ketua Panitia) dynamically
+  const officialSignatoryOptions = useMemo(() => {
+    const kepsekTeacher = teachers.find(
+      (t) => t.role === 'KEPSEK' || t.position?.toLowerCase().includes('kepala sekolah')
+    );
+    const kepsekName = kepsekTeacher?.full_name || 'Farhan Sopian Sahid, S.Pd.I';
+    const kepsekNpp = kepsekTeacher?.nip || kepsekTeacher?.npp || undefined;
+
+    const ketuaComm = committeeMembers.find((c) => c.role === 'KETUA' && c.isActive);
+    const ketuaTeacher = ketuaComm ? teachers.find((t) => t.id === ketuaComm.userId) : undefined;
+    const committeeHeadName = ketuaComm?.fullName || 'Septi Nur Aeni, S.E';
+    const committeeHeadNpp = ketuaComm?.npp || ketuaTeacher?.nip || ketuaTeacher?.npp || undefined;
+
+    return {
+      kepsekName,
+      kepsekNip: kepsekNpp,
+      kepsekNpp,
+      committeeHeadName,
+      committeeHeadNip: committeeHeadNpp,
+      committeeHeadNpp,
+    };
+  }, [teachers, committeeMembers]);
+
   if (!isOpen) return null;
 
   return createPortal(
@@ -1024,7 +1047,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                 type="button"
                 onClick={() => {
                   if (invigilationMatrix) {
-                    ExamWordExporterService.printOfficialMatrix(invigilationMatrix);
+                    ExamWordExporterService.printOfficialMatrix(invigilationMatrix, officialSignatoryOptions);
                   } else {
                     window.print();
                   }
@@ -2821,7 +2844,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                       type="button"
                       onClick={() => {
                         if (invigilationMatrix) {
-                          ExamWordExporterService.printOfficialMatrix(invigilationMatrix);
+                          ExamWordExporterService.printOfficialMatrix(invigilationMatrix, officialSignatoryOptions);
                         } else {
                           window.print();
                         }
@@ -3126,7 +3149,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                       teacherCode,
                       myProctorAssignments,
                       effectiveInstitutionName,
-                      scheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian'
+                      scheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian',
+                      officialSignatoryOptions.kepsekName,
+                      officialSignatoryOptions.kepsekNpp
                     );
                   }}
                   className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-xs"

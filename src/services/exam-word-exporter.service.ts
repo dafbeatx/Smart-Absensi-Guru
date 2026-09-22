@@ -5,6 +5,7 @@
  */
 
 import type { ExamInvigilationMatrix } from './exam-matrix-builder.service';
+import { SIGNATORY_OFFICIALS } from '../lib/excel-generator.lib';
 
 export class ExamWordExporterService {
   /**
@@ -234,16 +235,25 @@ export class ExamWordExporterService {
     options?: {
       kepsekName?: string;
       kepsekNip?: string;
+      kepsekNpp?: string;
       committeeHeadName?: string;
       committeeHeadNip?: string;
+      committeeHeadNpp?: string;
     }
   ): string {
     const { title, subTitle, institutionName, rooms, days, teacherLegend } = matrix;
-    const isSMA = institutionName.toUpperCase().includes('SMA');
-    const kepsekName = options?.kepsekName || (isSMA ? 'Drs. H. Ahmad Dahlan, M.Pd' : 'Drs. H. Ahmad Dahlan, M.Pd');
-    const kepsekNip = options?.kepsekNip || '197805122005011004';
-    const committeeHeadName = options?.committeeHeadName || 'Qodiatul Asrof Ramadhoni, S.E., G.r';
-    const committeeHeadNip = options?.committeeHeadNip || 'NPP. 202108001';
+    const defaultKepsek = SIGNATORY_OFFICIALS.KEPSEK_NAME || 'Farhan Sopian Sahid, S.Pd.I';
+    const kepsekName = options?.kepsekName || defaultKepsek;
+    const rawKepsekNpp = options?.kepsekNpp || options?.kepsekNip || '';
+    const formattedKepsekNpp = rawKepsekNpp && rawKepsekNpp !== '-'
+      ? (rawKepsekNpp.startsWith('NPP') ? rawKepsekNpp : `NPP. ${rawKepsekNpp}`)
+      : 'NPP. -';
+
+    const committeeHeadName = options?.committeeHeadName || 'Septi Nur Aeni, S.E';
+    const rawCommitteeNpp = options?.committeeHeadNpp || options?.committeeHeadNip || '';
+    const formattedCommitteeNpp = rawCommitteeNpp && rawCommitteeNpp !== '-'
+      ? (rawCommitteeNpp.startsWith('NPP') ? rawCommitteeNpp : `NPP. ${rawCommitteeNpp}`)
+      : 'NPP. -';
 
     const roomSubHeaders = rooms
       .map((r) => `<th class="text-center room-col">${r.label}</th>`)
@@ -550,19 +560,19 @@ export class ExamWordExporterService {
 
     <!-- Area Pengesahan Resmi -->
     <div class="signature-grid">
-      <div class="sig-col">
+      <div class="sig-col" style="min-width: 250px;">
         <div>Mengetahui,</div>
         <div style="font-weight: 800;">Kepala Sekolah</div>
         <div class="sig-space"></div>
-        <div class="sig-name">${kepsekName}</div>
-        <div class="sig-nip">NIP. ${kepsekNip}</div>
+        <div class="sig-name" style="white-space: nowrap; font-weight: 800; text-decoration: underline;">${kepsekName}</div>
+        <div class="sig-nip">${formattedKepsekNpp}</div>
       </div>
-      <div class="sig-col">
+      <div class="sig-col" style="min-width: 250px;">
         <div>Bogor, September 2026</div>
         <div style="font-weight: 800;">Ketua Panitia Asesmen</div>
         <div class="sig-space"></div>
-        <div class="sig-name">${committeeHeadName}</div>
-        <div class="sig-nip">${committeeHeadNip}</div>
+        <div class="sig-name" style="white-space: nowrap; font-weight: 800; text-decoration: underline;">${committeeHeadName}</div>
+        <div class="sig-nip">${formattedCommitteeNpp}</div>
       </div>
     </div>
   </div>
@@ -587,11 +597,17 @@ export class ExamWordExporterService {
       subject: string;
     }>,
     institutionName = 'SMA TERPADU AS SALAAM',
-    examTitle = 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)'
+    examTitle = 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)',
+    kepsekName?: string,
+    kepsekNpp?: string
   ): void {
     if (typeof window === 'undefined') return;
 
     const safeCode = teacherCode || '-';
+    const actualKepsekName = kepsekName || SIGNATORY_OFFICIALS.KEPSEK_NAME || 'Farhan Sopian Sahid, S.Pd.I';
+    const formattedKepsekNpp = kepsekNpp && kepsekNpp !== '-'
+      ? (kepsekNpp.startsWith('NPP') ? kepsekNpp : `NPP. ${kepsekNpp}`)
+      : 'NPP. -';
 
     const dutyRows = duties
       .map(
@@ -645,26 +661,26 @@ export class ExamWordExporterService {
 </head>
 <body>
   <div class="no-print-bar">
-    <div style="font-weight: 800;">📋 Kartu Jadwal Tugas Mengawas Pendidik — ${teacherName}</div>
+    <div><strong>Pratinjau Kartu Tugas Mengawas</strong> • ${teacherName}</div>
     <div style="display: flex; gap: 8px;">
-      <button class="btn-action btn-print" onclick="window.print()">🖨️ Cetak Kartu Tugas (A4)</button>
-      <button class="btn-action btn-close" onclick="window.close()">✖️ Tutup</button>
+      <button class="btn-action btn-print" onclick="window.print()">🖨️ Cetak Kartu Tugas</button>
+      <button class="btn-action btn-close" onclick="window.close()">Tutup</button>
     </div>
   </div>
   <div class="paper-page">
     <div class="doc-header">
-      <h1>KARTU JADWAL TUGAS MENGAWAS RUANG</h1>
-      <h2>${examTitle.toUpperCase()}</h2>
-      <h3>${institutionName.toUpperCase()}</h3>
+      <h1>SURAT TUGAS MENGAWAS ASESMEN SEKOLAH</h1>
+      <h2>${institutionName}</h2>
+      <h3>${examTitle}</h3>
     </div>
     <div class="teacher-badge">
       <div>
-        <div style="font-size: 13pt; font-weight: 900; color: #0f172a;">${teacherName}</div>
-        <div style="font-size: 9.5pt; color: #475569; margin-top: 2px;">Pendidik / Tenaga Kependidikan</div>
+        <div style="font-size: 12pt; font-weight: 800;">${teacherName}</div>
+        <div style="color: #64748b; font-size: 9pt;">Pendidik / Pengawas Ruangan Ujian</div>
       </div>
       <div style="text-align: right;">
-        <div style="font-size: 8pt; font-weight: 700; color: #64748b; text-transform: uppercase;">Kode Pengawas</div>
-        <div style="font-size: 16pt; font-weight: 900; font-family: monospace; color: #0369a1;">${teacherCode}</div>
+        <div style="font-size: 11pt; font-weight: 900; color: #0284c7;">Kode Pengawas: ${safeCode}</div>
+        <div style="color: #64748b; font-size: 9pt;">Total Tugas: ${duties.length} Sesi</div>
       </div>
     </div>
     <table>
@@ -691,18 +707,18 @@ export class ExamWordExporterService {
       </ol>
     </div>
     <div class="sig-area">
-      <div style="text-align: center; width: 200px;">
+      <div style="text-align: center; min-width: 240px;">
         <div>Mengetahui,</div>
         <div style="font-weight: 800;">Kepala Sekolah</div>
         <div style="height: 50px;"></div>
-        <div style="font-weight: 800; text-decoration: underline;">Drs. H. Ahmad Dahlan, M.Pd</div>
-        <div style="font-size: 8.5pt; color: #64748b;">NIP. 197805122005011004</div>
+        <div style="font-weight: 800; text-decoration: underline; white-space: nowrap;">${actualKepsekName}</div>
+        <div style="font-size: 8.5pt; color: #64748b;">${formattedKepsekNpp}</div>
       </div>
-      <div style="text-align: center; width: 200px;">
+      <div style="text-align: center; min-width: 240px;">
         <div>Bogor, September 2026</div>
         <div style="font-weight: 800;">Guru Pengawas,</div>
         <div style="height: 50px;"></div>
-        <div style="font-weight: 800; text-decoration: underline;">${teacherName}</div>
+        <div style="font-weight: 800; text-decoration: underline; white-space: nowrap;">${teacherName}</div>
         <div style="font-size: 8.5pt; color: #64748b;">Kode Pengawas: ${safeCode}</div>
       </div>
     </div>
@@ -721,10 +737,20 @@ export class ExamWordExporterService {
   /**
    * Generates printable HTML optimized for A4 paper and triggers browser print dialog via isolated tab.
    */
-  public static printOfficialMatrix(matrix: ExamInvigilationMatrix): void {
+  public static printOfficialMatrix(
+    matrix: ExamInvigilationMatrix,
+    options?: {
+      kepsekName?: string;
+      kepsekNip?: string;
+      kepsekNpp?: string;
+      committeeHeadName?: string;
+      committeeHeadNip?: string;
+      committeeHeadNpp?: string;
+    }
+  ): void {
     if (typeof window === 'undefined') return;
 
-    const htmlContent = this.generateOfficialA4PrintHtml(matrix);
+    const htmlContent = this.generateOfficialA4PrintHtml(matrix, options);
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const printWindow = window.open(url, '_blank');
