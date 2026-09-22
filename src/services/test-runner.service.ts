@@ -40,6 +40,7 @@ import { runAdministrationModulesTestSuite } from './__tests__/administration-mo
 import { runWhatsAppGroupNotificationTestSuite } from './__tests__/whatsapp-group-notification.test';
 import { runExamSchedulerTestSuite } from './__tests__/exam-scheduler.test';
 import { runExamMatrixTestSuite } from './__tests__/exam-matrix-builder.test';
+import { runExamAIGeneratorTestSuite } from './__tests__/exam-ai-generator.test';
 
 export interface TestResultItem {
   testName: string;
@@ -117,6 +118,7 @@ export class MasterTestRunner {
       { name: 'WhatsApp Group Attendance Notification Engine (Anti-Ban & Text-Only)', fn: runWhatsAppGroupNotificationTestSuite },
       { name: 'Exam Scheduler, Proctor Balancer & Committee AI Engine (Phase 4.6)', fn: runExamSchedulerTestSuite },
       { name: 'Exam Invigilation Matrix & Word Exporter Engine (Official Paper Format)', fn: runExamMatrixTestSuite },
+      { name: 'Exam AI Prompt Master Scheduler & Heuristic NLP Engine (Phase 4.7)', fn: runExamAIGeneratorTestSuite },
     ];
 
     let totalPassed = 0;

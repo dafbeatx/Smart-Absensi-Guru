@@ -27,6 +27,8 @@ import {
   BookOpen,
   Layers,
   Info,
+  Bot,
+  Zap,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -45,6 +47,10 @@ import { ExamScheduleRepository } from '../../../repositories/ExamScheduleReposi
 import { ExamSchedulerService } from '../../../services/exam-scheduler.service';
 import { ExamMatrixBuilderService } from '../../../services/exam-matrix-builder.service';
 import { ExamWordExporterService } from '../../../services/exam-word-exporter.service';
+import {
+  ExamScheduleAIGeneratorService,
+  EXAM_AI_PROMPT_PRESETS,
+} from '../../../services/exam-ai-generator.service';
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -108,7 +114,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   currentUser,
 }) => {
   // Navigation active tab
-  const [activeTab, setActiveTab] = useState<'form' | 'subjects' | 'proctors' | 'my_schedule' | 'committee'>('form');
+  const [activeTab, setActiveTab] = useState<'ai_prompt' | 'form' | 'subjects' | 'proctors' | 'my_schedule' | 'committee'>('ai_prompt');
   const [proctorViewMode, setProctorViewMode] = useState<'MATRIX' | 'TABLE'>('MATRIX');
   const institutionName = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah';
 
@@ -360,6 +366,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [excludeCommitteeProctor, setExcludeCommitteeProctor] = useState(true);
   const [assignBackupProctor, setAssignBackupProctor] = useState(true);
   const [aiCustomPrompt, setAiCustomPrompt] = useState('');
+  const [aiPromptInput, setAiPromptInput] = useState<string>(() => EXAM_AI_PROMPT_PRESETS[0].prompt);
+  const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
+  const [aiGenerationMessage, setAiGenerationMessage] = useState<string>('');
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(() => EXAM_AI_PROMPT_PRESETS[0].id);
 
   // Committee Admin Management State
   const [committeeEditingList, setCommitteeEditingList] = useState<Array<{
@@ -628,6 +638,54 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
   };
 
+  // Trigger AI Prompt Generator (Fast 1-Click NLP Mode)
+  const handleGenerateWithAIPrompt = async (promptToUse?: string) => {
+    const prompt = (promptToUse || aiPromptInput).trim();
+    if (!prompt) {
+      setToast({ text: 'Mohon masukkan instruksi jadwal ujian terlebih dahulu.', type: 'error' });
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    setAiGenerationMessage('AI sedang menganalisis instruksi jadwal ujian...');
+
+    try {
+      const result = await ExamScheduleAIGeneratorService.generateFromPrompt({
+        prompt,
+        academicYear: formAcademicYear || activeAcademicYear,
+        semester: activeSemester,
+        teachers,
+        committeeMembers,
+        availableClasses,
+        availableSubjects,
+      });
+
+      setScheduleData(result.schedule);
+      setSelectedExamType(result.config.examType);
+      setFormExamType(result.config.examType);
+      setFormStartDate(result.config.startDate);
+      setFormEndDate(result.config.endDate);
+      setSessionsPerDay(result.config.sessionsPerDay);
+      if (result.config.dayOverrides) {
+        setDayOverrides(result.config.dayOverrides);
+      }
+      setSelectedClasses(result.config.selectedClasses);
+      setSelectedSubjects(result.config.selectedSubjects);
+
+      setToast({
+        text: `Jadwal ${result.config.examType} berhasil disusun otomatis oleh AI (${result.schedule.summary.totalDays} hari, ${result.schedule.summary.totalClasses} rombel)! 🎉`,
+        type: 'success',
+      });
+      setActiveTab('subjects');
+    } catch (err: any) {
+      logger.error('ExamScheduleAndProctorModal', 'AI generation failed:', err);
+      setToast({ text: `Gagal menyusun jadwal: ${err?.message || 'Kendala parsing prompt'}`, type: 'error' });
+    } finally {
+      setIsGeneratingAI(false);
+      setAiGenerationMessage('');
+    }
+  };
+
   // Save Committee Members (Admin Only)
   const handleSaveCommittee = async () => {
     if (!accessInfo.isAdmin) {
@@ -867,7 +925,23 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       {/* Tab Navigation Bar */}
       <div className="px-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-2 overflow-x-auto shrink-0 shadow-2xs">
         <div className="flex items-center gap-1.5 sm:gap-2 py-2">
-          {/* Tab 1: Form & AI Generator (Only for Panitia & Admin) */}
+          {/* Tab 0: Asisten AI Jadwal (Prompt Cepat) */}
+          {accessInfo.canManage && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('ai_prompt')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
+                activeTab === 'ai_prompt'
+                  ? 'bg-[#023246] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Asisten AI Jadwal</span>
+            </button>
+          )}
+
+          {/* Tab 1: Form Parameter Manual */}
           {accessInfo.canManage && (
             <button
               type="button"
@@ -879,7 +953,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
               }`}
             >
               <Sliders className="w-3.5 h-3.5" />
-              <span>Form Parameter & AI</span>
+              <span>Form Parameter Manual</span>
             </button>
           )}
 
@@ -993,6 +1067,256 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
             <span>Memuat data jadwal & panitia...</span>
           </div>
         )}
+        {/* ========================================================================= */}
+        {/* TAB 0: ASISTEN AI JADWAL UJIAN (PROMPT CEPAT & OTOMATIS) */}
+        {/* ========================================================================= */}
+        {activeTab === 'ai_prompt' && accessInfo.canManage && (
+          <div className="max-w-4xl mx-auto space-y-5 animate-fadeIn pb-12">
+            {/* 1. Header Banner */}
+            <div className="bg-linear-to-r from-[#023246] via-[#18536B] to-[#2457A6] rounded-2xl p-5 sm:p-6 text-white shadow-md space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-white/10 backdrop-blur-xs border border-white/20 flex items-center justify-center text-amber-300 shrink-0">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                      <span>Asisten AI Jadwal Ujian & Pengawas</span>
+                      <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 rounded-full">
+                        AI Cepat
+                      </span>
+                    </h3>
+                    <p className="text-xs text-teal-100/90 mt-0.5">
+                      Cukup masukkan instruksi kebutuhan ujian dalam bahasa sehari-hari. AI akan menyusun jadwal mapel dan membagi rata pengawas secara instan tanpa ribet.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 self-start sm:self-auto bg-white/10 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/15 text-[11px] font-semibold text-teal-100 shrink-0">
+                  <span>{accessInfo.roleLabel}</span>
+                </div>
+              </div>
+
+              {/* Data Context Pills */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/15 text-xs">
+                <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
+                  <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Tahun Ajaran</span>
+                  <span className="font-bold text-white text-sm">{formAcademicYear || activeAcademicYear}</span>
+                </div>
+                <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
+                  <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Semester</span>
+                  <span className="font-bold text-white text-sm">{activeSemester}</span>
+                </div>
+                <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
+                  <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Rombel Terdata</span>
+                  <span className="font-bold text-white text-sm">{availableClasses.length} Kelas</span>
+                </div>
+                <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
+                  <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Guru Pengawas</span>
+                  <span className="font-bold text-white text-sm">{teachers.length} Guru Aktif</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Existing Schedule Status Banner (Bisa Dihapus / Diperbaharui) */}
+            {scheduleData && (
+              <div className="bg-white rounded-2xl p-5 border border-teal-200 shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-5 h-5 text-teal-600" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-slate-900">
+                          Jadwal {scheduleData.config.examTitle || scheduleData.config.examType} Sudah Tersimpan
+                        </span>
+                        <span className="px-2 py-0.5 text-[10px] font-bold bg-teal-100 text-teal-800 rounded-full">
+                          Aktif (TA {scheduleData.config.academicYear})
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Periode: {formatIndonesianDateLabel(scheduleData.config.startDate)} s.d. {formatIndonesianDateLabel(scheduleData.config.endDate)} • {scheduleData.summary.totalDays} Hari • {scheduleData.summary.totalClasses} Rombel • {scheduleData.summary.totalSubjects} Mapel • {scheduleData.summary.totalProctorsAssigned} Penugasan Pengawas
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick actions for existing schedule */}
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('subjects')}
+                    className="px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Lihat Jadwal Siswa</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('proctors')}
+                    className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <Users className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Lihat Roster Pengawas</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('form')}
+                    className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Buka Form Manual</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmDeleteOpen(true)}
+                    className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold inline-flex items-center gap-1.5 transition-colors ml-auto"
+                    title="Hapus Jadwal Saat Ini"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Hapus Jadwal Ini</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Prompt Presets (1-Click Fill) */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  <span>Pilih Template Prompt Cepat (1-Klik Isi):</span>
+                </label>
+                <span className="text-[11px] text-slate-400">Klik salah satu untuk mengisi otomatis</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {EXAM_AI_PROMPT_PRESETS.map((preset) => {
+                  const isSelected = selectedPresetId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPresetId(preset.id);
+                        setAiPromptInput(preset.prompt);
+                      }}
+                      className={`text-left p-3 rounded-xl border transition-all flex flex-col justify-between gap-1.5 min-h-19 ${
+                        isSelected
+                          ? 'bg-teal-50 border-teal-500/50 shadow-2xs ring-1 ring-teal-500/30'
+                          : 'bg-slate-50 hover:bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-900 truncate">{preset.title}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase shrink-0 ${
+                            isSelected
+                              ? 'bg-teal-600 text-white'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {preset.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                        {preset.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 4. Prompt Input Box */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Bot className="w-4 h-4 text-teal-600" />
+                    <span>Instruksi Kebutuhan Jadwal Ujian:</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    {aiPromptInput.length} karakter • Anda bebas mengedit kalimat ini
+                  </span>
+                </div>
+                <textarea
+                  rows={5}
+                  value={aiPromptInput}
+                  onChange={(e) => {
+                    setAiPromptInput(e.target.value);
+                    setSelectedPresetId(null);
+                  }}
+                  placeholder="Contoh: Buatkan jadwal ASTS ganjil dari tanggal 29 September sampai 3 Oktober 2026, 2 sesi per hari (sesi 1 jam 07:30 - 09:00, sesi 2 jam 09:30 - 11:00). Khusus hari Jumat 1 sesi saja. Bagi rata semua guru yang aktif untuk mengawas..."
+                  className="w-full bg-white border border-slate-300 rounded-xl p-3.5 text-xs text-slate-900 placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all font-sans leading-relaxed resize-y min-h-27.5"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiPromptInput('');
+                      setSelectedPresetId(null);
+                    }}
+                    disabled={!aiPromptInput || isGeneratingAI}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 transition-colors"
+                  >
+                    Bersihkan Prompt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPresetId(EXAM_AI_PROMPT_PRESETS[0].id);
+                      setAiPromptInput(EXAM_AI_PROMPT_PRESETS[0].prompt);
+                    }}
+                    disabled={isGeneratingAI}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-40 transition-colors"
+                  >
+                    Reset ke Standar
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleGenerateWithAIPrompt()}
+                  disabled={isGeneratingAI || !aiPromptInput.trim()}
+                  className="w-full sm:w-auto min-h-11 px-6 py-2.5 rounded-xl bg-linear-to-r from-[#023246] to-[#18536B] hover:from-[#18536B] hover:to-[#2457A6] disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-md flex items-center justify-center gap-2 transition-all active:scale-98"
+                >
+                  {isGeneratingAI ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 text-amber-300 animate-spin" />
+                      <span>AI Sedang Menyusun Jadwal...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>{scheduleData ? '🔄 Perbarui Jadwal dengan AI' : '🚀 Susun Jadwal Ujian dengan AI'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* In-flight status / hint */}
+              {isGeneratingAI && (
+                <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl space-y-2 text-xs text-teal-950 animate-pulse">
+                  <div className="flex items-center gap-2 font-bold text-teal-900">
+                    <Sparkles className="w-4 h-4 text-teal-600" />
+                    <span>{aiGenerationMessage || 'Sedang memproses instruksi dengan AI Engine...'}</span>
+                  </div>
+                  <div className="space-y-1 text-[11px] text-teal-800">
+                    <p>✓ Menganalisis parameter waktu, rombel, dan mata pelajaran...</p>
+                    <p>✓ Menghitung pembagian tugas pengawas bebas bentrok mengajar...</p>
+                    <p>✓ Menyimpan buku besar jadwal ujian ke database cloud sekolah...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ========================================================================= */}
         {/* TAB 1: FORM PARAMETER & AI GENERATOR (PANITIA ONLY) */}
         {/* ========================================================================= */}
