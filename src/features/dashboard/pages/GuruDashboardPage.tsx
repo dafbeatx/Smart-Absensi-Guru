@@ -453,6 +453,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [isAdministrationModalOpen, setIsAdministrationModalOpen] = useState(false);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
+  const [isExamScheduleReadOnly, setIsExamScheduleReadOnly] = useState(false);
+  const [examScheduleInitialTab, setExamScheduleInitialTab] = useState<'proctors' | 'subjects' | 'my_schedule' | 'ai_prompt' | 'form'>('proctors');
   const [studentBehaviorInitialTab, setStudentBehaviorInitialTab] = useState<'KEBAIKAN' | 'KEDISIPLINAN'>('KEBAIKAN');
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [activeEmergencies, setActiveEmergencies] = useState<ClassroomEmergencyAlert[]>([]);
@@ -513,28 +515,48 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     };
   }, [effectiveUser?.id, effectiveUser?.position, effectiveUser?.full_name, effectiveUser?.nip]);
 
-  // Published Exam Schedule & Personal Duty Assignments (Teacher View)
-  const [publishedExamDuty, setPublishedExamDuty] = useState<{
+  // Published Exam Schedule & Personal Duty Assignments (Teacher View across SMP & SMA)
+  const [smpExamDuty, setSmpExamDuty] = useState<{
     schedule: ExamScheduleData;
     duties: ExamProctorItem[];
     teacherCode?: string;
   } | null>(null);
+  const [smaExamDuty, setSmaExamDuty] = useState<{
+    schedule: ExamScheduleData;
+    duties: ExamProctorItem[];
+    teacherCode?: string;
+  } | null>(null);
+  const [selectedExamDutyLevel, setSelectedExamDutyLevel] = useState<'SMP' | 'SMA'>('SMP');
+
+  const publishedExamDuty = selectedExamDutyLevel === 'SMP'
+    ? (smpExamDuty || smaExamDuty)
+    : (smaExamDuty || smpExamDuty);
 
   useEffect(() => {
     let isMounted = true;
     const loadExamDuties = async () => {
       if (!effectiveUser?.id && !effectiveUser?.full_name) {
-        if (isMounted) setPublishedExamDuty(null);
+        if (isMounted) {
+          setSmpExamDuty(null);
+          setSmaExamDuty(null);
+        }
         return;
       }
       try {
         const activeYear = AdministrationRepository.getActiveAcademicYear();
-        const dutyData = await ExamScheduleRepository.getTeacherExamDuties(
-          effectiveUser.id || effectiveUser.full_name,
-          activeYear
-        );
+        const [smpData, smaData] = await Promise.all([
+          ExamScheduleRepository.getTeacherExamDuties(effectiveUser.id, activeYear, 'SMP', effectiveUser.full_name),
+          ExamScheduleRepository.getTeacherExamDuties(effectiveUser.id, activeYear, 'SMA', effectiveUser.full_name),
+        ]);
         if (isMounted) {
-          setPublishedExamDuty(dutyData);
+          setSmpExamDuty(smpData);
+          setSmaExamDuty(smaData);
+          // Auto-select level based on available duties
+          if (smpData && !smaData) {
+            setSelectedExamDutyLevel('SMP');
+          } else if (!smpData && smaData) {
+            setSelectedExamDutyLevel('SMA');
+          }
         }
       } catch (err) {
         console.warn('Failed to load teacher exam duties in GuruDashboardPage:', err);
@@ -667,7 +689,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setIsExamCardModalOpen(true);
         break;
       case 'jadwal_ujian_ngawas':
+        setIsExamScheduleReadOnly(true);
+        setExamScheduleInitialTab('proctors');
+        setIsExamScheduleModalOpen(true);
+        break;
       case 'exam_schedule':
+        setIsExamScheduleReadOnly(effectiveUser?.role !== 'ADMIN' && !committeeInfo?.isCommittee);
+        setExamScheduleInitialTab('proctors');
         setIsExamScheduleModalOpen(true);
         break;
       case 'student_good':
@@ -2371,7 +2399,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
                   <button
                     type="button"
-                    onClick={() => setIsExamScheduleModalOpen(true)}
+                    onClick={() => {
+                      setIsExamScheduleReadOnly(false);
+                      setExamScheduleInitialTab('ai_prompt');
+                      setIsExamScheduleModalOpen(true);
+                    }}
                     className="h-11 px-3.5 bg-[#023246] hover:bg-[#03445e] active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-between gap-2 cursor-pointer"
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -2412,16 +2444,46 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 id="teacher-exam-duty-card"
                 className="bg-white rounded-3xl p-4 sm:p-5 border-2 border-teal-600/30 shadow-sm space-y-4 animate-fadeIn"
               >
+                {/* Level Switcher (SMP vs SMA) if teacher has duties in both levels */}
+                {smpExamDuty && smaExamDuty && (
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExamDutyLevel('SMP')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        selectedExamDutyLevel === 'SMP'
+                          ? 'bg-teal-700 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      <span>🏫</span>
+                      <span>Jadwal SMP ({smpExamDuty.duties.length} Sesi)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExamDutyLevel('SMA')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        selectedExamDutyLevel === 'SMA'
+                          ? 'bg-blue-700 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      <span>🎓</span>
+                      <span>Jadwal SMA ({smaExamDuty.duties.length} Sesi)</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Header with High Contrast and Clear Badges */}
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <div className={`w-12 h-12 rounded-2xl ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700' : 'bg-teal-700'} text-white flex items-center justify-center shrink-0 shadow-xs`}>
                       <CalendarCheck className="w-6 h-6 text-white" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2.5 py-0.5 rounded-md bg-teal-100 text-teal-900 text-xs font-black tracking-wider uppercase border border-teal-300">
-                          TUGAS MENGAWAS ASESMEN
+                        <span className={`px-2.5 py-0.5 rounded-md ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-teal-100 text-teal-900 border-teal-300'} text-xs font-black tracking-wider uppercase border`}>
+                          TUGAS MENGAWAS ASESMEN ({selectedExamDutyLevel})
                         </span>
                         {publishedExamDuty.teacherCode && (
                           <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-xs font-black border border-amber-300">
@@ -2433,7 +2495,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         </span>
                       </div>
                       <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight mt-1">
-                        {publishedExamDuty.schedule.config.examTitle || 'Jadwal Tugas Mengawas Ujian'}
+                        {publishedExamDuty.schedule.config.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`}
                       </h3>
                     </div>
                   </div>
@@ -2445,7 +2507,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         ADA TUGAS HARI INI
                       </span>
                     ) : (
-                      <span className="px-3 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-300 text-xs font-extrabold shrink-0">
+                      <span className={`px-3 py-1 rounded-full ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-50 text-blue-800 border-blue-300' : 'bg-teal-50 text-teal-800 border-teal-300'} border text-xs font-extrabold shrink-0`}>
                         {publishedExamDuty.duties.length} Sesi Terjadwal
                       </span>
                     )}
@@ -2492,7 +2554,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                               </span>
                               <span className="text-xs text-slate-400">•</span>
                               <span className="text-xs font-bold text-slate-600">
-                                {duty.dayName ? `${duty.dayName}, ` : ''}{ExamMatrixBuilderService.formatIndonesianDate(duty.date)}
+                                {ExamMatrixBuilderService.formatIndonesianDate(duty.date)}
                               </span>
                             </div>
                             <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
@@ -2505,7 +2567,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                           {/* Large High-Contrast Room Badge */}
                           <div className="flex items-center gap-2 shrink-0">
-                            <div className="px-4 py-2 rounded-xl bg-teal-700 text-white font-black text-sm sm:text-base flex items-center gap-2 shadow-xs">
+                            <div className={`px-4 py-2 rounded-xl ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700' : 'bg-teal-700'} text-white font-black text-sm sm:text-base flex items-center gap-2 shadow-xs`}>
                               <DoorOpen className="w-4 h-4 text-teal-200" />
                               <span>{duty.roomName || 'Ruang Ujian'}</span>
                             </div>
@@ -2521,15 +2583,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      const institutionForSlip = selectedExamDutyLevel === 'SMA'
+                        ? 'SMA Terpadu As Salaam'
+                        : 'SMP Terpadu Al-Ittihadiyah';
                       ExamWordExporterService.printTeacherDutySlip(
                         effectiveUser?.full_name || 'Bapak/Ibu Guru',
                         publishedExamDuty.teacherCode,
                         publishedExamDuty.duties,
-                        settings.institution_name || 'SMP Terpadu Al-Ittihadiyah',
-                        publishedExamDuty.schedule.config.examTitle || 'Jadwal Tugas Mengawas Ujian'
+                        institutionForSlip,
+                        publishedExamDuty.schedule.config.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`
                       );
                     }}
-                    className="h-12 px-4 bg-teal-700 hover:bg-teal-800 active:scale-[0.98] text-white font-bold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className={`h-12 px-4 ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700 hover:bg-blue-800' : 'bg-teal-700 hover:bg-teal-800'} active:scale-[0.98] text-white font-bold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer`}
                   >
                     <Printer className="w-4 h-4 text-teal-200" />
                     <span>Cetak Kartu Tugas (A4)</span>
@@ -2537,7 +2602,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setIsExamScheduleModalOpen(true)}
+                    onClick={() => {
+                      setIsExamScheduleReadOnly(true);
+                      setExamScheduleInitialTab('proctors');
+                      setIsExamScheduleModalOpen(true);
+                    }}
                     className="h-12 px-4 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 font-bold text-sm rounded-xl border border-slate-300 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Calendar className="w-4 h-4 text-slate-600" />
@@ -5932,6 +6001,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               setIsEventsCalendarModalOpen(true);
               break;
             case 'exam_schedule':
+              setIsExamScheduleReadOnly(effectiveUser?.role !== 'ADMIN' && !committeeInfo?.isCommittee);
+              setExamScheduleInitialTab('proctors');
               setIsExamScheduleModalOpen(true);
               break;
             case 'rekap':
@@ -5943,12 +6014,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }}
       />
 
-      {/* 📋 Modal Layer Jadwal Ujian & Pengawas AI (Hak Panitia & Layer Fullscreen) */}
+      {/* 📋 Modal Layer Jadwal Ujian & Pengawas AI (Hak Panitia / Mode Pratinjau Sekolah) */}
       {effectiveUser && (
         <ExamScheduleAndProctorModal
           isOpen={isExamScheduleModalOpen}
           onClose={() => setIsExamScheduleModalOpen(false)}
           currentUser={effectiveUser}
+          initialLevel={selectedExamDutyLevel}
+          initialTab={examScheduleInitialTab}
+          readOnly={isExamScheduleReadOnly}
         />
       )}
 

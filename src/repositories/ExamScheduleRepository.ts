@@ -127,12 +127,25 @@ export class ExamScheduleRepository {
   }
 
   /**
+   * Normalizes a teacher name by removing academic titles and non-alphanumeric chars for robust matching.
+   */
+  public static normalizeTeacherName(name?: string): string {
+    if (!name) return '';
+    return name
+      .toLowerCase()
+      .replace(/(,\s*s\.pd.*|,\s*s\.mat.*|,\s*s\.e.*|,\s*s\.i.*|,\s*g\.r.*)/gi, '')
+      .replace(/[^a-z0-9]/g, ' ')
+      .trim();
+  }
+
+  /**
    * Helper to retrieve all active exam duties for a teacher across both levels or specified level.
    */
   public static async getTeacherExamDuties(
     teacherIdOrName: string,
     academicYear: string,
-    level?: 'SMP' | 'SMA'
+    level?: 'SMP' | 'SMA',
+    teacherFullName?: string
   ): Promise<{
     schedule: ExamScheduleData;
     duties: ExamScheduleData['proctorSchedules'];
@@ -141,7 +154,9 @@ export class ExamScheduleRepository {
     const examTypes = ['ASTS', 'ASAS'];
     const levelsToScan: ('SMP' | 'SMA')[] = level ? [level] : ['SMA', 'SMP'];
     const targetKey = (teacherIdOrName || '').toLowerCase().trim();
-    if (!targetKey) return null;
+    const targetName = (teacherFullName || '').toLowerCase().trim();
+    const cleanTargetName = this.normalizeTeacherName(teacherFullName || (!teacherIdOrName.startsWith('usr_') ? teacherIdOrName : ''));
+    if (!targetKey && !targetName && !cleanTargetName) return null;
 
     for (const lvl of levelsToScan) {
       for (const eType of examTypes) {
@@ -151,12 +166,24 @@ export class ExamScheduleRepository {
         }
 
         const duties = schedule.proctorSchedules.filter((p) => {
-          const matchMainId = p.mainProctorId?.toLowerCase().trim() === targetKey;
-          const matchMainName =
-            p.mainProctorName?.toLowerCase().includes(targetKey) ||
-            targetKey.includes(p.mainProctorName?.toLowerCase().trim() || '');
-          const matchSecId = p.secondaryProctorId?.toLowerCase().trim() === targetKey;
-          const matchSecName = p.secondaryProctorName?.toLowerCase().includes(targetKey);
+          const matchMainId = Boolean(targetKey && p.mainProctorId?.toLowerCase().trim() === targetKey);
+          const matchSecId = Boolean(targetKey && p.secondaryProctorId?.toLowerCase().trim() === targetKey);
+
+          const pMainClean = this.normalizeTeacherName(p.mainProctorName);
+          const pSecClean = this.normalizeTeacherName(p.secondaryProctorName);
+
+          const matchMainName = Boolean(
+            (targetName && p.mainProctorName?.toLowerCase().includes(targetName)) ||
+            (targetName && targetName.includes(p.mainProctorName?.toLowerCase().trim() || '')) ||
+            (cleanTargetName && pMainClean && (pMainClean.includes(cleanTargetName) || cleanTargetName.includes(pMainClean)))
+          );
+
+          const matchSecName = Boolean(
+            (targetName && p.secondaryProctorName?.toLowerCase().includes(targetName)) ||
+            (targetName && targetName.includes(p.secondaryProctorName?.toLowerCase().trim() || '')) ||
+            (cleanTargetName && pSecClean && (pSecClean.includes(cleanTargetName) || cleanTargetName.includes(pSecClean)))
+          );
+
           return matchMainId || matchMainName || matchSecId || matchSecName;
         });
 
@@ -165,9 +192,13 @@ export class ExamScheduleRepository {
           const allProctorNames = Array.from(
             new Set(schedule.proctorSchedules.map((p) => p.mainProctorName.trim()))
           ).sort((a, b) => a.localeCompare(b, 'id'));
-          const idx = allProctorNames.findIndex((n) =>
-            n.toLowerCase().includes(targetKey) || targetKey.includes(n.toLowerCase())
-          );
+          const idx = allProctorNames.findIndex((n) => {
+            const nClean = this.normalizeTeacherName(n);
+            return (
+              (targetName && (n.toLowerCase().includes(targetName) || targetName.includes(n.toLowerCase()))) ||
+              (cleanTargetName && nClean && (nClean.includes(cleanTargetName) || cleanTargetName.includes(nClean)))
+            );
+          });
           const teacherCode = idx !== -1 ? String(idx + 1).padStart(2, '0') : undefined;
 
           return {

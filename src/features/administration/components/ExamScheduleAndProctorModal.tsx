@@ -93,6 +93,9 @@ interface ExamScheduleAndProctorModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile;
+  initialTab?: 'ai_prompt' | 'form' | 'subjects' | 'proctors' | 'my_schedule' | 'committee';
+  initialLevel?: EducationLevel;
+  readOnly?: boolean;
 }
 
 const DEFAULT_SUBJECTS = [
@@ -116,11 +119,39 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   isOpen,
   onClose,
   currentUser,
+  initialTab,
+  initialLevel,
+  readOnly = false,
 }) => {
+  // Active filter state
+  const activeAcademicYear = useMemo(() => AdministrationRepository.getActiveAcademicYear(), []);
+  const activeSemester = useMemo(() => {
+    const s = AdministrationRepository.getActiveSemester();
+    return s === 'GENAP' ? 'Genap' : 'Ganjil';
+  }, []);
+  const [selectedExamType, setSelectedExamType] = useState<ExamType>('ASTS');
+  const [selectedLevel, setSelectedLevel] = useState<EducationLevel>(() => initialLevel || 'SMP');
+
   // Navigation active tab
-  const [activeTab, setActiveTab] = useState<'ai_prompt' | 'form' | 'subjects' | 'proctors' | 'my_schedule' | 'committee'>('ai_prompt');
+  const [activeTab, setActiveTab] = useState<'ai_prompt' | 'form' | 'subjects' | 'proctors' | 'my_schedule' | 'committee'>(
+    () => initialTab || (readOnly ? 'proctors' : 'ai_prompt')
+  );
   const [proctorViewMode, setProctorViewMode] = useState<'MATRIX' | 'TABLE'>('MATRIX');
   const institutionName = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah';
+
+  // Sync initialLevel and initialTab when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      if (initialLevel) {
+        setSelectedLevel(initialLevel);
+      }
+      if (initialTab) {
+        setActiveTab(initialTab);
+      } else if (readOnly) {
+        setActiveTab('proctors');
+      }
+    }
+  }, [isOpen, initialLevel, initialTab, readOnly]);
 
   // Authorization state
   const [accessInfo, setAccessInfo] = useState<{
@@ -134,15 +165,6 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     isAdmin: false,
     roleLabel: 'Memuat...',
   });
-
-  // Active filter state
-  const activeAcademicYear = useMemo(() => AdministrationRepository.getActiveAcademicYear(), []);
-  const activeSemester = useMemo(() => {
-    const s = AdministrationRepository.getActiveSemester();
-    return s === 'GENAP' ? 'Genap' : 'Ganjil';
-  }, []);
-  const [selectedExamType, setSelectedExamType] = useState<ExamType>('ASTS');
-  const [selectedLevel, setSelectedLevel] = useState<EducationLevel>('SMP');
 
   // Teachers & Directory data
   const [teachers, setTeachers] = useState<UserProfile[]>([]);
@@ -543,7 +565,16 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     try {
       // 1. Check committee access
       const access = await ExamCommitteeRepository.checkCommitteeAccess(currentUser, activeAcademicYear);
-      setAccessInfo(access);
+      const effectiveAccess = readOnly
+        ? {
+            ...access,
+            canManage: false,
+            isAdmin: false,
+            isCommittee: false,
+            roleLabel: 'Pendidik / Pengawas (Mode Pratinjau)',
+          }
+        : access;
+      setAccessInfo(effectiveAccess);
 
       // 2. Load teachers
       const provider = ProviderFactory.getProvider();
@@ -587,18 +618,18 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         if (saved.config.classRoomMapping) setClassRoomMapping(saved.config.classRoomMapping);
       }
 
-      // If user is a regular teacher, default tab to "my_schedule" or "subjects"
-      if (!access.canManage) {
-        setActiveTab(saved ? 'my_schedule' : 'subjects');
+      // If user is in readOnly mode or regular teacher, default tab to "proctors" or "subjects"
+      if (readOnly || !effectiveAccess.canManage) {
+        setActiveTab(initialTab || (saved ? 'proctors' : 'subjects'));
       } else {
-        setActiveTab(saved ? 'subjects' : 'form');
+        setActiveTab(initialTab || (saved ? 'subjects' : 'form'));
       }
     } catch (err) {
       logger.error('ExamScheduleAndProctorModal', 'Error loading initial data:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, activeAcademicYear, selectedExamType, formAcademicYear, selectedLevel, loadClassesForYear, loadSubjectsForYear]);
+  }, [currentUser, activeAcademicYear, selectedExamType, formAcademicYear, selectedLevel, loadClassesForYear, loadSubjectsForYear, readOnly, initialTab]);
 
   useEffect(() => {
     if (isOpen) {
