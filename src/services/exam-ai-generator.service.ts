@@ -191,6 +191,42 @@ export class ExamScheduleAIGeneratorService {
   }
 
   /**
+   * Evaluates if prompt explicitly mentions teachers, proctors, or invigilator assignments.
+   * If false, the AI scheduler will NOT generate proctor assignments (roster pengawas dikosongkan).
+   */
+  public static detectTeacherIntent(
+    prompt: string,
+    teachers: UserProfile[] = [],
+    hasCustomMatrix = false
+  ): boolean {
+    if (hasCustomMatrix) return true;
+    const text = (prompt || '').toLowerCase();
+
+    // 1. Generic teacher / invigilator keywords in Indonesian
+    const teacherKeywords = /\b(guru|pengawas|mengawas|piket|proctor|invigilator|penugasan|alokasi|p1|p2|p3|p4|p5)\b/i;
+    if (teacherKeywords.test(text)) {
+      return true;
+    }
+
+    // 2. Check if any specific teacher's name appears in the prompt
+    for (const t of teachers) {
+      if (!t.full_name) continue;
+      // Strip common Indonesian academic titles to match conversational mentions
+      const cleanName = t.full_name
+        .replace(/(drs\.|dra\.|dr\.|ir\.|h\.|hj\.|m\.pd|s\.pd|s\.si|s\.kom|s\.ag|s\.mat|s\.e|g\.r)/gi, '')
+        .replace(/[,\.]/g, ' ')
+        .trim()
+        .toLowerCase();
+
+      if (cleanName.length >= 3 && text.includes(cleanName)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Main entry point: Generates exam schedule and proctor roster from natural language prompt.
    */
   public static async generateFromPrompt(
@@ -232,6 +268,11 @@ export class ExamScheduleAIGeneratorService {
         parsedConfig = this.parsePromptLocally(rawPrompt, params);
         aiExplanation = 'Jadwal disusun menggunakan mesin heuristik cerdas kurikulum sekolah.';
       }
+    }
+
+    // If prompt did not mention teachers, note that proctors were omitted
+    if (parsedConfig.skipProctorAssignment) {
+      aiExplanation = 'Jadwal ujian mata pelajaran siswa berhasil disusun tanpa alokasi guru pengawas (sesuai instruksi prompt).';
     }
 
     // Explicitly lock education level
@@ -310,12 +351,14 @@ Aturan:
     ],
     "selectedClasses": ${JSON.stringify(params.availableClasses.length > 0 ? params.availableClasses : ['7A', '7B', '8A', '8B', '9A', '9B'])},
     "selectedSubjects": ["PAI", "Matematika", "IPA", "IPS", "Bahasa Indonesia", "Bahasa Inggris"],
+    "skipProctorAssignment": false,
     "proctorsPerRoom": 1,
     "excludeOwnSubject": true,
     "excludeCommitteeProctor": true,
     "assignBackupProctor": true
   }
-}`;
+}
+Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, piket, atau nama guru, maka "skipProctorAssignment" WAJIB diset true.`;
 
     const res = await fetch('/api/ai', {
       method: 'POST',
@@ -362,6 +405,7 @@ Aturan:
     const text = prompt.toLowerCase();
     const customMatrix = this.parseCustomSubjectProctors(prompt);
     const hasCustomMatrix = customMatrix.detectedSubjects.length > 0;
+    const hasTeacherIntent = this.detectTeacherIntent(prompt, params.teachers, hasCustomMatrix);
 
     const effectiveLevel: EducationLevel =
       params.educationLevel ||
@@ -559,13 +603,14 @@ Aturan:
       totalRooms,
       roomFormat: 'NUMERIC',
       selectedSubjects,
-      selectedTeacherIds: params.teachers.map((t) => t.id),
+      selectedTeacherIds: hasTeacherIntent ? params.teachers.map((t) => t.id) : [],
       proctorsPerRoom,
       excludeOwnSubject: hasCustomMatrix ? false : excludeOwnSubject,
       excludeCommitteeProctor,
       assignBackupProctor,
       aiCustomPrompt: prompt.trim(),
       customSubjectProctors: hasCustomMatrix ? customMatrix.customSubjectProctors : undefined,
+      skipProctorAssignment: !hasTeacherIntent,
     };
   }
 
@@ -621,6 +666,11 @@ Aturan:
         : fallback.selectedSubjects;
 
     const proctorsPerRoom: 1 | 2 = raw?.proctorsPerRoom === 2 ? 2 : 1;
+    const hasTeacherIntent = this.detectTeacherIntent(params.prompt, params.teachers, false);
+    const skipProctorAssignment =
+      raw?.skipProctorAssignment !== undefined
+        ? Boolean(raw.skipProctorAssignment)
+        : !hasTeacherIntent;
 
     return {
       ...fallback,
@@ -633,6 +683,8 @@ Aturan:
       sessionsPerDay,
       selectedClasses,
       selectedSubjects,
+      selectedTeacherIds: skipProctorAssignment ? [] : fallback.selectedTeacherIds,
+      skipProctorAssignment,
       proctorsPerRoom,
       excludeOwnSubject: raw?.excludeOwnSubject !== false,
       excludeCommitteeProctor: raw?.excludeCommitteeProctor !== false,

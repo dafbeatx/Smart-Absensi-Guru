@@ -319,202 +319,211 @@ export class ExamSchedulerService {
       return a.className.localeCompare(b.className);
     });
 
-    // ── 2. PREPARE PROCTOR TEACHERS POOL ──────────────────────────────────────
-    const committeeUserIds = new Set(
-      committeeMembers.filter((m) => m.isActive).map((m) => m.userId)
-    );
-
-    // Filter teachers available for invigilation
-    let eligibleTeachers = allTeachers.filter((t) => {
-      const isSelected = config.selectedTeacherIds.length === 0 || config.selectedTeacherIds.includes(t.id);
-      const isRoleTeacher = ['GURU', 'ADMIN', 'OPERATOR', 'WALIKELAS'].includes((t.role || 'GURU').toUpperCase());
-      const isCommitteeExcluded = config.excludeCommitteeProctor && committeeUserIds.has(t.id);
-      return isSelected && isRoleTeacher && !isCommitteeExcluded;
-    });
-
-    // Fallback if filter is too restrictive
-    if (eligibleTeachers.length === 0) {
-      eligibleTeachers = allTeachers.filter((t) => (t.role || 'GURU').toUpperCase() !== 'SISWA');
-    }
-
-    // Initialize teacher load balancing tracker
-    const teacherLoads: Map<string, TeacherLoad> = new Map();
-    eligibleTeachers.forEach((t) => {
-      const teachingSubjs: string[] = [];
-      if (t.teaching_assignment) {
-        if (Array.isArray(t.teaching_assignment)) {
-          teachingSubjs.push(...t.teaching_assignment);
-        } else if (typeof t.teaching_assignment === 'string') {
-          teachingSubjs.push(...(t.teaching_assignment as string).split(',').map((s) => s.trim()));
-        }
-      }
-      teacherLoads.set(t.id, {
-        userId: t.id,
-        fullName: t.full_name || 'Guru Pengawas',
-        assignedCount: 0,
-        teachingSubjects: teachingSubjs,
-      });
-    });
-
-    // ── 3. GENERATE PROCTOR ASSIGNMENTS (ANTI-OWN-SUBJECT & LOAD-BALANCED) ─────
+    // ── 2. PREPARE PROCTOR TEACHERS POOL & ASSIGNMENTS ────────────────────────
     const proctorSchedules: ExamProctorItem[] = [];
+    let eligibleTeachers: UserProfile[] = [];
 
-    // Group subjects by (date, sessionNumber)
-    const slotMap = new Map<string, ExamSubjectScheduleItem[]>();
-    subjectSchedules.forEach((item) => {
-      const key = `${item.date}_S${item.sessionNumber}`;
-      const list = slotMap.get(key) || [];
-      list.push(item);
-      slotMap.set(key, list);
-    });
+    if (!config.skipProctorAssignment) {
+      const committeeUserIds = new Set(
+        committeeMembers.filter((m) => m.isActive).map((m) => m.userId)
+      );
 
-    // Sort slot keys chronologically
-    const sortedSlotKeys = Array.from(slotMap.keys()).sort();
+      // Filter teachers available for invigilation
+      eligibleTeachers = allTeachers.filter((t) => {
+        const isSelected = config.selectedTeacherIds.length === 0 || config.selectedTeacherIds.includes(t.id);
+        const isRoleTeacher = ['GURU', 'ADMIN', 'OPERATOR', 'WALIKELAS'].includes((t.role || 'GURU').toUpperCase());
+        const isCommitteeExcluded = config.excludeCommitteeProctor && committeeUserIds.has(t.id);
+        return isSelected && isRoleTeacher && !isCommitteeExcluded;
+      });
 
-    sortedSlotKeys.forEach((slotKey) => {
-      const itemsInSlot = slotMap.get(slotKey) || [];
-      const firstItem = itemsInSlot[0];
-      const slotDate = firstItem.date;
-      const slotDayName = firstItem.dayName;
-      const slotNum = firstItem.sessionNumber;
-      const slotStart = firstItem.startTime;
-      const slotEnd = firstItem.endTime;
+      // Fallback if filter is too restrictive
+      if (eligibleTeachers.length === 0) {
+        eligibleTeachers = allTeachers.filter((t) => (t.role || 'GURU').toUpperCase() !== 'SISWA');
+      }
 
-      // Track teachers already assigned in THIS exact slot (prevents double-booking)
-      const assignedInCurrentSlot = new Set<string>();
-
-      itemsInSlot.forEach((subjItem, itemIdx) => {
-        const roomName = subjItem.roomName || classRoomMap.get(subjItem.className) || formatRoomName(1);
-
-        // Check if custom matrix has a specific proctor for this subject and room
-        const customProctors = this.findCustomProctorsForSubject(subjItem.subject, config.customSubjectProctors);
-        let chosenProctor: { userId: string; fullName: string } | undefined;
-
-        if (customProctors && customProctors.length > 0) {
-          const roomNumMatch = roomName.match(/\d+/);
-          const roomIdx = roomNumMatch ? Math.max(0, parseInt(roomNumMatch[0], 10) - 1) : itemIdx;
-          const targetTeacherName = customProctors[roomIdx % customProctors.length];
-
-          if (targetTeacherName && targetTeacherName !== '-') {
-            const matched = this.findMatchingTeacher(targetTeacherName, allTeachers);
-            chosenProctor = matched;
-            const tl = teacherLoads.get(matched.userId);
-            if (tl) {
-              tl.assignedCount++;
-            }
-            assignedInCurrentSlot.add(matched.userId);
+      // Initialize teacher load balancing tracker
+      const teacherLoads: Map<string, TeacherLoad> = new Map();
+      eligibleTeachers.forEach((t) => {
+        const teachingSubjs: string[] = [];
+        if (t.teaching_assignment) {
+          if (Array.isArray(t.teaching_assignment)) {
+            teachingSubjs.push(...t.teaching_assignment);
+          } else if (typeof t.teaching_assignment === 'string') {
+            teachingSubjs.push(...(t.teaching_assignment as string).split(',').map((s) => s.trim()));
           }
         }
-
-        // If no custom proctor, use heuristic greedy algorithm
-        if (!chosenProctor) {
-          // Find candidate proctors:
-          // Rule 1: Not assigned in this slot yet
-          // Rule 2: If excludeOwnSubject is true, teacher does not teach this subject
-          let candidates = Array.from(teacherLoads.values()).filter((tl) => {
-            if (assignedInCurrentSlot.has(tl.userId)) return false;
-
-            if (config.excludeOwnSubject) {
-              const teachesThisSubject = tl.teachingSubjects.some(
-                (ts) => ts.toLowerCase().trim() === subjItem.subject.toLowerCase().trim()
-              );
-              if (teachesThisSubject) return false;
-            }
-
-            return true;
-          });
-
-          // Soft fallback if rules leave no candidates (relax subject restriction)
-          if (candidates.length === 0) {
-            candidates = Array.from(teacherLoads.values()).filter(
-              (tl) => !assignedInCurrentSlot.has(tl.userId)
-            );
-          }
-
-          // Emergency fallback if total teachers < rooms
-          if (candidates.length === 0) {
-            candidates = Array.from(teacherLoads.values());
-          }
-
-          // Sort candidates by assignedCount ascending (least assigned gets prioritized)
-          candidates.sort((a, b) => a.assignedCount - b.assignedCount);
-
-          const candidate = candidates[0];
-          if (candidate) {
-            candidate.assignedCount++;
-            assignedInCurrentSlot.add(candidate.userId);
-            chosenProctor = { userId: candidate.userId, fullName: candidate.fullName };
-          }
-        }
-
-        // Secondary proctor if configured (2 proctors per room)
-        let chosenSecondary: { userId: string; fullName: string } | undefined;
-        if (config.proctorsPerRoom === 2) {
-          const secondaryCandidates = Array.from(teacherLoads.values()).filter(
-            (c) => c.userId !== chosenProctor?.userId && !assignedInCurrentSlot.has(c.userId)
-          );
-          if (secondaryCandidates.length > 0) {
-            secondaryCandidates.sort((a, b) => a.assignedCount - b.assignedCount);
-            const secondary = secondaryCandidates[0];
-            secondary.assignedCount++;
-            assignedInCurrentSlot.add(secondary.userId);
-            chosenSecondary = { userId: secondary.userId, fullName: secondary.fullName };
-          }
-        }
-
-        proctorSchedules.push({
-          id: `proc_${subjItem.className}_${slotDate}_s${slotNum}`,
-          date: slotDate,
-          dayName: slotDayName,
-          sessionNumber: slotNum,
-          startTime: slotStart,
-          endTime: slotEnd,
-          roomName,
-          className: subjItem.className,
-          subject: subjItem.subject,
-          mainProctorId: chosenProctor?.userId || 'GURU_1',
-          mainProctorName: chosenProctor?.fullName || 'Pengawas Ruangan',
-          secondaryProctorId: chosenSecondary?.userId,
-          secondaryProctorName: chosenSecondary?.fullName,
+        teacherLoads.set(t.id, {
+          userId: t.id,
+          fullName: t.full_name || 'Guru Pengawas',
+          assignedCount: 0,
+          teachingSubjects: teachingSubjs,
         });
       });
 
-      // Assign backup / piket proctor for this slot if requested
-      if (config.assignBackupProctor) {
-        const remainingForBackup = Array.from(teacherLoads.values())
-          .filter((tl) => !assignedInCurrentSlot.has(tl.userId))
-          .sort((a, b) => a.assignedCount - b.assignedCount);
+      // ── 3. GENERATE PROCTOR ASSIGNMENTS (ANTI-OWN-SUBJECT & LOAD-BALANCED) ─────
+      // Group subjects by (date, sessionNumber)
+      const slotMap = new Map<string, ExamSubjectScheduleItem[]>();
+      subjectSchedules.forEach((item) => {
+        const key = `${item.date}_S${item.sessionNumber}`;
+        const list = slotMap.get(key) || [];
+        list.push(item);
+        slotMap.set(key, list);
+      });
 
-        const backupTeacher = remainingForBackup[0];
-        if (backupTeacher) {
-          backupTeacher.assignedCount += 0.5; // Backup counts as half duty
-          // Attach backup proctor name to proctors of this slot for clarity
-          proctorSchedules
-            .filter((p) => p.date === slotDate && p.sessionNumber === slotNum)
-            .forEach((p) => {
-              p.backupProctorId = backupTeacher.userId;
-              p.backupProctorName = `${backupTeacher.fullName} (Piket)`;
+      // Sort slot keys chronologically
+      const sortedSlotKeys = Array.from(slotMap.keys()).sort();
+
+      sortedSlotKeys.forEach((slotKey) => {
+        const itemsInSlot = slotMap.get(slotKey) || [];
+        const firstItem = itemsInSlot[0];
+        const slotDate = firstItem.date;
+        const slotDayName = firstItem.dayName;
+        const slotNum = firstItem.sessionNumber;
+        const slotStart = firstItem.startTime;
+        const slotEnd = firstItem.endTime;
+
+        // Track teachers already assigned in THIS exact slot (prevents double-booking)
+        const assignedInCurrentSlot = new Set<string>();
+
+        itemsInSlot.forEach((subjItem, itemIdx) => {
+          const roomName = subjItem.roomName || classRoomMap.get(subjItem.className) || formatRoomName(1);
+
+          // Check if custom matrix has a specific proctor for this subject and room
+          const customProctors = this.findCustomProctorsForSubject(subjItem.subject, config.customSubjectProctors);
+          let chosenProctor: { userId: string; fullName: string } | undefined;
+
+          if (customProctors && customProctors.length > 0) {
+            const roomNumMatch = roomName.match(/\d+/);
+            const roomIdx = roomNumMatch ? Math.max(0, parseInt(roomNumMatch[0], 10) - 1) : itemIdx;
+            const targetTeacherName = customProctors[roomIdx % customProctors.length];
+
+            if (targetTeacherName && targetTeacherName !== '-') {
+              const matched = this.findMatchingTeacher(targetTeacherName, allTeachers);
+              chosenProctor = matched;
+              const tl = teacherLoads.get(matched.userId);
+              if (tl) {
+                tl.assignedCount++;
+              }
+              assignedInCurrentSlot.add(matched.userId);
+            }
+          }
+
+          // If no custom proctor, use heuristic greedy algorithm
+          if (!chosenProctor) {
+            // Find candidate proctors:
+            // Rule 1: Not assigned in this slot yet
+            // Rule 2: If excludeOwnSubject is true, teacher does not teach this subject
+            let candidates = Array.from(teacherLoads.values()).filter((tl) => {
+              if (assignedInCurrentSlot.has(tl.userId)) return false;
+
+              if (config.excludeOwnSubject) {
+                const teachesThisSubject = tl.teachingSubjects.some(
+                  (ts) => ts.toLowerCase().trim() === subjItem.subject.toLowerCase().trim()
+                );
+                if (teachesThisSubject) return false;
+              }
+
+              return true;
             });
-        }
-      }
-    });
 
-    // Sort proctor schedules chronologically: date ASC, sessionNumber ASC, roomName ASC
-    proctorSchedules.sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      if (a.sessionNumber !== b.sessionNumber) return a.sessionNumber - b.sessionNumber;
-      return a.roomName.localeCompare(b.roomName);
-    });
+            // Soft fallback if rules leave no candidates (relax subject restriction)
+            if (candidates.length === 0) {
+              candidates = Array.from(teacherLoads.values()).filter(
+                (tl) => !assignedInCurrentSlot.has(tl.userId)
+              );
+            }
+
+            // Emergency fallback if total teachers < rooms
+            if (candidates.length === 0) {
+              candidates = Array.from(teacherLoads.values());
+            }
+
+            // Sort candidates by assignedCount ascending (least assigned gets prioritized)
+            candidates.sort((a, b) => a.assignedCount - b.assignedCount);
+
+            const candidate = candidates[0];
+            if (candidate) {
+              candidate.assignedCount++;
+              assignedInCurrentSlot.add(candidate.userId);
+              chosenProctor = { userId: candidate.userId, fullName: candidate.fullName };
+            }
+          }
+
+          // Secondary proctor if configured (2 proctors per room)
+          let chosenSecondary: { userId: string; fullName: string } | undefined;
+          if (config.proctorsPerRoom === 2) {
+            const secondaryCandidates = Array.from(teacherLoads.values()).filter(
+              (c) => c.userId !== chosenProctor?.userId && !assignedInCurrentSlot.has(c.userId)
+            );
+            if (secondaryCandidates.length > 0) {
+              secondaryCandidates.sort((a, b) => a.assignedCount - b.assignedCount);
+              const secondary = secondaryCandidates[0];
+              secondary.assignedCount++;
+              assignedInCurrentSlot.add(secondary.userId);
+              chosenSecondary = { userId: secondary.userId, fullName: secondary.fullName };
+            }
+          }
+
+          proctorSchedules.push({
+            id: `proc_${subjItem.className}_${slotDate}_s${slotNum}`,
+            date: slotDate,
+            dayName: slotDayName,
+            sessionNumber: slotNum,
+            startTime: slotStart,
+            endTime: slotEnd,
+            roomName,
+            className: subjItem.className,
+            subject: subjItem.subject,
+            mainProctorId: chosenProctor?.userId || 'GURU_1',
+            mainProctorName: chosenProctor?.fullName || 'Pengawas Ruangan',
+            secondaryProctorId: chosenSecondary?.userId,
+            secondaryProctorName: chosenSecondary?.fullName,
+          });
+        });
+
+        // Assign backup / piket proctor for this slot if requested
+        if (config.assignBackupProctor) {
+          const remainingForBackup = Array.from(teacherLoads.values())
+            .filter((tl) => !assignedInCurrentSlot.has(tl.userId))
+            .sort((a, b) => a.assignedCount - b.assignedCount);
+
+          const backupTeacher = remainingForBackup[0];
+          if (backupTeacher) {
+            backupTeacher.assignedCount += 0.5; // Backup counts as half duty
+            // Attach backup proctor name to proctors of this slot for clarity
+            proctorSchedules
+              .filter((p) => p.date === slotDate && p.sessionNumber === slotNum)
+              .forEach((p) => {
+                p.backupProctorId = backupTeacher.userId;
+                p.backupProctorName = `${backupTeacher.fullName} (Piket)`;
+              });
+          }
+        }
+      });
+
+      // Sort proctor schedules chronologically: date ASC, sessionNumber ASC, roomName ASC
+      proctorSchedules.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        if (a.sessionNumber !== b.sessionNumber) return a.sessionNumber - b.sessionNumber;
+        return a.roomName.localeCompare(b.roomName);
+      });
+    }
 
     // ── 4. COMPOSE SUMMARY & AI OBSERVATION ───────────────────────────────────
     const totalProctorsAssigned = proctorSchedules.length;
-    const totalActiveTeachers = eligibleTeachers.length || 1;
-    const averageSessionsPerTeacher = Math.round((totalProctorsAssigned / totalActiveTeachers) * 10) / 10;
+    const totalActiveTeachers = eligibleTeachers.length;
+    const averageSessionsPerTeacher = totalActiveTeachers > 0
+      ? Math.round((totalProctorsAssigned / totalActiveTeachers) * 10) / 10
+      : 0;
 
-    const aiNote = `Penyusunan jadwal asesmen ${config.examType} (${config.academicYear} - ${config.semester}) berhasil dioptimasi oleh AI Engine. ` +
-      `Mata pelajaran (${subjects.length} mapel) terdistribusi merata ke dalam ${totalDays} hari pelaksanaan. ` +
-      `Seluruh guru pengawas (${eligibleTeachers.length} guru) dialokasikan dengan rata-rata ${averageSessionsPerTeacher} sesi/guru. ` +
-      `${config.excludeOwnSubject ? 'Aturan integritas anti-mapel sendiri terpenuhi 100% tanpa konflik mengajar.' : 'Distribusi mengawas adil dan seimbang.'}`;
+    const aiNote = config.skipProctorAssignment
+      ? `Penyusunan jadwal asesmen ${config.examType} (${config.academicYear} - ${config.semester}) berhasil dioptimasi oleh AI Engine. ` +
+        `Mata pelajaran (${subjects.length} mapel) terdistribusi merata ke dalam ${totalDays} hari pelaksanaan untuk ${classes.length} rombel. ` +
+        `Roster guru pengawas tidak dibuat karena instruksi prompt tidak mencantumkan atau meminta alokasi guru pengawas.`
+      : `Penyusunan jadwal asesmen ${config.examType} (${config.academicYear} - ${config.semester}) berhasil dioptimasi oleh AI Engine. ` +
+        `Mata pelajaran (${subjects.length} mapel) terdistribusi merata ke dalam ${totalDays} hari pelaksanaan. ` +
+        `Seluruh guru pengawas (${eligibleTeachers.length} guru) dialokasikan dengan rata-rata ${averageSessionsPerTeacher} sesi/guru. ` +
+        `${config.excludeOwnSubject ? 'Aturan integritas anti-mapel sendiri terpenuhi 100% tanpa konflik mengajar.' : 'Distribusi mengawas adil dan seimbang.'}`;
 
     const summary: ExamScheduleSummary = {
       totalDays,

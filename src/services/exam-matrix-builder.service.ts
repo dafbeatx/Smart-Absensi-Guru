@@ -4,7 +4,7 @@
  * invigilation matrix format (Matriks Jadwal Pengawas & Legenda Kode Pengawas).
  */
 
-import type { ExamScheduleData, ExamProctorItem } from '../types/exam-schedule.types';
+import type { ExamScheduleData, ExamProctorItem, ExamSubjectScheduleItem } from '../types/exam-schedule.types';
 import type { UserProfile } from '../types/database.types';
 import { ExamSchedulerService } from './exam-scheduler.service';
 
@@ -218,7 +218,59 @@ export class ExamMatrixBuilderService {
     const sortedDates = Array.from(dateMap.keys()).sort();
     const days: MatrixDayGroup[] = [];
 
-    sortedDates.forEach((dateStr, dayIdx) => {
+    if (sortedDates.length === 0 && scheduleData.subjectSchedules && scheduleData.subjectSchedules.length > 0) {
+      // Fallback when proctor schedules are omitted: construct timetable structure from subject schedules
+      const subjDateMap = new Map<string, ExamSubjectScheduleItem[]>();
+      scheduleData.subjectSchedules.forEach((s) => {
+        const list = subjDateMap.get(s.date) || [];
+        list.push(s);
+        subjDateMap.set(s.date, list);
+      });
+
+      const sortedSubjDates = Array.from(subjDateMap.keys()).sort();
+      sortedSubjDates.forEach((dateStr, dayIdx) => {
+        const subjsOnDate = subjDateMap.get(dateStr) || [];
+        const dayFormatted = this.formatIndonesianDate(dateStr);
+
+        const sessionMap = new Map<number, ExamSubjectScheduleItem[]>();
+        subjsOnDate.forEach((s) => {
+          const list = sessionMap.get(s.sessionNumber) || [];
+          list.push(s);
+          sessionMap.set(s.sessionNumber, list);
+        });
+
+        const sortedSessions = Array.from(sessionMap.keys()).sort((a, b) => a - b);
+        const sessionRows: MatrixSessionRow[] = [];
+
+        sortedSessions.forEach((sNum) => {
+          const items = sessionMap.get(sNum) || [];
+          const first = items[0];
+          const timeRange = this.formatTimeRange(first.startTime, first.endTime);
+          const subjectTitle = first.subject || 'Mata Pelajaran';
+
+          const roomCodes: Record<string, string> = {};
+          rooms.forEach((r) => {
+            roomCodes[r.key] = '-';
+          });
+
+          sessionRows.push({
+            sessionNumber: sNum,
+            timeRange,
+            subjectNumber: sNum,
+            subjectTitle,
+            roomCodes,
+          });
+        });
+
+        days.push({
+          dayNumber: dayIdx + 1,
+          date: dateStr,
+          dayFormatted,
+          sessions: sessionRows,
+        });
+      });
+    } else {
+      sortedDates.forEach((dateStr, dayIdx) => {
       const proctorsOnDate = dateMap.get(dateStr) || [];
       const dayFormatted = this.formatIndonesianDate(dateStr);
 
@@ -270,6 +322,7 @@ export class ExamMatrixBuilderService {
         sessions: sessionRows,
       });
     });
+  }
 
     return {
       title: 'JADWAL PENGAWAS',

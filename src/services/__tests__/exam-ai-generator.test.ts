@@ -378,6 +378,63 @@ Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan gur
     assert('Exam AI 06: Error verifying custom proctor matrix', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 7: Proctor Omission Guard (Prompt tanpa menyebutkan guru tidak membuat roster pengawas)
+  // ---------------------------------------------------------------------------
+  try {
+    const promptWithoutTeacher =
+      'Buatkan jadwal ASTS ganjil dari tanggal 29 September sampai 3 Oktober 2026, 2 sesi per hari untuk kelas 7A, 7B, mapel PAI, IPA, MTK.';
+
+    // 1. Check helper detectTeacherIntent
+    const intentDetected = ExamScheduleAIGeneratorService.detectTeacherIntent(
+      promptWithoutTeacher,
+      sampleTeachers,
+      false
+    );
+
+    // 2. Parse locally
+    const parsed = ExamScheduleAIGeneratorService.parsePromptLocally(promptWithoutTeacher, {
+      prompt: promptWithoutTeacher,
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      teachers: sampleTeachers,
+      availableClasses: ['7A', '7B'],
+      availableSubjects: ['PAI', 'IPA', 'MTK'],
+    });
+
+    // 3. Generate complete schedule
+    const res = await ExamScheduleAIGeneratorService.generateFromPrompt({
+      prompt: promptWithoutTeacher,
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      educationLevel: 'SMP',
+      teachers: sampleTeachers,
+      availableClasses: ['7A', '7B'],
+      availableSubjects: ['PAI', 'IPA', 'MTK'],
+    });
+
+    const isIntentFalse = intentDetected === false;
+    const isConfigSkipped = parsed.skipProctorAssignment === true && parsed.selectedTeacherIds.length === 0;
+    const hasSubjects = res.schedule.subjectSchedules.length > 0;
+    const proctorsAreEmpty = res.schedule.proctorSchedules.length === 0;
+    const totalProctorsZero = res.schedule.summary.totalProctorsAssigned === 0;
+
+    // 4. Matrix builder should handle empty proctors gracefully with timetable structure
+    const matrix = ExamMatrixBuilderService.buildMatrix(res.schedule, sampleTeachers);
+    const matrixHasDays = matrix.days.length > 0;
+    const matrixRoomsAllHyphen = matrix.days.every((d) =>
+      d.sessions.every((s) => matrix.rooms.every((r) => s.roomCodes[r.key] === '-'))
+    );
+
+    assert(
+      'Exam AI 07: Omits proctor schedules when prompt does not mention teachers while keeping subject schedules intact',
+      isIntentFalse && isConfigSkipped && hasSubjects && proctorsAreEmpty && totalProctorsZero && matrixHasDays && matrixRoomsAllHyphen,
+      `Intent: ${intentDetected}, Subjects: ${res.schedule.subjectSchedules.length}, Proctors: ${res.schedule.proctorSchedules.length}, Matrix days: ${matrix.days.length}, Empty matrix safe: ${matrixRoomsAllHyphen}`
+    );
+  } catch (err: any) {
+    assert('Exam AI 07: Error testing proctor omission guard', false, err?.message);
+  }
+
   return {
     passed,
     failed,

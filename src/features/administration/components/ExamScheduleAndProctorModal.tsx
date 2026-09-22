@@ -714,12 +714,19 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       }
       setSelectedClasses(result.config.selectedClasses);
       setSelectedSubjects(result.config.selectedSubjects);
+      if (result.config.selectedTeacherIds) {
+        setSelectedTeacherIds(result.config.selectedTeacherIds);
+      }
       if (result.config.totalRooms) {
         setTotalRooms(result.config.totalRooms);
       }
 
+      const toastMessage = result.schedule.summary.totalProctorsAssigned === 0
+        ? `Jadwal ${result.config.examType} (${selectedLevel}) berhasil disusun tanpa roster pengawas (sesuai instruksi prompt). 🎉`
+        : `Jadwal ${result.config.examType} (${selectedLevel}) berhasil disusun otomatis oleh AI (${result.schedule.summary.totalDays} hari, ${result.schedule.summary.totalClasses} rombel)! 🎉`;
+
       setToast({
-        text: `Jadwal ${result.config.examType} (${selectedLevel}) berhasil disusun otomatis oleh AI (${result.schedule.summary.totalDays} hari, ${result.schedule.summary.totalClasses} rombel)! 🎉`,
+        text: toastMessage,
         type: 'success',
       });
       setActiveTab('subjects');
@@ -2956,26 +2963,40 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium">
-                            {scheduleData.proctorSchedules.map((item, idx) => (
-                              <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                                <td className="py-2.5 px-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
-                                <td className="py-2.5 px-3.5">
-                                  <span className="font-bold text-slate-900">{item.dayName}</span>, {item.date} • <span className="font-bold text-teal-700">Sesi {item.sessionNumber}</span> ({item.startTime}-{item.endTime})
-                                </td>
-                                <td className="py-2.5 px-3.5">
-                                  <span className="font-black text-teal-900 text-xs block">{item.roomName}</span>
-                                  <span className="text-[10px] text-slate-500 font-semibold">Kelas {item.className}</span>
-                                </td>
-                                <td className="py-2.5 px-3.5 font-semibold text-slate-700">{item.subject}</td>
-                                <td className="py-2.5 px-3.5 font-bold text-teal-700 flex items-center gap-1.5">
-                                  <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                                  <span>{item.mainProctorName}</span>
-                                </td>
-                                <td className="py-2.5 px-3.5 text-slate-500 text-[11px]">
-                                  {item.backupProctorName || '-'}
+                            {scheduleData.proctorSchedules.length === 0 ? (
+                              <tr>
+                                <td colSpan={6} className="py-12 px-4 text-center">
+                                  <div className="max-w-md mx-auto space-y-2">
+                                    <Users className="w-10 h-10 text-slate-300 mx-auto" />
+                                    <p className="font-bold text-slate-700 text-sm">Roster Pengawas Tidak Dibuat</p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                      Instruksi prompt tidak menyebutkan alokasi guru pengawas sehingga sistem hanya menyusun jadwal mata pelajaran siswa. Anda dapat melakukan perbaruan prompt dengan menyertakan instruksi pengawas atau membagikan pengawas secara manual jika diperlukan.
+                                    </p>
+                                  </div>
                                 </td>
                               </tr>
-                            ))}
+                            ) : (
+                              scheduleData.proctorSchedules.map((item, idx) => (
+                                <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="py-2.5 px-3.5 text-center text-slate-400 font-mono">{idx + 1}</td>
+                                  <td className="py-2.5 px-3.5">
+                                    <span className="font-bold text-slate-900">{item.dayName}</span>, {item.date} • <span className="font-bold text-teal-700">Sesi {item.sessionNumber}</span> ({item.startTime}-{item.endTime})
+                                  </td>
+                                  <td className="py-2.5 px-3.5">
+                                    <span className="font-black text-teal-900 text-xs block">{item.roomName}</span>
+                                    <span className="text-[10px] text-slate-500 font-semibold">Kelas {item.className}</span>
+                                  </td>
+                                  <td className="py-2.5 px-3.5 font-semibold text-slate-700">{item.subject}</td>
+                                  <td className="py-2.5 px-3.5 font-bold text-teal-700 flex items-center gap-1.5">
+                                    <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                                    <span>{item.mainProctorName}</span>
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-slate-500 text-[11px]">
+                                    {item.backupProctorName || '-'}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
                           </tbody>
                         </table>
                       </div>
