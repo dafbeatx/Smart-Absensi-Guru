@@ -206,6 +206,66 @@ export const runExamAIGeneratorTestSuite = async (): Promise<{
     assert('Exam AI 04: Error in full lifecycle test', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 5: SMP vs SMA Independent Segregation & Safe Isolation
+  // ---------------------------------------------------------------------------
+  try {
+    const combinedClasses = ['7A', '7B', '8A', '8B', '9A', '9B', '10', '11', '12'];
+
+    // 1. Generate SMP Schedule
+    const smpPrompt = 'Buatkan jadwal ASTS SMP Terpadu Al-Ittihadiyah 2 sesi per hari tanggal 29 Sep - 3 Okt 2026';
+    const smpGen = await ExamScheduleAIGeneratorService.generateFromPrompt({
+      prompt: smpPrompt,
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      educationLevel: 'SMP',
+      teachers: sampleTeachers,
+      availableClasses: combinedClasses,
+      availableSubjects: sampleSubjects,
+    });
+
+    // 2. Generate SMA Schedule
+    const smaPrompt = 'Buatkan jadwal ASTS SMA Terpadu As Salaam 2 sesi per hari tanggal 29 Sep - 3 Okt 2026';
+    const smaGen = await ExamScheduleAIGeneratorService.generateFromPrompt({
+      prompt: smaPrompt,
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      educationLevel: 'SMA',
+      teachers: sampleTeachers,
+      availableClasses: combinedClasses,
+      availableSubjects: sampleSubjects,
+    });
+
+    // Verify SMP only contains SMP classes
+    const smpOnlySMPClasses = smpGen.config.selectedClasses.every((c) => /^[789]/.test(c));
+    // Verify SMA only contains SMA classes
+    const smaOnlySMAClasses = smaGen.config.selectedClasses.every((c) => /^(10|11|12)/.test(c));
+
+    // Verify both exist independently in repository
+    const smpLoaded = await ExamScheduleRepository.getSchedule('2026/2027', 'ASTS', 'SMP');
+    const smaLoaded = await ExamScheduleRepository.getSchedule('2026/2027', 'ASTS', 'SMA');
+    const bothExist = smpLoaded !== null && smaLoaded !== null;
+
+    // Delete SMP only
+    await ExamScheduleRepository.deleteSchedule('2026/2027', 'ASTS', 'SMP');
+    const smpAfterDelete = await ExamScheduleRepository.getSchedule('2026/2027', 'ASTS', 'SMP');
+    const smaAfterSmpDelete = await ExamScheduleRepository.getSchedule('2026/2027', 'ASTS', 'SMA');
+
+    const smpDeletedIsolated = smpAfterDelete === null && smaAfterSmpDelete !== null;
+
+    // Clean up SMA
+    await ExamScheduleRepository.deleteSchedule('2026/2027', 'ASTS', 'SMA');
+    const smaCleaned = (await ExamScheduleRepository.getSchedule('2026/2027', 'ASTS', 'SMA')) === null;
+
+    assert(
+      'Exam AI 05: SMP and SMA schedules operate with 100% independent storage, class filtering, and safe deletion',
+      smpOnlySMPClasses && smaOnlySMAClasses && bothExist && smpDeletedIsolated && smaCleaned,
+      `SMP Classes: ${smpGen.config.selectedClasses.join(',')} | SMA Classes: ${smaGen.config.selectedClasses.join(',')} | Isolated delete: ${smpDeletedIsolated}`
+    );
+  } catch (err: any) {
+    assert('Exam AI 05: Error in SMP vs SMA segregation test', false, err?.message);
+  }
+
   return {
     passed,
     failed,

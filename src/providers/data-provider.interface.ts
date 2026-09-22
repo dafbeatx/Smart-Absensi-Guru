@@ -210,9 +210,9 @@ export interface IDataProvider {
   saveExamCommitteeMembers(members: ExamCommitteeMember[], academicYear?: string, token?: string): Promise<boolean>;
 
   // Exam Schedule Persistence API
-  getExamSchedule(academicYear: string, examType: string, token?: string): Promise<ExamScheduleData | null>;
-  saveExamSchedule(schedule: ExamScheduleData, token?: string): Promise<boolean>;
-  deleteExamSchedule(academicYear: string, examType: string, token?: string): Promise<boolean>;
+  getExamSchedule(academicYear: string, examType: string, token?: string, level?: 'SMP' | 'SMA'): Promise<ExamScheduleData | null>;
+  saveExamSchedule(schedule: ExamScheduleData, token?: string, level?: 'SMP' | 'SMA'): Promise<boolean>;
+  deleteExamSchedule(academicYear: string, examType: string, token?: string, level?: 'SMP' | 'SMA'): Promise<boolean>;
 }
 
 

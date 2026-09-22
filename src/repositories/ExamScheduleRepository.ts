@@ -29,10 +29,11 @@ const safeSetStorage = (key: string, value: string): void => {
 };
 
 export class ExamScheduleRepository {
-  private static getStorageKey(academicYear: string, examType: string): string {
+  private static getStorageKey(academicYear: string, examType: string, level?: 'SMP' | 'SMA'): string {
     const cleanYear = academicYear.replace(/[^\w]/g, '_');
     const cleanType = examType.replace(/[^\w]/g, '_');
-    return `${EXAM_SCHEDULE_STORAGE_PREFIX}${cleanYear}_${cleanType}`;
+    const cleanLevel = level ? `_${level.toLowerCase()}` : '';
+    return `${EXAM_SCHEDULE_STORAGE_PREFIX}${cleanYear}_${cleanType}${cleanLevel}`;
   }
 
   /**
@@ -40,12 +41,13 @@ export class ExamScheduleRepository {
    */
   public static async getSchedule(
     academicYear: string,
-    examType: string
+    examType: string,
+    level?: 'SMP' | 'SMA'
   ): Promise<ExamScheduleData | null> {
     // 1. Fetch from cloud provider
     try {
       const provider = ProviderFactory.getProvider();
-      const remoteSchedule = await provider.getExamSchedule(academicYear, examType);
+      const remoteSchedule = await provider.getExamSchedule(academicYear, examType, undefined, level);
       if (remoteSchedule) {
         return remoteSchedule;
       }
@@ -55,10 +57,18 @@ export class ExamScheduleRepository {
 
     // 2. Fallback to local storage
     try {
-      const key = this.getStorageKey(academicYear, examType);
+      const key = this.getStorageKey(academicYear, examType, level);
       const raw = safeGetStorage(key);
       if (raw) {
         return JSON.parse(raw);
+      }
+      // Fallback for SMP to legacy key without level suffix
+      if (level === 'SMP') {
+        const legacyKey = this.getStorageKey(academicYear, examType);
+        const legacyRaw = safeGetStorage(legacyKey);
+        if (legacyRaw) {
+          return JSON.parse(legacyRaw);
+        }
       }
     } catch (err) {
       logger.error('ExamScheduleRepository', 'Failed to parse exam schedule:', err);
@@ -69,15 +79,16 @@ export class ExamScheduleRepository {
   /**
    * Saves or updates an exam schedule.
    */
-  public static async saveSchedule(schedule: ExamScheduleData): Promise<boolean> {
+  public static async saveSchedule(schedule: ExamScheduleData, level?: 'SMP' | 'SMA'): Promise<boolean> {
     try {
-      const key = this.getStorageKey(schedule.config.academicYear, schedule.config.examType);
+      const effectiveLevel = level || schedule.config.educationLevel || schedule.educationLevel;
+      const key = this.getStorageKey(schedule.config.academicYear, schedule.config.examType, effectiveLevel);
       safeSetStorage(key, JSON.stringify(schedule));
 
       // Persist to Supabase Cloud Provider
       try {
         const provider = ProviderFactory.getProvider();
-        await provider.saveExamSchedule(schedule);
+        await provider.saveExamSchedule(schedule, undefined, effectiveLevel);
       } catch (cloudErr) {
         logger.warn('ExamScheduleRepository', 'Failed to save schedule to cloud provider:', cloudErr);
       }
@@ -97,18 +108,27 @@ export class ExamScheduleRepository {
   /**
    * Deletes an exam schedule.
    */
-  public static async deleteSchedule(academicYear: string, examType: string): Promise<boolean> {
+  public static async deleteSchedule(academicYear: string, examType: string, level?: 'SMP' | 'SMA'): Promise<boolean> {
     try {
-      const key = this.getStorageKey(academicYear, examType);
+      const key = this.getStorageKey(academicYear, examType, level);
       if (typeof localStorage !== 'undefined' && localStorage) {
         localStorage.removeItem(key);
       }
       memoryScheduleStore.delete(key);
 
+      // Clean legacy key if SMP or unspecified
+      if (level === 'SMP' || !level) {
+        const legacyKey = this.getStorageKey(academicYear, examType);
+        if (typeof localStorage !== 'undefined' && localStorage) {
+          localStorage.removeItem(legacyKey);
+        }
+        memoryScheduleStore.delete(legacyKey);
+      }
+
       // Delete from Supabase Cloud Provider
       try {
         const provider = ProviderFactory.getProvider();
-        await provider.deleteExamSchedule(academicYear, examType);
+        await provider.deleteExamSchedule(academicYear, examType, undefined, level);
       } catch (cloudErr) {
         logger.warn('ExamScheduleRepository', 'Failed to delete schedule from cloud provider:', cloudErr);
       }
@@ -130,7 +150,14 @@ export class ExamScheduleRepository {
    */
   public static exportToExcel(schedule: ExamScheduleData): void {
     const appSettings = useSettingsStore.getState().settings;
-    const institutionName = appSettings.institution_name || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam';
+    const effectiveLevel = schedule.config.educationLevel || schedule.educationLevel;
+    let defaultInstitution = 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam';
+    if (effectiveLevel === 'SMP') {
+      defaultInstitution = 'SMP Terpadu Al-Ittihadiyah';
+    } else if (effectiveLevel === 'SMA') {
+      defaultInstitution = 'SMA Terpadu As Salaam';
+    }
+    const institutionName = appSettings.institution_name || defaultInstitution;
     const appName = appSettings.app_name || 'Smart Absensi Guru';
 
     const { config, subjectSchedules, proctorSchedules } = schedule;
@@ -139,7 +166,7 @@ export class ExamScheduleRepository {
     const subjectRows: (string | number)[][] = [
       [appName.toUpperCase()],
       [institutionName.toUpperCase()],
-      [`JADWAL UJIAN MATA PELAJARAN — ${config.examTitle || config.examType}`],
+      [`JADWAL UJIAN MATA PELAJARAN — ${config.examTitle || config.examType}${effectiveLevel ? ` (${effectiveLevel})` : ''}`],
       [`Tahun Ajaran: ${config.academicYear} | Semester: ${config.semester}`],
       [`Periode Pelaksanaan: ${config.startDate} s.d. ${config.endDate}`],
       [''],
@@ -184,7 +211,7 @@ export class ExamScheduleRepository {
     const proctorRows: (string | number)[][] = [
       [appName.toUpperCase()],
       [institutionName.toUpperCase()],
-      [`JADWAL TUGAS MENGAWAS UJIAN GURU — ${config.examTitle || config.examType}`],
+      [`JADWAL TUGAS MENGAWAS UJIAN GURU — ${config.examTitle || config.examType}${effectiveLevel ? ` (${effectiveLevel})` : ''}`],
       [`Tahun Ajaran: ${config.academicYear} | Semester: ${config.semester}`],
       [''],
       [
@@ -228,10 +255,11 @@ export class ExamScheduleRepository {
     ];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, subjectWs, 'Jadwal Ujian Mapel');
-    XLSX.utils.book_append_sheet(wb, proctorWs, 'Jadwal Pengawas Guru');
+    XLSX.utils.book_append_sheet(wb, subjectWs, `Jadwal Ujian ${effectiveLevel || 'Mapel'}`);
+    XLSX.utils.book_append_sheet(wb, proctorWs, `Jadwal Pengawas ${effectiveLevel || 'Guru'}`);
 
-    const filename = `Jadwal_${config.examType}_${config.academicYear.replace('/', '-')}.xlsx`.replace(/\s+/g, '_');
+    const levelStr = effectiveLevel ? `_${effectiveLevel}` : '';
+    const filename = `Jadwal_${config.examType}${levelStr}_${config.academicYear.replace('/', '-')}.xlsx`.replace(/\s+/g, '_');
     XLSX.writeFile(wb, filename);
   }
 }

@@ -3327,19 +3327,28 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
-  public async getExamSchedule(academicYear: string, examType: string, _token?: string): Promise<ExamScheduleData | null> {
-    const key = `${academicYear}_${examType}`.replace(/[^\w]/g, '_');
+  public async getExamSchedule(academicYear: string, examType: string, _token?: string, level?: 'SMP' | 'SMA'): Promise<ExamScheduleData | null> {
+    const levelSuffix = level ? `_${level.toLowerCase()}` : '';
+    const key = `${academicYear}_${examType}${levelSuffix}`.replace(/[^\w]/g, '_');
     try {
       if (typeof localStorage !== 'undefined') {
         const raw = localStorage.getItem(`smart_absensi_exam_schedule_${key}`);
         if (raw) return JSON.parse(raw);
+        // Fallback to non-suffixed legacy key if SMP
+        if (level === 'SMP') {
+          const legacyKey = `${academicYear}_${examType}`.replace(/[^\w]/g, '_');
+          const legacyRaw = localStorage.getItem(`smart_absensi_exam_schedule_${legacyKey}`);
+          if (legacyRaw) return JSON.parse(legacyRaw);
+        }
       }
     } catch {}
-    return this.mockExamSchedules.get(key) || null;
+    return this.mockExamSchedules.get(key) || (level === 'SMP' ? this.mockExamSchedules.get(`${academicYear}_${examType}`.replace(/[^\w]/g, '_')) : null) || null;
   }
 
-  public async saveExamSchedule(schedule: ExamScheduleData, _token?: string): Promise<boolean> {
-    const key = `${schedule.config.academicYear}_${schedule.config.examType}`.replace(/[^\w]/g, '_');
+  public async saveExamSchedule(schedule: ExamScheduleData, _token?: string, level?: 'SMP' | 'SMA'): Promise<boolean> {
+    const effectiveLevel = level || schedule.config.educationLevel || schedule.educationLevel;
+    const levelSuffix = effectiveLevel ? `_${effectiveLevel.toLowerCase()}` : '';
+    const key = `${schedule.config.academicYear}_${schedule.config.examType}${levelSuffix}`.replace(/[^\w]/g, '_');
     this.mockExamSchedules.set(key, schedule);
     try {
       if (typeof localStorage !== 'undefined') {
@@ -3349,12 +3358,17 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
-  public async deleteExamSchedule(academicYear: string, examType: string, _token?: string): Promise<boolean> {
-    const key = `${academicYear}_${examType}`.replace(/[^\w]/g, '_');
+  public async deleteExamSchedule(academicYear: string, examType: string, _token?: string, level?: 'SMP' | 'SMA'): Promise<boolean> {
+    const levelSuffix = level ? `_${level.toLowerCase()}` : '';
+    const key = `${academicYear}_${examType}${levelSuffix}`.replace(/[^\w]/g, '_');
     this.mockExamSchedules.delete(key);
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(`smart_absensi_exam_schedule_${key}`);
+        if (!level) {
+          localStorage.removeItem(`smart_absensi_exam_schedule_${academicYear}_${examType}_smp`.replace(/[^\w]/g, '_'));
+          localStorage.removeItem(`smart_absensi_exam_schedule_${academicYear}_${examType}_sma`.replace(/[^\w]/g, '_'));
+        }
       }
     } catch {}
     return true;

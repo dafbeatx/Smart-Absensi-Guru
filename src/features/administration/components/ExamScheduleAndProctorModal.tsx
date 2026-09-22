@@ -41,6 +41,7 @@ import type {
   ExamScheduleFormConfig,
   SessionTimeSlot,
   DaySessionOverride,
+  EducationLevel,
 } from '../../../types/exam-schedule.types';
 import { ExamCommitteeRepository } from '../../../repositories/ExamCommitteeRepository';
 import { ExamScheduleRepository } from '../../../repositories/ExamScheduleRepository';
@@ -49,12 +50,13 @@ import { ExamMatrixBuilderService } from '../../../services/exam-matrix-builder.
 import { ExamWordExporterService } from '../../../services/exam-word-exporter.service';
 import {
   ExamScheduleAIGeneratorService,
+  getExamAIPromptPresets,
   EXAM_AI_PROMPT_PRESETS,
 } from '../../../services/exam-ai-generator.service';
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
-import { normalizeClassCode } from '../../../utils/class.utils';
+import { normalizeClassCode, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
 
 const formatIndonesianDateLabel = (dateStr: string) => {
@@ -138,11 +140,15 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     return s === 'GENAP' ? 'Genap' : 'Ganjil';
   }, []);
   const [selectedExamType, setSelectedExamType] = useState<ExamType>('ASTS');
+  const [selectedLevel, setSelectedLevel] = useState<EducationLevel>('SMP');
 
   // Teachers & Directory data
   const [teachers, setTeachers] = useState<UserProfile[]>([]);
   const [committeeMembers, setCommitteeMembers] = useState<ExamCommitteeMember[]>([]);
-  const [availableClasses, setAvailableClasses] = useState<string[]>(DEFAULT_CLASSES);
+  const [allYearClasses, setAllYearClasses] = useState<string[]>(DEFAULT_CLASSES);
+  const [availableClasses, setAvailableClasses] = useState<string[]>(() =>
+    DEFAULT_CLASSES.filter((c) => resolveSchoolLevel(c) === 'SMP')
+  );
 
   // Saved schedule data
   const [scheduleData, setScheduleData] = useState<ExamScheduleData | null>(null);
@@ -366,10 +372,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [excludeCommitteeProctor, setExcludeCommitteeProctor] = useState(true);
   const [assignBackupProctor, setAssignBackupProctor] = useState(true);
   const [aiCustomPrompt, setAiCustomPrompt] = useState('');
-  const [aiPromptInput, setAiPromptInput] = useState<string>(() => EXAM_AI_PROMPT_PRESETS[0].prompt);
+  const [aiPromptInput, setAiPromptInput] = useState<string>(() => getExamAIPromptPresets('SMP')[0].prompt);
   const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
   const [aiGenerationMessage, setAiGenerationMessage] = useState<string>('');
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(() => EXAM_AI_PROMPT_PRESETS[0].id);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(() => getExamAIPromptPresets('SMP')[0].id);
 
   // Committee Admin Management State
   const [committeeEditingList, setCommitteeEditingList] = useState<Array<{
@@ -417,19 +423,28 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
   }, []);
 
-  // Load distinct classes strictly filtered by Academic Year (Zero Unnecessary Egress)
-  const loadClassesForYear = useCallback(async (year: string, forceRefresh: boolean = false) => {
+  // Load distinct classes strictly filtered by Academic Year and Education Level (Zero Unnecessary Egress)
+  const loadClassesForYear = useCallback(async (year: string, forceRefresh: boolean = false, levelToUse?: EducationLevel) => {
     if (forceRefresh) setIsSyncingClasses(true);
     try {
+      const activeLevel = levelToUse || selectedLevel;
       const res = await StudentRepository.getDistinctClassesByAcademicYear(year, forceRefresh);
-      setAvailableClasses(res.classes);
+      setAllYearClasses(res.classes);
       setClassStudentCounts(res.classStudentCounts);
       setClassDataSource(res.source);
       setTotalStudentsInYear(res.totalStudents);
-      setSelectedClasses(res.classes);
+
+      const filtered = res.classes.filter((c) => resolveSchoolLevel(c) === activeLevel);
+      const initialClasses = filtered.length > 0
+        ? filtered
+        : (activeLevel === 'SMA' ? ['10', '11', '12'] : ['7A', '7B', '8A', '8B', '9A', '9B']);
+      setAvailableClasses(initialClasses);
+      setSelectedClasses(initialClasses);
+      setTotalRooms(initialClasses.length);
+
       if (forceRefresh) {
         setToast({
-          text: `Data rombel TA ${year} berhasil disinkronkan (${res.classes.length} rombel, ${res.totalStudents} siswa).`,
+          text: `Data rombel ${activeLevel} TA ${year} berhasil disinkronkan (${initialClasses.length} rombel, ${res.totalStudents} siswa).`,
           type: 'success',
         });
       }
@@ -438,24 +453,50 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     } finally {
       if (forceRefresh) setIsSyncingClasses(false);
     }
-  }, []);
+  }, [selectedLevel]);
+
+  // Handle switching education level (SMP vs SMA)
+  const handleLevelChange = useCallback(async (newLevel: EducationLevel) => {
+    setSelectedLevel(newLevel);
+    // Reload schedule for this level
+    const targetYear = formAcademicYear || activeAcademicYear;
+    const targetType = formExamType || selectedExamType;
+    const saved = await ExamScheduleRepository.getSchedule(targetYear, targetType, newLevel);
+    setScheduleData(saved);
+
+    // Filter available classes for this level
+    const levelFiltered = allYearClasses.filter((c) => resolveSchoolLevel(c) === newLevel);
+    const classesToSet = levelFiltered.length > 0
+      ? levelFiltered
+      : (newLevel === 'SMA' ? ['10', '11', '12'] : ['7A', '7B', '8A', '8B', '9A', '9B']);
+    setAvailableClasses(classesToSet);
+    setSelectedClasses(classesToSet);
+    setTotalRooms(classesToSet.length);
+
+    // Update AI presets and default input
+    const presets = getExamAIPromptPresets(newLevel);
+    if (presets.length > 0) {
+      setSelectedPresetId(presets[0].id);
+      setAiPromptInput(presets[0].prompt);
+    }
+  }, [formAcademicYear, activeAcademicYear, formExamType, selectedExamType, allYearClasses]);
 
   // Handle academic year change in exam questionnaire
   const handleAcademicYearChange = useCallback(async (newYear: string) => {
     setFormAcademicYear(newYear);
-    loadClassesForYear(newYear, false);
+    await loadClassesForYear(newYear, false, selectedLevel);
     loadSubjectsForYear(newYear);
-    const saved = await ExamScheduleRepository.getSchedule(newYear, formExamType);
+    const saved = await ExamScheduleRepository.getSchedule(newYear, formExamType, selectedLevel);
     setScheduleData(saved);
-  }, [loadClassesForYear, loadSubjectsForYear, formExamType]);
+  }, [loadClassesForYear, loadSubjectsForYear, formExamType, selectedLevel]);
 
   // Handle exam type change
   const handleExamTypeChange = useCallback(async (newType: ExamType) => {
     setFormExamType(newType);
     setSelectedExamType(newType);
-    const saved = await ExamScheduleRepository.getSchedule(formAcademicYear, newType);
+    const saved = await ExamScheduleRepository.getSchedule(formAcademicYear, newType, selectedLevel);
     setScheduleData(saved);
-  }, [formAcademicYear]);
+  }, [formAcademicYear, selectedLevel]);
 
   // Handle adding custom subject to exam
   const handleAddCustomSubject = useCallback(() => {
@@ -528,14 +569,14 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         }))
       );
 
-      // 4. Load dynamic classes strictly filtered by active academic year (Zero Egress Priority)
-      await loadClassesForYear(formAcademicYear, false);
+      // 4. Load dynamic classes strictly filtered by active academic year & level (Zero Egress Priority)
+      await loadClassesForYear(formAcademicYear, false, selectedLevel);
 
       // 5. Load subjects for academic year (Zero Egress Priority)
       loadSubjectsForYear(formAcademicYear);
 
-      // 6. Load existing schedule if available
-      const saved = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType);
+      // 6. Load existing schedule if available for selectedLevel
+      const saved = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, selectedLevel);
       setScheduleData(saved);
       if (saved?.config) {
         if (saved.config.totalRooms) setTotalRooms(saved.config.totalRooms);
@@ -554,7 +595,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, activeAcademicYear, selectedExamType, formAcademicYear, loadClassesForYear, loadSubjectsForYear]);
+  }, [currentUser, activeAcademicYear, selectedExamType, formAcademicYear, selectedLevel, loadClassesForYear, loadSubjectsForYear]);
 
   useEffect(() => {
     if (isOpen) {
@@ -599,7 +640,8 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     try {
       const config: ExamScheduleFormConfig = {
         examType: formExamType,
-        examTitle: `${formExamType === 'ASTS' ? 'Asesmen Sumatif Tengah Semester (ASTS)' : formExamType === 'ASAS' ? 'Asesmen Sumatif Akhir Semester (ASAS)' : `Ujian ${formExamType}`}`,
+        examTitle: `${formExamType === 'ASTS' ? 'Asesmen Sumatif Tengah Semester (ASTS)' : formExamType === 'ASAS' ? 'Asesmen Sumatif Akhir Semester (ASAS)' : `Ujian ${formExamType}`} ${selectedLevel}`,
+        educationLevel: selectedLevel,
         academicYear: formAcademicYear,
         semester: activeSemester,
         startDate: formStartDate,
@@ -624,12 +666,12 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       // Generate via ExamSchedulerService
       const generated = ExamSchedulerService.generateSchedule(config, teachers, committeeMembers);
 
-      // Save to repository
-      await ExamScheduleRepository.saveSchedule(generated);
+      // Save to repository with level
+      await ExamScheduleRepository.saveSchedule(generated, selectedLevel);
       setScheduleData(generated);
       setSelectedExamType(formExamType);
       setActiveTab('subjects');
-      setToast({ text: 'Jadwal Ujian & Pengawas berhasil di-generate secara cerdas oleh AI! 🎉', type: 'success' });
+      setToast({ text: `Jadwal Ujian & Pengawas ${selectedLevel} berhasil di-generate secara cerdas oleh AI! 🎉`, type: 'success' });
     } catch (err: any) {
       logger.error('ExamScheduleAndProctorModal', 'Failed to generate schedule:', err);
       setToast({ text: `Gagal menyusun jadwal: ${err?.message || 'Periksa kendala input'}`, type: 'error' });
@@ -647,13 +689,14 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
 
     setIsGeneratingAI(true);
-    setAiGenerationMessage('AI sedang menganalisis instruksi jadwal ujian...');
+    setAiGenerationMessage(`AI sedang menyusun jadwal ujian ${selectedLevel}...`);
 
     try {
       const result = await ExamScheduleAIGeneratorService.generateFromPrompt({
         prompt,
         academicYear: formAcademicYear || activeAcademicYear,
         semester: activeSemester,
+        educationLevel: selectedLevel,
         teachers,
         committeeMembers,
         availableClasses,
@@ -673,7 +716,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       setSelectedSubjects(result.config.selectedSubjects);
 
       setToast({
-        text: `Jadwal ${result.config.examType} berhasil disusun otomatis oleh AI (${result.schedule.summary.totalDays} hari, ${result.schedule.summary.totalClasses} rombel)! 🎉`,
+        text: `Jadwal ${result.config.examType} (${selectedLevel}) berhasil disusun otomatis oleh AI (${result.schedule.summary.totalDays} hari, ${result.schedule.summary.totalClasses} rombel)! 🎉`,
         type: 'success',
       });
       setActiveTab('subjects');
@@ -722,13 +765,14 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const handleDeleteSchedule = async () => {
     const targetYear = scheduleData?.config.academicYear || formAcademicYear || activeAcademicYear;
     const targetType = scheduleData?.config.examType || formExamType || selectedExamType;
+    const targetLevel = scheduleData?.config.educationLevel || scheduleData?.educationLevel || selectedLevel;
     try {
-      await ExamScheduleRepository.deleteSchedule(targetYear, targetType);
+      await ExamScheduleRepository.deleteSchedule(targetYear, targetType, targetLevel);
       setScheduleData(null);
       setIsConfirmDeleteOpen(false);
       setActiveTab('form');
       setToast({
-        text: `Jadwal ujian ${targetType} (TA ${targetYear}) berhasil dihapus.`,
+        text: `Jadwal ujian ${targetType} (${targetLevel} - TA ${targetYear}) berhasil dihapus.`,
         type: 'success',
       });
     } catch (err) {
@@ -745,8 +789,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
 
     try {
       const updatedSubjectSchedules = scheduleData.subjectSchedules.filter((s) => s.id !== scheduleItemId);
+      const effectiveLevel = scheduleData.config.educationLevel || scheduleData.educationLevel || selectedLevel;
       const updatedSchedule: ExamScheduleData = {
         ...scheduleData,
+        educationLevel: effectiveLevel,
         subjectSchedules: updatedSubjectSchedules,
         summary: {
           ...scheduleData.summary,
@@ -755,7 +801,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         updatedAt: new Date().toISOString(),
       };
 
-      await ExamScheduleRepository.saveSchedule(updatedSchedule);
+      await ExamScheduleRepository.saveSchedule(updatedSchedule, effectiveLevel);
       setScheduleData(updatedSchedule);
       setToast({
         text: `Jadwal ${subjectName} (${className}) berhasil dihapus dari jadwal aktif.`,
@@ -780,10 +826,17 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   }, [scheduleData, currentUser]);
 
   // Build Official Invigilation Matrix (Official School Layout)
+  const effectiveInstitutionName = useMemo(() => {
+    const level = scheduleData?.config.educationLevel || scheduleData?.educationLevel || selectedLevel;
+    if (level === 'SMP') return 'SMP Terpadu Al-Ittihadiyah';
+    if (level === 'SMA') return 'SMA Terpadu As Salaam';
+    return institutionName;
+  }, [scheduleData, selectedLevel, institutionName]);
+
   const invigilationMatrix = useMemo(() => {
     if (!scheduleData) return null;
-    return ExamMatrixBuilderService.buildMatrix(scheduleData, teachers, institutionName);
-  }, [scheduleData, teachers, institutionName]);
+    return ExamMatrixBuilderService.buildMatrix(scheduleData, teachers, effectiveInstitutionName);
+  }, [scheduleData, teachers, effectiveInstitutionName]);
 
   if (!isOpen) return null;
 
@@ -845,8 +898,8 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
             </div>
             <p className="text-[11px] text-slate-500 truncate">
               {scheduleData
-                ? `${scheduleData.config.examTitle || scheduleData.config.examType} • TA ${activeAcademicYear} (${activeSemester}) • ${scheduleData.summary.totalDays} Hari Ujian`
-                : `Penyusunan jadwal otomatis berbasis AI • Tahun Ajaran ${activeAcademicYear}`}
+                ? `${scheduleData.config.examTitle || scheduleData.config.examType} (${selectedLevel}) • TA ${activeAcademicYear} (${activeSemester}) • ${scheduleData.summary.totalDays} Hari Ujian`
+                : `Penyusunan jadwal otomatis berbasis AI (${selectedLevel}) • Tahun Ajaran ${activeAcademicYear}`}
             </p>
           </div>
         </div>
@@ -925,6 +978,37 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       {/* Tab Navigation Bar */}
       <div className="px-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-2 overflow-x-auto shrink-0 shadow-2xs">
         <div className="flex items-center gap-1.5 sm:gap-2 py-2">
+          {/* Level Switcher (SMP vs SMA) */}
+          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 mr-1 shrink-0 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => handleLevelChange('SMP')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                selectedLevel === 'SMP'
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+              title="Pilih Jenjang SMP Terpadu Al-Ittihadiyah"
+            >
+              <span className="text-xs">🏫</span>
+              <span>SMP</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleLevelChange('SMA')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                selectedLevel === 'SMA'
+                  ? 'bg-blue-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+              title="Pilih Jenjang SMA Terpadu As Salaam"
+            >
+              <span className="text-xs">🎓</span>
+              <span>SMA</span>
+            </button>
+          </div>
+          <div className="h-6 w-px bg-slate-200 shrink-0 mx-0.5" />
+
           {/* Tab 0: Asisten AI Jadwal (Prompt Cepat) */}
           {accessInfo.canManage && (
             <button
@@ -1097,7 +1181,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
               </div>
 
               {/* Data Context Pills */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/15 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-white/15 text-xs">
+                <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
+                  <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Unit Sekolah</span>
+                  <span className="font-bold text-white text-sm">
+                    {selectedLevel === 'SMP' ? 'SMP Al-Ittihadiyah' : 'SMA As Salaam'}
+                  </span>
+                </div>
                 <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
                   <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Tahun Ajaran</span>
                   <span className="font-bold text-white text-sm">{formAcademicYear || activeAcademicYear}</span>
@@ -1107,10 +1197,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                   <span className="font-bold text-white text-sm">{activeSemester}</span>
                 </div>
                 <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
-                  <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Rombel Terdata</span>
+                  <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Rombel {selectedLevel}</span>
                   <span className="font-bold text-white text-sm">{availableClasses.length} Kelas</span>
                 </div>
-                <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
+                <div className="bg-black/20 rounded-xl p-2.5 border border-white/10 col-span-2 sm:col-span-1">
                   <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Guru Pengawas</span>
                   <span className="font-bold text-white text-sm">{teachers.length} Guru Aktif</span>
                 </div>
@@ -1131,7 +1221,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                           Jadwal {scheduleData.config.examTitle || scheduleData.config.examType} Sudah Tersimpan
                         </span>
                         <span className="px-2 py-0.5 text-[10px] font-bold bg-teal-100 text-teal-800 rounded-full">
-                          Aktif (TA {scheduleData.config.academicYear})
+                          Aktif ({selectedLevel} • TA {scheduleData.config.academicYear})
                         </span>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
@@ -1185,13 +1275,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Zap className="w-4 h-4 text-amber-500" />
-                  <span>Pilih Template Prompt Cepat (1-Klik Isi):</span>
+                  <span>Pilih Template Prompt Cepat {selectedLevel} (1-Klik Isi):</span>
                 </label>
                 <span className="text-[11px] text-slate-400">Klik salah satu untuk mengisi otomatis</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {EXAM_AI_PROMPT_PRESETS.map((preset) => {
+                {getExamAIPromptPresets(selectedLevel).map((preset) => {
                   const isSelected = selectedPresetId === preset.id;
                   return (
                     <button
@@ -1789,6 +1879,11 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                   <div>
                     <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
                       <span>Rombel / Kelas Peserta Ujian</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        selectedLevel === 'SMA' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-teal-50 text-teal-700 border border-teal-200'
+                      }`}>
+                        Jenjang {selectedLevel}
+                      </span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-50 text-teal-700 border border-teal-200">
                         TA {formAcademicYear}
                       </span>

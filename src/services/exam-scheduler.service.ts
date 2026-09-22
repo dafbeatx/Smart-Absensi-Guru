@@ -392,9 +392,11 @@ export class ExamSchedulerService {
       aiOptimizationNote: aiNote,
     };
 
+    const levelSuffix = config.educationLevel ? `_${config.educationLevel.toLowerCase()}` : '';
     return {
-      id: `sched_${config.academicYear.replace(/[^\w]/g, '_')}_${config.examType}_${Date.now()}`,
+      id: `sched_${config.academicYear.replace(/[^\w]/g, '_')}_${config.examType}${levelSuffix}_${Date.now()}`,
       config,
+      educationLevel: config.educationLevel,
       subjectSchedules,
       proctorSchedules,
       summary,

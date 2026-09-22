@@ -6171,10 +6171,11 @@ export class SupabaseProvider implements IDataProvider {
     return true;
   }
 
-  public async getExamSchedule(academicYear: string, examType: string, _token?: string): Promise<ExamScheduleData | null> {
+  public async getExamSchedule(academicYear: string, examType: string, _token?: string, level?: 'SMP' | 'SMA'): Promise<ExamScheduleData | null> {
     const cleanYear = academicYear.replace(/[^\w]/g, '_');
     const cleanType = examType.replace(/[^\w]/g, '_');
-    const storageKey = `exam_schedule_${cleanYear}_${cleanType}`;
+    const levelSuffix = level ? `_${level.toLowerCase()}` : '';
+    const storageKey = `exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
 
     const now = Date.now();
     const cached = this.cachedExamSchedules.get(storageKey);
@@ -6198,7 +6199,7 @@ export class SupabaseProvider implements IDataProvider {
           // Update local cache
           try {
             if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`, JSON.stringify(parsed));
+              localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`, JSON.stringify(parsed));
             }
           } catch {}
 
@@ -6211,11 +6212,15 @@ export class SupabaseProvider implements IDataProvider {
       // 2. Check local storage fallback
       try {
         if (typeof localStorage !== 'undefined') {
-          const raw = localStorage.getItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`);
+          let raw = localStorage.getItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`);
+          // Fallback to legacy key without level if SMP
+          if (!raw && level === 'SMP') {
+            raw = localStorage.getItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`);
+          }
           if (raw) {
             const parsed: ExamScheduleData = JSON.parse(raw);
             // Auto-migrate to cloud
-            this.saveExamSchedule(parsed).catch((e) => {
+            this.saveExamSchedule(parsed, undefined, level).catch((e) => {
               logger.warn('SupabaseProvider', 'Failed auto-migrating local exam schedule to cloud:', e);
             });
             this.cachedExamSchedules.set(storageKey, { data: parsed, timestamp: Date.now() });
@@ -6228,17 +6233,19 @@ export class SupabaseProvider implements IDataProvider {
     });
   }
 
-  public async saveExamSchedule(schedule: ExamScheduleData, _token?: string): Promise<boolean> {
+  public async saveExamSchedule(schedule: ExamScheduleData, _token?: string, level?: 'SMP' | 'SMA'): Promise<boolean> {
     const cleanYear = schedule.config.academicYear.replace(/[^\w]/g, '_');
     const cleanType = schedule.config.examType.replace(/[^\w]/g, '_');
-    const storageKey = `exam_schedule_${cleanYear}_${cleanType}`;
+    const effectiveLevel = level || schedule.config.educationLevel || schedule.educationLevel;
+    const levelSuffix = effectiveLevel ? `_${effectiveLevel.toLowerCase()}` : '';
+    const storageKey = `exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
 
     this.cachedExamSchedules.delete(storageKey);
 
     // 1. Local storage
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`, JSON.stringify(schedule));
+        localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`, JSON.stringify(schedule));
       }
     } catch {}
 
@@ -6262,16 +6269,21 @@ export class SupabaseProvider implements IDataProvider {
     return true;
   }
 
-  public async deleteExamSchedule(academicYear: string, examType: string, _token?: string): Promise<boolean> {
+  public async deleteExamSchedule(academicYear: string, examType: string, _token?: string, level?: 'SMP' | 'SMA'): Promise<boolean> {
     const cleanYear = academicYear.replace(/[^\w]/g, '_');
     const cleanType = examType.replace(/[^\w]/g, '_');
-    const storageKey = `exam_schedule_${cleanYear}_${cleanType}`;
+    const levelSuffix = level ? `_${level.toLowerCase()}` : '';
+    const storageKey = `exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
 
     this.cachedExamSchedules.delete(storageKey);
 
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`);
+        localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`);
+        if (!level) {
+          localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}_smp`);
+          localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}_sma`);
+        }
       }
     } catch {}
 

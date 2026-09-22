@@ -12,10 +12,12 @@ import type {
   SessionTimeSlot,
   DaySessionOverride,
   ExamCommitteeMember,
+  EducationLevel,
 } from '../types/exam-schedule.types';
 import type { UserProfile } from '../types/database.types';
 import { ExamSchedulerService } from './exam-scheduler.service';
 import { ExamScheduleRepository } from '../repositories/ExamScheduleRepository';
+import { resolveSchoolLevel } from '../utils/class.utils';
 import { logger } from '../utils/logger.utils';
 
 export interface AIPromptPreset {
@@ -26,45 +28,88 @@ export interface AIPromptPreset {
   prompt: string;
 }
 
-export const EXAM_AI_PROMPT_PRESETS: AIPromptPreset[] = [
+export const EXAM_AI_PROMPT_PRESETS_SMP: AIPromptPreset[] = [
   {
-    id: 'asts_standard_5days',
-    title: 'ASTS Ganjil Standar (5 Hari, 2 Sesi/Hari)',
-    badge: 'Paling Populer',
-    description: 'Senin s/d Jumat, 2 sesi/hari (Jumat 1 sesi), pembagian pengawas merata & adil.',
+    id: 'asts_smp_standard_5days',
+    title: 'ASTS SMP Standar (Kelas 7-9, 5 Hari)',
+    badge: 'SMP Al-Ittihadiyah',
+    description: 'Senin s/d Jumat, 2 sesi/hari (Jumat 1 sesi), kelas 7A-9B, pembagian pengawas merata & adil.',
     prompt:
-      'Buatkan jadwal ASTS (Asesmen Sumatif Tengah Semester) ganjil untuk semua kelas dari tanggal 29 September sampai 3 Oktober 2026. 2 sesi per hari (sesi 1 jam 07:30 - 09:00, sesi 2 jam 09:30 - 11:00), khusus hari Jumat 1 sesi saja (07:15 - 08:45). Mapel: PAI, Matematika, Bahasa Indonesia, IPA, IPS, Bahasa Inggris, PJOK, Seni Budaya, Informatika, PKn. Bagi rata seluruh guru sebagai pengawas, 1 guru per ruang, jangan tugaskan guru mengawas mata pelajarannya sendiri.',
+      'Buatkan jadwal ASTS (Asesmen Sumatif Tengah Semester) ganjil SMP Terpadu Al-Ittihadiyah untuk kelas 7A, 7B, 8A, 8B, 9A, 9B dari tanggal 29 September sampai 3 Oktober 2026. 2 sesi per hari (sesi 1 jam 07:30 - 09:00, sesi 2 jam 09:30 - 11:00), khusus hari Jumat 1 sesi saja (07:15 - 08:45). Mapel: PAI, Matematika, Bahasa Indonesia, IPA, IPS, Bahasa Inggris, PJOK, Seni Budaya, Informatika, PKn, Bahasa Arab. Bagi rata seluruh guru sebagai pengawas, 1 guru per ruang, jangan tugaskan guru mengawas mata pelajarannya sendiri.',
   },
   {
-    id: 'asts_quick_all',
-    title: 'ASTS Kilat (Semua Rombel & Guru Aktif)',
-    badge: 'Instan',
-    description: 'Jadwal otomatis 5 hari kerja dengan seluruh rombel dan seluruh guru yang aktif.',
+    id: 'asts_smp_quick_all',
+    title: 'ASTS Kilat SMP (Semua Rombel SMP)',
+    badge: 'Instan SMP',
+    description: 'Jadwal otomatis 5 hari kerja untuk seluruh rombel SMP yang aktif.',
     prompt:
-      'Buatkan jadwal ASTS kilat untuk semua rombel yang ada, 2 sesi per hari, hari Jumat 1 sesi, semua guru aktif ditugaskan mengawas secara adil dan merata, 1 pengawas per ruang, jangan mengawas mapel sendiri.',
+      'Buatkan jadwal ASTS kilat untuk semua rombel SMP yang ada, 2 sesi per hari, hari Jumat 1 sesi, semua guru aktif ditugaskan mengawas secara adil dan merata, 1 pengawas per ruang, jangan mengawas mapel sendiri.',
   },
   {
-    id: 'asas_6days_saturday',
-    title: 'ASAS Lengkap 6 Hari (Termasuk Sabtu)',
-    badge: 'Semester Lengkap',
-    description: 'Senin s/d Sabtu, 2 sesi per hari, seluruh mata pelajaran pokok dan muatan lokal.',
+    id: 'asas_smp_6days_saturday',
+    title: 'ASAS Lengkap 6 Hari SMP (Termasuk Sabtu)',
+    badge: 'Semester SMP',
+    description: 'Senin s/d Sabtu, 2 sesi per hari, seluruh mata pelajaran pokok SMP dan muatan lokal.',
     prompt:
-      'Buatkan jadwal ASAS (Asesmen Sumatif Akhir Semester) selama 6 hari dari Senin sampai Sabtu, sertakan hari Sabtu, 2 sesi per hari, 1 pengawas per ruang, seluruh mata pelajaran lengkap, tetapkan pengawas cadangan.',
+      'Buatkan jadwal ASAS (Asesmen Sumatif Akhir Semester) SMP selama 6 hari dari Senin sampai Sabtu, sertakan hari Sabtu, 2 sesi per hari, 1 pengawas per ruang, seluruh mata pelajaran lengkap, tetapkan pengawas cadangan.',
   },
   {
-    id: 'asts_morning_3sessions',
-    title: 'ASTS Intensif 3 Sesi (Pagi s/d Siang)',
-    badge: '3 Sesi',
-    description: '3 sesi per hari (Jumat 2 sesi), alokasi ruang dan pengawas proporsional.',
+    id: 'asts_smp_morning_3sessions',
+    title: 'ASTS Intensif 3 Sesi SMP (Pagi s/d Siang)',
+    badge: '3 Sesi SMP',
+    description: '3 sesi per hari (Jumat 2 sesi), alokasi ruang dan pengawas SMP proporsional.',
     prompt:
-      'Buatkan jadwal ASTS intensif 3 sesi per hari mulai jam 07:30 WIB, khusus hari Jumat 2 sesi sebelum sholat Jumat. Rombel lengkap, 1 pengawas per ruang, bagi rata jadwal mengawas antar guru.',
+      'Buatkan jadwal ASTS intensif SMP 3 sesi per hari mulai jam 07:30 WIB, khusus hari Jumat 2 sesi sebelum sholat Jumat. Rombel SMP lengkap, 1 pengawas per ruang, bagi rata jadwal mengawas antar guru.',
   },
 ];
+
+export const EXAM_AI_PROMPT_PRESETS_SMA: AIPromptPreset[] = [
+  {
+    id: 'asts_sma_standard_5days',
+    title: 'ASTS SMA Standar (Kelas 10-12, 5 Hari)',
+    badge: 'SMA As Salaam',
+    description: 'Senin s/d Jumat, 2 sesi/hari (Jumat 1 sesi), kelas 10, 11, 12 SMA, pengawas merata.',
+    prompt:
+      'Buatkan jadwal ASTS (Asesmen Sumatif Tengah Semester) ganjil SMA Terpadu As Salaam untuk rombel SMA dari tanggal 29 September sampai 3 Oktober 2026. 2 sesi per hari (sesi 1 jam 07:30 - 09:00, sesi 2 jam 09:30 - 11:00), khusus hari Jumat 1 sesi saja (07:15 - 08:45). Mapel: PAI, Matematika, Bahasa Indonesia, Bahasa Inggris, Fisika, Kimia, Biologi, Ekonomi, Sosiologi, Geografi, PKn, PJOK. Bagi rata seluruh guru sebagai pengawas, 1 guru per ruang, jangan tugaskan guru mengawas mata pelajarannya sendiri.',
+  },
+  {
+    id: 'asts_sma_quick_all',
+    title: 'ASTS Kilat SMA (Semua Rombel SMA)',
+    badge: 'Instan SMA',
+    description: 'Jadwal otomatis 5 hari kerja untuk seluruh rombel SMA (10, 11, 12) dan guru aktif.',
+    prompt:
+      'Buatkan jadwal ASTS kilat untuk semua rombel SMA yang ada, 2 sesi per hari, hari Jumat 1 sesi, semua guru aktif ditugaskan mengawas secara adil dan merata, 1 pengawas per ruang, jangan mengawas mapel sendiri.',
+  },
+  {
+    id: 'asas_sma_6days_saturday',
+    title: 'ASAS Lengkap 6 Hari SMA (Termasuk Sabtu)',
+    badge: 'Semester SMA',
+    description: 'Senin s/d Sabtu, 2 sesi per hari, seluruh mata pelajaran SMA lengkap dan tetapkan pengawas cadangan.',
+    prompt:
+      'Buatkan jadwal ASAS (Asesmen Sumatif Akhir Semester) SMA selama 6 hari dari Senin sampai Sabtu, sertakan hari Sabtu, 2 sesi per hari, 1 pengawas per ruang, seluruh mata pelajaran SMA lengkap, tetapkan pengawas cadangan.',
+  },
+  {
+    id: 'asts_sma_morning_3sessions',
+    title: 'ASTS Intensif 3 Sesi SMA (Pagi s/d Siang)',
+    badge: '3 Sesi SMA',
+    description: '3 sesi per hari (Jumat 2 sesi), alokasi ruang dan pengawas SMA proporsional.',
+    prompt:
+      'Buatkan jadwal ASTS intensif SMA 3 sesi per hari mulai jam 07:30 WIB, khusus hari Jumat 2 sesi sebelum sholat Jumat. Rombel SMA lengkap, 1 pengawas per ruang, bagi rata jadwal mengawas antar guru.',
+  },
+];
+
+export function getExamAIPromptPresets(level?: EducationLevel): AIPromptPreset[] {
+  return level === 'SMA' ? EXAM_AI_PROMPT_PRESETS_SMA : EXAM_AI_PROMPT_PRESETS_SMP;
+}
+
+// Fallback legacy export
+export const EXAM_AI_PROMPT_PRESETS: AIPromptPreset[] = EXAM_AI_PROMPT_PRESETS_SMP;
 
 export interface ExamAIGenerateParams {
   prompt: string;
   academicYear: string;
   semester: string;
+  educationLevel?: EducationLevel;
   teachers: UserProfile[];
   committeeMembers?: ExamCommitteeMember[];
   availableClasses: string[];
@@ -112,6 +157,11 @@ export class ExamScheduleAIGeneratorService {
       aiExplanation = 'Jadwal disusun menggunakan mesin heuristik cerdas kurikulum sekolah.';
     }
 
+    // Explicitly lock education level
+    if (params.educationLevel) {
+      parsedConfig.educationLevel = params.educationLevel;
+    }
+
     // 3. Generate conflict-free subject schedules & fair proctor roster
     const schedule = ExamSchedulerService.generateSchedule(
       parsedConfig,
@@ -119,13 +169,18 @@ export class ExamScheduleAIGeneratorService {
       params.committeeMembers || []
     );
 
+    if (params.educationLevel) {
+      schedule.config.educationLevel = params.educationLevel;
+      schedule.educationLevel = params.educationLevel;
+    }
+
     // Attach AI optimization note
     schedule.summary.aiOptimizationNote = `${aiExplanation} (${
       usedFallback ? 'Mode Heuristik Cepat' : 'Mode Groq AI'
     })`;
 
-    // 4. Save schedule to repository (cloud + local storage)
-    await ExamScheduleRepository.saveSchedule(schedule);
+    // 4. Save schedule to repository (cloud + local storage) with level segregation
+    await ExamScheduleRepository.saveSchedule(schedule, params.educationLevel);
 
     return {
       schedule,
@@ -144,10 +199,12 @@ export class ExamScheduleAIGeneratorService {
   ): Promise<{ config: any; explanation?: string } | null> {
     if (typeof window === 'undefined') return null;
 
+    const schoolName = params.educationLevel === 'SMA' ? 'SMA Terpadu As Salaam' : 'SMP Terpadu Al-Ittihadiyah';
     const systemInstruction = `Anda adalah "AI Master Scheduler" untuk sekolah dan madrasah di Indonesia.
 Tugas Anda adalah membaca instruksi jadwal ujian (ASTS/ASAS) dan mengubahnya menjadi objek JSON konfigurasi terstruktur.
 
 Data Sekolah Tersedia:
+- Unit Sekolah: ${schoolName} (${params.educationLevel || 'SMP'})
 - Tahun Ajaran: ${params.academicYear}
 - Semester: ${params.semester}
 - Rombel/Kelas yang ada di sekolah: ${JSON.stringify(params.availableClasses)}
@@ -174,7 +231,7 @@ Aturan:
     "dayOverrides": [
       { "date": "YYYY-MM-DD", "dayName": "Jumat", "sessionsCount": 1 }
     ],
-    "selectedClasses": ["7A", "7B", "8A", "8B", "9A", "9B"],
+    "selectedClasses": ${JSON.stringify(params.availableClasses.length > 0 ? params.availableClasses : ['7A', '7B', '8A', '8B', '9A', '9B'])},
     "selectedSubjects": ["PAI", "Matematika", "IPA", "IPS", "Bahasa Indonesia", "Bahasa Inggris"],
     "proctorsPerRoom": 1,
     "excludeOwnSubject": true,
@@ -226,16 +283,21 @@ Aturan:
     params: ExamAIGenerateParams
   ): ExamScheduleFormConfig {
     const text = prompt.toLowerCase();
+    const effectiveLevel: EducationLevel =
+      params.educationLevel ||
+      (text.includes('sma') || text.includes('as salaam') || text.includes('assalaam')
+        ? 'SMA'
+        : 'SMP');
 
     // 1. Detect Exam Type
     const isASAS = text.includes('asas') || text.includes('akhir semester') || text.includes('semester akhir');
     const isASAJ = text.includes('asaj') || text.includes('akhir jenjang');
     const examType: ExamType = isASAS ? 'ASAS' : isASAJ ? 'ASAJ' : 'ASTS';
     const examTitle = isASAS
-      ? 'Asesmen Sumatif Akhir Semester (ASAS)'
+      ? `Asesmen Sumatif Akhir Semester (ASAS) ${effectiveLevel}`
       : isASAJ
-      ? 'Asesmen Sumatif Akhir Jenjang (ASAJ)'
-      : 'Asesmen Sumatif Tengah Semester (ASTS)';
+      ? `Asesmen Sumatif Akhir Jenjang (ASAJ) ${effectiveLevel}`
+      : `Asesmen Sumatif Tengah Semester (ASTS) ${effectiveLevel}`;
 
     // 2. Detect Saturday inclusion
     const includeSaturday =
@@ -293,40 +355,76 @@ Aturan:
       });
     });
 
-    // 7. Extract Classes
-    let selectedClasses = [...params.availableClasses];
-    if (selectedClasses.length === 0) {
-      selectedClasses = ['7A', '7B', '8A', '8B', '9A', '9B'];
+    // 7. Extract Classes with Education Level Segregation
+    let levelClasses = params.availableClasses.filter(
+      (c) => resolveSchoolLevel(c) === effectiveLevel
+    );
+    if (levelClasses.length === 0) {
+      levelClasses =
+        effectiveLevel === 'SMA'
+          ? ['10', '11', '12']
+          : ['7A', '7B', '8A', '8B', '9A', '9B'];
     }
 
-    // If prompt mentions specific grades (e.g. "hanya kelas 7 dan 8" or "kelas 9 saja")
-    if (text.includes('kelas 7') && !text.includes('kelas 8') && !text.includes('kelas 9')) {
-      const filtered = selectedClasses.filter((c) => c.startsWith('7'));
-      if (filtered.length > 0) selectedClasses = filtered;
-    } else if (text.includes('kelas 8') && !text.includes('kelas 7') && !text.includes('kelas 9')) {
-      const filtered = selectedClasses.filter((c) => c.startsWith('8'));
-      if (filtered.length > 0) selectedClasses = filtered;
-    } else if (text.includes('kelas 9') && !text.includes('kelas 7') && !text.includes('kelas 8')) {
-      const filtered = selectedClasses.filter((c) => c.startsWith('9'));
-      if (filtered.length > 0) selectedClasses = filtered;
+    let selectedClasses = [...levelClasses];
+
+    // If prompt mentions specific grades
+    if (effectiveLevel === 'SMP') {
+      if (text.includes('kelas 7') && !text.includes('kelas 8') && !text.includes('kelas 9')) {
+        const filtered = selectedClasses.filter((c) => c.startsWith('7'));
+        if (filtered.length > 0) selectedClasses = filtered;
+      } else if (text.includes('kelas 8') && !text.includes('kelas 7') && !text.includes('kelas 9')) {
+        const filtered = selectedClasses.filter((c) => c.startsWith('8'));
+        if (filtered.length > 0) selectedClasses = filtered;
+      } else if (text.includes('kelas 9') && !text.includes('kelas 7') && !text.includes('kelas 8')) {
+        const filtered = selectedClasses.filter((c) => c.startsWith('9'));
+        if (filtered.length > 0) selectedClasses = filtered;
+      }
+    } else {
+      if (text.includes('kelas 10') && !text.includes('kelas 11') && !text.includes('kelas 12')) {
+        const filtered = selectedClasses.filter((c) => c.startsWith('10') || c.startsWith('X'));
+        if (filtered.length > 0) selectedClasses = filtered;
+      } else if (text.includes('kelas 11') && !text.includes('kelas 10') && !text.includes('kelas 12')) {
+        const filtered = selectedClasses.filter((c) => c.startsWith('11') || c.startsWith('XI'));
+        if (filtered.length > 0) selectedClasses = filtered;
+      } else if (text.includes('kelas 12') && !text.includes('kelas 10') && !text.includes('kelas 11')) {
+        const filtered = selectedClasses.filter((c) => c.startsWith('12') || c.startsWith('XII'));
+        if (filtered.length > 0) selectedClasses = filtered;
+      }
     }
 
     // 8. Extract Subjects
     let selectedSubjects = [...params.availableSubjects];
     if (selectedSubjects.length === 0) {
-      selectedSubjects = [
-        'PAI',
-        'PKn',
-        'Bahasa Indonesia',
-        'Matematika',
-        'IPA',
-        'IPS',
-        'Bahasa Inggris',
-        'Informatika',
-        'Seni Budaya',
-        'PJOK',
-        'Bahasa Arab',
-      ];
+      selectedSubjects =
+        effectiveLevel === 'SMA'
+          ? [
+              'PAI',
+              'PKn',
+              'Bahasa Indonesia',
+              'Bahasa Inggris',
+              'Matematika',
+              'Fisika',
+              'Kimia',
+              'Biologi',
+              'Ekonomi',
+              'Sosiologi',
+              'Geografi',
+              'PJOK',
+            ]
+          : [
+              'PAI',
+              'PKn',
+              'Bahasa Indonesia',
+              'Matematika',
+              'IPA',
+              'IPS',
+              'Bahasa Inggris',
+              'Informatika',
+              'Seni Budaya',
+              'PJOK',
+              'Bahasa Arab',
+            ];
     }
 
     // If prompt explicitly lists subjects
@@ -352,6 +450,7 @@ Aturan:
     return {
       examType,
       examTitle,
+      educationLevel: effectiveLevel,
       academicYear: params.academicYear,
       semester: params.semester,
       startDate,
@@ -381,6 +480,7 @@ Aturan:
     params: ExamAIGenerateParams
   ): ExamScheduleFormConfig {
     const fallback = this.parsePromptLocally(params.prompt, params);
+    const effectiveLevel = params.educationLevel || fallback.educationLevel;
 
     const examType: ExamType =
       raw?.examType === 'ASAS' || raw?.examType === 'ASAJ' || raw?.examType === 'ASTS'
@@ -402,10 +502,21 @@ Aturan:
         ? raw.sessionsPerDay
         : fallback.sessionsPerDay;
 
-    const selectedClasses =
+    let selectedClasses =
       Array.isArray(raw?.selectedClasses) && raw.selectedClasses.length > 0
         ? raw.selectedClasses.filter((c: any) => typeof c === 'string' && c.trim().length > 0)
         : fallback.selectedClasses;
+
+    if (effectiveLevel) {
+      const filteredByLevel = selectedClasses.filter(
+        (c: string) => resolveSchoolLevel(c) === effectiveLevel
+      );
+      if (filteredByLevel.length > 0) {
+        selectedClasses = filteredByLevel;
+      } else {
+        selectedClasses = fallback.selectedClasses;
+      }
+    }
 
     const selectedSubjects =
       Array.isArray(raw?.selectedSubjects) && raw.selectedSubjects.length > 0
@@ -417,6 +528,7 @@ Aturan:
     return {
       ...fallback,
       examType,
+      educationLevel: effectiveLevel,
       examTitle: typeof raw?.examTitle === 'string' && raw.examTitle.trim() ? raw.examTitle.trim() : fallback.examTitle,
       startDate,
       endDate,

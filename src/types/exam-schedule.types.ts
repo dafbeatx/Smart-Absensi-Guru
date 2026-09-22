@@ -5,6 +5,8 @@
 
 export type ExamType = 'ASTS' | 'ASAS' | 'ASAJ' | 'HARIAN';
 
+export type EducationLevel = 'SMP' | 'SMA';
+
 export type CommitteeRole = 'KETUA' | 'SEKRETARIS' | 'BENDAHARA' | 'ANGGOTA';
 
 export interface ExamCommitteeMember {
@@ -64,6 +66,7 @@ export interface DaySessionOverride {
 }
 
 export interface ExamScheduleFormConfig {
+  educationLevel?: EducationLevel; // 'SMP' | 'SMA' (Terpisah antar jenjang)
   examType: ExamType;
   examTitle: string;
   academicYear: string;
@@ -99,6 +102,7 @@ export interface ExamScheduleSummary {
 
 export interface ExamScheduleData {
   id: string;
+  educationLevel?: EducationLevel; // 'SMP' | 'SMA'
   config: ExamScheduleFormConfig;
   subjectSchedules: ExamSubjectScheduleItem[];
   proctorSchedules: ExamProctorItem[];
