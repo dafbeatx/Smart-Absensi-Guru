@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Award } from 'lucide-react';
+import { Award, RefreshCw } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
@@ -12,6 +12,7 @@ import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHist
 import { convertToWebP, formatFileSize } from '../../../utils/image.utils';
 import { handleAppError } from '../../../utils/error.utils';
 import { getTeacherDisciplineLeaderboard } from '../../../utils/teacher-appreciation.utils';
+import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import {
   ExamCommitteeRepository,
   EXAM_COMMITTEE_CHANGED_EVENT,
@@ -51,6 +52,32 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
   const [selectedTeacherForPoints, setSelectedTeacherForPoints] = useState<UserProfile | null>(null);
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [allPointLogs, setAllPointLogs] = useState<TeacherPointLog[]>([]);
+  const [isSyncingPoints, setIsSyncingPoints] = useState(false);
+
+  const handleSyncAllPoints = async () => {
+    if (isSyncingPoints) return;
+    setIsSyncingPoints(true);
+    try {
+      const token = useAuthStore.getState().token || '';
+      const logs = await TeacherPointReconciliationService.reconcileAllTeachers(token, true);
+      setAllPointLogs(logs || []);
+      try {
+        localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(logs || []));
+      } catch {}
+
+      // Dispatch global event agar seluruh komponen dan dashboard guru/admin ter-refresh serempak
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smart_absensi_points_updated'));
+      }
+
+      showToast('success', 'Sinkronisasi Berhasil', 'Poin kedisiplinan seluruh guru berhasil disinkronkan!');
+    } catch (err) {
+      console.error('Failed to sync all teacher points:', err);
+      showToast('error', 'Sinkronisasi Gagal', 'Gagal menyinkronkan poin guru. Silakan coba lagi.');
+    } finally {
+      setIsSyncingPoints(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -637,11 +664,24 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <p className="text-xs text-slate-500">{filteredTeachers.length} pengguna terdaftar</p>
         </div>
 
-        {!effectiveReadOnly && (
-          <Button variant="primary" onClick={handleOpenAddModal}>
-            + Tambah Pengguna Baru
-          </Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleSyncAllPoints}
+            disabled={isSyncingPoints}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Sinkronisasikan seluruh riwayat absensi ke buku besar poin guru (aman & hemat egress)"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingPoints ? 'animate-spin' : ''}`} />
+            <span>{isSyncingPoints ? 'Menyinkronkan Poin...' : 'Sinkron Poin Guru'}</span>
+          </button>
+
+          {!effectiveReadOnly && (
+            <Button variant="primary" onClick={handleOpenAddModal}>
+              + Tambah Pengguna Baru
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filter & Search Bar */}

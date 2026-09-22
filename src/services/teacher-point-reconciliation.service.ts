@@ -7,6 +7,7 @@ import type {
   HolidayRecord,
 } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
+import { getTodayDateInJakarta } from '../utils/time.utils';
 
 export interface ReconcilePointsOptions {
   includePenalties?: boolean;
@@ -294,10 +295,16 @@ export class TeacherPointReconciliationService {
     }
 
     const provider = ProviderFactory.getProvider();
+    if (forceRefresh) {
+      this.invalidateReconciliationCache();
+      if (typeof (provider as any).invalidateTeacherPointCache === 'function') {
+        (provider as any).invalidateTeacherPointCache();
+      }
+    }
+
     try {
-      const now = new Date();
-      const currentMonth = String(now.getMonth() + 1);
-      const currentYear = String(now.getFullYear());
+      const todayJakarta = getTodayDateInJakarta();
+      const [currentYear, currentMonth] = todayJakarta.split('-');
       const allAttendance = await provider.getMonthlyAttendance('ALL', currentMonth, currentYear, token || '');
       const allLogs = await provider.getTeacherPointHistory('ALL', token);
       const dutySchedules = await provider.getDutySchedules(token).catch(() => []);
@@ -346,7 +353,7 @@ export class TeacherPointReconciliationService {
         }
       }
 
-      if (totalChanges && typeof window !== 'undefined') {
+      if ((totalChanges || forceRefresh) && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('smart_absensi_points_updated'));
       }
 

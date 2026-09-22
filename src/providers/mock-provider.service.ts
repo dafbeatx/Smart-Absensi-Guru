@@ -2808,6 +2808,10 @@ export class MockProvider implements IDataProvider {
     return newLog;
   }
 
+  public invalidateTeacherPointCache(_userId?: string): void {
+    // No-op for mock provider (uses localStorage directly)
+  }
+
   private generateSeedTeacherPointLogs(): TeacherPointLog[] {
     return getInitialSeedTeacherPointLogs();
   }

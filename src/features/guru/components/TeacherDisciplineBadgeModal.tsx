@@ -10,6 +10,7 @@ import {
   type DisciplinePeriodType,
   type TeacherLeaderboardItem,
 } from '../../../utils/teacher-appreciation.utils';
+import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import {
   Trophy,
   Award,
@@ -190,10 +191,15 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     try {
       const token = useAuthStore.getState().token || undefined;
       setSyncProgress(65);
-      setSyncStageText('Memuat riwayat perolehan poin seluruh guru...');
+      setSyncStageText(_forceRefresh ? 'Merekonsiliasi riwayat presensi & poin guru...' : 'Memuat riwayat perolehan poin seluruh guru...');
 
       const provider = ProviderFactory.getProvider();
-      const logs = await provider.getTeacherPointHistory('ALL', token);
+      let logs: TeacherPointLog[] = [];
+      if (_forceRefresh) {
+        logs = await TeacherPointReconciliationService.reconcileAllTeachers(token, true);
+      } else {
+        logs = await provider.getTeacherPointHistory('ALL', token);
+      }
 
       if (abortCtrl.signal.aborted) return;
       clearTimeout(timeoutTimer);

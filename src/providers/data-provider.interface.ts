@@ -181,6 +181,7 @@ export interface IDataProvider {
     log: Omit<TeacherPointLog, 'id' | 'created_at'>,
     token?: string
   ): Promise<TeacherPointLog>;
+  invalidateTeacherPointCache?(userId?: string): void;
 
   // Sarana dan Prasarana (Sarpras) Inventory API
   getInventorySarpras(token?: string): Promise<InventorySarprasItem[]>;

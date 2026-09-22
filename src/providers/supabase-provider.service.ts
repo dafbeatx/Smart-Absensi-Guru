@@ -5317,6 +5317,14 @@ export class SupabaseProvider implements IDataProvider {
     }
   }
 
+  public invalidateTeacherPointCache(userId?: string): void {
+    if (userId) {
+      this.cachedTeacherPointHistory.delete(userId);
+    } else {
+      this.cachedTeacherPointHistory.clear();
+    }
+  }
+
   // ============================================================================
   // SARANA DAN PRASARANA (SARPRAS) INVENTORY API
   // ============================================================================
