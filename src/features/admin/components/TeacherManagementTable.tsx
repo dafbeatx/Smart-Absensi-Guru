@@ -779,7 +779,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
                       {t.teaching_assignment && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
                           <span>📖</span>
-                          <span className="truncate max-w-[150px]">
+                          <span className="truncate max-w-37.5">
                             {Array.isArray(t.teaching_assignment) ? t.teaching_assignment.join(', ') : t.teaching_assignment}
                           </span>
                         </span>
