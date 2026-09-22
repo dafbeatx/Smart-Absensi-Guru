@@ -88,6 +88,7 @@ export interface ExamScheduleFormConfig {
   excludeCommitteeProctor: boolean;
   assignBackupProctor: boolean;
   aiCustomPrompt?: string;
+  customSubjectProctors?: Record<string, string[]>; // Alokasi eksak pengawas per mapel & ruang [P1, P2, P3, ...]
 }
 
 export interface ExamScheduleSummary {

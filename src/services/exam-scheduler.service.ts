@@ -19,6 +19,100 @@ interface TeacherLoad {
 
 export class ExamSchedulerService {
   /**
+   * Normalizes teacher names by removing academic titles, degree suffixes, and punctuation.
+   */
+  public static normalizeTeacherName(name: string): string {
+    return (name || '')
+      .toLowerCase()
+      .replace(/\b(s\.?pd|s\.?mat|s\.?e|g\.?r|s\.?si|s\.?kom|s\.?ag|m\.?pd|drs|dra|h\.|hj\.|m\.?m|s\.?pd\.?i)\b/gi, '')
+      .replace(/\bm\.?\s*iqbal\b/gi, 'muhammad iqbal')
+      .replace(/\bfarhiya\b/gi, 'fahriya')
+      .replace(/[.,]/g, ' ')
+      .replace(/[^a-z0-9\s]/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Finds matching teacher record from UserProfile list with title-insensitive matching,
+   * with fallback to stable synthetic profile to ensure zero data loss.
+   */
+  public static findMatchingTeacher(
+    targetName: string,
+    allTeachers: UserProfile[]
+  ): { userId: string; fullName: string } {
+    const normTarget = this.normalizeTeacherName(targetName);
+
+    // 1. Exact match on normalized full name
+    const exact = allTeachers.find((t) => this.normalizeTeacherName(t.full_name || '') === normTarget);
+    if (exact) return { userId: exact.id, fullName: exact.full_name || targetName };
+
+    // 2. Substring match
+    const sub = allTeachers.find((t) => {
+      const norm = this.normalizeTeacherName(t.full_name || '');
+      return norm.includes(normTarget) || normTarget.includes(norm);
+    });
+    if (sub) return { userId: sub.id, fullName: sub.full_name || targetName };
+
+    // 3. Fallback: generate a stable synthetic userId preserving the target name
+    const slug = normTarget.replace(/\s+/g, '_') || 'guru';
+    return {
+      userId: `usr_${slug}`,
+      fullName: targetName,
+    };
+  }
+
+  /**
+   * Finds custom proctor list for a subject from config.customSubjectProctors with alias lookup.
+   */
+  public static findCustomProctorsForSubject(
+    subjectName: string,
+    customMap?: Record<string, string[]>
+  ): string[] | undefined {
+    if (!customMap || Object.keys(customMap).length === 0) return undefined;
+
+    // 1. Exact key match
+    if (customMap[subjectName]) return customMap[subjectName];
+
+    // 2. Case-insensitive key match
+    const lowerSubj = subjectName.toLowerCase().trim();
+    const matchedKey = Object.keys(customMap).find((k) => k.toLowerCase().trim() === lowerSubj);
+    if (matchedKey && customMap[matchedKey]) return customMap[matchedKey];
+
+    // 3. Alias dictionary match
+    const aliasGroups: string[][] = [
+      ['pai', 'pendidikan agama islam', 'agama islam', 'pai & bp'],
+      ['ipa', 'ilmu pengetahuan alam'],
+      ['ips', 'ilmu pengetahuan sosial'],
+      ['mtk', 'matematika', 'mat'],
+      ['pp', 'pkn', 'pendidikan pancasila', 'ppkn'],
+      ['b. indonesia', 'bahasa indonesia', 'b indonesia', 'bindo', 'b.indo'],
+      ['b. inggris', 'bahasa inggris', 'b inggris', 'bing', 'b.ing'],
+      ['b. arab', 'bahasa arab', 'b arab'],
+      ['sbpk', 'seni budaya', 'sbdp', 'seni budaya dan prakarya', 'sbk'],
+      ['informatika', 'tik', 'komputer'],
+      ['hadits', 'hadis', "al-qur'an hadits", "qur'an hadits", 'qurdis'],
+      ['btq', "baca tulis al-qur'an", 'baca tulis quran'],
+    ];
+
+    for (const group of aliasGroups) {
+      if (group.includes(lowerSubj)) {
+        const keyInGroup = Object.keys(customMap).find((k) => group.includes(k.toLowerCase().trim()));
+        if (keyInGroup && customMap[keyInGroup]) return customMap[keyInGroup];
+      }
+    }
+
+    // 4. Substring inclusion match
+    const subKey = Object.keys(customMap).find((k) => {
+      const lk = k.toLowerCase().trim();
+      return lowerSubj.includes(lk) || lk.includes(lowerSubj);
+    });
+    if (subKey && customMap[subKey]) return customMap[subKey];
+
+    return undefined;
+  }
+
+  /**
    * Generates date sequence (YYYY-MM-DD) between start and end date.
    * By default, skips Sundays and Saturdays (standard 5-day school week).
    * If includeSaturday is true, Saturdays are included (6-day school week).
@@ -154,22 +248,34 @@ export class ExamSchedulerService {
 
     const totalSlots = Math.max(1, allSlots.length);
 
-    const classes = config.selectedClasses && config.selectedClasses.length > 0
-      ? config.selectedClasses
-      : ['7A', '7B', '8A', '8B', '9A', '9B'];
+    const maxCustomProctors = config.customSubjectProctors
+      ? Math.max(0, ...Object.values(config.customSubjectProctors).map((arr) => (Array.isArray(arr) ? arr.length : 0)))
+      : 0;
 
-    const subjects = config.selectedSubjects && config.selectedSubjects.length > 0
-      ? config.selectedSubjects
-      : ['PAI', 'PKn', 'Bahasa Indonesia', 'Matematika', 'IPA', 'IPS', 'Bahasa Inggris', 'Informatika', 'Seni Budaya', 'PJOK'];
-
-    // ── PREPARE ROOM ALLOCATION (RUANG 1 S/D RUANG X) ────────────────────────
-    const totalRooms = Math.max(1, config.totalRooms || classes.length || 1);
     const roomFormat = config.roomFormat || 'NUMERIC';
-
     const formatRoomName = (roomNumber: number): string => {
       const numStr = roomFormat === 'DOUBLE_DIGIT' ? String(roomNumber).padStart(2, '0') : String(roomNumber);
       return `Ruang ${numStr}`;
     };
+
+    const totalRooms = Math.max(
+      1,
+      maxCustomProctors || config.totalRooms || (config.selectedClasses ? config.selectedClasses.length : 1)
+    );
+
+    let classes = config.selectedClasses && config.selectedClasses.length > 0
+      ? config.selectedClasses
+      : ['7A', '7B', '8A', '8B', '9A', '9B'];
+
+    // When custom proctor matrix is present, align classes with totalRooms
+    // so every room gets exactly 1 exam roster without double booking
+    if (maxCustomProctors > 0 && classes.length !== totalRooms) {
+      classes = Array.from({ length: totalRooms }, (_, i) => formatRoomName(i + 1));
+    }
+
+    const subjects = config.selectedSubjects && config.selectedSubjects.length > 0
+      ? config.selectedSubjects
+      : ['PAI', 'PKn', 'Bahasa Indonesia', 'Matematika', 'IPA', 'IPS', 'Bahasa Inggris', 'Informatika', 'Seni Budaya', 'PJOK'];
 
     const classRoomMap = new Map<string, string>();
     classes.forEach((cls, clsIdx) => {
@@ -277,54 +383,82 @@ export class ExamSchedulerService {
       // Track teachers already assigned in THIS exact slot (prevents double-booking)
       const assignedInCurrentSlot = new Set<string>();
 
-      itemsInSlot.forEach((subjItem) => {
+      itemsInSlot.forEach((subjItem, itemIdx) => {
         const roomName = subjItem.roomName || classRoomMap.get(subjItem.className) || formatRoomName(1);
 
-        // Find candidate proctors:
-        // Rule 1: Not assigned in this slot yet
-        // Rule 2: If excludeOwnSubject is true, teacher does not teach this subject
-        let candidates = Array.from(teacherLoads.values()).filter((tl) => {
-          if (assignedInCurrentSlot.has(tl.userId)) return false;
+        // Check if custom matrix has a specific proctor for this subject and room
+        const customProctors = this.findCustomProctorsForSubject(subjItem.subject, config.customSubjectProctors);
+        let chosenProctor: { userId: string; fullName: string } | undefined;
 
-          if (config.excludeOwnSubject) {
-            const teachesThisSubject = tl.teachingSubjects.some(
-              (ts) => ts.toLowerCase().trim() === subjItem.subject.toLowerCase().trim()
+        if (customProctors && customProctors.length > 0) {
+          const roomNumMatch = roomName.match(/\d+/);
+          const roomIdx = roomNumMatch ? Math.max(0, parseInt(roomNumMatch[0], 10) - 1) : itemIdx;
+          const targetTeacherName = customProctors[roomIdx % customProctors.length];
+
+          if (targetTeacherName && targetTeacherName !== '-') {
+            const matched = this.findMatchingTeacher(targetTeacherName, allTeachers);
+            chosenProctor = matched;
+            const tl = teacherLoads.get(matched.userId);
+            if (tl) {
+              tl.assignedCount++;
+            }
+            assignedInCurrentSlot.add(matched.userId);
+          }
+        }
+
+        // If no custom proctor, use heuristic greedy algorithm
+        if (!chosenProctor) {
+          // Find candidate proctors:
+          // Rule 1: Not assigned in this slot yet
+          // Rule 2: If excludeOwnSubject is true, teacher does not teach this subject
+          let candidates = Array.from(teacherLoads.values()).filter((tl) => {
+            if (assignedInCurrentSlot.has(tl.userId)) return false;
+
+            if (config.excludeOwnSubject) {
+              const teachesThisSubject = tl.teachingSubjects.some(
+                (ts) => ts.toLowerCase().trim() === subjItem.subject.toLowerCase().trim()
+              );
+              if (teachesThisSubject) return false;
+            }
+
+            return true;
+          });
+
+          // Soft fallback if rules leave no candidates (relax subject restriction)
+          if (candidates.length === 0) {
+            candidates = Array.from(teacherLoads.values()).filter(
+              (tl) => !assignedInCurrentSlot.has(tl.userId)
             );
-            if (teachesThisSubject) return false;
           }
 
-          return true;
-        });
+          // Emergency fallback if total teachers < rooms
+          if (candidates.length === 0) {
+            candidates = Array.from(teacherLoads.values());
+          }
 
-        // Soft fallback if rules leave no candidates (relax subject restriction)
-        if (candidates.length === 0) {
-          candidates = Array.from(teacherLoads.values()).filter(
-            (tl) => !assignedInCurrentSlot.has(tl.userId)
-          );
-        }
+          // Sort candidates by assignedCount ascending (least assigned gets prioritized)
+          candidates.sort((a, b) => a.assignedCount - b.assignedCount);
 
-        // Emergency fallback if total teachers < rooms
-        if (candidates.length === 0) {
-          candidates = Array.from(teacherLoads.values());
-        }
-
-        // Sort candidates by assignedCount ascending (least assigned gets prioritized)
-        candidates.sort((a, b) => a.assignedCount - b.assignedCount);
-
-        const chosenProctor = candidates[0];
-        if (chosenProctor) {
-          chosenProctor.assignedCount++;
-          assignedInCurrentSlot.add(chosenProctor.userId);
+          const candidate = candidates[0];
+          if (candidate) {
+            candidate.assignedCount++;
+            assignedInCurrentSlot.add(candidate.userId);
+            chosenProctor = { userId: candidate.userId, fullName: candidate.fullName };
+          }
         }
 
         // Secondary proctor if configured (2 proctors per room)
-        let chosenSecondary: TeacherLoad | undefined;
+        let chosenSecondary: { userId: string; fullName: string } | undefined;
         if (config.proctorsPerRoom === 2) {
-          const secondaryCandidates = candidates.filter((c) => c.userId !== chosenProctor?.userId);
+          const secondaryCandidates = Array.from(teacherLoads.values()).filter(
+            (c) => c.userId !== chosenProctor?.userId && !assignedInCurrentSlot.has(c.userId)
+          );
           if (secondaryCandidates.length > 0) {
-            chosenSecondary = secondaryCandidates[0];
-            chosenSecondary.assignedCount++;
-            assignedInCurrentSlot.add(chosenSecondary.userId);
+            secondaryCandidates.sort((a, b) => a.assignedCount - b.assignedCount);
+            const secondary = secondaryCandidates[0];
+            secondary.assignedCount++;
+            assignedInCurrentSlot.add(secondary.userId);
+            chosenSecondary = { userId: secondary.userId, fullName: secondary.fullName };
           }
         }
 

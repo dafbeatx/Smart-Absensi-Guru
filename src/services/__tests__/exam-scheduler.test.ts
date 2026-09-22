@@ -559,6 +559,44 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 18: Error testing dynamic committee assignment', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 19: Custom Subject Proctors Allocation & Name Normalization
+  // ---------------------------------------------------------------------------
+  try {
+    const customConfig: ExamScheduleFormConfig = {
+      ...config,
+      totalRooms: 5,
+      selectedSubjects: ['PAI', 'IPA'],
+      customSubjectProctors: {
+        PAI: ['Fitri Ani Rahayu', 'Qodiatul Asrof Ramadhoni', 'Widianingsih', 'Adi Prasetyo', 'M. Iqbal Gustiawan'],
+        IPA: ['Widianingsih', 'Nurul Farhiya', 'Ridho Maulana Al Farizi', 'Fitri Ani Rahayu', 'Adi Prasetyo'],
+      },
+    };
+
+    const sched = ExamSchedulerService.generateSchedule(customConfig, sampleTeachers, []);
+    const paiProctors = sched.proctorSchedules.filter((p) => p.subject === 'PAI');
+    const paiR1 = paiProctors.find((p) => p.roomName === 'Ruang 1');
+    const paiR2 = paiProctors.find((p) => p.roomName === 'Ruang 2');
+    const paiR3 = paiProctors.find((p) => p.roomName === 'Ruang 3');
+    const paiR4 = paiProctors.find((p) => p.roomName === 'Ruang 4');
+    const paiR5 = paiProctors.find((p) => p.roomName === 'Ruang 5');
+
+    const isMatch =
+      Boolean(paiR1?.mainProctorName.includes('Fitri Ani Rahayu')) &&
+      Boolean(paiR2?.mainProctorName.includes('Qodiatul Asrof Ramadhoni')) &&
+      Boolean(paiR3?.mainProctorName.includes('Widianingsih')) &&
+      Boolean(paiR4?.mainProctorName.includes('Adi Prasetyo')) &&
+      Boolean(paiR5?.mainProctorName.includes('M. Iqbal Gustiawan'));
+
+    assert(
+      'Exam Scheduler 19: Custom subject proctors accurately allocated to Ruang 1-5 with name normalization',
+      Boolean(isMatch && paiProctors.length === 5),
+      `PAI proctors count: ${paiProctors.length}, R1: ${paiR1?.mainProctorName}, R2: ${paiR2?.mainProctorName}, R3: ${paiR3?.mainProctorName}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 19: Error testing custom subject proctors', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
 

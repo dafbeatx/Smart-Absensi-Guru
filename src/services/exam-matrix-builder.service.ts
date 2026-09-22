@@ -6,6 +6,7 @@
 
 import type { ExamScheduleData, ExamProctorItem } from '../types/exam-schedule.types';
 import type { UserProfile } from '../types/database.types';
+import { ExamSchedulerService } from './exam-scheduler.service';
 
 export interface TeacherLegendItem {
   no: number;
@@ -103,6 +104,7 @@ export class ExamMatrixBuilderService {
       teacherProfileMap.set(t.id, t);
       if (t.full_name) {
         teacherProfileMap.set(t.full_name.toLowerCase().trim(), t);
+        teacherProfileMap.set(ExamSchedulerService.normalizeTeacherName(t.full_name), t);
       }
     });
 
@@ -110,7 +112,10 @@ export class ExamMatrixBuilderService {
     proctorSchedules.forEach((p) => {
       if (p.mainProctorId && p.mainProctorName) {
         if (!teacherMap.has(p.mainProctorId)) {
-          const profile = teacherProfileMap.get(p.mainProctorId) || teacherProfileMap.get(p.mainProctorName.toLowerCase().trim());
+          const profile =
+            teacherProfileMap.get(p.mainProctorId) ||
+            teacherProfileMap.get(p.mainProctorName.toLowerCase().trim()) ||
+            teacherProfileMap.get(ExamSchedulerService.normalizeTeacherName(p.mainProctorName));
           let subject = '-';
           if (profile?.teaching_assignment) {
             subject = Array.isArray(profile.teaching_assignment)

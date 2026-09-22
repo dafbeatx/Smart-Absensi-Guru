@@ -125,6 +125,72 @@ export interface ExamAIGenerateResult {
 
 export class ExamScheduleAIGeneratorService {
   /**
+   * Parses explicit subject-to-proctor allocation matrix from Indonesian prompt.
+   * Pattern: "<Subject>: P1 = <Name>, P2 = <Name>, P3 = <Name>, P4 = <Name>, P5 = <Name>"
+   */
+  public static parseCustomSubjectProctors(prompt: string): {
+    customSubjectProctors: Record<string, string[]>;
+    detectedSubjects: string[];
+    maxProctorsPerSubject: number;
+    detectedTeacherNames: string[];
+  } {
+    const customSubjectProctors: Record<string, string[]> = {};
+    const detectedTeacherNamesSet = new Set<string>();
+    let maxProctorsPerSubject = 0;
+
+    const lines = (prompt || '').split(/\r?\n/);
+    const subjectList: string[] = [];
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      // Match "<Subject>: P1 = ..." or "<Subject> - P1 = ..." or "<Subject> : P1: ..."
+      const match = line.match(/^([^:\-\n]+)[:\-]\s*(P1\s*[:=].+)$/i);
+      if (!match) continue;
+
+      const subjectName = match[1].trim();
+      const proctorsPart = match[2].trim();
+
+      // Extract all P<num> = <TeacherName>
+      const pRegex = /P(\d+)\s*[:=]\s*([^,;]+)/gi;
+      let pMatch: RegExpExecArray | null;
+      const proctorsMap = new Map<number, string>();
+
+      while ((pMatch = pRegex.exec(proctorsPart)) !== null) {
+        const pNum = parseInt(pMatch[1], 10);
+        const tName = pMatch[2].trim();
+        if (pNum > 0 && tName) {
+          proctorsMap.set(pNum, tName);
+          detectedTeacherNamesSet.add(tName);
+        }
+      }
+
+      if (proctorsMap.size > 0) {
+        const sortedPNums = Array.from(proctorsMap.keys()).sort((a, b) => a - b);
+        const maxP = sortedPNums[sortedPNums.length - 1];
+        const proctorArray: string[] = [];
+        for (let i = 1; i <= maxP; i++) {
+          proctorArray.push(proctorsMap.get(i) || '-');
+        }
+
+        customSubjectProctors[subjectName] = proctorArray;
+        subjectList.push(subjectName);
+        if (proctorArray.length > maxProctorsPerSubject) {
+          maxProctorsPerSubject = proctorArray.length;
+        }
+      }
+    }
+
+    return {
+      customSubjectProctors,
+      detectedSubjects: subjectList,
+      maxProctorsPerSubject,
+      detectedTeacherNames: Array.from(detectedTeacherNamesSet),
+    };
+  }
+
+  /**
    * Main entry point: Generates exam schedule and proctor roster from natural language prompt.
    */
   public static async generateFromPrompt(
@@ -135,26 +201,37 @@ export class ExamScheduleAIGeneratorService {
       throw new Error('Prompt instruksi jadwal ujian tidak boleh kosong.');
     }
 
+    const customMatrix = this.parseCustomSubjectProctors(rawPrompt);
+    const hasCustomMatrix = customMatrix.detectedSubjects.length > 0;
+
     let parsedConfig: ExamScheduleFormConfig | null = null;
     let usedFallback = false;
     let aiExplanation = '';
 
-    // 1. Attempt Zero-Trust AI parsing via Serverless Proxy (/api/ai)
-    try {
-      const aiResponse = await this.callAIProxy(rawPrompt, params);
-      if (aiResponse) {
-        parsedConfig = this.sanitizeAIConfig(aiResponse.config, params);
-        aiExplanation = aiResponse.explanation || 'Jadwal disusun otomatis menggunakan analisis AI.';
-      }
-    } catch (aiErr) {
-      logger.warn('ExamScheduleAIGeneratorService', 'AI API proxy failed, using heuristic fallback:', aiErr);
-    }
-
-    // 2. Fallback to Smart Local Indonesian NLP Heuristic Engine if AI is unavailable or failed
-    if (!parsedConfig) {
-      usedFallback = true;
+    // If explicit custom proctor matrix (P1..P5) is detected, prioritize zero-hallucination local parser
+    // to strictly preserve exact subject ordering and room proctor allocation.
+    if (hasCustomMatrix) {
+      usedFallback = false;
       parsedConfig = this.parsePromptLocally(rawPrompt, params);
-      aiExplanation = 'Jadwal disusun menggunakan mesin heuristik cerdas kurikulum sekolah.';
+      aiExplanation = `Jadwal ujian dan alokasi pengawas (${customMatrix.detectedSubjects.length} mata pelajaran, ${customMatrix.maxProctorsPerSubject} ruangan) berhasil disusun 100% presisi sesuai matrik alokasi guru pengawas (P1 s/d P${customMatrix.maxProctorsPerSubject}).`;
+    } else {
+      // 1. Attempt Zero-Trust AI parsing via Serverless Proxy (/api/ai)
+      try {
+        const aiResponse = await this.callAIProxy(rawPrompt, params);
+        if (aiResponse) {
+          parsedConfig = this.sanitizeAIConfig(aiResponse.config, params);
+          aiExplanation = aiResponse.explanation || 'Jadwal disusun otomatis menggunakan analisis AI.';
+        }
+      } catch (aiErr) {
+        logger.warn('ExamScheduleAIGeneratorService', 'AI API proxy failed, using heuristic fallback:', aiErr);
+      }
+
+      // 2. Fallback to Smart Local Indonesian NLP Heuristic Engine if AI is unavailable or failed
+      if (!parsedConfig) {
+        usedFallback = true;
+        parsedConfig = this.parsePromptLocally(rawPrompt, params);
+        aiExplanation = 'Jadwal disusun menggunakan mesin heuristik cerdas kurikulum sekolah.';
+      }
     }
 
     // Explicitly lock education level
@@ -283,6 +360,9 @@ Aturan:
     params: ExamAIGenerateParams
   ): ExamScheduleFormConfig {
     const text = prompt.toLowerCase();
+    const customMatrix = this.parseCustomSubjectProctors(prompt);
+    const hasCustomMatrix = customMatrix.detectedSubjects.length > 0;
+
     const effectiveLevel: EducationLevel =
       params.educationLevel ||
       (text.includes('sma') || text.includes('as salaam') || text.includes('assalaam')
@@ -299,8 +379,9 @@ Aturan:
       ? `Asesmen Sumatif Akhir Jenjang (ASAJ) ${effectiveLevel}`
       : `Asesmen Sumatif Tengah Semester (ASTS) ${effectiveLevel}`;
 
-    // 2. Detect Saturday inclusion
+    // 2. Detect Saturday inclusion (automatically included if custom matrix has > 10 subjects)
     const includeSaturday =
+      (hasCustomMatrix && customMatrix.detectedSubjects.length > 10) ||
       text.includes('sabtu') ||
       text.includes('6 hari') ||
       text.includes('enam hari') ||
@@ -344,6 +425,9 @@ Aturan:
       fridaySessions = 2;
     } else if (text.includes('jumat 3 sesi')) {
       fridaySessions = 3;
+    } else if (hasCustomMatrix && customMatrix.detectedSubjects.length > 10) {
+      // 12 subjects across 6 days require 2 sessions on Friday so all 12 get a slot
+      fridaySessions = 2;
     }
 
     validDates.forEach((d) => {
@@ -367,9 +451,14 @@ Aturan:
     }
 
     let selectedClasses = [...levelClasses];
+    let totalRooms = selectedClasses.length;
 
-    // If prompt mentions specific grades
-    if (effectiveLevel === 'SMP') {
+    // If explicit proctor matrix exists, configure rooms and classes to match matrix rooms (Ruang 1 s/d Ruang X)
+    if (hasCustomMatrix && customMatrix.maxProctorsPerSubject > 0) {
+      totalRooms = customMatrix.maxProctorsPerSubject;
+      selectedClasses = Array.from({ length: totalRooms }, (_, i) => `Ruang ${i + 1}`);
+    } else if (effectiveLevel === 'SMP') {
+      // If prompt mentions specific grades
       if (text.includes('kelas 7') && !text.includes('kelas 8') && !text.includes('kelas 9')) {
         const filtered = selectedClasses.filter((c) => c.startsWith('7'));
         if (filtered.length > 0) selectedClasses = filtered;
@@ -380,6 +469,7 @@ Aturan:
         const filtered = selectedClasses.filter((c) => c.startsWith('9'));
         if (filtered.length > 0) selectedClasses = filtered;
       }
+      totalRooms = selectedClasses.length;
     } else {
       if (text.includes('kelas 10') && !text.includes('kelas 11') && !text.includes('kelas 12')) {
         const filtered = selectedClasses.filter((c) => c.startsWith('10') || c.startsWith('X'));
@@ -391,48 +481,54 @@ Aturan:
         const filtered = selectedClasses.filter((c) => c.startsWith('12') || c.startsWith('XII'));
         if (filtered.length > 0) selectedClasses = filtered;
       }
+      totalRooms = selectedClasses.length;
     }
 
     // 8. Extract Subjects
     let selectedSubjects = [...params.availableSubjects];
-    if (selectedSubjects.length === 0) {
-      selectedSubjects =
-        effectiveLevel === 'SMA'
-          ? [
-              'PAI',
-              'PKn',
-              'Bahasa Indonesia',
-              'Bahasa Inggris',
-              'Matematika',
-              'Fisika',
-              'Kimia',
-              'Biologi',
-              'Ekonomi',
-              'Sosiologi',
-              'Geografi',
-              'PJOK',
-            ]
-          : [
-              'PAI',
-              'PKn',
-              'Bahasa Indonesia',
-              'Matematika',
-              'IPA',
-              'IPS',
-              'Bahasa Inggris',
-              'Informatika',
-              'Seni Budaya',
-              'PJOK',
-              'Bahasa Arab',
-            ];
-    }
+    if (hasCustomMatrix) {
+      // Strictly maintain the subjects and their exact sequence from user matrix
+      selectedSubjects = [...customMatrix.detectedSubjects];
+    } else {
+      if (selectedSubjects.length === 0) {
+        selectedSubjects =
+          effectiveLevel === 'SMA'
+            ? [
+                'PAI',
+                'PKn',
+                'Bahasa Indonesia',
+                'Bahasa Inggris',
+                'Matematika',
+                'Fisika',
+                'Kimia',
+                'Biologi',
+                'Ekonomi',
+                'Sosiologi',
+                'Geografi',
+                'PJOK',
+              ]
+            : [
+                'PAI',
+                'PKn',
+                'Bahasa Indonesia',
+                'Matematika',
+                'IPA',
+                'IPS',
+                'Bahasa Inggris',
+                'Informatika',
+                'Seni Budaya',
+                'PJOK',
+                'Bahasa Arab',
+              ];
+      }
 
-    // If prompt explicitly lists subjects
-    const mentionedSubjects = params.availableSubjects.filter((subj) =>
-      text.includes(subj.toLowerCase())
-    );
-    if (mentionedSubjects.length >= 3) {
-      selectedSubjects = mentionedSubjects;
+      // If prompt explicitly lists subjects
+      const mentionedSubjects = params.availableSubjects.filter((subj) =>
+        text.includes(subj.toLowerCase())
+      );
+      if (mentionedSubjects.length >= 3) {
+        selectedSubjects = mentionedSubjects;
+      }
     }
 
     // 9. Proctor settings
@@ -460,15 +556,16 @@ Aturan:
       sessionSlots,
       dayOverrides,
       selectedClasses,
-      totalRooms: selectedClasses.length,
+      totalRooms,
       roomFormat: 'NUMERIC',
       selectedSubjects,
       selectedTeacherIds: params.teachers.map((t) => t.id),
       proctorsPerRoom,
-      excludeOwnSubject,
+      excludeOwnSubject: hasCustomMatrix ? false : excludeOwnSubject,
       excludeCommitteeProctor,
       assignBackupProctor,
       aiCustomPrompt: prompt.trim(),
+      customSubjectProctors: hasCustomMatrix ? customMatrix.customSubjectProctors : undefined,
     };
   }
 

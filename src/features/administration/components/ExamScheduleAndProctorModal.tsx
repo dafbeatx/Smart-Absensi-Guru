@@ -714,6 +714,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       }
       setSelectedClasses(result.config.selectedClasses);
       setSelectedSubjects(result.config.selectedSubjects);
+      if (result.config.totalRooms) {
+        setTotalRooms(result.config.totalRooms);
+      }
 
       setToast({
         text: `Jadwal ${result.config.examType} (${selectedLevel}) berhasil disusun otomatis oleh AI (${result.schedule.summary.totalDays} hari, ${result.schedule.summary.totalClasses} rombel)! 🎉`,
