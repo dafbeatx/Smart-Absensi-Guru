@@ -2889,24 +2889,32 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                               </tr>
                             </thead>
                             <tbody>
-                              {invigilationMatrix.teacherLegend.map((item, idx) => (
-                                <tr key={item.userId || idx} className="hover:bg-slate-50/90 transition-colors">
-                                  <td className="border border-slate-400 py-1.5 px-2.5 text-center text-slate-600 font-mono font-medium">
-                                    {item.no || idx + 1}
-                                  </td>
-                                  <td className="border border-slate-400 py-1.5 px-3 font-bold text-slate-900">
-                                    {item.fullName}
-                                  </td>
-                                  <td className="border border-slate-400 py-1.5 px-3 text-slate-700">
-                                    {item.subject}
-                                  </td>
-                                  <td className="border border-slate-400 py-1.5 px-3 text-center">
-                                    <span className="inline-block px-2.5 py-0.5 rounded font-mono font-black text-xs bg-slate-100 text-teal-900 border border-slate-300">
-                                      {item.code}
-                                    </span>
+                              {invigilationMatrix.teacherLegend.length === 0 ? (
+                                <tr>
+                                  <td colSpan={4} className="border border-slate-400 py-6 px-4 text-center text-slate-500 italic bg-slate-50/50">
+                                    Tidak ada guru pengawas yang ditugaskan (roster pengawas kosong atau tidak ditentukan dalam prompt).
                                   </td>
                                 </tr>
-                              ))}
+                              ) : (
+                                invigilationMatrix.teacherLegend.map((item, idx) => (
+                                  <tr key={item.userId || idx} className="hover:bg-slate-50/90 transition-colors">
+                                    <td className="border border-slate-400 py-1.5 px-2.5 text-center text-slate-600 font-mono font-medium">
+                                      {item.no || idx + 1}
+                                    </td>
+                                    <td className="border border-slate-400 py-1.5 px-3 font-bold text-slate-900">
+                                      {item.fullName}
+                                    </td>
+                                    <td className="border border-slate-400 py-1.5 px-3 text-slate-700">
+                                      {item.subject}
+                                    </td>
+                                    <td className="border border-slate-400 py-1.5 px-3 text-center">
+                                      <span className="inline-block px-2.5 py-0.5 rounded font-mono font-black text-xs bg-slate-100 text-teal-900 border border-slate-300">
+                                        {item.code}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
                             </tbody>
                           </table>
                         </div>

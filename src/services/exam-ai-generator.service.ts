@@ -603,11 +603,39 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
       totalRooms,
       roomFormat: 'NUMERIC',
       selectedSubjects,
-      selectedTeacherIds: hasTeacherIntent ? params.teachers.map((t) => t.id) : [],
+      selectedTeacherIds: (() => {
+        if (!hasTeacherIntent) return [];
+        if (hasCustomMatrix && customMatrix.detectedTeacherNames.length > 0) {
+          const matrixTeacherIds = new Set<string>();
+          customMatrix.detectedTeacherNames.forEach((name) => {
+            const matched = ExamSchedulerService.findMatchingTeacher(name, params.teachers);
+            if (matched && matched.userId) {
+              matrixTeacherIds.add(matched.userId);
+            }
+          });
+          return Array.from(matrixTeacherIds);
+        }
+        const mentionedTeacherIds = new Set<string>();
+        params.teachers.forEach((t) => {
+          if (!t.full_name) return;
+          const cleanName = t.full_name
+            .replace(/(drs\.|dra\.|dr\.|ir\.|h\.|hj\.|m\.pd|s\.pd|s\.si|s\.kom|s\.ag|s\.mat|s\.e|g\.r)/gi, '')
+            .replace(/[,\.]/g, ' ')
+            .trim()
+            .toLowerCase();
+          if (cleanName.length >= 4 && text.includes(cleanName)) {
+            mentionedTeacherIds.add(t.id);
+          }
+        });
+        if (mentionedTeacherIds.size >= 1) {
+          return Array.from(mentionedTeacherIds);
+        }
+        return params.teachers.map((t) => t.id);
+      })(),
       proctorsPerRoom,
       excludeOwnSubject: hasCustomMatrix ? false : excludeOwnSubject,
       excludeCommitteeProctor,
-      assignBackupProctor,
+      assignBackupProctor: hasCustomMatrix ? false : assignBackupProctor,
       aiCustomPrompt: prompt.trim(),
       customSubjectProctors: hasCustomMatrix ? customMatrix.customSubjectProctors : undefined,
       skipProctorAssignment: !hasTeacherIntent,

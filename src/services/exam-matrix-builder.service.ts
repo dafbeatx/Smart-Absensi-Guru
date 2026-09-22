@@ -108,7 +108,7 @@ export class ExamMatrixBuilderService {
       }
     });
 
-    // Extract proctors from assignments
+    // Extract proctors from actual assignments (main and secondary proctors)
     proctorSchedules.forEach((p) => {
       if (p.mainProctorId && p.mainProctorName) {
         if (!teacherMap.has(p.mainProctorId)) {
@@ -129,29 +129,27 @@ export class ExamMatrixBuilderService {
           });
         }
       }
-    });
 
-    // If proctors are few, populate with selected teachers
-    if (teacherMap.size < (config.selectedTeacherIds?.length || 0)) {
-      config.selectedTeacherIds.forEach((tId) => {
-        if (!teacherMap.has(tId)) {
-          const profile = teacherProfileMap.get(tId);
-          if (profile) {
-            let subject = '-';
-            if (profile.teaching_assignment) {
-              subject = Array.isArray(profile.teaching_assignment)
-                ? profile.teaching_assignment.join(', ')
-                : String(profile.teaching_assignment);
-            }
-            teacherMap.set(tId, {
-              userId: tId,
-              fullName: profile.full_name || 'Guru',
-              subject,
-            });
+      if (p.secondaryProctorId && p.secondaryProctorName) {
+        if (!teacherMap.has(p.secondaryProctorId)) {
+          const profile =
+            teacherProfileMap.get(p.secondaryProctorId) ||
+            teacherProfileMap.get(p.secondaryProctorName.toLowerCase().trim()) ||
+            teacherProfileMap.get(ExamSchedulerService.normalizeTeacherName(p.secondaryProctorName));
+          let subject = '-';
+          if (profile?.teaching_assignment) {
+            subject = Array.isArray(profile.teaching_assignment)
+              ? profile.teaching_assignment.join(', ')
+              : String(profile.teaching_assignment);
           }
+          teacherMap.set(p.secondaryProctorId, {
+            userId: p.secondaryProctorId,
+            fullName: p.secondaryProctorName,
+            subject,
+          });
         }
-      });
-    }
+      }
+    });
 
     // Sort teachers alphabetically by full name
     const sortedTeachers = Array.from(teacherMap.values()).sort((a, b) =>

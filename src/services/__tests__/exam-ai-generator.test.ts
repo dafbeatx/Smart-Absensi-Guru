@@ -362,17 +362,18 @@ Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan gur
       btqR4?.mainProctorId === 'usr_dafa' &&
       btqR5?.mainProctorId === 'usr_mawar';
 
-    // Verify Matrix Generation has 5 rooms and no '-' room codes
+    // Verify Matrix Generation has 5 rooms, all cells filled, and teacherLegend contains ONLY the 11 mentioned teachers
     const matrix = ExamMatrixBuilderService.buildMatrix(res.schedule, customTeachers);
     const has5Rooms = matrix.rooms.length === 5;
     const allCellsFilled = matrix.days.every((d) =>
       d.sessions.every((s) => matrix.rooms.every((r) => s.roomCodes[r.key] && s.roomCodes[r.key] !== '-'))
     );
+    const legendOnlyMentioned = matrix.teacherLegend.length === 11;
 
     assert(
-      'Exam AI 06: Deterministic parser converts explicit P1-P5 matrix with 100% fidelity without LLM drift',
-      has12Subjects && has5ProctorsPerSubject && subjectsPreserved && isPAIValid && isBTQValid && has5Rooms && allCellsFilled,
-      `Subjects: ${res.config.selectedSubjects.length}, PAI R1-R5 match: 100%, BTQ R1-R5 match: 100%, Matrix Rooms: ${matrix.rooms.length}, All cells filled: ${allCellsFilled}`
+      'Exam AI 06: Deterministic parser converts explicit P1-P5 matrix with 100% fidelity without LLM drift and isolates teacher legend',
+      has12Subjects && has5ProctorsPerSubject && subjectsPreserved && isPAIValid && isBTQValid && has5Rooms && allCellsFilled && legendOnlyMentioned,
+      `Subjects: ${res.config.selectedSubjects.length}, PAI R1-R5 match: 100%, BTQ R1-R5 match: 100%, Matrix Rooms: ${matrix.rooms.length}, Legend Teachers: ${matrix.teacherLegend.length} (Expected 11)`
     );
   } catch (err: any) {
     assert('Exam AI 06: Error verifying custom proctor matrix', false, err?.message);
@@ -419,17 +420,18 @@ Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan gur
     const proctorsAreEmpty = res.schedule.proctorSchedules.length === 0;
     const totalProctorsZero = res.schedule.summary.totalProctorsAssigned === 0;
 
-    // 4. Matrix builder should handle empty proctors gracefully with timetable structure
+    // 4. Matrix builder should handle empty proctors gracefully with timetable structure and empty teacher legend
     const matrix = ExamMatrixBuilderService.buildMatrix(res.schedule, sampleTeachers);
     const matrixHasDays = matrix.days.length > 0;
     const matrixRoomsAllHyphen = matrix.days.every((d) =>
       d.sessions.every((s) => matrix.rooms.every((r) => s.roomCodes[r.key] === '-'))
     );
+    const legendEmpty = matrix.teacherLegend.length === 0;
 
     assert(
       'Exam AI 07: Omits proctor schedules when prompt does not mention teachers while keeping subject schedules intact',
-      isIntentFalse && isConfigSkipped && hasSubjects && proctorsAreEmpty && totalProctorsZero && matrixHasDays && matrixRoomsAllHyphen,
-      `Intent: ${intentDetected}, Subjects: ${res.schedule.subjectSchedules.length}, Proctors: ${res.schedule.proctorSchedules.length}, Matrix days: ${matrix.days.length}, Empty matrix safe: ${matrixRoomsAllHyphen}`
+      isIntentFalse && isConfigSkipped && hasSubjects && proctorsAreEmpty && totalProctorsZero && matrixHasDays && matrixRoomsAllHyphen && legendEmpty,
+      `Intent: ${intentDetected}, Subjects: ${res.schedule.subjectSchedules.length}, Proctors: ${res.schedule.proctorSchedules.length}, Legend Teachers: ${matrix.teacherLegend.length} (Expected 0)`
     );
   } catch (err: any) {
     assert('Exam AI 07: Error testing proctor omission guard', false, err?.message);
