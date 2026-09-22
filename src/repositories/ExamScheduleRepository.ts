@@ -169,19 +169,24 @@ export class ExamScheduleRepository {
           const matchMainId = Boolean(targetKey && p.mainProctorId?.toLowerCase().trim() === targetKey);
           const matchSecId = Boolean(targetKey && p.secondaryProctorId?.toLowerCase().trim() === targetKey);
 
+          const mainTrimmed = p.mainProctorName?.toLowerCase().trim();
+          const secTrimmed = p.secondaryProctorName?.toLowerCase().trim();
+
           const pMainClean = this.normalizeTeacherName(p.mainProctorName);
           const pSecClean = this.normalizeTeacherName(p.secondaryProctorName);
 
           const matchMainName = Boolean(
-            (targetName && p.mainProctorName?.toLowerCase().includes(targetName)) ||
-            (targetName && targetName.includes(p.mainProctorName?.toLowerCase().trim() || '')) ||
-            (cleanTargetName && pMainClean && (pMainClean.includes(cleanTargetName) || cleanTargetName.includes(pMainClean)))
+            mainTrimmed && mainTrimmed.length > 2 && (
+              (targetName && (mainTrimmed.includes(targetName) || targetName.includes(mainTrimmed))) ||
+              (cleanTargetName && pMainClean && (pMainClean.includes(cleanTargetName) || cleanTargetName.includes(pMainClean)))
+            )
           );
 
           const matchSecName = Boolean(
-            (targetName && p.secondaryProctorName?.toLowerCase().includes(targetName)) ||
-            (targetName && targetName.includes(p.secondaryProctorName?.toLowerCase().trim() || '')) ||
-            (cleanTargetName && pSecClean && (pSecClean.includes(cleanTargetName) || cleanTargetName.includes(pSecClean)))
+            secTrimmed && secTrimmed.length > 2 && (
+              (targetName && (secTrimmed.includes(targetName) || targetName.includes(secTrimmed))) ||
+              (cleanTargetName && pSecClean && (pSecClean.includes(cleanTargetName) || cleanTargetName.includes(pSecClean)))
+            )
           );
 
           return matchMainId || matchMainName || matchSecId || matchSecName;
@@ -193,10 +198,11 @@ export class ExamScheduleRepository {
             new Set(schedule.proctorSchedules.map((p) => p.mainProctorName.trim()))
           ).sort((a, b) => a.localeCompare(b, 'id'));
           const idx = allProctorNames.findIndex((n) => {
+            const nTrim = n.toLowerCase().trim();
             const nClean = this.normalizeTeacherName(n);
             return (
-              (targetName && (n.toLowerCase().includes(targetName) || targetName.includes(n.toLowerCase()))) ||
-              (cleanTargetName && nClean && (nClean.includes(cleanTargetName) || cleanTargetName.includes(nClean)))
+              (targetName && nTrim.length > 2 && (nTrim.includes(targetName) || targetName.includes(nTrim))) ||
+              (cleanTargetName && nClean.length > 2 && (nClean.includes(cleanTargetName) || cleanTargetName.includes(nClean)))
             );
           });
           const teacherCode = idx !== -1 ? String(idx + 1).padStart(2, '0') : undefined;

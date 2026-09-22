@@ -76,7 +76,6 @@ import {
   CheckCircle2,
   CalendarDays,
   CalendarCheck,
-  DoorOpen,
   Printer,
   Award,
   Coffee,
@@ -139,7 +138,6 @@ import {
   EXAM_SCHEDULE_UPDATED_EVENT,
 } from '../../../repositories/ExamScheduleRepository';
 import { ExamWordExporterService } from '../../../services/exam-word-exporter.service';
-import { ExamMatrixBuilderService } from '../../../services/exam-matrix-builder.service';
 import {
   AdministrationRepository,
   ADMIN_YEAR_CHANGED_EVENT,
@@ -2474,108 +2472,102 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   </div>
                 )}
 
-                {/* Header with High Contrast and Clear Badges */}
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-12 h-12 rounded-2xl ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700' : 'bg-teal-700'} text-white flex items-center justify-center shrink-0 shadow-xs`}>
-                      <CalendarCheck className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`px-2.5 py-0.5 rounded-md ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-teal-100 text-teal-900 border-teal-300'} text-xs font-black tracking-wider uppercase border`}>
-                          TUGAS MENGAWAS ASESMEN ({selectedExamDutyLevel})
-                        </span>
-                        {publishedExamDuty.teacherCode && (
-                          <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-xs font-black border border-amber-300">
-                            KODE {publishedExamDuty.teacherCode}
+                {/* Interactive Card Summary: Click to open full official schedule */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setIsExamScheduleReadOnly(true);
+                    setExamScheduleInitialTab('my_schedule');
+                    setIsExamScheduleModalOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setIsExamScheduleReadOnly(true);
+                      setExamScheduleInitialTab('my_schedule');
+                      setIsExamScheduleModalOpen(true);
+                    }
+                  }}
+                  className={`group relative rounded-2xl p-4 sm:p-4.5 border transition-all cursor-pointer select-none ${
+                    selectedExamDutyLevel === 'SMA'
+                      ? 'bg-linear-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 border-blue-200 hover:border-blue-400 hover:shadow-md active:scale-[0.99]'
+                      : 'bg-linear-to-br from-teal-50/70 via-slate-50 to-emerald-50/50 border-teal-200 hover:border-teal-400 hover:shadow-md active:scale-[0.99]'
+                  }`}
+                  title="Klik untuk membuka jadwal mengawas asli & rincian lengkap"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-12 h-12 rounded-2xl ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700' : 'bg-teal-700'} text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform`}>
+                        <CalendarCheck className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`px-2.5 py-0.5 rounded-md ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-teal-100 text-teal-900 border-teal-300'} text-[11px] font-black tracking-wider uppercase border`}>
+                            TUGAS MENGAWAS ({selectedExamDutyLevel})
                           </span>
-                        )}
-                        <span className="text-xs text-slate-500 font-semibold">
-                          T.A. {publishedExamDuty.schedule.config.academicYear}
-                        </span>
+                          {publishedExamDuty.teacherCode && (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[11px] font-black border border-amber-300">
+                              KODE {publishedExamDuty.teacherCode}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-500 font-semibold">
+                            T.A. {publishedExamDuty.schedule.config.academicYear}
+                          </span>
+                        </div>
+                        <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight mt-1 truncate">
+                          {publishedExamDuty.schedule.config.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                          Bapak/Ibu: <strong className="text-slate-800">{effectiveUser?.full_name}</strong>
+                          {effectiveUser?.nip ? ` (NPP: ${effectiveUser.nip})` : ''}
+                        </p>
                       </div>
-                      <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight mt-1">
-                        {publishedExamDuty.schedule.config.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`}
-                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {publishedExamDuty.duties.some((d) => d.date === getTodayDateInJakarta()) ? (
+                        <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black shrink-0 flex items-center gap-1.5 shadow-xs animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-white" />
+                          ADA TUGAS HARI INI
+                        </span>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-teal-100 text-teal-900 border-teal-300'} border text-xs font-extrabold shrink-0`}>
+                          {publishedExamDuty.duties.length} Sesi Terjadwal
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {publishedExamDuty.duties.some((d) => d.date === getTodayDateInJakarta()) ? (
-                      <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black shrink-0 flex items-center gap-1.5 shadow-xs animate-pulse">
-                        <span className="w-2 h-2 rounded-full bg-white" />
-                        ADA TUGAS HARI INI
-                      </span>
-                    ) : (
-                      <span className={`px-3 py-1 rounded-full ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-50 text-blue-800 border-blue-300' : 'bg-teal-50 text-teal-800 border-teal-300'} border text-xs font-extrabold shrink-0`}>
-                        {publishedExamDuty.duties.length} Sesi Terjadwal
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Senior/Adult Teacher Information Banner */}
-                <div className="bg-slate-50 rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-700">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-slate-500 font-medium">Bapak/Ibu:</span>
-                    <strong className="text-slate-900 font-bold">{effectiveUser?.full_name}</strong>
-                    <span className="text-slate-500 text-xs">
-                      ({effectiveUser?.nip ? `NPP: ${effectiveUser.nip}` : 'Pendidik'})
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-600 font-medium">
-                    Status: <strong className="text-emerald-700 font-bold">Resmi Diterbitkan Panitia</strong>
-                  </div>
-                </div>
-
-                {/* Duty Session List - High Legibility (Clear 15-18px text, large room badges) */}
-                <div className="space-y-2.5">
-                  {publishedExamDuty.duties.map((duty, idx) => {
-                    const isToday = duty.date === getTodayDateInJakarta();
-                    return (
-                      <div
-                        key={duty.id || idx}
-                        className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
-                          isToday
-                            ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-300/60 shadow-2xs'
-                            : 'bg-white border-slate-200/90 hover:border-teal-400'
-                        }`}
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {isToday && (
-                                <span className="px-2 py-0.5 rounded bg-rose-600 text-white text-[10px] font-black uppercase tracking-wide">
-                                  Hari Ini
-                                </span>
-                              )}
-                              <span className="text-xs font-bold text-slate-700">
-                                Sesi {duty.sessionNumber} ({duty.startTime} - {duty.endTime} WIB)
-                              </span>
-                              <span className="text-xs text-slate-400">•</span>
-                              <span className="text-xs font-bold text-slate-600">
-                                {ExamMatrixBuilderService.formatIndonesianDate(duty.date)}
-                              </span>
-                            </div>
-                            <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
-                              {duty.subject}
-                            </h4>
-                            <p className="text-xs text-slate-500 font-medium">
-                              {duty.className ? `Kelas / Rombel: ${duty.className}` : ''} • Peran: Pengawas Ruangan
-                            </p>
+                  {/* Compact Duty Badges Preview (Chips horizontally instead of vertical list) */}
+                  <div className="mt-3.5 pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-slate-500 font-medium">Jadwal Tugas:</span>
+                      {publishedExamDuty.duties.map((duty, idx) => {
+                        const isToday = duty.date === getTodayDateInJakarta();
+                        return (
+                          <div
+                            key={duty.id || idx}
+                            className={`px-2.5 py-1 rounded-xl text-xs font-bold border flex items-center gap-1.5 ${
+                              isToday
+                                ? 'bg-amber-100 text-amber-950 border-amber-300 ring-2 ring-amber-300/60 font-black'
+                                : 'bg-white text-slate-800 border-slate-300/80'
+                            }`}
+                          >
+                            <span className="text-slate-500 font-medium">{duty.dayName}:</span>
+                            <span className="text-slate-900 font-black">{duty.subject}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-800' : 'bg-teal-100 text-teal-800'}`}>
+                              {duty.roomName || `R.${duty.className}`}
+                            </span>
                           </div>
+                        );
+                      })}
+                    </div>
 
-                          {/* Large High-Contrast Room Badge */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className={`px-4 py-2 rounded-xl ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700' : 'bg-teal-700'} text-white font-black text-sm sm:text-base flex items-center gap-2 shadow-xs`}>
-                              <DoorOpen className="w-4 h-4 text-teal-200" />
-                              <span>{duty.roomName || 'Ruang Ujian'}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-teal-700 group-hover:text-teal-900 transition-colors shrink-0">
+                      <span>Buka Jadwal Lengkap</span>
+                      <ChevronRight className="w-4 h-4 text-teal-600 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Touch-Friendly Action Buttons (Senior-friendly height 48px) */}
