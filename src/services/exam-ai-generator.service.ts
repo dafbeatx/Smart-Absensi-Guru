@@ -454,41 +454,42 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
     };
     const perDaySessionOverrides = new Map<string, number>();
 
-    // Pattern 1: "<Hari> <N> sesi/mapel/mata pelajaran" or "<Hari> terdiri dari <N> ..."
-    const dayCountPatterns = [
-      /\b(senin|selasa|rabu|kamis|jumat|sabtu)\s+(?:terdiri\s+dari\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi,
-      /\b(senin|selasa|rabu|kamis|jumat|sabtu)\s+(?:hanya\s+|cukup\s+)?(\d+)\s*sesi/gi,
-    ];
-    for (const pattern of dayCountPatterns) {
-      let dm: RegExpExecArray | null;
-      while ((dm = pattern.exec(text)) !== null) {
-        const dayKey = dm[1].toLowerCase();
-        const count = parseInt(dm[2], 10);
-        if (count >= 1 && count <= 4 && dayNameMap[dayKey]) {
-          perDaySessionOverrides.set(dayKey, count);
-        }
+    // Pattern 1: Multi-day lists or conjunctions, e.g.:
+    // "Rabu dan Kamis terdiri dari 3 mata pelajaran", "Rabu dan Kamis memiliki 3 mata pelajaran",
+    // "Senin, Selasa, dan Jumat masing-masing 2 mata pelajaran", "Rabu dan Kamis: 3 sesi"
+    const multiDayPattern = /(?:(?:senin|selasa|rabu|kamis|jumat|sabtu)(?:,\s*|\s+dan\s+|\s+))+\s*[:=\-]?\s*(?:masing-masing\s+|terdiri\s+dari\s+|memiliki\s+|sebanyak\s+|ada\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi;
+    let mm: RegExpExecArray | null;
+    while ((mm = multiDayPattern.exec(text)) !== null) {
+      const fullMatch = mm[0];
+      const count = parseInt(mm[1], 10);
+      if (count >= 1 && count <= 4) {
+        const daysFound = fullMatch.match(/\b(senin|selasa|rabu|kamis|jumat|sabtu)\b/gi) || [];
+        daysFound.forEach((d) => {
+          const dk = d.toLowerCase();
+          if (dayNameMap[dk]) perDaySessionOverrides.set(dk, count);
+        });
       }
     }
 
-    // Pattern 2: "<Hari> dan <Hari> <N> sesi/mapel" (conjunction)
-    const conjPattern = /\b(senin|selasa|rabu|kamis|jumat|sabtu)\s+dan\s+(senin|selasa|rabu|kamis|jumat|sabtu)\s+(?:terdiri\s+dari\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi;
-    let conjMatch: RegExpExecArray | null;
-    while ((conjMatch = conjPattern.exec(text)) !== null) {
-      const d1 = conjMatch[1].toLowerCase();
-      const d2 = conjMatch[2].toLowerCase();
-      const cnt = parseInt(conjMatch[3], 10);
-      if (cnt >= 1 && cnt <= 4) {
-        if (dayNameMap[d1]) perDaySessionOverrides.set(d1, cnt);
-        if (dayNameMap[d2]) perDaySessionOverrides.set(d2, cnt);
+    // Pattern 2: Single day with count (supports bullet points and colons):
+    // e.g. "- Senin: 2 sesi (2 mata pelajaran)", "Rabu 3 mata pelajaran", "Kamis: 3 sesi", "Senin 2 mapel"
+    const singleDayPattern = /\b(senin|selasa|rabu|kamis|jumat|sabtu)\s*[:=\-]?\s*(?:terdiri\s+dari\s+|memiliki\s+|hanya\s+|cukup\s+|sebanyak\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi;
+    let sm: RegExpExecArray | null;
+    while ((sm = singleDayPattern.exec(text)) !== null) {
+      const dayKey = sm[1].toLowerCase();
+      const count = parseInt(sm[2], 10);
+      if (count >= 1 && count <= 4 && dayNameMap[dayKey]) {
+        perDaySessionOverrides.set(dayKey, count);
       }
     }
 
-    // Pattern 3: "khusus hari <Hari> <N> sesi" 
-    const khususPattern = /khusus\s+(?:hari\s+)?(senin|selasa|rabu|kamis|jumat|sabtu)\s+(?:hanya\s+)?(\d+)\s*sesi/gi;
-    let khususMatch: RegExpExecArray | null;
-    while ((khususMatch = khususPattern.exec(text)) !== null) {
-      const dayKey = khususMatch[1].toLowerCase();
-      const count = parseInt(khususMatch[2], 10);
+    // Pattern 3: Inverted count then day:
+    // e.g. "3 mata pelajaran pada hari rabu dan kamis", "2 sesi untuk hari jumat"
+    const invertedPattern = /(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)\s*(?:per\s+hari\s+)?(?:pada\s+hari\s+|untuk\s+hari\s+|khusus\s+hari\s+|hari\s+)(senin|selasa|rabu|kamis|jumat|sabtu)/gi;
+    let im: RegExpExecArray | null;
+    while ((im = invertedPattern.exec(text)) !== null) {
+      const count = parseInt(im[1], 10);
+      const dayKey = im[2].toLowerCase();
       if (count >= 1 && count <= 4 && dayNameMap[dayKey]) {
         perDaySessionOverrides.set(dayKey, count);
       }
@@ -677,7 +678,7 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
       startDate,
       endDate,
       includeSaturday,
-      sessionsPerDay,
+      sessionsPerDay: effectiveMaxSessions,
       sessionSlots,
       dayOverrides,
       selectedClasses,
