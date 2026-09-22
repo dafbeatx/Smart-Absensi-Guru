@@ -65,7 +65,13 @@ GRANT UPDATE (
 GRANT ALL ON public.users TO service_role;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 4. VERIFIKASI INSTAN (Jalankan untuk menguji keabsahan struktur)
+-- 4. RELOAD POSTGREST SCHEMA CACHE (WAJIB agar error schema cache 400 hilang)
+-- ─────────────────────────────────────────────────────────────────────────────
+NOTIFY pgrst, 'reload schema';
+NOTIFY pgrst, 'reload config';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5. VERIFIKASI INSTAN (Jalankan untuk menguji keabsahan struktur)
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Query 1: Cek apakah kolom teaching_assignment terdaftar di view
 -- SELECT column_name, data_type 
@@ -76,3 +82,4 @@ GRANT ALL ON public.users TO service_role;
 -- SELECT id, full_name, role, position, teaching_assignment 
 -- FROM public.users_public_view 
 -- LIMIT 5;
+

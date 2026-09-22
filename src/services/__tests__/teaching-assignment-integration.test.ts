@@ -150,6 +150,57 @@ export const runTeachingAssignmentTestSuite = async (): Promise<TestSuiteResult>
     assert('Teaching Assignment 05: Filtering and searching teachers by teaching_assignment', false, String(err));
   }
 
+  // Test 6: Verify all 12 official school subjects are correctly registered
+  try {
+    const { OFFICIAL_SCHOOL_SUBJECTS } = await import('../../config/school-subjects.config');
+    const expectedCodes = ['PAI', 'IPA', 'MTK', 'PP', 'B. Indonesia', 'IPS', 'B. Arab', 'B. Inggris', 'SBPK', 'Informatika', 'Hadits', 'BTQ'];
+    const foundCodes = OFFICIAL_SCHOOL_SUBJECTS.map((s) => s.code);
+    const allFound = expectedCodes.every((code) => foundCodes.includes(code));
+
+    assert(
+      'Teaching Assignment 06: All 12 official school subjects are accurately registered in config',
+      allFound && OFFICIAL_SCHOOL_SUBJECTS.length === 12,
+      `Registered count: ${OFFICIAL_SCHOOL_SUBJECTS.length} (Expected 12)`
+    );
+  } catch (err) {
+    assert('Teaching Assignment 06: All 12 official school subjects are accurately registered', false, String(err));
+  }
+
+  // Test 7: Verify normalizeSubjectName correctly converts aliases/codes to official labels
+  try {
+    const { normalizeSubjectName } = await import('../../config/school-subjects.config');
+    const testCases: Array<[string, string]> = [
+      ['PAI', 'PAI – Pendidikan Agama Islam'],
+      ['MTK', 'MTK – Matematika'],
+      ['Matematika', 'MTK – Matematika'],
+      ['IPA', 'IPA – Ilmu Pengetahuan Alam'],
+      ['PP', 'PP – Pendidikan Pancasila'],
+      ['PKn', 'PP – Pendidikan Pancasila'],
+      ['B. Indonesia', 'B. Indonesia – Bahasa Indonesia'],
+      ['Bahasa Indonesia', 'B. Indonesia – Bahasa Indonesia'],
+      ['IPS', 'IPS – Ilmu Pengetahuan Sosial'],
+      ['B. Arab', 'B. Arab – Bahasa Arab'],
+      ['B. Inggris', 'B. Inggris – Bahasa Inggris'],
+      ['SBPK', 'SBPK – Seni Budaya dan Prakarya'],
+      ['Informatika', 'Informatika'],
+      ['Hadits', 'Hadits'],
+      ['BTQ', "BTQ – Baca Tulis Al-Qur'an"],
+    ];
+
+    const resultsOk = testCases.every(([input, expected]) => {
+      const normalized = normalizeSubjectName(input);
+      return normalized === expected;
+    });
+
+    assert(
+      'Teaching Assignment 07: normalizeSubjectName maps codes and aliases to official labels accurately',
+      resultsOk,
+      `Normalized ${testCases.length} subjects successfully`
+    );
+  } catch (err) {
+    assert('Teaching Assignment 07: normalizeSubjectName maps codes and aliases', false, String(err));
+  }
+
   return {
     suiteName: 'Teacher Teaching Assignment Engine & Prepopulation (Phase 4.8)',
     passed,

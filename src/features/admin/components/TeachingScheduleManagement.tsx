@@ -18,6 +18,7 @@ import {
   normalizeDayOfWeek,
   timeStringToMinutes,
 } from '../../../utils/teaching-schedule.utils';
+import { normalizeSubjectName } from '../../../config/school-subjects.config';
 
 export interface ExtendedTeachingSlot extends TeachingSlot {
   user_id?: string; // Associated teacher user ID or NIP
@@ -169,7 +170,18 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
       const firstSubject = Array.isArray(firstTeacher.teaching_assignment)
         ? firstTeacher.teaching_assignment[0]
         : firstTeacher.teaching_assignment.split(',')[0].trim();
-      setFormSubject(firstSubject || subjects[0]?.name || '');
+      if (firstSubject) {
+        const normalized = normalizeSubjectName(firstSubject);
+        const matched = subjects.find(
+          (s) =>
+            s.name.toLowerCase() === firstSubject.toLowerCase() ||
+            s.name.toLowerCase() === normalized.toLowerCase() ||
+            (s.code && s.code.toLowerCase() === firstSubject.toLowerCase())
+        );
+        setFormSubject(matched ? matched.name : normalized);
+      } else {
+        setFormSubject(subjects[0]?.name || '');
+      }
     } else {
       setFormSubject(subjects[0]?.name || '');
     }
@@ -186,7 +198,14 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
         ? selectedT.teaching_assignment[0]
         : selectedT.teaching_assignment.split(',')[0].trim();
       if (firstSubject) {
-        setFormSubject(firstSubject);
+        const normalized = normalizeSubjectName(firstSubject);
+        const matched = subjects.find(
+          (s) =>
+            s.name.toLowerCase() === firstSubject.toLowerCase() ||
+            s.name.toLowerCase() === normalized.toLowerCase() ||
+            (s.code && s.code.toLowerCase() === firstSubject.toLowerCase())
+        );
+        setFormSubject(matched ? matched.name : normalized);
       }
     }
   };

@@ -152,6 +152,38 @@ export class SupabaseProvider implements IDataProvider {
     return msg.includes('teaching_assignment') && (msg.includes('schema cache') || msg.includes('does not exist') || msg.includes('column'));
   }
 
+  // Dual-layer persistence mirror for teaching assignment:
+  // Guarantees zero data loss if the Supabase migration hasn't been run yet or schema cache is pending
+  private static LOCAL_TEACHING_ASSIGNMENTS_KEY = 'smart_absensi_teacher_assignments';
+
+  private getLocalTeachingAssignments(): Record<string, string> {
+    if (typeof window === 'undefined' || !window.localStorage) return {};
+    try {
+      const raw = localStorage.getItem(SupabaseProvider.LOCAL_TEACHING_ASSIGNMENTS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private saveLocalTeachingAssignment(userId: string, assignment?: string | string[] | null) {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      const current = this.getLocalTeachingAssignments();
+      const val = assignment
+        ? (Array.isArray(assignment) ? assignment.join(', ') : String(assignment).trim())
+        : '';
+      if (val) {
+        current[userId] = val;
+      } else {
+        delete current[userId];
+      }
+      localStorage.setItem(SupabaseProvider.LOCAL_TEACHING_ASSIGNMENTS_KEY, JSON.stringify(current));
+    } catch (e) {
+      console.warn('Failed to save local teaching assignment:', e);
+    }
+  }
+
   private dedupeRequest<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (this.inFlightRequests.has(key)) {
       return this.inFlightRequests.get(key) as Promise<T>;
@@ -329,6 +361,8 @@ export class SupabaseProvider implements IDataProvider {
         const user = userQuery.data as any;
 
         if (user) {
+          const localAssignments = this.getLocalTeachingAssignments();
+          const localSubj = localAssignments[user.id] || (user.nip ? localAssignments[user.nip] : undefined);
           return {
             id: user.id,
             nip: user.nip,
@@ -338,7 +372,7 @@ export class SupabaseProvider implements IDataProvider {
             position: user.position,
             avatar_url: user.avatar_url || null,
             is_active: user.account_status === 'ACTIVE',
-            teaching_assignment: user.teaching_assignment || undefined,
+            teaching_assignment: user.teaching_assignment || localSubj || undefined,
             created_at: user.created_at,
           };
         }
@@ -1886,19 +1920,23 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     const data = userQuery.data as any[];
+    const localAssignments = this.getLocalTeachingAssignments();
 
-    const result: UserProfile[] = (data || []).map((row) => ({
-      id: row.id,
-      nip: row.nip,
-      full_name: row.full_name,
-      phone_number: row.phone_number,
-      role: row.role,
-      position: row.position,
-      avatar_url: row.avatar_url || null,
-      is_active: row.account_status === 'ACTIVE',
-      teaching_assignment: row.teaching_assignment || undefined,
-      created_at: row.created_at,
-    }));
+    const result: UserProfile[] = (data || []).map((row) => {
+      const localSubj = localAssignments[row.id] || (row.nip ? localAssignments[row.nip] : undefined);
+      return {
+        id: row.id,
+        nip: row.nip,
+        full_name: row.full_name,
+        phone_number: row.phone_number,
+        role: row.role,
+        position: row.position,
+        avatar_url: row.avatar_url || null,
+        is_active: row.account_status === 'ACTIVE',
+        teaching_assignment: row.teaching_assignment || localSubj || undefined,
+        created_at: row.created_at,
+      };
+    });
 
     this.cachedUsers = result;
     this.cachedUsersTimestamp = now;
@@ -1944,6 +1982,14 @@ export class SupabaseProvider implements IDataProvider {
 
     if (insertResult.error) throw new Error('Gagal menambahkan pengguna baru: ' + insertResult.error.message);
 
+    // Save to persistent local mirror so it is never lost
+    if (user.teaching_assignment) {
+      this.saveLocalTeachingAssignment(newId, user.teaching_assignment);
+      if (newUser.nip) {
+        this.saveLocalTeachingAssignment(String(newUser.nip), user.teaching_assignment);
+      }
+    }
+
     return {
       id: newId,
       nip: newUser.nip as string | null,
@@ -1953,7 +1999,7 @@ export class SupabaseProvider implements IDataProvider {
       position: newUser.position as string,
       avatar_url: null,
       is_active: true,
-      teaching_assignment: this._hasTeachingAssignmentCol !== false ? user.teaching_assignment : undefined,
+      teaching_assignment: user.teaching_assignment || undefined,
       created_at: new Date().toISOString(),
     };
   }
@@ -1986,6 +2032,14 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     if (updateResult.error) throw new Error('Gagal memperbarui data pengguna: ' + updateResult.error.message);
+
+    // Always mirror to persistent local storage so changes are NEVER lost
+    if (updates.teaching_assignment !== undefined) {
+      this.saveLocalTeachingAssignment(userId, updates.teaching_assignment);
+      if (updates.nip) {
+        this.saveLocalTeachingAssignment(updates.nip, updates.teaching_assignment);
+      }
+    }
 
     const activeUser = useAuthStore.getState().user;
     if (activeUser && (activeUser.id === userId || (activeUser.nip && activeUser.nip === userId))) {

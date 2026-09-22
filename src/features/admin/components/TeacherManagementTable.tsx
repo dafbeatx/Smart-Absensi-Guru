@@ -22,6 +22,10 @@ import {
   ADMIN_YEAR_CHANGED_EVENT,
 } from '../../../repositories/AdministrationRepository';
 import type { ExamCommitteeMember, CommitteeRole } from '../../../types/exam-schedule.types';
+import {
+  OFFICIAL_SCHOOL_SUBJECTS,
+  normalizeSubjectName,
+} from '../../../config/school-subjects.config';
 
 export interface TeacherManagementTableProps {
   teachers: UserProfile[];
@@ -318,11 +322,10 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     setNip(t.nip && !t.nip.startsWith('NIP_') ? t.nip : '');
     setPhone(t.phone_number || '');
     setPosition(t.position || '');
-    setTeachingAssignment(
-      Array.isArray(t.teaching_assignment)
-        ? t.teaching_assignment.join(', ')
-        : (t.teaching_assignment || '')
-    );
+    const rawSubj = Array.isArray(t.teaching_assignment)
+      ? t.teaching_assignment.join(', ')
+      : (t.teaching_assignment || '');
+    setTeachingAssignment(rawSubj ? normalizeSubjectName(rawSubj) : '');
     setRole(t.role);
     setAvatarUrl(t.avatar_url || null);
 
@@ -1103,15 +1106,117 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
           <Input label="Jabatan / Posisi" value={position} onChange={(e) => setPosition(e.target.value)} required />
-          <div className="space-y-1">
-            <Input
-              label="Mata Pelajaran yang Diampu (Opsional)"
-              value={teachingAssignment}
-              onChange={(e) => setTeachingAssignment(e.target.value)}
-              placeholder="Contoh: Matematika, IPA, Bahasa Indonesia"
-            />
-            <p className="text-[10px] text-slate-500">
-              Opsional. Otomatis dimuat saat pembuatan jadwal pelajaran atau pembuatan soal ujian guru ini.
+
+          {/* Selector Mata Pelajaran yang Diampu (Dropdown + Pilihan Cepat) */}
+          <div className="space-y-2 p-3 bg-slate-50/80 rounded-xl border border-slate-200/80">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Mata Pelajaran yang Diampu (Opsional)
+              </label>
+              {teachingAssignment && (
+                <button
+                  type="button"
+                  onClick={() => setTeachingAssignment('')}
+                  className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 transition-colors"
+                >
+                  ✕ Kosongkan Mapel
+                </button>
+              )}
+            </div>
+
+            <select
+              value={
+                OFFICIAL_SCHOOL_SUBJECTS.some((s) => s.label === teachingAssignment || s.code === teachingAssignment)
+                  ? (OFFICIAL_SCHOOL_SUBJECTS.find((s) => s.label === teachingAssignment || s.code === teachingAssignment)?.label || '')
+                  : teachingAssignment ? 'CUSTOM' : ''
+              }
+              onChange={(e) => {
+                const selected = e.target.value;
+                if (selected === 'CUSTOM') {
+                  // user will type in custom input
+                } else {
+                  setTeachingAssignment(selected);
+                }
+              }}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="">-- Pilih Mata Pelajaran (Opsional) --</option>
+              {OFFICIAL_SCHOOL_SUBJECTS.map((subj) => (
+                <option key={subj.code} value={subj.label}>
+                  {subj.label}
+                </option>
+              ))}
+              <option value="CUSTOM">Lainnya / Kustom (Ketik Manual)...</option>
+            </select>
+
+            {/* Field Input Kustom jika bukan dari 12 mapel resmi */}
+            {(!OFFICIAL_SCHOOL_SUBJECTS.some((s) => s.label === teachingAssignment) && teachingAssignment !== '') && (
+              <Input
+                label="Ketik Nama Mata Pelajaran Kustom"
+                value={teachingAssignment}
+                onChange={(e) => setTeachingAssignment(e.target.value)}
+                placeholder="Contoh: Robotik, Seni Musik..."
+              />
+            )}
+
+            {/* Quick-Pick Pill Badges untuk 12 Mapel Resmi */}
+            <div className="pt-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10.5px] font-bold text-slate-600">Pilihan Cepat Mapel:</span>
+                <span className="text-[9.5px] text-slate-600 font-medium">Klik untuk memilih</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-0.5">
+                {OFFICIAL_SCHOOL_SUBJECTS.map((s) => {
+                  const items = teachingAssignment.split(',').map((x) => x.trim()).filter(Boolean);
+                  const isSelected = items.some(
+                    (x) =>
+                      x.toLowerCase() === s.label.toLowerCase() ||
+                      x.toLowerCase() === s.code.toLowerCase() ||
+                      x.toLowerCase() === s.name.toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={s.code}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          const remaining = items.filter(
+                            (x) =>
+                              x.toLowerCase() !== s.label.toLowerCase() &&
+                              x.toLowerCase() !== s.code.toLowerCase() &&
+                              x.toLowerCase() !== s.name.toLowerCase()
+                          );
+                          setTeachingAssignment(remaining.join(', '));
+                        } else {
+                          if (items.length === 0) {
+                            setTeachingAssignment(s.label);
+                          } else {
+                            setTeachingAssignment([...items, s.label].join(', '));
+                          }
+                        }
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10.5px] font-bold border transition-all ${
+                        isSelected
+                          ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-teal-50 hover:border-teal-300'
+                      }`}
+                    >
+                      {isSelected ? '✓ ' : ''}{s.code}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {teachingAssignment && (
+              <div className="flex items-center gap-1.5 pt-1 text-[11px] text-teal-800 font-bold bg-teal-50/80 px-2 py-1 rounded-lg border border-teal-200">
+                <span>📖</span>
+                <span className="truncate">Terpilih: {teachingAssignment}</span>
+              </div>
+            )}
+
+            <p className="text-[10px] text-slate-600">
+              Mata pelajaran otomatis disinkronkan saat membuat jadwal pelajaran atau pembuatan soal ujian guru ini.
             </p>
           </div>
 
@@ -1209,15 +1314,117 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
           <Input label="NPP / Nomor Pegawai (Opsional)" value={nip} onChange={(e) => setNip(e.target.value)} />
           <Input label="Nomor WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required />
           <Input label="Jabatan / Posisi" value={position} onChange={(e) => setPosition(e.target.value)} required />
-          <div className="space-y-1">
-            <Input
-              label="Mata Pelajaran yang Diampu (Opsional)"
-              value={teachingAssignment}
-              onChange={(e) => setTeachingAssignment(e.target.value)}
-              placeholder="Contoh: Matematika, IPA, Bahasa Indonesia"
-            />
-            <p className="text-[10px] text-slate-500">
-              Opsional. Otomatis dimuat saat pembuatan jadwal pelajaran atau pembuatan soal ujian guru ini.
+
+          {/* Selector Mata Pelajaran yang Diampu (Dropdown + Pilihan Cepat) */}
+          <div className="space-y-2 p-3 bg-slate-50/80 rounded-xl border border-slate-200/80">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Mata Pelajaran yang Diampu (Opsional)
+              </label>
+              {teachingAssignment && (
+                <button
+                  type="button"
+                  onClick={() => setTeachingAssignment('')}
+                  className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 transition-colors"
+                >
+                  ✕ Kosongkan Mapel
+                </button>
+              )}
+            </div>
+
+            <select
+              value={
+                OFFICIAL_SCHOOL_SUBJECTS.some((s) => s.label === teachingAssignment || s.code === teachingAssignment)
+                  ? (OFFICIAL_SCHOOL_SUBJECTS.find((s) => s.label === teachingAssignment || s.code === teachingAssignment)?.label || '')
+                  : teachingAssignment ? 'CUSTOM' : ''
+              }
+              onChange={(e) => {
+                const selected = e.target.value;
+                if (selected === 'CUSTOM') {
+                  // user will type in custom input
+                } else {
+                  setTeachingAssignment(selected);
+                }
+              }}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="">-- Pilih Mata Pelajaran (Opsional) --</option>
+              {OFFICIAL_SCHOOL_SUBJECTS.map((subj) => (
+                <option key={subj.code} value={subj.label}>
+                  {subj.label}
+                </option>
+              ))}
+              <option value="CUSTOM">Lainnya / Kustom (Ketik Manual)...</option>
+            </select>
+
+            {/* Field Input Kustom jika bukan dari 12 mapel resmi */}
+            {(!OFFICIAL_SCHOOL_SUBJECTS.some((s) => s.label === teachingAssignment) && teachingAssignment !== '') && (
+              <Input
+                label="Ketik Nama Mata Pelajaran Kustom"
+                value={teachingAssignment}
+                onChange={(e) => setTeachingAssignment(e.target.value)}
+                placeholder="Contoh: Robotik, Seni Musik..."
+              />
+            )}
+
+            {/* Quick-Pick Pill Badges untuk 12 Mapel Resmi */}
+            <div className="pt-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10.5px] font-bold text-slate-600">Pilihan Cepat Mapel:</span>
+                <span className="text-[9.5px] text-slate-600 font-medium">Klik untuk memilih</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-0.5">
+                {OFFICIAL_SCHOOL_SUBJECTS.map((s) => {
+                  const items = teachingAssignment.split(',').map((x) => x.trim()).filter(Boolean);
+                  const isSelected = items.some(
+                    (x) =>
+                      x.toLowerCase() === s.label.toLowerCase() ||
+                      x.toLowerCase() === s.code.toLowerCase() ||
+                      x.toLowerCase() === s.name.toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={s.code}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          const remaining = items.filter(
+                            (x) =>
+                              x.toLowerCase() !== s.label.toLowerCase() &&
+                              x.toLowerCase() !== s.code.toLowerCase() &&
+                              x.toLowerCase() !== s.name.toLowerCase()
+                          );
+                          setTeachingAssignment(remaining.join(', '));
+                        } else {
+                          if (items.length === 0) {
+                            setTeachingAssignment(s.label);
+                          } else {
+                            setTeachingAssignment([...items, s.label].join(', '));
+                          }
+                        }
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10.5px] font-bold border transition-all ${
+                        isSelected
+                          ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-teal-50 hover:border-teal-300'
+                      }`}
+                    >
+                      {isSelected ? '✓ ' : ''}{s.code}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {teachingAssignment && (
+              <div className="flex items-center gap-1.5 pt-1 text-[11px] text-teal-800 font-bold bg-teal-50/80 px-2 py-1 rounded-lg border border-teal-200">
+                <span>📖</span>
+                <span className="truncate">Terpilih: {teachingAssignment}</span>
+              </div>
+            )}
+
+            <p className="text-[10px] text-slate-600">
+              Mata pelajaran otomatis disinkronkan saat membuat jadwal pelajaran atau pembuatan soal ujian guru ini.
             </p>
           </div>
 

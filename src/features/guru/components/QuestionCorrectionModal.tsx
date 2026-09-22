@@ -43,6 +43,10 @@ import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../rep
 import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel } from '../../../utils/scoring.utils';
 import { normalizeClassCode, areClassCodesEqual, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
+import {
+  OFFICIAL_SCHOOL_SUBJECTS,
+  normalizeSubjectName,
+} from '../../../config/school-subjects.config';
 
 export type ModalLoadState =
   | 'IDLE'
@@ -63,18 +67,8 @@ interface QuestionCorrectionModalProps {
 
 const PREDEFINED_CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
 const PREDEFINED_SUBJECTS = [
-  'Informatika',
-  'Matematika',
-  'IPA',
-  'IPS',
-  'Bahasa Indonesia',
-  'Bahasa Inggris',
-  'Bahasa Arab',
-  'PAI',
+  ...OFFICIAL_SCHOOL_SUBJECTS.map((s) => s.label),
   'PJOK',
-  'Seni Budaya',
-  'PKn',
-  'SBPK',
 ];
 const PREDEFINED_EXAM_TYPES = ['Harian', 'PTS / UTS', 'PAS / UAS', 'ASTS', 'ASAJ', 'Simulasi'];
 
@@ -219,8 +213,13 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           : currentUser.teaching_assignment.split(',')[0].trim();
 
         if (rawMapel) {
+          const normalized = normalizeSubjectName(rawMapel);
           const matched = PREDEFINED_SUBJECTS.find(
-            (sub) => sub.toLowerCase() === rawMapel.toLowerCase()
+            (sub) =>
+              sub.toLowerCase() === rawMapel.toLowerCase() ||
+              sub.toLowerCase() === normalized.toLowerCase() ||
+              sub.toLowerCase().includes(rawMapel.toLowerCase()) ||
+              rawMapel.toLowerCase().includes(sub.toLowerCase())
           );
           if (matched) {
             setSelectedSubject(matched);
@@ -268,8 +267,13 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         : currentUser.teaching_assignment.split(',')[0].trim();
 
       if (rawMapel) {
+        const normalized = normalizeSubjectName(rawMapel);
         const matched = PREDEFINED_SUBJECTS.find(
-          (sub) => sub.toLowerCase() === rawMapel.toLowerCase()
+          (sub) =>
+            sub.toLowerCase() === rawMapel.toLowerCase() ||
+            sub.toLowerCase() === normalized.toLowerCase() ||
+            sub.toLowerCase().includes(rawMapel.toLowerCase()) ||
+            rawMapel.toLowerCase().includes(sub.toLowerCase())
         );
         if (matched) {
           setSelectedSubject(matched);
