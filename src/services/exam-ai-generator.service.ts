@@ -133,9 +133,11 @@ export class ExamScheduleAIGeneratorService {
     detectedSubjects: string[];
     maxProctorsPerSubject: number;
     detectedTeacherNames: string[];
+    detectedRoomNumbers: number[];
   } {
     const customSubjectProctors: Record<string, string[]> = {};
     const detectedTeacherNamesSet = new Set<string>();
+    const allDetectedRoomNums = new Set<number>();
     let maxProctorsPerSubject = 0;
 
     const lines = (prompt || '').split(/\r?\n/);
@@ -145,15 +147,16 @@ export class ExamScheduleAIGeneratorService {
       const line = rawLine.trim();
       if (!line) continue;
 
-      // Match "<Subject>: P1 = ..." or "<Subject> - P1 = ..." or "<Subject> : P1: ..."
-      const match = line.match(/^([^:\-\n]+)[:\-]\s*(P1\s*[:=].+)$/i);
+      // Match "<Subject>: P1 = ..." or "<Subject>: P6 = ..." or "<Subject> - Ruang 6 = ..." or "<Subject>: R6: ..."
+      const match = line.match(/^([^:\-\n]+)[:\-]\s*((?:(?:P|R|Ruang\s*)\d+)\s*[:=].+)$/i);
       if (!match) continue;
 
       const subjectName = match[1].trim();
       const proctorsPart = match[2].trim();
 
-      // Extract all P<num> = <TeacherName>
-      const pRegex = /P(\d+)\s*[:=]\s*([^,;]+)/gi;
+      // Extract all P<num> = <TeacherName> or Ruang <num> = <TeacherName> or R<num> = <TeacherName>
+      // Lookahead ensures commas inside Indonesian academic titles (e.g. "S.E., G.r") are preserved
+      const pRegex = /(?:P|R|Ruang\s*)(\d+)\s*[:=]\s*(.*?)(?=(?:,\s*|;\s*|\s+)(?:P|R|Ruang\s*)\d+\s*[:=]|$)/gi;
       let pMatch: RegExpExecArray | null;
       const proctorsMap = new Map<number, string>();
 
@@ -163,6 +166,7 @@ export class ExamScheduleAIGeneratorService {
         if (pNum > 0 && tName) {
           proctorsMap.set(pNum, tName);
           detectedTeacherNamesSet.add(tName);
+          allDetectedRoomNums.add(pNum);
         }
       }
 
@@ -182,11 +186,14 @@ export class ExamScheduleAIGeneratorService {
       }
     }
 
+    const detectedRoomNumbers = Array.from(allDetectedRoomNums).sort((a, b) => a - b);
+
     return {
       customSubjectProctors,
       detectedSubjects: subjectList,
       maxProctorsPerSubject,
       detectedTeacherNames: Array.from(detectedTeacherNamesSet),
+      detectedRoomNumbers,
     };
   }
 
@@ -203,7 +210,7 @@ export class ExamScheduleAIGeneratorService {
     const text = (prompt || '').toLowerCase();
 
     // 1. Generic teacher / invigilator keywords in Indonesian
-    const teacherKeywords = /\b(guru|pengawas|mengawas|piket|proctor|invigilator|penugasan|alokasi|p1|p2|p3|p4|p5)\b/i;
+    const teacherKeywords = /\b(guru|pengawas|mengawas|piket|proctor|invigilator|penugasan|alokasi|p\d+|r\d+|ruang\s*\d+)\b/i;
     if (teacherKeywords.test(text)) {
       return true;
     }
@@ -244,12 +251,15 @@ export class ExamScheduleAIGeneratorService {
     let usedFallback = false;
     let aiExplanation = '';
 
-    // If explicit custom proctor matrix (P1..P5) is detected, prioritize zero-hallucination local parser
+    // If explicit custom proctor matrix (P1..P10) is detected, prioritize zero-hallucination local parser
     // to strictly preserve exact subject ordering and room proctor allocation.
     if (hasCustomMatrix) {
       usedFallback = false;
       parsedConfig = this.parsePromptLocally(rawPrompt, params);
-      aiExplanation = `Jadwal ujian dan alokasi pengawas (${customMatrix.detectedSubjects.length} mata pelajaran, ${customMatrix.maxProctorsPerSubject} ruangan) berhasil disusun 100% presisi sesuai matrik alokasi guru pengawas (P1 s/d P${customMatrix.maxProctorsPerSubject}).`;
+      const roomDesc = customMatrix.detectedRoomNumbers.length > 0
+        ? `ruangan ${customMatrix.detectedRoomNumbers.join(', ')}`
+        : `${customMatrix.maxProctorsPerSubject} ruangan`;
+      aiExplanation = `Jadwal ujian dan alokasi pengawas (${customMatrix.detectedSubjects.length} mata pelajaran, ${roomDesc}) berhasil disusun 100% presisi sesuai matrik alokasi guru pengawas.`;
     } else {
       // 1. Attempt Zero-Trust AI parsing via Serverless Proxy (/api/ai)
       try {
@@ -497,8 +507,11 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
     let selectedClasses = [...levelClasses];
     let totalRooms = selectedClasses.length;
 
-    // If explicit proctor matrix exists, configure rooms and classes to match matrix rooms (Ruang 1 s/d Ruang X)
-    if (hasCustomMatrix && customMatrix.maxProctorsPerSubject > 0) {
+    // If explicit proctor matrix exists, configure rooms and classes to match matrix rooms (e.g. Ruang 6 for SMA)
+    if (hasCustomMatrix && customMatrix.detectedRoomNumbers && customMatrix.detectedRoomNumbers.length > 0) {
+      selectedClasses = customMatrix.detectedRoomNumbers.map((num) => `Ruang ${num}`);
+      totalRooms = selectedClasses.length;
+    } else if (hasCustomMatrix && customMatrix.maxProctorsPerSubject > 0) {
       totalRooms = customMatrix.maxProctorsPerSubject;
       selectedClasses = Array.from({ length: totalRooms }, (_, i) => `Ruang ${i + 1}`);
     } else if (effectiveLevel === 'SMP') {
@@ -638,6 +651,7 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
       assignBackupProctor: hasCustomMatrix ? false : assignBackupProctor,
       aiCustomPrompt: prompt.trim(),
       customSubjectProctors: hasCustomMatrix ? customMatrix.customSubjectProctors : undefined,
+      customRoomNumbers: hasCustomMatrix ? customMatrix.detectedRoomNumbers : undefined,
       skipProctorAssignment: !hasTeacherIntent,
     };
   }

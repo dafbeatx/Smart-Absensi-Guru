@@ -93,6 +93,8 @@ export class ExamSchedulerService {
       ['informatika', 'tik', 'komputer'],
       ['hadits', 'hadis', "al-qur'an hadits", "qur'an hadits", 'qurdis'],
       ['btq', "baca tulis al-qur'an", 'baca tulis quran'],
+      ['akuntansi', 'accounting', 'keuangan'],
+      ['ekonomi', 'economy', 'ekonomi bisnis'],
     ];
 
     for (const group of aliasGroups) {
@@ -258,18 +260,21 @@ export class ExamSchedulerService {
       return `Ruang ${numStr}`;
     };
 
-    const totalRooms = Math.max(
-      1,
-      maxCustomProctors || config.totalRooms || (config.selectedClasses ? config.selectedClasses.length : 1)
-    );
-
     let classes = config.selectedClasses && config.selectedClasses.length > 0
       ? config.selectedClasses
       : ['7A', '7B', '8A', '8B', '9A', '9B'];
 
+    const classesAreExplicitRooms = classes.every((c) => /^Ruang\s*\d+/i.test(c));
+    const totalRooms = classesAreExplicitRooms
+      ? classes.length
+      : Math.max(
+          1,
+          config.totalRooms || maxCustomProctors || classes.length
+        );
+
     // When custom proctor matrix is present, align classes with totalRooms
-    // so every room gets exactly 1 exam roster without double booking
-    if (maxCustomProctors > 0 && classes.length !== totalRooms) {
+    // only if classes are not already explicit rooms (e.g. ['Ruang 6'])
+    if (maxCustomProctors > 0 && !classesAreExplicitRooms && classes.length !== totalRooms) {
       classes = Array.from({ length: totalRooms }, (_, i) => formatRoomName(i + 1));
     }
 
@@ -281,6 +286,8 @@ export class ExamSchedulerService {
     classes.forEach((cls, clsIdx) => {
       if (config.classRoomMapping && config.classRoomMapping[cls]) {
         classRoomMap.set(cls, config.classRoomMapping[cls]);
+      } else if (/^Ruang\s*(\d+)/i.test(cls)) {
+        classRoomMap.set(cls, cls);
       } else {
         const roomNum = (clsIdx % totalRooms) + 1;
         classRoomMap.set(cls, formatRoomName(roomNum));
@@ -394,8 +401,19 @@ export class ExamSchedulerService {
 
           if (customProctors && customProctors.length > 0) {
             const roomNumMatch = roomName.match(/\d+/);
-            const roomIdx = roomNumMatch ? Math.max(0, parseInt(roomNumMatch[0], 10) - 1) : itemIdx;
-            const targetTeacherName = customProctors[roomIdx % customProctors.length];
+            const roomNum = roomNumMatch ? parseInt(roomNumMatch[0], 10) : (itemIdx + 1);
+            let targetTeacherName: string | undefined;
+
+            if (roomNum > 0 && roomNum <= customProctors.length && customProctors[roomNum - 1] !== '-') {
+              targetTeacherName = customProctors[roomNum - 1];
+            } else if (customProctors.length === 1 && customProctors[0] !== '-') {
+              targetTeacherName = customProctors[0];
+            } else {
+              const fallbackIdx = (roomNum - 1) % customProctors.length;
+              if (customProctors[fallbackIdx] !== '-') {
+                targetTeacherName = customProctors[fallbackIdx];
+              }
+            }
 
             if (targetTeacherName && targetTeacherName !== '-') {
               const matched = this.findMatchingTeacher(targetTeacherName, allTeachers);

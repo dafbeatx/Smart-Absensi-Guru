@@ -89,6 +89,7 @@ export interface ExamScheduleFormConfig {
   assignBackupProctor: boolean;
   aiCustomPrompt?: string;
   customSubjectProctors?: Record<string, string[]>; // Alokasi eksak pengawas per mapel & ruang [P1, P2, P3, ...]
+  customRoomNumbers?: number[]; // Nomor ruangan ujian yang terdeteksi dari matriks alokasi (misal [6] untuk SMA Ruang 6)
   skipProctorAssignment?: boolean; // Jika prompt AI tidak menyebutkan guru/pengawas, roster pengawas tidak dibuat
 }
 

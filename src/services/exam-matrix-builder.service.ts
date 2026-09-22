@@ -86,7 +86,9 @@ export class ExamMatrixBuilderService {
   ): ExamInvigilationMatrix {
     const { config, proctorSchedules } = scheduleData;
 
-    const institutionName = institutionNameOverride || 'SMP TERPADU AL - ITTIHADIYAH';
+    const institutionName =
+      institutionNameOverride ||
+      (config.educationLevel === 'SMA' ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL - ITTIHADIYAH');
     const examName = config.examType === 'ASAS'
       ? 'ASESMEN SUMATIF AKHIR SEMESTER (ASAS)'
       : config.examType === 'ASTS'

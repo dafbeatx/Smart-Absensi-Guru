@@ -437,6 +437,74 @@ Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan gur
     assert('Exam AI 07: Error testing proctor omission guard', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 8: SMA Single-Room (P6) Custom Proctor Matrix Recognition
+  // ---------------------------------------------------------------------------
+  try {
+    const smaTeachers: UserProfile[] = [
+      { id: 'usr_qodiatul', full_name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', role: 'ADMIN', teaching_assignment: 'IPS – Ilmu Pengetahuan Sosial' } as unknown as UserProfile,
+      { id: 'usr_iqbal', full_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', role: 'GURU', teaching_assignment: 'PJOK' } as unknown as UserProfile,
+      { id: 'usr_nurul', full_name: 'Nurul Fahriya, S.Pd., G.r', role: 'GURU', teaching_assignment: 'Kurikulum' } as unknown as UserProfile,
+      { id: 'usr_ridho', full_name: 'Ridho Maulana Al Farizi', role: 'GURU', teaching_assignment: 'Akhlak' } as unknown as UserProfile,
+      { id: 'usr_dafa', full_name: 'Dafa Maulana', role: 'GURU', teaching_assignment: 'IT' } as unknown as UserProfile,
+      { id: 'usr_mawar', full_name: 'Mawar Andinia, S.Pd., G.r', role: 'GURU', teaching_assignment: 'BK' } as unknown as UserProfile,
+    ];
+
+    const smaP6Prompt = `Tolong buatkan jadwal pengawasan ujian SMA sesuai dengan matrik alokasi guru pengawas per mata pelajaran P6 berikut:
+
+PAI: P6 = Nurul Farhiya
+IPA: P6 = Qodiatul Asrof Ramadhoni
+MTK: P6 = Qodiatul Asrof Ramadhoni
+PP: P6 = Dafa Maulana
+B. Indonesia: P6 = Qodiatul Asrof Ramadhoni
+Akuntansi: P6 = Mawar Andinia
+B. Arab: P6 = Ridho Maulana Al Farizi
+B. Inggris: P6 = Ridho Maulana Al Farizi
+Ekonomi: P6 = M. Iqbal Gustiawan
+Informatika: P6 = Nurul Farhiya
+Hadits: P6 = M. Iqbal Gustiawan
+BTQ: P6 = Ridho Maulana Al Farizi
+
+Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan guru pengawas untuk masing-masing mata pelajaran.`;
+
+    const parsedMatrix = ExamScheduleAIGeneratorService.parseCustomSubjectProctors(smaP6Prompt);
+    const has12Subjs = parsedMatrix.detectedSubjects.length === 12;
+    const has6Teachers = parsedMatrix.detectedTeacherNames.length === 6;
+    const hasRoom6 = parsedMatrix.detectedRoomNumbers.length === 1 && parsedMatrix.detectedRoomNumbers[0] === 6;
+
+    const smaRes = await ExamScheduleAIGeneratorService.generateFromPrompt({
+      prompt: smaP6Prompt,
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      educationLevel: 'SMA',
+      teachers: smaTeachers,
+      availableClasses: ['10', '11', '12'],
+      availableSubjects: ['PAI', 'IPA', 'MTK', 'PP', 'B. Indonesia', 'Akuntansi', 'B. Arab', 'B. Inggris', 'Ekonomi', 'Informatika', 'Hadits', 'BTQ'],
+    });
+
+    const matrix = ExamMatrixBuilderService.buildMatrix(smaRes.schedule, smaTeachers);
+    const legendCount = matrix.teacherLegend.length;
+    const isSingleRoom = matrix.rooms.length === 1 && matrix.rooms[0].label === 'R 06';
+    const isInstitutionSMA = matrix.institutionName === 'SMA TERPADU AS SALAAM';
+
+    // Verify all 12 proctor schedules map to Ruang 6 and have assigned proctors
+    const proctorSchedulesValid =
+      smaRes.schedule.proctorSchedules.length === 12 &&
+      smaRes.schedule.proctorSchedules.every((p) => p.roomName === 'Ruang 6' && p.mainProctorName);
+
+    // Verify PAI proctor is Nurul Fahriya
+    const paiProctor = smaRes.schedule.proctorSchedules.find((p) => p.subject === 'PAI');
+    const isPAIOk = paiProctor?.mainProctorName.includes('Nurul Fahriya');
+
+    assert(
+      'Exam AI 08: SMA P6 custom proctor matrix accurately recognizes 12 subjects, 6 teachers, allocates Ruang 6, and formats matrix legend',
+      has12Subjs && has6Teachers && hasRoom6 && legendCount === 6 && isSingleRoom && isInstitutionSMA && proctorSchedulesValid && (isPAIOk ?? false),
+      `Subjects: ${parsedMatrix.detectedSubjects.length}/12, Teachers: ${parsedMatrix.detectedTeacherNames.length}/6, Legend: ${legendCount}/6, Room: ${matrix.rooms[0]?.label}, Inst: ${matrix.institutionName}`
+    );
+  } catch (err: any) {
+    assert('Exam AI 08: Error testing SMA P6 custom proctor matrix', false, err?.message);
+  }
+
   return {
     passed,
     failed,
