@@ -29,6 +29,7 @@ import {
   Info,
   Bot,
   Zap,
+  Copy,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -377,6 +378,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
   const [aiGenerationMessage, setAiGenerationMessage] = useState<string>('');
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(() => getExamAIPromptPresets('SMP')[0].id);
+  const [isCopiedSample, setIsCopiedSample] = useState(false);
 
   // Committee Admin Management State
   const [committeeEditingList, setCommitteeEditingList] = useState<Array<{
@@ -738,6 +740,95 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       setIsGeneratingAI(false);
       setAiGenerationMessage('');
     }
+  };
+
+  // Get canonical 100% verified sample prompt for current education level
+  const getSamplePromptText = useCallback((): string => {
+    if (selectedLevel === 'SMA') {
+      return `Tolong buatkan jadwal pengawasan ujian ASTS SMA Terpadu As Salaam tanggal 28 September sampai 2 Oktober 2026 untuk kelas 10, 11, 12 (Ruang 6).
+
+Pembagian sesi per hari:
+- Senin: 2 sesi (2 mata pelajaran)
+- Selasa: 2 sesi (2 mata pelajaran)
+- Rabu: 3 sesi (3 mata pelajaran)
+- Kamis: 3 sesi (3 mata pelajaran)
+- Jumat: 2 sesi (2 mata pelajaran)
+
+Alokasi guru pengawas per mata pelajaran P6:
+PAI: P6 = Nurul Farhiya
+IPA: P6 = Qodiatul Asrof Ramadhoni
+MTK: P6 = Qodiatul Asrof Ramadhoni
+PP: P6 = Dafa Maulana
+B. Indonesia: P6 = Qodiatul Asrof Ramadhoni
+Akuntansi: P6 = Mawar Andinia
+B. Arab: P6 = Ridho Maulana Al Farizi
+B. Inggris: P6 = Ridho Maulana Al Farizi
+Ekonomi: P6 = M. Iqbal Gustiawan
+Informatika: P6 = Nurul Farhiya
+Hadits: P6 = M. Iqbal Gustiawan
+BTQ: P6 = Ridho Maulana Al Farizi
+
+Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan guru pengawas untuk masing-masing mata pelajaran.`;
+    }
+
+    return `Buatkan jadwal pengawasan ujian ASTS SMP Terpadu Al-Ittihadiyah tanggal 28 September sampai 2 Oktober 2026 untuk kelas 7A, 7B, 8A, 8B, 9A, 9B (Ruang 1 sampai Ruang 5).
+
+Pembagian sesi per hari:
+- Senin: 2 sesi (2 mata pelajaran)
+- Selasa: 2 sesi (2 mata pelajaran)
+- Rabu: 3 sesi (3 mata pelajaran)
+- Kamis: 3 sesi (3 mata pelajaran)
+- Jumat: 2 sesi (2 mata pelajaran)
+
+Alokasi pengawas per mapel:
+PAI: P1 = Fitri Ani Rahayu, S.Mat, P2 = Qodiatul Asrof Ramadhoni, S.E., G.r, P3 = Widianingsih, S.I., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = M. Iqbal Gustiawan, S.Pd., G.r.
+IPA: P1 = Widianingsih, S.I., G.r, P2 = Nurul Farhiya, S.Pd., G.r, P3 = Ridho Maulana Al Farizi, P4 = Fitri Ani Rahayu, S.Mat, P5 = Adi Prasetyo, S.Pd., G.r.
+MTK: P1 = Septi Nur Aeni, S.E, P2 = Fitri Ani Rahayu, S.Mat, P3 = M. Iqbal Gustiawan, S.Pd., G.r, P4 = Mira Nurdianti, S.Pd, P5 = Adi Prasetyo, S.Pd., G.r.
+PP: P1 = Widianingsih, S.I., G.r, P2 = Ridho Maulana Al Farizi, P3 = Septi Nur Aeni, S.E, P4 = Qodiatul Asrof Ramadhoni, S.E., G.r, P5 = Nurul Farhiya, S.Pd., G.r.
+B. Indonesia: P1 = Nurul Farhiya, S.Pd., G.r, P2 = Dafa Maulana, S.Pd, P3 = Fitri Ani Rahayu, S.Mat, P4 = Mawar Andinia, S.Pd., G.r, P5 = Adi Prasetyo, S.Pd., G.r.
+IPS: P1 = Ridho Maulana Al Farizi, P2 = Septi Nur Aeni, S.E, P3 = Widianingsih, S.I., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = Fitri Ani Rahayu, S.Mat.
+B. Arab: P1 = Qodiatul Asrof Ramadhoni, S.E., G.r, P2 = Widianingsih, S.I., G.r, P3 = Nurul Farhiya, S.Pd., G.r, P4 = M. Iqbal Gustiawan, S.Pd., G.r, P5 = Adi Prasetyo, S.Pd., G.r.
+B. Inggris: P1 = Nurul Farhiya, S.Pd., G.r, P2 = Widianingsih, S.I., G.r, P3 = Fitri Ani Rahayu, S.Mat, P4 = Mira Nurdianti, S.Pd, P5 = Adi Prasetyo, S.Pd., G.r.
+SBPK: P1 = Fitri Ani Rahayu, S.Mat, P2 = Mawar Andinia, S.Pd., G.r, P3 = Qodiatul Asrof Ramadhoni, S.E., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = Widianingsih, S.I., G.r.
+Informatika: P1 = Qodiatul Asrof Ramadhoni, S.E., G.r, P2 = Septi Nur Aeni, S.E, P3 = Dafa Maulana, S.Pd, P4 = Fitri Ani Rahayu, S.Mat, P5 = M. Iqbal Gustiawan, S.Pd., G.r.
+Hadits: P1 = Widianingsih, S.I., G.r, P2 = Mawar Andinia, S.Pd., G.r, P3 = Ridho Maulana Al Farizi, P4 = Nurul Farhiya, S.Pd., G.r, P5 = Mira Nurdianti, S.Pd.
+BTQ: P1 = M. Iqbal Gustiawan, S.Pd., G.r, P2 = Mira Nurdianti, S.Pd, P3 = Qodiatul Asrof Ramadhoni, S.E., G.r, P4 = Dafa Maulana, S.Pd, P5 = Mawar Andinia, S.Pd., G.r.
+
+Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi pengawas setiap mata pelajaran persis seperti data di atas.`;
+  }, [selectedLevel]);
+
+  const handleCopySamplePrompt = async () => {
+    const sample = getSamplePromptText();
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(sample);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = sample;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setIsCopiedSample(true);
+      setTimeout(() => setIsCopiedSample(false), 2500);
+      setToast({
+        text: `Contoh prompt presisi ${selectedLevel} berhasil disalin ke clipboard! Silakan paste atau edit sesuai kebutuhan. 📋`,
+        type: 'success',
+      });
+    } catch {
+      setToast({ text: 'Gagal menyalin contoh prompt ke clipboard.', type: 'error' });
+    }
+  };
+
+  const handleApplySamplePrompt = () => {
+    const sample = getSamplePromptText();
+    setAiPromptInput(sample);
+    setSelectedPresetId(null);
+    setToast({
+      text: `Contoh prompt presisi ${selectedLevel} berhasil dimasukkan ke kolom input! 🚀`,
+      type: 'success',
+    });
   };
 
   // Save Committee Members (Admin Only)
@@ -1418,30 +1509,77 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
             {/* 4. Prompt Input Box */}
             <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs space-y-4">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <Bot className="w-4 h-4 text-teal-600" />
-                    <span>Instruksi Kebutuhan Jadwal Ujian:</span>
+                    <span>Instruksi Kebutuhan Jadwal Ujian ({selectedLevel}):</span>
                   </label>
-                  <span className="text-[11px] text-slate-400">
-                    {aiPromptInput.length} karakter • Anda bebas mengedit kalimat ini
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCopySamplePrompt}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 transition-all shadow-2xs cursor-pointer active:scale-95"
+                      title={`Salin contoh prompt matriks pengawas ${selectedLevel} ke clipboard`}
+                    >
+                      {isCopiedSample ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700 font-extrabold">Tersalin!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-teal-700" />
+                          <span>Salin Contoh Prompt</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplySamplePrompt}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-all shadow-2xs cursor-pointer active:scale-95"
+                      title={`Terapkan contoh prompt ${selectedLevel} langsung ke kolom input`}
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Pakai Contoh Ini</span>
+                    </button>
+                  </div>
                 </div>
                 <textarea
-                  rows={5}
+                  rows={6}
                   value={aiPromptInput}
                   onChange={(e) => {
                     setAiPromptInput(e.target.value);
                     setSelectedPresetId(null);
                   }}
-                  placeholder="Contoh: Buatkan jadwal ASTS ganjil dari tanggal 29 September sampai 3 Oktober 2026, 2 sesi per hari (sesi 1 jam 07:30 - 09:00, sesi 2 jam 09:30 - 11:00). Khusus hari Jumat 1 sesi saja. Bagi rata semua guru yang aktif untuk mengawas..."
-                  className="w-full bg-white border border-slate-300 rounded-xl p-3.5 text-xs text-slate-900 placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all font-sans leading-relaxed resize-y min-h-27.5"
+                  placeholder="Contoh: Buatkan jadwal ASTS ganjil dari tanggal 28 September sampai 2 Oktober 2026, 2 sesi per hari (sesi 1 jam 07:30 - 09:00, sesi 2 jam 09:30 - 11:00). Khusus hari Rabu dan Kamis 3 mata pelajaran. Alokasi pengawas per mapel: PAI: P1 = ..., P2 = ..."
+                  className="w-full bg-white border border-slate-300 rounded-xl p-3.5 text-xs text-slate-900 placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all font-sans leading-relaxed resize-y min-h-28"
                 />
+                <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                  <span>{aiPromptInput.length} karakter</span>
+                  <span>💡 Tip: Klik tombol <b>Salin Contoh Prompt</b> atau <b>Pakai Contoh Ini</b> untuk format 100% presisi.</span>
+                </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleCopySamplePrompt}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-colors"
+                  >
+                    {isCopiedSample ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700">Tersalin ke Clipboard!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-teal-700" />
+                        <span>Salin Contoh Prompt</span>
+                      </>
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1451,7 +1589,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                     disabled={!aiPromptInput || isGeneratingAI}
                     className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 transition-colors"
                   >
-                    Bersihkan Prompt
+                    Bersihkan
                   </button>
                   <button
                     type="button"
