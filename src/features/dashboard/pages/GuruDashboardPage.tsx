@@ -75,6 +75,9 @@ import {
   Settings2,
   CheckCircle2,
   CalendarDays,
+  CalendarCheck,
+  DoorOpen,
+  Printer,
   Award,
   Coffee,
 } from 'lucide-react';
@@ -131,10 +134,21 @@ import {
   EXAM_COMMITTEE_CHANGED_EVENT,
 } from '../../../repositories/ExamCommitteeRepository';
 import {
+  ExamScheduleRepository,
+  EXAM_SCHEDULE_PUBLISHED_EVENT,
+  EXAM_SCHEDULE_UPDATED_EVENT,
+} from '../../../repositories/ExamScheduleRepository';
+import { ExamWordExporterService } from '../../../services/exam-word-exporter.service';
+import { ExamMatrixBuilderService } from '../../../services/exam-matrix-builder.service';
+import {
   AdministrationRepository,
   ADMIN_YEAR_CHANGED_EVENT,
 } from '../../../repositories/AdministrationRepository';
-import type { CommitteeRole } from '../../../types/exam-schedule.types';
+import type {
+  CommitteeRole,
+  ExamScheduleData,
+  ExamProctorItem,
+} from '../../../types/exam-schedule.types';
 import type {
   AttendanceRecord,
   HolidayRecord,
@@ -498,6 +512,60 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       window.removeEventListener('storage', handleStorage);
     };
   }, [effectiveUser?.id, effectiveUser?.position, effectiveUser?.full_name, effectiveUser?.nip]);
+
+  // Published Exam Schedule & Personal Duty Assignments (Teacher View)
+  const [publishedExamDuty, setPublishedExamDuty] = useState<{
+    schedule: ExamScheduleData;
+    duties: ExamProctorItem[];
+    teacherCode?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadExamDuties = async () => {
+      if (!effectiveUser?.id && !effectiveUser?.full_name) {
+        if (isMounted) setPublishedExamDuty(null);
+        return;
+      }
+      try {
+        const activeYear = AdministrationRepository.getActiveAcademicYear();
+        const dutyData = await ExamScheduleRepository.getTeacherExamDuties(
+          effectiveUser.id || effectiveUser.full_name,
+          activeYear
+        );
+        if (isMounted) {
+          setPublishedExamDuty(dutyData);
+        }
+      } catch (err) {
+        console.warn('Failed to load teacher exam duties in GuruDashboardPage:', err);
+      }
+    };
+
+    loadExamDuties();
+
+    const handleScheduleChanged = () => {
+      loadExamDuties();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.includes('exam_schedule')) {
+        loadExamDuties();
+      }
+    };
+
+    window.addEventListener(EXAM_SCHEDULE_PUBLISHED_EVENT, handleScheduleChanged);
+    window.addEventListener(EXAM_SCHEDULE_UPDATED_EVENT, handleScheduleChanged);
+    window.addEventListener(ADMIN_YEAR_CHANGED_EVENT, handleScheduleChanged);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener(EXAM_SCHEDULE_PUBLISHED_EVENT, handleScheduleChanged);
+      window.removeEventListener(EXAM_SCHEDULE_UPDATED_EVENT, handleScheduleChanged);
+      window.removeEventListener(ADMIN_YEAR_CHANGED_EVENT, handleScheduleChanged);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [effectiveUser?.id, effectiveUser?.full_name, effectiveUser?.nip]);
 
   // 8 Quick Icons Customization State & Hak Akses Wakasek Sarpras (M. Iqbal Gustiawan)
   const isSarprasOfficer = isUserSarprasOfficer(effectiveUser);
@@ -2334,6 +2402,147 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       <span className="truncate">Koreksi Soal</span>
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* 📋 KARTU TUGAS MENGAWAS ASESMEN SEKOLAH (SENIOR & ADULT FRIENDLY >25 THN) */}
+            {publishedExamDuty && publishedExamDuty.duties.length > 0 && (
+              <div
+                id="teacher-exam-duty-card"
+                className="bg-white rounded-3xl p-4 sm:p-5 border-2 border-teal-600/30 shadow-sm space-y-4 animate-fadeIn"
+              >
+                {/* Header with High Contrast and Clear Badges */}
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-2xl bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <CalendarCheck className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-md bg-teal-100 text-teal-900 text-xs font-black tracking-wider uppercase border border-teal-300">
+                          TUGAS MENGAWAS ASESMEN
+                        </span>
+                        {publishedExamDuty.teacherCode && (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-xs font-black border border-amber-300">
+                            KODE {publishedExamDuty.teacherCode}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-500 font-semibold">
+                          T.A. {publishedExamDuty.schedule.config.academicYear}
+                        </span>
+                      </div>
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight mt-1">
+                        {publishedExamDuty.schedule.config.examTitle || 'Jadwal Tugas Mengawas Ujian'}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {publishedExamDuty.duties.some((d) => d.date === getTodayDateInJakarta()) ? (
+                      <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black shrink-0 flex items-center gap-1.5 shadow-xs animate-pulse">
+                        <span className="w-2 h-2 rounded-full bg-white" />
+                        ADA TUGAS HARI INI
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-300 text-xs font-extrabold shrink-0">
+                        {publishedExamDuty.duties.length} Sesi Terjadwal
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Senior/Adult Teacher Information Banner */}
+                <div className="bg-slate-50 rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-700">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-slate-500 font-medium">Bapak/Ibu:</span>
+                    <strong className="text-slate-900 font-bold">{effectiveUser?.full_name}</strong>
+                    <span className="text-slate-500 text-xs">
+                      ({effectiveUser?.nip ? `NPP: ${effectiveUser.nip}` : 'Pendidik'})
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 font-medium">
+                    Status: <strong className="text-emerald-700 font-bold">Resmi Diterbitkan Panitia</strong>
+                  </div>
+                </div>
+
+                {/* Duty Session List - High Legibility (Clear 15-18px text, large room badges) */}
+                <div className="space-y-2.5">
+                  {publishedExamDuty.duties.map((duty, idx) => {
+                    const isToday = duty.date === getTodayDateInJakarta();
+                    return (
+                      <div
+                        key={duty.id || idx}
+                        className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                          isToday
+                            ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-300/60 shadow-2xs'
+                            : 'bg-white border-slate-200/90 hover:border-teal-400'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {isToday && (
+                                <span className="px-2 py-0.5 rounded bg-rose-600 text-white text-[10px] font-black uppercase tracking-wide">
+                                  Hari Ini
+                                </span>
+                              )}
+                              <span className="text-xs font-bold text-slate-700">
+                                Sesi {duty.sessionNumber} ({duty.startTime} - {duty.endTime} WIB)
+                              </span>
+                              <span className="text-xs text-slate-400">•</span>
+                              <span className="text-xs font-bold text-slate-600">
+                                {duty.dayName ? `${duty.dayName}, ` : ''}{ExamMatrixBuilderService.formatIndonesianDate(duty.date)}
+                              </span>
+                            </div>
+                            <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+                              {duty.subject}
+                            </h4>
+                            <p className="text-xs text-slate-500 font-medium">
+                              {duty.className ? `Kelas / Rombel: ${duty.className}` : ''} • Peran: Pengawas Ruangan
+                            </p>
+                          </div>
+
+                          {/* Large High-Contrast Room Badge */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="px-4 py-2 rounded-xl bg-teal-700 text-white font-black text-sm sm:text-base flex items-center gap-2 shadow-xs">
+                              <DoorOpen className="w-4 h-4 text-teal-200" />
+                              <span>{duty.roomName || 'Ruang Ujian'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Touch-Friendly Action Buttons (Senior-friendly height 48px) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      ExamWordExporterService.printTeacherDutySlip(
+                        effectiveUser?.full_name || 'Bapak/Ibu Guru',
+                        publishedExamDuty.teacherCode,
+                        publishedExamDuty.duties,
+                        settings.institution_name || 'SMP Terpadu Al-Ittihadiyah',
+                        publishedExamDuty.schedule.config.examTitle || 'Jadwal Tugas Mengawas Ujian'
+                      );
+                    }}
+                    className="h-12 px-4 bg-teal-700 hover:bg-teal-800 active:scale-[0.98] text-white font-bold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4 text-teal-200" />
+                    <span>Cetak Kartu Tugas (A4)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsExamScheduleModalOpen(true)}
+                    className="h-12 px-4 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 font-bold text-sm rounded-xl border border-slate-300 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Calendar className="w-4 h-4 text-slate-600" />
+                    <span>Lihat Semua Jadwal Sekolah</span>
+                  </button>
                 </div>
               </div>
             )}

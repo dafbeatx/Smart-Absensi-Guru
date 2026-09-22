@@ -249,3 +249,24 @@
   animation: radar-ping-expand 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* 🖨️ Clean A4 Printing Styles (Prevents Web UI Screenshots) */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print,
+  nav,
+  aside,
+  header,
+  footer,
+  button,
+  .no-print-bar,
+  #app-bottom-nav,
+  .pwa-install-banner,
+  .toast-container {
+    display: none !important;
+  }
+}
+
+

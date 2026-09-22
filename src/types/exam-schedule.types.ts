@@ -110,6 +110,8 @@ export interface ExamScheduleData {
   subjectSchedules: ExamSubjectScheduleItem[];
   proctorSchedules: ExamProctorItem[];
   summary: ExamScheduleSummary;
+  isPublished?: boolean; // Status resmi diterbitkan ke guru
+  publishedAt?: string;  // Waktu publikasi
   createdAt: string;
   updatedAt: string;
 }

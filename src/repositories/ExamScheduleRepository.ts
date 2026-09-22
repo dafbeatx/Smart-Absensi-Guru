@@ -6,6 +6,7 @@ import { ProviderFactory } from '../providers/provider-factory';
 
 export const EXAM_SCHEDULE_STORAGE_PREFIX = 'smart_absensi_exam_schedule_';
 export const EXAM_SCHEDULE_UPDATED_EVENT = 'smart_absensi_exam_schedule_updated';
+export const EXAM_SCHEDULE_PUBLISHED_EVENT = 'smart_absensi_exam_schedule_published';
 
 const memoryScheduleStore = new Map<string, string>();
 
@@ -103,6 +104,82 @@ export class ExamScheduleRepository {
       logger.error('ExamScheduleRepository', 'Failed to save exam schedule:', err);
       return false;
     }
+  }
+
+  /**
+   * Publishes an exam schedule to teachers, updates publication metadata, and broadcasts event.
+   */
+  public static async publishSchedule(
+    schedule: ExamScheduleData,
+    level?: 'SMP' | 'SMA'
+  ): Promise<boolean> {
+    schedule.isPublished = true;
+    schedule.publishedAt = new Date().toISOString();
+    schedule.updatedAt = new Date().toISOString();
+
+    const saved = await this.saveSchedule(schedule, level);
+    if (saved && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(EXAM_SCHEDULE_PUBLISHED_EVENT, { detail: schedule })
+      );
+    }
+    return saved;
+  }
+
+  /**
+   * Helper to retrieve all active exam duties for a teacher across both levels or specified level.
+   */
+  public static async getTeacherExamDuties(
+    teacherIdOrName: string,
+    academicYear: string,
+    level?: 'SMP' | 'SMA'
+  ): Promise<{
+    schedule: ExamScheduleData;
+    duties: ExamScheduleData['proctorSchedules'];
+    teacherCode?: string;
+  } | null> {
+    const examTypes = ['ASTS', 'ASAS'];
+    const levelsToScan: ('SMP' | 'SMA')[] = level ? [level] : ['SMA', 'SMP'];
+    const targetKey = (teacherIdOrName || '').toLowerCase().trim();
+    if (!targetKey) return null;
+
+    for (const lvl of levelsToScan) {
+      for (const eType of examTypes) {
+        const schedule = await this.getSchedule(academicYear, eType, lvl);
+        if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
+          continue;
+        }
+
+        const duties = schedule.proctorSchedules.filter((p) => {
+          const matchMainId = p.mainProctorId?.toLowerCase().trim() === targetKey;
+          const matchMainName =
+            p.mainProctorName?.toLowerCase().includes(targetKey) ||
+            targetKey.includes(p.mainProctorName?.toLowerCase().trim() || '');
+          const matchSecId = p.secondaryProctorId?.toLowerCase().trim() === targetKey;
+          const matchSecName = p.secondaryProctorName?.toLowerCase().includes(targetKey);
+          return matchMainId || matchMainName || matchSecId || matchSecName;
+        });
+
+        if (duties.length > 0) {
+          // Derive deterministic teacher code (01, 02...) matching matrix proctor legend
+          const allProctorNames = Array.from(
+            new Set(schedule.proctorSchedules.map((p) => p.mainProctorName.trim()))
+          ).sort((a, b) => a.localeCompare(b, 'id'));
+          const idx = allProctorNames.findIndex((n) =>
+            n.toLowerCase().includes(targetKey) || targetKey.includes(n.toLowerCase())
+          );
+          const teacherCode = idx !== -1 ? String(idx + 1).padStart(2, '0') : undefined;
+
+          return {
+            schedule,
+            duties,
+            teacherCode,
+          };
+        }
+      }
+    }
+
+    return null;
   }
 
   /**

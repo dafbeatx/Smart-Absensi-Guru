@@ -58,6 +58,7 @@ import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { normalizeClassCode, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
+import { NotificationService } from '../../../services/notification-permission.service';
 
 const formatIndonesianDateLabel = (dateStr: string) => {
   try {
@@ -823,6 +824,51 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     }
   };
 
+  // State & Handler for Publishing Schedule to Teachers
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const handlePublishSchedule = async () => {
+    if (!scheduleData) return;
+    setIsPublishing(true);
+    try {
+      const updatedSchedule: ExamScheduleData = {
+        ...scheduleData,
+        isPublished: true,
+        publishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const success = await ExamScheduleRepository.publishSchedule(updatedSchedule, selectedLevel);
+      if (success) {
+        setScheduleData(updatedSchedule);
+
+        // Kirim notifikasi sistem ke seluruh pendidik
+        try {
+          NotificationService.sendNativeNotification({
+            title: `📢 Jadwal Pengawas ${updatedSchedule.config.examType} (${selectedLevel}) Diterbitkan`,
+            body: `Jadwal ujian dan alokasi ruang pengawas untuk ${selectedLevel} telah resmi diterbitkan oleh Admin/Panitia. Silakan periksa ruangan Anda di Beranda Guru.`,
+            type: 'EVENT',
+            roleTarget: 'ALL',
+          });
+        } catch (notifErr) {
+          logger.warn('ExamScheduleAndProctorModal', 'Failed to push publication notification:', notifErr);
+        }
+
+        setToast({
+          text: `Jadwal ${updatedSchedule.config.examType} (${selectedLevel}) berhasil disimpan & resmi dipublikasikan ke seluruh guru! 🎉`,
+          type: 'success',
+        });
+      } else {
+        setToast({ text: 'Gagal menyimpan dan mempublikasikan jadwal.', type: 'error' });
+      }
+    } catch (err: any) {
+      logger.error('ExamScheduleAndProctorModal', 'Failed to publish schedule:', err);
+      setToast({ text: `Gagal mempublikasikan jadwal: ${err?.message || 'Terjadi kesalahan sistem'}`, type: 'error' });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   // Filter my personal schedule (Logged in teacher's assigned duties)
   const myProctorAssignments = useMemo(() => {
     if (!scheduleData || !currentUser) return [];
@@ -929,6 +975,24 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                 </button>
               )}
 
+              {/* Tombol Simpan & Publikasikan ke Guru (Hanya Pengelola / Admin) */}
+              {accessInfo.canManage && (
+                <button
+                  type="button"
+                  onClick={handlePublishSchedule}
+                  disabled={isPublishing}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer ${
+                    scheduleData.isPublished
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-teal-700 hover:bg-teal-800 text-white animate-pulse'
+                  }`}
+                  title="Simpan dan Terbitkan Jadwal Ini ke Seluruh Guru"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{isPublishing ? 'Menyimpan...' : scheduleData.isPublished ? 'Tersimpan & Terbit' : 'Simpan & Publikasikan'}</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
@@ -965,10 +1029,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                     window.print();
                   }
                 }}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
                 title="Cetak Jadwal Pengawas Format Resmi Sekolah (A4)"
               >
-                <Printer className="w-3.5 h-3.5 text-slate-600" />
+                <Printer className="w-3.5 h-3.5 text-slate-700" />
                 <span>Cetak A4</span>
               </button>
             </>
@@ -2737,6 +2801,22 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                       <FileText className="w-3.5 h-3.5 text-blue-600" />
                       <span>Unduh Word (.doc)</span>
                     </button>
+                    {accessInfo.canManage && (
+                      <button
+                        type="button"
+                        onClick={handlePublishSchedule}
+                        disabled={isPublishing}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                          scheduleData?.isPublished
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : 'bg-teal-700 hover:bg-teal-800 text-white'
+                        }`}
+                        title="Simpan dan Terbitkan Jadwal ke Guru"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{isPublishing ? 'Menyimpan...' : scheduleData?.isPublished ? 'Tersimpan & Terbit' : 'Simpan & Publikasikan'}</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -2746,8 +2826,8 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                           window.print();
                         }
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-colors shadow-2xs"
-                      title="Cetak Jadwal atau Simpan ke PDF (A4)"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                      title="Cetak Jadwal Format Resmi Sekolah (A4)"
                     >
                       <Printer className="w-3.5 h-3.5 text-teal-700" />
                       <span>Cetak / PDF (A4)</span>
@@ -3037,11 +3117,22 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
               {myProctorAssignments.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  onClick={() => {
+                    const teacherCode = invigilationMatrix?.teacherLegend?.find(
+                      (l) => l.fullName === currentUser?.full_name || l.fullName?.toLowerCase().includes((currentUser?.full_name || '').toLowerCase())
+                    )?.code;
+                    ExamWordExporterService.printTeacherDutySlip(
+                      currentUser?.full_name || 'Bapak/Ibu Guru',
+                      teacherCode,
+                      myProctorAssignments,
+                      effectiveInstitutionName,
+                      scheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian'
+                    );
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-xs"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Cetak Jadwal Saya</span>
+                  <Printer className="w-4 h-4" />
+                  <span>Cetak Jadwal Saya (A4)</span>
                 </button>
               )}
             </div>
