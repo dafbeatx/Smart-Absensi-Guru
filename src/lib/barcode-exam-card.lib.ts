@@ -11,6 +11,7 @@ import { SMP_AL_ITTIHADIYAH_LOGO_BASE64 } from '../assets/logo-smp-terpadu';
 import { SMA_AS_SALAAM_LOGO_BASE64 } from '../assets/logo-sma-terpadu';
 import type { StudentItem } from '../types/database.types';
 import { resolveSchoolLevel } from '../utils/class.utils';
+import { exportHtmlToPdf } from './pdf-export.lib';
 
 export type EducationLevel = 'SMP' | 'SMA';
 
@@ -632,18 +633,14 @@ export class BarcodeExamCardService {
     .join('')}
   <script>
     function downloadAllCardsFile() {
-      var clone = document.documentElement.cloneNode(true);
-      var bar = clone.querySelector('.print-bar');
-      if (bar) bar.remove();
-      var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'Kartu_Peserta_' + '${selectedLevel}_' + '${cleanAcademicYear}' + '.html';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      if (window.opener && window.opener.__exportHtmlToPdf) {
+        window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
+          filename: 'Kartu_Peserta_' + '${selectedLevel}_' + '${cleanAcademicYear}' + '.pdf',
+          orientation: 'portrait'
+        });
+      } else {
+        window.print();
+      }
     }
   </script>
 </body>
@@ -675,27 +672,24 @@ export class BarcodeExamCardService {
   }
 
   /**
-   * Downloads the complete A4 exam cards layout directly as an HTML file
+   * Downloads the complete A4 exam cards layout directly as an official PDF file
    */
-  public static downloadExamCardsA4(
+  public static async downloadExamCardsA4(
     students: AnyStudentData[],
     options: ExamCardRenderOptions,
     filenameOverride?: string
-  ): void {
+  ): Promise<void> {
     if (typeof window === 'undefined') return;
     const html = this.generateExamCardsA4HTML(students, options);
     const selectedLevel = options.level || 'SMP';
     const year = (options.tahunAjaran || '2026-2027').replace('/', '-');
-    const filename = filenameOverride || `Kartu_Peserta_${selectedLevel}_${year}.html`;
+    const filename = filenameOverride
+      ? filenameOverride.replace(/\.html$/i, '.pdf')
+      : `Kartu_Peserta_${selectedLevel}_${year}.pdf`;
 
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    await exportHtmlToPdf(html, {
+      filename,
+      orientation: 'portrait',
+    });
   }
 }

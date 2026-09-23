@@ -6,6 +6,7 @@
 
 import type { ExamInvigilationMatrix } from './exam-matrix-builder.service';
 import { SIGNATORY_OFFICIALS } from '../lib/excel-generator.lib';
+import { exportHtmlToPdf } from '../lib/pdf-export.lib';
 
 export class ExamWordExporterService {
   /**
@@ -549,18 +550,14 @@ export class ExamWordExporterService {
 
   <script>
     function downloadMatrixA4File() {
-      var clone = document.documentElement.cloneNode(true);
-      var bar = clone.querySelector('.no-print-bar');
-      if (bar) bar.remove();
-      var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'Jadwal_Pengawas_' + '${cleanSubTitle}' + '_A4.html';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      if (window.opener && window.opener.__exportHtmlToPdf) {
+        window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
+          filename: 'Jadwal_Pengawas_' + '${cleanSubTitle}' + '_A4.pdf',
+          orientation: 'portrait'
+        });
+      } else {
+        window.print();
+      }
     }
   </script>
 </body>
@@ -713,18 +710,14 @@ export class ExamWordExporterService {
   </div>
   <script>
     function downloadDutySlipFile() {
-      var clone = document.documentElement.cloneNode(true);
-      var bar = clone.querySelector('.no-print-bar');
-      if (bar) bar.remove();
-      var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'Surat_Tugas_Mengawas_' + '${cleanTeacherName}' + '.html';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      if (window.opener && window.opener.__exportHtmlToPdf) {
+        window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
+          filename: 'Surat_Tugas_Mengawas_' + '${cleanTeacherName}' + '.pdf',
+          orientation: 'portrait'
+        });
+      } else {
+        window.print();
+      }
     }
   </script>
 </body>
@@ -739,9 +732,9 @@ export class ExamWordExporterService {
   }
 
   /**
-   * Directly downloads the teacher duty slip as an A4 HTML document
+   * Directly downloads the teacher duty slip as an official A4 PDF document
    */
-  public static downloadTeacherDutySlip(
+  public static async downloadTeacherDutySlip(
     teacherName: string,
     teacherCode: string | undefined = '-',
     duties: Array<{
@@ -757,7 +750,7 @@ export class ExamWordExporterService {
     examTitle = 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)',
     kepsekName?: string,
     kepsekNpp?: string
-  ): void {
+  ): Promise<void> {
     if (typeof window === 'undefined') return;
 
     const safeCode = teacherCode || '-';
@@ -871,39 +864,30 @@ export class ExamWordExporterService {
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Surat_Tugas_Mengawas_${teacherName.replace(/[^\w]/g, '_')}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const cleanFileName = `Surat_Tugas_Mengawas_${teacherName.replace(/[^\w]/g, '_')}.pdf`;
+    await exportHtmlToPdf(html, {
+      filename: cleanFileName,
+      orientation: 'portrait',
+    });
   }
 
   /**
-   * Downloads the official A4 invigilation matrix directly as an HTML document
+   * Downloads the official A4 invigilation matrix directly as an official PDF document
    */
-  public static downloadOfficialA4Html(
+  public static async downloadOfficialA4Html(
     matrix: ExamInvigilationMatrix,
     fileNameOverride?: string
-  ): void {
+  ): Promise<void> {
     if (typeof window === 'undefined') return;
     const htmlContent = this.generateOfficialA4PrintHtml(matrix);
     // Strip out the no-print-bar for clean direct download
     const cleanHtml = htmlContent.replace(/<div class="no-print-bar">[\s\S]*?<\/div>\s*<!-- Lembar Kertas/i, '<!-- Lembar Kertas');
-    const blob = new Blob([cleanHtml], { type: 'text/html;charset=utf-8' });
-    const defaultFileName = `Jadwal_Pengawas_${matrix.subTitle.replace(/[^\w]/g, '_')}_A4.html`;
-    const fileName = fileNameOverride || defaultFileName;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const defaultFileName = `Jadwal_Pengawas_${matrix.subTitle.replace(/[^\w]/g, '_')}_A4.pdf`;
+    const fileName = (fileNameOverride || defaultFileName).replace(/\.html$/i, '.pdf');
+    await exportHtmlToPdf(cleanHtml, {
+      filename: fileName,
+      orientation: 'portrait',
+    });
   }
 
   /**

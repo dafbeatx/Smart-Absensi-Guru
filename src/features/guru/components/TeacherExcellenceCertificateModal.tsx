@@ -78,9 +78,10 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
     openPrintableCertificate(certificatePayload);
   };
 
-  const handleDownload = () => {
-    downloadPrintableCertificate(certificatePayload);
-    showToast('success', 'Piagam Diunduh', 'File Piagam Penghargaan Resmi A4 berhasil diunduh.');
+  const handleDownload = async () => {
+    showToast('info', 'Menyiapkan PDF', 'Sedang menyusun file PDF Piagam Penghargaan...');
+    await downloadPrintableCertificate(certificatePayload);
+    showToast('success', 'Piagam Diunduh', 'File PDF Piagam Penghargaan Resmi A4 berhasil diunduh.');
   };
 
   const handleOpenNewTab = () => {
@@ -334,10 +335,10 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
               type="button"
               onClick={handleDownload}
               className="flex-1 sm:flex-none h-11 px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
-              title="Unduh File Piagam Penghargaan Resmi (A4)"
+              title="Unduh File Piagam Penghargaan Resmi Format PDF (A4)"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Unduh File</span>
+              <span>Unduh PDF</span>
             </button>
 
             {/* Cetak / Simpan PDF */}

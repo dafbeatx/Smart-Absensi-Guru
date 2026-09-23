@@ -187,32 +187,34 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
     }
   };
 
-  const handleDownloadAllFiltered = () => {
+  const handleDownloadAllFiltered = async () => {
     if (filteredStudents.length === 0) {
       showToast('error', 'Tidak Ada Siswa', `Tidak ada data siswa ${selectedLevel} yang terpilih untuk diunduh.`);
       return;
     }
     const cleanYear = academicYear.replace(/\//g, '-');
-    BarcodeExamCardService.downloadExamCardsA4(
+    showToast('info', 'Menyiapkan PDF', `Sedang menyusun file PDF untuk ${filteredStudents.length} kartu siswa...`);
+    await BarcodeExamCardService.downloadExamCardsA4(
       filteredStudents,
       examOptions,
-      `Kartu_Peserta_${selectedLevel}_${cleanYear}.html`
+      `Kartu_Peserta_${selectedLevel}_${cleanYear}.pdf`
     );
     showToast(
       'success',
       'Kartu Ujian Diunduh',
-      `File ${filteredStudents.length} kartu ujian ${selectedLevel} (A4) berhasil diunduh.`
+      `File PDF ${filteredStudents.length} kartu ujian ${selectedLevel} berhasil diunduh.`
     );
   };
 
-  const handleDownloadSingle = (student: StudentItem) => {
+  const handleDownloadSingle = async (student: StudentItem) => {
     const cleanName = student.fullName.replace(/[^\w]/g, '_');
-    BarcodeExamCardService.downloadExamCardsA4(
+    showToast('info', 'Menyiapkan PDF', `Sedang menyusun file PDF kartu ${student.fullName}...`);
+    await BarcodeExamCardService.downloadExamCardsA4(
       [student],
       examOptions,
-      `Kartu_Peserta_${cleanName}_${selectedLevel}.html`
+      `Kartu_Peserta_${cleanName}_${selectedLevel}.pdf`
     );
-    showToast('success', 'Kartu Diunduh', `Kartu ujian untuk ${student.fullName} berhasil diunduh.`);
+    showToast('success', 'Kartu Diunduh', `File PDF kartu ujian untuk ${student.fullName} berhasil diunduh.`);
   };
 
   return (
@@ -311,10 +313,10 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
               onClick={handleDownloadAllFiltered}
               disabled={isLoading || filteredStudents.length === 0}
               className="bg-white/20 hover:bg-white/30 text-white font-bold text-xs border border-white/30 shadow-xs flex items-center gap-1.5 cursor-pointer"
-              title="Unduh semua kartu peserta ujian dalam format file A4"
+              title="Unduh semua kartu peserta ujian dalam format PDF resmi"
             >
               <Download className="w-4 h-4" />
-              <span>Unduh File ({filteredStudents.length})</span>
+              <span>Unduh PDF ({filteredStudents.length})</span>
             </Button>
             <Button
               variant="primary"

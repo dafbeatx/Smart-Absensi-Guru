@@ -6,6 +6,7 @@
 
 import { APP_CONFIG } from '../config/app.config';
 import { SIGNATORY_OFFICIALS, getDynamicBranding } from './excel-generator.lib';
+import { exportHtmlToPdf } from './pdf-export.lib';
 
 export interface CertificatePayload {
   recipientName: string;
@@ -610,18 +611,14 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
 
   <script>
     function downloadCertFile() {
-      var clone = document.documentElement.cloneNode(true);
-      var bar = clone.querySelector('.no-print-bar');
-      if (bar) bar.remove();
-      var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'Piagam_Penghargaan_' + '${cleanRecipientName}' + '.html';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      if (window.opener && window.opener.__exportHtmlToPdf) {
+        window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
+          filename: 'Piagam_Penghargaan_' + '${cleanRecipientName}' + '.pdf',
+          orientation: 'landscape'
+        });
+      } else {
+        window.print();
+      }
     }
   </script>
 </body>
@@ -642,20 +639,18 @@ export const openPrintableCertificate = (payload: CertificatePayload): void => {
 };
 
 /**
- * Directly downloads the certificate as an A4 HTML document
+ * Directly downloads the certificate as an official A4 landscape PDF document
  */
-export const downloadPrintableCertificate = (payload: CertificatePayload, filenameOverride?: string): void => {
+export const downloadPrintableCertificate = async (
+  payload: CertificatePayload,
+  filenameOverride?: string
+): Promise<void> => {
   if (typeof window === 'undefined') return;
   const html = generateExcellenceCertificateHTML(payload);
   const cleanName = (payload.recipientName || 'Guru').replace(/[^\w]/g, '_');
-  const filename = filenameOverride || `Piagam_Penghargaan_${cleanName}.html`;
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const filename = (filenameOverride || `Piagam_Penghargaan_${cleanName}.pdf`).replace(/\.html$/i, '.pdf');
+  await exportHtmlToPdf(html, {
+    filename,
+    orientation: 'landscape',
+  });
 };

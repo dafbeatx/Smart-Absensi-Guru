@@ -142,7 +142,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     ExamAdministrativeDocsService.printHtmlDocument(currentHtml, titles[activeDocType]);
   };
 
-  const handleDownloadA4 = () => {
+  const handleDownloadA4 = async () => {
     const filePrefix: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar_Hadir_Pengawas',
       HANDOVER_DOCS: selectedRoom === 'ALL' ? 'Serah_Terima_Naskah_LJK_Semua_Ruang' : `Serah_Terima_${selectedRoom.replace(/\s+/g, '_')}`,
@@ -151,10 +151,11 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     };
     const examType = scheduleData.config.examType || 'ASTS';
     const academicYear = (scheduleData.config.academicYear || '2026/2027').replace('/', '-');
-    const fileName = `${filePrefix[activeDocType]}_${examType}_${academicYear}_A4.html`;
+    const fileName = `${filePrefix[activeDocType]}_${examType}_${academicYear}_A4.pdf`;
 
-    ExamAdministrativeDocsService.downloadHtmlDocument(currentHtml, fileName);
-    showToast(`Dokumen A4 (${fileName}) berhasil diunduh.`);
+    showToast(`Menyiapkan unduhan PDF (${fileName})...`);
+    await ExamAdministrativeDocsService.downloadPdfDocument(currentHtml, fileName, pageOrientation);
+    showToast(`Dokumen PDF (${fileName}) berhasil diunduh.`);
   };
 
   const handleExportWord = () => {
@@ -214,10 +215,10 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               type="button"
               onClick={handleDownloadA4}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
-              title="Unduh format dokumen resmi A4 siap cetak kapan saja"
+              title="Unduh format dokumen resmi PDF (A4) siap pakai"
             >
               <Download className="w-3.5 h-3.5 text-sky-700" />
-              <span>Unduh A4</span>
+              <span>Unduh PDF</span>
             </button>
 
             <button

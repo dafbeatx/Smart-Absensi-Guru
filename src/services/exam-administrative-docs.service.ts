@@ -15,6 +15,7 @@
 
 import * as XLSXModule from 'xlsx-js-style';
 const XLSX: any = (XLSXModule as any).default || XLSXModule;
+import { exportHtmlToPdf } from '../lib/pdf-export.lib';
 import type {
   ExamScheduleData,
   ExamCommitteeMember,
@@ -937,11 +938,12 @@ export class ExamAdministrativeDocsService {
   /**
    * Opens isolated print window for standard A4 paper format with action bar (print & download)
    */
-  public static printHtmlDocument(htmlContent: string, title?: string): void {
+  public static printHtmlDocument(htmlContent: string, title?: string, options?: AdminDocOptions): void {
     if (typeof window === 'undefined') return;
 
     const safeTitle = title || 'Dokumen Administrasi Ujian';
-    const cleanFileName = `${safeTitle.replace(/[^\w]/g, '_')}_A4.html`;
+    const isLandscape = options?.orientation === 'landscape' || htmlContent.includes('size: A4 landscape');
+    const cleanPdfFileName = `${safeTitle.replace(/[^\w]/g, '_')}_A4.pdf`;
 
     const topBarHtml = `
       <div class="no-print-bar" style="position: sticky; top: 0; left: 0; right: 0; background: #023246; color: #ffffff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
@@ -954,7 +956,7 @@ export class ExamAdministrativeDocsService {
             🖨️ Cetak / Simpan PDF
           </button>
           <button type="button" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; background: #0284c7; color: #ffffff;" onclick="downloadDocFile()">
-            📥 Unduh File Dokumen (A4)
+            📥 Unduh File Dokumen (PDF)
           </button>
           <button type="button" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; background: rgba(255,255,255,0.15); color: #ffffff;" onclick="window.close()">
             ✖️ Tutup
@@ -968,18 +970,14 @@ export class ExamAdministrativeDocsService {
       </style>
       <script>
         function downloadDocFile() {
-          var clone = document.documentElement.cloneNode(true);
-          var bar = clone.querySelector('.no-print-bar');
-          if (bar) bar.remove();
-          var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
-          var url = URL.createObjectURL(blob);
-          var a = document.createElement('a');
-          a.href = url;
-          a.download = '${cleanFileName}';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          if (window.opener && window.opener.__exportHtmlToPdf) {
+            window.opener.__exportHtmlToPdf(document.documentElement.outerHTML, {
+              filename: '${cleanPdfFileName}',
+              orientation: '${isLandscape ? 'landscape' : 'portrait'}'
+            });
+          } else {
+            window.print();
+          }
         }
       </script>
     `;
@@ -1007,21 +1005,32 @@ export class ExamAdministrativeDocsService {
   }
 
   /**
-   * Directly downloads any generated administrative document as an A4 HTML file
+   * Directly downloads any generated administrative document as an official A4 PDF file
    */
-  public static downloadHtmlDocument(htmlContent: string, fileName: string): void {
+  public static async downloadPdfDocument(
+    htmlContent: string,
+    fileName: string,
+    orientation: 'portrait' | 'landscape' = 'portrait'
+  ): Promise<void> {
     if (typeof window === 'undefined') return;
 
     const cleanHtml = htmlContent.replace(/<div class="no-print-bar">[\s\S]*?<\/div>/gi, '');
-    const blob = new Blob([cleanHtml], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName.endsWith('.html') ? fileName : `${fileName}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const cleanFileName = fileName.toLowerCase().endsWith('.pdf') ? fileName : `${fileName.replace(/\.html$/i, '')}.pdf`;
+    await exportHtmlToPdf(cleanHtml, {
+      filename: cleanFileName,
+      orientation,
+    });
+  }
+
+  /**
+   * Backward-compatible alias for downloadPdfDocument
+   */
+  public static async downloadHtmlDocument(
+    htmlContent: string,
+    fileName: string,
+    orientation: 'portrait' | 'landscape' = 'portrait'
+  ): Promise<void> {
+    return this.downloadPdfDocument(htmlContent, fileName, orientation);
   }
 
   /**

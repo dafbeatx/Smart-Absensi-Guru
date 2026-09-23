@@ -1333,16 +1333,16 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                 onClick={() => {
                   if (invigilationMatrix) {
                     ExamWordExporterService.downloadOfficialA4Html(invigilationMatrix);
-                    setToast({ text: 'Dokumen A4 berhasil diunduh.', type: 'success' });
+                    setToast({ text: 'Dokumen PDF berhasil diunduh.', type: 'success' });
                   } else {
                     setToast({ text: 'Belum ada jadwal untuk diunduh.', type: 'error' });
                   }
                 }}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
-                title="Unduh Jadwal Pengawas Format Resmi Sekolah (A4)"
+                title="Unduh Jadwal Pengawas Format Resmi Sekolah (PDF)"
               >
                 <Download className="w-3.5 h-3.5 text-sky-700" />
-                <span>Unduh A4</span>
+                <span>Unduh PDF</span>
               </button>
 
               <button
@@ -3274,16 +3274,16 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       onClick={() => {
                         if (invigilationMatrix) {
                           ExamWordExporterService.downloadOfficialA4Html(invigilationMatrix);
-                          setToast({ text: 'Dokumen A4 berhasil diunduh.', type: 'success' });
+                          setToast({ text: 'Dokumen PDF berhasil diunduh.', type: 'success' });
                         } else {
                           setToast({ text: 'Belum ada jadwal untuk diunduh.', type: 'error' });
                         }
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
-                      title="Unduh Jadwal Format Resmi Sekolah (A4)"
+                      title="Unduh Jadwal Format Resmi Sekolah (PDF)"
                     >
                       <Download className="w-3.5 h-3.5 text-sky-700" />
-                      <span>Unduh A4</span>
+                      <span>Unduh PDF</span>
                     </button>
 
                     <button
@@ -3898,13 +3898,13 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                         officialSignatoryOptions.kepsekName,
                         officialSignatoryOptions.kepsekNpp
                       );
-                      setToast({ text: 'Surat Tugas Mengawas berhasil diunduh.', type: 'success' });
+                      setToast({ text: 'Surat Tugas Mengawas (PDF) berhasil diunduh.', type: 'success' });
                     }}
                     className="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                    title="Unduh Surat Tugas Mengawas Resmi (A4)"
+                    title="Unduh Surat Tugas Mengawas Resmi (PDF)"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Unduh Jadwal Saya</span>
+                    <span>Unduh Jadwal (PDF)</span>
                   </button>
 
                   <button
