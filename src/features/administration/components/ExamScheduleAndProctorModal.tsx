@@ -31,6 +31,7 @@ import {
   Zap,
   Copy,
   Smartphone,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -50,6 +51,8 @@ import { ExamScheduleRepository } from '../../../repositories/ExamScheduleReposi
 import { ExamSchedulerService } from '../../../services/exam-scheduler.service';
 import { ExamMatrixBuilderService } from '../../../services/exam-matrix-builder.service';
 import { ExamWordExporterService } from '../../../services/exam-word-exporter.service';
+import { ExamAdministrativeDocsModal } from './ExamAdministrativeDocsModal';
+import type { AdminDocType } from '../../../services/exam-administrative-docs.service';
 import {
   ExamScheduleAIGeneratorService,
   getExamAIPromptPresets,
@@ -197,6 +200,8 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [showAdministrativeDocsModal, setShowAdministrativeDocsModal] = useState<boolean>(false);
+  const [adminDocInitialTab, setAdminDocInitialTab] = useState<AdminDocType>('PROCTOR_ATTENDANCE');
 
   // ── FORM QUESTIONNAIRE STATE (Parameters filled by Committee) ──────────────
   const [formAcademicYear, setFormAcademicYear] = useState<string>(() => AdministrationRepository.getActiveAcademicYear());
@@ -1323,6 +1328,19 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               >
                 <Printer className="w-3.5 h-3.5 text-slate-700" />
                 <span>Cetak A4</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminDocInitialTab('PROCTOR_ATTENDANCE');
+                  setShowAdministrativeDocsModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                title="Buka Dokumen Administrasi Ujian Resmi (Daftar Hadir Pengawas, Serah Terima Soal, Berita Acara, Daftar Hadir Panitia)"
+              >
+                <ClipboardCheck className="w-3.5 h-3.5 text-teal-700" />
+                <span>Dokumen Administrasi</span>
               </button>
             </>
           )}
@@ -3180,6 +3198,19 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       <Printer className="w-3.5 h-3.5 text-teal-700" />
                       <span>Cetak / PDF (A4)</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdminDocInitialTab('PROCTOR_ATTENDANCE');
+                        setShowAdministrativeDocsModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                      title="Buka Dokumen Administrasi Ujian Resmi (Daftar Hadir Pengawas, Serah Terima Soal, Berita Acara, Daftar Hadir Panitia)"
+                    >
+                      <ClipboardCheck className="w-3.5 h-3.5 text-teal-200" />
+                      <span>Dokumen Administrasi</span>
+                    </button>
                   </div>
                 </div>
 
@@ -3896,6 +3927,19 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL DOKUMEN ADMINISTRASI UJIAN (CETAK A4 / WORD / EXCEL) */}
+      {showAdministrativeDocsModal && scheduleData && (
+        <ExamAdministrativeDocsModal
+          isOpen={showAdministrativeDocsModal}
+          onClose={() => setShowAdministrativeDocsModal(false)}
+          matrix={invigilationMatrix}
+          scheduleData={scheduleData}
+          committeeMembers={committeeMembers}
+          initialDocType={adminDocInitialTab}
+          officialSignatoryOptions={officialSignatoryOptions}
+        />
       )}
     </div>,
     document.body

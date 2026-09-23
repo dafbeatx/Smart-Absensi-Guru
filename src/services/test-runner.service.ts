@@ -42,6 +42,7 @@ import { runExamSchedulerTestSuite } from './__tests__/exam-scheduler.test';
 import { runExamMatrixTestSuite } from './__tests__/exam-matrix-builder.test';
 import { runExamAIGeneratorTestSuite } from './__tests__/exam-ai-generator.test';
 import { runTeachingAssignmentTestSuite } from './__tests__/teaching-assignment-integration.test';
+import { runExamAdministrativeDocsTestSuite } from './__tests__/exam-administrative-docs.test';
 
 export interface TestResultItem {
   testName: string;
@@ -121,6 +122,7 @@ export class MasterTestRunner {
       { name: 'Exam Invigilation Matrix & Word Exporter Engine (Official Paper Format)', fn: runExamMatrixTestSuite },
       { name: 'Exam AI Prompt Master Scheduler & Heuristic NLP Engine (Phase 4.7)', fn: runExamAIGeneratorTestSuite },
       { name: 'Teacher Teaching Assignment Engine & Prepopulation (Phase 4.8)', fn: runTeachingAssignmentTestSuite },
+      { name: 'Exam Administrative Physical Documents Engine (A4/Word/Excel Suite 41)', fn: runExamAdministrativeDocsTestSuite },
     ];
 
     let totalPassed = 0;
