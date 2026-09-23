@@ -397,6 +397,22 @@ export class ExamSchedulerService {
         // Track teachers already assigned in THIS exact slot (prevents double-booking)
         const assignedInCurrentSlot = new Set<string>();
 
+        // Pre-populate teachers already assigned in this slot from another level (e.g. SMA Ruang 6 during SMP generation)
+        if (config.existingCrossLevelProctors && config.existingCrossLevelProctors.length > 0) {
+          config.existingCrossLevelProctors.forEach((xp) => {
+            if (xp.date === slotDate && xp.sessionNumber === slotNum) {
+              if (xp.mainProctorId) assignedInCurrentSlot.add(xp.mainProctorId);
+              const normXp = this.normalizeTeacherName(xp.mainProctorName);
+              if (normXp) {
+                const matchedTeacher = allTeachers.find(
+                  (t) => this.normalizeTeacherName(t.full_name || '') === normXp
+                );
+                if (matchedTeacher) assignedInCurrentSlot.add(matchedTeacher.id);
+              }
+            }
+          });
+        }
+
         itemsInSlot.forEach((subjItem, itemIdx) => {
           const roomName = subjItem.roomName || classRoomMap.get(subjItem.className) || formatRoomName(1);
 
@@ -501,6 +517,7 @@ export class ExamSchedulerService {
             mainProctorName: chosenProctor?.fullName || 'Pengawas Ruangan',
             secondaryProctorId: chosenSecondary?.userId,
             secondaryProctorName: chosenSecondary?.fullName,
+            educationLevel: config.educationLevel || 'SMP',
           });
         });
 
@@ -573,6 +590,7 @@ export class ExamSchedulerService {
 
   /**
    * Checks if a teacher is already assigned to another room on a given date and sessionNumber.
+   * Supports cross-level validation via additionalProctors (e.g. checking SMP + SMA Ruang 6 simultaneously).
    */
   public static checkProctorConflict(
     proctors: ExamProctorItem[],
@@ -580,10 +598,12 @@ export class ExamSchedulerService {
     teacherName: string,
     date: string,
     sessionNumber: number,
-    excludeSlotId?: string
+    excludeSlotId?: string,
+    additionalProctors: ExamProctorItem[] = []
   ): ExamProctorItem | undefined {
+    const allProctors = additionalProctors.length > 0 ? [...proctors, ...additionalProctors] : proctors;
     const normTarget = this.normalizeTeacherName(teacherName);
-    return proctors.find((p) => {
+    return allProctors.find((p) => {
       if (excludeSlotId && p.id === excludeSlotId) return false;
       if (p.date !== date || p.sessionNumber !== sessionNumber) return false;
 
@@ -605,7 +625,8 @@ export class ExamSchedulerService {
     slotAId: string,
     slotBId: string,
     adminName: string = 'Admin Kurikulum',
-    reason?: string
+    reason?: string,
+    additionalProctors: ExamProctorItem[] = []
   ): { success: boolean; updatedSchedule?: ExamScheduleData; error?: string } {
     if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
       return { success: false, error: 'Data jadwal pengawas tidak ditemukan.' };
@@ -634,7 +655,8 @@ export class ExamSchedulerService {
       slotA.mainProctorName,
       slotB.date,
       slotB.sessionNumber,
-      slotB.id
+      slotB.id,
+      additionalProctors
     );
 
     if (conflictForA && conflictForA.id !== slotA.id) {
@@ -652,7 +674,8 @@ export class ExamSchedulerService {
       slotB.mainProctorName,
       slotA.date,
       slotA.sessionNumber,
-      slotA.id
+      slotA.id,
+      additionalProctors
     );
 
     if (conflictForB && conflictForB.id !== slotB.id) {
@@ -732,6 +755,207 @@ export class ExamSchedulerService {
   }
 
   /**
+   * Swaps proctors across two different schedules (e.g. Schedule A = SMP, Schedule B = SMA Ruang 6).
+   * Verifies mutual conflict-freedom across all rooms in both schedules and updates both schedules.
+   */
+  public static swapProctorsCrossLevel(
+    scheduleA: ExamScheduleData,
+    scheduleB: ExamScheduleData,
+    slotAId: string,
+    slotBId: string,
+    adminName: string = 'Admin Kurikulum',
+    reason?: string
+  ): {
+    success: boolean;
+    updatedScheduleA?: ExamScheduleData;
+    updatedScheduleB?: ExamScheduleData;
+    error?: string;
+  } {
+    if (!scheduleA || !scheduleB) {
+      return { success: false, error: 'Data jadwal SMP atau SMA tidak lengkap.' };
+    }
+
+    const inA1 = scheduleA.proctorSchedules?.some((p) => p.id === slotAId);
+    const inA2 = scheduleA.proctorSchedules?.some((p) => p.id === slotBId);
+    const inB1 = scheduleB.proctorSchedules?.some((p) => p.id === slotAId);
+    const inB2 = scheduleB.proctorSchedules?.some((p) => p.id === slotBId);
+
+    // If both slots are in Schedule A:
+    if (inA1 && inA2) {
+      const res = this.swapProctorsBetweenSlots(
+        scheduleA,
+        slotAId,
+        slotBId,
+        adminName,
+        reason,
+        scheduleB.proctorSchedules
+      );
+      return {
+        success: res.success,
+        updatedScheduleA: res.updatedSchedule,
+        updatedScheduleB: scheduleB,
+        error: res.error,
+      };
+    }
+
+    // If both slots are in Schedule B:
+    if (inB1 && inB2) {
+      const res = this.swapProctorsBetweenSlots(
+        scheduleB,
+        slotAId,
+        slotBId,
+        adminName,
+        reason,
+        scheduleA.proctorSchedules
+      );
+      return {
+        success: res.success,
+        updatedScheduleA: scheduleA,
+        updatedScheduleB: res.updatedSchedule,
+        error: res.error,
+      };
+    }
+
+    // Cross-schedule swap (Slot A in one schedule, Slot B in the other):
+    let slotA: ExamProctorItem | undefined;
+    let slotB: ExamProctorItem | undefined;
+    let slotAInSchedA = true;
+
+    if (inA1 && inB2) {
+      slotA = scheduleA.proctorSchedules.find((p) => p.id === slotAId);
+      slotB = scheduleB.proctorSchedules.find((p) => p.id === slotBId);
+      slotAInSchedA = true;
+    } else if (inB1 && inA2) {
+      slotA = scheduleB.proctorSchedules.find((p) => p.id === slotAId);
+      slotB = scheduleA.proctorSchedules.find((p) => p.id === slotBId);
+      slotAInSchedA = false;
+    } else {
+      return { success: false, error: 'Slot sesi pengawas tidak ditemukan di jadwal SMP maupun SMA.' };
+    }
+
+    if (!slotA || !slotB) {
+      return { success: false, error: 'Sesi pengawas tidak valid.' };
+    }
+
+    const allCombinedProctors = [...scheduleA.proctorSchedules, ...scheduleB.proctorSchedules];
+
+    // Conflict validation for Proctor A moving to Slot B (date, session)
+    const conflictForA = this.checkProctorConflict(
+      allCombinedProctors,
+      slotA.mainProctorId,
+      slotA.mainProctorName,
+      slotB.date,
+      slotB.sessionNumber,
+      slotB.id
+    );
+    if (conflictForA && conflictForA.id !== slotA.id) {
+      return {
+        success: false,
+        error: `Konflik: ${slotA.mainProctorName} sudah memiliki jadwal mengawas di ${conflictForA.roomName} pada ${conflictForA.dayName}, Sesi ${conflictForA.sessionNumber}.`,
+      };
+    }
+
+    // Conflict validation for Proctor B moving to Slot A (date, session)
+    const conflictForB = this.checkProctorConflict(
+      allCombinedProctors,
+      slotB.mainProctorId,
+      slotB.mainProctorName,
+      slotA.date,
+      slotA.sessionNumber,
+      slotA.id
+    );
+    if (conflictForB && conflictForB.id !== slotB.id) {
+      return {
+        success: false,
+        error: `Konflik: ${slotB.mainProctorName} sudah memiliki jadwal mengawas di ${conflictForB.roomName} pada ${conflictForB.dayName}, Sesi ${conflictForB.sessionNumber}.`,
+      };
+    }
+
+    const targetAInSched = slotAInSchedA ? scheduleA : scheduleB;
+    const targetBInSched = slotAInSchedA ? scheduleB : scheduleA;
+
+    const updatedProctorsA = targetAInSched.proctorSchedules.map((p) => {
+      if (p.id === slotA!.id) {
+        return {
+          ...p,
+          mainProctorId: slotB!.mainProctorId,
+          mainProctorName: slotB!.mainProctorName,
+          isSwapped: true,
+          swapNote: reason || `Ditukar lintas jenjang dengan ${slotB!.mainProctorName} (${slotB!.dayName}, ${slotB!.roomName})`,
+        };
+      }
+      return p;
+    });
+
+    const updatedProctorsB = targetBInSched.proctorSchedules.map((p) => {
+      if (p.id === slotB!.id) {
+        return {
+          ...p,
+          mainProctorId: slotA!.mainProctorId,
+          mainProctorName: slotA!.mainProctorName,
+          isSwapped: true,
+          swapNote: reason || `Ditukar lintas jenjang dengan ${slotA!.mainProctorName} (${slotA!.dayName}, ${slotA!.roomName})`,
+        };
+      }
+      return p;
+    });
+
+    const historyItem: ExamProctorSwapHistoryItem = {
+      id: `swap_cross_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      swappedAt: new Date().toISOString(),
+      adminName,
+      type: 'SWAP_SLOTS',
+      reason: reason || 'Tukar silang jadwal mengawas lintas jenjang (SMP & SMA) atas persetujuan Panitia/Admin',
+      slotA: {
+        id: slotA.id,
+        dayName: slotA.dayName,
+        date: slotA.date,
+        sessionNumber: slotA.sessionNumber,
+        roomName: slotA.roomName,
+        className: slotA.className,
+        subject: slotA.subject,
+        previousProctorId: slotA.mainProctorId,
+        previousProctorName: slotA.mainProctorName,
+        newProctorId: slotB.mainProctorId,
+        newProctorName: slotB.mainProctorName,
+      },
+      slotB: {
+        id: slotB.id,
+        dayName: slotB.dayName,
+        date: slotB.date,
+        sessionNumber: slotB.sessionNumber,
+        roomName: slotB.roomName,
+        className: slotB.className,
+        subject: slotB.subject,
+        previousProctorId: slotB.mainProctorId,
+        previousProctorName: slotB.mainProctorName,
+        newProctorId: slotA.mainProctorId,
+        newProctorName: slotA.mainProctorName,
+      },
+    };
+
+    const newSchedA: ExamScheduleData = {
+      ...targetAInSched,
+      proctorSchedules: updatedProctorsA,
+      swapHistory: [historyItem, ...(targetAInSched.swapHistory || [])],
+      updatedAt: new Date().toISOString(),
+    };
+
+    const newSchedB: ExamScheduleData = {
+      ...targetBInSched,
+      proctorSchedules: updatedProctorsB,
+      swapHistory: [historyItem, ...(targetBInSched.swapHistory || [])],
+      updatedAt: new Date().toISOString(),
+    };
+
+    return {
+      success: true,
+      updatedScheduleA: slotAInSchedA ? newSchedA : newSchedB,
+      updatedScheduleB: slotAInSchedA ? newSchedB : newSchedA,
+    };
+  }
+
+  /**
    * Reassigns a single proctor slot to another teacher without mutual swap.
    */
   public static reassignSingleProctor(
@@ -739,7 +963,8 @@ export class ExamSchedulerService {
     slotId: string,
     newTeacher: { userId: string; fullName: string },
     adminName: string = 'Admin Kurikulum',
-    reason?: string
+    reason?: string,
+    additionalProctors: ExamProctorItem[] = []
   ): { success: boolean; updatedSchedule?: ExamScheduleData; error?: string } {
     if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
       return { success: false, error: 'Data jadwal pengawas tidak ditemukan.' };
@@ -752,14 +977,15 @@ export class ExamSchedulerService {
 
     const targetSlot = schedule.proctorSchedules[slotIndex];
 
-    // Conflict validation for new teacher:
+    // Conflict validation for new teacher (including cross-level proctors):
     const conflict = this.checkProctorConflict(
       schedule.proctorSchedules,
       newTeacher.userId,
       newTeacher.fullName,
       targetSlot.date,
       targetSlot.sessionNumber,
-      targetSlot.id
+      targetSlot.id,
+      additionalProctors
     );
 
     if (conflict) {
@@ -839,18 +1065,21 @@ export class ExamSchedulerService {
   /**
    * Generates intelligent, 100% clash-free swap recommendations for an admin.
    * Finds slots where both teachers are completely free to switch duties without conflict.
+   * Supports cross-level candidates (e.g. SMA Ruang 6).
    */
   public static getSmartSwapCandidates(
     schedule: ExamScheduleData,
     slotAId: string,
     filterDayName?: string,
-    allTeachers: UserProfile[] = []
+    allTeachers: UserProfile[] = [],
+    additionalProctors: ExamProctorItem[] = []
   ): SmartSwapCandidate[] {
     if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
       return [];
     }
 
-    const slotA = schedule.proctorSchedules.find((p) => p.id === slotAId);
+    const allCandidatePool = [...schedule.proctorSchedules, ...additionalProctors];
+    const slotA = allCandidatePool.find((p) => p.id === slotAId);
     if (!slotA) return [];
 
     const normA = this.normalizeTeacherName(slotA.mainProctorName);
@@ -858,7 +1087,7 @@ export class ExamSchedulerService {
 
     const cleanFilterDay = (filterDayName || '').toLowerCase().trim();
 
-    for (const slotB of schedule.proctorSchedules) {
+    for (const slotB of allCandidatePool) {
       // Must not be the same slot
       if (slotB.id === slotA.id) continue;
 
@@ -871,9 +1100,9 @@ export class ExamSchedulerService {
         if (slotB.dayName.toLowerCase().trim() !== cleanFilterDay) continue;
       }
 
-      // Check conflict: Proctor A moving to slotB (date & sessionNumber)
+      // Check conflict: Proctor A moving to slotB (date & sessionNumber) across all proctors
       const conflictForA = this.checkProctorConflict(
-        schedule.proctorSchedules,
+        allCandidatePool,
         slotA.mainProctorId,
         slotA.mainProctorName,
         slotB.date,
@@ -884,9 +1113,9 @@ export class ExamSchedulerService {
         continue; // Clash detected for Proctor A
       }
 
-      // Check conflict: Proctor B moving to slotA (date & sessionNumber)
+      // Check conflict: Proctor B moving to slotA (date & sessionNumber) across all proctors
       const conflictForB = this.checkProctorConflict(
-        schedule.proctorSchedules,
+        allCandidatePool,
         slotB.mainProctorId,
         slotB.mainProctorName,
         slotA.date,
@@ -953,22 +1182,25 @@ export class ExamSchedulerService {
   /**
    * Generates intelligent substitute teacher recommendations for single slot reassignment.
    * Ranks available teachers with the lowest workload first for optimal load-balancing.
+   * Supports cross-level workload aggregation and clash prevention via additionalProctors.
    */
   public static getSmartReassignCandidates(
     schedule: ExamScheduleData,
     slotId: string,
-    allTeachers: UserProfile[]
+    allTeachers: UserProfile[],
+    additionalProctors: ExamProctorItem[] = []
   ): SmartReassignCandidate[] {
     if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
       return [];
     }
 
-    const targetSlot = schedule.proctorSchedules.find((p) => p.id === slotId);
+    const allProctors = [...schedule.proctorSchedules, ...additionalProctors];
+    const targetSlot = allProctors.find((p) => p.id === slotId);
     if (!targetSlot) return [];
 
-    // Calculate current duty counts for all teachers
+    // Calculate current duty counts for all teachers across both levels
     const dutyCountMap = new Map<string, number>();
-    for (const p of schedule.proctorSchedules) {
+    for (const p of allProctors) {
       const normName = this.normalizeTeacherName(p.mainProctorName);
       dutyCountMap.set(normName, (dutyCountMap.get(normName) || 0) + 1);
       if (p.mainProctorId) {
@@ -985,9 +1217,9 @@ export class ExamSchedulerService {
       const normTeacher = this.normalizeTeacherName(teacher.full_name || '');
       if (normTeacher === normTargetProctor) continue;
 
-      // Check conflict at target date & session
+      // Check conflict at target date & session across all proctors
       const conflict = this.checkProctorConflict(
-        schedule.proctorSchedules,
+        allProctors,
         teacher.id,
         teacher.full_name || '',
         targetSlot.date,

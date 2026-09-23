@@ -199,6 +199,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
 
   // Saved schedule data
   const [scheduleData, setScheduleData] = useState<ExamScheduleData | null>(null);
+  const [otherScheduleData, setOtherScheduleData] = useState<ExamScheduleData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -781,6 +782,15 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         assignBackupProctor,
         aiCustomPrompt: aiCustomPrompt.trim() || undefined,
       };
+
+      // Pre-load complementary level proctors to guarantee zero clash between SMP and SMA
+      const complementaryLevel = selectedLevel === 'SMP' ? 'SMA' : 'SMP';
+      try {
+        const otherSched = await ExamScheduleRepository.getSchedule(formAcademicYear, formExamType, complementaryLevel);
+        if (otherSched && otherSched.proctorSchedules?.length > 0) {
+          config.existingCrossLevelProctors = otherSched.proctorSchedules;
+        }
+      } catch {}
 
       // Generate via ExamSchedulerService
       const generated = ExamSchedulerService.generateSchedule(config, teachers, committeeMembers);
@@ -4122,14 +4132,18 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
             setSwapInitialSlotId(undefined);
           }}
           scheduleData={scheduleData}
+          otherScheduleData={otherScheduleData}
           allTeachers={teachers}
           currentAdminName={currentUser?.full_name || 'Admin Kurikulum'}
           initialSelectedSlotId={swapInitialSlotId}
-          onSwapSuccess={(updated) => {
-            setScheduleData(updated);
+          onSwapSuccess={(updatedPrimary, updatedOther) => {
+            setScheduleData(updatedPrimary);
+            if (updatedOther) {
+              setOtherScheduleData(updatedOther);
+            }
             setToast({
               type: 'success',
-              text: 'Pergantian jadwal pengawas berhasil disimpan dan disinkronkan.',
+              text: 'Pergantian jadwal pengawas (SMP & SMA Ruang 6) berhasil disimpan dan disinkronkan.',
             });
           }}
         />

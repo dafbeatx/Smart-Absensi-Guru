@@ -58,6 +58,7 @@ export interface ExamProctorItem {
   backupProctorName?: string;
   isSwapped?: boolean;
   swapNote?: string;
+  educationLevel?: EducationLevel;
 }
 
 export interface DaySessionOverride {
@@ -93,6 +94,7 @@ export interface ExamScheduleFormConfig {
   customSubjectProctors?: Record<string, string[]>; // Alokasi eksak pengawas per mapel & ruang [P1, P2, P3, ...]
   customRoomNumbers?: number[]; // Nomor ruangan ujian yang terdeteksi dari matriks alokasi (misal [6] untuk SMA Ruang 6)
   skipProctorAssignment?: boolean; // Jika prompt AI tidak menyebutkan guru/pengawas, roster pengawas tidak dibuat
+  existingCrossLevelProctors?: ExamProctorItem[]; // Jadwal pengawas dari jenjang lain (misal SMA Ruang 6 saat susun SMP) agar 100% bebas bentrok
 }
 
 export interface ExamScheduleSummary {

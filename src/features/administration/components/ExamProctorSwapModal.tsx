@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   ArrowLeftRight,
@@ -21,22 +21,60 @@ interface ExamProctorSwapModalProps {
   isOpen: boolean;
   onClose: () => void;
   scheduleData: ExamScheduleData;
+  otherScheduleData?: ExamScheduleData | null;
   allTeachers: UserProfile[];
   currentAdminName: string;
   initialSelectedSlotId?: string;
-  onSwapSuccess: (updatedSchedule: ExamScheduleData) => void;
+  onSwapSuccess: (updatedSchedule: ExamScheduleData, updatedOtherSchedule?: ExamScheduleData) => void;
 }
 
 export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
   isOpen,
   onClose,
   scheduleData,
+  otherScheduleData,
   allTeachers,
   currentAdminName,
   initialSelectedSlotId,
   onSwapSuccess,
 }) => {
   const [activeTab, setActiveTab] = useState<'SWAP' | 'REASSIGN' | 'HISTORY'>('SWAP');
+
+  // Complementary schedule (e.g. SMA if current is SMP, or vice versa)
+  const [otherSchedule, setOtherSchedule] = useState<ExamScheduleData | null>(otherScheduleData || null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (otherScheduleData) {
+      setOtherSchedule(otherScheduleData);
+      return;
+    }
+    const currentLevel = scheduleData.config.educationLevel || scheduleData.educationLevel || 'SMP';
+    const complementaryLevel = currentLevel === 'SMP' ? 'SMA' : 'SMP';
+    ExamScheduleRepository.getSchedule(
+      scheduleData.config.academicYear,
+      scheduleData.config.examType,
+      complementaryLevel
+    ).then((remoteOther) => {
+      if (remoteOther) setOtherSchedule(remoteOther);
+    }).catch(() => {});
+  }, [isOpen, otherScheduleData, scheduleData]);
+
+  const primaryLevel = scheduleData.config.educationLevel || scheduleData.educationLevel || 'SMP';
+  const otherLevel = otherSchedule?.config.educationLevel || otherSchedule?.educationLevel || (primaryLevel === 'SMP' ? 'SMA' : 'SMP');
+
+  // Combined proctors across SMP and SMA (including Ruang 6)
+  const allCombinedProctors = useMemo(() => {
+    const primaryItems = (scheduleData.proctorSchedules || []).map((p) => ({
+      ...p,
+      educationLevel: p.educationLevel || primaryLevel,
+    }));
+    const otherItems = (otherSchedule?.proctorSchedules || []).map((p) => ({
+      ...p,
+      educationLevel: p.educationLevel || otherLevel,
+    }));
+    return [...primaryItems, ...otherItems];
+  }, [scheduleData.proctorSchedules, otherSchedule?.proctorSchedules, primaryLevel, otherLevel]);
 
   // State for Swap Tab
   const [slotAId, setSlotAId] = useState<string>(
@@ -56,25 +94,25 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Unique exam days for fast filter chips
+  // Unique exam days for fast filter chips (across both SMP and SMA)
   const availableDays = useMemo(() => {
     const daysSet = new Set<string>();
-    scheduleData.proctorSchedules.forEach((p) => daysSet.add(p.dayName));
+    allCombinedProctors.forEach((p) => daysSet.add(p.dayName));
     return Array.from(daysSet);
-  }, [scheduleData.proctorSchedules]);
+  }, [allCombinedProctors]);
 
-  // Selected slots data
+  // Selected slots data (searched across all combined proctors)
   const slotA = useMemo(
-    () => scheduleData.proctorSchedules.find((p) => p.id === slotAId),
-    [scheduleData.proctorSchedules, slotAId]
+    () => allCombinedProctors.find((p) => p.id === slotAId),
+    [allCombinedProctors, slotAId]
   );
   const slotB = useMemo(
-    () => scheduleData.proctorSchedules.find((p) => p.id === slotBId),
-    [scheduleData.proctorSchedules, slotBId]
+    () => allCombinedProctors.find((p) => p.id === slotBId),
+    [allCombinedProctors, slotBId]
   );
   const reassignSlot = useMemo(
-    () => scheduleData.proctorSchedules.find((p) => p.id === reassignSlotId),
-    [scheduleData.proctorSchedules, reassignSlotId]
+    () => allCombinedProctors.find((p) => p.id === reassignSlotId),
+    [allCombinedProctors, reassignSlotId]
   );
 
   const selectedNewTeacher = useMemo(
@@ -82,26 +120,40 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
     [allTeachers, newTeacherId]
   );
 
-  // 1-Click Smart Recommendations for Mutual Swap
+  // 1-Click Smart Recommendations for Mutual Swap (includes SMA Ruang 6)
   const smartSwapSuggestions = useMemo(() => {
     if (!slotAId) return [];
     return ExamSchedulerService.getSmartSwapCandidates(
       scheduleData,
       slotAId,
       swapFilterDay,
-      allTeachers
+      allTeachers,
+      otherSchedule?.proctorSchedules || []
     );
-  }, [scheduleData, slotAId, swapFilterDay, allTeachers]);
+  }, [scheduleData, slotAId, swapFilterDay, allTeachers, otherSchedule?.proctorSchedules]);
 
-  // 1-Click Smart Recommendations for Reassignment (Lightest workload & available first)
+  // 1-Click Smart Recommendations for Reassignment (includes SMA Ruang 6)
   const smartReassignSuggestions = useMemo(() => {
     if (!reassignSlotId) return [];
     return ExamSchedulerService.getSmartReassignCandidates(
       scheduleData,
       reassignSlotId,
-      allTeachers
+      allTeachers,
+      otherSchedule?.proctorSchedules || []
     );
-  }, [scheduleData, reassignSlotId, allTeachers]);
+  }, [scheduleData, reassignSlotId, allTeachers, otherSchedule?.proctorSchedules]);
+
+  // Combined swap history across SMP and SMA
+  const combinedHistory = useMemo(() => {
+    const list = [...(scheduleData.swapHistory || []), ...(otherSchedule?.swapHistory || [])];
+    const unique = new Map<string, (typeof list)[0]>();
+    list.forEach((item) => {
+      if (item && item.id) unique.set(item.id, item);
+    });
+    return Array.from(unique.values()).sort(
+      (a, b) => new Date(b.swappedAt).getTime() - new Date(a.swappedAt).getTime()
+    );
+  }, [scheduleData.swapHistory, otherSchedule?.swapHistory]);
 
   // Helper: check if a teacher teaches the subject in a slot
   const isTeacherOfSubject = (teacherName: string, subject: string): boolean => {
@@ -119,14 +171,14 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
     return teacherSubj.includes(normSubj) || normSubj.includes(teacherSubj);
   };
 
-  // Conflict preview for SWAP
+  // Conflict preview for SWAP (validated across SMP + SMA)
   const swapConflictWarning = useMemo(() => {
     if (!slotA || !slotB) return null;
     if (slotA.id === slotB.id) return 'Sesi asal dan sesi tujuan tidak boleh sama.';
 
-    // Check Slot A proctor moving to Slot B time
+    // Check Slot A proctor moving to Slot B time across all combined proctors
     const confA = ExamSchedulerService.checkProctorConflict(
-      scheduleData.proctorSchedules,
+      allCombinedProctors,
       slotA.mainProctorId,
       slotA.mainProctorName,
       slotB.date,
@@ -134,12 +186,13 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
       slotB.id
     );
     if (confA && confA.id !== slotA.id) {
-      return `Konflik: ${slotA.mainProctorName} sudah dijadwalkan mengawas di ${confA.roomName} pada ${confA.dayName}, Sesi ${confA.sessionNumber}.`;
+      const confLevel = confA.educationLevel || (confA.roomName.includes('6') ? 'SMA' : 'SMP');
+      return `Konflik: ${slotA.mainProctorName} sudah dijadwalkan mengawas di [${confLevel}] ${confA.roomName} pada ${confA.dayName}, Sesi ${confA.sessionNumber}.`;
     }
 
-    // Check Slot B proctor moving to Slot A time
+    // Check Slot B proctor moving to Slot A time across all combined proctors
     const confB = ExamSchedulerService.checkProctorConflict(
-      scheduleData.proctorSchedules,
+      allCombinedProctors,
       slotB.mainProctorId,
       slotB.mainProctorName,
       slotA.date,
@@ -147,17 +200,18 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
       slotA.id
     );
     if (confB && confB.id !== slotB.id) {
-      return `Konflik: ${slotB.mainProctorName} sudah dijadwalkan mengawas di ${confB.roomName} pada ${confB.dayName}, Sesi ${confB.sessionNumber}.`;
+      const confLevel = confB.educationLevel || (confB.roomName.includes('6') ? 'SMA' : 'SMP');
+      return `Konflik: ${slotB.mainProctorName} sudah dijadwalkan mengawas di [${confLevel}] ${confB.roomName} pada ${confB.dayName}, Sesi ${confB.sessionNumber}.`;
     }
 
     return null;
-  }, [slotA, slotB, scheduleData.proctorSchedules]);
+  }, [slotA, slotB, allCombinedProctors]);
 
-  // Conflict preview for REASSIGN
+  // Conflict preview for REASSIGN (validated across SMP + SMA)
   const reassignConflictWarning = useMemo(() => {
     if (!reassignSlot || !selectedNewTeacher) return null;
     const conf = ExamSchedulerService.checkProctorConflict(
-      scheduleData.proctorSchedules,
+      allCombinedProctors,
       selectedNewTeacher.id,
       selectedNewTeacher.full_name || '',
       reassignSlot.date,
@@ -165,10 +219,11 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
       reassignSlot.id
     );
     if (conf) {
-      return `Konflik: ${selectedNewTeacher.full_name} sudah dijadwalkan mengawas di ${conf.roomName} pada ${conf.dayName}, Sesi ${conf.sessionNumber}.`;
+      const confLevel = conf.educationLevel || (conf.roomName.includes('6') ? 'SMA' : 'SMP');
+      return `Konflik: ${selectedNewTeacher.full_name} sudah dijadwalkan mengawas di [${confLevel}] ${conf.roomName} pada ${conf.dayName}, Sesi ${conf.sessionNumber}.`;
     }
     return null;
-  }, [reassignSlot, selectedNewTeacher, scheduleData.proctorSchedules]);
+  }, [reassignSlot, selectedNewTeacher, allCombinedProctors]);
 
   // Handlers
   const handleExecuteSwap = async () => {
@@ -184,27 +239,59 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      const result = ExamSchedulerService.swapProctorsBetweenSlots(
-        scheduleData,
-        slotA.id,
-        slotB.id,
-        currentAdminName,
-        swapReason.trim() || undefined
-      );
+      if (otherSchedule) {
+        // Cross-level or dual-schedule swap
+        const result = ExamSchedulerService.swapProctorsCrossLevel(
+          scheduleData,
+          otherSchedule,
+          slotA.id,
+          slotB.id,
+          currentAdminName,
+          swapReason.trim() || undefined
+        );
 
-      if (!result.success || !result.updatedSchedule) {
-        setErrorMessage(result.error || 'Gagal menukar jadwal pengawas.');
-        setIsSubmitting(false);
-        return;
+        if (!result.success || !result.updatedScheduleA || !result.updatedScheduleB) {
+          setErrorMessage(result.error || 'Gagal menukar jadwal pengawas.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        await ExamScheduleRepository.saveSchedule(
+          result.updatedScheduleA,
+          result.updatedScheduleA.educationLevel || scheduleData.config.educationLevel || 'SMP'
+        );
+        await ExamScheduleRepository.saveSchedule(
+          result.updatedScheduleB,
+          result.updatedScheduleB.educationLevel || otherSchedule.config.educationLevel || 'SMA'
+        );
+
+        setOtherSchedule(result.updatedScheduleB);
+        onSwapSuccess(result.updatedScheduleA, result.updatedScheduleB);
+        onClose();
+      } else {
+        // Single schedule fallback
+        const result = ExamSchedulerService.swapProctorsBetweenSlots(
+          scheduleData,
+          slotA.id,
+          slotB.id,
+          currentAdminName,
+          swapReason.trim() || undefined
+        );
+
+        if (!result.success || !result.updatedSchedule) {
+          setErrorMessage(result.error || 'Gagal menukar jadwal pengawas.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        await ExamScheduleRepository.saveSchedule(
+          result.updatedSchedule,
+          result.updatedSchedule.educationLevel || scheduleData.config.educationLevel
+        );
+
+        onSwapSuccess(result.updatedSchedule);
+        onClose();
       }
-
-      await ExamScheduleRepository.saveSchedule(
-        result.updatedSchedule,
-        result.updatedSchedule.educationLevel || scheduleData.config.educationLevel
-      );
-
-      onSwapSuccess(result.updatedSchedule);
-      onClose();
     } catch (err) {
       setErrorMessage('Terjadi kesalahan saat menyimpan jadwal yang ditukar.');
     } finally {
@@ -225,15 +312,29 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
+      const isSlotInPrimary = scheduleData.proctorSchedules.some((p) => p.id === reassignSlot.id);
+      const targetSchedule = isSlotInPrimary ? scheduleData : otherSchedule;
+
+      if (!targetSchedule) {
+        setErrorMessage('Jadwal untuk sesi ini tidak ditemukan.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const otherProctors = isSlotInPrimary
+        ? (otherSchedule?.proctorSchedules || [])
+        : scheduleData.proctorSchedules;
+
       const result = ExamSchedulerService.reassignSingleProctor(
-        scheduleData,
+        targetSchedule,
         reassignSlot.id,
         {
           userId: selectedNewTeacher.id,
           fullName: selectedNewTeacher.full_name || 'Guru Pengganti',
         },
         currentAdminName,
-        reassignReason.trim() || undefined
+        reassignReason.trim() || undefined,
+        otherProctors
       );
 
       if (!result.success || !result.updatedSchedule) {
@@ -244,10 +345,15 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
 
       await ExamScheduleRepository.saveSchedule(
         result.updatedSchedule,
-        result.updatedSchedule.educationLevel || scheduleData.config.educationLevel
+        result.updatedSchedule.educationLevel || targetSchedule.config.educationLevel
       );
 
-      onSwapSuccess(result.updatedSchedule);
+      if (isSlotInPrimary) {
+        onSwapSuccess(result.updatedSchedule, otherSchedule || undefined);
+      } else {
+        setOtherSchedule(result.updatedSchedule);
+        onSwapSuccess(scheduleData, result.updatedSchedule);
+      }
       onClose();
     } catch (err) {
       setErrorMessage('Terjadi kesalahan saat menyimpan penggantian pengawas.');
@@ -333,7 +439,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
               }`}
             >
               <History className="w-3.5 h-3.5" />
-              <span>Riwayat Perubahan ({scheduleData.swapHistory?.length || 0})</span>
+              <span>Riwayat Perubahan ({combinedHistory.length})</span>
             </button>
           </div>
 
@@ -387,16 +493,29 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                       onChange={(e) => setSlotAId(e.target.value)}
                       className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 cursor-pointer"
                     >
-                      {scheduleData.proctorSchedules.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
-                        </option>
-                      ))}
+                      {allCombinedProctors.map((p) => {
+                        const lvl = p.educationLevel || (p.roomName.includes('6') ? 'SMA' : 'SMP');
+                        return (
+                          <option key={p.id} value={p.id}>
+                            [{lvl}] {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
                   {slotA && (
                     <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-100">
+                        <span className="text-slate-500">Jenjang:</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                          (slotA.educationLevel === 'SMA' || slotA.roomName.includes('6'))
+                            ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                            : 'bg-teal-100 text-teal-900 border border-teal-300'
+                        }`}>
+                          {(slotA.educationLevel === 'SMA' || slotA.roomName.includes('6')) ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
+                        </span>
+                      </div>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500">Pengawas Saat Ini:</span>
                         <strong className="text-slate-900 font-bold">{slotA.mainProctorName}</strong>
@@ -443,18 +562,31 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                       className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 cursor-pointer"
                     >
                       <option value="">-- Pilih Sesi Tujuan Bertukar --</option>
-                      {scheduleData.proctorSchedules
+                      {allCombinedProctors
                         .filter((p) => p.id !== slotAId)
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
-                          </option>
-                        ))}
+                        .map((p) => {
+                          const lvl = p.educationLevel || (p.roomName.includes('6') ? 'SMA' : 'SMP');
+                          return (
+                            <option key={p.id} value={p.id}>
+                              [{lvl}] {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
+                            </option>
+                          );
+                        })}
                     </select>
                   </div>
 
                   {slotB ? (
                     <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-100">
+                        <span className="text-slate-500">Jenjang:</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                          (slotB.educationLevel === 'SMA' || slotB.roomName.includes('6'))
+                            ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                            : 'bg-teal-100 text-teal-900 border border-teal-300'
+                        }`}>
+                          {(slotB.educationLevel === 'SMA' || slotB.roomName.includes('6')) ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
+                        </span>
+                      </div>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500">Pengawas Saat Ini:</span>
                         <strong className="text-slate-900 font-bold">{slotB.mainProctorName}</strong>
@@ -557,8 +689,12 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                                 {cand.slot.dayName}, {cand.slot.date}
                               </span>
-                              <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-black">
-                                {cand.slot.roomName}
+                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${
+                                (cand.slot.educationLevel === 'SMA' || cand.slot.roomName.includes('6'))
+                                  ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                                  : 'bg-teal-50 text-teal-800 border border-teal-200'
+                              }`}>
+                                {(cand.slot.educationLevel === 'SMA' || cand.slot.roomName.includes('6')) ? '[SMA] ' : '[SMP] '}{cand.slot.roomName}
                               </span>
                             </div>
 
@@ -706,16 +842,29 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                       onChange={(e) => setReassignSlotId(e.target.value)}
                       className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer"
                     >
-                      {scheduleData.proctorSchedules.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
-                        </option>
-                      ))}
+                      {allCombinedProctors.map((p) => {
+                        const lvl = p.educationLevel || (p.roomName.includes('6') ? 'SMA' : 'SMP');
+                        return (
+                          <option key={p.id} value={p.id}>
+                            [{lvl}] {p.dayName} (Sesi {p.sessionNumber}) • {p.roomName} - {p.mainProctorName} ({p.subject})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
                   {reassignSlot && (
                     <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-100">
+                        <span className="text-slate-500">Jenjang:</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                          (reassignSlot.educationLevel === 'SMA' || reassignSlot.roomName.includes('6'))
+                            ? 'bg-blue-100 text-blue-900 border border-blue-300'
+                            : 'bg-teal-100 text-teal-900 border border-teal-300'
+                        }`}>
+                          {(reassignSlot.educationLevel === 'SMA' || reassignSlot.roomName.includes('6')) ? '🎓 SMA Terpadu As Salaam' : '🏫 SMP Terpadu Al-Ittihadiyah'}
+                        </span>
+                      </div>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-500">Pengawas Semula:</span>
                         <strong className="text-slate-900 font-bold">{reassignSlot.mainProctorName}</strong>
@@ -939,7 +1088,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
           {/* TAB 3: RIWAYAT PERUBAHAN */}
           {activeTab === 'HISTORY' && (
             <div className="space-y-3 animate-fadeIn">
-              {!scheduleData.swapHistory || scheduleData.swapHistory.length === 0 ? (
+              {combinedHistory.length === 0 ? (
                 <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
                   <History className="w-8 h-8 text-slate-300 mx-auto" />
                   <p className="text-xs font-bold text-slate-600">Belum Ada Riwayat Pergantian</p>
@@ -949,7 +1098,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  {scheduleData.swapHistory.map((item, idx) => (
+                  {combinedHistory.map((item, idx) => (
                     <div
                       key={item.id || idx}
                       className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 text-xs space-y-2"

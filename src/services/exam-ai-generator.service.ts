@@ -285,9 +285,19 @@ export class ExamScheduleAIGeneratorService {
       aiExplanation = 'Jadwal ujian mata pelajaran siswa berhasil disusun tanpa alokasi guru pengawas (sesuai instruksi prompt).';
     }
 
-    // Explicitly lock education level
-    if (params.educationLevel) {
-      parsedConfig.educationLevel = params.educationLevel;
+    // Pre-load complementary level proctors to guarantee zero clash between SMP and SMA
+    if (params.educationLevel && !parsedConfig.existingCrossLevelProctors) {
+      try {
+        const compLevel = params.educationLevel === 'SMP' ? 'SMA' : 'SMP';
+        const existingComp = await ExamScheduleRepository.getSchedule(
+          parsedConfig.academicYear,
+          parsedConfig.examType,
+          compLevel
+        );
+        if (existingComp && existingComp.proctorSchedules?.length > 0) {
+          parsedConfig.existingCrossLevelProctors = existingComp.proctorSchedules;
+        }
+      } catch {}
     }
 
     // 3. Generate conflict-free subject schedules & fair proctor roster

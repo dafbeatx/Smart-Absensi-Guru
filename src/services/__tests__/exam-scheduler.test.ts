@@ -10,6 +10,8 @@ import { StudentRepository } from '../../repositories/StudentRepository';
 import type {
   ExamScheduleFormConfig,
   ExamCommitteeMember,
+  ExamScheduleData,
+  ExamProctorItem,
 } from '../../types/exam-schedule.types';
 import type { UserProfile, StudentItem } from '../../types/database.types';
 
@@ -860,6 +862,264 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     );
   } catch (err: any) {
     assert('Exam Scheduler 24: Error testing smart reassign recommendation engine', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 25: Cross-Level Scheduling Anti-Clash (SMP & SMA Ruang 6)
+  // ---------------------------------------------------------------------------
+  try {
+    // 1. Simulate existing SMA schedule in Ruang 6 with Ahmad Dahlan on 2026-09-28 Sesi 1
+    const smaSlot: ExamProctorItem = {
+      id: 'proc_SMA_Ruang6_2026-09-28_s1',
+      date: '2026-09-28',
+      dayName: 'Senin',
+      sessionNumber: 1,
+      startTime: '07:30',
+      endTime: '09:00',
+      roomName: 'Ruang 6',
+      className: '10, 11, 12',
+      subject: 'Fisika SMA',
+      mainProctorId: sampleTeachers[0].id, // Ahmad Dahlan
+      mainProctorName: sampleTeachers[0].full_name,
+      educationLevel: 'SMA',
+    };
+
+    // 2. Generate SMP schedule on identical date & session, passing SMA Ruang 6 in existingCrossLevelProctors
+    const smpConfig: ExamScheduleFormConfig = {
+      examType: 'ASTS',
+      examTitle: 'ASTS SMP Anti-Clash Test',
+      educationLevel: 'SMP',
+      academicYear: testAcademicYear,
+      semester: '1',
+      startDate: '2026-09-28',
+      endDate: '2026-09-28',
+      sessionsPerDay: 1,
+      sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:00' }],
+      selectedClasses: ['7A', '7B'],
+      selectedSubjects: ['PAI'],
+      totalRooms: 2,
+      selectedTeacherIds: sampleTeachers.map((t) => t.id),
+      proctorsPerRoom: 1,
+      excludeOwnSubject: false,
+      excludeCommitteeProctor: false,
+      assignBackupProctor: false,
+      existingCrossLevelProctors: [smaSlot],
+    };
+
+    const smpSched = ExamSchedulerService.generateSchedule(smpConfig, sampleTeachers, []);
+    const proctorsInSlot1 = smpSched.proctorSchedules.filter(
+      (p) => p.date === '2026-09-28' && p.sessionNumber === 1
+    );
+
+    // Ahmad Dahlan MUST NOT be assigned in SMP slot 1 because he is already in SMA Ruang 6
+    const ahmadInSmp = proctorsInSlot1.some(
+      (p) => p.mainProctorId === sampleTeachers[0].id || p.mainProctorName === sampleTeachers[0].full_name
+    );
+
+    assert(
+      'Exam Scheduler 25: Cross-level anti-clash prevents proctors assigned in SMA Ruang 6 from being double-booked in SMP',
+      !ahmadInSmp && proctorsInSlot1.length === 2,
+      `Ahmad Dahlan double-booked in SMP: ${ahmadInSmp}, Assigned in SMP R1 & R2: ${proctorsInSlot1.map((p) => p.mainProctorName).join(', ')}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 25: Error testing cross-level anti-clash', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 26: Cross-Level Proctor Swap (SMP Ruang 1 & SMA Ruang 6)
+  // ---------------------------------------------------------------------------
+  try {
+    const smpSchedule: ExamScheduleData = {
+      id: 'sched_smp_swap_test',
+      educationLevel: 'SMP',
+      config: {
+        examType: 'ASTS',
+        examTitle: 'ASTS SMP',
+        academicYear: testAcademicYear,
+        semester: '1',
+        startDate: '2026-09-28',
+        endDate: '2026-09-29',
+        sessionsPerDay: 1,
+        sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:00' }],
+        selectedClasses: ['7A'],
+        selectedSubjects: ['PAI'],
+        selectedTeacherIds: [sampleTeachers[1].id],
+        proctorsPerRoom: 1,
+        excludeOwnSubject: false,
+        excludeCommitteeProctor: false,
+        assignBackupProctor: false,
+      },
+      subjectSchedules: [],
+      proctorSchedules: [
+        {
+          id: 'proc_smp_slot_senin',
+          date: '2026-09-28',
+          dayName: 'Senin',
+          sessionNumber: 1,
+          startTime: '07:30',
+          endTime: '09:00',
+          roomName: 'Ruang 1',
+          className: '7A',
+          subject: 'PAI SMP',
+          mainProctorId: sampleTeachers[1].id, // Siti Aminah
+          mainProctorName: sampleTeachers[1].full_name,
+          educationLevel: 'SMP',
+        },
+      ],
+      summary: { totalDays: 1, totalSessions: 1, totalClasses: 1, totalSubjects: 1, totalProctorsAssigned: 1, averageSessionsPerTeacher: 1 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const smaSchedule: ExamScheduleData = {
+      id: 'sched_sma_swap_test',
+      educationLevel: 'SMA',
+      config: {
+        examType: 'ASTS',
+        examTitle: 'ASTS SMA',
+        academicYear: testAcademicYear,
+        semester: '1',
+        startDate: '2026-09-29',
+        endDate: '2026-09-29',
+        sessionsPerDay: 1,
+        sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:00' }],
+        selectedClasses: ['10, 11, 12'],
+        selectedSubjects: ['Fisika SMA'],
+        selectedTeacherIds: [sampleTeachers[0].id],
+        proctorsPerRoom: 1,
+        excludeOwnSubject: false,
+        excludeCommitteeProctor: false,
+        assignBackupProctor: false,
+      },
+      subjectSchedules: [],
+      proctorSchedules: [
+        {
+          id: 'proc_sma_slot_selasa_r6',
+          date: '2026-09-29',
+          dayName: 'Selasa',
+          sessionNumber: 1,
+          startTime: '07:30',
+          endTime: '09:00',
+          roomName: 'Ruang 6',
+          className: '10, 11, 12',
+          subject: 'Fisika SMA',
+          mainProctorId: sampleTeachers[0].id, // Ahmad Dahlan
+          mainProctorName: sampleTeachers[0].full_name,
+          educationLevel: 'SMA',
+        },
+      ],
+      summary: { totalDays: 1, totalSessions: 1, totalClasses: 1, totalSubjects: 1, totalProctorsAssigned: 1, averageSessionsPerTeacher: 1 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Swap Siti Aminah (SMP Ruang 1 Senin) with Ahmad Dahlan (SMA Ruang 6 Selasa)
+    const swapRes = ExamSchedulerService.swapProctorsCrossLevel(
+      smpSchedule,
+      smaSchedule,
+      'proc_smp_slot_senin',
+      'proc_sma_slot_selasa_r6',
+      'Admin Kurikulum',
+      'Tukar jadwal lintas jenjang SMP-SMA'
+    );
+
+    const smpSlotAfter = swapRes.updatedScheduleA?.proctorSchedules.find((p) => p.id === 'proc_smp_slot_senin');
+    const smaSlotAfter = swapRes.updatedScheduleB?.proctorSchedules.find((p) => p.id === 'proc_sma_slot_selasa_r6');
+
+    assert(
+      'Exam Scheduler 26: Cross-level proctor swap between SMP Ruang 1 and SMA Ruang 6 exchanges proctors and logs audit in both schedules',
+      swapRes.success === true &&
+        smpSlotAfter?.mainProctorId === sampleTeachers[0].id && // Now Ahmad Dahlan in SMP Ruang 1
+        smaSlotAfter?.mainProctorId === sampleTeachers[1].id && // Now Siti Aminah in SMA Ruang 6
+        swapRes.updatedScheduleA?.swapHistory?.length === 1 &&
+        swapRes.updatedScheduleB?.swapHistory?.length === 1,
+      `Success: ${swapRes.success}, SMP Proctor: ${smpSlotAfter?.mainProctorName}, SMA Proctor: ${smaSlotAfter?.mainProctorName}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 26: Error testing cross-level proctor swap', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 27: Smart Recommendation Engine Suggests Ruang 6 (SMA) as Swap Candidate
+  // ---------------------------------------------------------------------------
+  try {
+    const smpSched: ExamScheduleData = {
+      id: 'sched_smp_rec',
+      educationLevel: 'SMP',
+      config: {
+        examType: 'ASTS',
+        examTitle: 'ASTS SMP',
+        academicYear: testAcademicYear,
+        semester: '1',
+        startDate: '2026-09-28',
+        endDate: '2026-09-28',
+        sessionsPerDay: 1,
+        sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:00' }],
+        selectedClasses: ['7A'],
+        selectedSubjects: ['Matematika'],
+        selectedTeacherIds: [sampleTeachers[0].id],
+        proctorsPerRoom: 1,
+        excludeOwnSubject: false,
+        excludeCommitteeProctor: false,
+        assignBackupProctor: false,
+      },
+      subjectSchedules: [],
+      proctorSchedules: [
+        {
+          id: 'proc_smp_senin_slot1',
+          date: '2026-09-28',
+          dayName: 'Senin',
+          sessionNumber: 1,
+          startTime: '07:30',
+          endTime: '09:00',
+          roomName: 'Ruang 1',
+          className: '7A',
+          subject: 'Matematika',
+          mainProctorId: sampleTeachers[0].id, // Ahmad Dahlan
+          mainProctorName: sampleTeachers[0].full_name,
+          educationLevel: 'SMP',
+        },
+      ],
+      summary: { totalDays: 1, totalSessions: 1, totalClasses: 1, totalSubjects: 1, totalProctorsAssigned: 1, averageSessionsPerTeacher: 1 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const smaRuang6Slot: ExamProctorItem = {
+      id: 'proc_sma_selasa_ruang6',
+      date: '2026-09-29',
+      dayName: 'Selasa',
+      sessionNumber: 1,
+      startTime: '07:30',
+      endTime: '09:00',
+      roomName: 'Ruang 6',
+      className: '10, 11, 12',
+      subject: 'Biologi SMA',
+      mainProctorId: sampleTeachers[2].id, // Budi Santoso
+      mainProctorName: sampleTeachers[2].full_name,
+      educationLevel: 'SMA',
+    };
+
+    // Candidate search for Ahmad Dahlan in SMP, passing SMA Ruang 6 in additionalProctors
+    const candidates = ExamSchedulerService.getSmartSwapCandidates(
+      smpSched,
+      'proc_smp_senin_slot1',
+      'ALL',
+      sampleTeachers,
+      [smaRuang6Slot]
+    );
+
+    const hasRuang6Sma = candidates.some(
+      (c) => c.slot.id === 'proc_sma_selasa_ruang6' && c.slot.roomName === 'Ruang 6' && c.isZeroConflict
+    );
+
+    assert(
+      'Exam Scheduler 27: Smart Recommendation Engine successfully presents Ruang 6 (SMA) as a 100% clash-free swap candidate for SMP',
+      hasRuang6Sma && candidates.length > 0,
+      `Ruang 6 SMA Suggested: ${hasRuang6Sma}, Total Candidates: ${candidates.length}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 27: Error testing smart recommendations with Ruang 6 SMA', false, err?.message);
   }
 
   return { passed, failed, results };
