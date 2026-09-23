@@ -111,7 +111,7 @@ export interface ExamProctorSwapHistoryItem {
   id: string;
   swappedAt: string;
   adminName: string;
-  type: 'SWAP_SLOTS' | 'REASSIGN';
+  type: 'SWAP_SLOTS' | 'REASSIGN' | 'SWAP_SUBJECTS' | 'REPLACE_SUBJECT';
   reason?: string;
   slotA: {
     id: string;

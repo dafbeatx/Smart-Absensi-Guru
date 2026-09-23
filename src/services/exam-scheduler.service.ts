@@ -1262,4 +1262,204 @@ export class ExamSchedulerService {
 
     return candidates;
   }
+
+  /**
+   * Exchanges subjects between two exam sessions (Slot A and Slot B).
+   * Updates all classes in both sessions, synchronizes proctor schedule subject labels,
+   * logs the change in swapHistory, and returns the updated schedule.
+   */
+  public static swapSubjectsBetweenSessions(
+    schedule: ExamScheduleData,
+    slotA: { date: string; sessionNumber: number },
+    slotB: { date: string; sessionNumber: number },
+    adminName = 'Admin Ujian'
+  ): { success: boolean; error?: string; updatedSchedule?: ExamScheduleData } {
+    if (!schedule || !schedule.subjectSchedules || schedule.subjectSchedules.length === 0) {
+      return { success: false, error: 'Jadwal ujian tidak ditemukan atau kosong.' };
+    }
+
+    if (slotA.date === slotB.date && slotA.sessionNumber === slotB.sessionNumber) {
+      return { success: false, error: 'Sesi A dan Sesi B tidak boleh merupakan sesi yang sama.' };
+    }
+
+    // Find subjects in Slot A and Slot B
+    const itemsA = schedule.subjectSchedules.filter(
+      (s) => s.date === slotA.date && s.sessionNumber === slotA.sessionNumber
+    );
+    const itemsB = schedule.subjectSchedules.filter(
+      (s) => s.date === slotB.date && s.sessionNumber === slotB.sessionNumber
+    );
+
+    if (itemsA.length === 0) {
+      return { success: false, error: `Tidak ditemukan mata pelajaran pada tanggal ${slotA.date} Sesi ${slotA.sessionNumber}.` };
+    }
+    if (itemsB.length === 0) {
+      return { success: false, error: `Tidak ditemukan mata pelajaran pada tanggal ${slotB.date} Sesi ${slotB.sessionNumber}.` };
+    }
+
+    const subjectA = itemsA[0].subject;
+    const subjectB = itemsB[0].subject;
+
+    // Deep clone subjectSchedules & proctorSchedules
+    const updatedSubjectSchedules = schedule.subjectSchedules.map((s) => {
+      if (s.date === slotA.date && s.sessionNumber === slotA.sessionNumber) {
+        return { ...s, subject: subjectB };
+      }
+      if (s.date === slotB.date && s.sessionNumber === slotB.sessionNumber) {
+        return { ...s, subject: subjectA };
+      }
+      return { ...s };
+    });
+
+    const updatedProctorSchedules = (schedule.proctorSchedules || []).map((p) => {
+      if (p.date === slotA.date && p.sessionNumber === slotA.sessionNumber) {
+        return { ...p, subject: subjectB };
+      }
+      if (p.date === slotB.date && p.sessionNumber === slotB.sessionNumber) {
+        return { ...p, subject: subjectA };
+      }
+      return { ...p };
+    });
+
+    // History record
+    const historyItem: ExamProctorSwapHistoryItem = {
+      id: `subj_swap_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      swappedAt: new Date().toISOString(),
+      adminName,
+      type: 'SWAP_SUBJECTS',
+      reason: `Tukar mapel: [${itemsA[0].dayName || slotA.date} Sesi ${slotA.sessionNumber}: ${subjectA}] ⇄ [${itemsB[0].dayName || slotB.date} Sesi ${slotB.sessionNumber}: ${subjectB}]`,
+      slotA: {
+        id: itemsA[0].id,
+        dayName: itemsA[0].dayName,
+        date: slotA.date,
+        sessionNumber: slotA.sessionNumber,
+        roomName: itemsA[0].roomName || '',
+        className: itemsA.map((i) => i.className).join(', '),
+        subject: subjectB, // new subject
+        previousProctorId: '',
+        previousProctorName: subjectA, // previous subject
+        newProctorId: '',
+        newProctorName: subjectB,
+      },
+      slotB: {
+        id: itemsB[0].id,
+        dayName: itemsB[0].dayName,
+        date: slotB.date,
+        sessionNumber: slotB.sessionNumber,
+        roomName: itemsB[0].roomName || '',
+        className: itemsB.map((i) => i.className).join(', '),
+        subject: subjectA, // new subject
+        previousProctorId: '',
+        previousProctorName: subjectB, // previous subject
+        newProctorId: '',
+        newProctorName: subjectA,
+      },
+    };
+
+    const updatedSchedule: ExamScheduleData = {
+      ...schedule,
+      subjectSchedules: updatedSubjectSchedules,
+      proctorSchedules: updatedProctorSchedules,
+      swapHistory: [historyItem, ...(schedule.swapHistory || [])],
+      updatedAt: new Date().toISOString(),
+    };
+
+    return {
+      success: true,
+      updatedSchedule,
+    };
+  }
+
+  /**
+   * Replaces the subject for a specific exam session with a new subject name.
+   * Updates all classes in that session (or a specific class if requested),
+   * synchronizes proctor schedules, and logs the change.
+   */
+  public static replaceSubjectInSession(
+    schedule: ExamScheduleData,
+    targetSlot: { date: string; sessionNumber: number },
+    newSubject: string,
+    targetClassName?: string,
+    adminName = 'Admin Ujian'
+  ): { success: boolean; error?: string; updatedSchedule?: ExamScheduleData } {
+    if (!schedule || !schedule.subjectSchedules || schedule.subjectSchedules.length === 0) {
+      return { success: false, error: 'Jadwal ujian tidak ditemukan atau kosong.' };
+    }
+
+    const trimmedSubject = newSubject.trim();
+    if (!trimmedSubject) {
+      return { success: false, error: 'Nama mata pelajaran baru tidak boleh kosong.' };
+    }
+
+    const matchingItems = schedule.subjectSchedules.filter(
+      (s) =>
+        s.date === targetSlot.date &&
+        s.sessionNumber === targetSlot.sessionNumber &&
+        (!targetClassName || targetClassName === 'ALL' || s.className === targetClassName)
+    );
+
+    if (matchingItems.length === 0) {
+      return {
+        success: false,
+        error: `Tidak ditemukan sesi ujian pada tanggal ${targetSlot.date} Sesi ${targetSlot.sessionNumber}${targetClassName ? ` untuk kelas ${targetClassName}` : ''}.`,
+      };
+    }
+
+    const oldSubject = matchingItems[0].subject;
+
+    // Update subjectSchedules
+    const updatedSubjectSchedules = schedule.subjectSchedules.map((s) => {
+      if (
+        s.date === targetSlot.date &&
+        s.sessionNumber === targetSlot.sessionNumber &&
+        (!targetClassName || targetClassName === 'ALL' || s.className === targetClassName)
+      ) {
+        return { ...s, subject: trimmedSubject };
+      }
+      return { ...s };
+    });
+
+    // Update proctorSchedules
+    const updatedProctorSchedules = (schedule.proctorSchedules || []).map((p) => {
+      if (p.date === targetSlot.date && p.sessionNumber === targetSlot.sessionNumber) {
+        return { ...p, subject: trimmedSubject };
+      }
+      return { ...p };
+    });
+
+    // History record
+    const historyItem: ExamProctorSwapHistoryItem = {
+      id: `subj_reassign_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      swappedAt: new Date().toISOString(),
+      adminName,
+      type: 'REPLACE_SUBJECT',
+      reason: `Ganti mapel: [${matchingItems[0].dayName || targetSlot.date} Sesi ${targetSlot.sessionNumber}: ${oldSubject} ➔ ${trimmedSubject}]`,
+      slotA: {
+        id: matchingItems[0].id,
+        dayName: matchingItems[0].dayName,
+        date: targetSlot.date,
+        sessionNumber: targetSlot.sessionNumber,
+        roomName: matchingItems[0].roomName || '',
+        className: matchingItems.map((i) => i.className).join(', '),
+        subject: trimmedSubject,
+        previousProctorId: '',
+        previousProctorName: oldSubject,
+        newProctorId: '',
+        newProctorName: trimmedSubject,
+      },
+    };
+
+    const updatedSchedule: ExamScheduleData = {
+      ...schedule,
+      subjectSchedules: updatedSubjectSchedules,
+      proctorSchedules: updatedProctorSchedules,
+      swapHistory: [historyItem, ...(schedule.swapHistory || [])],
+      updatedAt: new Date().toISOString(),
+    };
+
+    return {
+      success: true,
+      updatedSchedule,
+    };
+  }
 }

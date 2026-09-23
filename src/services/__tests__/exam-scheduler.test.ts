@@ -1122,6 +1122,100 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 27: Error testing smart recommendations with Ruang 6 SMA', false, err?.message);
   }
 
+  // Test 28: In-place Exam Subject Swap between two sessions without re-prompting AI
+  try {
+    const swapSubjectConfig: ExamScheduleFormConfig = {
+      examType: 'ASTS',
+      examTitle: 'ASTS Ganjil',
+      academicYear: testAcademicYear,
+      semester: '1',
+      startDate: '2026-09-28',
+      endDate: '2026-09-29',
+      sessionsPerDay: 1,
+      sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:30' }],
+      selectedClasses: ['7A', '8A'],
+      selectedSubjects: ['Matematika', 'Bahasa Indonesia'],
+      selectedTeacherIds: sampleTeachers.map((t) => t.id),
+      proctorsPerRoom: 1,
+      excludeOwnSubject: false,
+      excludeCommitteeProctor: false,
+      assignBackupProctor: false,
+    };
+
+    const initialSchedule = ExamSchedulerService.generateSchedule(swapSubjectConfig, sampleTeachers, []);
+
+    // Slot A: 2026-09-28 Sesi 1 (Matematika)
+    // Slot B: 2026-09-29 Sesi 1 (Bahasa Indonesia)
+    const swapResult = ExamSchedulerService.swapSubjectsBetweenSessions(
+      initialSchedule,
+      { date: '2026-09-28', sessionNumber: 1 },
+      { date: '2026-09-29', sessionNumber: 1 },
+      'Admin Kurikulum'
+    );
+
+    const updated = swapResult.updatedSchedule;
+    const subjsDay1 = updated?.subjectSchedules.filter((s) => s.date === '2026-09-28').map((s) => s.subject);
+    const subjsDay2 = updated?.subjectSchedules.filter((s) => s.date === '2026-09-29').map((s) => s.subject);
+    const proctorsDay1 = updated?.proctorSchedules.filter((p) => p.date === '2026-09-28').map((p) => p.subject);
+    const proctorsDay2 = updated?.proctorSchedules.filter((p) => p.date === '2026-09-29').map((p) => p.subject);
+
+    const isDay1Swapped = subjsDay1?.every((s) => s === 'Bahasa Indonesia') && proctorsDay1?.every((s) => s === 'Bahasa Indonesia');
+    const isDay2Swapped = subjsDay2?.every((s) => s === 'Matematika') && proctorsDay2?.every((s) => s === 'Matematika');
+    const hasHistory = updated?.swapHistory?.some((h) => h.type === 'SWAP_SUBJECTS');
+
+    assert(
+      'Exam Scheduler 28: swapSubjectsBetweenSessions swaps subjects across all classes and syncs proctor schedules with audit history',
+      Boolean(swapResult.success && isDay1Swapped && isDay2Swapped && hasHistory),
+      `Success: ${swapResult.success}, Day 1 subjs: ${subjsDay1?.join(',')}, Day 2 subjs: ${subjsDay2?.join(',')}, HasHistory: ${hasHistory}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 28: Error testing subject swap between sessions', false, err?.message);
+  }
+
+  // Test 29: In-place Single Session Subject Replacement
+  try {
+    const replaceConfig: ExamScheduleFormConfig = {
+      examType: 'ASTS',
+      examTitle: 'ASTS Ganjil',
+      academicYear: testAcademicYear,
+      semester: '1',
+      startDate: '2026-09-28',
+      endDate: '2026-09-28',
+      sessionsPerDay: 1,
+      sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:30' }],
+      selectedClasses: ['7A'],
+      selectedSubjects: ['Matematika'],
+      selectedTeacherIds: sampleTeachers.map((t) => t.id),
+      proctorsPerRoom: 1,
+      excludeOwnSubject: false,
+      excludeCommitteeProctor: false,
+      assignBackupProctor: false,
+    };
+
+    const initialSchedule = ExamSchedulerService.generateSchedule(replaceConfig, sampleTeachers, []);
+
+    const replaceResult = ExamSchedulerService.replaceSubjectInSession(
+      initialSchedule,
+      { date: '2026-09-28', sessionNumber: 1 },
+      'Informatika Terapan',
+      undefined,
+      'Admin Kurikulum'
+    );
+
+    const updated = replaceResult.updatedSchedule;
+    const newSubject = updated?.subjectSchedules[0]?.subject;
+    const newProctorSubject = updated?.proctorSchedules[0]?.subject;
+    const hasHistory = updated?.swapHistory?.some((h) => h.type === 'REPLACE_SUBJECT');
+
+    assert(
+      'Exam Scheduler 29: replaceSubjectInSession updates subject in session, syncs proctor schedule and records audit trail',
+      Boolean(replaceResult.success && newSubject === 'Informatika Terapan' && newProctorSubject === 'Informatika Terapan' && hasHistory),
+      `Success: ${replaceResult.success}, Subject: ${newSubject}, ProctorSubject: ${newProctorSubject}, HasHistory: ${hasHistory}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 29: Error testing replaceSubjectInSession', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
 

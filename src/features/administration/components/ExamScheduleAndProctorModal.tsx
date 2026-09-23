@@ -33,6 +33,7 @@ import {
   Smartphone,
   ClipboardCheck,
   ArrowLeftRight,
+  Edit3,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -54,6 +55,7 @@ import { ExamMatrixBuilderService } from '../../../services/exam-matrix-builder.
 import { ExamWordExporterService } from '../../../services/exam-word-exporter.service';
 import { ExamAdministrativeDocsModal } from './ExamAdministrativeDocsModal';
 import { ExamProctorSwapModal } from './ExamProctorSwapModal';
+import { ExamSubjectSwapModal } from './ExamSubjectSwapModal';
 import type { AdminDocType } from '../../../services/exam-administrative-docs.service';
 import {
   ExamScheduleAIGeneratorService,
@@ -207,6 +209,8 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [adminDocInitialTab, setAdminDocInitialTab] = useState<AdminDocType>('PROCTOR_ATTENDANCE');
   const [isSwapModalOpen, setIsSwapModalOpen] = useState<boolean>(false);
   const [swapInitialSlotId, setSwapInitialSlotId] = useState<string | undefined>(undefined);
+  const [isSubjectSwapModalOpen, setIsSubjectSwapModalOpen] = useState<boolean>(false);
+  const [subjectSwapInitialSlot, setSubjectSwapInitialSlot] = useState<{ date: string; sessionNumber: number } | undefined>(undefined);
 
   // ── FORM QUESTIONNAIRE STATE (Parameters filled by Committee) ──────────────
   const [formAcademicYear, setFormAcademicYear] = useState<string>(() => AdministrationRepository.getActiveAcademicYear());
@@ -2918,6 +2922,18 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       <>
                         <button
                           type="button"
+                          onClick={() => {
+                            setSubjectSwapInitialSlot(undefined);
+                            setIsSubjectSwapModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-colors shadow-2xs flex items-center gap-1.5"
+                          title="Tukar atau ganti mata pelajaran langsung tanpa prompt ulang"
+                        >
+                          <ArrowLeftRight className="w-3.5 h-3.5" />
+                          <span>Tukar / Ganti Mapel</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setActiveTab('form')}
                           className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition-colors shadow-2xs flex items-center gap-1.5"
                           title="Ubah parameter atau buat jadwal baru"
@@ -3037,6 +3053,19 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       <h5 className="text-sm sm:text-base font-black text-slate-900 truncate tracking-tight">
                                         {sess.subject}
                                       </h5>
+                                      {accessInfo.canManage && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSubjectSwapInitialSlot({ date: day.date, sessionNumber: sess.sessionNumber });
+                                            setIsSubjectSwapModalOpen(true);
+                                          }}
+                                          className="p-1 rounded-md hover:bg-slate-200/80 text-slate-400 hover:text-teal-700 transition-colors shrink-0"
+                                          title={`Tukar atau ganti mata pelajaran ${sess.subject}`}
+                                        >
+                                          <ArrowLeftRight className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
                                     </div>
 
                                     <div className="inline-flex items-center gap-1.5 shrink-0 bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 shadow-2xs self-start sm:self-auto">
@@ -3119,7 +3148,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                             <th className="py-3 px-3.5 font-black text-slate-900">Mata Pelajaran</th>
                             <th className="py-3 px-3.5 text-center">Ruangan</th>
                             {accessInfo.canManage && (
-                              <th className="py-3 px-3 text-center w-14">Aksi</th>
+                              <th className="py-3 px-3 text-center w-20">Aksi</th>
                             )}
                           </tr>
                         </thead>
@@ -3145,14 +3174,27 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                               </td>
                               {accessInfo.canManage && (
                                 <td className="py-2.5 px-3 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteSingleSubject(item.id, item.subject, item.className)}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                    title={`Hapus ujian ${item.subject} (${item.className})`}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSubjectSwapInitialSlot({ date: item.date, sessionNumber: item.sessionNumber });
+                                        setIsSubjectSwapModalOpen(true);
+                                      }}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+                                      title={`Ganti atau tukar mata pelajaran ${item.subject} (${item.className})`}
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSingleSubject(item.id, item.subject, item.className)}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                      title={`Hapus ujian ${item.subject} (${item.className})`}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </td>
                               )}
                             </tr>
@@ -4144,6 +4186,27 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
             setToast({
               type: 'success',
               text: 'Pergantian jadwal pengawas (SMP & SMA Ruang 6) berhasil disimpan dan disinkronkan.',
+            });
+          }}
+        />
+      )}
+
+      {/* MODAL PERGANTIAN & TUKAR MAPEL UJIAN (ADMIN) */}
+      {isSubjectSwapModalOpen && scheduleData && (
+        <ExamSubjectSwapModal
+          isOpen={isSubjectSwapModalOpen}
+          onClose={() => {
+            setIsSubjectSwapModalOpen(false);
+            setSubjectSwapInitialSlot(undefined);
+          }}
+          scheduleData={scheduleData}
+          currentAdminName={currentUser?.full_name || 'Admin Kurikulum'}
+          initialSelectedSlot={subjectSwapInitialSlot}
+          onSuccess={(updated) => {
+            setScheduleData(updated);
+            setToast({
+              type: 'success',
+              text: 'Perubahan mata pelajaran ujian berhasil diperbarui dan disinkronkan ke seluruh jadwal & pengawas.',
             });
           }}
         />
