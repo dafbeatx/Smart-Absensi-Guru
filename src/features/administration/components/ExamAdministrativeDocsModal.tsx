@@ -167,7 +167,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col h-[94vh] max-h-[900px] border border-slate-200 overflow-hidden">
+      <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col h-[94vh] max-h-225 border border-slate-200 overflow-hidden">
         {/* MODAL HEADER */}
         <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -325,7 +325,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             <iframe
               title="Pratinjau Dokumen Administrasi Ujian"
               srcDoc={currentHtml}
-              className="w-full flex-1 border-none min-h-[800px]"
+              className="w-full flex-1 border-none min-h-200"
               style={{ backgroundColor: '#ffffff' }}
             />
           </div>
