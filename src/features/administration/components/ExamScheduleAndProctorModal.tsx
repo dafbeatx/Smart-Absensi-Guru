@@ -35,6 +35,7 @@ import {
   ArrowLeftRight,
   Edit3,
   ChevronDown,
+  GraduationCap,
 } from 'lucide-react';
 import { formatTimeForInput } from '../../../utils/time.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -1425,7 +1426,26 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
 
                     <div className="h-px bg-slate-100 my-1" />
 
-                    {/* 5. Dokumen Administrasi Lengkap */}
+                    {/* 5. Daftar Hadir Peserta Ujian */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportMenuOpen(false);
+                        setAdminDocInitialTab('STUDENT_ATTENDANCE_ROSTER');
+                        setShowAdministrativeDocsModal(true);
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 hover:bg-emerald-50 flex items-center gap-3 transition-colors cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-200">
+                        <GraduationCap className="w-4 h-4 text-emerald-700" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-emerald-950">Daftar Hadir Peserta (Siswa)</div>
+                        <div className="text-[10px] text-emerald-700 font-mono">Format 13-0820-001 per ruangan</div>
+                      </div>
+                    </button>
+
+                    {/* 6. Dokumen Fisik Administrasi Lengkap */}
                     <button
                       type="button"
                       onClick={() => {
@@ -1440,7 +1460,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       </div>
                       <div>
                         <div className="text-xs font-bold text-teal-900">Dokumen Fisik Administrasi</div>
-                        <div className="text-[10px] text-teal-700">Daftar hadir, serah terima naskah, berita acara</div>
+                        <div className="text-[10px] text-teal-700">Daftar hadir pengawas, serah terima, berita acara</div>
                       </div>
                     </button>
                   </div>

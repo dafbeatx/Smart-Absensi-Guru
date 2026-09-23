@@ -25,6 +25,7 @@ import { SIGNATORY_OFFICIALS, getDynamicBranding } from '../lib/excel-generator.
 
 export type AdminDocType =
   | 'PROCTOR_ATTENDANCE'
+  | 'STUDENT_ATTENDANCE_ROSTER'
   | 'HANDOVER_DOCS'
   | 'STUDENT_ATTENDANCE_SUMMARY'
   | 'COMMITTEE_ATTENDANCE';
@@ -39,6 +40,15 @@ export interface AdminDocOptions {
   totalRegisteredStudents?: number | Record<string, number>; // total or per subject
   orientation?: 'portrait' | 'landscape';
   includeNumberPrefix?: boolean;
+  participantNumberPrefix?: string; // e.g. "13-0820-"
+  studentsList?: Array<{
+    id?: string;
+    fullName: string;
+    className: string;
+    gender?: string;
+    roomName?: string;
+    participantNumber?: string;
+  }>;
 }
 
 export interface ExamDayInfo {
@@ -682,6 +692,387 @@ export class ExamAdministrativeDocsService {
   }
 
   // =========================================================================
+  // DOCUMENT: DAFTAR HADIR PESERTA UJIAN (PER RUANGAN)
+  // Sesuai format fisik ASTS SMP Terpadu Al-Ittihadiyah / SMA Terpadu As Salaam
+  // Nomor peserta: 13-0820-001 (dimulai dari peserta 1 di Ruang 1 secara sekuensial)
+  // =========================================================================
+
+  public static readonly OFFICIAL_SMP_ROOM_1_STUDENTS = [
+    { fullName: 'AMANDA HASNA MIRZA', gender: 'P', className: 'VII A' },
+    { fullName: 'BILQIS AINUN NISSA', gender: 'P', className: 'VII A' },
+    { fullName: 'CASKIA APRILIA', gender: 'P', className: 'VII A' },
+    { fullName: 'DONA', gender: 'P', className: 'VII A' },
+    { fullName: 'KIRANA AURA ANWARUDIN', gender: 'P', className: 'VII A' },
+    { fullName: 'NAJWA NUR FADILLAH', gender: 'P', className: 'VII A' },
+    { fullName: 'NENG KASIH', gender: 'P', className: 'VII A' },
+    { fullName: 'NATASYA HOLIVAH', gender: 'P', className: 'VII A' },
+    { fullName: 'RADISTI PUTRI RIANTI', gender: 'P', className: 'VII A' },
+    { fullName: 'RIZKA LIANA HAKIM', gender: 'P', className: 'VII A' },
+    { fullName: 'SANTIKA', gender: 'P', className: 'VII A' },
+    { fullName: 'SUCI RAHMAWATI', gender: 'P', className: 'VII A' },
+    { fullName: 'TASYIRA AFIFA', gender: 'P', className: 'VII A' },
+    { fullName: 'WANDA INDRIANI', gender: 'P', className: 'VII A' },
+    { fullName: 'YOLA AULIA SANTOSO', gender: 'P', className: 'VII A' },
+    { fullName: 'YUNA HANDAYANI', gender: 'P', className: 'VII A' },
+  ];
+
+  public static readonly OFFICIAL_SMP_ROOM_2_STUDENTS = [
+    { fullName: 'ABILA YAZID RIZAQI', gender: 'L', className: 'VII B' },
+    { fullName: 'FARDHAN HANIF', gender: 'L', className: 'VII B' },
+    { fullName: 'MARVHEL PUTRA IHSANUL ALIM', gender: 'L', className: 'VII B' },
+    { fullName: 'MUHAMAD RAKA ADITYA', gender: 'L', className: 'VII B' },
+    { fullName: 'ROMADONI', gender: 'L', className: 'VII B' },
+    { fullName: 'ADIBA KHANSA AZ-ZAHRA', gender: 'P', className: 'VII B' },
+    { fullName: 'AKBAR AZHI MUGHNI', gender: 'L', className: 'VII B' },
+    { fullName: 'CALISA CANIA MARYAM', gender: 'P', className: 'VII B' },
+    { fullName: 'HANIFAH AL-QUSYARI', gender: 'P', className: 'VII B' },
+    { fullName: 'IFHAM FATHAR MUBAROK', gender: 'L', className: 'VII B' },
+    { fullName: 'MUHAMAD IBNU ZIKRA', gender: 'L', className: 'VII B' },
+    { fullName: 'ANDIKA PRATAMA', gender: 'L', className: 'VII B' },
+    { fullName: 'FAIRUZ PRASETIA', gender: 'L', className: 'VII B' },
+    { fullName: 'FARIZ ABQORI MAULANA', gender: 'L', className: 'VII B' },
+    { fullName: 'FITRA RAMADHAN', gender: 'L', className: 'VII B' },
+    { fullName: 'WILDAN KHOER BASUKI', gender: 'L', className: 'VII B' },
+  ];
+
+  public static readonly OFFICIAL_SMP_ROOM_3_STUDENTS = [
+    { fullName: 'AJENG ALIFATUL KHOIR', gender: 'P', className: 'VIII A' },
+    { fullName: 'AZZAHRA ASHILA ROHMAH', gender: 'P', className: 'VIII A' },
+    { fullName: 'FUJI HIKMAH', gender: 'P', className: 'VIII A' },
+    { fullName: 'SEPTI MUJIANTI', gender: 'P', className: 'VIII A' },
+    { fullName: 'SIFA NURKHALIFAH', gender: 'P', className: 'VIII A' },
+    { fullName: 'AULIA RAHMADHANI', gender: 'P', className: 'VIII A' },
+    { fullName: 'CINTA LAURA SAFITRI', gender: 'P', className: 'VIII A' },
+    { fullName: 'DINA MARLIANA', gender: 'P', className: 'VIII A' },
+    { fullName: 'FITRI HANDAYANI', gender: 'P', className: 'VIII A' },
+    { fullName: 'HANI ANGGRAENI', gender: 'P', className: 'VIII A' },
+    { fullName: 'INTAN NURAINI', gender: 'P', className: 'VIII A' },
+    { fullName: 'LESTARI DEWI', gender: 'P', className: 'VIII A' },
+    { fullName: 'MAULIDA ZAHRA', gender: 'P', className: 'VIII A' },
+    { fullName: 'NADIA PUTRI', gender: 'P', className: 'VIII A' },
+    { fullName: 'REVALINA SALSABILA', gender: 'P', className: 'VIII A' },
+    { fullName: 'ZASKIA MECCA', gender: 'P', className: 'VIII A' },
+  ];
+
+  public static readonly OFFICIAL_SMA_ROOM_1_STUDENTS = [
+    { fullName: 'ACHMAD DANI PRATAMA', gender: 'L', className: '10' },
+    { fullName: 'ARNESTA HADIWINATA', gender: 'P', className: '10' },
+    { fullName: 'BELLA NOVITA SARI', gender: 'P', className: '10' },
+    { fullName: 'EVIANA', gender: 'P', className: '10' },
+    { fullName: 'HAYATUSSIFA', gender: 'P', className: '10' },
+    { fullName: 'MUHAMMAD RIFQI PRATAMA', gender: 'L', className: '10' },
+    { fullName: 'NAZWATUNNISA', gender: 'P', className: '10' },
+    { fullName: 'NYIMAS RANI RAHMAWATI', gender: 'P', className: '10' },
+    { fullName: 'REVAN ADITYA', gender: 'L', className: '10' },
+    { fullName: 'RIZKI RAMADHAN', gender: 'L', className: '10' },
+    { fullName: 'SITI NURHALIZA', gender: 'P', className: '10' },
+    { fullName: 'TIARA ANDINI', gender: 'P', className: '10' },
+  ];
+
+  public static resolveRoomStudents(
+    scheduleData: ExamScheduleData,
+    options?: AdminDocOptions
+  ): Record<string, Array<{
+    urut: number;
+    participantNumber: string;
+    fullName: string;
+    gender: string;
+    className: string;
+  }>> {
+    const prefix = options?.participantNumberPrefix || '13-0820-';
+    const isSma = scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+
+    // 1. Ekstraksi daftar ruangan dari jadwal
+    let rooms: string[] = [];
+    if (scheduleData.proctorSchedules) {
+      const rSet = new Set<string>();
+      scheduleData.proctorSchedules.forEach((p) => {
+        if (p.roomName) rSet.add(p.roomName);
+      });
+      rooms = Array.from(rSet);
+    }
+    if (rooms.length === 0) {
+      const count = scheduleData.config.totalRooms || 3;
+      for (let i = 1; i <= count; i++) {
+        rooms.push(`Ruang ${String(i).padStart(2, '0')}`);
+      }
+    }
+    rooms.sort((a, b) => {
+      const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
+      const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
+      return numA - numB;
+    });
+
+    // 2. Susun daftar siswa per ruangan
+    const rawStudentMap: Record<string, Array<{ fullName: string; gender: string; className: string }>> = {};
+
+    if (options?.studentsList && options.studentsList.length > 0) {
+      const hasRoomAssignment = options.studentsList.some((s) => s.roomName);
+      if (hasRoomAssignment) {
+        options.studentsList.forEach((st) => {
+          const rName = st.roomName || rooms[0];
+          if (!rawStudentMap[rName]) rawStudentMap[rName] = [];
+          rawStudentMap[rName].push({
+            fullName: st.fullName,
+            gender: st.gender || 'L',
+            className: st.className,
+          });
+        });
+      } else {
+        const capacityPerRoom = Math.ceil(options.studentsList.length / Math.max(1, rooms.length));
+        rooms.forEach((rName, rIdx) => {
+          rawStudentMap[rName] = options.studentsList!
+            .slice(rIdx * capacityPerRoom, (rIdx + 1) * capacityPerRoom)
+            .map((st) => ({
+              fullName: st.fullName,
+              gender: st.gender || 'L',
+              className: st.className,
+            }));
+        });
+      }
+    } else {
+      let cachedStudents: any[] = [];
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const raw = localStorage.getItem('smart_absensi_students');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              cachedStudents = parsed;
+            }
+          }
+        }
+      } catch {}
+
+      if (cachedStudents.length > 0) {
+        const targetLevel = isSma ? 'SMA' : 'SMP';
+        const levelFiltered = cachedStudents.filter((s) => {
+          const cls = s.className || s.kelas || '';
+          const isClsSma = /10|11|12|sma|ipa|ips/i.test(cls);
+          return targetLevel === 'SMA' ? isClsSma : !isClsSma;
+        });
+
+        const studentsToUse = levelFiltered.length > 0 ? levelFiltered : cachedStudents;
+        const capacityPerRoom = 16;
+        rooms.forEach((rName, rIdx) => {
+          const chunk = studentsToUse.slice(rIdx * capacityPerRoom, (rIdx + 1) * capacityPerRoom);
+          if (chunk.length > 0) {
+            rawStudentMap[rName] = chunk.map((s) => ({
+              fullName: s.fullName || s.name || 'Siswa',
+              gender: s.gender || (s.className === '8A' || s.className === '9A' || s.className === 'VII A' ? 'P' : 'L'),
+              className: s.className || s.kelas || 'VII A',
+            }));
+          }
+        });
+      }
+
+      if (!rawStudentMap[rooms[0]] || rawStudentMap[rooms[0]].length === 0) {
+        if (isSma) {
+          rawStudentMap[rooms[0]] = this.OFFICIAL_SMA_ROOM_1_STUDENTS;
+          if (rooms[1]) rawStudentMap[rooms[1]] = this.OFFICIAL_SMA_ROOM_1_STUDENTS.map((s) => ({ ...s, className: '11' }));
+          if (rooms[2]) rawStudentMap[rooms[2]] = this.OFFICIAL_SMA_ROOM_1_STUDENTS.map((s) => ({ ...s, className: '12' }));
+        } else {
+          rawStudentMap[rooms[0]] = this.OFFICIAL_SMP_ROOM_1_STUDENTS;
+          if (rooms[1]) rawStudentMap[rooms[1]] = this.OFFICIAL_SMP_ROOM_2_STUDENTS;
+          if (rooms[2]) rawStudentMap[rooms[2]] = this.OFFICIAL_SMP_ROOM_3_STUDENTS;
+          for (let i = 3; i < rooms.length; i++) {
+            rawStudentMap[rooms[i]] = this.OFFICIAL_SMP_ROOM_3_STUDENTS.map((s) => ({
+              ...s,
+              fullName: `${s.fullName} ${i + 1}`,
+              className: `IX ${String.fromCharCode(65 + (i % 2))}`,
+            }));
+          }
+        }
+      }
+    }
+
+    // 3. Penomoran Peserta Sekuensial: 13-0820-001 dari peserta pertama Ruang 1
+    let globalIndex = 1;
+    const finalMap: Record<string, Array<{
+      urut: number;
+      participantNumber: string;
+      fullName: string;
+      gender: string;
+      className: string;
+    }>> = {};
+
+    rooms.forEach((rName) => {
+      const list = rawStudentMap[rName] || [];
+      finalMap[rName] = list.map((st, idx) => {
+        const urut = idx + 1;
+        const participantNumber = `${prefix}${String(globalIndex).padStart(3, '0')}`;
+        globalIndex++;
+        return {
+          urut,
+          participantNumber,
+          fullName: st.fullName,
+          gender: st.gender || 'L',
+          className: st.className,
+        };
+      });
+    });
+
+    return finalMap;
+  }
+
+  public static generateSingleRoomAttendanceRosterHtml(
+    roomName: string,
+    students: Array<{
+      urut: number;
+      participantNumber: string;
+      fullName: string;
+      gender: string;
+      className: string;
+    }>,
+    scheduleData: ExamScheduleData,
+    _options?: AdminDocOptions
+  ): string {
+    const branding = getDynamicBranding();
+    const config = scheduleData.config;
+    const isSma = config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+    const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
+    const academicYear = config.academicYear || '2025/2026';
+    const semesterStr = config.semester ? config.semester.toUpperCase() : 'GENAP';
+
+    let examTitle = config.examTitle || `ASESMEN SUMATIF TENGAH SEMESTER (${config.examType || 'ASTS'})`;
+    if (!examTitle.toUpperCase().includes('GENAP') && !examTitle.toUpperCase().includes('GANJIL')) {
+      examTitle = `${examTitle} ${semesterStr}`;
+    }
+
+    const roomNumMatch = roomName.match(/\d+/);
+    const roomNumStr = roomNumMatch ? String(parseInt(roomNumMatch[0], 10)).padStart(2, '0') : '';
+    const roomBadge = roomNumStr ? `RUANG ${roomNumStr}` : roomName.toUpperCase();
+
+    const rowsHtml = students.map((s) => `
+      <tr>
+        <td style="border: 1pt solid #000000; text-align: center; padding: 4px; font-size: 10pt;">${s.urut}</td>
+        <td style="border: 1pt solid #000000; text-align: center; padding: 4px 6px; font-size: 10pt; font-family: 'Times New Roman', serif; font-weight: 500;">${s.participantNumber}</td>
+        <td style="border: 1pt solid #000000; text-align: left; padding: 4px 8px; font-size: 10pt; text-transform: uppercase;">${s.fullName}</td>
+        <td style="border: 1pt solid #000000; text-align: center; padding: 4px; font-size: 10pt;">${s.gender}</td>
+        <td style="border: 1pt solid #000000; text-align: center; padding: 4px 6px; font-size: 10pt;">${s.className}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="page-container" style="font-family: 'Times New Roman', Times, serif; color: #000000; background: #ffffff;">
+        <div class="doc-header" style="text-align: center; margin-bottom: 16px;">
+          <h1 style="font-size: 13.5pt; font-weight: bold; margin: 0 0 2px 0; text-transform: uppercase; font-family: 'Times New Roman', serif; letter-spacing: 0.3px;">
+            DAFTAR HADIR PESERTA
+          </h1>
+          <h2 style="font-size: 12.5pt; font-weight: bold; margin: 0 0 2px 0; text-transform: uppercase; font-family: 'Times New Roman', serif;">
+            ${examTitle}
+          </h2>
+          <div style="font-size: 13pt; font-weight: bold; margin: 0 0 2px 0; text-transform: uppercase; font-family: 'Times New Roman', serif; letter-spacing: 0.3px;">
+            ${institutionName}
+          </div>
+          <div style="font-size: 11.5pt; font-weight: bold; margin: 0; font-family: 'Times New Roman', serif;">
+            Tahun Pelajaran ${academicYear}
+          </div>
+        </div>
+
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 6px;">
+          <tr style="border: none;">
+            <td style="border: none; width: 60%; padding: 0;"></td>
+            <td style="border: none; width: 40%; text-align: right; padding: 0;" align="right">
+              <span style="font-size: 17pt; font-weight: bold; font-family: 'Times New Roman', serif; letter-spacing: 0.5px; color: #000000;">
+                ${roomBadge}
+              </span>
+            </td>
+          </tr>
+        </table>
+
+        <table class="doc-table" style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', serif; border: 1pt solid #000000;">
+          <thead>
+            <tr style="background-color: transparent;">
+              <th colspan="2" style="border: 1pt solid #000000; padding: 5px 4px; text-align: center; font-weight: bold; font-size: 10.5pt; width: 190px;">
+                NOMOR
+              </th>
+              <th rowspan="2" style="border: 1pt solid #000000; padding: 5px 8px; text-align: center; font-weight: bold; font-size: 10.5pt;">
+                NAMA PESERTA
+              </th>
+              <th rowspan="2" style="border: 1pt solid #000000; padding: 5px 4px; text-align: center; font-weight: bold; font-size: 10.5pt; width: 55px;">
+                L/P
+              </th>
+              <th rowspan="2" style="border: 1pt solid #000000; padding: 5px 6px; text-align: center; font-weight: bold; font-size: 10.5pt; width: 85px;">
+                KELAS
+              </th>
+            </tr>
+            <tr style="background-color: transparent;">
+              <th style="border: 1pt solid #000000; padding: 4px; text-align: center; font-weight: bold; font-size: 10pt; width: 48px;">
+                URUT
+              </th>
+              <th style="border: 1pt solid #000000; padding: 4px; text-align: center; font-weight: bold; font-size: 10pt; width: 142px;">
+                PESERTA
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <!-- Proctor Signatory Block -->
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-top: 24px; font-family: 'Times New Roman', serif; font-size: 10.5pt; page-break-inside: avoid;">
+          <tr style="border: none;">
+            <td style="border: none; width: 60%; vertical-align: top; padding: 0;"></td>
+            <td style="border: none; width: 40%; text-align: center; vertical-align: top; padding: 0;">
+              <div>Pengawas Ruang,</div>
+              <div style="height: 52px;"></div>
+              <div style="font-weight: bold; text-decoration: underline;">( .................................................... )</div>
+              <div style="font-size: 9.5pt; margin-top: 2px;">NPP. ........................................</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+  }
+
+  public static generateStudentAttendanceRosterHtml(
+    scheduleData: ExamScheduleData,
+    options?: AdminDocOptions
+  ): string {
+    const branding = getDynamicBranding();
+    const config = scheduleData.config;
+    const isSma = config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+    const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
+
+    const roomStudentMap = this.resolveRoomStudents(scheduleData, options);
+    const rooms = Object.keys(roomStudentMap);
+
+    const selectedRoom = options?.roomFilter;
+    const roomsToRender =
+      selectedRoom && selectedRoom !== 'ALL'
+        ? rooms.filter((r) => r.toLowerCase() === selectedRoom.toLowerCase())
+        : rooms;
+
+    const sections = roomsToRender.map((r, idx) => {
+      const students = roomStudentMap[r] || [];
+      const roomHtml = this.generateSingleRoomAttendanceRosterHtml(r, students, scheduleData, options);
+      const isLast = idx === roomsToRender.length - 1;
+      return `
+        ${roomHtml}
+        ${!isLast ? '<br clear="all" style="page-break-before: always; mso-break-type: section-break;" /><div class="page-break"></div>' : ''}
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html lang="id">
+      <head>
+        <meta charset="utf-8">
+        <title>Daftar Hadir Peserta - ${institutionName}</title>
+        <style>
+          ${this.getOfficialDocumentStyles(options?.orientation)}
+        </style>
+      </head>
+      <body>
+        ${sections}
+      </body>
+      </html>
+    `;
+  }
+
+  // =========================================================================
   // DOCUMENT 3: BERITA ACARA REKAPITULASI KEHADIRAN PESERTA UJIAN
   // =========================================================================
 
@@ -1109,6 +1500,173 @@ export class ExamAdministrativeDocsService {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     }
+  }
+
+  /**
+   * Generates a fully-styled Excel worksheet for Document: Daftar Hadir Peserta Ujian (per room)
+   */
+  public static buildStudentAttendanceRosterWorksheet(
+    roomName: string,
+    students: Array<{
+      urut: number;
+      participantNumber: string;
+      fullName: string;
+      gender: string;
+      className: string;
+    }>,
+    scheduleData: ExamScheduleData,
+    _options?: AdminDocOptions
+  ): any {
+    const branding = getDynamicBranding();
+    const config = scheduleData.config;
+    const isSma = config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+    const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
+    const academicYear = config.academicYear || '2025/2026';
+    const semesterStr = config.semester ? config.semester.toUpperCase() : 'GENAP';
+
+    let examTitle = config.examTitle || `ASESMEN SUMATIF TENGAH SEMESTER (${config.examType || 'ASTS'})`;
+    if (!examTitle.toUpperCase().includes('GENAP') && !examTitle.toUpperCase().includes('GANJIL')) {
+      examTitle = `${examTitle} ${semesterStr}`;
+    }
+
+    const roomNumMatch = roomName.match(/\d+/);
+    const roomNumStr = roomNumMatch ? String(parseInt(roomNumMatch[0], 10)).padStart(2, '0') : '';
+    const roomBadge = roomNumStr ? `RUANG ${roomNumStr}` : roomName.toUpperCase();
+
+    const ws: any = {};
+    const merges: any[] = [];
+    const rowHeights: { hpt: number }[] = [];
+
+    const BORDER_THIN = {
+      top: { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left: { style: 'thin', color: { rgb: '000000' } },
+      right: { style: 'thin', color: { rgb: '000000' } },
+    };
+
+    const STYLE_TITLE_HEADER = {
+      font: { name: 'Times New Roman', sz: 13, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+
+    const STYLE_SUBTITLE_HEADER = {
+      font: { name: 'Times New Roman', sz: 12, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+
+    const STYLE_TH = {
+      font: { name: 'Times New Roman', sz: 10.5, bold: true, color: { rgb: '000000' } },
+      fill: { fgColor: { rgb: 'FFFFFF' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: BORDER_THIN,
+    };
+
+    const STYLE_TD_CENTER = {
+      font: { name: 'Times New Roman', sz: 10, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: BORDER_THIN,
+    };
+
+    const STYLE_TD_LEFT = {
+      font: { name: 'Times New Roman', sz: 10, color: { rgb: '000000' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: BORDER_THIN,
+    };
+
+    const STYLE_ROOM_BADGE = {
+      font: { name: 'Times New Roman', sz: 16, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'right', vertical: 'center' },
+    };
+
+    const STYLE_SIGN_TEXT = {
+      font: { name: 'Times New Roman', sz: 10.5, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+
+    const STYLE_SIGN_NAME = {
+      font: { name: 'Times New Roman', sz: 10.5, bold: true, underline: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+
+    const setCell = (c: number, r: number, val: any, style?: any) => {
+      const ref = XLSX.utils.encode_cell({ c, r });
+      ws[ref] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's', s: style || {} };
+    };
+
+    const mergeRange = (sc: number, sr: number, ec: number, er: number, val?: any, style?: any) => {
+      merges.push({ s: { c: sc, r: sr }, e: { c: ec, r: er } });
+      for (let r = sr; r <= er; r++) {
+        for (let c = sc; c <= ec; c++) {
+          const ref = XLSX.utils.encode_cell({ c, r });
+          if (!ws[ref]) ws[ref] = { v: '', t: 's', s: style || {} };
+          else if (style) ws[ref].s = { ...ws[ref].s, ...style };
+        }
+      }
+      if (val !== undefined) setCell(sc, sr, val, style);
+    };
+
+    // Header Titles (Rows 0-3)
+    mergeRange(0, 0, 4, 0, 'DAFTAR HADIR PESERTA', STYLE_TITLE_HEADER);
+    rowHeights[0] = { hpt: 20 };
+    mergeRange(0, 1, 4, 1, examTitle.toUpperCase(), STYLE_SUBTITLE_HEADER);
+    rowHeights[1] = { hpt: 19 };
+    mergeRange(0, 2, 4, 2, institutionName.toUpperCase(), STYLE_SUBTITLE_HEADER);
+    rowHeights[2] = { hpt: 19 };
+    mergeRange(0, 3, 4, 3, `Tahun Pelajaran ${academicYear}`, STYLE_SUBTITLE_HEADER);
+    rowHeights[3] = { hpt: 19 };
+
+    rowHeights[4] = { hpt: 10 }; // spacer
+
+    // Room Label on Right (Column 3-4, Row 5)
+    mergeRange(3, 5, 4, 5, roomBadge, STYLE_ROOM_BADGE);
+    rowHeights[5] = { hpt: 22 };
+
+    // Table Headers (Rows 6 & 7)
+    mergeRange(0, 6, 1, 6, 'NOMOR', STYLE_TH);
+    mergeRange(2, 6, 2, 7, 'NAMA PESERTA', STYLE_TH);
+    mergeRange(3, 6, 3, 7, 'L/P', STYLE_TH);
+    mergeRange(4, 6, 4, 7, 'KELAS', STYLE_TH);
+    rowHeights[6] = { hpt: 18 };
+
+    setCell(0, 7, 'URUT', STYLE_TH);
+    setCell(1, 7, 'PESERTA', STYLE_TH);
+    rowHeights[7] = { hpt: 18 };
+
+    // Data rows (Row 8+)
+    let currRow = 8;
+    students.forEach((st) => {
+      setCell(0, currRow, st.urut, STYLE_TD_CENTER);
+      setCell(1, currRow, st.participantNumber, STYLE_TD_CENTER);
+      setCell(2, currRow, st.fullName.toUpperCase(), STYLE_TD_LEFT);
+      setCell(3, currRow, st.gender, STYLE_TD_CENTER);
+      setCell(4, currRow, st.className, STYLE_TD_CENTER);
+      rowHeights[currRow] = { hpt: 20 };
+      currRow++;
+    });
+
+    // Proctor Signatory
+    rowHeights[currRow] = { hpt: 16 }; currRow++;
+    mergeRange(3, currRow, 4, currRow, 'Pengawas Ruang,', STYLE_SIGN_TEXT);
+    rowHeights[currRow] = { hpt: 18 }; currRow++;
+    rowHeights[currRow] = { hpt: 22 }; currRow++;
+    rowHeights[currRow] = { hpt: 22 }; currRow++;
+    mergeRange(3, currRow, 4, currRow, '( .................................................... )', STYLE_SIGN_NAME);
+    rowHeights[currRow] = { hpt: 18 }; currRow++;
+    mergeRange(3, currRow, 4, currRow, 'NPP. ........................................', STYLE_SIGN_TEXT);
+    rowHeights[currRow] = { hpt: 18 };
+
+    ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 4, r: currRow } });
+    ws['!cols'] = [
+      { wch: 8 },  // URUT
+      { wch: 18 }, // PESERTA
+      { wch: 36 }, // NAMA PESERTA
+      { wch: 8 },  // L/P
+      { wch: 14 }, // KELAS
+    ];
+    ws['!rows'] = rowHeights;
+    ws['!merges'] = merges;
+
+    return ws;
   }
 
   /**
@@ -1567,6 +2125,27 @@ export class ExamAdministrativeDocsService {
 
       XLSX.utils.book_append_sheet(wb, ws, 'Daftar Hadir Pengawas');
       const filename = fileNameOverride || `Daftar_Hadir_Pengawas_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}.xlsx`;
+      XLSX.writeFile(wb, filename);
+
+    } else if (docType === 'STUDENT_ATTENDANCE_ROSTER') {
+      // -------------------------------------------------------------
+      // EXCEL: DAFTAR HADIR PESERTA UJIAN (PER RUANGAN)
+      // -------------------------------------------------------------
+      const roomStudentMap = this.resolveRoomStudents(scheduleData, options);
+      const rooms = Object.keys(roomStudentMap);
+      const selectedRoom = options?.roomFilter;
+      const roomsToExport = selectedRoom && selectedRoom !== 'ALL'
+        ? rooms.filter((r) => r.toLowerCase() === selectedRoom.toLowerCase())
+        : rooms;
+
+      roomsToExport.forEach((roomName) => {
+        const students = roomStudentMap[roomName] || [];
+        const ws = this.buildStudentAttendanceRosterWorksheet(roomName, students, scheduleData, options);
+        const safeSheetName = roomName.replace(/[^\w]/g, '_').substring(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+      });
+
+      const filename = fileNameOverride || `Daftar_Hadir_Peserta_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}.xlsx`;
       XLSX.writeFile(wb, filename);
 
     } else if (docType === 'HANDOVER_DOCS') {

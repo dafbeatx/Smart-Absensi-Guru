@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   DoorOpen,
   Sparkles,
+  GraduationCap,
 } from 'lucide-react';
 import type {
   ExamScheduleData,
@@ -105,6 +106,11 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
           scheduleData,
           docOptions
         );
+      case 'STUDENT_ATTENDANCE_ROSTER':
+        return ExamAdministrativeDocsService.generateStudentAttendanceRosterHtml(
+          scheduleData,
+          docOptions
+        );
       case 'HANDOVER_DOCS':
         return ExamAdministrativeDocsService.generateHandoverDocsHtml(
           scheduleData,
@@ -135,6 +141,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   const handlePrintA4 = () => {
     const titles: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar Hadir Pengawas',
+      STUDENT_ATTENDANCE_ROSTER: 'Daftar Hadir Peserta Ujian',
       HANDOVER_DOCS: 'Daftar Serah Terima Naskah Soal & LJK',
       STUDENT_ATTENDANCE_SUMMARY: 'Rekapitulasi Kehadiran Peserta Ujian',
       COMMITTEE_ATTENDANCE: 'Daftar Hadir Panitia Ujian',
@@ -145,6 +152,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   const handleDownloadA4 = async () => {
     const filePrefix: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar_Hadir_Pengawas',
+      STUDENT_ATTENDANCE_ROSTER: selectedRoom === 'ALL' ? 'Daftar_Hadir_Peserta_Semua_Ruang' : `Daftar_Hadir_Peserta_${selectedRoom.replace(/\s+/g, '_')}`,
       HANDOVER_DOCS: selectedRoom === 'ALL' ? 'Serah_Terima_Naskah_LJK_Semua_Ruang' : `Serah_Terima_${selectedRoom.replace(/\s+/g, '_')}`,
       STUDENT_ATTENDANCE_SUMMARY: 'Rekapitulasi_Kehadiran_Peserta_Ujian',
       COMMITTEE_ATTENDANCE: 'Daftar_Hadir_Panitia',
@@ -161,6 +169,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   const handleExportWord = () => {
     const filePrefix: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar_Hadir_Pengawas',
+      STUDENT_ATTENDANCE_ROSTER: selectedRoom === 'ALL' ? 'Daftar_Hadir_Peserta_Semua_Ruang' : `Daftar_Hadir_Peserta_${selectedRoom.replace(/\s+/g, '_')}`,
       HANDOVER_DOCS: selectedRoom === 'ALL' ? 'Serah_Terima_Naskah_LJK_Semua_Ruang' : `Serah_Terima_${selectedRoom.replace(/\s+/g, '_')}`,
       STUDENT_ATTENDANCE_SUMMARY: 'Rekapitulasi_Kehadiran_Peserta_Ujian',
       COMMITTEE_ATTENDANCE: 'Daftar_Hadir_Panitia',
@@ -280,6 +289,19 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
             <button
               type="button"
+              onClick={() => setActiveDocType('STUDENT_ATTENDANCE_ROSTER')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                activeDocType === 'STUDENT_ATTENDANCE_ROSTER'
+                  ? 'bg-white text-teal-700 shadow-xs border border-slate-200/80 ring-1 ring-teal-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5 text-teal-600" />
+              <span>2. Daftar Hadir Peserta</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveDocType('HANDOVER_DOCS')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 activeDocType === 'HANDOVER_DOCS'
@@ -288,7 +310,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               }`}
             >
               <ClipboardCheck className="w-3.5 h-3.5 text-teal-600" />
-              <span>2. Serah Terima Soal & LJK</span>
+              <span>3. Serah Terima Soal & LJK</span>
             </button>
 
             <button
@@ -301,7 +323,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5 text-teal-600" />
-              <span>3. Rekap Kehadiran Siswa</span>
+              <span>4. Rekap Kehadiran Siswa</span>
             </button>
 
             <button
@@ -314,7 +336,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-              <span>4. Daftar Hadir Panitia</span>
+              <span>5. Daftar Hadir Panitia</span>
             </button>
           </div>
 
@@ -347,8 +369,8 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               </label>
             </div>
 
-            {/* ROOM SELECTOR FILTER (KHUSUS DOKUMEN SERAH TERIMA SOAL & LJK) */}
-            {activeDocType === 'HANDOVER_DOCS' && (
+            {/* ROOM SELECTOR FILTER (DOKUMEN SERAH TERIMA & DAFTAR HADIR PESERTA) */}
+            {(activeDocType === 'HANDOVER_DOCS' || activeDocType === 'STUDENT_ATTENDANCE_ROSTER') && (
               <>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
@@ -369,15 +391,26 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                   </select>
                 </div>
 
-                <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none bg-white px-2 py-1 rounded-xl border border-slate-300 shadow-2xs">
-                  <input
-                    type="checkbox"
-                    checked={includeNumberPrefix}
-                    onChange={(e) => setIncludeNumberPrefix(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
-                  />
-                  <span>No. Urut (1, 2)</span>
-                </label>
+                {activeDocType === 'HANDOVER_DOCS' && (
+                  <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none bg-white px-2 py-1 rounded-xl border border-slate-300 shadow-2xs">
+                    <input
+                      type="checkbox"
+                      checked={includeNumberPrefix}
+                      onChange={(e) => setIncludeNumberPrefix(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
+                    />
+                    <span>No. Urut (1, 2)</span>
+                  </label>
+                )}
+
+                {activeDocType === 'STUDENT_ATTENDANCE_ROSTER' && (
+                  <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 shadow-2xs">
+                    <span className="text-[11px] font-bold text-emerald-800">No. Peserta:</span>
+                    <span className="text-xs font-mono font-black text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-300">
+                      13-0820-001 dst.
+                    </span>
+                  </div>
+                )}
               </>
             )}
           </div>

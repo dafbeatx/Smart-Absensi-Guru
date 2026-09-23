@@ -326,6 +326,45 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   );
 
   // -------------------------------------------------------------
+  // TEST 5b: Document - Daftar Hadir Peserta Ujian (Roster Siswa per Ruangan)
+  // Sesuai layout fisik ASTS SMP Terpadu Al-Ittihadiyah / SMA Terpadu As Salaam
+  // -------------------------------------------------------------
+  const docRosterHtml = ExamAdministrativeDocsService.generateStudentAttendanceRosterHtml(
+    sampleScheduleData,
+    { roomFilter: 'Ruang 01' }
+  );
+
+  assert(
+    '10b. generateStudentAttendanceRosterHtml matches physical sheet layout and headers',
+    docRosterHtml.includes('DAFTAR HADIR PESERTA') &&
+      docRosterHtml.includes('RUANG 01') &&
+      docRosterHtml.includes('NOMOR') &&
+      docRosterHtml.includes('URUT') &&
+      docRosterHtml.includes('PESERTA') &&
+      docRosterHtml.includes('NAMA PESERTA') &&
+      docRosterHtml.includes('L/P') &&
+      docRosterHtml.includes('KELAS'),
+    'Roster HTML missing title, room badge, or column headers'
+  );
+
+  const roomStudentsMap = ExamAdministrativeDocsService.resolveRoomStudents(sampleScheduleData);
+  const r1Students = roomStudentsMap['Ruang 01'] || [];
+  const r2Students = roomStudentsMap['Ruang 02'] || [];
+
+  assert(
+    '10c. resolveRoomStudents starts participant numbers from 13-0820-001 sequentially across rooms',
+    r1Students.length > 0 &&
+      r1Students[0].participantNumber === '13-0820-001' &&
+      r1Students[0].fullName === 'AMANDA HASNA MIRZA' &&
+      r1Students[1].participantNumber === '13-0820-002' &&
+      r1Students[1].fullName === 'BILQIS AINUN NISSA' &&
+      r1Students[r1Students.length - 1].participantNumber === '13-0820-016' &&
+      r2Students.length > 0 &&
+      r2Students[0].participantNumber === '13-0820-017',
+    `Participant numbers incorrect: R1[0]=${r1Students[0]?.participantNumber}, R2[0]=${r2Students[0]?.participantNumber}`
+  );
+
+  // -------------------------------------------------------------
   // TEST 6: Document 4 - Daftar Hadir Panitia Ujian
   // -------------------------------------------------------------
   const doc4Html = ExamAdministrativeDocsService.generateCommitteeAttendanceHtml(
@@ -406,6 +445,39 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
     'Handover worksheet missing exact colors, badge, or row-by-row structure'
   );
 
+  let excelRosterWorked = true;
+  try {
+    ExamAdministrativeDocsService.exportToExcel('STUDENT_ATTENDANCE_ROSTER', {
+      scheduleData: sampleScheduleData,
+      committeeMembers: sampleCommittees,
+    }, 'test_student_roster.xlsx');
+  } catch {
+    excelRosterWorked = false;
+  }
+
+  assert(
+    '14c. exportToExcel executes successfully for STUDENT_ATTENDANCE_ROSTER',
+    excelRosterWorked,
+    'exportToExcel STUDENT_ATTENDANCE_ROSTER threw an error'
+  );
+
+  const studentWs = ExamAdministrativeDocsService.buildStudentAttendanceRosterWorksheet(
+    'Ruang 01',
+    r1Students,
+    sampleScheduleData
+  );
+
+  assert(
+    '14d. buildStudentAttendanceRosterWorksheet contains titles, Ruang 01 badge, and 13-0820-001 participant',
+    studentWs['A1']?.v === 'DAFTAR HADIR PESERTA' &&
+      studentWs['D6']?.v === 'RUANG 01' &&
+      studentWs['A7']?.v === 'NOMOR' &&
+      studentWs['C7']?.v === 'NAMA PESERTA' &&
+      studentWs['B9']?.v === '13-0820-001' &&
+      studentWs['C9']?.v === 'AMANDA HASNA MIRZA',
+    'Student attendance worksheet missing header, badge, or participant row'
+  );
+
   let excelRecapWorked = true;
   try {
     ExamAdministrativeDocsService.exportToExcel('STUDENT_ATTENDANCE_SUMMARY', {
@@ -478,7 +550,7 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   // Clean up any test files written by XLSX.writeFile during node execution if created
   try {
     const fs = await import('fs');
-    ['test_proctor_attendance.xlsx', 'test_handover_docs.xlsx', 'test_recap_docs.xlsx', 'test_committee_docs.xlsx'].forEach((f) => {
+    ['test_proctor_attendance.xlsx', 'test_student_roster.xlsx', 'test_handover_docs.xlsx', 'test_recap_docs.xlsx', 'test_committee_docs.xlsx'].forEach((f) => {
       if (fs.existsSync(f)) {
         fs.unlinkSync(f);
       }
