@@ -420,6 +420,43 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
     'exportToExcel COMMITTEE_ATTENDANCE threw an error'
   );
 
+  // -------------------------------------------------------------
+  // TEST 8: Word Export fidelity and structure
+  // -------------------------------------------------------------
+  const wordDoc2Html = ExamAdministrativeDocsService.generateWordHtmlString(
+    doc2LandscapeHtml,
+    'landscape'
+  );
+
+  assert(
+    '17. generateWordHtmlString does not nest duplicate html or body tags inside Section1',
+    !wordDoc2Html.includes('<div class="Section1">\n          <!DOCTYPE html>') &&
+      !wordDoc2Html.includes('<div class="Section1">\n          <html') &&
+      wordDoc2Html.includes('mso-page-orientation: landscape'),
+    'generateWordHtmlString has invalid nested document root'
+  );
+
+  assert(
+    '18. generateWordHtmlString preserves table-banner-th and badge-table layout for Word',
+    wordDoc2Html.includes('table-banner-th') &&
+      wordDoc2Html.includes('badge-box-table') &&
+      wordDoc2Html.includes('footer-sign-table'),
+    'Word document missing table headers, badge layout table, or signatory table'
+  );
+
+  let wordExportWorked = true;
+  try {
+    ExamAdministrativeDocsService.exportToWord(doc2SingleHtml, 'test_export.doc', 'portrait');
+  } catch {
+    wordExportWorked = false;
+  }
+
+  assert(
+    '19. exportToWord executes safely in node environment without exceptions',
+    wordExportWorked,
+    'exportToWord threw unexpected exception'
+  );
+
   // Clean up any test files written by XLSX.writeFile during node execution if created
   try {
     const fs = await import('fs');

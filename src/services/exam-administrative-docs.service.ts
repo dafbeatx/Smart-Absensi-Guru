@@ -135,6 +135,32 @@ export class ExamAdministrativeDocsService {
   }
 
   /**
+   * Generates a 2-column borderless layout table for the signatory footer,
+   * fully compatible with both browser print/PDF and Microsoft Word rendering.
+   */
+  public static renderSignatoryTableHtml(
+    city: string,
+    signDate: string,
+    committeeHead: string
+  ): string {
+    return `
+      <table class="footer-sign-table footer-signatory" style="width: 100%; border: none; border-collapse: collapse; margin-top: 20px; page-break-inside: avoid;">
+        <tr style="border: none;">
+          <td style="border: none; width: 62%;"></td>
+          <td style="border: none; width: 38%; text-align: left; font-size: 10.5pt; vertical-align: top;">
+            <div class="footer-sign-box">
+              <div>${city},   ${signDate}</div>
+              <div>Ketua Penyelenggara,</div>
+              <div class="footer-sign-space" style="height: 55px;"></div>
+              <div class="footer-sign-name" style="font-weight: bold; text-decoration: underline;">${committeeHead}</div>
+            </div>
+          </td>
+        </tr>
+      </table>
+    `;
+  }
+
+  /**
    * Common CSS for official A4 school documents
    */
   public static getOfficialDocumentStyles(orientation: 'portrait' | 'landscape' = 'portrait'): string {
@@ -202,15 +228,29 @@ export class ExamAdministrativeDocsService {
         justify-content: flex-end;
         margin-bottom: 8px;
       }
-      .badge-room {
-        border: 2px solid #5b9bd5;
-        background-color: #d9e1f2;
-        color: #c00000;
-        font-weight: bold;
-        font-size: 14pt;
-        padding: 4px 20px;
+      .badge-table {
+        width: 100%;
+        border: none !important;
+        border-collapse: collapse;
+        margin-bottom: 8px;
+      }
+      .badge-table td, .badge-table tr {
+        border: none !important;
+        padding: 0;
+      }
+      .badge-box-table {
+        border: 2px solid #5b9bd5 !important;
+        background-color: #d9e1f2 !important;
+        border-collapse: collapse;
+      }
+      .badge-box-table td, .badge-room {
+        border: none !important;
+        color: #c00000 !important;
+        font-weight: bold !important;
+        font-size: 13.5pt !important;
         letter-spacing: 1px;
         text-align: center;
+        padding: 4px 18px;
       }
       .table-banner {
         background-color: #1f4e78;
@@ -223,6 +263,16 @@ export class ExamAdministrativeDocsService {
         margin-top: 10px;
         border: 1pt solid #000000;
         border-bottom: none;
+      }
+      .table-banner-th {
+        background-color: #1f4e78 !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        text-align: center !important;
+        padding: 6px 4px !important;
+        font-size: 10.5pt !important;
+        letter-spacing: 0.5px;
+        border: 1pt solid #000000 !important;
       }
       table.doc-table {
         width: 100%;
@@ -253,20 +303,28 @@ export class ExamAdministrativeDocsService {
         height: 38px;
         min-height: 38px;
       }
+      .footer-sign-table {
+        width: 100%;
+        border: none !important;
+        border-collapse: collapse;
+        margin-top: 20px;
+        page-break-inside: avoid;
+      }
+      .footer-sign-table tr, .footer-sign-table td {
+        border: none !important;
+        background: transparent !important;
+      }
       .footer-signatory {
         width: 100%;
-        margin-top: 24px;
-        display: flex;
-        justify-content: flex-end;
+        margin-top: 20px;
         page-break-inside: avoid;
       }
       .footer-sign-box {
-        width: 250px;
         text-align: left;
         font-size: 10.5pt;
       }
       .footer-sign-space {
-        height: 60px;
+        height: 55px;
       }
       .footer-sign-name {
         font-weight: bold;
@@ -390,14 +448,7 @@ export class ExamAdministrativeDocsService {
             </tbody>
           </table>
 
-          <div class="footer-signatory">
-            <div class="footer-sign-box">
-              <div>${city},   ${signDate}</div>
-              <div>Ketua Penyelenggara,</div>
-              <div class="footer-sign-space"></div>
-              <div class="footer-sign-name">${committeeHead}</div>
-            </div>
-          </div>
+          ${this.renderSignatoryTableHtml(city, signDate, committeeHead)}
         </div>
       </body>
       </html>
@@ -516,13 +567,26 @@ export class ExamAdministrativeDocsService {
           <div class="doc-academic-year">TAHUN PELAJARAN ${academicYear}</div>
         </div>
 
-        <div class="badge-room-container">
-          <div class="badge-room">${badgeText}</div>
-        </div>
+        <table class="badge-table" style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px;">
+          <tr style="border: none;">
+            <td style="border: none; padding: 0; width: 65%;"></td>
+            <td style="border: none; padding: 0; width: 35%; text-align: right;" align="right">
+              <table align="right" class="badge-box-table" style="width: auto; border: 2px solid #5b9bd5; border-collapse: collapse; background-color: #d9e1f2; margin-left: auto;">
+                <tr style="border: none;">
+                  <td class="badge-room" style="border: none; padding: 4px 18px; color: #c00000; font-weight: bold; font-size: 13.5pt; letter-spacing: 1px; text-align: center; white-space: nowrap;">
+                    ${badgeText}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
 
-        <div class="table-banner">Daftar Pengambilan Naskah Soal ${config.examType || 'ASTS'}</div>
         <table class="doc-table">
           <thead>
+            <tr>
+              <th colspan="6" class="table-banner-th" style="background-color: #1f4e78; color: #ffffff; font-weight: bold; text-align: center; padding: 6px 4px; font-size: 10.5pt; letter-spacing: 0.5px; border: 1pt solid #000000;">Daftar Pengambilan Naskah Soal ${config.examType || 'ASTS'}</th>
+            </tr>
             <tr>
               <th style="width: 32px;">No.</th>
               <th style="width: 170px;">Hari,Tanggal</th>
@@ -537,9 +601,11 @@ export class ExamAdministrativeDocsService {
           </tbody>
         </table>
 
-        <div class="table-banner">Daftar Penyerahan Lembar Jawaban ${config.examType || 'ASTS'}</div>
-        <table class="doc-table">
+        <table class="doc-table" style="margin-top: 14px;">
           <thead>
+            <tr>
+              <th colspan="6" class="table-banner-th" style="background-color: #1f4e78; color: #ffffff; font-weight: bold; text-align: center; padding: 6px 4px; font-size: 10.5pt; letter-spacing: 0.5px; border: 1pt solid #000000;">Daftar Penyerahan Lembar Jawaban ${config.examType || 'ASTS'}</th>
+            </tr>
             <tr>
               <th style="width: 32px;">No.</th>
               <th style="width: 170px;">Hari,Tanggal</th>
@@ -554,14 +620,7 @@ export class ExamAdministrativeDocsService {
           </tbody>
         </table>
 
-        <div class="footer-signatory">
-          <div class="footer-sign-box">
-            <div>${city},   ${signDate}</div>
-            <div>Ketua Penyelenggara,</div>
-            <div class="footer-sign-space"></div>
-            <div class="footer-sign-name">${committeeHead}</div>
-          </div>
-        </div>
+        ${this.renderSignatoryTableHtml(city, signDate, committeeHead)}
       </div>
     `;
   }
@@ -599,7 +658,7 @@ export class ExamAdministrativeDocsService {
       const isLast = idx === roomsToRender.length - 1;
       return `
         ${roomHtml}
-        ${!isLast ? '<div class="page-break"></div>' : ''}
+        ${!isLast ? '<br clear="all" style="page-break-before: always; mso-break-type: section-break;" /><div class="page-break"></div>' : ''}
       `;
     }).join('');
 
@@ -723,14 +782,7 @@ export class ExamAdministrativeDocsService {
             </tbody>
           </table>
 
-          <div class="footer-signatory">
-            <div class="footer-sign-box">
-              <div>${city},   ${signDate}</div>
-              <div>Ketua Penyelenggara,</div>
-              <div class="footer-sign-space"></div>
-              <div class="footer-sign-name">${committeeHead}</div>
-            </div>
-          </div>
+          ${this.renderSignatoryTableHtml(city, signDate, committeeHead)}
         </div>
       </body>
       </html>
@@ -870,14 +922,7 @@ export class ExamAdministrativeDocsService {
             </tbody>
           </table>
 
-          <div class="footer-signatory">
-            <div class="footer-sign-box">
-              <div>${city},   ${signDate}</div>
-              <div>Ketua Penyelenggara,</div>
-              <div class="footer-sign-space"></div>
-              <div class="footer-sign-name">${committeeHead}</div>
-            </div>
-          </div>
+          ${this.renderSignatoryTableHtml(city, signDate, committeeHead)}
         </div>
       </body>
       </html>
@@ -911,15 +956,23 @@ export class ExamAdministrativeDocsService {
   }
 
   /**
-   * Generates editable Microsoft Word (.doc) file and triggers download
+   * Generates a fully formatted Microsoft Word XML/HTML document string
+   * with extracted body content, A4 page layout, and complete CSS styles.
    */
-  public static exportToWord(
+  public static generateWordHtmlString(
     htmlContent: string,
-    fileName: string,
     orientation: 'portrait' | 'landscape' = 'portrait'
-  ): void {
+  ): string {
     const isLandscape = orientation === 'landscape';
-    const wordXmlHtml = `
+
+    // Extract inner body content if htmlContent is already a complete HTML document
+    let bodyContent = htmlContent;
+    const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    if (bodyMatch && bodyMatch[1]) {
+      bodyContent = bodyMatch[1];
+    }
+
+    return `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta charset="utf-8">
@@ -942,24 +995,27 @@ export class ExamAdministrativeDocsService {
             mso-page-orientation: ${orientation};
           }
           div.Section1 { page: Section1; }
-          body {
-            font-family: 'Times New Roman', Times, serif;
-            font-size: ${isLandscape ? '10.5pt' : '11pt'};
-            color: #000000;
-          }
-          table { border-collapse: collapse; width: 100%; }
-          table, th, td { border: 1pt solid #000000; }
-          th { background-color: #8eaadb; font-weight: bold; text-align: center; }
-          td { padding: 4px 6px; }
+          ${this.getOfficialDocumentStyles(orientation)}
         </style>
       </head>
       <body>
         <div class="Section1">
-          ${htmlContent}
+          ${bodyContent}
         </div>
       </body>
       </html>
     `;
+  }
+
+  /**
+   * Generates editable Microsoft Word (.doc) file and triggers download
+   */
+  public static exportToWord(
+    htmlContent: string,
+    fileName: string,
+    orientation: 'portrait' | 'landscape' = 'portrait'
+  ): void {
+    const wordXmlHtml = this.generateWordHtmlString(htmlContent, orientation);
 
     const blob = new Blob(['\ufeff', wordXmlHtml], {
       type: 'application/msword;charset=utf-8',
