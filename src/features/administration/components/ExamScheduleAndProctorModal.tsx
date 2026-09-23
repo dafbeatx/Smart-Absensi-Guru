@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X,
@@ -34,7 +34,9 @@ import {
   ClipboardCheck,
   ArrowLeftRight,
   Edit3,
+  ChevronDown,
 } from 'lucide-react';
+import { formatTimeForInput } from '../../../utils/time.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import type { UserProfile } from '../../../types/database.types';
@@ -65,7 +67,6 @@ import {
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
-import { OFFICIAL_SCHOOL_SUBJECTS } from '../../../config/school-subjects.config';
 import { normalizeClassCode, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
 import { NotificationService } from '../../../services/notification-permission.service';
@@ -109,31 +110,50 @@ interface ExamScheduleAndProctorModalProps {
 
 export type ProctorViewMode = 'CARDS' | 'MATRIX' | 'TABLE';
 
-const DEFAULT_SUBJECTS = [
+const CANONICAL_SCHOOL_SUBJECTS = [
   'PAI',
-  'IPA',
-  'MTK',
-  'Matematika',
-  'PP',
-  'PKn',
-  'Bahasa Indonesia',
+  'Pendidikan Pancasila',
   'B. Indonesia',
-  'IPS',
-  'Bahasa Arab',
-  'B. Arab',
-  'Bahasa Inggris',
   'B. Inggris',
-  'SBPK',
+  'Matematika',
+  'IPA',
+  'IPS',
   'Informatika',
+  'Biologi',
+  'Ekonomi',
+  'Akuntansi',
+  'B. Arab',
   'Hadits',
   'BTQ',
   'PJOK',
   'Seni Budaya',
-  'Ekonomi',
-  'Akuntansi',
-  'Biologi',
-  'Pendidikan Pancasila',
 ];
+
+function normalizeSubjectToCanonical(name: string): string {
+  const clean = (name || '').trim();
+  const lower = clean.toLowerCase();
+  if (lower === 'mtk' || lower === 'matematika' || lower === 'math') return 'Matematika';
+  if (lower === 'pp' || lower === 'pkn' || lower === 'ppkn' || lower === 'pendidikan pancasila' || lower.includes('pancasila')) return 'Pendidikan Pancasila';
+  if (lower === 'b. indonesia' || lower === 'bahasa indonesia' || lower === 'bind' || lower === 'b. indo' || lower === 'b indo') return 'B. Indonesia';
+  if (lower === 'b. inggris' || lower === 'bahasa inggris' || lower === 'bing' || lower === 'b. ing' || lower === 'b ing') return 'B. Inggris';
+  if (lower === 'b. arab' || lower === 'bahasa arab' || lower === 'barab') return 'B. Arab';
+  if (lower === 'pai' || lower.includes('agama islam')) return 'PAI';
+  if (lower === 'ipa' || lower === 'sains') return 'IPA';
+  if (lower === 'ips' || lower === 'sosial') return 'IPS';
+  if (lower === 'sbpk' || lower === 'seni budaya') return 'Seni Budaya';
+  if (lower === 'tik' || lower === 'informatika') return 'Informatika';
+  if (lower === 'btq' || lower.includes('baca tulis quran')) return 'BTQ';
+  if (lower === 'hadits' || lower === 'hadis') return 'Hadits';
+  if (lower === 'biologi') return 'Biologi';
+  if (lower === 'ekonomi') return 'Ekonomi';
+  if (lower === 'akuntansi' || lower === 'akutansi') return 'Akuntansi';
+  if (lower === 'pjok' || lower.includes('olahraga')) return 'PJOK';
+  if (lower === 'fisika') return 'Fisika';
+  if (lower === 'kimia') return 'Kimia';
+  return clean;
+}
+
+const DEFAULT_SUBJECTS = CANONICAL_SCHOOL_SUBJECTS;
 
 const DEFAULT_CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
 
@@ -213,6 +233,22 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [swapInitialSlotId, setSwapInitialSlotId] = useState<string | undefined>(undefined);
   const [isSubjectSwapModalOpen, setIsSubjectSwapModalOpen] = useState<boolean>(false);
   const [subjectSwapInitialSlot, setSubjectSwapInitialSlot] = useState<{ date: string; sessionNumber: number } | undefined>(undefined);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState<boolean>(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+    if (isExportMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isExportMenuOpen]);
 
   // ── FORM QUESTIONNAIRE STATE (Parameters filled by Committee) ──────────────
   const [formAcademicYear, setFormAcademicYear] = useState<string>(() => AdministrationRepository.getActiveAcademicYear());
@@ -451,24 +487,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // Load subjects from cache & official school subjects (Zero Egress)
+  // Load subjects from cache & official school subjects (Zero Egress, Clean Canonical Normalization)
   const loadSubjectsForYear = useCallback((year: string) => {
     try {
-      const subjectsSet = new Set<string>(DEFAULT_SUBJECTS);
-
-      // 1. Incorporate all 12 official school subjects and their standard aliases
-      OFFICIAL_SCHOOL_SUBJECTS.forEach((os) => {
-        if (os.name) subjectsSet.add(os.name);
-        if (os.code) subjectsSet.add(os.code);
-        if (Array.isArray(os.aliases)) {
-          os.aliases.forEach((a) => {
-            if (a && a.length > 1) subjectsSet.add(a);
-          });
-        }
-      });
+      const subjectsSet = new Set<string>(CANONICAL_SCHOOL_SUBJECTS);
 
       if (typeof window !== 'undefined' && window.localStorage) {
-        // 2. Read admin curriculum subjects (smart_absensi_subjects)
+        // 1. Read admin curriculum subjects (smart_absensi_subjects)
         const curriculumRaw = localStorage.getItem('smart_absensi_subjects');
         if (curriculumRaw) {
           try {
@@ -476,15 +501,15 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
             if (Array.isArray(parsedCurriculum)) {
               parsedCurriculum.forEach((sub: any) => {
                 const name = (sub.name || '').trim();
-                if (name && name.length > 1) subjectsSet.add(name);
-                const code = (sub.code || '').trim();
-                if (code && code.length > 1) subjectsSet.add(code);
+                if (name && name.length > 1) {
+                  subjectsSet.add(normalizeSubjectToCanonical(name));
+                }
               });
             }
           } catch {}
         }
 
-        // 3. Read teaching schedules (smart_absensi_teaching_schedules)
+        // 2. Read teaching schedules (smart_absensi_teaching_schedules)
         const cached = localStorage.getItem('smart_absensi_teaching_schedules');
         if (cached) {
           try {
@@ -494,7 +519,7 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
                 if (!slot.academic_year || slot.academic_year === year) {
                   const s = (slot.subject || slot.subject_name || '').trim();
                   if (s && s.length > 1) {
-                    subjectsSet.add(s);
+                    subjectsSet.add(normalizeSubjectToCanonical(s));
                   }
                 }
               });
@@ -506,14 +531,18 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       const combined = Array.from(subjectsSet);
       setAvailableSubjects(combined);
       setSelectedSubjects((prev) => {
-        const base = prev.length > 0 ? prev : DEFAULT_SUBJECTS;
-        const merged = new Set([...base]);
-        return Array.from(merged).filter((s) => combined.includes(s));
+        const base = prev.length > 0
+          ? prev
+          : (selectedLevel === 'SMA'
+              ? ['PAI', 'Biologi', 'Matematika', 'Pendidikan Pancasila', 'B. Indonesia', 'Akuntansi', 'B. Arab', 'B. Inggris', 'Ekonomi', 'Informatika', 'Hadits', 'BTQ']
+              : CANONICAL_SCHOOL_SUBJECTS.slice(0, 12));
+        const normalized = base.map(normalizeSubjectToCanonical);
+        return Array.from(new Set(normalized)).filter((s) => combined.includes(s));
       });
     } catch (err) {
       logger.warn('ExamScheduleAndProctorModal', 'Failed to extract subjects from cache:', err);
     }
-  }, []);
+  }, [selectedLevel]);
 
   // Load distinct classes strictly filtered by Academic Year and Education Level (Zero Unnecessary Egress)
   const loadClassesForYear = useCallback(async (year: string, forceRefresh: boolean = false, levelToUse?: EducationLevel) => {
@@ -568,6 +597,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       }
     }
     setScheduleData(saved);
+    if (saved) {
+      setActiveTab((prev) => (prev === 'form' || prev === 'ai_prompt' ? 'subjects' : prev));
+    }
     if (saved?.config?.selectedSubjects && saved.config.selectedSubjects.length > 0) {
       setSelectedSubjects(saved.config.selectedSubjects);
     }
@@ -1283,28 +1315,148 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
         <div className="flex items-center gap-2 shrink-0 ml-2">
           {scheduleData && (
             <>
-              {accessInfo.canManage && (
+              {/* Dropdown Menu Ekspor & Cetak Terpadu */}
+              <div className="relative" ref={exportDropdownRef}>
                 <button
                   type="button"
-                  onClick={() => setIsConfirmDeleteOpen(true)}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors shadow-2xs"
-                  title="Hapus Seluruh Jadwal Ujian Ini"
+                  onClick={() => setIsExportMenuOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                  title="Pilihan Unduh Berkas dan Cetak Dokumen Resmi"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Hapus Jadwal</span>
+                  <Download className="w-3.5 h-3.5 text-slate-700" />
+                  <span>Unduh & Cetak</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isExportMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
-              )}
 
-              {/* Tombol Simpan & Publikasikan ke Guru (Hanya Pengelola / Admin) */}
+                {isExportMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95">
+                    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                      Opsi Ekspor & Dokumen
+                    </div>
+
+                    {/* 1. Unduh PDF Resmi */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportMenuOpen(false);
+                        if (invigilationMatrix) {
+                          ExamWordExporterService.downloadOfficialA4Html(invigilationMatrix);
+                          setToast({ text: 'Dokumen PDF berhasil diunduh.', type: 'success' });
+                        } else {
+                          setToast({ text: 'Belum ada jadwal untuk diunduh.', type: 'error' });
+                        }
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 flex items-center gap-3 transition-colors cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center shrink-0 border border-sky-100">
+                        <Download className="w-4 h-4 text-sky-700" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">Unduh PDF Resmi (A4)</div>
+                        <div className="text-[10px] text-slate-500">Jadwal & matriks pengawas berstempel</div>
+                      </div>
+                    </button>
+
+                    {/* 2. Unduh Word */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportMenuOpen(false);
+                        if (invigilationMatrix) {
+                          ExamWordExporterService.exportToWord(invigilationMatrix);
+                          setToast({ text: 'Dokumen Word (.doc) berhasil diunduh.', type: 'success' });
+                        } else {
+                          setToast({ text: 'Belum ada jadwal pengawas untuk diekspor.', type: 'error' });
+                        }
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 flex items-center gap-3 transition-colors cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+                        <FileText className="w-4 h-4 text-blue-700" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">Unduh Dokumen Word (.doc)</div>
+                        <div className="text-[10px] text-slate-500">Matriks resmi Microsoft Word</div>
+                      </div>
+                    </button>
+
+                    {/* 3. Unduh Excel */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportMenuOpen(false);
+                        ExamScheduleRepository.exportToExcel(scheduleData);
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 flex items-center gap-3 transition-colors cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
+                        <Download className="w-4 h-4 text-emerald-700" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">Unduh Rekap Excel (.xlsx)</div>
+                        <div className="text-[10px] text-slate-500">Lembar rekapitulasi sesi & jadwal</div>
+                      </div>
+                    </button>
+
+                    {/* 4. Cetak Langsung A4 */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportMenuOpen(false);
+                        if (invigilationMatrix) {
+                          ExamWordExporterService.printOfficialMatrix(invigilationMatrix, officialSignatoryOptions);
+                        } else {
+                          const originalTitle = document.title;
+                          document.title = `${scheduleData?.config.examTitle || 'Jadwal Ujian'} - ${effectiveInstitutionName}`;
+                          window.print();
+                          setTimeout(() => { document.title = originalTitle; }, 1000);
+                        }
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 flex items-center gap-3 transition-colors cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
+                        <Printer className="w-4 h-4 text-slate-700" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">Cetak Langsung (A4)</div>
+                        <div className="text-[10px] text-slate-500">Dialog cetak browser / printer fisik</div>
+                      </div>
+                    </button>
+
+                    <div className="h-px bg-slate-100 my-1" />
+
+                    {/* 5. Dokumen Administrasi Lengkap */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsExportMenuOpen(false);
+                        setAdminDocInitialTab('PROCTOR_ATTENDANCE');
+                        setShowAdministrativeDocsModal(true);
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 hover:bg-teal-50 flex items-center gap-3 transition-colors cursor-pointer"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center shrink-0 border border-teal-200">
+                        <ClipboardCheck className="w-4 h-4 text-teal-700" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-teal-900">Dokumen Fisik Administrasi</div>
+                        <div className="text-[10px] text-teal-700">Daftar hadir, serah terima naskah, berita acara</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Tombol Simpan & Publikasikan */}
               {accessInfo.canManage && (
                 <button
                   type="button"
                   onClick={handlePublishSchedule}
                   disabled={isPublishing}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
                     scheduleData.isPublished
                       ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : 'bg-teal-700 hover:bg-teal-800 text-white animate-pulse'
+                      : 'bg-teal-700 hover:bg-teal-800 text-white'
                   }`}
                   title="Simpan dan Terbitkan Jadwal Ini ke Seluruh Guru"
                 >
@@ -1313,88 +1465,25 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (invigilationMatrix) {
-                    ExamWordExporterService.exportToWord(invigilationMatrix);
-                    setToast({ text: 'Dokumen Word (.doc) berhasil diunduh.', type: 'success' });
-                  } else {
-                    setToast({ text: 'Belum ada jadwal pengawas untuk diekspor.', type: 'error' });
-                  }
-                }}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-colors shadow-2xs"
-                title="Unduh Jadwal Pengawas Format Word (.doc)"
-              >
-                <FileText className="w-3.5 h-3.5 text-blue-600" />
-                <span>Unduh Word</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => ExamScheduleRepository.exportToExcel(scheduleData)}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold transition-colors shadow-2xs"
-                title="Ekspor Jadwal ke Excel (.xlsx)"
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Unduh Excel</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (invigilationMatrix) {
-                    ExamWordExporterService.downloadOfficialA4Html(invigilationMatrix);
-                    setToast({ text: 'Dokumen PDF berhasil diunduh.', type: 'success' });
-                  } else {
-                    setToast({ text: 'Belum ada jadwal untuk diunduh.', type: 'error' });
-                  }
-                }}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
-                title="Unduh Jadwal Pengawas Format Resmi Sekolah (PDF)"
-              >
-                <Download className="w-3.5 h-3.5 text-sky-700" />
-                <span>Unduh PDF</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (invigilationMatrix) {
-                    ExamWordExporterService.printOfficialMatrix(invigilationMatrix, officialSignatoryOptions);
-                  } else {
-                    const originalTitle = document.title;
-                    document.title = `${scheduleData?.config.examTitle || 'Jadwal Ujian'} - ${effectiveInstitutionName}`;
-                    window.print();
-                    setTimeout(() => { document.title = originalTitle; }, 1000);
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
-                title="Cetak Jadwal Pengawas Format Resmi Sekolah (A4)"
-              >
-                <Printer className="w-3.5 h-3.5 text-slate-700" />
-                <span>Cetak A4</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAdminDocInitialTab('PROCTOR_ATTENDANCE');
-                  setShowAdministrativeDocsModal(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
-                title="Buka Dokumen Administrasi Ujian Resmi (Daftar Hadir Pengawas, Serah Terima Soal, Berita Acara, Daftar Hadir Panitia)"
-              >
-                <ClipboardCheck className="w-3.5 h-3.5 text-teal-700" />
-                <span>Dokumen Administrasi</span>
-              </button>
+              {/* Tombol Hapus Jadwal (Subtle Danger) */}
+              {accessInfo.canManage && (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmDeleteOpen(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-rose-700 hover:bg-rose-50 border border-rose-200 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                  title="Hapus Seluruh Jadwal Ujian Ini"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span className="hidden sm:inline">Hapus</span>
+                </button>
+              )}
             </>
           )}
 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ml-1 cursor-pointer"
             title="Tutup (Esc)"
           >
             <X className="w-5 h-5" />
@@ -1403,14 +1492,14 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
       </header>
 
       {/* Tab Navigation Bar */}
-      <div className="px-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-2 overflow-x-auto shrink-0 shadow-2xs">
+      <div className="px-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 overflow-x-auto shrink-0 shadow-2xs">
         <div className="flex items-center gap-1.5 sm:gap-2 py-2">
           {/* Level Switcher (SMP vs SMA) */}
-          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 mr-1 shrink-0 shadow-2xs">
+          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 mr-2 shrink-0">
             <button
               type="button"
               onClick={() => handleLevelChange('SMP')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 selectedLevel === 'SMP'
                   ? 'bg-teal-700 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -1423,7 +1512,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
             <button
               type="button"
               onClick={() => handleLevelChange('SMA')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 selectedLevel === 'SMA'
                   ? 'bg-blue-700 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -1434,140 +1523,116 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               <span>SMA</span>
             </button>
           </div>
-          <div className="h-6 w-px bg-slate-200 shrink-0 mx-0.5" />
 
-          {/* Tab 0: Asisten AI Jadwal (Prompt Cepat) */}
-          {accessInfo.canManage && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('ai_prompt')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
-                activeTab === 'ai_prompt'
-                  ? 'bg-[#023246] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Asisten AI Jadwal</span>
-            </button>
-          )}
+          <div className="h-5 w-px bg-slate-200 shrink-0 mx-0.5" />
 
-          {/* Tab 1: Form Parameter Manual */}
-          {accessInfo.canManage && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('form')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
-                activeTab === 'form'
-                  ? 'bg-[#023246] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Form Parameter Manual</span>
-            </button>
-          )}
-
-          {/* Tab 2: Jadwal Ujian Siswa */}
+          {/* Group 1: Hasil Jadwal (Jadwal Siswa & Pengawas) */}
           <button
             type="button"
             onClick={() => setActiveTab('subjects')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'subjects'
                 ? 'bg-[#023246] text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Jadwal Ujian Siswa</span>
+            <span>Jadwal Siswa</span>
             {scheduleData && (
-              <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded-full border ${
-                activeTab === 'subjects' ? 'bg-teal-500/20 text-teal-200 border-teal-400/30' : 'bg-teal-50 text-teal-700 border-teal-200'
+              <span className={`px-1.5 py-0.2 text-[10px] font-bold rounded-full ${
+                activeTab === 'subjects' ? 'bg-teal-900 text-teal-100' : 'bg-slate-100 text-slate-700'
               }`}>
                 {scheduleData.subjectSchedules.length}
               </span>
             )}
           </button>
 
-          {/* Tab 3: Roster Pengawas Guru */}
           <button
             type="button"
             onClick={() => setActiveTab('proctors')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'proctors'
                 ? 'bg-[#023246] text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Roster Pengawas Guru</span>
+            <span>Roster Pengawas</span>
             {scheduleData && (
-              <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded-full border ${
-                activeTab === 'proctors' ? 'bg-teal-500/20 text-teal-200 border-teal-400/30' : 'bg-teal-50 text-teal-700 border-teal-200'
+              <span className={`px-1.5 py-0.2 text-[10px] font-bold rounded-full ${
+                activeTab === 'proctors' ? 'bg-teal-900 text-teal-100' : 'bg-slate-100 text-slate-700'
               }`}>
                 {scheduleData.proctorSchedules.length}
               </span>
             )}
           </button>
 
-          {/* Tab 4: Jadwal Mengawas Saya */}
           <button
             type="button"
             onClick={() => setActiveTab('my_schedule')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               activeTab === 'my_schedule'
                 ? 'bg-[#023246] text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
             <UserCheck className="w-3.5 h-3.5 text-teal-600" />
-            <span>Jadwal Mengawas Saya</span>
+            <span>Jadwal Saya</span>
             {myProctorAssignments.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-emerald-500 text-white">
-                {myProctorAssignments.length} Sesi
+              <span className="px-1.5 py-0.2 text-[10px] font-black rounded-full bg-emerald-500 text-white">
+                {myProctorAssignments.length}
               </span>
             )}
           </button>
 
-          {/* Tab 5: Pengaturan Panitia (Admin Only) */}
           {accessInfo.isAdmin && (
             <button
               type="button"
               onClick={() => setActiveTab('committee')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all min-h-9.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === 'committee'
                   ? 'bg-purple-700 text-white shadow-xs'
                   : 'text-purple-700 hover:bg-purple-50'
               }`}
             >
               <Crown className="w-3.5 h-3.5" />
-              <span>Panitia Ujian ({committeeMembers.length})</span>
+              <span>Panitia ({committeeMembers.length})</span>
             </button>
           )}
-        </div>
 
-        {/* Action button if schedule exists */}
-        {accessInfo.canManage && scheduleData && activeTab !== 'form' && (
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setActiveTab('form')}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-teal-700 hover:bg-teal-50 border border-teal-200 flex items-center gap-1"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span>Revisi / Buat Ulang</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsConfirmDeleteOpen(true)}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200 flex items-center gap-1 transition-colors"
-              title="Hapus Seluruh Jadwal Ujian Ini"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              <span>Hapus Jadwal</span>
-            </button>
-          </div>
-        )}
+          {/* Group 2: Pengaturan & AI Generator */}
+          {accessInfo.canManage && (
+            <>
+              <div className="h-5 w-px bg-slate-200 shrink-0 mx-1" />
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('ai_prompt')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  activeTab === 'ai_prompt'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Asisten AI</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('form')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  activeTab === 'form'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Parameter Manual</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Layer Body */}
@@ -1884,7 +1949,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
         {/* ========================================================================= */}
         {/* TAB 1: FORM PARAMETER & AI GENERATOR (PANITIA ONLY) */}
         {activeTab === 'form' && accessInfo.canManage && (
-          <div className="w-full max-w-7xl mx-auto space-y-6 animate-fadeIn pb-24">
+          <div className="w-full max-w-7xl mx-auto space-y-6 animate-fadeIn pb-12">
             {/* Top Overview & Status Card */}
             <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -2149,21 +2214,24 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                           {sessionSlots.map((slot, idx) => (
-                            <div key={slot.sessionNumber} className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+                            <div key={slot.sessionNumber} className="bg-white p-3 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block truncate">
-                                  {slot.sessionName}
+                                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                  <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-800 flex items-center justify-center font-bold text-[11px] border border-teal-200 shrink-0">
+                                    {slot.sessionNumber}
+                                  </span>
+                                  <span>{slot.sessionNumber === 1 ? 'Sesi Pagi' : slot.sessionNumber === 2 ? 'Sesi Siang' : slot.sessionNumber === 3 ? 'Sesi Siang II' : 'Sesi Tambahan'}</span>
                                 </span>
-                                <span className="text-[9px] font-mono text-slate-400">
+                                <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                                   {getSessionDurationText(slot.startTime, slot.endTime)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <input
                                   type="time"
-                                  value={slot.startTime}
+                                  value={formatTimeForInput(slot.startTime, '07:30')}
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     setSessionSlots((prev) => {
@@ -2172,12 +2240,12 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       return next;
                                     });
                                   }}
-                                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                  className="w-full bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-1 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
                                 />
-                                <span className="text-[10px] text-slate-400 font-bold">s/d</span>
+                                <span className="text-[10px] text-slate-400 font-bold shrink-0">s/d</span>
                                 <input
                                   type="time"
-                                  value={slot.endTime}
+                                  value={formatTimeForInput(slot.endTime, '09:00')}
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     setSessionSlots((prev) => {
@@ -2186,7 +2254,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       return next;
                                     });
                                   }}
-                                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                  className="w-full bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-1 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
                                 />
                               </div>
                             </div>
@@ -2666,32 +2734,33 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                     </button>
                   </div>
 
-                  {/* List of subject pills */}
-                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1 bg-slate-50/50 rounded-xl border border-slate-200/60">
+                  {/* List of subject cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto p-2 bg-slate-50/70 rounded-xl border border-slate-200/80">
                     {availableSubjects.map((sub) => {
                       const isChecked = selectedSubjects.includes(sub);
                       const isCustom = !DEFAULT_SUBJECTS.includes(sub);
                       return (
                         <div
                           key={sub}
-                          className={`inline-flex items-center rounded-lg text-xs font-medium transition-all ${
+                          onClick={() => {
+                            setSelectedSubjects((prev) =>
+                              isChecked ? prev.filter((s) => s !== sub) : [...prev, sub]
+                            );
+                          }}
+                          className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all cursor-pointer select-none border ${
                             isChecked
-                              ? 'bg-slate-900 text-white font-bold shadow-2xs'
-                              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs font-semibold'
+                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                           }`}
                         >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedSubjects((prev) =>
-                                isChecked ? prev.filter((s) => s !== sub) : [...prev, sub]
-                              );
-                            }}
-                            className="px-2.5 py-1.5 flex items-center gap-1.5 cursor-pointer"
-                          >
-                            {isChecked && <Check className="w-3 h-3 text-emerald-400" />}
-                            <span>{sub}</span>
-                          </button>
+                          <div className="flex items-center gap-2 truncate">
+                            <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
+                              isChecked ? 'bg-emerald-500 text-white' : 'border border-slate-300 bg-white'
+                            }`}>
+                              {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                            <span className="truncate">{sub}</span>
+                          </div>
                           {isCustom && (
                             <button
                               type="button"
@@ -2700,7 +2769,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                 handleRemoveCustomSubject(sub);
                               }}
                               title={`Hapus ${sub} dari daftar`}
-                              className="pr-2 pl-0.5 py-1.5 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -2832,32 +2901,32 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               </div>
             </div>
 
-            {/* Sticky Floating Action Footer for Desktop / Laptop / Tablet */}
-            <div className="sticky bottom-4 z-20 bg-white/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Docked Action Footer */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mt-6">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-amber-500" />
                   Ringkasan Setup:
                 </span>
-                <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-700 border border-slate-200">
-                    🗓️ {validExamDates.length} Hari Ujian
+                <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-semibold text-slate-700 border border-slate-200">
+                    {validExamDates.length} Hari Ujian
                   </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-700 border border-slate-200">
-                    🏫 {totalRooms} Ruangan
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-semibold text-slate-700 border border-slate-200">
+                    {totalRooms} Ruangan
                   </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-700 border border-slate-200">
-                    👥 {selectedClasses.length} Rombel
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-semibold text-slate-700 border border-slate-200">
+                    {selectedClasses.length} Rombel
                   </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-700 border border-slate-200">
-                    📚 {selectedSubjects.length} Mapel
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-semibold text-slate-700 border border-slate-200">
+                    {selectedSubjects.length} Mapel
                   </span>
                   <span className={`px-2.5 py-1 rounded-lg font-bold border ${
                     totalSlotsCapacity >= selectedSubjects.length
                       ? 'bg-teal-50 text-teal-800 border-teal-200'
                       : 'bg-amber-50 text-amber-800 border-amber-200'
                   }`}>
-                    📊 Kapasitas {totalSlotsCapacity} Sesi ({totalSlotsCapacity >= selectedSubjects.length ? 'Cukup' : 'Kurang'})
+                    Kapasitas {totalSlotsCapacity} Sesi ({totalSlotsCapacity >= selectedSubjects.length ? 'Cukup' : 'Kurang'})
                   </span>
                 </div>
               </div>
@@ -2867,17 +2936,17 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                   type="button"
                   onClick={handleGenerateSchedule}
                   disabled={isGenerating}
-                  className="w-full md:w-auto px-6 py-3 rounded-xl bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-700 hover:to-[#023246] disabled:opacity-50 text-white text-xs sm:text-sm font-black uppercase tracking-wider shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                  className="w-full md:w-auto px-6 py-2.5 rounded-xl bg-[#023246] hover:bg-[#18536B] disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
                   {isGenerating ? (
                     <>
-                      <RefreshCw className="w-4 h-4 text-amber-300 animate-spin" />
+                      <RefreshCw className="w-4 h-4 text-teal-300 animate-spin" />
                       <span>AI Sedang Menyusun Jadwal...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 text-amber-300" />
-                      <span>🤖 Buat Jadwal Ujian & Pengawas Cerdas dengan AI</span>
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>Buat Jadwal Ujian & Pengawas Cerdas (AI)</span>
                     </>
                   )}
                 </button>
