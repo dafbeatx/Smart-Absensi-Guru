@@ -23,6 +23,7 @@ export interface CertificatePayload {
 export const generateExcellenceCertificateHTML = (payload: CertificatePayload): string => {
   const branding = getDynamicBranding();
   const recipientName = payload.recipientName || 'Bapak/Ibu Guru Teladan';
+  const cleanRecipientName = recipientName.replace(/[^\w]/g, '_');
   const rawNip = (payload.recipientNipOrNpp || '').trim();
   // Aturan pengguna: Jika tidak ada data NPP/NIP jangan dipakai, pakai - saja
   const nipOrNpp = rawNip ? `NPP/NIP: ${rawNip}` : '-';
@@ -507,6 +508,9 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
     <button type="button" class="btn-action btn-print" onclick="window.print()">
       🖨️ Cetak / Unduh Piagam Resmi (PDF)
     </button>
+    <button type="button" class="btn-action btn-download" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer;" onclick="downloadCertFile()">
+      📥 Unduh File Piagam (A4)
+    </button>
     <button type="button" class="btn-action btn-close" onclick="window.close()">
       ✖️ Tutup Tab
     </button>
@@ -523,19 +527,13 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
         <div class="corner-decor corner-bl"></div>
         <div class="corner-decor corner-br"></div>
 
-        <!-- Watermark Emas Samar -->
-        <svg class="watermark-seal" viewBox="0 0 100 100" fill="#d4af37">
-          <circle cx="50" cy="50" r="45" stroke="#d4af37" stroke-width="2" fill="none" />
-          <polygon points="50,15 61,38 86,41 67,59 72,84 50,71 28,84 33,59 14,41 39,38" />
-        </svg>
-
         <!-- 1. KOP SURAT INSTITUSI: CUKUP SMP TERPADU AL-ITTIHADIYAH & SMA TERPADU AS SALAAM -->
         <div class="cert-header">
           <img src="/school-logo.png" alt="Logo Sekolah" class="cert-logo" onerror="this.style.display='none'" />
 
           <div class="cert-institution-meta">
             <h1 class="inst-school">SMP TERPADU AL-ITTIHADIYAH &amp; SMA TERPADU AS SALAAM</h1>
-            <p class="inst-sub">Sistem Manajemen Presensi &amp; Keteladanan Pendidik Terintegrasi (${branding.appName})</p>
+            <p class="inst-sub">Sistem Manajemen Presensi &amp; Keteladanan Pendidik Terpadu</p>
           </div>
 
           <div class="cert-medal-badge">
@@ -610,6 +608,22 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
     </div>
   </div>
 
+  <script>
+    function downloadCertFile() {
+      var clone = document.documentElement.cloneNode(true);
+      var bar = clone.querySelector('.no-print-bar');
+      if (bar) bar.remove();
+      var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'Piagam_Penghargaan_' + '${cleanRecipientName}' + '.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
 </body>
 </html>`;
 };
@@ -625,4 +639,23 @@ export const openPrintableCertificate = (payload: CertificatePayload): void => {
   if (!printWindow) {
     alert('Pop-up terblokir oleh browser. Izinkan pop-up untuk mencetak Piagam Penghargaan Resmi.');
   }
+};
+
+/**
+ * Directly downloads the certificate as an A4 HTML document
+ */
+export const downloadPrintableCertificate = (payload: CertificatePayload, filenameOverride?: string): void => {
+  if (typeof window === 'undefined') return;
+  const html = generateExcellenceCertificateHTML(payload);
+  const cleanName = (payload.recipientName || 'Guru').replace(/[^\w]/g, '_');
+  const filename = filenameOverride || `Piagam_Penghargaan_${cleanName}.html`;
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };

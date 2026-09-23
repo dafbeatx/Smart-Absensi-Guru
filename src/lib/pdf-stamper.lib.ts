@@ -4,7 +4,7 @@
  * Powered by pdf-lib & qrcode
  */
 
-import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import QRCode from 'qrcode';
 import { SIGNATORY_OFFICIALS, getDynamicBranding, type MultiSheetReportPayload } from './excel-generator.lib';
 
@@ -183,8 +183,8 @@ export class PdfStamperService {
     pdfDoc.setTitle(`Laporan Presensi ${payload.month} ${payload.year} - ${branding.institutionName}`);
     pdfDoc.setAuthor(SIGNATORY_OFFICIALS.KEPSEK_NAME);
     pdfDoc.setSubject('Laporan Kehadiran Guru Resmi Terverifikasi Digital');
-    pdfDoc.setCreator(branding.appName);
-    pdfDoc.setProducer(`Hopding/pdf-lib (${branding.appName} Engine)`);
+    pdfDoc.setCreator('Sistem Informasi Akademik Sekolah');
+    pdfDoc.setProducer('pdf-lib Official Document Engine');
     pdfDoc.setCreationDate(new Date());
 
     // Fonts
@@ -199,17 +199,7 @@ export class PdfStamperService {
     const page = pdfDoc.addPage([595.28, 841.89]);
     const { width, height } = page.getSize();
 
-    // ── 1. WATERMARK DOKUMEN RESMI ──────────────────────────────────────────
-    page.drawText('DOKUMEN RESMI TERVERIFIKASI', {
-      x: 90,
-      y: 350,
-      size: 32,
-      font: fontBold,
-      color: rgb(0.88, 0.92, 0.96),
-      rotate: degrees(35),
-    });
-
-    // ── 2. KOP SURAT (LETTERHEAD) ───────────────────────────────────────────
+    // ── 1. KOP SURAT (LETTERHEAD) ───────────────────────────────────────────
     const primaryColor = rgb(0.06, 0.09, 0.16); // #0f172a
     const blueColor = rgb(0.12, 0.25, 0.69); // #1e40af
     const slateColor = rgb(0.39, 0.45, 0.55); // #64748b
@@ -405,7 +395,7 @@ export class PdfStamperService {
     });
 
     // Stamp text
-    page.drawText('*  SMA SMART ABSENSI  *', {
+    page.drawText('* TERAKREDITASI RESMI *', {
       x: stampCenterX - 30,
       y: stampCenterY + 20,
       size: 5,
@@ -469,15 +459,15 @@ export class PdfStamperService {
       color: rgb(0.8, 0.85, 0.9),
     });
 
-    page.drawText(`Dicetak otomatis oleh ${branding.appName} pada ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}`, {
+    page.drawText(`Dokumen resmi ini dicetak pada ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}`, {
       x: 45,
       y: 28,
       size: 7,
       font: fontRegular,
       color: slateColor,
     });
-    page.drawText(`Keaslian dokumen dijamin kriptografis melalui sistem ${branding.appName} Cloud`, {
-      x: width - 300,
+    page.drawText(`Keaslian dokumen dijamin resmi dan terverifikasi secara digital`, {
+      x: width - 290,
       y: 28,
       size: 7,
       font: fontRegular,

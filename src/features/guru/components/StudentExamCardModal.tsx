@@ -24,6 +24,7 @@ import { SMA_AS_SALAAM_LOGO_BASE64 } from '../../../assets/logo-sma-terpadu';
 import type { StudentItem } from '../../../types/database.types';
 import {
   Printer,
+  Download,
   Search,
   Filter,
   Calendar,
@@ -186,6 +187,34 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
     }
   };
 
+  const handleDownloadAllFiltered = () => {
+    if (filteredStudents.length === 0) {
+      showToast('error', 'Tidak Ada Siswa', `Tidak ada data siswa ${selectedLevel} yang terpilih untuk diunduh.`);
+      return;
+    }
+    const cleanYear = academicYear.replace(/\//g, '-');
+    BarcodeExamCardService.downloadExamCardsA4(
+      filteredStudents,
+      examOptions,
+      `Kartu_Peserta_${selectedLevel}_${cleanYear}.html`
+    );
+    showToast(
+      'success',
+      'Kartu Ujian Diunduh',
+      `File ${filteredStudents.length} kartu ujian ${selectedLevel} (A4) berhasil diunduh.`
+    );
+  };
+
+  const handleDownloadSingle = (student: StudentItem) => {
+    const cleanName = student.fullName.replace(/[^\w]/g, '_');
+    BarcodeExamCardService.downloadExamCardsA4(
+      [student],
+      examOptions,
+      `Kartu_Peserta_${cleanName}_${selectedLevel}.html`
+    );
+    showToast('success', 'Kartu Diunduh', `Kartu ujian untuk ${student.fullName} berhasil diunduh.`);
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -276,6 +305,17 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleDownloadAllFiltered}
+              disabled={isLoading || filteredStudents.length === 0}
+              className="bg-white/20 hover:bg-white/30 text-white font-bold text-xs border border-white/30 shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="Unduh semua kartu peserta ujian dalam format file A4"
+            >
+              <Download className="w-4 h-4" />
+              <span>Unduh File ({filteredStudents.length})</span>
+            </Button>
             <Button
               variant="primary"
               size="sm"
@@ -426,17 +466,30 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePrintSingle(s);
-                        }}
-                        className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                        title="Cetak kartu siswa ini saja"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadSingle(s);
+                          }}
+                          className="p-1 text-slate-400 hover:text-sky-700 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
+                          title="Unduh kartu siswa ini saja"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrintSingle(s);
+                          }}
+                          className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                          title="Cetak kartu siswa ini saja"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })
@@ -461,11 +514,6 @@ export const StudentExamCardModal: React.FC<StudentExamCardModalProps> = ({
                 className="w-full max-w-sm bg-white rounded-xl p-3 shadow-md space-y-1.5 relative overflow-hidden font-sans border-2"
                 style={{ borderColor: schoolColor }}
               >
-                {/* Watermark */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-4 rotate-[-22deg] select-none text-xl font-black">
-                  KARTU PESERTA {selectedLevel}
-                </div>
-
                 {/* Kop Kartu dengan Logo */}
                 <div
                   className="flex items-center gap-2 pb-1.5 border-b-2"

@@ -195,6 +195,7 @@ export class BarcodeExamCardService {
     const rawTitle = options.examTitle || options.namaUjian || 'PENILAIAN AKHIR SEMESTER (PAS) GANJIL';
     const title = rawTitle.toUpperCase();
     const academicYear = options.academicYear || options.tahunAjaran || '2026/2027';
+    const cleanAcademicYear = academicYear.replace(/\//g, '-');
     const semesterStr = (options.semester || 'Ganjil').toUpperCase();
     const defaultRoom = options.roomName || options.ruangDefault || 'Ruang 01';
     const kepsekNip = options.nipKepalaSekolah || '197605122005011004';
@@ -468,19 +469,6 @@ export class BarcodeExamCardService {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .watermark-bg {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-22deg);
-      font-size: 22px;
-      font-weight: 900;
-      color: rgba(15, 23, 42, 0.025);
-      letter-spacing: 2px;
-      pointer-events: none;
-      white-space: nowrap;
-      user-select: none;
-    }
     .cut-guide {
       position: absolute;
       top: -4px;
@@ -516,6 +504,22 @@ export class BarcodeExamCardService {
     .btn-print:hover {
       background: #15803d;
     }
+    .btn-download {
+      background: #0284c7;
+      color: white;
+      border: none;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-download:hover {
+      background: #0369a1;
+    }
   </style>
 </head>
 <body>
@@ -527,6 +531,9 @@ export class BarcodeExamCardService {
     <div style="display: flex; gap: 8px;">
       <button class="btn-print" onclick="window.print()">
         🖨️ Cetak Semua Kartu (${selectedLevel})
+      </button>
+      <button class="btn-download" onclick="downloadAllCardsFile()">
+        📥 Unduh File Kartu (A4)
       </button>
     </div>
   </div>
@@ -553,8 +560,6 @@ export class BarcodeExamCardService {
             <div class="exam-card-wrapper">
               <span class="cut-guide">✂️</span>
               <div class="exam-card">
-                <div class="watermark-bg">KARTU PESERTA</div>
-
                 <div class="card-header">
                   <div class="logo-box">
                     <img src="${logoSrc}" alt="Logo ${selectedLevel}" />
@@ -625,6 +630,22 @@ export class BarcodeExamCardService {
       return `<div class="a4-sheet">${cardsHtml}</div>`;
     })
     .join('')}
+  <script>
+    function downloadAllCardsFile() {
+      var clone = document.documentElement.cloneNode(true);
+      var bar = clone.querySelector('.print-bar');
+      if (bar) bar.remove();
+      var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'Kartu_Peserta_' + '${selectedLevel}_' + '${cleanAcademicYear}' + '.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
 </body>
 </html>
     `.trim();
@@ -651,5 +672,30 @@ export class BarcodeExamCardService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Downloads the complete A4 exam cards layout directly as an HTML file
+   */
+  public static downloadExamCardsA4(
+    students: AnyStudentData[],
+    options: ExamCardRenderOptions,
+    filenameOverride?: string
+  ): void {
+    if (typeof window === 'undefined') return;
+    const html = this.generateExamCardsA4HTML(students, options);
+    const selectedLevel = options.level || 'SMP';
+    const year = (options.tahunAjaran || '2026-2027').replace('/', '-');
+    const filename = filenameOverride || `Kartu_Peserta_${selectedLevel}_${year}.html`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }

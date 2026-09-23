@@ -1322,9 +1322,29 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                 type="button"
                 onClick={() => {
                   if (invigilationMatrix) {
+                    ExamWordExporterService.downloadOfficialA4Html(invigilationMatrix);
+                    setToast({ text: 'Dokumen A4 berhasil diunduh.', type: 'success' });
+                  } else {
+                    setToast({ text: 'Belum ada jadwal untuk diunduh.', type: 'error' });
+                  }
+                }}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                title="Unduh Jadwal Pengawas Format Resmi Sekolah (A4)"
+              >
+                <Download className="w-3.5 h-3.5 text-sky-700" />
+                <span>Unduh A4</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (invigilationMatrix) {
                     ExamWordExporterService.printOfficialMatrix(invigilationMatrix, officialSignatoryOptions);
                   } else {
+                    const originalTitle = document.title;
+                    document.title = `${scheduleData?.config.examTitle || 'Jadwal Ujian'} - ${effectiveInstitutionName}`;
                     window.print();
+                    setTimeout(() => { document.title = originalTitle; }, 1000);
                   }
                 }}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
@@ -3243,9 +3263,29 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       type="button"
                       onClick={() => {
                         if (invigilationMatrix) {
+                          ExamWordExporterService.downloadOfficialA4Html(invigilationMatrix);
+                          setToast({ text: 'Dokumen A4 berhasil diunduh.', type: 'success' });
+                        } else {
+                          setToast({ text: 'Belum ada jadwal untuk diunduh.', type: 'error' });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                      title="Unduh Jadwal Format Resmi Sekolah (A4)"
+                    >
+                      <Download className="w-3.5 h-3.5 text-sky-700" />
+                      <span>Unduh A4</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (invigilationMatrix) {
                           ExamWordExporterService.printOfficialMatrix(invigilationMatrix, officialSignatoryOptions);
                         } else {
+                          const originalTitle = document.title;
+                          document.title = `${scheduleData?.config.examTitle || 'Jadwal Ujian'} - ${effectiveInstitutionName}`;
                           window.print();
+                          setTimeout(() => { document.title = originalTitle; }, 1000);
                         }
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
@@ -3832,27 +3872,53 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               </div>
 
               {myProctorAssignments.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const teacherCode = invigilationMatrix?.teacherLegend?.find(
-                      (l) => l.fullName === currentUser?.full_name || l.fullName?.toLowerCase().includes((currentUser?.full_name || '').toLowerCase())
-                    )?.code;
-                    ExamWordExporterService.printTeacherDutySlip(
-                      currentUser?.full_name || 'Bapak/Ibu Guru',
-                      teacherCode,
-                      myProctorAssignments,
-                      effectiveInstitutionName,
-                      scheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian',
-                      officialSignatoryOptions.kepsekName,
-                      officialSignatoryOptions.kepsekNpp
-                    );
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-xs"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>Cetak Jadwal Saya (A4)</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const teacherCode = invigilationMatrix?.teacherLegend?.find(
+                        (l) => l.fullName === currentUser?.full_name || l.fullName?.toLowerCase().includes((currentUser?.full_name || '').toLowerCase())
+                      )?.code;
+                      ExamWordExporterService.downloadTeacherDutySlip(
+                        currentUser?.full_name || 'Bapak/Ibu Guru',
+                        teacherCode,
+                        myProctorAssignments,
+                        effectiveInstitutionName,
+                        scheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian',
+                        officialSignatoryOptions.kepsekName,
+                        officialSignatoryOptions.kepsekNpp
+                      );
+                      setToast({ text: 'Surat Tugas Mengawas berhasil diunduh.', type: 'success' });
+                    }}
+                    className="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                    title="Unduh Surat Tugas Mengawas Resmi (A4)"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Unduh Jadwal Saya</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const teacherCode = invigilationMatrix?.teacherLegend?.find(
+                        (l) => l.fullName === currentUser?.full_name || l.fullName?.toLowerCase().includes((currentUser?.full_name || '').toLowerCase())
+                      )?.code;
+                      ExamWordExporterService.printTeacherDutySlip(
+                        currentUser?.full_name || 'Bapak/Ibu Guru',
+                        teacherCode,
+                        myProctorAssignments,
+                        effectiveInstitutionName,
+                        scheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian',
+                        officialSignatoryOptions.kepsekName,
+                        officialSignatoryOptions.kepsekNpp
+                      );
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Cetak Jadwal Saya (A4)</span>
+                  </button>
+                </div>
               )}
             </div>
 

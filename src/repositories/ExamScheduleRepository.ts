@@ -272,13 +272,11 @@ export class ExamScheduleRepository {
       defaultInstitution = 'SMA Terpadu As Salaam';
     }
     const institutionName = appSettings.institution_name || defaultInstitution;
-    const appName = appSettings.app_name || 'Smart Absensi Guru';
 
     const { config, subjectSchedules, proctorSchedules } = schedule;
 
     // --- SHEET 1: JADWAL UJIAN MAPEL SISWA ---
     const subjectRows: (string | number)[][] = [
-      [appName.toUpperCase()],
       [institutionName.toUpperCase()],
       [`JADWAL UJIAN MATA PELAJARAN — ${config.examTitle || config.examType}${effectiveLevel ? ` (${effectiveLevel})` : ''}`],
       [`Tahun Ajaran: ${config.academicYear} | Semester: ${config.semester}`],
@@ -323,7 +321,6 @@ export class ExamScheduleRepository {
 
     // --- SHEET 2: JADWAL PENGAWAS GURU ---
     const proctorRows: (string | number)[][] = [
-      [appName.toUpperCase()],
       [institutionName.toUpperCase()],
       [`JADWAL TUGAS MENGAWAS UJIAN GURU — ${config.examTitle || config.examType}${effectiveLevel ? ` (${effectiveLevel})` : ''}`],
       [`Tahun Ajaran: ${config.academicYear} | Semester: ${config.semester}`],

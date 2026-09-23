@@ -292,6 +292,8 @@ export class ExamWordExporterService {
       )
       .join('');
 
+    const cleanSubTitle = subTitle.replace(/[^\w]/g, '_');
+
     return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -490,6 +492,9 @@ export class ExamWordExporterService {
       <button type="button" class="btn-action btn-print" onclick="window.print()">
         🖨️ Cetak ke Kertas A4 / Simpan PDF
       </button>
+      <button type="button" class="btn-action btn-download" style="background: #0284c7; color: #ffffff;" onclick="downloadMatrixA4File()">
+        📥 Unduh Dokumen (A4)
+      </button>
       <button type="button" class="btn-action btn-close" onclick="window.close()">
         ✖️ Tutup Pratinjau
       </button>
@@ -542,6 +547,22 @@ export class ExamWordExporterService {
     </div>
   </div>
 
+  <script>
+    function downloadMatrixA4File() {
+      var clone = document.documentElement.cloneNode(true);
+      var bar = clone.querySelector('.no-print-bar');
+      if (bar) bar.remove();
+      var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'Jadwal_Pengawas_' + '${cleanSubTitle}' + '_A4.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
 </body>
 </html>`;
   }
@@ -569,6 +590,7 @@ export class ExamWordExporterService {
     if (typeof window === 'undefined') return;
 
     const safeCode = teacherCode || '-';
+    const cleanTeacherName = teacherName.replace(/[^\w]/g, '_');
     const actualKepsekName = kepsekName || SIGNATORY_OFFICIALS.KEPSEK_NAME || 'Farhan Sopian Sahid, S.Pd.I';
     const formattedKepsekNpp = kepsekNpp && kepsekNpp !== '-'
       ? (kepsekNpp.startsWith('NPP') ? kepsekNpp : `NPP. ${kepsekNpp}`)
@@ -629,9 +651,167 @@ export class ExamWordExporterService {
     <div><strong>Pratinjau Kartu Tugas Mengawas</strong> • ${teacherName}</div>
     <div style="display: flex; gap: 8px;">
       <button class="btn-action btn-print" onclick="window.print()">🖨️ Cetak Kartu Tugas</button>
+      <button class="btn-action btn-download" style="background: #0284c7; color: white;" onclick="downloadDutySlipFile()">📥 Unduh Surat Tugas</button>
       <button class="btn-action btn-close" onclick="window.close()">Tutup</button>
     </div>
   </div>
+  <div class="paper-page">
+    <div class="doc-header">
+      <h1>SURAT TUGAS MENGAWAS ASESMEN SEKOLAH</h1>
+      <h2>${institutionName}</h2>
+      <h3>${examTitle}</h3>
+    </div>
+    <div class="teacher-badge">
+      <div>
+        <div style="font-size: 12pt; font-weight: 800;">${teacherName}</div>
+        <div style="color: #64748b; font-size: 9pt;">Pendidik / Pengawas Ruangan Ujian</div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 11pt; font-weight: 900; color: #0284c7;">Kode Pengawas: ${safeCode}</div>
+        <div style="color: #64748b; font-size: 9pt;">Total Tugas: ${duties.length} Sesi</div>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 30px;">No</th>
+          <th style="width: 130px;">Hari / Tanggal</th>
+          <th style="width: 120px;">Waktu / Sesi</th>
+          <th>Mata Pelajaran</th>
+          <th style="width: 80px;">Ruangan</th>
+          <th style="width: 65px;">Kode</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${dutyRows}
+      </tbody>
+    </table>
+    <div class="rules-box">
+      <strong>Tata Tertib Pengawas:</strong>
+      <ol style="margin: 4px 0 0 16px; padding: 0;">
+        <li>Hadir di ruang sekretariat panitia minimal 15 menit sebelum waktu asesmen dimulai.</li>
+        <li>Memastikan ketertiban ruang ujian dan memverifikasi kehadiran peserta didik.</li>
+        <li>Menandatangani berita acara pelaksanaan asesmen setelah sesi berakhir.</li>
+      </ol>
+    </div>
+    <div class="sig-area">
+      <div style="text-align: center; min-width: 240px;">
+        <div>Mengetahui,</div>
+        <div style="font-weight: 800;">Kepala Sekolah</div>
+        <div style="height: 50px;"></div>
+        <div style="font-weight: 800; text-decoration: underline; white-space: nowrap;">${actualKepsekName}</div>
+        <div style="font-size: 8.5pt; color: #64748b;">${formattedKepsekNpp}</div>
+      </div>
+      <div style="text-align: center; min-width: 240px;">
+        <div>Bogor, September 2026</div>
+        <div style="font-weight: 800;">Guru Pengawas,</div>
+        <div style="height: 50px;"></div>
+        <div style="font-weight: 800; text-decoration: underline; white-space: nowrap;">${teacherName}</div>
+        <div style="font-size: 8.5pt; color: #64748b;">Kode Pengawas: ${safeCode}</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    function downloadDutySlipFile() {
+      var clone = document.documentElement.cloneNode(true);
+      var bar = clone.querySelector('.no-print-bar');
+      if (bar) bar.remove();
+      var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'Surat_Tugas_Mengawas_' + '${cleanTeacherName}' + '.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (!win) {
+      alert('Pop-up terblokir oleh browser. Izinkan pop-up untuk mencetak kartu tugas mengawas.');
+    }
+  }
+
+  /**
+   * Directly downloads the teacher duty slip as an A4 HTML document
+   */
+  public static downloadTeacherDutySlip(
+    teacherName: string,
+    teacherCode: string | undefined = '-',
+    duties: Array<{
+      date: string;
+      dayName: string;
+      sessionNumber: number;
+      startTime: string;
+      endTime: string;
+      roomName: string;
+      subject: string;
+    }>,
+    institutionName = 'SMA TERPADU AS SALAAM',
+    examTitle = 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)',
+    kepsekName?: string,
+    kepsekNpp?: string
+  ): void {
+    if (typeof window === 'undefined') return;
+
+    const safeCode = teacherCode || '-';
+    const actualKepsekName = kepsekName || SIGNATORY_OFFICIALS.KEPSEK_NAME || 'Farhan Sopian Sahid, S.Pd.I';
+    const formattedKepsekNpp = kepsekNpp && kepsekNpp !== '-'
+      ? (kepsekNpp.startsWith('NPP') ? kepsekNpp : `NPP. ${kepsekNpp}`)
+      : 'NPP. -';
+
+    const dutyRows = duties
+      .map(
+        (d, idx) => `
+          <tr>
+            <td class="text-center">${idx + 1}</td>
+            <td class="font-bold">${d.dayName}, ${d.date}</td>
+            <td class="text-center font-code">${d.startTime} - ${d.endTime} (Sesi ${d.sessionNumber})</td>
+            <td>${d.subject}</td>
+            <td class="text-center font-bold" style="background-color: #f1f5f9;">${d.roomName}</td>
+            <td class="text-center font-code font-bold">${safeCode}</td>
+          </tr>
+        `
+      )
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Surat Tugas Mengawas - ${teacherName}</title>
+  <style>
+    @page { size: A4 portrait; margin: 15mm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11pt; color: #0f172a; margin: 0; padding: 0; background: #ffffff; }
+    .paper-page { background: white; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm 18mm; }
+    .doc-header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 16px; }
+    .doc-header h1 { font-size: 13pt; margin: 0; font-weight: 900; }
+    .doc-header h2 { font-size: 11pt; margin: 3px 0; color: #1e293b; }
+    .doc-header h3 { font-size: 12.5pt; margin: 0; color: #0369a1; }
+    .teacher-badge { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 16px; }
+    table, th, td { border: 1px solid #1e293b; }
+    th, td { padding: 6px 8px; font-size: 9.5pt; vertical-align: middle; }
+    th { background: #f1f5f9; font-weight: 800; text-align: center; }
+    .text-center { text-align: center; }
+    .font-bold { font-weight: bold; }
+    .font-code { font-family: monospace; font-size: 10pt; }
+    .rules-box { background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 6px; padding: 10px 14px; font-size: 8.5pt; margin-top: 14px; line-height: 1.4; }
+    .sig-area { display: flex; justify-content: space-between; margin-top: 24px; font-size: 9.5pt; }
+    @media print {
+      body { background: white !important; }
+      .paper-page { margin: 0 !important; padding: 0 !important; box-shadow: none !important; width: 100% !important; }
+    }
+  </style>
+</head>
+<body>
   <div class="paper-page">
     <div class="doc-header">
       <h1>SURAT TUGAS MENGAWAS ASESMEN SEKOLAH</h1>
@@ -693,10 +873,37 @@ export class ExamWordExporterService {
 
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const win = window.open(url, '_blank');
-    if (!win) {
-      alert('Pop-up terblokir oleh browser. Izinkan pop-up untuk mencetak kartu tugas mengawas.');
-    }
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Surat_Tugas_Mengawas_${teacherName.replace(/[^\w]/g, '_')}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Downloads the official A4 invigilation matrix directly as an HTML document
+   */
+  public static downloadOfficialA4Html(
+    matrix: ExamInvigilationMatrix,
+    fileNameOverride?: string
+  ): void {
+    if (typeof window === 'undefined') return;
+    const htmlContent = this.generateOfficialA4PrintHtml(matrix);
+    // Strip out the no-print-bar for clean direct download
+    const cleanHtml = htmlContent.replace(/<div class="no-print-bar">[\s\S]*?<\/div>\s*<!-- Lembar Kertas/i, '<!-- Lembar Kertas');
+    const blob = new Blob([cleanHtml], { type: 'text/html;charset=utf-8' });
+    const defaultFileName = `Jadwal_Pengawas_${matrix.subTitle.replace(/[^\w]/g, '_')}_A4.html`;
+    const fileName = fileNameOverride || defaultFileName;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   /**

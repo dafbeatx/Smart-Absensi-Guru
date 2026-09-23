@@ -935,12 +935,63 @@ export class ExamAdministrativeDocsService {
   // =========================================================================
 
   /**
-   * Opens isolated print window for standard A4 paper format
+   * Opens isolated print window for standard A4 paper format with action bar (print & download)
    */
   public static printHtmlDocument(htmlContent: string, title?: string): void {
     if (typeof window === 'undefined') return;
 
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const safeTitle = title || 'Dokumen Administrasi Ujian';
+    const cleanFileName = `${safeTitle.replace(/[^\w]/g, '_')}_A4.html`;
+
+    const topBarHtml = `
+      <div class="no-print-bar" style="position: sticky; top: 0; left: 0; right: 0; background: #023246; color: #ffffff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16px;">📄</span>
+          <span style="font-weight: 800; font-size: 13px;">${safeTitle}</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; background: #059669; color: #ffffff;" onclick="window.print()">
+            🖨️ Cetak / Simpan PDF
+          </button>
+          <button type="button" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; background: #0284c7; color: #ffffff;" onclick="downloadDocFile()">
+            📥 Unduh File Dokumen (A4)
+          </button>
+          <button type="button" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; background: rgba(255,255,255,0.15); color: #ffffff;" onclick="window.close()">
+            ✖️ Tutup
+          </button>
+        </div>
+      </div>
+      <style>
+        @media print {
+          .no-print-bar { display: none !important; }
+        }
+      </style>
+      <script>
+        function downloadDocFile() {
+          var clone = document.documentElement.cloneNode(true);
+          var bar = clone.querySelector('.no-print-bar');
+          if (bar) bar.remove();
+          var blob = new Blob(['<!DOCTYPE html>' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = '${cleanFileName}';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      </script>
+    `;
+
+    let enrichedHtml = htmlContent;
+    if (htmlContent.includes('<body')) {
+      enrichedHtml = htmlContent.replace(/<body([^>]*)>/i, `<body$1>${topBarHtml}`);
+    } else {
+      enrichedHtml = topBarHtml + htmlContent;
+    }
+
+    const blob = new Blob([enrichedHtml], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const printWindow = window.open(url, '_blank');
 
@@ -952,8 +1003,25 @@ export class ExamAdministrativeDocsService {
     printWindow.onload = () => {
       if (title) printWindow.document.title = title;
       printWindow.focus();
-      printWindow.print();
     };
+  }
+
+  /**
+   * Directly downloads any generated administrative document as an A4 HTML file
+   */
+  public static downloadHtmlDocument(htmlContent: string, fileName: string): void {
+    if (typeof window === 'undefined') return;
+
+    const cleanHtml = htmlContent.replace(/<div class="no-print-bar">[\s\S]*?<\/div>/gi, '');
+    const blob = new Blob([cleanHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName.endsWith('.html') ? fileName : `${fileName}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   /**

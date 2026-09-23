@@ -3,12 +3,14 @@ import type { UserProfile } from '../../../types/database.types';
 import {
   openPrintableCertificate,
   generateExcellenceCertificateHTML,
+  downloadPrintableCertificate,
 } from '../../../lib/certificate-generator.lib';
 import { APP_CONFIG } from '../../../config/app.config';
 import { SIGNATORY_OFFICIALS } from '../../../lib/excel-generator.lib';
 import { useToastStore } from '../../../store/useToastStore';
 import {
   Printer,
+  Download,
   Share2,
   ExternalLink,
   X,
@@ -74,6 +76,11 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
 
   const handlePrint = () => {
     openPrintableCertificate(certificatePayload);
+  };
+
+  const handleDownload = () => {
+    downloadPrintableCertificate(certificatePayload);
+    showToast('success', 'Piagam Diunduh', 'File Piagam Penghargaan Resmi A4 berhasil diunduh.');
   };
 
   const handleOpenNewTab = () => {
@@ -192,18 +199,13 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
               <div className="absolute bottom-1.5 left-1.5 w-4 h-4 border-b-2 border-l-2 border-amber-600 pointer-events-none" />
               <div className="absolute bottom-1.5 right-1.5 w-4 h-4 border-b-2 border-r-2 border-amber-600 pointer-events-none" />
 
-              {/* Watermark Seal */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-[0.035] pointer-events-none">
-                <span className="text-8xl">👑</span>
-              </div>
-
               {/* Header Lembaga: CUKUP SMP TERPADU AL-ITTIHADIYAH & SMA TERPADU AS SALAAM */}
               <div className="space-y-0.5 border-b border-amber-300/40 pb-2 mb-2 relative z-10">
                 <h4 className="text-xs sm:text-base font-black text-[#023246] uppercase leading-tight">
                   SMP TERPADU AL-ITTIHADIYAH &amp; SMA TERPADU AS SALAAM
                 </h4>
                 <p className="text-[8.5px] sm:text-[9.5px] text-slate-500 font-medium">
-                  Sistem Keteladanan Pendidik Terintegrasi ({APP_CONFIG.APP_NAME})
+                  Sistem Manajemen Presensi &amp; Keteladanan Pendidik Terpadu
                 </p>
               </div>
 
@@ -325,6 +327,17 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span className="hidden xs:inline">Tab Baru</span>
+            </button>
+
+            {/* Unduh File Piagam */}
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="flex-1 sm:flex-none h-11 px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              title="Unduh File Piagam Penghargaan Resmi (A4)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Unduh File</span>
             </button>
 
             {/* Cetak / Simpan PDF */}
