@@ -152,3 +152,24 @@ export interface ExamScheduleData {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface SmartSwapCandidate {
+  slot: ExamProctorItem;
+  matchScore: number;
+  isZeroConflict: boolean;
+  targetDayName: string;
+  isOwnSubjectForA: boolean;
+  isOwnSubjectForB: boolean;
+  reason: string;
+}
+
+export interface SmartReassignCandidate {
+  teacherId: string;
+  teacherName: string;
+  npp?: string;
+  teachingSubject?: string;
+  isAvailable: boolean;
+  currentDutyCount: number;
+  isOwnSubject: boolean;
+  reason: string;
+}

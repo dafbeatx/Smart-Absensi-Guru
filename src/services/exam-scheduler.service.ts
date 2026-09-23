@@ -6,6 +6,8 @@ import type {
   ExamScheduleSummary,
   ExamCommitteeMember,
   ExamProctorSwapHistoryItem,
+  SmartSwapCandidate,
+  SmartReassignCandidate,
 } from '../types/exam-schedule.types';
 import type { UserProfile } from '../types/database.types';
 
@@ -810,5 +812,222 @@ export class ExamSchedulerService {
     };
 
     return { success: true, updatedSchedule };
+  }
+
+  /**
+   * Helper to check if a teacher is the instructor for a subject.
+   */
+  public static isTeacherTeachingSubject(
+    teacherName: string,
+    subject: string,
+    allTeachers: UserProfile[] = []
+  ): boolean {
+    if (!teacherName || !subject || allTeachers.length === 0) return false;
+    const normT = this.normalizeTeacherName(teacherName);
+    const teacher = allTeachers.find(
+      (t) => this.normalizeTeacherName(t.full_name || '') === normT
+    );
+    if (!teacher || !teacher.teaching_assignment) return false;
+    const normSubj = subject.toLowerCase().trim();
+    const rawAssignment = teacher.teaching_assignment;
+    const teacherSubj = Array.isArray(rawAssignment)
+      ? rawAssignment.join(' ').toLowerCase()
+      : String(rawAssignment || '').toLowerCase().trim();
+    return teacherSubj.includes(normSubj) || normSubj.includes(teacherSubj);
+  }
+
+  /**
+   * Generates intelligent, 100% clash-free swap recommendations for an admin.
+   * Finds slots where both teachers are completely free to switch duties without conflict.
+   */
+  public static getSmartSwapCandidates(
+    schedule: ExamScheduleData,
+    slotAId: string,
+    filterDayName?: string,
+    allTeachers: UserProfile[] = []
+  ): SmartSwapCandidate[] {
+    if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
+      return [];
+    }
+
+    const slotA = schedule.proctorSchedules.find((p) => p.id === slotAId);
+    if (!slotA) return [];
+
+    const normA = this.normalizeTeacherName(slotA.mainProctorName);
+    const results: SmartSwapCandidate[] = [];
+
+    const cleanFilterDay = (filterDayName || '').toLowerCase().trim();
+
+    for (const slotB of schedule.proctorSchedules) {
+      // Must not be the same slot
+      if (slotB.id === slotA.id) continue;
+
+      // Must not have the exact same proctor
+      if (slotB.mainProctorId === slotA.mainProctorId) continue;
+      if (this.normalizeTeacherName(slotB.mainProctorName) === normA) continue;
+
+      // Day filter if specified
+      if (cleanFilterDay && cleanFilterDay !== 'all') {
+        if (slotB.dayName.toLowerCase().trim() !== cleanFilterDay) continue;
+      }
+
+      // Check conflict: Proctor A moving to slotB (date & sessionNumber)
+      const conflictForA = this.checkProctorConflict(
+        schedule.proctorSchedules,
+        slotA.mainProctorId,
+        slotA.mainProctorName,
+        slotB.date,
+        slotB.sessionNumber,
+        slotB.id
+      );
+      if (conflictForA && conflictForA.id !== slotA.id) {
+        continue; // Clash detected for Proctor A
+      }
+
+      // Check conflict: Proctor B moving to slotA (date & sessionNumber)
+      const conflictForB = this.checkProctorConflict(
+        schedule.proctorSchedules,
+        slotB.mainProctorId,
+        slotB.mainProctorName,
+        slotA.date,
+        slotA.sessionNumber,
+        slotA.id
+      );
+      if (conflictForB && conflictForB.id !== slotB.id) {
+        continue; // Clash detected for Proctor B
+      }
+
+      // Both are 100% free! Calculate smart match score
+      let matchScore = 100;
+
+      // Prefer different day if user wants to swap days (e.g. Monday to Tuesday)
+      const isDifferentDay = slotB.date !== slotA.date;
+      if (isDifferentDay) {
+        matchScore += 30;
+      }
+
+      // Bonus if matches specific filtered day
+      if (cleanFilterDay && cleanFilterDay !== 'all' && slotB.dayName.toLowerCase().trim() === cleanFilterDay) {
+        matchScore += 20;
+      }
+
+      // Check subject teaching overlap
+      const isOwnSubjectForA = this.isTeacherTeachingSubject(slotA.mainProctorName, slotB.subject, allTeachers);
+      const isOwnSubjectForB = this.isTeacherTeachingSubject(slotB.mainProctorName, slotA.subject, allTeachers);
+
+      if (!isOwnSubjectForA && !isOwnSubjectForB) {
+        matchScore += 15;
+      }
+
+      // Convenient same session number bonus
+      if (slotB.sessionNumber === slotA.sessionNumber) {
+        matchScore += 10;
+      }
+
+      const reason = isDifferentDay
+        ? `100% Bebas bentrok • Pindah ke ${slotB.dayName} (${slotB.startTime}-${slotB.endTime}) • ${slotB.roomName}`
+        : `100% Bebas bentrok • Tukar sesi ${slotB.dayName} (${slotB.startTime}-${slotB.endTime}) • ${slotB.roomName}`;
+
+      results.push({
+        slot: slotB,
+        matchScore,
+        isZeroConflict: true,
+        targetDayName: slotB.dayName,
+        isOwnSubjectForA,
+        isOwnSubjectForB,
+        reason,
+      });
+    }
+
+    // Sort by match score descending, then by date, sessionNumber, roomName
+    results.sort((a, b) => {
+      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+      if (a.slot.date !== b.slot.date) return a.slot.date.localeCompare(b.slot.date);
+      if (a.slot.sessionNumber !== b.slot.sessionNumber) return a.slot.sessionNumber - b.slot.sessionNumber;
+      return a.slot.roomName.localeCompare(b.slot.roomName);
+    });
+
+    return results;
+  }
+
+  /**
+   * Generates intelligent substitute teacher recommendations for single slot reassignment.
+   * Ranks available teachers with the lowest workload first for optimal load-balancing.
+   */
+  public static getSmartReassignCandidates(
+    schedule: ExamScheduleData,
+    slotId: string,
+    allTeachers: UserProfile[]
+  ): SmartReassignCandidate[] {
+    if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
+      return [];
+    }
+
+    const targetSlot = schedule.proctorSchedules.find((p) => p.id === slotId);
+    if (!targetSlot) return [];
+
+    // Calculate current duty counts for all teachers
+    const dutyCountMap = new Map<string, number>();
+    for (const p of schedule.proctorSchedules) {
+      const normName = this.normalizeTeacherName(p.mainProctorName);
+      dutyCountMap.set(normName, (dutyCountMap.get(normName) || 0) + 1);
+      if (p.mainProctorId) {
+        dutyCountMap.set(p.mainProctorId, (dutyCountMap.get(p.mainProctorId) || 0) + 1);
+      }
+    }
+
+    const normTargetProctor = this.normalizeTeacherName(targetSlot.mainProctorName);
+    const candidates: SmartReassignCandidate[] = [];
+
+    for (const teacher of allTeachers) {
+      // Exclude current proctor
+      if (teacher.id === targetSlot.mainProctorId) continue;
+      const normTeacher = this.normalizeTeacherName(teacher.full_name || '');
+      if (normTeacher === normTargetProctor) continue;
+
+      // Check conflict at target date & session
+      const conflict = this.checkProctorConflict(
+        schedule.proctorSchedules,
+        teacher.id,
+        teacher.full_name || '',
+        targetSlot.date,
+        targetSlot.sessionNumber,
+        targetSlot.id
+      );
+
+      const isAvailable = !conflict;
+      const dutyCount = dutyCountMap.get(teacher.id) ?? (dutyCountMap.get(normTeacher) || 0);
+      const isOwnSubject = this.isTeacherTeachingSubject(teacher.full_name || '', targetSlot.subject, allTeachers);
+
+      const rawSubj = teacher.teaching_assignment;
+      const displaySubj = Array.isArray(rawSubj) ? rawSubj.join(', ') : rawSubj || undefined;
+
+      const reason = isAvailable
+        ? `Bebas tugas jam ini • Beban saat ini: ${dutyCount} sesi mengawas`
+        : `Sedang mengawas di ${conflict.roomName} (${conflict.dayName}, Sesi ${conflict.sessionNumber})`;
+
+      candidates.push({
+        teacherId: teacher.id,
+        teacherName: teacher.full_name || 'Guru',
+        npp: (teacher.nip || teacher.npp) || undefined,
+        teachingSubject: displaySubj,
+        isAvailable,
+        currentDutyCount: dutyCount,
+        isOwnSubject,
+        reason,
+      });
+    }
+
+    // Sort order:
+    // 1. Available teachers first
+    // 2. Lightest workload first (duty count ASC)
+    // 3. Name ASC
+    candidates.sort((a, b) => {
+      if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+      if (a.currentDutyCount !== b.currentDutyCount) return a.currentDutyCount - b.currentDutyCount;
+      return a.teacherName.localeCompare(b.teacherName);
+    });
+
+    return candidates;
   }
 }

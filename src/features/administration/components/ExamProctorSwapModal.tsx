@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   History,
   Info,
+  Sparkles,
+  Check,
 } from 'lucide-react';
 import type {
   ExamScheduleData,
@@ -42,6 +44,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
   );
   const [slotBId, setSlotBId] = useState<string>('');
   const [swapReason, setSwapReason] = useState<string>('');
+  const [swapFilterDay, setSwapFilterDay] = useState<string>('ALL');
 
   // State for Reassign Tab
   const [reassignSlotId, setReassignSlotId] = useState<string>(
@@ -52,6 +55,13 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Unique exam days for fast filter chips
+  const availableDays = useMemo(() => {
+    const daysSet = new Set<string>();
+    scheduleData.proctorSchedules.forEach((p) => daysSet.add(p.dayName));
+    return Array.from(daysSet);
+  }, [scheduleData.proctorSchedules]);
 
   // Selected slots data
   const slotA = useMemo(
@@ -71,6 +81,27 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
     () => allTeachers.find((t) => t.id === newTeacherId),
     [allTeachers, newTeacherId]
   );
+
+  // 1-Click Smart Recommendations for Mutual Swap
+  const smartSwapSuggestions = useMemo(() => {
+    if (!slotAId) return [];
+    return ExamSchedulerService.getSmartSwapCandidates(
+      scheduleData,
+      slotAId,
+      swapFilterDay,
+      allTeachers
+    );
+  }, [scheduleData, slotAId, swapFilterDay, allTeachers]);
+
+  // 1-Click Smart Recommendations for Reassignment (Lightest workload & available first)
+  const smartReassignSuggestions = useMemo(() => {
+    if (!reassignSlotId) return [];
+    return ExamSchedulerService.getSmartReassignCandidates(
+      scheduleData,
+      reassignSlotId,
+      allTeachers
+    );
+  }, [scheduleData, reassignSlotId, allTeachers]);
 
   // Helper: check if a teacher teaches the subject in a slot
   const isTeacherOfSubject = (teacherName: string, subject: string): boolean => {
@@ -452,6 +483,136 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                 </div>
               </div>
 
+              {/* SMART SWAP SUGGESTIONS (1-CLICK NO CLASH) */}
+              <div className="p-3.5 sm:p-4 bg-linear-to-br from-amber-50/70 via-white to-slate-50 rounded-2xl border border-amber-300/80 shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
+                        <span>Penyaranan Cerdas Bebas Bentrok (1-Klik)</span>
+                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black">
+                          {smartSwapSuggestions.length} Pilihan Aman
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Pilih langsung tanpa takut bentrok jadwal. Guru A dan Guru B sama-sama senggang di waktu pertukaran.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Day Filter Chips */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setSwapFilterDay('ALL')}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        swapFilterDay === 'ALL'
+                          ? 'bg-amber-600 text-white shadow-2xs'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      Semua Hari
+                    </button>
+                    {availableDays.map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => setSwapFilterDay(day)}
+                        className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          swapFilterDay.toLowerCase() === day.toLowerCase()
+                            ? 'bg-amber-600 text-white shadow-2xs'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Suggestions Grid */}
+                {smartSwapSuggestions.length === 0 ? (
+                  <div className="p-4 bg-white rounded-xl border border-dashed border-slate-300 text-center text-slate-500 text-xs">
+                    Tidak ditemukan sesi yang bebas bentrok untuk filter hari ini. Silakan coba filter hari lain atau pilih manual melalui dropdown Sesi B di atas.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {smartSwapSuggestions.slice(0, 4).map((cand) => {
+                      const isSelected = slotBId === cand.slot.id;
+                      return (
+                        <div
+                          key={cand.slot.id}
+                          className={`p-3 rounded-xl border transition-all text-xs flex flex-col justify-between gap-2 ${
+                            isSelected
+                              ? 'bg-amber-50/90 border-amber-400 ring-2 ring-amber-400/40 shadow-xs'
+                              : 'bg-white border-slate-200 hover:border-amber-300 hover:shadow-2xs'
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                              <span className="font-extrabold text-slate-900 flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                {cand.slot.dayName}, {cand.slot.date}
+                              </span>
+                              <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-black">
+                                {cand.slot.roomName}
+                              </span>
+                            </div>
+
+                            <div className="pt-0.5 flex items-center justify-between gap-1">
+                              <span className="font-black text-slate-800 truncate text-[11px]">
+                                {cand.slot.mainProctorName}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                                Sesi {cand.slot.sessionNumber} ({cand.slot.startTime}-{cand.slot.endTime})
+                              </span>
+                            </div>
+
+                            <p className="text-[10px] text-slate-500 truncate">
+                              Mapel: <strong className="text-slate-700">{cand.slot.subject}</strong> (Kelas {cand.slot.className})
+                            </p>
+
+                            {cand.isOwnSubjectForA && (
+                              <div className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
+                                ℹ️ {slotA?.mainProctorName} pengampu mapel ini (diizinkan)
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSlotBId(cand.slot.id);
+                              setErrorMessage(null);
+                            }}
+                            className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-600 text-white shadow-2xs'
+                                : 'bg-slate-100 hover:bg-amber-100 text-slate-800 hover:text-amber-950 border border-slate-200 hover:border-amber-300'
+                            }`}
+                          >
+                            {isSelected ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-white" />
+                                <span>Terpilih sebagai Sesi B</span>
+                              </>
+                            ) : (
+                              <>
+                                <ArrowLeftRight className="w-3.5 h-3.5 text-amber-700" />
+                                <span>1-Klik Pilih Sesi Ini</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Preview Comparison Card */}
               {slotA && slotB && (
                 <div className="p-4 bg-linear-to-r from-amber-50/80 via-white to-teal-50/80 rounded-2xl border border-amber-200/90 shadow-2xs space-y-3">
@@ -642,6 +803,97 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* SMART REASSIGN SUGGESTIONS (LIGHTEST LOAD & AVAILABLE) */}
+              <div className="p-3.5 sm:p-4 bg-linear-to-br from-teal-50/70 via-white to-slate-50 rounded-2xl border border-teal-300/80 shadow-xs space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-teal-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
+                      <span>Rekomendasi Guru Pengganti (Beban Paling Ringan)</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-teal-100 text-teal-900 border border-teal-300 text-[10px] font-black">
+                        {smartReassignSuggestions.filter((c) => c.isAvailable).length} Guru Siap
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Sistem memprioritaskan guru yang sedang senggang di jam ini dan memiliki jumlah sesi mengawas paling sedikit.
+                    </p>
+                  </div>
+                </div>
+
+                {smartReassignSuggestions.filter((c) => c.isAvailable).length === 0 ? (
+                  <div className="p-4 bg-white rounded-xl border border-dashed border-slate-300 text-center text-slate-500 text-xs">
+                    Seluruh guru sedang bertugas mengawas pada jam & sesi ini.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {smartReassignSuggestions
+                      .filter((c) => c.isAvailable)
+                      .slice(0, 6)
+                      .map((cand) => {
+                        const isSelected = newTeacherId === cand.teacherId;
+                        return (
+                          <div
+                            key={cand.teacherId}
+                            className={`p-3 rounded-xl border transition-all text-xs flex flex-col justify-between gap-2 ${
+                              isSelected
+                                ? 'bg-teal-50/90 border-teal-500 ring-2 ring-teal-400/40 shadow-xs'
+                                : 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-2xs'
+                            }`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-black text-slate-900 truncate text-[11px]">
+                                  {cand.teacherName}
+                                </span>
+                                <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 text-[10px] font-bold shrink-0">
+                                  {cand.currentDutyCount} Sesi
+                                </span>
+                              </div>
+
+                              <p className="text-[10px] text-slate-500 truncate">
+                                Mapel: {cand.teachingSubject || '-'}
+                              </p>
+
+                              {cand.isOwnSubject && (
+                                <div className="text-[9px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
+                                  ℹ️ Pengampu mapel ini (diizinkan)
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewTeacherId(cand.teacherId);
+                                setErrorMessage(null);
+                              }}
+                              className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-teal-700 text-white shadow-2xs'
+                                  : 'bg-slate-100 hover:bg-teal-100 text-slate-800 hover:text-teal-950 border border-slate-200 hover:border-teal-300'
+                              }`}
+                            >
+                              {isSelected ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-white" />
+                                  <span>Terpilih</span>
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="w-3.5 h-3.5 text-teal-700" />
+                                  <span>1-Klik Tugaskan</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
 
               {reassignConflictWarning && (

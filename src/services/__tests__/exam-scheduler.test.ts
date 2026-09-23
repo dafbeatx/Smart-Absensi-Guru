@@ -741,6 +741,127 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 22: Error testing single proctor reassign', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 23: Smart Recommendation Engine for Mutual Proctor Swap
+  // ---------------------------------------------------------------------------
+  try {
+    const multiDayConfig: ExamScheduleFormConfig = {
+      examType: 'ASTS',
+      examTitle: 'ASTS Ganjil Multi-Day',
+      academicYear: testAcademicYear,
+      semester: '1',
+      startDate: '2026-09-28', // Senin
+      endDate: '2026-09-29',   // Selasa
+      sessionsPerDay: 2,
+      sessionSlots: [
+        { sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:30' },
+        { sessionNumber: 2, sessionName: 'Sesi 2', startTime: '10:00', endTime: '12:00' },
+      ],
+      selectedClasses: ['7A', '7B'],
+      selectedSubjects: ['Matematika', 'Bahasa Indonesia', 'Informatika', 'IPA'],
+      selectedTeacherIds: [
+        sampleTeachers[0].id, // Ahmad Dahlan (Matematika)
+        sampleTeachers[1].id, // Siti Aminah (Bahasa Indonesia)
+        sampleTeachers[2].id, // Budi Santoso (Informatika)
+        sampleTeachers[3].id, // Dewi Lestari (IPA)
+      ],
+      proctorsPerRoom: 1,
+      excludeOwnSubject: false,
+      excludeCommitteeProctor: false,
+      assignBackupProctor: false,
+    };
+
+    const sched = ExamSchedulerService.generateSchedule(multiDayConfig, sampleTeachers, []);
+    const slotA = sched.proctorSchedules[0];
+
+    // 1. Get all smart swap candidates (unfiltered)
+    const allCandidates = ExamSchedulerService.getSmartSwapCandidates(sched, slotA.id, undefined, sampleTeachers);
+
+    // Verify all returned candidates are marked zero conflict
+    const allZeroConflict = allCandidates.length > 0 && allCandidates.every((c) => c.isZeroConflict);
+
+    // Verify none of the candidates have the same slot or the same proctor
+    const noSelfSwap = allCandidates.every(
+      (c) => c.slot.id !== slotA.id && c.slot.mainProctorId !== slotA.mainProctorId
+    );
+
+    // 2. Filter candidates specifically for 'Selasa'
+    const selasaCandidates = ExamSchedulerService.getSmartSwapCandidates(sched, slotA.id, 'Selasa', sampleTeachers);
+    const allAreSelasa = selasaCandidates.length > 0 && selasaCandidates.every((c) => c.targetDayName.toLowerCase() === 'selasa');
+
+    // 3. Verify match scores are sorted descending
+    let isSorted = true;
+    for (let i = 0; i < allCandidates.length - 1; i++) {
+      if (allCandidates[i].matchScore < allCandidates[i + 1].matchScore) {
+        isSorted = false;
+        break;
+      }
+    }
+
+    assert(
+      'Exam Scheduler 23: Smart Recommendation Engine generates 100% clash-free swap candidates with day filtering and score ranking',
+      allCandidates.length > 0 &&
+        allZeroConflict &&
+        noSelfSwap &&
+        selasaCandidates.length > 0 &&
+        allAreSelasa &&
+        isSorted,
+      `All Candidates: ${allCandidates.length}, Selasa Candidates: ${selasaCandidates.length}, All Zero Conflict: ${allZeroConflict}, Sorted: ${isSorted}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 23: Error testing smart swap recommendation engine', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 24: Smart Recommendation Engine for Single Proctor Reassignment
+  // ---------------------------------------------------------------------------
+  try {
+    const reassignConfig: ExamScheduleFormConfig = {
+      examType: 'ASTS',
+      examTitle: 'ASTS Reassign Test',
+      academicYear: testAcademicYear,
+      semester: '1',
+      startDate: '2026-09-28',
+      endDate: '2026-09-28',
+      sessionsPerDay: 1,
+      sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:30' }],
+      selectedClasses: ['7A'],
+      selectedSubjects: ['Matematika'],
+      selectedTeacherIds: [sampleTeachers[0].id], // Ahmad Dahlan assigned
+      proctorsPerRoom: 1,
+      excludeOwnSubject: false,
+      excludeCommitteeProctor: false,
+      assignBackupProctor: false,
+    };
+
+    const sched = ExamSchedulerService.generateSchedule(reassignConfig, sampleTeachers, []);
+    const targetSlot = sched.proctorSchedules[0];
+
+    // Get smart reassign candidates from all sample teachers
+    const candidates = ExamSchedulerService.getSmartReassignCandidates(sched, targetSlot.id, sampleTeachers);
+
+    // Target proctor (Ahmad Dahlan) should not be in candidate list
+    const containsSelf = candidates.some((c) => c.teacherId === targetSlot.mainProctorId);
+
+    // All other 4 teachers (Siti, Budi, Dewi, Hasan) should be available (isAvailable = true)
+    const availableCount = candidates.filter((c) => c.isAvailable).length;
+
+    // Available candidates should have duty count 0 and be ranked first
+    const firstCandidate = candidates[0];
+
+    assert(
+      'Exam Scheduler 24: Smart Reassign Recommendation Engine ranks available teachers with lowest duty count and excludes current proctor',
+      !containsSelf &&
+        candidates.length === sampleTeachers.length - 1 &&
+        availableCount === sampleTeachers.length - 1 &&
+        firstCandidate.isAvailable === true &&
+        firstCandidate.currentDutyCount === 0,
+      `Total candidates: ${candidates.length}, Contains Self: ${containsSelf}, First candidate: ${firstCandidate?.teacherName} (Duties: ${firstCandidate?.currentDutyCount})`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 24: Error testing smart reassign recommendation engine', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
 
