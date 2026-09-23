@@ -354,7 +354,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     <select
                       value={slotAId}
                       onChange={(e) => setSlotAId(e.target.value)}
-                      className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                      className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 cursor-pointer"
                     >
                       {scheduleData.proctorSchedules.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -409,7 +409,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     <select
                       value={slotBId}
                       onChange={(e) => setSlotBId(e.target.value)}
-                      className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 cursor-pointer"
+                      className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 cursor-pointer"
                     >
                       <option value="">-- Pilih Sesi Tujuan Bertukar --</option>
                       {scheduleData.proctorSchedules
@@ -496,7 +496,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                   value={swapReason}
                   onChange={(e) => setSwapReason(e.target.value)}
                   placeholder="Contoh: Pak Ahmad izin dinas luar hari Senin, bertukar ke Selasa dengan Bu Siti"
-                  className="w-full text-xs bg-white border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  className="w-full text-xs bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 />
               </div>
 
@@ -506,7 +506,11 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                   type="button"
                   onClick={handleExecuteSwap}
                   disabled={!slotA || !slotB || Boolean(swapConflictWarning) || isSubmitting}
-                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 text-white text-xs font-bold transition-all shadow-xs disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                  className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 ${
+                    !slotA || !slotB || Boolean(swapConflictWarning) || isSubmitting
+                      ? 'bg-slate-300 cursor-not-allowed'
+                      : 'bg-amber-600 hover:bg-amber-700 cursor-pointer'
+                  }`}
                 >
                   <ArrowLeftRight className="w-4 h-4" />
                   <span>{isSubmitting ? 'Memproses Pertukaran...' : 'Tukar Kedua Jadwal Ini'}</span>
@@ -539,7 +543,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     <select
                       value={reassignSlotId}
                       onChange={(e) => setReassignSlotId(e.target.value)}
-                      className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 cursor-pointer"
+                      className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer"
                     >
                       {scheduleData.proctorSchedules.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -584,7 +588,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     <select
                       value={newTeacherId}
                       onChange={(e) => setNewTeacherId(e.target.value)}
-                      className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 cursor-pointer"
+                      className="w-full text-xs font-medium bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer"
                     >
                       <option value="">-- Pilih Guru Pengganti --</option>
                       {allTeachers
@@ -657,7 +661,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                   value={reassignReason}
                   onChange={(e) => setReassignReason(e.target.value)}
                   placeholder="Contoh: Menggantikan guru piket / izin sakit"
-                  className="w-full text-xs bg-white border border-slate-300 rounded-xl p-2.5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full text-xs bg-white border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
                 />
               </div>
 
@@ -667,7 +671,11 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                   type="button"
                   onClick={handleExecuteReassign}
                   disabled={!reassignSlot || !selectedNewTeacher || Boolean(reassignConflictWarning) || isSubmitting}
-                  className="px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white text-xs font-bold transition-all shadow-xs disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                  className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 ${
+                    !reassignSlot || !selectedNewTeacher || Boolean(reassignConflictWarning) || isSubmitting
+                      ? 'bg-slate-300 cursor-not-allowed'
+                      : 'bg-teal-700 hover:bg-teal-800 cursor-pointer'
+                  }`}
                 >
                   <UserCheck className="w-4 h-4" />
                   <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Pergantian Pengawas'}</span>
