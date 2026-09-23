@@ -2757,7 +2757,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                             <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
                               isChecked ? 'bg-emerald-500 text-white' : 'border border-slate-300 bg-white'
                             }`}>
-                              {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                              {isChecked && <Check className="w-3 h-3 stroke-3" />}
                             </div>
                             <span className="truncate">{sub}</span>
                           </div>
