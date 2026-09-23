@@ -1540,7 +1540,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
         {/* TAB 0: ASISTEN AI JADWAL UJIAN (PROMPT CEPAT & OTOMATIS) */}
         {/* ========================================================================= */}
         {activeTab === 'ai_prompt' && accessInfo.canManage && (
-          <div className="max-w-4xl mx-auto space-y-5 animate-fadeIn pb-12">
+          <div className="w-full max-w-6xl xl:max-w-7xl mx-auto space-y-6 animate-fadeIn pb-16">
             {/* 1. Header Banner */}
             <div className="bg-linear-to-r from-[#023246] via-[#18536B] to-[#2457A6] rounded-2xl p-5 sm:p-6 text-white shadow-md space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1566,8 +1566,8 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               </div>
 
               {/* Data Context Pills */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-white/15 text-xs">
-                <div className="bg-black/20 rounded-xl p-2.5 border border-white/10">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-3 border-t border-white/15 text-xs">
+                <div className="bg-black/20 rounded-xl p-3 border border-white/10">
                   <span className="text-[10px] text-teal-200 block uppercase font-bold tracking-wider">Unit Sekolah</span>
                   <span className="font-bold text-white text-sm">
                     {selectedLevel === 'SMP' ? 'SMP Al-Ittihadiyah' : 'SMA As Salaam'}
@@ -1665,7 +1665,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                 <span className="text-[11px] text-slate-400">Klik salah satu untuk mengisi otomatis</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {getExamAIPromptPresets(selectedLevel).map((preset) => {
                   const isSelected = selectedPresetId === preset.id;
                   return (
@@ -1841,257 +1841,462 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
 
         {/* ========================================================================= */}
         {/* TAB 1: FORM PARAMETER & AI GENERATOR (PANITIA ONLY) */}
-        {/* ========================================================================= */}
         {activeTab === 'form' && accessInfo.canManage && (
-          <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn pb-12">
-            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-5">
-              <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-200">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-amber-500" />
-                    Formulir Parameter Penyusunan Jadwal Ujian Cerdas (AI)
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Silakan lengkapi parameter pelaksanaan di bawah ini. AI Engine akan menyusun jadwal mapel dan distribusi pengawas yang adil, seimbang, dan bebas bentrok.
-                  </p>
-                </div>
+          <div className="w-full max-w-7xl mx-auto space-y-6 animate-fadeIn pb-24">
+            {/* Top Overview & Status Card */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-500 shrink-0" />
+                  <span>Formulir Parameter Penyusunan Jadwal Ujian Cerdas (AI)</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                  Silakan lengkapi parameter pelaksanaan di bawah ini. AI Engine akan menghitung kapasitas slot, memetakan mata pelajaran, dan membagi tugas pengawas secara adil, seimbang, dan bebas bentrok.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+                <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                  Jenjang: <strong>{selectedLevel}</strong>
+                </span>
+                <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                  TA: <strong>{formAcademicYear || activeAcademicYear}</strong>
+                </span>
                 <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200 shrink-0">
                   {accessInfo.roleLabel}
                 </span>
               </div>
+            </div>
 
-              {/* Alert Banner if schedule already exists */}
-              {scheduleData && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
-                  <div className="flex items-center gap-2.5">
-                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-                    <div>
-                      <span className="font-bold text-slate-900 block">Jadwal Ujian Tersimpan Ditemukan</span>
-                      <span className="text-slate-600">
-                        Jadwal {scheduleData.config.examTitle || scheduleData.config.examType} (TA {scheduleData.config.academicYear}) sudah tersimpan di sistem. Anda dapat melihat hasil di tab Jadwal Ujian / Roster Pengawas, atau menghapus jadwal saat ini untuk menyusun ulang.
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('subjects')}
-                      className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-800 text-xs font-bold hover:bg-amber-100 transition-colors shadow-2xs"
-                    >
-                      Lihat Jadwal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsConfirmDeleteOpen(true)}
-                      className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-2xs flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Hapus Jadwal Ini</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 1. Identitas Asesmen, Tahun Ajaran & Waktu */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Tahun Ajaran Pelaksanaan</label>
-                  <select
-                    value={formAcademicYear}
-                    onChange={(e) => handleAcademicYearChange(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                  >
-                    {AVAILABLE_ACADEMIC_YEARS.map((y) => (
-                      <option key={y.year} value={y.year}>
-                        TA {y.year} {y.isActive ? '(Tahun Aktif)' : '(Arsip)'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Jenis Asesmen / Ujian</label>
-                  <select
-                    value={formExamType}
-                    onChange={(e) => handleExamTypeChange(e.target.value as ExamType)}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                  >
-                    <option value="ASTS">ASTS (Asesmen Tengah Semester)</option>
-                    <option value="ASAS">ASAS (Asesmen Akhir Semester)</option>
-                    <option value="ASAJ">ASAJ (Asesmen Akhir Jenjang / US)</option>
-                    <option value="HARIAN">Penilaian Harian Bersama / Kuis</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Tanggal Mulai Ujian</label>
-                  <input
-                    type="date"
-                    value={formStartDate}
-                    onChange={(e) => setFormStartDate(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Tanggal Selesai Ujian</label>
-                  <input
-                    type="date"
-                    value={formEndDate}
-                    onChange={(e) => setFormEndDate(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Quick Range Selector & Saturday Toggle */}
-              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500">⚡ Rentang Cepat:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const mon = getSmartDefaultExamStartDate();
-                      setFormStartDate(mon);
-                      setFormEndDate(getSmartDefaultExamEndDate(mon));
-                    }}
-                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white border border-teal-200 text-teal-700 hover:bg-teal-50 shadow-2xs transition-all"
-                  >
-                    🗓️ Senin - Jumat Pekan Ini
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const now = new Date();
-                      const day = now.getDay();
-                      const daysToNextNextMon = day === 1 ? 7 : (8 - day) % 7 + 7;
-                      const nextMon = new Date(now);
-                      nextMon.setDate(now.getDate() + daysToNextNextMon);
-                      const monStr = nextMon.toISOString().split('T')[0];
-                      setFormStartDate(monStr);
-                      setFormEndDate(getSmartDefaultExamEndDate(monStr));
-                    }}
-                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 shadow-2xs transition-all"
-                  >
-                    🗓️ Senin - Jumat Pekan Depan
-                  </button>
-                </div>
-
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includeSaturday}
-                    onChange={(e) => setIncludeSaturday(e.target.checked)}
-                    className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300"
-                  />
-                  <span className="text-[11px] font-bold text-slate-700">
-                    Sertakan Hari Sabtu {includeSaturday ? '(Aktif)' : '(Libur Pekan)'}
-                  </span>
-                </label>
-              </div>
-
-              {/* 2. Pengaturan Sesi Jam per Hari (Mendukung Jumlah Sesi Berbeda Setiap Hari) */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200">
+            {/* Alert Banner if schedule already exists */}
+            {scheduleData && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
                   <div>
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-teal-600" />
-                      Pengaturan Sesi Harian
+                    <span className="font-bold text-slate-900 block">Jadwal Ujian Tersimpan Ditemukan</span>
+                    <span className="text-slate-600">
+                      Jadwal {scheduleData.config.examTitle || scheduleData.config.examType} (TA {scheduleData.config.academicYear}) sudah tersimpan di sistem. Anda dapat melihat hasil di tab Jadwal Ujian / Roster Pengawas, atau menghapus jadwal saat ini untuk menyusun ulang.
                     </span>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Tentukan jumlah sesi pelaksanaan ujian secara fleksibel (bisa berbeda setiap hari, mis. Jumat 1 atau 2 sesi, hari biasa 3 sesi).
-                    </p>
-                  </div>
-
-                  {/* Mode Selector Toggle */}
-                  <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs self-start sm:self-auto shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => setSessionMode('PER_DAY')}
-                      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 ${
-                        sessionMode === 'PER_DAY'
-                          ? 'bg-teal-600 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>🗓️ Kustom Per Hari</span>
-                      <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
-                        sessionMode === 'PER_DAY' ? 'bg-white/20 text-white' : 'bg-teal-50 text-teal-700'
-                      }`}>
-                        Rekomendasi
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSessionMode('UNIFORM')}
-                      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
-                        sessionMode === 'UNIFORM'
-                          ? 'bg-teal-600 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>⚖️ Seragam Semua Hari</span>
-                    </button>
                   </div>
                 </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('subjects')}
+                    className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-800 text-xs font-bold hover:bg-amber-100 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    Lihat Jadwal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmDeleteOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus Jadwal Ini</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
-                {/* Content based on sessionMode */}
-                {sessionMode === 'PER_DAY' ? (
-                  <div className="space-y-3">
-                    {/* Quick Preset Buttons */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] font-bold text-slate-500 mr-1">Preset Cepat:</span>
+            {/* Main 2-Column Responsive Layout for Desktop / Laptop / Tablet */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* LEFT COLUMN: Waktu, Periode & Pengaturan Sesi Harian (lg:col-span-7) */}
+              <div className="lg:col-span-7 space-y-6">
+                {/* 1. Identitas Asesmen & Rentang Waktu */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+                  <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-teal-600" />
+                      1. Periode & Identitas Asesmen
+                    </span>
+                    <span className="text-[11px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                      Langkah 1
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tahun Ajaran Pelaksanaan</label>
+                      <select
+                        value={formAcademicYear}
+                        onChange={(e) => handleAcademicYearChange(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all cursor-pointer"
+                      >
+                        {AVAILABLE_ACADEMIC_YEARS.map((y) => (
+                          <option key={y.year} value={y.year}>
+                            TA {y.year} {y.isActive ? '(Tahun Aktif)' : '(Arsip)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Jenis Asesmen / Ujian</label>
+                      <select
+                        value={formExamType}
+                        onChange={(e) => handleExamTypeChange(e.target.value as ExamType)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all cursor-pointer"
+                      >
+                        <option value="ASTS">ASTS (Asesmen Tengah Semester)</option>
+                        <option value="ASAS">ASAS (Asesmen Akhir Semester)</option>
+                        <option value="ASAJ">ASAJ (Asesmen Akhir Jenjang / US)</option>
+                        <option value="HARIAN">Penilaian Harian Bersama / Kuis</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tanggal Mulai Ujian</label>
+                      <input
+                        type="date"
+                        value={formStartDate}
+                        onChange={(e) => setFormStartDate(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono font-medium transition-all"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tanggal Selesai Ujian</label>
+                      <input
+                        type="date"
+                        value={formEndDate}
+                        onChange={(e) => setFormEndDate(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono font-medium transition-all"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick Range Selector & Saturday Toggle */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-500">⚡ Rentang Cepat:</span>
                       <button
                         type="button"
-                        onClick={applyPresetFriday2}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs"
+                        onClick={() => {
+                          const mon = getSmartDefaultExamStartDate();
+                          setFormStartDate(mon);
+                          setFormEndDate(getSmartDefaultExamEndDate(mon));
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white border border-teal-200 text-teal-700 hover:bg-teal-50 shadow-2xs transition-all cursor-pointer"
                       >
-                        ⚡ Hari Biasa 3 Sesi, Jumat 2 Sesi
+                        🗓️ Senin - Jumat Pekan Ini
                       </button>
                       <button
                         type="button"
-                        onClick={applyPresetFriday1}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs"
+                        onClick={() => {
+                          const now = new Date();
+                          const day = now.getDay();
+                          const daysToNextNextMon = day === 1 ? 7 : (8 - day) % 7 + 7;
+                          const nextMon = new Date(now);
+                          nextMon.setDate(now.getDate() + daysToNextNextMon);
+                          const monStr = nextMon.toISOString().split('T')[0];
+                          setFormStartDate(monStr);
+                          setFormEndDate(getSmartDefaultExamEndDate(monStr));
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 shadow-2xs transition-all cursor-pointer"
                       >
-                        ⚡ Hari Biasa 2 Sesi, Jumat 1 Sesi
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyPresetAll(3)}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs"
-                      >
-                        Semua 3 Sesi
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyPresetAll(2)}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs"
-                      >
-                        Semua 2 Sesi
+                        🗓️ Senin - Jumat Pekan Depan
                       </button>
                     </div>
 
-                    {/* Master Session Time Slots (Adjustable by Committee) */}
-                    <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2.5 shadow-2xs">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                        <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                          <span>⏰</span>
-                          <span>Jam Pelaksanaan Tiap Sesi (Hari Biasa: Senin - Kamis & Sabtu)</span>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={includeSaturday}
+                        onChange={(e) => setIncludeSaturday(e.target.checked)}
+                        className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300 cursor-pointer"
+                      />
+                      <span className="text-[11px] font-bold text-slate-700">
+                        Sertakan Hari Sabtu {includeSaturday ? '(Aktif)' : '(Libur Pekan)'}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* 2. Pengaturan Sesi Jam per Hari */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-teal-600" />
+                        2. Pengaturan Sesi Harian & Waktu
+                      </span>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Tentukan jumlah sesi pelaksanaan ujian secara fleksibel (bisa berbeda per hari, mis. Jumat 1-2 sesi, hari biasa 3 sesi).
+                      </p>
+                    </div>
+
+                    {/* Mode Selector Toggle */}
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs self-start sm:self-auto shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setSessionMode('PER_DAY')}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          sessionMode === 'PER_DAY'
+                            ? 'bg-teal-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <span>🗓️ Kustom Per Hari</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                          sessionMode === 'PER_DAY' ? 'bg-white/20 text-white' : 'bg-teal-50 text-teal-700'
+                        }`}>
+                          Rekomendasi
                         </span>
-                        <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md font-bold border border-teal-200">
-                          Setiap sesi menguji 1 mata pelajaran berbeda
-                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSessionMode('UNIFORM')}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                          sessionMode === 'UNIFORM'
+                            ? 'bg-teal-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <span>⚖️ Seragam Semua Hari</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {sessionMode === 'PER_DAY' ? (
+                    <div className="space-y-4">
+                      {/* Quick Preset Buttons */}
+                      <div className="flex items-center gap-2 flex-wrap p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl">
+                        <span className="text-[11px] font-bold text-slate-500 mr-1">Preset Cepat:</span>
+                        <button
+                          type="button"
+                          onClick={applyPresetFriday2}
+                          className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          ⚡ Hari Biasa 3 Sesi, Jumat 2 Sesi
+                        </button>
+                        <button
+                          type="button"
+                          onClick={applyPresetFriday1}
+                          className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          ⚡ Hari Biasa 2 Sesi, Jumat 1 Sesi
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPresetAll(3)}
+                          className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          Semua 3 Sesi
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPresetAll(2)}
+                          className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          Semua 2 Sesi
+                        </button>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                      {/* Master Session Time Slots */}
+                      <div className="p-3.5 bg-slate-50/70 border border-slate-200 rounded-xl space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                            <span>⏰</span>
+                            <span>Jam Pelaksanaan Tiap Sesi (Senin - Kamis & Sabtu)</span>
+                          </span>
+                          <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md font-bold border border-teal-200">
+                            1 sesi = 1 mapel
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5">
+                          {sessionSlots.map((slot, idx) => (
+                            <div key={slot.sessionNumber} className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block truncate">
+                                  {slot.sessionName}
+                                </span>
+                                <span className="text-[9px] font-mono text-slate-400">
+                                  {getSessionDurationText(slot.startTime, slot.endTime)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="time"
+                                  value={slot.startTime}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSessionSlots((prev) => {
+                                      const next = [...prev];
+                                      next[idx].startTime = val;
+                                      return next;
+                                    });
+                                  }}
+                                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                />
+                                <span className="text-[10px] text-slate-400 font-bold">s/d</span>
+                                <input
+                                  type="time"
+                                  value={slot.endTime}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSessionSlots((prev) => {
+                                      const next = [...prev];
+                                      next[idx].endTime = val;
+                                      return next;
+                                    });
+                                  }}
+                                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between text-[11px] text-amber-900 flex-wrap gap-2">
+                          <span className="font-bold flex items-center gap-1.5">
+                            <span>🕌</span>
+                            <span>Khusus Hari Jumat (Otomatis Selesai Sebelum Sholat Jumat):</span>
+                          </span>
+                          <span className="font-mono font-semibold bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+                            Sesi 1: 07:15 - 08:45 | Sesi 2: 09:00 - 10:30 WIB
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Per-Day Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                        {validExamDates.map((dateInfo) => {
+                          const override = dayOverrides.find((d) => d.date === dateInfo.date);
+                          const currentCount = override?.sessionsCount ?? (dateInfo.dayName.toLowerCase() === 'jumat' ? 2 : sessionsPerDay);
+                          const isFriday = dateInfo.dayName.toLowerCase() === 'jumat';
+                          const dayOffset = slotOffsets.get(dateInfo.date) || 0;
+
+                          return (
+                            <div
+                              key={dateInfo.date}
+                              className={`p-3.5 rounded-xl border transition-all shadow-2xs space-y-2.5 ${
+                                isFriday
+                                  ? 'bg-amber-50/50 border-amber-200'
+                                  : 'bg-slate-50/70 border-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <div>
+                                  <span className="text-xs font-black text-slate-900 block">
+                                    {dateInfo.dayName}
+                                    {isFriday && (
+                                      <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-200 text-amber-900">
+                                        Jumat
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 font-mono">
+                                    {dateInfo.date}
+                                  </span>
+                                </div>
+                                <span className="text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-lg">
+                                  {currentCount} Sesi / Mapel
+                                </span>
+                              </div>
+
+                              {/* Session count selector pills */}
+                              <div className="grid grid-cols-4 gap-1">
+                                {[1, 2, 3, 4].map((cnt) => (
+                                  <button
+                                    key={cnt}
+                                    type="button"
+                                    onClick={() => handleDaySessionChange(dateInfo.date, cnt)}
+                                    className={`py-1.5 rounded-lg text-[11px] font-bold text-center transition-all cursor-pointer ${
+                                      currentCount === cnt
+                                        ? 'bg-teal-600 text-white shadow-2xs'
+                                        : 'bg-white hover:bg-slate-200 text-slate-600 border border-slate-200/80'
+                                    }`}
+                                  >
+                                    {cnt} Sesi
+                                  </button>
+                                ))}
+                              </div>
+
+                              {/* Session Breakdown List */}
+                              <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200/70">
+                                {Array.from({ length: currentCount }, (_, i) => i + 1).map((sNum) => {
+                                  let sStart = '07:30';
+                                  let sEnd = '09:00';
+                                  if (isFriday) {
+                                    if (sNum === 1) { sStart = '07:15'; sEnd = '08:45'; }
+                                    else if (sNum === 2) { sStart = '09:00'; sEnd = '10:30'; }
+                                    else if (sNum === 3) { sStart = '13:30'; sEnd = '15:00'; }
+                                    else { sStart = '15:15'; sEnd = '16:30'; }
+                                  } else {
+                                    const slot = sessionSlots.find((s) => s.sessionNumber === sNum);
+                                    if (slot) { sStart = slot.startTime; sEnd = slot.endTime; }
+                                    else if (sNum === 1) { sStart = '07:30'; sEnd = '09:00'; }
+                                    else if (sNum === 2) { sStart = '09:30'; sEnd = '11:00'; }
+                                    else if (sNum === 3) { sStart = '11:15'; sEnd = '12:45'; }
+                                    else { sStart = '13:15'; sEnd = '14:45'; }
+                                  }
+
+                                  return (
+                                    <div key={sNum} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-md border border-slate-200/60 shadow-2xs">
+                                      <span className="font-bold text-teal-900">
+                                        Sesi {sNum}: <span className="font-mono text-slate-700 font-semibold">{sStart} - {sEnd}</span>
+                                      </span>
+                                      <span className="text-[10px] text-slate-500 font-medium">
+                                        Mapel #{dayOffset + sNum}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                                {isFriday && (
+                                  <p className="text-[10px] text-amber-800 font-bold flex items-center gap-1 pt-0.5">
+                                    <span>🕌</span>
+                                    <span>Selesai 10:30 (Sebelum Jumatan)</span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Summary bar */}
+                      <div className="p-3 bg-teal-50/80 border border-teal-200 rounded-xl flex items-center justify-between text-xs text-teal-900 flex-wrap gap-2">
+                        <span className="font-bold">
+                          📊 Total Kapasitas Slot: <span className="text-teal-700 font-black">{totalSlotsCapacity} Sesi Ujian</span> ({validExamDates.length} hari pelaksanaan)
+                        </span>
+                        <span className="text-[11px] text-teal-700 font-semibold">
+                          {totalSlotsCapacity >= selectedSubjects.length
+                            ? `✓ Kapasitas mencukupi untuk ${selectedSubjects.length} mata pelajaran terpilih`
+                            : `⚠️ Kurang ${selectedSubjects.length - totalSlotsCapacity} slot mapel. Tambah sesi pada hari tertentu.`}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <span className="text-xs font-bold text-slate-700">Jumlah Sesi per Hari (Sama untuk semua hari):</span>
+                        <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 text-xs">
+                          {[1, 2, 3, 4].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => handleSessionsPerDayChange(n)}
+                              className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                sessionsPerDay === n ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              {n} Sesi/Hari
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                         {sessionSlots.map((slot, idx) => (
-                          <div key={slot.sessionNumber} className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80 space-y-1.5">
-                            <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider block truncate">
+                          <div key={slot.sessionNumber} className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+                            <span className="text-[11px] font-black text-teal-700 uppercase tracking-wider block">
                               {slot.sessionName}
                             </span>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                               <input
                                 type="time"
                                 value={slot.startTime}
@@ -2103,9 +2308,9 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                     return next;
                                   });
                                 }}
-                                className="w-full bg-white border border-slate-300 rounded-md p-1 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-800"
                               />
-                              <span className="text-[10px] text-slate-400 font-bold">s/d</span>
+                              <span className="text-xs text-slate-400">s/d</span>
                               <input
                                 type="time"
                                 value={slot.endTime}
@@ -2117,504 +2322,293 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                     return next;
                                   });
                                 }}
-                                className="w-full bg-white border border-slate-300 rounded-md p-1 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-800"
                               />
                             </div>
                           </div>
                         ))}
                       </div>
-
-                      <div className="p-2 bg-amber-50/70 border border-amber-200 rounded-lg flex items-center justify-between text-[11px] text-amber-900 flex-wrap gap-1">
-                        <span className="font-bold flex items-center gap-1">
-                          <span>🕌</span>
-                          <span>Khusus Hari Jumat (Otomatis Selesai Sebelum Sholat Jumat):</span>
-                        </span>
-                        <span className="font-mono font-semibold">
-                          Sesi 1: 07:15 - 08:45 | Sesi 2: 09:00 - 10:30 WIB
-                        </span>
-                      </div>
                     </div>
-
-                    {/* Per-Day Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                      {validExamDates.map((dateInfo) => {
-                        const override = dayOverrides.find((d) => d.date === dateInfo.date);
-                        const currentCount = override?.sessionsCount ?? (dateInfo.dayName.toLowerCase() === 'jumat' ? 2 : sessionsPerDay);
-                        const isFriday = dateInfo.dayName.toLowerCase() === 'jumat';
-                        const dayOffset = slotOffsets.get(dateInfo.date) || 0;
-
-                        return (
-                          <div
-                            key={dateInfo.date}
-                            className={`p-3 rounded-xl border transition-all shadow-2xs space-y-2 ${
-                              isFriday
-                                ? 'bg-amber-50/60 border-amber-200'
-                                : 'bg-white border-slate-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1">
-                              <div>
-                                <span className="text-xs font-black text-slate-900 block">
-                                  {dateInfo.dayName}
-                                  {isFriday && (
-                                    <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-200 text-amber-900">
-                                      Jumat
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="text-[10px] text-slate-500 font-mono">
-                                  {dateInfo.date}
-                                </span>
-                              </div>
-                              <span className="text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-lg">
-                                {currentCount} Sesi / Mapel
-                              </span>
-                            </div>
-
-                            {/* Session count selector pills */}
-                            <div className="grid grid-cols-4 gap-1">
-                              {[1, 2, 3, 4].map((cnt) => (
-                                <button
-                                  key={cnt}
-                                  type="button"
-                                  onClick={() => handleDaySessionChange(dateInfo.date, cnt)}
-                                  className={`py-1 rounded-lg text-[11px] font-bold text-center transition-all ${
-                                    currentCount === cnt
-                                      ? 'bg-teal-600 text-white shadow-2xs'
-                                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                                  }`}
-                                >
-                                  {cnt} Sesi
-                                </button>
-                              ))}
-                            </div>
-
-                            {/* Session Breakdown List */}
-                            <div className="space-y-1 bg-slate-50/80 p-2 rounded-lg border border-slate-200/70">
-                              {Array.from({ length: currentCount }, (_, i) => i + 1).map((sNum) => {
-                                let sStart = '07:30';
-                                let sEnd = '09:00';
-                                if (isFriday) {
-                                  if (sNum === 1) { sStart = '07:15'; sEnd = '08:45'; }
-                                  else if (sNum === 2) { sStart = '09:00'; sEnd = '10:30'; }
-                                  else if (sNum === 3) { sStart = '13:30'; sEnd = '15:00'; }
-                                  else { sStart = '15:15'; sEnd = '16:30'; }
-                                } else {
-                                  const slot = sessionSlots.find((s) => s.sessionNumber === sNum);
-                                  if (slot) { sStart = slot.startTime; sEnd = slot.endTime; }
-                                  else if (sNum === 1) { sStart = '07:30'; sEnd = '09:00'; }
-                                  else if (sNum === 2) { sStart = '09:30'; sEnd = '11:00'; }
-                                  else if (sNum === 3) { sStart = '11:15'; sEnd = '12:45'; }
-                                  else { sStart = '13:15'; sEnd = '14:45'; }
-                                }
-
-                                return (
-                                  <div key={sNum} className="flex items-center justify-between text-[11px] bg-white px-2 py-1 rounded-md border border-slate-200/60 shadow-2xs">
-                                    <span className="font-bold text-teal-900">
-                                      Sesi {sNum}: <span className="font-mono text-slate-700 font-semibold">{sStart} - {sEnd}</span>
-                                    </span>
-                                    <span className="text-[10px] text-slate-500 font-medium">
-                                      Mapel #{dayOffset + sNum}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                              {isFriday && (
-                                <p className="text-[10px] text-amber-800 font-bold flex items-center gap-1 pt-0.5">
-                                  <span>🕌</span>
-                                  <span>Selesai 10:30 (Sebelum Jumatan)</span>
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Summary bar */}
-                    <div className="p-2.5 bg-teal-50/80 border border-teal-200 rounded-xl flex items-center justify-between text-xs text-teal-900 flex-wrap gap-2">
-                      <span className="font-bold">
-                        📊 Total Kapasitas Slot: <span className="text-teal-700 font-black">{totalSlotsCapacity} Sesi Ujian</span> ({validExamDates.length} hari pelaksanaan)
-                      </span>
-                      <span className="text-[11px] text-teal-700 font-semibold">
-                        {totalSlotsCapacity >= selectedSubjects.length
-                          ? `✓ Kapasitas mencukupi untuk ${selectedSubjects.length} mata pelajaran terpilih`
-                          : `⚠️ Kurang ${selectedSubjects.length - totalSlotsCapacity} slot mapel. Tambah sesi pada hari tertentu.`}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700">Jumlah Sesi per Hari (Sama untuk semua hari):</span>
-                      <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 text-xs">
-                        {[1, 2, 3, 4].map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => handleSessionsPerDayChange(n)}
-                            className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${
-                              sessionsPerDay === n ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                          >
-                            {n} Sesi/Hari
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {sessionSlots.map((slot, idx) => (
-                        <div key={slot.sessionNumber} className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs space-y-2">
-                          <span className="text-[11px] font-black text-teal-700 uppercase tracking-wider block">
-                            {slot.sessionName}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="time"
-                              value={slot.startTime}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setSessionSlots((prev) => {
-                                  const next = [...prev];
-                                  next[idx].startTime = val;
-                                  return next;
-                                });
-                              }}
-                              className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-800"
-                            />
-                            <span className="text-xs text-slate-400">s/d</span>
-                            <input
-                              type="time"
-                              value={slot.endTime}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setSessionSlots((prev) => {
-                                  const next = [...prev];
-                                  next[idx].endTime = val;
-                                  return next;
-                                });
-                              }}
-                              className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-800"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Pilihan Kelas / Rombel Peserta (Academic Year Aware & Zero-Egress Safe) */}
-              <div className="space-y-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-100">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
-                      <span>Rombel / Kelas Peserta Ujian</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        selectedLevel === 'SMA' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-teal-50 text-teal-700 border border-teal-200'
-                      }`}>
-                        Jenjang {selectedLevel}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-50 text-teal-700 border border-teal-200">
-                        TA {formAcademicYear}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                        {selectedClasses.length} Terpilih
-                      </span>
-                    </label>
-                    <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                      <span>
-                        {classDataSource === 'LOCAL_CACHE'
-                          ? `Terdeteksi ${availableClasses.length} rombel (${totalStudentsInYear} siswa terdaftar di TA ${formAcademicYear}) • 0 B Egress (Cache Lokal)`
-                          : classDataSource === 'TEACHING_SCHEDULE'
-                          ? `Terdeteksi ${availableClasses.length} rombel dari Jadwal KBM aktif TA ${formAcademicYear} • 0 B Egress`
-                          : classDataSource === 'CLOUD'
-                          ? `Tersinkron dari Cloud Supabase TA ${formAcademicYear} (${totalStudentsInYear} siswa)`
-                          : `Standar rombel sekolah TA ${formAcademicYear}`}
-                      </span>
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => loadClassesForYear(formAcademicYear, true)}
-                      disabled={isSyncingClasses}
-                      title="Sinkronkan rombel terbaru dari server (jika ada siswa baru ditambahkan)"
-                      className="text-[11px] font-bold text-slate-600 hover:text-teal-700 flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isSyncingClasses ? 'animate-spin text-teal-600' : ''}`} />
-                      <span>{isSyncingClasses ? 'Menyinkron...' : 'Sinkron Server'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedClasses.length === availableClasses.length) {
-                          setSelectedClasses([]);
-                        } else {
-                          setSelectedClasses([...availableClasses]);
-                        }
-                      }}
-                      className="text-[11px] font-bold text-teal-700 hover:text-teal-800 px-2 py-1"
-                    >
-                      {selectedClasses.length === availableClasses.length ? 'Batal Semua' : 'Pilih Semua'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* List of class pills */}
-                <div className="flex flex-wrap gap-2">
-                  {availableClasses.map((cls) => {
-                    const isChecked = selectedClasses.includes(cls);
-                    const count = classStudentCounts[cls];
-                    return (
-                      <button
-                        key={cls}
-                        type="button"
-                        onClick={() => {
-                          setSelectedClasses((prev) =>
-                            isChecked ? prev.filter((c) => c !== cls) : [...prev, cls]
-                          );
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                          isChecked
-                            ? 'bg-teal-600 text-white shadow-2xs'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        {isChecked && <Check className="w-3 h-3" />}
-                        <span>Kelas {cls}</span>
-                        {count !== undefined && count > 0 && (
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
-                            isChecked ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            {count} siswa
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Input Tambah Rombel Kustom */}
-                <div className="flex items-center gap-2 pt-1 max-w-sm">
-                  <input
-                    type="text"
-                    value={customClassInput}
-                    onChange={(e) => setCustomClassInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddCustomClass();
-                      }
-                    }}
-                    placeholder="Tambah rombel/ruang kustom (mis. 9C, Lab 1)..."
-                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 flex-1 font-sans"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomClass}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors shrink-0"
-                  >
-                    + Tambah
-                  </button>
+                  )}
                 </div>
               </div>
 
-              {/* 4. Pengaturan Ruangan Ujian (Ruang 1 s/d Ruang X) */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5 shadow-2xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              {/* RIGHT COLUMN: Rombel, Ruangan, Mapel & Aturan Pengawas (lg:col-span-5) */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* 3. Pilihan Kelas & Ruangan Ujian */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+                  <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                       <DoorOpen className="w-4 h-4 text-teal-600" />
-                      Pengaturan Ruangan Ujian (Ruang 1 s/d ...)
+                      3. Rombel & Ruangan Ujian
                     </span>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Tentukan nomor ruangan ujian (mulai dari Ruang 1 hingga berapa) dan alokasi rombel peserta ke setiap ruangan.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <span className="text-xs font-black text-teal-800 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-lg">
-                      {roomFormat === 'DOUBLE_DIGIT'
-                        ? `Ruang 01 s/d Ruang ${String(totalRooms).padStart(2, '0')}`
-                        : `Ruang 1 s/d Ruang ${totalRooms}`}
+                    <span className="text-[11px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                      Langkah 2
                     </span>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {/* Stepper Jumlah Ruangan */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
-                    <label className="text-[11px] font-bold text-slate-700 block">
-                      Jumlah Ruangan Ujian (Ruang 1 s/d ...)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTotalRooms((prev) => Math.max(1, prev - 1))}
-                        className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center transition-colors shrink-0"
-                        title="Kurangi 1 Ruang"
-                      >
-                        -
-                      </button>
-                      <div className="flex-1 text-center font-mono font-bold text-sm sm:text-base text-slate-900 bg-slate-50 py-1.5 rounded-lg border border-slate-200">
-                        Ruang 1 s/d {roomFormat === 'DOUBLE_DIGIT' ? String(totalRooms).padStart(2, '0') : totalRooms}
+                  {/* Rombel Section */}
+                  <div className="space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-100">
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <label className="text-xs font-bold text-slate-800">Rombel Peserta Ujian:</label>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            {selectedClasses.length} Terpilih
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                          <span>
+                            {classDataSource === 'LOCAL_CACHE'
+                              ? `${availableClasses.length} rombel (${totalStudentsInYear} siswa di TA ${formAcademicYear}) • 0 B Egress`
+                              : classDataSource === 'TEACHING_SCHEDULE'
+                              ? `${availableClasses.length} rombel dari Jadwal KBM TA ${formAcademicYear} • 0 B Egress`
+                              : classDataSource === 'CLOUD'
+                              ? `Tersinkron Cloud TA ${formAcademicYear} (${totalStudentsInYear} siswa)`
+                              : `Standar rombel TA ${formAcademicYear}`}
+                          </span>
+                        </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setTotalRooms((prev) => Math.min(50, prev + 1))}
-                        className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center transition-colors shrink-0"
-                        title="Tambah 1 Ruang"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] pt-1">
-                      <span className="text-slate-500 font-medium">
-                        Total: <strong className="text-slate-800">{totalRooms} Ruangan</strong>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setTotalRooms(Math.max(1, selectedClasses.length))}
-                        className="text-teal-700 font-bold hover:underline"
-                        title="Samakan jumlah ruangan dengan jumlah rombel terpilih"
-                      >
-                        🔄 Samakan dg Rombel ({selectedClasses.length})
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Format Penomoran Ruangan */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
-                    <label className="text-[11px] font-bold text-slate-700 block">
-                      Format Penomoran Ruangan
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setRoomFormat('NUMERIC')}
-                        className={`py-2 px-2.5 rounded-lg text-xs font-bold text-center transition-all ${
-                          roomFormat === 'NUMERIC'
-                            ? 'bg-teal-600 text-white shadow-2xs'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                        }`}
-                      >
-                        Ruang 1, 2, 3...
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRoomFormat('DOUBLE_DIGIT')}
-                        className={`py-2 px-2.5 rounded-lg text-xs font-bold text-center transition-all ${
-                          roomFormat === 'DOUBLE_DIGIT'
-                            ? 'bg-teal-600 text-white shadow-2xs'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
-                        }`}
-                      >
-                        Ruang 01, 02...
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-slate-500">
-                      Format penamaan ini berlaku untuk jadwal siswa, jadwal pengawas, dan kartu ujian.
-                    </p>
-                  </div>
-
-                  {/* Kebutuhan Pengawas */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1.5 flex flex-col justify-between shadow-2xs">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block">
-                        Kebutuhan Guru Pengawas
-                      </label>
-                      <p className="text-sm font-black text-slate-900 mt-1">
-                        {totalRooms * proctorsPerRoom} Guru / Sesi
-                      </p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
-                        {totalRooms} ruangan × {proctorsPerRoom} pengawas per ruangan
-                      </p>
-                    </div>
-                    <span className="text-[10px] text-teal-800 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200 self-start">
-                      {selectedClasses.length === totalRooms
-                        ? '✓ 1 Rombel = 1 Ruangan'
-                        : `${selectedClasses.length} Rombel disebar ke ${totalRooms} Ruang`}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Pemetaan Rombel ke Ruang Ujian */}
-                {selectedClasses.length > 0 && (
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
-                    <div className="flex items-center justify-between flex-wrap gap-1">
-                      <span className="text-[11px] font-bold text-slate-700">
-                        Alokasi Ruangan per Kelas / Rombel:
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setClassRoomMapping({})}
-                        className="text-[10px] text-slate-500 hover:text-teal-700 font-bold"
-                      >
-                        Reset Alokasi Berurutan
-                      </button>
+                      <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => loadClassesForYear(formAcademicYear, true)}
+                          disabled={isSyncingClasses}
+                          title="Sinkronkan rombel terbaru dari server"
+                          className="text-[10px] font-bold text-slate-600 hover:text-teal-700 flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isSyncingClasses ? 'animate-spin text-teal-600' : ''}`} />
+                          <span>{isSyncingClasses ? 'Sinkron...' : 'Sinkron Server'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedClasses.length === availableClasses.length) {
+                              setSelectedClasses([]);
+                            } else {
+                              setSelectedClasses([...availableClasses]);
+                            }
+                          }}
+                          className="text-[11px] font-bold text-teal-700 hover:text-teal-800 px-2 py-1 cursor-pointer"
+                        >
+                          {selectedClasses.length === availableClasses.length ? 'Batal' : 'Pilih Semua'}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
-                      {selectedClasses.map((cls, idx) => {
-                        const defaultRoomName = roomFormat === 'DOUBLE_DIGIT'
-                          ? `Ruang ${String((idx % totalRooms) + 1).padStart(2, '0')}`
-                          : `Ruang ${(idx % totalRooms) + 1}`;
-                        const currentAssigned = classRoomMapping[cls] || defaultRoomName;
-
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableClasses.map((cls) => {
+                        const isChecked = selectedClasses.includes(cls);
+                        const count = classStudentCounts[cls];
                         return (
-                          <div key={cls} className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center space-y-1.5">
-                            <span className="text-[11px] font-bold text-slate-700 block">
-                              Kelas {cls}
-                            </span>
-                            <select
-                              value={currentAssigned}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setClassRoomMapping((prev) => ({
-                                  ...prev,
-                                  [cls]: val,
-                                }));
-                              }}
-                              className="w-full bg-white border border-teal-300 rounded-md py-1 px-1 text-[11px] font-bold text-teal-800 text-center focus:outline-none focus:ring-1 focus:ring-teal-500 shadow-2xs cursor-pointer"
-                            >
-                              {Array.from({ length: totalRooms }, (_, rIdx) => {
-                                const rName = roomFormat === 'DOUBLE_DIGIT'
-                                  ? `Ruang ${String(rIdx + 1).padStart(2, '0')}`
-                                  : `Ruang ${rIdx + 1}`;
-                                return (
-                                  <option key={rName} value={rName}>
-                                    {rName}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </div>
+                          <button
+                            key={cls}
+                            type="button"
+                            onClick={() => {
+                              setSelectedClasses((prev) =>
+                                isChecked ? prev.filter((c) => c !== cls) : [...prev, cls]
+                              );
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                              isChecked
+                                ? 'bg-teal-600 text-white shadow-2xs'
+                                : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {isChecked && <Check className="w-3 h-3" />}
+                            <span>Kelas {cls}</span>
+                            {count !== undefined && count > 0 && (
+                              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
+                                isChecked ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+                              }`}>
+                                {count}
+                              </span>
+                            )}
+                          </button>
                         );
                       })}
                     </div>
-                  </div>
-                )}
-              </div>
 
-              {/* 5. Pilihan Mata Pelajaran */}
-              <div className="space-y-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-100">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
-                      <span>Mata Pelajaran yang Diujikan</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                        {selectedSubjects.length} dari {availableSubjects.length} Terpilih
-                      </span>
-                    </label>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Pilih mapel kurikulum atau tambahkan mapel kustom (mis. Bahasa Daerah, Fiqih, BTQ, Tahfidz).
-                    </p>
+                    {/* Input Tambah Rombel Kustom */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="text"
+                        value={customClassInput}
+                        onChange={(e) => setCustomClassInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCustomClass();
+                          }
+                        }}
+                        placeholder="Tambah rombel kustom (mis. 9C, Lab)..."
+                        className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 flex-1 font-sans"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomClass}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors shrink-0 cursor-pointer"
+                      >
+                        + Tambah
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  {/* Ruangan Ujian Settings */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 pt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800">Jumlah & Format Ruangan Ujian</span>
+                      <span className="text-xs font-black text-teal-800 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-lg">
+                        {roomFormat === 'DOUBLE_DIGIT'
+                          ? `Ruang 01 s/d Ruang ${String(totalRooms).padStart(2, '0')}`
+                          : `Ruang 1 s/d Ruang ${totalRooms}`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Stepper Jumlah Ruangan */}
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+                        <label className="text-[11px] font-bold text-slate-700 block">Jumlah Ruangan</label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setTotalRooms((prev) => Math.max(1, prev - 1))}
+                            className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <div className="flex-1 text-center font-mono font-bold text-sm text-slate-900 bg-slate-50 py-1 rounded-lg border border-slate-200">
+                            {totalRooms} Ruang
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setTotalRooms((prev) => Math.min(50, prev + 1))}
+                            className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setTotalRooms(Math.max(1, selectedClasses.length))}
+                            className="text-teal-700 font-bold hover:underline cursor-pointer"
+                          >
+                            🔄 Samakan Rombel ({selectedClasses.length})
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Format Penomoran */}
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+                        <label className="text-[11px] font-bold text-slate-700 block">Format Nomor</label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setRoomFormat('NUMERIC')}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold text-center transition-all cursor-pointer ${
+                              roomFormat === 'NUMERIC'
+                                ? 'bg-teal-600 text-white shadow-2xs'
+                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}
+                          >
+                            Ruang 1, 2...
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRoomFormat('DOUBLE_DIGIT')}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-bold text-center transition-all cursor-pointer ${
+                              roomFormat === 'DOUBLE_DIGIT'
+                                ? 'bg-teal-600 text-white shadow-2xs'
+                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}
+                          >
+                            Ruang 01, 02...
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          {totalRooms * proctorsPerRoom} Pengawas per Sesi
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Pemetaan Rombel ke Ruang Ujian */}
+                    {selectedClasses.length > 0 && (
+                      <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          <span className="text-[11px] font-bold text-slate-700">
+                            Alokasi Ruangan per Kelas:
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setClassRoomMapping({})}
+                            className="text-[10px] text-slate-500 hover:text-teal-700 font-bold cursor-pointer"
+                          >
+                            Reset Alokasi
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                          {selectedClasses.map((cls, idx) => {
+                            const defaultRoomName = roomFormat === 'DOUBLE_DIGIT'
+                              ? `Ruang ${String((idx % totalRooms) + 1).padStart(2, '0')}`
+                              : `Ruang ${(idx % totalRooms) + 1}`;
+                            const currentAssigned = classRoomMapping[cls] || defaultRoomName;
+
+                            return (
+                              <div key={cls} className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-center space-y-1">
+                                <span className="text-[11px] font-bold text-slate-700 block truncate">
+                                  Kelas {cls}
+                                </span>
+                                <select
+                                  value={currentAssigned}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setClassRoomMapping((prev) => ({
+                                      ...prev,
+                                      [cls]: val,
+                                    }));
+                                  }}
+                                  className="w-full bg-white border border-teal-300 rounded-md py-1 px-1 text-[11px] font-bold text-teal-800 text-center focus:outline-none focus:ring-1 focus:ring-teal-500 shadow-2xs cursor-pointer"
+                                >
+                                  {Array.from({ length: totalRooms }, (_, rIdx) => {
+                                    const rName = roomFormat === 'DOUBLE_DIGIT'
+                                      ? `Ruang ${String(rIdx + 1).padStart(2, '0')}`
+                                      : `Ruang ${rIdx + 1}`;
+                                    return (
+                                      <option key={rName} value={rName}>
+                                        {rName}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Mata Pelajaran yang Diujikan */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+                  <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-teal-600" />
+                      4. Mata Pelajaran yang Diujikan
+                    </span>
+                    <span className="text-[11px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                      {selectedSubjects.length} dari {availableSubjects.length} Mapel
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-slate-500">
+                      Pilih mapel kurikulum atau tambahkan mapel kustom:
+                    </p>
                     <button
                       type="button"
                       onClick={() => {
@@ -2624,182 +2618,226 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                           setSelectedSubjects([...availableSubjects]);
                         }
                       }}
-                      className="text-[11px] font-bold text-teal-700 hover:text-teal-800 px-2 py-1"
+                      className="text-[11px] font-bold text-teal-700 hover:text-teal-800 cursor-pointer"
                     >
                       {selectedSubjects.length === availableSubjects.length ? 'Batal Semua' : 'Pilih Semua'}
                     </button>
                   </div>
-                </div>
 
-                {/* List of subject pills */}
-                <div className="flex flex-wrap gap-1.5">
-                  {availableSubjects.map((sub) => {
-                    const isChecked = selectedSubjects.includes(sub);
-                    const isCustom = !DEFAULT_SUBJECTS.includes(sub);
-                    return (
-                      <div
-                        key={sub}
-                        className={`inline-flex items-center rounded-lg text-xs font-medium transition-all ${
-                          isChecked
-                            ? 'bg-slate-900 text-white font-bold shadow-2xs'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedSubjects((prev) =>
-                              isChecked ? prev.filter((s) => s !== sub) : [...prev, sub]
-                            );
-                          }}
-                          className="px-2.5 py-1.5 flex items-center gap-1.5"
+                  {/* List of subject pills */}
+                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1 bg-slate-50/50 rounded-xl border border-slate-200/60">
+                    {availableSubjects.map((sub) => {
+                      const isChecked = selectedSubjects.includes(sub);
+                      const isCustom = !DEFAULT_SUBJECTS.includes(sub);
+                      return (
+                        <div
+                          key={sub}
+                          className={`inline-flex items-center rounded-lg text-xs font-medium transition-all ${
+                            isChecked
+                              ? 'bg-slate-900 text-white font-bold shadow-2xs'
+                              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
                         >
-                          {isChecked && <Check className="w-3 h-3 text-emerald-400" />}
-                          <span>{sub}</span>
-                        </button>
-                        {isCustom && (
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveCustomSubject(sub);
+                            onClick={() => {
+                              setSelectedSubjects((prev) =>
+                                isChecked ? prev.filter((s) => s !== sub) : [...prev, sub]
+                              );
                             }}
-                            title={`Hapus ${sub} dari daftar pilihan`}
-                            className="pr-2 pl-0.5 py-1.5 text-slate-400 hover:text-rose-400 transition-colors"
+                            className="px-2.5 py-1.5 flex items-center gap-1.5 cursor-pointer"
                           >
-                            <X className="w-3 h-3" />
+                            {isChecked && <Check className="w-3 h-3 text-emerald-400" />}
+                            <span>{sub}</span>
                           </button>
-                        )}
+                          {isCustom && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveCustomSubject(sub);
+                              }}
+                              title={`Hapus ${sub} dari daftar`}
+                              className="pr-2 pl-0.5 py-1.5 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Input Tambah Mapel Kustom */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={customSubjectInput}
+                      onChange={(e) => setCustomSubjectInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomSubject();
+                        }
+                      }}
+                      placeholder="Tambah mapel kustom (mis. Bahasa Sunda, Fiqih)..."
+                      className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 flex-1 font-sans"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomSubject}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors shrink-0 cursor-pointer"
+                    >
+                      + Tambah
+                    </button>
+                  </div>
+                </div>
+
+                {/* 5. Aturan Cerdas Pengawas & Instruksi AI */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+                  <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 text-amber-600" />
+                      5. Aturan Pengawas & Otomasi AI
+                    </span>
+                    <span className="text-[11px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                      Langkah 3
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs">
+                    <label className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100/70 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={excludeOwnSubject}
+                        onChange={(e) => setExcludeOwnSubject(e.target.checked)}
+                        className="mt-0.5 rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="font-bold text-slate-900 block">Anti-Mapel Sendiri (Objektivitas)</span>
+                        <span className="text-[11px] text-slate-500 block">Guru dilarang mengawas kelas yang sedang mengujikan mata pelajarannya sendiri.</span>
                       </div>
-                    );
-                  })}
-                </div>
+                    </label>
 
-                {/* Input Tambah Mapel Kustom */}
-                <div className="flex items-center gap-2 pt-1 max-w-sm">
-                  <input
-                    type="text"
-                    value={customSubjectInput}
-                    onChange={(e) => setCustomSubjectInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddCustomSubject();
-                      }
-                    }}
-                    placeholder="Tambah mapel kustom (mis. Bahasa Sunda, BTQ, Fiqih)..."
-                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 flex-1 font-sans"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomSubject}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors shrink-0"
-                  >
-                    + Tambah Mapel
-                  </button>
-                </div>
-              </div>
+                    <label className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100/70 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={excludeCommitteeProctor}
+                        onChange={(e) => setExcludeCommitteeProctor(e.target.checked)}
+                        className="mt-0.5 rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="font-bold text-slate-900 block">Bebaskan Panitia Ujian</span>
+                        <span className="text-[11px] text-slate-500 block">Panitia difokuskan di posko dan dibebaskan dari mengawas ruang.</span>
+                      </div>
+                    </label>
 
-              {/* 5. Aturan Cerdas Pengawas Guru */}
-              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
-                <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                  <ShieldAlert className="w-4 h-4 text-amber-600" />
-                  Aturan Cerdas Pengawas Ujian
-                </span>
+                    <label className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100/70 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={assignBackupProctor}
+                        onChange={(e) => setAssignBackupProctor(e.target.checked)}
+                        className="mt-0.5 rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="font-bold text-slate-900 block">Sertakan Pengawas Cadangan / Piket</span>
+                        <span className="text-[11px] text-slate-500 block">Menunjuk 1 guru cadangan per sesi untuk bersiaga di ruang panitia.</span>
+                      </div>
+                    </label>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <label className="flex items-start gap-2.5 bg-white p-3 rounded-xl border border-amber-200 cursor-pointer shadow-2xs">
-                    <input
-                      type="checkbox"
-                      checked={excludeOwnSubject}
-                      onChange={(e) => setExcludeOwnSubject(e.target.checked)}
-                      className="mt-0.5 rounded text-teal-600 focus:ring-teal-500"
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-slate-900 block">Jumlah Pengawas / Ruang</span>
+                        <span className="text-[11px] text-slate-500 block">Kebutuhan guru per ruangan</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setProctorsPerRoom(1)}
+                          className={`px-3 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                            proctorsPerRoom === 1 ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          1 Guru
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setProctorsPerRoom(2)}
+                          className={`px-3 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
+                            proctorsPerRoom === 2 ? 'bg-teal-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          2 Guru
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Instruksi Tambahan untuk AI */}
+                  <div className="pt-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Instruksi Khusus untuk AI (Opsional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={aiCustomPrompt}
+                      onChange={(e) => setAiCustomPrompt(e.target.value)}
+                      placeholder="Contoh: Hari Jumat hanya 1 sesi sampai jam 10.30 WIB..."
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all font-sans"
                     />
-                    <div>
-                      <span className="font-bold text-slate-900 block">Anti-Mapel Sendiri (Objektivitas)</span>
-                      <span className="text-[11px] text-slate-500 block">Guru dilarang mengawas kelas yang sedang mengujikan mata pelajarannya sendiri.</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 bg-white p-3 rounded-xl border border-amber-200 cursor-pointer shadow-2xs">
-                    <input
-                      type="checkbox"
-                      checked={excludeCommitteeProctor}
-                      onChange={(e) => setExcludeCommitteeProctor(e.target.checked)}
-                      className="mt-0.5 rounded text-teal-600 focus:ring-teal-500"
-                    />
-                    <div>
-                      <span className="font-bold text-slate-900 block">Bebaskan Panitia Ujian</span>
-                      <span className="text-[11px] text-slate-500 block">Panitia (Ketua/Sekretaris) difokuskan di posko dan dibebaskan dari mengawas ruang.</span>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 bg-white p-3 rounded-xl border border-amber-200 cursor-pointer shadow-2xs">
-                    <input
-                      type="checkbox"
-                      checked={assignBackupProctor}
-                      onChange={(e) => setAssignBackupProctor(e.target.checked)}
-                      className="mt-0.5 rounded text-teal-600 focus:ring-teal-500"
-                    />
-                    <div>
-                      <span className="font-bold text-slate-900 block">Sertakan Pengawas Cadangan / Piket</span>
-                      <span className="text-[11px] text-slate-500 block">Menunjuk 1 guru piket/cadangan per sesi untuk bersiaga di ruang panitia.</span>
-                    </div>
-                  </label>
-
-                  <div className="bg-white p-3 rounded-xl border border-amber-200 flex items-center justify-between shadow-2xs">
-                    <div>
-                      <span className="font-bold text-slate-900 block">Jumlah Pengawas / Ruang</span>
-                      <span className="text-[11px] text-slate-500 block">Kebutuhan pengawas per kelas</span>
-                    </div>
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-                      <button
-                        type="button"
-                        onClick={() => setProctorsPerRoom(1)}
-                        className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                          proctorsPerRoom === 1 ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
-                        }`}
-                      >
-                        1 Guru
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setProctorsPerRoom(2)}
-                        className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
-                          proctorsPerRoom === 2 ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
-                        }`}
-                      >
-                        2 Guru
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* 6. Kolom Instruksi Tambahan untuk AI */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Instruksi Khusus untuk AI (Opsional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={aiCustomPrompt}
-                  onChange={(e) => setAiCustomPrompt(e.target.value)}
-                  placeholder="Contoh: Hari Jumat hanya 1 sesi sampai jam 10.30 WIB. Guru yang bertugas sebagai walikelas diprioritaskan tidak mengawas di kelas asuhannya..."
-                  className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                />
+            {/* Sticky Floating Action Footer for Desktop / Laptop / Tablet */}
+            <div className="sticky bottom-4 z-20 bg-white/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  Ringkasan Setup:
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-700 border border-slate-200">
+                    🗓️ {validExamDates.length} Hari Ujian
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-700 border border-slate-200">
+                    🏫 {totalRooms} Ruangan
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-700 border border-slate-200">
+                    👥 {selectedClasses.length} Rombel
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold text-slate-700 border border-slate-200">
+                    📚 {selectedSubjects.length} Mapel
+                  </span>
+                  <span className={`px-2.5 py-1 rounded-lg font-bold border ${
+                    totalSlotsCapacity >= selectedSubjects.length
+                      ? 'bg-teal-50 text-teal-800 border-teal-200'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}>
+                    📊 Kapasitas {totalSlotsCapacity} Sesi ({totalSlotsCapacity >= selectedSubjects.length ? 'Cukup' : 'Kurang'})
+                  </span>
+                </div>
               </div>
 
-              {/* Action Submit Button */}
-              <div className="pt-2 flex justify-end">
+              <div className="flex items-center gap-3 w-full md:w-auto shrink-0 justify-end">
                 <button
                   type="button"
                   onClick={handleGenerateSchedule}
                   disabled={isGenerating}
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-700 hover:to-[#023246] disabled:opacity-50 text-white text-xs sm:text-sm font-black uppercase tracking-wider shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
+                  className="w-full md:w-auto px-6 py-3 rounded-xl bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-700 hover:to-[#023246] disabled:opacity-50 text-white text-xs sm:text-sm font-black uppercase tracking-wider shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>{isGenerating ? 'AI Sedang Menyusun Jadwal...' : '🤖 Buat Jadwal Ujian & Pengawas Cerdas dengan AI'}</span>
+                  {isGenerating ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 text-amber-300 animate-spin" />
+                      <span>AI Sedang Menyusun Jadwal...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>🤖 Buat Jadwal Ujian & Pengawas Cerdas dengan AI</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

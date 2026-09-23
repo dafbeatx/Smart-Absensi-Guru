@@ -260,7 +260,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden my-auto flex flex-col max-h-[92vh]">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden my-auto flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="px-4 sm:px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -539,8 +539,8 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     Tidak ditemukan sesi yang bebas bentrok untuk filter hari ini. Silakan coba filter hari lain atau pilih manual melalui dropdown Sesi B di atas.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {smartSwapSuggestions.slice(0, 4).map((cand) => {
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {smartSwapSuggestions.slice(0, 6).map((cand) => {
                       const isSelected = slotBId === cand.slot.id;
                       return (
                         <div
@@ -829,7 +829,7 @@ export const ExamProctorSwapModal: React.FC<ExamProctorSwapModalProps> = ({
                     Seluruh guru sedang bertugas mengawas pada jam & sesi ini.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {smartReassignSuggestions
                       .filter((c) => c.isAvailable)
                       .slice(0, 6)
