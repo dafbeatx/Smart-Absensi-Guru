@@ -32,6 +32,7 @@ import {
   Copy,
   Smartphone,
   ClipboardCheck,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -52,6 +53,7 @@ import { ExamSchedulerService } from '../../../services/exam-scheduler.service';
 import { ExamMatrixBuilderService } from '../../../services/exam-matrix-builder.service';
 import { ExamWordExporterService } from '../../../services/exam-word-exporter.service';
 import { ExamAdministrativeDocsModal } from './ExamAdministrativeDocsModal';
+import { ExamProctorSwapModal } from './ExamProctorSwapModal';
 import type { AdminDocType } from '../../../services/exam-administrative-docs.service';
 import {
   ExamScheduleAIGeneratorService,
@@ -202,6 +204,8 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [showAdministrativeDocsModal, setShowAdministrativeDocsModal] = useState<boolean>(false);
   const [adminDocInitialTab, setAdminDocInitialTab] = useState<AdminDocType>('PROCTOR_ATTENDANCE');
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState<boolean>(false);
+  const [swapInitialSlotId, setSwapInitialSlotId] = useState<string | undefined>(undefined);
 
   // ── FORM QUESTIONNAIRE STATE (Parameters filled by Committee) ──────────────
   const [formAcademicYear, setFormAcademicYear] = useState<string>(() => AdministrationRepository.getActiveAcademicYear());
@@ -3167,6 +3171,20 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       <FileText className="w-3.5 h-3.5 text-blue-600" />
                       <span>Unduh Word (.doc)</span>
                     </button>
+                    {accessInfo.canManage && scheduleData && scheduleData.proctorSchedules.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSwapInitialSlotId(undefined);
+                          setIsSwapModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        title="Tukar atau Ganti Jadwal Pengawas Ujian (Admin)"
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                        <span>Tukar / Ganti Pengawas</span>
+                      </button>
+                    )}
                     {accessInfo.canManage && (
                       <button
                         type="button"
@@ -3357,9 +3375,16 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                             <div className="pt-1 border-t border-slate-100 space-y-1">
                                               <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0">
-                                                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">
-                                                    Pengawas Utama
-                                                  </span>
+                                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[10px] font-semibold text-slate-400 block uppercase">
+                                                      Pengawas Utama
+                                                    </span>
+                                                    {p.isSwapped && (
+                                                      <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black uppercase">
+                                                        Ditukar
+                                                      </span>
+                                                    )}
+                                                  </div>
                                                   <span className={`font-bold block truncate ${isMe ? 'text-amber-950 font-black' : 'text-slate-800'}`}>
                                                     {p.mainProctorName || 'Belum Ditentukan'}
                                                   </span>
@@ -3385,9 +3410,25 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                           </div>
 
                                           {/* Subject Pill Footer */}
-                                          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                                            <span className="truncate">{p.subject}</span>
-                                            <span className="text-[10px] text-slate-400 font-mono">{sess.sessionTime}</span>
+                                          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1 text-[11px] text-slate-500">
+                                            <div className="flex items-center gap-1 min-w-0">
+                                              <span className="truncate">{p.subject}</span>
+                                              <span className="text-[10px] text-slate-400 font-mono">({sess.sessionTime})</span>
+                                            </div>
+                                            {accessInfo.canManage && (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setSwapInitialSlotId(p.id);
+                                                  setIsSwapModalOpen(true);
+                                                }}
+                                                className="px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                                                title="Tukar atau ganti pengawas ruangan ini"
+                                              >
+                                                <ArrowLeftRight className="w-2.5 h-2.5 text-amber-700" />
+                                                <span>Ganti</span>
+                                              </button>
+                                            )}
                                           </div>
                                         </div>
                                       );
@@ -3660,12 +3701,13 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                               <th className="py-3 px-3.5">Mata Pelajaran</th>
                               <th className="py-3 px-3.5 font-black text-teal-900">Pengawas Utama</th>
                               <th className="py-3 px-3.5 text-slate-600">Pengawas Cadangan / Piket</th>
+                              <th className="py-3 px-3.5 text-center">Aksi</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {scheduleData.proctorSchedules.length === 0 ? (
                               <tr>
-                                <td colSpan={6} className="py-12 px-4 text-center">
+                                <td colSpan={7} className="py-12 px-4 text-center">
                                   <div className="max-w-md mx-auto space-y-2">
                                     <Users className="w-10 h-10 text-slate-300 mx-auto" />
                                     <p className="font-bold text-slate-700 text-sm">Roster Pengawas Tidak Dibuat</p>
@@ -3687,12 +3729,37 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                     <span className="text-[10px] text-slate-500 font-semibold">Kelas {item.className}</span>
                                   </td>
                                   <td className="py-2.5 px-3.5 font-semibold text-slate-700">{item.subject}</td>
-                                  <td className="py-2.5 px-3.5 font-bold text-teal-700 flex items-center gap-1.5">
-                                    <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                                    <span>{item.mainProctorName}</span>
+                                  <td className="py-2.5 px-3.5 font-bold text-teal-700">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <User className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                                      <span>{item.mainProctorName}</span>
+                                      {item.isSwapped && (
+                                        <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black uppercase">
+                                          Ditukar
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="py-2.5 px-3.5 text-slate-500 text-[11px]">
                                     {item.backupProctorName || '-'}
+                                  </td>
+                                  <td className="py-2.5 px-3.5 text-center">
+                                    {accessInfo.canManage ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSwapInitialSlotId(item.id);
+                                          setIsSwapModalOpen(true);
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[11px] font-bold transition-colors cursor-pointer"
+                                        title="Tukar atau ganti pengawas untuk sesi ini"
+                                      >
+                                        <ArrowLeftRight className="w-3 h-3 text-amber-700" />
+                                        <span>Ganti / Tukar</span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-slate-400 font-mono text-[10px]">-</span>
+                                    )}
                                   </td>
                                 </tr>
                               ))
@@ -3939,6 +4006,28 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
           committeeMembers={committeeMembers}
           initialDocType={adminDocInitialTab}
           officialSignatoryOptions={officialSignatoryOptions}
+        />
+      )}
+
+      {/* MODAL PERGANTIAN & TUKAR JADWAL PENGAWAS (ADMIN) */}
+      {isSwapModalOpen && scheduleData && (
+        <ExamProctorSwapModal
+          isOpen={isSwapModalOpen}
+          onClose={() => {
+            setIsSwapModalOpen(false);
+            setSwapInitialSlotId(undefined);
+          }}
+          scheduleData={scheduleData}
+          allTeachers={teachers}
+          currentAdminName={currentUser?.full_name || 'Admin Kurikulum'}
+          initialSelectedSlotId={swapInitialSlotId}
+          onSwapSuccess={(updated) => {
+            setScheduleData(updated);
+            setToast({
+              type: 'success',
+              text: 'Pergantian jadwal pengawas berhasil disimpan dan disinkronkan.',
+            });
+          }}
         />
       )}
     </div>,

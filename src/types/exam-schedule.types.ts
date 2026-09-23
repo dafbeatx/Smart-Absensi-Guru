@@ -56,6 +56,8 @@ export interface ExamProctorItem {
   secondaryProctorName?: string;
   backupProctorId?: string;
   backupProctorName?: string;
+  isSwapped?: boolean;
+  swapNote?: string;
 }
 
 export interface DaySessionOverride {
@@ -103,6 +105,40 @@ export interface ExamScheduleSummary {
   aiOptimizationNote?: string;
 }
 
+export interface ExamProctorSwapHistoryItem {
+  id: string;
+  swappedAt: string;
+  adminName: string;
+  type: 'SWAP_SLOTS' | 'REASSIGN';
+  reason?: string;
+  slotA: {
+    id: string;
+    dayName: string;
+    date: string;
+    sessionNumber: number;
+    roomName: string;
+    className: string;
+    subject: string;
+    previousProctorId: string;
+    previousProctorName: string;
+    newProctorId: string;
+    newProctorName: string;
+  };
+  slotB?: {
+    id: string;
+    dayName: string;
+    date: string;
+    sessionNumber: number;
+    roomName: string;
+    className: string;
+    subject: string;
+    previousProctorId: string;
+    previousProctorName: string;
+    newProctorId: string;
+    newProctorName: string;
+  };
+}
+
 export interface ExamScheduleData {
   id: string;
   educationLevel?: EducationLevel; // 'SMP' | 'SMA'
@@ -110,6 +146,7 @@ export interface ExamScheduleData {
   subjectSchedules: ExamSubjectScheduleItem[];
   proctorSchedules: ExamProctorItem[];
   summary: ExamScheduleSummary;
+  swapHistory?: ExamProctorSwapHistoryItem[];
   isPublished?: boolean; // Status resmi diterbitkan ke guru
   publishedAt?: string;  // Waktu publikasi
   createdAt: string;

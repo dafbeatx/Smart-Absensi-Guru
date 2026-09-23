@@ -5,6 +5,7 @@ import type {
   ExamScheduleData,
   ExamScheduleSummary,
   ExamCommitteeMember,
+  ExamProctorSwapHistoryItem,
 } from '../types/exam-schedule.types';
 import type { UserProfile } from '../types/database.types';
 
@@ -566,5 +567,248 @@ export class ExamSchedulerService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Checks if a teacher is already assigned to another room on a given date and sessionNumber.
+   */
+  public static checkProctorConflict(
+    proctors: ExamProctorItem[],
+    teacherId: string,
+    teacherName: string,
+    date: string,
+    sessionNumber: number,
+    excludeSlotId?: string
+  ): ExamProctorItem | undefined {
+    const normTarget = this.normalizeTeacherName(teacherName);
+    return proctors.find((p) => {
+      if (excludeSlotId && p.id === excludeSlotId) return false;
+      if (p.date !== date || p.sessionNumber !== sessionNumber) return false;
+
+      // Check by userId match
+      if (teacherId && p.mainProctorId && p.mainProctorId === teacherId) return true;
+
+      // Check by normalized name match
+      if (normTarget && this.normalizeTeacherName(p.mainProctorName) === normTarget) return true;
+
+      return false;
+    });
+  }
+
+  /**
+   * Swaps proctors between two schedule slots (e.g. Guru A in Slot A swaps with Guru B in Slot B).
+   */
+  public static swapProctorsBetweenSlots(
+    schedule: ExamScheduleData,
+    slotAId: string,
+    slotBId: string,
+    adminName: string = 'Admin Kurikulum',
+    reason?: string
+  ): { success: boolean; updatedSchedule?: ExamScheduleData; error?: string } {
+    if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
+      return { success: false, error: 'Data jadwal pengawas tidak ditemukan.' };
+    }
+
+    if (slotAId === slotBId) {
+      return { success: false, error: 'Sesi asal dan sesi tujuan tidak boleh sama.' };
+    }
+
+    const slotAIndex = schedule.proctorSchedules.findIndex((p) => p.id === slotAId);
+    const slotBIndex = schedule.proctorSchedules.findIndex((p) => p.id === slotBId);
+
+    if (slotAIndex === -1 || slotBIndex === -1) {
+      return { success: false, error: 'Salah satu slot sesi pengawas tidak ditemukan.' };
+    }
+
+    const slotA = schedule.proctorSchedules[slotAIndex];
+    const slotB = schedule.proctorSchedules[slotBIndex];
+
+    // Conflict validation:
+    // Slot A's proctor moves to Slot B's time (slotB.date, slotB.sessionNumber).
+    // Make sure Proctor A is not already assigned to another room at that time (ignoring slotA).
+    const conflictForA = this.checkProctorConflict(
+      schedule.proctorSchedules,
+      slotA.mainProctorId,
+      slotA.mainProctorName,
+      slotB.date,
+      slotB.sessionNumber,
+      slotB.id
+    );
+
+    if (conflictForA && conflictForA.id !== slotA.id) {
+      return {
+        success: false,
+        error: `Konflik: ${slotA.mainProctorName} sudah memiliki jadwal mengawas di ${conflictForA.roomName} pada ${conflictForA.dayName}, Sesi ${conflictForA.sessionNumber}.`,
+      };
+    }
+
+    // Slot B's proctor moves to Slot A's time (slotA.date, slotA.sessionNumber).
+    // Make sure Proctor B is not already assigned to another room at that time (ignoring slotB).
+    const conflictForB = this.checkProctorConflict(
+      schedule.proctorSchedules,
+      slotB.mainProctorId,
+      slotB.mainProctorName,
+      slotA.date,
+      slotA.sessionNumber,
+      slotA.id
+    );
+
+    if (conflictForB && conflictForB.id !== slotB.id) {
+      return {
+        success: false,
+        error: `Konflik: ${slotB.mainProctorName} sudah memiliki jadwal mengawas di ${conflictForB.roomName} pada ${conflictForB.dayName}, Sesi ${conflictForB.sessionNumber}.`,
+      };
+    }
+
+    // Execute swap on proctor list
+    const updatedProctors = [...schedule.proctorSchedules];
+
+    const updatedSlotA: ExamProctorItem = {
+      ...slotA,
+      mainProctorId: slotB.mainProctorId,
+      mainProctorName: slotB.mainProctorName,
+      isSwapped: true,
+      swapNote: reason || `Ditukar dengan ${slotB.mainProctorName} (${slotB.dayName}, ${slotB.roomName})`,
+    };
+
+    const updatedSlotB: ExamProctorItem = {
+      ...slotB,
+      mainProctorId: slotA.mainProctorId,
+      mainProctorName: slotA.mainProctorName,
+      isSwapped: true,
+      swapNote: reason || `Ditukar dengan ${slotA.mainProctorName} (${slotA.dayName}, ${slotA.roomName})`,
+    };
+
+    updatedProctors[slotAIndex] = updatedSlotA;
+    updatedProctors[slotBIndex] = updatedSlotB;
+
+    // Record audit trail
+    const historyItem: ExamProctorSwapHistoryItem = {
+      id: `swap_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      swappedAt: new Date().toISOString(),
+      adminName,
+      type: 'SWAP_SLOTS',
+      reason: reason || 'Tukar silang jadwal mengawas atas persetujuan Panitia/Admin',
+      slotA: {
+        id: slotA.id,
+        dayName: slotA.dayName,
+        date: slotA.date,
+        sessionNumber: slotA.sessionNumber,
+        roomName: slotA.roomName,
+        className: slotA.className,
+        subject: slotA.subject,
+        previousProctorId: slotA.mainProctorId,
+        previousProctorName: slotA.mainProctorName,
+        newProctorId: slotB.mainProctorId,
+        newProctorName: slotB.mainProctorName,
+      },
+      slotB: {
+        id: slotB.id,
+        dayName: slotB.dayName,
+        date: slotB.date,
+        sessionNumber: slotB.sessionNumber,
+        roomName: slotB.roomName,
+        className: slotB.className,
+        subject: slotB.subject,
+        previousProctorId: slotB.mainProctorId,
+        previousProctorName: slotB.mainProctorName,
+        newProctorId: slotA.mainProctorId,
+        newProctorName: slotA.mainProctorName,
+      },
+    };
+
+    const existingHistory = schedule.swapHistory || [];
+
+    const updatedSchedule: ExamScheduleData = {
+      ...schedule,
+      proctorSchedules: updatedProctors,
+      swapHistory: [historyItem, ...existingHistory],
+      updatedAt: new Date().toISOString(),
+    };
+
+    return { success: true, updatedSchedule };
+  }
+
+  /**
+   * Reassigns a single proctor slot to another teacher without mutual swap.
+   */
+  public static reassignSingleProctor(
+    schedule: ExamScheduleData,
+    slotId: string,
+    newTeacher: { userId: string; fullName: string },
+    adminName: string = 'Admin Kurikulum',
+    reason?: string
+  ): { success: boolean; updatedSchedule?: ExamScheduleData; error?: string } {
+    if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
+      return { success: false, error: 'Data jadwal pengawas tidak ditemukan.' };
+    }
+
+    const slotIndex = schedule.proctorSchedules.findIndex((p) => p.id === slotId);
+    if (slotIndex === -1) {
+      return { success: false, error: 'Sesi pengawas tidak ditemukan.' };
+    }
+
+    const targetSlot = schedule.proctorSchedules[slotIndex];
+
+    // Conflict validation for new teacher:
+    const conflict = this.checkProctorConflict(
+      schedule.proctorSchedules,
+      newTeacher.userId,
+      newTeacher.fullName,
+      targetSlot.date,
+      targetSlot.sessionNumber,
+      targetSlot.id
+    );
+
+    if (conflict) {
+      return {
+        success: false,
+        error: `Konflik: ${newTeacher.fullName} sudah memiliki jadwal mengawas di ${conflict.roomName} pada ${conflict.dayName}, Sesi ${conflict.sessionNumber}.`,
+      };
+    }
+
+    const updatedProctors = [...schedule.proctorSchedules];
+    const previousProctorId = targetSlot.mainProctorId;
+    const previousProctorName = targetSlot.mainProctorName;
+
+    updatedProctors[slotIndex] = {
+      ...targetSlot,
+      mainProctorId: newTeacher.userId,
+      mainProctorName: newTeacher.fullName,
+      isSwapped: true,
+      swapNote: reason || `Digantikan oleh ${newTeacher.fullName}`,
+    };
+
+    const historyItem: ExamProctorSwapHistoryItem = {
+      id: `reassign_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      swappedAt: new Date().toISOString(),
+      adminName,
+      type: 'REASSIGN',
+      reason: reason || 'Pelimpahan / penggantian pengawas ujian oleh Panitia/Admin',
+      slotA: {
+        id: targetSlot.id,
+        dayName: targetSlot.dayName,
+        date: targetSlot.date,
+        sessionNumber: targetSlot.sessionNumber,
+        roomName: targetSlot.roomName,
+        className: targetSlot.className,
+        subject: targetSlot.subject,
+        previousProctorId,
+        previousProctorName,
+        newProctorId: newTeacher.userId,
+        newProctorName: newTeacher.fullName,
+      },
+    };
+
+    const existingHistory = schedule.swapHistory || [];
+
+    const updatedSchedule: ExamScheduleData = {
+      ...schedule,
+      proctorSchedules: updatedProctors,
+      swapHistory: [historyItem, ...existingHistory],
+      updatedAt: new Date().toISOString(),
+    };
+
+    return { success: true, updatedSchedule };
   }
 }

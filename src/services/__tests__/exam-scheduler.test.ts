@@ -597,6 +597,150 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 19: Error testing custom subject proctors', false, err?.message);
   }
 
+  // Test 20: Admin Proctor Swap between 2 slots (e.g. Senin vs Selasa)
+  try {
+    const baseConfig: ExamScheduleFormConfig = {
+      examType: 'ASTS',
+      examTitle: 'ASTS Ganjil',
+      academicYear: testAcademicYear,
+      semester: '1',
+      startDate: '2026-09-28', // Senin
+      endDate: '2026-09-29',   // Selasa
+      sessionsPerDay: 1,
+      sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:30' }],
+      selectedClasses: ['7A', '7B'],
+      selectedSubjects: ['Matematika', 'Bahasa Indonesia'],
+      selectedTeacherIds: sampleTeachers.map((t) => t.id),
+      proctorsPerRoom: 1,
+      excludeOwnSubject: false,
+      excludeCommitteeProctor: false,
+      assignBackupProctor: false,
+    };
+
+    const initialSched = ExamSchedulerService.generateSchedule(baseConfig, sampleTeachers, []);
+    const slotA = initialSched.proctorSchedules[0];
+    const slotB = initialSched.proctorSchedules[1];
+
+    const prevAProctor = slotA.mainProctorName;
+    const prevBProctor = slotB.mainProctorName;
+
+    const swapResult = ExamSchedulerService.swapProctorsBetweenSlots(
+      initialSched,
+      slotA.id,
+      slotB.id,
+      'Admin Ujian',
+      'Pak A bertukar dengan Bu B'
+    );
+
+    const updatedSlotA = swapResult.updatedSchedule?.proctorSchedules.find((p) => p.id === slotA.id);
+    const updatedSlotB = swapResult.updatedSchedule?.proctorSchedules.find((p) => p.id === slotB.id);
+    const historyItem = swapResult.updatedSchedule?.swapHistory?.[0];
+
+    const isSwappedAccurately =
+      Boolean(swapResult.success) &&
+      updatedSlotA?.mainProctorName === prevBProctor &&
+      updatedSlotB?.mainProctorName === prevAProctor &&
+      updatedSlotA?.isSwapped === true &&
+      updatedSlotB?.isSwapped === true &&
+      historyItem?.type === 'SWAP_SLOTS';
+
+    assert(
+      'Exam Scheduler 20: Admin Proctor Swap between 2 slots accurately exchanges proctors and logs history',
+      Boolean(isSwappedAccurately),
+      `Swap success: ${swapResult.success}, New Slot A Proctor: ${updatedSlotA?.mainProctorName} (Expected ${prevBProctor}), History: ${historyItem?.reason}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 20: Error testing proctor swap', false, err?.message);
+  }
+
+  // Test 21: Conflict prevention when proctor already scheduled at that session
+  try {
+    const configWith2Rooms: ExamScheduleFormConfig = {
+      examType: 'ASTS',
+      examTitle: 'ASTS Ganjil',
+      academicYear: testAcademicYear,
+      semester: '1',
+      startDate: '2026-09-28', // Senin
+      endDate: '2026-09-28',   // Senin saja
+      sessionsPerDay: 1,
+      sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:30' }],
+      selectedClasses: ['7A', '7B'],
+      totalRooms: 2,
+      selectedSubjects: ['Matematika'],
+      selectedTeacherIds: [sampleTeachers[0].id, sampleTeachers[1].id],
+      proctorsPerRoom: 1,
+      excludeOwnSubject: false,
+      excludeCommitteeProctor: false,
+      assignBackupProctor: false,
+    };
+
+    const twoRoomSched = ExamSchedulerService.generateSchedule(configWith2Rooms, sampleTeachers, []);
+    const r1Slot = twoRoomSched.proctorSchedules.find((p) => p.roomName.includes('1'));
+
+    // Try to reassign Room 1 to sampleTeacher[1] who is ALREADY proctoring Room 2 in the exact same date & session
+    const conflictResult = ExamSchedulerService.reassignSingleProctor(
+      twoRoomSched,
+      r1Slot?.id || '',
+      { userId: sampleTeachers[1].id, fullName: sampleTeachers[1].full_name || '' },
+      'Admin Ujian'
+    );
+
+    assert(
+      'Exam Scheduler 21: Proctor assignment prevents double-booking conflict at identical date & session',
+      conflictResult.success === false && Boolean(conflictResult.error?.includes('Konflik')),
+      `Expected conflict error, got: ${conflictResult.error}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 21: Error testing conflict prevention', false, err?.message);
+  }
+
+  // Test 22: Admin Single Proctor Reassignment with relaxed own-subject rule
+  try {
+    const singleConfig: ExamScheduleFormConfig = {
+      examType: 'ASTS',
+      examTitle: 'ASTS Ganjil',
+      academicYear: testAcademicYear,
+      semester: '1',
+      startDate: '2026-09-28',
+      endDate: '2026-09-28',
+      sessionsPerDay: 1,
+      sessionSlots: [{ sessionNumber: 1, sessionName: 'Sesi 1', startTime: '07:30', endTime: '09:30' }],
+      selectedClasses: ['7A'],
+      selectedSubjects: ['Matematika'],
+      selectedTeacherIds: [sampleTeachers[1].id], // Starts with teacher 2 (Bahasa Indonesia)
+      proctorsPerRoom: 1,
+      excludeOwnSubject: false,
+      excludeCommitteeProctor: false,
+      assignBackupProctor: false,
+    };
+
+    const sched = ExamSchedulerService.generateSchedule(singleConfig, sampleTeachers, []);
+    const targetSlot = sched.proctorSchedules[0];
+
+    // Reassign to teacher 1 (Ahmad Dahlan, Matematika) - teaching subject is Matematika, should succeed because quota is limited
+    const reassignResult = ExamSchedulerService.reassignSingleProctor(
+      sched,
+      targetSlot.id,
+      { userId: sampleTeachers[0].id, fullName: sampleTeachers[0].full_name || '' },
+      'Admin Ujian',
+      'Pelimpahan tugas darurat'
+    );
+
+    const reloadedSlot = reassignResult.updatedSchedule?.proctorSchedules.find((p) => p.id === targetSlot.id);
+    const history = reassignResult.updatedSchedule?.swapHistory?.[0];
+
+    assert(
+      'Exam Scheduler 22: Admin reassigns single proctor and permits proctoring own subject when teacher quota is limited',
+      Boolean(reassignResult.success) &&
+        reloadedSlot?.mainProctorName === sampleTeachers[0].full_name &&
+        reloadedSlot?.isSwapped === true &&
+        history?.type === 'REASSIGN',
+      `Reassigned name: ${reloadedSlot?.mainProctorName}, IsSwapped: ${reloadedSlot?.isSwapped}, History: ${history?.reason}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 22: Error testing single proctor reassign', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
 
