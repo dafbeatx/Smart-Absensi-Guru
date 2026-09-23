@@ -567,6 +567,75 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
     'exportToWord threw unexpected exception'
   );
 
+  // -------------------------------------------------------------
+  // TEST 9: Review & In-Place Editing Roster with Zero Empty Rooms Guarantee
+  // -------------------------------------------------------------
+  const customEditedMap = {
+    'Ruang 01': [
+      { urut: 1, participantNumber: '13-0820-001', fullName: 'AHMAD REVIU EDITED', gender: 'L', className: '7' },
+      { urut: 2, participantNumber: '13-0820-002', fullName: 'BELLA REVIU EDITED', gender: 'P', className: '7' },
+    ],
+  };
+
+  const resolvedCustomMap = ExamAdministrativeDocsService.resolveRoomStudents(sampleScheduleData, {
+    customRoomStudentsMap: customEditedMap,
+    includeNumberPrefix: true,
+  });
+
+  const customR1Students = resolvedCustomMap['Ruang 01'] || [];
+  const customR2Students = resolvedCustomMap['Ruang 02'] || [];
+  const customR5Students = resolvedCustomMap['Ruang 05'] || [];
+
+  assert(
+    '20. resolveRoomStudents applies custom edited roster to Ruang 01 and guarantees zero empty rooms across 5 rooms',
+    customR1Students.length === 2 &&
+      customR1Students[0].fullName === 'AHMAD REVIU EDITED' &&
+      customR2Students.length > 0 &&
+      customR5Students.length > 0,
+    `Custom review roster or zero-empty guarantee failed: R1=${customR1Students.length}, R2=${customR2Students.length}, R5=${customR5Students.length}`
+  );
+
+  // -------------------------------------------------------------
+  // TEST 10: Strict A4 Sizing Verification (Excel, Word, Print)
+  // -------------------------------------------------------------
+  const sampleRosterWs = ExamAdministrativeDocsService.buildStudentAttendanceRosterWorksheet(
+    'Ruang 01',
+    customR1Students,
+    sampleScheduleData
+  );
+
+  const sampleHandoverWs = ExamAdministrativeDocsService.buildHandoverDocsWorksheet(
+    'Ruang 01',
+    sampleScheduleData
+  );
+
+  assert(
+    '21. Excel worksheets strictly enforce ISO A4 paperSize 9 and print margins',
+    sampleRosterWs['!pageSetup']?.paperSize === 9 &&
+      sampleHandoverWs['!pageSetup']?.paperSize === 9 &&
+      sampleRosterWs['!margins']?.left === 0.5,
+    'Excel worksheets do not have paperSize 9 (A4) or margins configured'
+  );
+
+  const wordPortraitDoc = ExamAdministrativeDocsService.generateWordHtmlString('<p>Hello</p>', 'portrait');
+  const wordLandscapeDoc = ExamAdministrativeDocsService.generateWordHtmlString('<p>Hello</p>', 'landscape');
+
+  assert(
+    '22. Word documents strictly enforce ISO A4 dimensions (210mm x 297mm)',
+    wordPortraitDoc.includes('size: 210mm 297mm;') &&
+      wordLandscapeDoc.includes('size: 297mm 210mm;'),
+    'Word documents missing A4 dimensions (210mm 297mm / 297mm 210mm)'
+  );
+
+  const officialStyles = ExamAdministrativeDocsService.getOfficialDocumentStyles('portrait');
+  assert(
+    '23. Official document styles enforce A4 size and margins for print and PDF',
+    officialStyles.includes('size: A4 portrait;') &&
+      officialStyles.includes('margin: 10mm 15mm 10mm 15mm;') &&
+      officialStyles.includes('width: 210mm;'),
+    'Official styles do not enforce @page A4 portrait with margins'
+  );
+
   // Clean up any test files written by XLSX.writeFile during node execution if created
   try {
     const fs = await import('fs');

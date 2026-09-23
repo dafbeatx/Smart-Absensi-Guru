@@ -49,6 +49,13 @@ export interface AdminDocOptions {
     roomName?: string;
     participantNumber?: string;
   }>;
+  customRoomStudentsMap?: Record<string, Array<{
+    urut: number;
+    participantNumber: string;
+    fullName: string;
+    gender: string;
+    className: string;
+  }>>;
 }
 
 export interface ExamDayInfo {
@@ -173,6 +180,18 @@ export class ExamAdministrativeDocsService {
   }
 
   /**
+   * Helper to normalize any room string into a standard canonical form "Ruang 01", "Ruang 02", etc.
+   */
+  public static canonicalRoomName(raw?: string, defaultIdx: number = 1): string {
+    if (!raw) return `Ruang ${String(defaultIdx).padStart(2, '0')}`;
+    const match = raw.match(/\d+/);
+    if (match) {
+      return `Ruang ${String(parseInt(match[0], 10)).padStart(2, '0')}`;
+    }
+    return raw.trim();
+  }
+
+  /**
    * Common CSS for official A4 school documents
    */
   public static getOfficialDocumentStyles(orientation: 'portrait' | 'landscape' = 'portrait'): string {
@@ -180,7 +199,7 @@ export class ExamAdministrativeDocsService {
     return `
       @page {
         size: A4 ${orientation};
-        margin: ${isLandscape ? '10mm 15mm 10mm 15mm' : '12mm 15mm 12mm 15mm'};
+        margin: ${isLandscape ? '10mm 15mm 10mm 15mm' : '10mm 15mm 10mm 15mm'};
       }
       * {
         box-sizing: border-box;
@@ -193,6 +212,25 @@ export class ExamAdministrativeDocsService {
         margin: 0;
         padding: 0;
         line-height: 1.2;
+      }
+      @media print {
+        html, body {
+          width: ${isLandscape ? '297mm' : '210mm'};
+          margin: 0 !important;
+          padding: 0 !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .page-container {
+          width: ${isLandscape ? '297mm' : '210mm'};
+          min-height: ${isLandscape ? '210mm' : '297mm'};
+          padding: ${isLandscape ? '8mm 12mm' : '10mm 15mm'} !important;
+          margin: 0 auto !important;
+          page-break-inside: avoid;
+          page-break-after: always;
+          break-after: page;
+          box-sizing: border-box;
+        }
       }
       .page-container {
         width: 100%;
@@ -852,25 +890,23 @@ export class ExamAdministrativeDocsService {
     const prefix = options?.participantNumberPrefix || '13-0820-';
     const isSma = scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
 
-    // 1. Ekstraksi daftar ruangan dari jadwal
-    let rooms: string[] = [];
-    if (scheduleData.proctorSchedules) {
-      const rSet = new Set<string>();
-      scheduleData.proctorSchedules.forEach((p) => {
-        if (p.roomName) rSet.add(p.roomName);
-      });
-      rooms = Array.from(rSet);
+    // 1. Ekstraksi daftar ruangan dari jadwal & standardisasi nama (selalu tepat 5 ruangan untuk SMP)
+    const minRooms = isSma ? 3 : 5;
+    const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms);
+    const rooms: string[] = [];
+    for (let i = 1; i <= targetRoomCount; i++) {
+      rooms.push(`Ruang ${String(i).padStart(2, '0')}`);
     }
 
-    // Untuk SMP, wajib sediakan minimal 5 ruangan (Ruang 1 : Kelas 7, Ruang 2 : Kelas 8A, dst sampai Ruang 5 : Kelas 9B)
-    // Untuk SMA, minimal 3 ruangan (Kelas 10, Kelas 11, Kelas 12)
-    const minRooms = isSma ? 3 : 5;
-    const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms, rooms.length);
-    for (let i = 1; i <= targetRoomCount; i++) {
-      const standardName = `Ruang ${String(i).padStart(2, '0')}`;
-      if (!rooms.some((r) => r.toLowerCase().replace(/[^a-z0-9]/g, '') === standardName.toLowerCase().replace(/[^a-z0-9]/g, ''))) {
-        rooms.push(standardName);
-      }
+    if (scheduleData.proctorSchedules) {
+      scheduleData.proctorSchedules.forEach((p) => {
+        if (p.roomName) {
+          const canon = this.canonicalRoomName(p.roomName);
+          if (!rooms.includes(canon)) {
+            rooms.push(canon);
+          }
+        }
+      });
     }
 
     rooms.sort((a, b) => {
@@ -878,6 +914,59 @@ export class ExamAdministrativeDocsService {
       const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
       return numA - numB;
     });
+
+    // 1b. Jika pengguna telah me-review & mengedit daftar siswa melalui modal Review & Edit
+    if (options?.customRoomStudentsMap && Object.keys(options.customRoomStudentsMap).length > 0) {
+      const customMap = options.customRoomStudentsMap;
+      const verifiedMap: Record<string, Array<{
+        urut: number;
+        participantNumber: string;
+        fullName: string;
+        gender: string;
+        className: string;
+      }>> = {};
+
+      let globalIndex = 1;
+      rooms.forEach((rName, idx) => {
+        const matchingCustom =
+          customMap[rName] ||
+          customMap[`Ruang ${idx + 1}`] ||
+          customMap[`Ruang ${String(idx + 1).padStart(2, '0')}`];
+
+        if (matchingCustom && matchingCustom.length > 0) {
+          verifiedMap[rName] = matchingCustom.map((st, i) => {
+            const participantNumber = st.participantNumber && st.participantNumber.trim() !== ''
+              ? st.participantNumber
+              : `${prefix}${String(globalIndex).padStart(3, '0')}`;
+            globalIndex++;
+            return {
+              urut: st.urut || i + 1,
+              participantNumber,
+              fullName: (st.fullName || '').toUpperCase(),
+              gender: st.gender || 'P',
+              className: st.className || (idx === 0 ? '7' : idx === 1 ? '8A' : idx === 2 ? '8B' : idx === 3 ? '9A' : '9B'),
+            };
+          });
+        } else {
+          // Fallback resmi agar ruangan tidak kosong
+          const fallback = isSma
+            ? (idx === 0 ? this.OFFICIAL_SMA_ROOM_1_STUDENTS : idx === 1 ? this.OFFICIAL_SMA_ROOM_2_STUDENTS : this.OFFICIAL_SMA_ROOM_3_STUDENTS)
+            : (idx === 0 ? this.OFFICIAL_SMP_ROOM_1_STUDENTS : idx === 1 ? this.OFFICIAL_SMP_ROOM_2_STUDENTS : idx === 2 ? this.OFFICIAL_SMP_ROOM_3_STUDENTS : idx === 3 ? this.OFFICIAL_SMP_ROOM_4_STUDENTS : this.OFFICIAL_SMP_ROOM_5_STUDENTS);
+          verifiedMap[rName] = (fallback || this.OFFICIAL_SMP_ROOM_1_STUDENTS).map((st, i) => {
+            const participantNumber = `${prefix}${String(globalIndex).padStart(3, '0')}`;
+            globalIndex++;
+            return {
+              urut: i + 1,
+              participantNumber,
+              fullName: st.fullName,
+              gender: st.gender || 'L',
+              className: st.className,
+            };
+          });
+        }
+      });
+      return verifiedMap;
+    }
 
     // 2. Susun daftar siswa per ruangan - PER KELAS (BUKAN 16-16 PER RUANGAN)
     // Ruang 1: Kelas 7
@@ -892,10 +981,8 @@ export class ExamAdministrativeDocsService {
       st: { roomName?: string; className?: string; class?: string; kelas?: string }
     ): string => {
       if (st.roomName) {
-        const found = rooms.find(
-          (r) => r.toLowerCase().replace(/[^a-z0-9]/g, '') === st.roomName!.toLowerCase().replace(/[^a-z0-9]/g, '')
-        );
-        if (found) return found;
+        const canon = this.canonicalRoomName(st.roomName);
+        if (rooms.includes(canon)) return canon;
       }
 
       const rawCls = (st.className || (st as any).class || (st as any).kelas || '').trim().toUpperCase();
@@ -935,69 +1022,66 @@ export class ExamAdministrativeDocsService {
           className: st.className,
         });
       });
-    } else {
-      let cachedStudents: any[] = [];
-      try {
-        if (typeof localStorage !== 'undefined') {
-          const raw = localStorage.getItem('smart_absensi_students');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              cachedStudents = parsed;
-            }
+    }
+
+    let cachedStudents: any[] = [];
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('smart_absensi_students');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cachedStudents = parsed;
           }
         }
-      } catch {}
+      }
+    } catch {}
 
-      if (cachedStudents.length > 0) {
-        const targetLevel = isSma ? 'SMA' : 'SMP';
-        const levelFiltered = cachedStudents.filter((s) => {
-          const cls = s.className || s.kelas || '';
-          const isClsSma = /10|11|12|sma|ipa|ips/i.test(cls);
-          return targetLevel === 'SMA' ? isClsSma : !isClsSma;
-        });
+    if (cachedStudents.length > 0) {
+      const targetLevel = isSma ? 'SMA' : 'SMP';
+      const levelFiltered = cachedStudents.filter((s) => {
+        const cls = s.className || s.kelas || '';
+        const isClsSma = /10|11|12|sma|ipa|ips/i.test(cls);
+        return targetLevel === 'SMA' ? isClsSma : !isClsSma;
+      });
 
-        const studentsToUse = levelFiltered.length > 0 ? levelFiltered : cachedStudents;
-        studentsToUse.forEach((s) => {
-          const targetRoom = getTargetRoomForStudent(s);
+      const studentsToUse = levelFiltered.length > 0 ? levelFiltered : cachedStudents;
+      studentsToUse.forEach((s) => {
+        const targetRoom = getTargetRoomForStudent(s);
+        // Hindari duplikasi jika sudah ada siswa bernama sama di ruangan
+        const existingInRoom = rawStudentMap[targetRoom] || [];
+        const isAlreadyAdded = existingInRoom.some(
+          (e) => e.fullName.toUpperCase() === (s.fullName || s.name || '').toUpperCase()
+        );
+        if (!isAlreadyAdded) {
           if (!rawStudentMap[targetRoom]) rawStudentMap[targetRoom] = [];
           rawStudentMap[targetRoom].push({
             fullName: s.fullName || s.name || 'Siswa',
             gender: s.gender || (/8A|9A/i.test(s.className || '') ? 'P' : 'L'),
             className: s.className || s.kelas || (targetRoom === rooms[0] ? '7' : '8A'),
           });
-        });
-      }
-
-      // Pastikan setiap ruangan terisi lengkap dengan daftar resmi per kelas (bukan 16-16)
-      if (isSma) {
-        if (!rawStudentMap[rooms[0]] || rawStudentMap[rooms[0]].length === 0) {
-          rawStudentMap[rooms[0]] = this.OFFICIAL_SMA_ROOM_1_STUDENTS;
         }
-        if (rooms[1] && (!rawStudentMap[rooms[1]] || rawStudentMap[rooms[1]].length === 0)) {
-          rawStudentMap[rooms[1]] = this.OFFICIAL_SMA_ROOM_2_STUDENTS;
-        }
-        if (rooms[2] && (!rawStudentMap[rooms[2]] || rawStudentMap[rooms[2]].length === 0)) {
-          rawStudentMap[rooms[2]] = this.OFFICIAL_SMA_ROOM_3_STUDENTS;
-        }
-      } else {
-        if (!rawStudentMap[rooms[0]] || rawStudentMap[rooms[0]].length === 0) {
-          rawStudentMap[rooms[0]] = this.OFFICIAL_SMP_ROOM_1_STUDENTS;
-        }
-        if (rooms[1] && (!rawStudentMap[rooms[1]] || rawStudentMap[rooms[1]].length === 0)) {
-          rawStudentMap[rooms[1]] = this.OFFICIAL_SMP_ROOM_2_STUDENTS;
-        }
-        if (rooms[2] && (!rawStudentMap[rooms[2]] || rawStudentMap[rooms[2]].length === 0)) {
-          rawStudentMap[rooms[2]] = this.OFFICIAL_SMP_ROOM_3_STUDENTS;
-        }
-        if (rooms[3] && (!rawStudentMap[rooms[3]] || rawStudentMap[rooms[3]].length === 0)) {
-          rawStudentMap[rooms[3]] = this.OFFICIAL_SMP_ROOM_4_STUDENTS;
-        }
-        if (rooms[4] && (!rawStudentMap[rooms[4]] || rawStudentMap[rooms[4]].length === 0)) {
-          rawStudentMap[rooms[4]] = this.OFFICIAL_SMP_ROOM_5_STUDENTS;
-        }
-      }
+      });
     }
+
+    // 2b. JAMINAN MUTLAK: SETIAP RUANGAN TERISI LENGKAP, TIDAK BOLEH ADA RUANGAN YANG KOSONG
+    rooms.forEach((rName, idx) => {
+      if (!rawStudentMap[rName] || rawStudentMap[rName].length === 0) {
+        if (isSma) {
+          if (idx === 0) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_1_STUDENTS];
+          else if (idx === 1) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_2_STUDENTS];
+          else if (idx === 2) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_3_STUDENTS];
+          else rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_1_STUDENTS];
+        } else {
+          if (idx === 0) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_1_STUDENTS];
+          else if (idx === 1) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_2_STUDENTS];
+          else if (idx === 2) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_3_STUDENTS];
+          else if (idx === 3) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_4_STUDENTS];
+          else if (idx === 4) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_5_STUDENTS];
+          else rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_1_STUDENTS];
+        }
+      }
+    });
 
     // 3. Penomoran Peserta Sekuensial: 13-0820-001 dari peserta pertama Ruang 1 berlanjut ke seluruh ruangan
     let globalIndex = 1;
@@ -1155,7 +1239,7 @@ export class ExamAdministrativeDocsService {
     const selectedRoom = options?.roomFilter;
     const roomsToRender =
       selectedRoom && selectedRoom !== 'ALL'
-        ? rooms.filter((r) => r.toLowerCase() === selectedRoom.toLowerCase())
+        ? rooms.filter((r) => this.canonicalRoomName(r).toLowerCase() === this.canonicalRoomName(selectedRoom).toLowerCase())
         : rooms;
 
     const sections = roomsToRender.map((r, idx) => {
@@ -1778,6 +1862,21 @@ export class ExamAdministrativeDocsService {
     ];
     ws['!rows'] = rowHeights;
     ws['!merges'] = merges;
+    ws['!pageSetup'] = {
+      paperSize: 9, // ISO A4 (210 x 297 mm)
+      orientation: 'portrait',
+      fitToWidth: 1,
+      fitToHeight: 0,
+      scale: 100,
+    };
+    ws['!margins'] = {
+      left: 0.5,
+      right: 0.5,
+      top: 0.6,
+      bottom: 0.6,
+      header: 0.3,
+      footer: 0.3,
+    };
 
     return ws;
   }
@@ -2064,6 +2163,21 @@ export class ExamAdministrativeDocsService {
     ];
     ws['!rows'] = rowHeights;
     ws['!merges'] = merges;
+    ws['!pageSetup'] = {
+      paperSize: 9, // ISO A4 (210 x 297 mm)
+      orientation: options?.orientation || 'portrait',
+      fitToWidth: 1,
+      fitToHeight: 0,
+      scale: 100,
+    };
+    ws['!margins'] = {
+      left: 0.5,
+      right: 0.5,
+      top: 0.6,
+      bottom: 0.6,
+      header: 0.3,
+      footer: 0.3,
+    };
 
     return ws;
   }
@@ -2235,6 +2349,21 @@ export class ExamAdministrativeDocsService {
       ws['!cols'] = [{ wch: 6 }, { wch: 32 }, { wch: 14 }, ...days.map(() => ({ wch: 16 }))];
       ws['!rows'] = rowHeights;
       ws['!merges'] = merges;
+      ws['!pageSetup'] = {
+        paperSize: 9, // ISO A4
+        orientation: options?.orientation || 'portrait',
+        fitToWidth: 1,
+        fitToHeight: 0,
+        scale: 100,
+      };
+      ws['!margins'] = {
+        left: 0.5,
+        right: 0.5,
+        top: 0.6,
+        bottom: 0.6,
+        header: 0.3,
+        footer: 0.3,
+      };
 
       XLSX.utils.book_append_sheet(wb, ws, 'Daftar Hadir Pengawas');
       const filename = fileNameOverride || `Daftar_Hadir_Pengawas_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}.xlsx`;
@@ -2248,7 +2377,7 @@ export class ExamAdministrativeDocsService {
       const rooms = Object.keys(roomStudentMap);
       const selectedRoom = options?.roomFilter;
       const roomsToExport = selectedRoom && selectedRoom !== 'ALL'
-        ? rooms.filter((r) => r.toLowerCase() === selectedRoom.toLowerCase())
+        ? rooms.filter((r) => this.canonicalRoomName(r).toLowerCase() === this.canonicalRoomName(selectedRoom).toLowerCase())
         : rooms;
 
       roomsToExport.forEach((roomName) => {
@@ -2258,26 +2387,37 @@ export class ExamAdministrativeDocsService {
         XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
       });
 
-      const filename = fileNameOverride || `Daftar_Hadir_Peserta_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}.xlsx`;
+      const filename = fileNameOverride || `Daftar_Hadir_Peserta_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}_A4.xlsx`;
       XLSX.writeFile(wb, filename);
 
     } else if (docType === 'HANDOVER_DOCS') {
       // -------------------------------------------------------------
       // EXCEL: SERAH TERIMA NASKAH SOAL & LJK PER RUANGAN
       // -------------------------------------------------------------
-      let rooms: string[] = [];
-      if (scheduleData.proctorSchedules) {
-        const rSet = new Set<string>();
-        scheduleData.proctorSchedules.forEach((p) => {
-          if (p.roomName) rSet.add(p.roomName);
-        });
-        rooms = Array.from(rSet);
+      const isSma = config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+      const minRooms = isSma ? 3 : 5;
+      const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms);
+      const rooms: string[] = [];
+      for (let i = 1; i <= targetRoomCount; i++) {
+        rooms.push(`Ruang ${String(i).padStart(2, '0')}`);
       }
-      if (rooms.length === 0) rooms = ['Ruang 01', 'Ruang 02', 'Ruang 03'];
+      if (scheduleData.proctorSchedules) {
+        scheduleData.proctorSchedules.forEach((p) => {
+          if (p.roomName) {
+            const canon = this.canonicalRoomName(p.roomName);
+            if (!rooms.includes(canon)) rooms.push(canon);
+          }
+        });
+      }
+      rooms.sort((a, b) => {
+        const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
+        const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
+        return numA - numB;
+      });
 
       const selectedRoom = options?.roomFilter;
       const roomsToExport = selectedRoom && selectedRoom !== 'ALL'
-        ? rooms.filter((r) => r.toLowerCase() === selectedRoom.toLowerCase())
+        ? rooms.filter((r) => this.canonicalRoomName(r).toLowerCase() === this.canonicalRoomName(selectedRoom).toLowerCase())
         : rooms;
 
       roomsToExport.forEach((roomName) => {
@@ -2286,7 +2426,7 @@ export class ExamAdministrativeDocsService {
         XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
       });
 
-      const filename = fileNameOverride || `Serah_Terima_Soal_LJK_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}.xlsx`;
+      const filename = fileNameOverride || `Serah_Terima_Soal_LJK_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}_A4.xlsx`;
       XLSX.writeFile(wb, filename);
 
     } else if (docType === 'STUDENT_ATTENDANCE_SUMMARY') {
@@ -2373,9 +2513,24 @@ export class ExamAdministrativeDocsService {
       ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 24 }];
       ws['!rows'] = rowHeights;
       ws['!merges'] = merges;
+      ws['!pageSetup'] = {
+        paperSize: 9, // ISO A4
+        orientation: options?.orientation || 'portrait',
+        fitToWidth: 1,
+        fitToHeight: 0,
+        scale: 100,
+      };
+      ws['!margins'] = {
+        left: 0.5,
+        right: 0.5,
+        top: 0.6,
+        bottom: 0.6,
+        header: 0.3,
+        footer: 0.3,
+      };
 
       XLSX.utils.book_append_sheet(wb, ws, 'Rekap Kehadiran Peserta');
-      const filename = fileNameOverride || `Rekap_Kehadiran_Siswa_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}.xlsx`;
+      const filename = fileNameOverride || `Rekap_Kehadiran_Siswa_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}_A4.xlsx`;
       XLSX.writeFile(wb, filename);
 
     } else if (docType === 'COMMITTEE_ATTENDANCE') {
@@ -2482,9 +2637,24 @@ export class ExamAdministrativeDocsService {
       ws['!cols'] = [{ wch: 6 }, { wch: 32 }, { wch: 22 }, ...days.map(() => ({ wch: 16 }))];
       ws['!rows'] = rowHeights;
       ws['!merges'] = merges;
+      ws['!pageSetup'] = {
+        paperSize: 9, // ISO A4
+        orientation: options?.orientation || 'portrait',
+        fitToWidth: 1,
+        fitToHeight: 0,
+        scale: 100,
+      };
+      ws['!margins'] = {
+        left: 0.5,
+        right: 0.5,
+        top: 0.6,
+        bottom: 0.6,
+        header: 0.3,
+        footer: 0.3,
+      };
 
       XLSX.utils.book_append_sheet(wb, ws, 'Daftar Hadir Panitia');
-      const filename = fileNameOverride || `Daftar_Hadir_Panitia_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}.xlsx`;
+      const filename = fileNameOverride || `Daftar_Hadir_Panitia_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}_A4.xlsx`;
       XLSX.writeFile(wb, filename);
     }
   }
