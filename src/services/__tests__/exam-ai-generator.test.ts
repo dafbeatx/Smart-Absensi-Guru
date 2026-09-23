@@ -453,7 +453,7 @@ Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan gur
     const smaP6Prompt = `Tolong buatkan jadwal pengawasan ujian SMA sesuai dengan matrik alokasi guru pengawas per mata pelajaran P6 berikut:
 
 PAI: P6 = Nurul Farhiya
-IPA: P6 = Qodiatul Asrof Ramadhoni
+Biologi: P6 = Qodiatul Asrof Ramadhoni
 MTK: P6 = Qodiatul Asrof Ramadhoni
 PP: P6 = Dafa Maulana
 B. Indonesia: P6 = Qodiatul Asrof Ramadhoni
@@ -479,7 +479,7 @@ Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan gur
       educationLevel: 'SMA',
       teachers: smaTeachers,
       availableClasses: ['10', '11', '12'],
-      availableSubjects: ['PAI', 'IPA', 'MTK', 'PP', 'B. Indonesia', 'Akuntansi', 'B. Arab', 'B. Inggris', 'Ekonomi', 'Informatika', 'Hadits', 'BTQ'],
+      availableSubjects: ['PAI', 'Biologi', 'MTK', 'PP', 'B. Indonesia', 'Akuntansi', 'B. Arab', 'B. Inggris', 'Ekonomi', 'Informatika', 'Hadits', 'BTQ'],
     });
 
     const matrix = ExamMatrixBuilderService.buildMatrix(smaRes.schedule, smaTeachers);

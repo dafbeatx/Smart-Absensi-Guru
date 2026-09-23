@@ -66,11 +66,11 @@ export const EXAM_AI_PROMPT_PRESETS_SMP: AIPromptPreset[] = [
 export const EXAM_AI_PROMPT_PRESETS_SMA: AIPromptPreset[] = [
   {
     id: 'asts_sma_standard_5days',
-    title: 'ASTS SMA Standar (Kelas 10-12, 5 Hari)',
+    title: 'ASTS SMA Standar (Ruang 6, 5 Hari, 12 Mapel)',
     badge: 'SMA As Salaam',
-    description: 'Senin s/d Jumat, 2 sesi/hari (Jumat 1 sesi), kelas 10, 11, 12 SMA, pengawas merata.',
+    description: 'Senin s/d Jumat, mapel resmi SMA: PAI, Biologi, Matematika, PP, B. Indonesia, Akuntansi, dll.',
     prompt:
-      'Buatkan jadwal ASTS (Asesmen Sumatif Tengah Semester) ganjil SMA Terpadu As Salaam untuk rombel SMA dari tanggal 29 September sampai 3 Oktober 2026. 2 sesi per hari (sesi 1 jam 07:30 - 09:00, sesi 2 jam 09:30 - 11:00), khusus hari Jumat 1 sesi saja (07:15 - 08:45). Mapel: PAI, Matematika, Bahasa Indonesia, Bahasa Inggris, Fisika, Kimia, Biologi, Ekonomi, Sosiologi, Geografi, PKn, PJOK. Bagi rata seluruh guru sebagai pengawas, 1 guru per ruang, jangan tugaskan guru mengawas mata pelajarannya sendiri.',
+      'Tolong buatkan jadwal pengawasan ujian ASTS SMA Terpadu As Salaam tanggal 28 September sampai 2 Oktober 2026 untuk kelas 10, 11, 12 (Ruang 6).\n\nPembagian sesi per hari:\n- Senin: 2 sesi (1. PAI, 2. Biologi)\n- Selasa: 2 sesi (1. Matematika, 2. Pendidikan Pancasila)\n- Rabu: 3 sesi (1. B. Indonesia, 2. Akuntansi, 3. B. Arab)\n- Kamis: 3 sesi (1. B. Inggris, 2. Ekonomi, 3. Informatika)\n- Jumat: 2 sesi (1. Hadits, 2. BTQ)\n\nAlokasi guru pengawas per mata pelajaran P6:\nPAI: P6 = Nurul Farhiya\nBiologi: P6 = Qodiatul Asrof Ramadhoni\nMatematika: P6 = Qodiatul Asrof Ramadhoni\nPendidikan Pancasila: P6 = Dafa Maulana\nB. Indonesia: P6 = Qodiatul Asrof Ramadhoni\nAkuntansi: P6 = Mawar Andinia\nB. Arab: P6 = Ridho Maulana Al Farizi\nB. Inggris: P6 = Ridho Maulana Al Farizi\nEkonomi: P6 = M. Iqbal Gustiawan\nInformatika: P6 = Nurul Farhiya\nHadits: P6 = M. Iqbal Gustiawan\nBTQ: P6 = Ridho Maulana Al Farizi\n\nMohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan guru pengawas untuk masing-masing mata pelajaran.',
   },
   {
     id: 'asts_sma_quick_all',
@@ -631,17 +631,17 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
           effectiveLevel === 'SMA'
             ? [
                 'PAI',
-                'PKn',
-                'Bahasa Indonesia',
-                'Bahasa Inggris',
-                'Matematika',
-                'Fisika',
-                'Kimia',
                 'Biologi',
+                'Matematika',
+                'Pendidikan Pancasila',
+                'B. Indonesia',
+                'Akuntansi',
+                'B. Arab',
+                'B. Inggris',
                 'Ekonomi',
-                'Sosiologi',
-                'Geografi',
-                'PJOK',
+                'Informatika',
+                'Hadits',
+                'BTQ',
               ]
             : [
                 'PAI',

@@ -1216,6 +1216,61 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 29: Error testing replaceSubjectInSession', false, err?.message);
   }
 
+  // Test 30: Cross-layer Synchronization for SMA Schedule (Senin-Jumat 12 Subjects)
+  try {
+    const canonical = ExamScheduleRepository.createCanonicalSmaSchedule(testAcademicYear, 'ASTS');
+    await ExamScheduleRepository.saveSchedule(canonical, 'SMA');
+    const smaSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASTS', 'SMA');
+
+    const seninSubjs = smaSchedule?.subjectSchedules
+      .filter((s) => s.dayName.toLowerCase() === 'senin')
+      .map((s) => s.subject);
+    const selasaSubjs = smaSchedule?.subjectSchedules
+      .filter((s) => s.dayName.toLowerCase() === 'selasa')
+      .map((s) => s.subject);
+    const rabuSubjs = smaSchedule?.subjectSchedules
+      .filter((s) => s.dayName.toLowerCase() === 'rabu')
+      .map((s) => s.subject);
+    const kamisSubjs = smaSchedule?.subjectSchedules
+      .filter((s) => s.dayName.toLowerCase() === 'kamis')
+      .map((s) => s.subject);
+    const jumatSubjs = smaSchedule?.subjectSchedules
+      .filter((s) => s.dayName.toLowerCase() === 'jumat')
+      .map((s) => s.subject);
+
+    const proctorSeninS1 = smaSchedule?.proctorSchedules.find((p) => p.dayName.toLowerCase() === 'senin' && p.sessionNumber === 1);
+    const proctorSeninS2 = smaSchedule?.proctorSchedules.find((p) => p.dayName.toLowerCase() === 'senin' && p.sessionNumber === 2);
+    const proctorRabuS2 = smaSchedule?.proctorSchedules.find((p) => p.dayName.toLowerCase() === 'rabu' && p.sessionNumber === 2);
+
+    const isSeninValid = Boolean(seninSubjs?.includes('PAI') && seninSubjs?.includes('Biologi'));
+    const isSelasaValid = Boolean(selasaSubjs?.includes('Matematika') && selasaSubjs?.includes('Pendidikan Pancasila'));
+    const isRabuValid = Boolean(rabuSubjs?.includes('B. Indonesia') && rabuSubjs?.includes('Akuntansi') && rabuSubjs?.includes('B. Arab'));
+    const isKamisValid = Boolean(kamisSubjs?.includes('B. Inggris') && kamisSubjs?.includes('Ekonomi') && kamisSubjs?.includes('Informatika'));
+    const isJumatValid = Boolean(jumatSubjs?.includes('Hadits') && jumatSubjs?.includes('BTQ'));
+
+    const isProctorSynced =
+      proctorSeninS1?.subject === 'PAI' &&
+      proctorSeninS2?.subject === 'Biologi' &&
+      proctorRabuS2?.subject === 'Akuntansi';
+
+    assert(
+      'Exam Scheduler 30: SMA schedule is 100% synchronized across subjects, proctor roster, and days (Senin: PAI, Biologi | Selasa: Matematika, PP | Rabu: B.Indo, Akuntansi, B.Arab | Kamis: B.Ing, Ekonomi, Info | Jumat: Hadits, BTQ)',
+      Boolean(
+        smaSchedule &&
+        isSeninValid &&
+        isSelasaValid &&
+        isRabuValid &&
+        isKamisValid &&
+        isJumatValid &&
+        isProctorSynced &&
+        smaSchedule.summary.totalSubjects === 12
+      ),
+      `Senin: ${seninSubjs?.slice(0, 2).join(',')}, Selasa: ${selasaSubjs?.slice(0, 2).join(',')}, Rabu: ${rabuSubjs?.slice(0, 3).join(',')}, Kamis: ${kamisSubjs?.slice(0, 3).join(',')}, Jumat: ${jumatSubjs?.slice(0, 2).join(',')}, ProctorSynced: ${isProctorSynced}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 30: Error verifying SMA synchronized schedule', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
 

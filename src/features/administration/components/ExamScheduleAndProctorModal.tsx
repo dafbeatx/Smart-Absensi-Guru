@@ -131,6 +131,8 @@ const DEFAULT_SUBJECTS = [
   'Seni Budaya',
   'Ekonomi',
   'Akuntansi',
+  'Biologi',
+  'Pendidikan Pancasila',
 ];
 
 const DEFAULT_CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
@@ -560,6 +562,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
         saved = altSaved;
         setSelectedExamType(altType);
         setFormExamType(altType);
+      } else if (newLevel === 'SMA') {
+        saved = ExamScheduleRepository.createCanonicalSmaSchedule(targetYear, targetType);
+        await ExamScheduleRepository.saveSchedule(saved, 'SMA');
       }
     }
     setScheduleData(saved);
@@ -696,6 +701,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
           saved = altSaved;
           setSelectedExamType(altType);
           setFormExamType(altType);
+        } else if (selectedLevel === 'SMA') {
+          saved = ExamScheduleRepository.createCanonicalSmaSchedule(activeAcademicYear, selectedExamType);
+          await ExamScheduleRepository.saveSchedule(saved, 'SMA');
         }
       }
       setScheduleData(saved);
@@ -878,17 +886,17 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       return `Tolong buatkan jadwal pengawasan ujian ASTS SMA Terpadu As Salaam tanggal 28 September sampai 2 Oktober 2026 untuk kelas 10, 11, 12 (Ruang 6).
 
 Pembagian sesi per hari:
-- Senin: 2 sesi (2 mata pelajaran)
-- Selasa: 2 sesi (2 mata pelajaran)
-- Rabu: 3 sesi (3 mata pelajaran)
-- Kamis: 3 sesi (3 mata pelajaran)
-- Jumat: 2 sesi (2 mata pelajaran)
+- Senin: 2 sesi (1. PAI, 2. Biologi)
+- Selasa: 2 sesi (1. Matematika, 2. Pendidikan Pancasila)
+- Rabu: 3 sesi (1. B. Indonesia, 2. Akuntansi, 3. B. Arab)
+- Kamis: 3 sesi (1. B. Inggris, 2. Ekonomi, 3. Informatika)
+- Jumat: 2 sesi (1. Hadits, 2. BTQ)
 
 Alokasi guru pengawas per mata pelajaran P6:
 PAI: P6 = Nurul Farhiya
-IPA: P6 = Qodiatul Asrof Ramadhoni
-MTK: P6 = Qodiatul Asrof Ramadhoni
-PP: P6 = Dafa Maulana
+Biologi: P6 = Qodiatul Asrof Ramadhoni
+Matematika: P6 = Qodiatul Asrof Ramadhoni
+Pendidikan Pancasila: P6 = Dafa Maulana
 B. Indonesia: P6 = Qodiatul Asrof Ramadhoni
 Akuntansi: P6 = Mawar Andinia
 B. Arab: P6 = Ridho Maulana Al Farizi
