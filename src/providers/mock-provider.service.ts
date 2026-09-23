@@ -3351,9 +3351,17 @@ export class MockProvider implements IDataProvider {
     const levelSuffix = effectiveLevel ? `_${effectiveLevel.toLowerCase()}` : '';
     const key = `${schedule.config.academicYear}_${schedule.config.examType}${levelSuffix}`.replace(/[^\w]/g, '_');
     this.mockExamSchedules.set(key, schedule);
+    if (effectiveLevel === 'SMP') {
+      const legacyKey = `${schedule.config.academicYear}_${schedule.config.examType}`.replace(/[^\w]/g, '_');
+      this.mockExamSchedules.set(legacyKey, schedule);
+    }
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(`smart_absensi_exam_schedule_${key}`, JSON.stringify(schedule));
+        if (effectiveLevel === 'SMP') {
+          const legacyKey = `${schedule.config.academicYear}_${schedule.config.examType}`.replace(/[^\w]/g, '_');
+          localStorage.setItem(`smart_absensi_exam_schedule_${legacyKey}`, JSON.stringify(schedule));
+        }
       }
     } catch {}
     return true;
@@ -3363,9 +3371,17 @@ export class MockProvider implements IDataProvider {
     const levelSuffix = level ? `_${level.toLowerCase()}` : '';
     const key = `${academicYear}_${examType}${levelSuffix}`.replace(/[^\w]/g, '_');
     this.mockExamSchedules.delete(key);
+    if (level === 'SMP' || !level) {
+      const legacyKey = `${academicYear}_${examType}`.replace(/[^\w]/g, '_');
+      this.mockExamSchedules.delete(legacyKey);
+    }
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(`smart_absensi_exam_schedule_${key}`);
+        if (level === 'SMP' || !level) {
+          const legacyKey = `${academicYear}_${examType}`.replace(/[^\w]/g, '_');
+          localStorage.removeItem(`smart_absensi_exam_schedule_${legacyKey}`);
+        }
         if (!level) {
           localStorage.removeItem(`smart_absensi_exam_schedule_${academicYear}_${examType}_smp`.replace(/[^\w]/g, '_'));
           localStorage.removeItem(`smart_absensi_exam_schedule_${academicYear}_${examType}_sma`.replace(/[^\w]/g, '_'));

@@ -6332,22 +6332,38 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     return this.dedupeRequest(`getExamSchedule_${storageKey}`, async () => {
-      // 1. Try system_settings KV
+      // 1. Try system_settings KV (Primary Key)
       try {
-        const { data: kvData } = await this.client
+        let { data: kvData } = await this.client
           .from('system_settings')
           .select('value')
           .eq('key', storageKey)
           .maybeSingle();
 
+        // 1.1 Fallback for SMP to legacy non-suffixed key in Cloud system_settings
+        if (!kvData?.value && level === 'SMP') {
+          const legacyStorageKey = `exam_schedule_${cleanYear}_${cleanType}`;
+          const { data: legacyKvData } = await this.client
+            .from('system_settings')
+            .select('value')
+            .eq('key', legacyStorageKey)
+            .maybeSingle();
+          if (legacyKvData?.value) {
+            kvData = legacyKvData;
+          }
+        }
+
         if (kvData?.value) {
           const parsed: ExamScheduleData = JSON.parse(kvData.value);
           this.cachedExamSchedules.set(storageKey, { data: parsed, timestamp: Date.now() });
 
-          // Update local cache
+          // Update local cache for offline/fast reloads
           try {
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`, JSON.stringify(parsed));
+              if (level === 'SMP') {
+                localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`, JSON.stringify(parsed));
+              }
             }
           } catch {}
 
@@ -6389,21 +6405,36 @@ export class SupabaseProvider implements IDataProvider {
     const storageKey = `exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
 
     this.cachedExamSchedules.delete(storageKey);
+    if (effectiveLevel === 'SMP') {
+      this.cachedExamSchedules.delete(`exam_schedule_${cleanYear}_${cleanType}`);
+    }
 
     // 1. Local storage
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`, JSON.stringify(schedule));
+        if (effectiveLevel === 'SMP') {
+          localStorage.setItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`, JSON.stringify(schedule));
+        }
       }
     } catch {}
 
-    // 2. Cloud system_settings
+    // 2. Cloud system_settings (Upsert primary key + legacy key for SMP)
     try {
-      await this.client.from('system_settings').upsert({
+      const payload = {
         key: storageKey,
         value: JSON.stringify(schedule),
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'key' });
+      };
+      await this.client.from('system_settings').upsert(payload, { onConflict: 'key' });
+
+      if (effectiveLevel === 'SMP') {
+        await this.client.from('system_settings').upsert({
+          key: `exam_schedule_${cleanYear}_${cleanType}`,
+          value: JSON.stringify(schedule),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+      }
     } catch (err) {
       logger.warn('SupabaseProvider', 'Failed to save exam schedule to system_settings:', err);
     }
@@ -6424,10 +6455,16 @@ export class SupabaseProvider implements IDataProvider {
     const storageKey = `exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`;
 
     this.cachedExamSchedules.delete(storageKey);
+    if (level === 'SMP' || !level) {
+      this.cachedExamSchedules.delete(`exam_schedule_${cleanYear}_${cleanType}`);
+    }
 
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}${levelSuffix}`);
+        if (level === 'SMP' || !level) {
+          localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}`);
+        }
         if (!level) {
           localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}_smp`);
           localStorage.removeItem(`smart_absensi_exam_schedule_${cleanYear}_${cleanType}_sma`);
@@ -6437,6 +6474,9 @@ export class SupabaseProvider implements IDataProvider {
 
     try {
       await this.client.from('system_settings').delete().eq('key', storageKey);
+      if (level === 'SMP' || !level) {
+        await this.client.from('system_settings').delete().eq('key', `exam_schedule_${cleanYear}_${cleanType}`);
+      }
     } catch (err) {
       logger.warn('SupabaseProvider', 'Failed to delete exam schedule from system_settings:', err);
     }

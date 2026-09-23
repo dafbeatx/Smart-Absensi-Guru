@@ -30,6 +30,7 @@ import {
   Bot,
   Zap,
   Copy,
+  Smartphone,
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -57,6 +58,7 @@ import {
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
+import { OFFICIAL_SCHOOL_SUBJECTS } from '../../../config/school-subjects.config';
 import { normalizeClassCode, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
 import { NotificationService } from '../../../services/notification-permission.service';
@@ -98,19 +100,30 @@ interface ExamScheduleAndProctorModalProps {
   readOnly?: boolean;
 }
 
+export type ProctorViewMode = 'CARDS' | 'MATRIX' | 'TABLE';
+
 const DEFAULT_SUBJECTS = [
   'PAI',
+  'IPA',
+  'MTK',
+  'Matematika',
+  'PP',
   'PKn',
   'Bahasa Indonesia',
-  'Matematika',
-  'IPA',
+  'B. Indonesia',
   'IPS',
-  'Bahasa Inggris',
-  'Informatika',
-  'Seni Budaya',
-  'PJOK',
   'Bahasa Arab',
+  'B. Arab',
+  'Bahasa Inggris',
+  'B. Inggris',
   'SBPK',
+  'Informatika',
+  'Hadits',
+  'BTQ',
+  'PJOK',
+  'Seni Budaya',
+  'Ekonomi',
+  'Akuntansi',
 ];
 
 const DEFAULT_CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
@@ -136,7 +149,12 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [activeTab, setActiveTab] = useState<'ai_prompt' | 'form' | 'subjects' | 'proctors' | 'my_schedule' | 'committee'>(
     () => initialTab || (readOnly ? 'proctors' : 'ai_prompt')
   );
-  const [proctorViewMode, setProctorViewMode] = useState<'MATRIX' | 'TABLE'>('MATRIX');
+  const [proctorViewMode, setProctorViewMode] = useState<ProctorViewMode>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'CARDS';
+    }
+    return 'MATRIX';
+  });
   const institutionName = useSettingsStore((s) => s.settings.institution_name) || 'SMP Terpadu Al-Ittihadiyah';
 
   // Sync initialLevel and initialTab when modal opens
@@ -417,30 +435,63 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // Load subjects from cache (Zero Egress)
+  // Load subjects from cache & official school subjects (Zero Egress)
   const loadSubjectsForYear = useCallback((year: string) => {
     try {
       const subjectsSet = new Set<string>(DEFAULT_SUBJECTS);
+
+      // 1. Incorporate all 12 official school subjects and their standard aliases
+      OFFICIAL_SCHOOL_SUBJECTS.forEach((os) => {
+        if (os.name) subjectsSet.add(os.name);
+        if (os.code) subjectsSet.add(os.code);
+        if (Array.isArray(os.aliases)) {
+          os.aliases.forEach((a) => {
+            if (a && a.length > 1) subjectsSet.add(a);
+          });
+        }
+      });
+
       if (typeof window !== 'undefined' && window.localStorage) {
+        // 2. Read admin curriculum subjects (smart_absensi_subjects)
+        const curriculumRaw = localStorage.getItem('smart_absensi_subjects');
+        if (curriculumRaw) {
+          try {
+            const parsedCurriculum = JSON.parse(curriculumRaw);
+            if (Array.isArray(parsedCurriculum)) {
+              parsedCurriculum.forEach((sub: any) => {
+                const name = (sub.name || '').trim();
+                if (name && name.length > 1) subjectsSet.add(name);
+                const code = (sub.code || '').trim();
+                if (code && code.length > 1) subjectsSet.add(code);
+              });
+            }
+          } catch {}
+        }
+
+        // 3. Read teaching schedules (smart_absensi_teaching_schedules)
         const cached = localStorage.getItem('smart_absensi_teaching_schedules');
         if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed)) {
-            parsed.forEach((slot: any) => {
-              if (!slot.academic_year || slot.academic_year === year) {
-                const s = (slot.subject || slot.subject_name || '').trim();
-                if (s && s.length > 1) {
-                  subjectsSet.add(s);
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((slot: any) => {
+                if (!slot.academic_year || slot.academic_year === year) {
+                  const s = (slot.subject || slot.subject_name || '').trim();
+                  if (s && s.length > 1) {
+                    subjectsSet.add(s);
+                  }
                 }
-              }
-            });
-          }
+              });
+            }
+          } catch {}
         }
       }
+
       const combined = Array.from(subjectsSet);
       setAvailableSubjects(combined);
       setSelectedSubjects((prev) => {
-        const merged = new Set([...prev, ...DEFAULT_SUBJECTS]);
+        const base = prev.length > 0 ? prev : DEFAULT_SUBJECTS;
+        const merged = new Set([...base]);
         return Array.from(merged).filter((s) => combined.includes(s));
       });
     } catch (err) {
@@ -486,8 +537,21 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     // Reload schedule for this level
     const targetYear = formAcademicYear || activeAcademicYear;
     const targetType = formExamType || selectedExamType;
-    const saved = await ExamScheduleRepository.getSchedule(targetYear, targetType, newLevel);
+    let saved = await ExamScheduleRepository.getSchedule(targetYear, targetType, newLevel);
+    // Fallback if not found under targetType: check alternative type (ASTS / ASAS)
+    if (!saved) {
+      const altType = targetType === 'ASTS' ? 'ASAS' : 'ASTS';
+      const altSaved = await ExamScheduleRepository.getSchedule(targetYear, altType, newLevel);
+      if (altSaved) {
+        saved = altSaved;
+        setSelectedExamType(altType);
+        setFormExamType(altType);
+      }
+    }
     setScheduleData(saved);
+    if (saved?.config?.selectedSubjects && saved.config.selectedSubjects.length > 0) {
+      setSelectedSubjects(saved.config.selectedSubjects);
+    }
 
     // Filter available classes for this level
     const levelFiltered = allYearClasses.filter((c) => resolveSchoolLevel(c) === newLevel);
@@ -610,12 +674,24 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       loadSubjectsForYear(formAcademicYear);
 
       // 6. Load existing schedule if available for selectedLevel
-      const saved = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, selectedLevel);
+      let saved = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, selectedLevel);
+      if (!saved) {
+        const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
+        const altSaved = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, selectedLevel);
+        if (altSaved) {
+          saved = altSaved;
+          setSelectedExamType(altType);
+          setFormExamType(altType);
+        }
+      }
       setScheduleData(saved);
       if (saved?.config) {
         if (saved.config.totalRooms) setTotalRooms(saved.config.totalRooms);
         if (saved.config.roomFormat) setRoomFormat(saved.config.roomFormat);
         if (saved.config.classRoomMapping) setClassRoomMapping(saved.config.classRoomMapping);
+        if (saved.config.selectedSubjects && saved.config.selectedSubjects.length > 0) {
+          setSelectedSubjects(saved.config.selectedSubjects);
+        }
       }
 
       // If user is in readOnly mode or regular teacher, default tab to "proctors" or "subjects"
@@ -1038,6 +1114,74 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
       committeeHeadNpp,
     };
   }, [teachers, committeeMembers]);
+
+  // Proctor Code Mapping for Mobile Cards & Matrix
+  const teacherCodeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (invigilationMatrix?.teacherLegend) {
+      invigilationMatrix.teacherLegend.forEach((t) => {
+        if (t.userId) map.set(t.userId, t.code);
+        if (t.fullName) {
+          map.set(t.fullName.toLowerCase().trim(), t.code);
+          map.set(ExamSchedulerService.normalizeTeacherName(t.fullName), t.code);
+        }
+      });
+    }
+    return map;
+  }, [invigilationMatrix]);
+
+  // Grouped Proctor Schedules for Mobile Roster Card View
+  const groupedProctorCards = useMemo(() => {
+    if (!scheduleData?.proctorSchedules || scheduleData.proctorSchedules.length === 0) return [];
+
+    const dateMap = new Map<
+      string,
+      {
+        date: string;
+        dayName: string;
+        dayFormatted: string;
+        sessions: Map<
+          number,
+          {
+            sessionNumber: number;
+            sessionTime: string;
+            subject: string;
+            rooms: typeof scheduleData.proctorSchedules;
+          }
+        >;
+      }
+    >();
+
+    scheduleData.proctorSchedules.forEach((p) => {
+      let day = dateMap.get(p.date);
+      if (!day) {
+        day = {
+          date: p.date,
+          dayName: p.dayName,
+          dayFormatted: ExamMatrixBuilderService.formatIndonesianDate(p.date),
+          sessions: new Map(),
+        };
+        dateMap.set(p.date, day);
+      }
+      let sess = day.sessions.get(p.sessionNumber);
+      if (!sess) {
+        sess = {
+          sessionNumber: p.sessionNumber,
+          sessionTime: p.startTime && p.endTime ? `${p.startTime} - ${p.endTime}` : '',
+          subject: p.subject || '-',
+          rooms: [],
+        };
+        day.sessions.set(p.sessionNumber, sess);
+      }
+      sess.rooms.push(p);
+    });
+
+    const sortedDates = Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    return sortedDates.map((d) => ({
+      ...d,
+      sessions: Array.from(d.sessions.values()).sort((a, b) => a.sessionNumber - b.sessionNumber),
+    }));
+  }, [scheduleData]);
 
   if (!isOpen) return null;
 
@@ -2948,25 +3092,37 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               <div className="space-y-4">
                 {/* View Switcher & Action Toolbar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-xs">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <span className="text-xs font-bold text-slate-600 shrink-0">Tampilan:</span>
-                    <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200">
+                    <div className="inline-flex flex-wrap p-1 bg-slate-100/90 rounded-xl border border-slate-200 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setProctorViewMode('CARDS')}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                          proctorViewMode === 'CARDS'
+                            ? 'bg-white text-[#023246] shadow-2xs font-extrabold'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <Smartphone className="w-3.5 h-3.5 text-teal-600" />
+                        <span>Kartu Roster (HP)</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => setProctorViewMode('MATRIX')}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                           proctorViewMode === 'MATRIX'
                             ? 'bg-white text-[#023246] shadow-2xs font-extrabold'
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
                         <LayoutGrid className="w-3.5 h-3.5 text-teal-600" />
-                        <span>Format Resmi Sekolah (Matriks)</span>
+                        <span>Format Resmi (A4)</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setProctorViewMode('TABLE')}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
                           proctorViewMode === 'TABLE'
                             ? 'bg-white text-[#023246] shadow-2xs font-extrabold'
                             : 'text-slate-600 hover:text-slate-900'
@@ -3027,11 +3183,244 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                   </div>
                 </div>
 
-                {/* MODE 1: FORMAT MATRIKS RESMI SEKOLAH (IDENTIK DENGAN FOTO FISIK) */}
+                {/* MODE 1: KARTU ROSTER PENGAWAS MOBILE (KHUSUS TAMPILAN HP YANG RAPI & JELAS) */}
+                {proctorViewMode === 'CARDS' && (
+                  <div className="space-y-4">
+                    {/* Header Summary Card */}
+                    <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-xs">
+                      <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
+                        <div>
+                          <h4 className="text-sm font-black text-slate-900">
+                            {scheduleData.config.examTitle || `${scheduleData.config.examType} ${selectedLevel}`}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            Tahun Pelajaran {scheduleData.config.academicYear || activeAcademicYear} • Jenjang {selectedLevel}
+                          </p>
+                        </div>
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200">
+                          {scheduleData.summary.totalDays} Hari • {scheduleData.summary.totalProctorsAssigned} Sesi Mengawas
+                        </span>
+                      </div>
+
+                      {myProctorAssignments.length > 0 && (
+                        <div className="mt-3 p-3 rounded-xl bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200/80 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">⭐</span>
+                            <div>
+                              <p className="text-xs font-black text-amber-950">
+                                Tugas Mengawas Anda ({currentUser.full_name || 'Guru'})
+                              </p>
+                              <p className="text-[11px] text-amber-800">
+                                Anda terjadwal di <strong className="font-extrabold">{myProctorAssignments.length} sesi ujian</strong>.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('my_schedule')}
+                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shrink-0 transition-colors shadow-2xs"
+                          >
+                            Jadwal Saya
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Grouped Day & Session Cards */}
+                    {groupedProctorCards.length === 0 ? (
+                      <div className="bg-white rounded-2xl p-8 text-center border border-slate-200/90 shadow-xs space-y-2">
+                        <Users className="w-10 h-10 text-slate-300 mx-auto" />
+                        <h5 className="text-sm font-bold text-slate-800">Belum Ada Pembagian Ruang Pengawas</h5>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          Jadwal ini belum memiliki pembagian pengawas ruang atau disusun tanpa roster pengawas.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {groupedProctorCards.map((day, dayIdx) => (
+                          <div key={day.date} className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                            {/* Day Header Banner */}
+                            <div className="bg-slate-50/90 px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-lg bg-[#023246] text-white text-xs font-black flex items-center justify-center">
+                                  {dayIdx + 1}
+                                </span>
+                                <div>
+                                  <h5 className="text-xs sm:text-sm font-black text-slate-900">
+                                    {day.dayFormatted}
+                                  </h5>
+                                  <p className="text-[10px] sm:text-[11px] text-slate-500 font-semibold">
+                                    {day.sessions.length} Sesi Ujian
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600">
+                                {day.date}
+                              </span>
+                            </div>
+
+                            {/* Sessions in Day */}
+                            <div className="p-3 sm:p-4 space-y-4">
+                              {day.sessions.map((sess) => (
+                                <div key={sess.sessionNumber} className="space-y-2.5">
+                                  {/* Session Header Pill */}
+                                  <div className="flex items-center justify-between gap-2 bg-teal-50/80 px-3 py-1.5 rounded-xl border border-teal-200/70 text-xs">
+                                    <div className="flex items-center gap-1.5 font-black text-teal-950">
+                                      <Clock className="w-3.5 h-3.5 text-teal-700" />
+                                      <span>Sesi {sess.sessionNumber}</span>
+                                      {sess.sessionTime && (
+                                        <span className="font-semibold text-teal-800 text-[11px]">
+                                          ({sess.sessionTime.replace(':', '.').replace('-', '–')})
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="font-bold text-teal-900 bg-white px-2 py-0.5 rounded-md border border-teal-200 text-[11px]">
+                                      {sess.subject}
+                                    </span>
+                                  </div>
+
+                                  {/* Rooms Grid */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                    {sess.rooms.map((p) => {
+                                      const isMe =
+                                        currentUser &&
+                                        (p.mainProctorId === currentUser.id ||
+                                          p.secondaryProctorId === currentUser.id ||
+                                          p.backupProctorId === currentUser.id ||
+                                          p.mainProctorName?.toLowerCase().trim() === currentUser.full_name?.toLowerCase().trim());
+
+                                      const proctorCode =
+                                        teacherCodeMap.get(p.mainProctorId) ||
+                                        teacherCodeMap.get(p.mainProctorName?.toLowerCase().trim() || '') ||
+                                        teacherCodeMap.get(ExamSchedulerService.normalizeTeacherName(p.mainProctorName || '')) ||
+                                        '-';
+
+                                      return (
+                                        <div
+                                          key={p.id}
+                                          className={`p-3 rounded-xl border transition-all text-xs flex flex-col justify-between gap-2 ${
+                                            isMe
+                                              ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400/40 shadow-xs'
+                                              : 'bg-white border-slate-200 hover:border-slate-300'
+                                          }`}
+                                        >
+                                          <div className="space-y-1.5">
+                                            {/* Room Top Bar */}
+                                            <div className="flex items-center justify-between gap-1.5">
+                                              <span className="font-black text-slate-900 flex items-center gap-1">
+                                                <DoorOpen className="w-3.5 h-3.5 text-slate-400" />
+                                                {p.roomName}
+                                              </span>
+                                              {isMe ? (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-500 text-white shadow-2xs">
+                                                  ⭐ Tugas Anda
+                                                </span>
+                                              ) : (
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-mono">
+                                                  {p.className || '-'}
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            {/* Proctor Name & Code */}
+                                            <div className="pt-1 border-t border-slate-100 space-y-1">
+                                              <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0">
+                                                  <span className="text-[10px] font-semibold text-slate-400 block uppercase">
+                                                    Pengawas Utama
+                                                  </span>
+                                                  <span className={`font-bold block truncate ${isMe ? 'text-amber-950 font-black' : 'text-slate-800'}`}>
+                                                    {p.mainProctorName || 'Belum Ditentukan'}
+                                                  </span>
+                                                </div>
+                                                <span className="px-1.5 py-0.5 rounded font-mono font-black text-[11px] bg-slate-100 text-teal-900 border border-slate-300 shrink-0">
+                                                  {proctorCode}
+                                                </span>
+                                              </div>
+
+                                              {p.secondaryProctorName && (
+                                                <div className="text-[11px] pt-1 border-t border-slate-100 text-slate-600">
+                                                  <span className="text-[10px] text-slate-400 block">Pengawas 2:</span>
+                                                  <span className="font-medium text-slate-700">{p.secondaryProctorName}</span>
+                                                </div>
+                                              )}
+
+                                              {p.backupProctorName && (
+                                                <div className="text-[10px] text-slate-500">
+                                                  Cadangan: {p.backupProctorName}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* Subject Pill Footer */}
+                                          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                                            <span className="truncate">{p.subject}</span>
+                                            <span className="text-[10px] text-slate-400 font-mono">{sess.sessionTime}</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Teacher Legend Card for Mobile */}
+                        {invigilationMatrix && invigilationMatrix.teacherLegend.length > 0 && (
+                          <div className="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-4 shadow-xs space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                                Daftar Kode Pengawas Ruang
+                              </h5>
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                {invigilationMatrix.teacherLegend.length} Guru
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {invigilationMatrix.teacherLegend.map((t) => {
+                                const isMe = currentUser && (t.userId === currentUser.id || t.fullName.toLowerCase().trim() === currentUser.full_name?.toLowerCase().trim());
+                                return (
+                                  <div
+                                    key={t.code}
+                                    className={`p-2 rounded-xl border flex items-center justify-between gap-2 text-xs ${
+                                      isMe ? 'bg-amber-50/70 border-amber-300 font-bold' : 'bg-slate-50/60 border-slate-200'
+                                    }`}
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-bold text-slate-900 truncate">{t.fullName}</span>
+                                        {isMe && <span className="text-[10px] text-amber-600 font-black">★</span>}
+                                      </div>
+                                      <span className="text-[10px] text-slate-500 block truncate">{t.subject}</span>
+                                    </div>
+                                    <span className="px-2 py-0.5 rounded font-mono font-black text-xs bg-white text-teal-900 border border-slate-300 shrink-0">
+                                      {t.code}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* MODE 2: FORMAT MATRIKS RESMI SEKOLAH (IDENTIK DENGAN FOTO FISIK) */}
                 {proctorViewMode === 'MATRIX' && invigilationMatrix && (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
+                    {/* Mobile swipe hint banner */}
+                    <div className="flex sm:hidden items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] font-semibold text-amber-900">
+                      <span className="text-sm">👉</span>
+                      <span>Geser tabel ke samping untuk melihat seluruh ruang ujian (R 01 s.d. {invigilationMatrix.rooms[invigilationMatrix.rooms.length - 1]?.label || 'R 10'}).</span>
+                    </div>
+
                     {/* Paper Container Preview */}
-                    <div className="bg-white rounded-2xl border border-slate-300 shadow-sm p-4 sm:p-7 space-y-6 text-slate-800">
+                    <div className="bg-white rounded-2xl border border-slate-300 shadow-sm p-3 sm:p-7 space-y-4 sm:space-y-6 text-slate-800">
                       {/* Paper Official Header */}
                       <div className="text-center space-y-1 pb-4 border-b border-slate-300">
                         <h2 className="text-base sm:text-lg font-black tracking-wide text-slate-900 uppercase">
@@ -3051,7 +3440,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       {/* Table 1: Matrix Jadwal Pengawas (Atas) */}
                       <div className="space-y-2">
                         <div className="overflow-x-auto">
-                          <table className="w-full text-xs border-collapse border border-slate-400">
+                          <table className="w-full min-w-170 text-xs border-collapse border border-slate-400">
                             <thead>
                               <tr className="bg-slate-100 text-slate-800 font-bold text-center">
                                 <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 w-10 text-center font-black">
@@ -3118,15 +3507,12 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                           key={col.key}
                                           className="border border-slate-400 py-1.5 px-1.5 text-center align-middle"
                                         >
-                                          {code ? (
-                                            <span
-                                              className="inline-flex items-center justify-center w-8 h-7 rounded bg-teal-50 text-teal-900 border border-teal-300 font-mono font-black text-xs shadow-2xs hover:bg-teal-600 hover:text-white transition-colors cursor-help"
-                                              title={`Ruang ${col.label}: Kode ${code}`}
-                                            >
+                                          {code && code !== '-' ? (
+                                            <span className="inline-block px-1.5 py-0.5 rounded font-mono font-black text-xs bg-teal-50 text-teal-900 border border-teal-200">
                                               {code}
                                             </span>
                                           ) : (
-                                            <span className="text-slate-300 font-bold">-</span>
+                                            <span className="text-slate-300 font-mono">-</span>
                                           )}
                                         </td>
                                       );
@@ -3151,7 +3537,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                         </div>
 
                         <div className="overflow-x-auto">
-                          <table className="w-full text-xs border-collapse border border-slate-400">
+                          <table className="w-full min-w-120 text-xs border-collapse border border-slate-400">
                             <thead>
                               <tr className="bg-slate-100 text-slate-800 font-bold">
                                 <th className="border border-slate-400 py-2 px-2.5 w-12 text-center font-black">No</th>
