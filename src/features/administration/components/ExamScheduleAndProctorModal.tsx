@@ -3420,7 +3420,10 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                     </div>
 
                     {/* Paper Container Preview */}
-                    <div className="bg-white rounded-2xl border border-slate-300 shadow-sm p-3 sm:p-7 space-y-4 sm:space-y-6 text-slate-800">
+                    <div
+                      className="bg-white rounded-2xl border border-slate-300 shadow-sm p-3 sm:p-7 space-y-4 sm:space-y-6 text-slate-800"
+                      style={{ fontFamily: '"Times New Roman", Times, Georgia, serif' }}
+                    >
                       {/* Paper Official Header */}
                       <div className="text-center space-y-1 pb-4 border-b border-slate-300">
                         <h2 className="text-base sm:text-lg font-black tracking-wide text-slate-900 uppercase">
@@ -3443,13 +3446,13 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                           <table className="w-full min-w-170 text-xs border-collapse border border-slate-400">
                             <thead>
                               <tr className="bg-slate-100 text-slate-800 font-bold text-center">
-                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 w-10 text-center font-black">
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 w-10 text-center font-black whitespace-nowrap">
                                   No
                                 </th>
-                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-32.5 text-center font-black">
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-32.5 text-center font-black whitespace-nowrap">
                                   Hari / Tanggal
                                 </th>
-                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 min-w-25 text-center font-black">
+                                <th rowSpan={2} className="border border-slate-400 py-2.5 px-2 min-w-25 text-center font-black whitespace-nowrap">
                                   Waktu
                                 </th>
                                 <th rowSpan={2} className="border border-slate-400 py-2.5 px-3 min-w-35 text-left font-black">
@@ -3457,7 +3460,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                 </th>
                                 <th
                                   colSpan={invigilationMatrix.rooms.length}
-                                  className="border border-slate-400 py-2 px-2 text-center font-black bg-slate-200/90 text-slate-900"
+                                  className="border border-slate-400 py-2 px-2 text-center font-black bg-slate-200/90 text-slate-900 whitespace-nowrap"
                                 >
                                   Kode Pengawas
                                 </th>
@@ -3466,7 +3469,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                 {invigilationMatrix.rooms.map((col) => (
                                   <th
                                     key={col.key}
-                                    className="border border-slate-400 py-1.5 px-2 text-center text-[11px] font-black w-12 text-teal-950"
+                                    className="border border-slate-400 py-1.5 px-2 text-center text-[11px] font-black min-w-12 w-12 text-teal-950 whitespace-nowrap"
                                   >
                                     {col.label}
                                   </th>
@@ -3481,7 +3484,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       <>
                                         <td
                                           rowSpan={day.sessions.length}
-                                          className="border border-slate-400 py-2 px-2 text-center font-bold align-middle bg-white text-slate-700"
+                                          className="border border-slate-400 py-2 px-2 text-center font-bold align-middle bg-white text-slate-700 whitespace-nowrap"
                                         >
                                           {day.dayNumber}
                                         </td>
@@ -3489,7 +3492,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                           rowSpan={day.sessions.length}
                                           className="border border-slate-400 py-2 px-3 align-middle bg-white"
                                         >
-                                          <div className="font-extrabold text-slate-900 text-xs">{day.dayFormatted}</div>
+                                          <div className="font-extrabold text-slate-900 text-xs whitespace-nowrap">{day.dayFormatted}</div>
                                         </td>
                                       </>
                                     )}
@@ -3505,7 +3508,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       return (
                                         <td
                                           key={col.key}
-                                          className="border border-slate-400 py-1.5 px-1.5 text-center align-middle"
+                                          className="border border-slate-400 py-1.5 px-1.5 text-center align-middle whitespace-nowrap"
                                         >
                                           {code && code !== '-' ? (
                                             <span className="inline-block px-1.5 py-0.5 rounded font-mono font-black text-xs bg-teal-50 text-teal-900 border border-teal-200">
@@ -3540,10 +3543,10 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                           <table className="w-full min-w-120 text-xs border-collapse border border-slate-400">
                             <thead>
                               <tr className="bg-slate-100 text-slate-800 font-bold">
-                                <th className="border border-slate-400 py-2 px-2.5 w-12 text-center font-black">No</th>
+                                <th className="border border-slate-400 py-2 px-2.5 w-12 text-center font-black whitespace-nowrap">No</th>
                                 <th className="border border-slate-400 py-2 px-3 text-left font-black">Nama Guru</th>
                                 <th className="border border-slate-400 py-2 px-3 text-left font-black">Mata Pelajaran</th>
-                                <th className="border border-slate-400 py-2 px-3 w-28 text-center font-black">Kode Pengawas</th>
+                                <th className="border border-slate-400 py-2 px-3 w-28 text-center font-black whitespace-nowrap">Kode Pengawas</th>
                               </tr>
                             </thead>
                             <tbody>

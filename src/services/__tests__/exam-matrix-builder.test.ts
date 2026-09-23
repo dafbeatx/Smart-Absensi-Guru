@@ -301,5 +301,53 @@ export const runExamMatrixTestSuite = async (): Promise<{
     assert('Exam Matrix 08: Error testing normalizeTeacherName', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 9: Official A4 Print HTML Omits Signatures by Default
+  // ---------------------------------------------------------------------------
+  try {
+    const matrix = ExamMatrixBuilderService.buildMatrix(
+      scheduleData,
+      sampleTeachers,
+      'SMP Terpadu Al - Ittihadiyah'
+    );
+    const printHtml = ExamWordExporterService.generateOfficialA4PrintHtml(matrix);
+
+    const hasMengetahui = printHtml.includes('Mengetahui,');
+    const hasKetuaPanitia = printHtml.includes('Ketua Panitia Asesmen');
+    const hasSignatureGrid = printHtml.includes('signature-grid');
+
+    assert(
+      'Exam Matrix 09: Official A4 print HTML strictly excludes signature block by default',
+      !hasMengetahui && !hasKetuaPanitia && !hasSignatureGrid,
+      `Has Mengetahui: ${hasMengetahui}, Has Ketua: ${hasKetuaPanitia}, Has SigGrid: ${hasSignatureGrid}`
+    );
+  } catch (err: any) {
+    assert('Exam Matrix 09: Error testing official A4 print signatures omission', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 10: Official A4 Print HTML Uses Times New Roman and White-Space Nowrap
+  // ---------------------------------------------------------------------------
+  try {
+    const matrix = ExamMatrixBuilderService.buildMatrix(
+      scheduleData,
+      sampleTeachers,
+      'SMP Terpadu Al - Ittihadiyah'
+    );
+    const printHtml = ExamWordExporterService.generateOfficialA4PrintHtml(matrix);
+
+    const hasTimesNewRoman = printHtml.includes("Times New Roman");
+    const hasRoomNowrap = printHtml.includes('white-space: nowrap') && printHtml.includes('room-col');
+    const hasLegendTable100 = printHtml.includes('.legend-table') && printHtml.includes('width: 100%');
+
+    assert(
+      'Exam Matrix 10: Official A4 print HTML uses Times New Roman typography and nowrap room headers',
+      hasTimesNewRoman && hasRoomNowrap && hasLegendTable100,
+      `Times New Roman: ${hasTimesNewRoman}, Room Nowrap: ${hasRoomNowrap}, Legend 100%: ${hasLegendTable100}`
+    );
+  } catch (err: any) {
+    assert('Exam Matrix 10: Error testing Times New Roman and nowrap formatting', false, err?.message);
+  }
+
   return { passed, failed, results };
 };

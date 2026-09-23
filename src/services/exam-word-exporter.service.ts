@@ -18,7 +18,7 @@ export class ExamWordExporterService {
     // Header Row 1: No, Hari/Tanggal, Waktu, Mata Pelajaran, Kode Pengawas (colspan = rooms.length)
     // Header Row 2: subheaders for each room (R 01, R 02, ...)
     const roomSubHeaders = rooms
-      .map((r) => `<th class="text-center room-col">${r.label}</th>`)
+      .map((r) => `<th class="text-center room-col" style="white-space: nowrap; width: 48px; min-width: 48px;">${r.label}</th>`)
       .join('');
 
     // Build Table 1 Body Rows
@@ -29,7 +29,7 @@ export class ExamWordExporterService {
       day.sessions.forEach((sess, sIdx) => {
         const isFirstInDay = sIdx === 0;
         const roomTds = rooms
-          .map((r) => `<td class="text-center font-bold font-code">${sess.roomCodes[r.key] || '-'}</td>`)
+          .map((r) => `<td class="text-center font-bold font-code" style="white-space: nowrap;">${sess.roomCodes[r.key] || '-'}</td>`)
           .join('');
 
         if (isFirstInDay) {
@@ -141,14 +141,14 @@ export class ExamWordExporterService {
           .text-center { text-align: center; }
           .text-left { text-align: left; }
           .font-bold { font-weight: bold; }
-          .font-code { font-family: 'Courier New', Courier, monospace; font-size: 10pt; }
-          .room-col { width: 32px; }
-          .day-col { padding-left: 8px; }
+          .font-code { font-family: 'Times New Roman', Times, serif; font-size: 10pt; font-weight: bold; }
+          .room-col { width: 48px; min-width: 48px; white-space: nowrap; text-align: center; }
+          .day-col { padding-left: 8px; white-space: nowrap; }
           .subject-col { padding-left: 8px; }
           .teacher-col { padding-left: 8px; }
           .legend-table {
-            width: 75%;
-            margin-top: 8px;
+            width: 100%;
+            margin-top: 10px;
           }
         </style>
       </head>
@@ -242,21 +242,10 @@ export class ExamWordExporterService {
     }
   ): string {
     const { title, subTitle, institutionName, rooms, days, teacherLegend } = matrix;
-    const defaultKepsek = SIGNATORY_OFFICIALS.KEPSEK_NAME || 'Farhan Sopian Sahid, S.Pd.I';
-    const kepsekName = options?.kepsekName || defaultKepsek;
-    const rawKepsekNpp = options?.kepsekNpp || options?.kepsekNip || '';
-    const formattedKepsekNpp = rawKepsekNpp && rawKepsekNpp !== '-'
-      ? (rawKepsekNpp.startsWith('NPP') ? rawKepsekNpp : `NPP. ${rawKepsekNpp}`)
-      : 'NPP. -';
-
-    const committeeHeadName = options?.committeeHeadName || 'Septi Nur Aeni, S.E';
-    const rawCommitteeNpp = options?.committeeHeadNpp || options?.committeeHeadNip || '';
-    const formattedCommitteeNpp = rawCommitteeNpp && rawCommitteeNpp !== '-'
-      ? (rawCommitteeNpp.startsWith('NPP') ? rawCommitteeNpp : `NPP. ${rawCommitteeNpp}`)
-      : 'NPP. -';
+    void options; // Signatures are omitted from official invigilation matrix per requirements
 
     const roomSubHeaders = rooms
-      .map((r) => `<th class="text-center room-col">${r.label}</th>`)
+      .map((r) => `<th class="text-center room-col" style="white-space: nowrap; width: 48px; min-width: 48px;">${r.label}</th>`)
       .join('');
 
     let matrixBodyRows = '';
@@ -265,7 +254,7 @@ export class ExamWordExporterService {
       day.sessions.forEach((sess, sIdx) => {
         const isFirstInDay = sIdx === 0;
         const roomTds = rooms
-          .map((r) => `<td class="text-center font-code font-bold">${sess.roomCodes[r.key] || '-'}</td>`)
+          .map((r) => `<td class="text-center font-code font-bold" style="white-space: nowrap;">${sess.roomCodes[r.key] || '-'}</td>`)
           .join('');
 
         if (isFirstInDay) {
@@ -273,7 +262,7 @@ export class ExamWordExporterService {
             <tr>
               <td class="text-center" rowspan="${rowSpan}">${day.dayNumber}</td>
               <td class="day-col font-bold" rowspan="${rowSpan}">${day.dayFormatted}</td>
-              <td class="text-center">${sess.timeRange}</td>
+              <td class="text-center" style="white-space: nowrap;">${sess.timeRange}</td>
               <td class="subject-col">${sess.subjectNumber}. ${sess.subjectTitle}</td>
               ${roomTds}
             </tr>
@@ -281,7 +270,7 @@ export class ExamWordExporterService {
         } else {
           matrixBodyRows += `
             <tr>
-              <td class="text-center">${sess.timeRange}</td>
+              <td class="text-center" style="white-space: nowrap;">${sess.timeRange}</td>
               <td class="subject-col">${sess.subjectNumber}. ${sess.subjectTitle}</td>
               ${roomTds}
             </tr>
@@ -297,7 +286,7 @@ export class ExamWordExporterService {
             <td class="text-center">${t.no}</td>
             <td class="teacher-col font-bold">${t.fullName}</td>
             <td class="subject-col">${t.subject}</td>
-            <td class="text-center font-bold font-code">${t.code}</td>
+            <td class="text-center font-bold font-code" style="white-space: nowrap;">${t.code}</td>
           </tr>
         `
       )
@@ -312,7 +301,7 @@ export class ExamWordExporterService {
   <style>
     @page {
       size: A4 portrait;
-      margin: 10mm 14mm 10mm 14mm;
+      margin: 10mm 12mm 10mm 12mm;
     }
     * {
       box-sizing: border-box;
@@ -320,10 +309,10 @@ export class ExamWordExporterService {
       print-color-adjust: exact !important;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: 'Times New Roman', Times, Georgia, serif;
       font-size: 10pt;
       line-height: 1.25;
-      color: #0f172a;
+      color: #000000;
       background-color: #f8fafc;
       margin: 0;
       padding: 0;
@@ -342,7 +331,7 @@ export class ExamWordExporterService {
       gap: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       z-index: 9999;
-      font-family: inherit;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     .btn-action {
       display: inline-flex;
@@ -372,110 +361,104 @@ export class ExamWordExporterService {
       width: 210mm;
       min-height: 297mm;
       margin: 20px auto;
-      padding: 12mm 15mm;
+      padding: 12mm 14mm;
       box-shadow: 0 4px 15px rgba(0,0,0,0.08);
       position: relative;
     }
 
     .doc-header {
       text-align: center;
-      border-bottom: 2px solid #0f172a;
+      border-bottom: 2px solid #000000;
       padding-bottom: 8px;
       margin-bottom: 12px;
+      font-family: 'Times New Roman', Times, Georgia, serif;
     }
     .doc-header h1 {
-      font-size: 12.5pt;
-      font-weight: 900;
+      font-family: 'Times New Roman', Times, Georgia, serif;
+      font-size: 13pt;
+      font-weight: bold;
       margin: 0;
       letter-spacing: 0.5px;
       text-transform: uppercase;
-      color: #0f172a;
+      color: #000000;
     }
     .doc-header h2 {
-      font-size: 10.5pt;
-      font-weight: 800;
+      font-family: 'Times New Roman', Times, Georgia, serif;
+      font-size: 11pt;
+      font-weight: bold;
       margin: 2px 0;
       text-transform: uppercase;
-      color: #1e293b;
+      color: #000000;
     }
     .doc-header h3 {
+      font-family: 'Times New Roman', Times, Georgia, serif;
       font-size: 12pt;
-      font-weight: 900;
+      font-weight: bold;
       margin: 0;
       letter-spacing: 0.8px;
       text-transform: uppercase;
-      color: #0369a1;
+      color: #000000;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
       page-break-inside: avoid;
+      font-family: 'Times New Roman', Times, Georgia, serif;
     }
     table, th, td {
-      border: 1px solid #1e293b;
+      border: 1px solid #000000;
+      font-family: 'Times New Roman', Times, Georgia, serif;
     }
     th, td {
       padding: 4px 6px;
-      font-size: 8.5pt;
+      font-size: 9.5pt;
       vertical-align: middle;
+      font-family: 'Times New Roman', Times, Georgia, serif;
     }
     th {
-      background-color: #f1f5f9;
-      font-weight: 800;
+      background-color: #f8fafc;
+      font-weight: bold;
       text-align: center;
-      color: #0f172a;
+      color: #000000;
+      font-family: 'Times New Roman', Times, Georgia, serif;
     }
     .text-center { text-align: center; }
     .text-left { text-align: left; }
     .font-bold { font-weight: bold; }
     .font-code {
-      font-family: "Courier New", Courier, monospace;
-      font-size: 9.5pt;
+      font-family: 'Times New Roman', Times, Georgia, serif;
+      font-weight: bold;
+      font-size: 10pt;
     }
-    .room-col { width: 36px; min-width: 36px; }
-    .day-col { padding-left: 6px; width: 125px; }
+    .room-col {
+      width: 48px;
+      min-width: 48px;
+      white-space: nowrap !important;
+      text-align: center;
+    }
+    .day-col { padding-left: 6px; width: 135px; white-space: nowrap; }
     .subject-col { padding-left: 6px; }
     .teacher-col { padding-left: 6px; }
 
     .legend-section {
-      margin-top: 8px;
+      margin-top: 10px;
       page-break-inside: avoid;
+      font-family: 'Times New Roman', Times, Georgia, serif;
     }
     .legend-title {
-      font-size: 9pt;
-      font-weight: 800;
-      margin: 0 0 4px 0;
+      font-family: 'Times New Roman', Times, Georgia, serif;
+      font-size: 10.5pt;
+      font-weight: bold;
+      margin: 0 0 6px 0;
       text-transform: uppercase;
       letter-spacing: 0.3px;
+      color: #000000;
     }
     .legend-table {
-      width: 82%;
-      margin-bottom: 12px;
-    }
-
-    .signature-grid {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 20px;
-      page-break-inside: avoid;
-      font-size: 9pt;
-    }
-    .sig-col {
-      width: 210px;
-      text-align: center;
-    }
-    .sig-space {
-      height: 52px;
-    }
-    .sig-name {
-      font-weight: 800;
-      text-decoration: underline;
-    }
-    .sig-nip {
-      font-size: 8pt;
-      color: #475569;
+      width: 100%;
+      margin-bottom: 14px;
     }
 
     @media print {
@@ -525,11 +508,11 @@ export class ExamWordExporterService {
     <table>
       <thead>
         <tr>
-          <th rowspan="2" style="width: 28px;">No</th>
-          <th rowspan="2" style="width: 125px;">Hari / Tanggal</th>
-          <th rowspan="2" style="width: 85px;">Waktu</th>
+          <th rowspan="2" style="width: 32px; white-space: nowrap;">No</th>
+          <th rowspan="2" style="width: 140px; white-space: nowrap;">Hari / Tanggal</th>
+          <th rowspan="2" style="width: 90px; white-space: nowrap;">Waktu</th>
           <th rowspan="2">Mata Pelajaran</th>
-          <th colspan="${rooms.length}">Kode Pengawas</th>
+          <th colspan="${rooms.length}" style="white-space: nowrap;">Kode Pengawas</th>
         </tr>
         <tr>
           ${roomSubHeaders}
@@ -546,34 +529,16 @@ export class ExamWordExporterService {
       <table class="legend-table">
         <thead>
           <tr>
-            <th style="width: 30px;">No</th>
-            <th style="width: 210px;">Nama Guru Pengawas</th>
-            <th>Mata Pelajaran</th>
-            <th style="width: 90px;">Kode Pengawas</th>
+            <th style="width: 32px; white-space: nowrap;">No</th>
+            <th style="width: 260px; text-align: left; padding-left: 8px;">Nama Guru Pengawas</th>
+            <th style="text-align: left; padding-left: 8px;">Mata Pelajaran</th>
+            <th style="width: 100px; white-space: nowrap; text-align: center;">Kode Pengawas</th>
           </tr>
         </thead>
         <tbody>
           ${legendBodyRows}
         </tbody>
       </table>
-    </div>
-
-    <!-- Area Pengesahan Resmi -->
-    <div class="signature-grid">
-      <div class="sig-col" style="min-width: 250px;">
-        <div>Mengetahui,</div>
-        <div style="font-weight: 800;">Kepala Sekolah</div>
-        <div class="sig-space"></div>
-        <div class="sig-name" style="white-space: nowrap; font-weight: 800; text-decoration: underline;">${kepsekName}</div>
-        <div class="sig-nip">${formattedKepsekNpp}</div>
-      </div>
-      <div class="sig-col" style="min-width: 250px;">
-        <div>Bogor, September 2026</div>
-        <div style="font-weight: 800;">Ketua Panitia Asesmen</div>
-        <div class="sig-space"></div>
-        <div class="sig-name" style="white-space: nowrap; font-weight: 800; text-decoration: underline;">${committeeHeadName}</div>
-        <div class="sig-nip">${formattedCommitteeNpp}</div>
-      </div>
     </div>
   </div>
 
