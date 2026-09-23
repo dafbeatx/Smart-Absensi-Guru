@@ -350,18 +350,38 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   const roomStudentsMap = ExamAdministrativeDocsService.resolveRoomStudents(sampleScheduleData);
   const r1Students = roomStudentsMap['Ruang 01'] || [];
   const r2Students = roomStudentsMap['Ruang 02'] || [];
+  const r3Students = roomStudentsMap['Ruang 03'] || [];
+  const r4Students = roomStudentsMap['Ruang 04'] || [];
+  const r5Students = roomStudentsMap['Ruang 05'] || [];
 
   assert(
-    '10c. resolveRoomStudents starts participant numbers from 13-0820-001 sequentially across rooms',
-    r1Students.length > 0 &&
-      r1Students[0].participantNumber === '13-0820-001' &&
-      r1Students[0].fullName === 'AMANDA HASNA MIRZA' &&
-      r1Students[1].participantNumber === '13-0820-002' &&
-      r1Students[1].fullName === 'BILQIS AINUN NISSA' &&
-      r1Students[r1Students.length - 1].participantNumber === '13-0820-016' &&
-      r2Students.length > 0 &&
-      r2Students[0].participantNumber === '13-0820-017',
-    `Participant numbers incorrect: R1[0]=${r1Students[0]?.participantNumber}, R2[0]=${r2Students[0]?.participantNumber}`
+    '10c. resolveRoomStudents allocates 5 rooms per class with exact class rosters (not fixed 16)',
+    r1Students.length === 16 &&
+      r1Students.every((s) => s.className === '7') &&
+      r2Students.length === 18 &&
+      r2Students.every((s) => s.className === '8A') &&
+      r3Students.length === 17 &&
+      r3Students.every((s) => s.className === '8B') &&
+      r4Students.length === 16 &&
+      r4Students.every((s) => s.className === '9A') &&
+      r5Students.length === 15 &&
+      r5Students.every((s) => s.className === '9B'),
+    `Room class allocations incorrect: R1=${r1Students.length}, R2=${r2Students.length}, R3=${r3Students.length}, R4=${r4Students.length}, R5=${r5Students.length}`
+  );
+
+  assert(
+    '10d. resolveRoomStudents numbers participants sequentially from 13-0820-001 continuously through Ruang 5',
+    r1Students[0].participantNumber === '13-0820-001' &&
+      r1Students[15].participantNumber === '13-0820-016' &&
+      r2Students[0].participantNumber === '13-0820-017' &&
+      r2Students[17].participantNumber === '13-0820-034' &&
+      r3Students[0].participantNumber === '13-0820-035' &&
+      r3Students[16].participantNumber === '13-0820-051' &&
+      r4Students[0].participantNumber === '13-0820-052' &&
+      r4Students[15].participantNumber === '13-0820-067' &&
+      r5Students[0].participantNumber === '13-0820-068' &&
+      r5Students[14].participantNumber === '13-0820-082',
+    `Sequential participant numbering across rooms failed: R1[0]=${r1Students[0]?.participantNumber}, R2[0]=${r2Students[0]?.participantNumber}, R5[end]=${r5Students[14]?.participantNumber}`
   );
 
   // -------------------------------------------------------------

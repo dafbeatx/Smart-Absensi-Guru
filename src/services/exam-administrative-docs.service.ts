@@ -698,60 +698,100 @@ export class ExamAdministrativeDocsService {
   // =========================================================================
 
   public static readonly OFFICIAL_SMP_ROOM_1_STUDENTS = [
-    { fullName: 'AMANDA HASNA MIRZA', gender: 'P', className: 'VII A' },
-    { fullName: 'BILQIS AINUN NISSA', gender: 'P', className: 'VII A' },
-    { fullName: 'CASKIA APRILIA', gender: 'P', className: 'VII A' },
-    { fullName: 'DONA', gender: 'P', className: 'VII A' },
-    { fullName: 'KIRANA AURA ANWARUDIN', gender: 'P', className: 'VII A' },
-    { fullName: 'NAJWA NUR FADILLAH', gender: 'P', className: 'VII A' },
-    { fullName: 'NENG KASIH', gender: 'P', className: 'VII A' },
-    { fullName: 'NATASYA HOLIVAH', gender: 'P', className: 'VII A' },
-    { fullName: 'RADISTI PUTRI RIANTI', gender: 'P', className: 'VII A' },
-    { fullName: 'RIZKA LIANA HAKIM', gender: 'P', className: 'VII A' },
-    { fullName: 'SANTIKA', gender: 'P', className: 'VII A' },
-    { fullName: 'SUCI RAHMAWATI', gender: 'P', className: 'VII A' },
-    { fullName: 'TASYIRA AFIFA', gender: 'P', className: 'VII A' },
-    { fullName: 'WANDA INDRIANI', gender: 'P', className: 'VII A' },
-    { fullName: 'YOLA AULIA SANTOSO', gender: 'P', className: 'VII A' },
-    { fullName: 'YUNA HANDAYANI', gender: 'P', className: 'VII A' },
+    { fullName: 'AMANDA HASNA MIRZA', gender: 'P', className: '7' },
+    { fullName: 'BILQIS AINUN NISSA', gender: 'P', className: '7' },
+    { fullName: 'CASKIA APRILIA', gender: 'P', className: '7' },
+    { fullName: 'DONA', gender: 'P', className: '7' },
+    { fullName: 'KIRANA AURA ANWARUDIN', gender: 'P', className: '7' },
+    { fullName: 'NAJWA NUR FADILLAH', gender: 'P', className: '7' },
+    { fullName: 'NENG KASIH', gender: 'P', className: '7' },
+    { fullName: 'NATASYA HOLIVAH', gender: 'P', className: '7' },
+    { fullName: 'RADISTI PUTRI RIANTI', gender: 'P', className: '7' },
+    { fullName: 'RIZKA LIANA HAKIM', gender: 'P', className: '7' },
+    { fullName: 'SANTIKA', gender: 'P', className: '7' },
+    { fullName: 'SUCI RAHMAWATI', gender: 'P', className: '7' },
+    { fullName: 'TASYIRA AFIFA', gender: 'P', className: '7' },
+    { fullName: 'WANDA INDRIANI', gender: 'P', className: '7' },
+    { fullName: 'YOLA AULIA SANTOSO', gender: 'P', className: '7' },
+    { fullName: 'YUNA HANDAYANI', gender: 'P', className: '7' },
   ];
 
   public static readonly OFFICIAL_SMP_ROOM_2_STUDENTS = [
-    { fullName: 'ABILA YAZID RIZAQI', gender: 'L', className: 'VII B' },
-    { fullName: 'FARDHAN HANIF', gender: 'L', className: 'VII B' },
-    { fullName: 'MARVHEL PUTRA IHSANUL ALIM', gender: 'L', className: 'VII B' },
-    { fullName: 'MUHAMAD RAKA ADITYA', gender: 'L', className: 'VII B' },
-    { fullName: 'ROMADONI', gender: 'L', className: 'VII B' },
-    { fullName: 'ADIBA KHANSA AZ-ZAHRA', gender: 'P', className: 'VII B' },
-    { fullName: 'AKBAR AZHI MUGHNI', gender: 'L', className: 'VII B' },
-    { fullName: 'CALISA CANIA MARYAM', gender: 'P', className: 'VII B' },
-    { fullName: 'HANIFAH AL-QUSYARI', gender: 'P', className: 'VII B' },
-    { fullName: 'IFHAM FATHAR MUBAROK', gender: 'L', className: 'VII B' },
-    { fullName: 'MUHAMAD IBNU ZIKRA', gender: 'L', className: 'VII B' },
-    { fullName: 'ANDIKA PRATAMA', gender: 'L', className: 'VII B' },
-    { fullName: 'FAIRUZ PRASETIA', gender: 'L', className: 'VII B' },
-    { fullName: 'FARIZ ABQORI MAULANA', gender: 'L', className: 'VII B' },
-    { fullName: 'FITRA RAMADHAN', gender: 'L', className: 'VII B' },
-    { fullName: 'WILDAN KHOER BASUKI', gender: 'L', className: 'VII B' },
+    { fullName: 'AJENG ALIFATUL KHOIR', gender: 'P', className: '8A' },
+    { fullName: 'AZZAHRA ASHILA ROHMAH', gender: 'P', className: '8A' },
+    { fullName: 'BILQIS NUR AZIZAH', gender: 'P', className: '8A' },
+    { fullName: 'DEWI SARTIKA', gender: 'P', className: '8A' },
+    { fullName: 'FUJI HIKMAH', gender: 'P', className: '8A' },
+    { fullName: 'GINA SONIA', gender: 'P', className: '8A' },
+    { fullName: 'HANIFAH AL-QUSYARI', gender: 'P', className: '8A' },
+    { fullName: 'INDAH PERMATA', gender: 'P', className: '8A' },
+    { fullName: 'KHOIRUNNISA', gender: 'P', className: '8A' },
+    { fullName: 'LAILA FITRIANI', gender: 'P', className: '8A' },
+    { fullName: 'MEIDINA PUTRI', gender: 'P', className: '8A' },
+    { fullName: 'NURAENI', gender: 'P', className: '8A' },
+    { fullName: 'RADISTI PUTRI', gender: 'P', className: '8A' },
+    { fullName: 'SALMA AULIA', gender: 'P', className: '8A' },
+    { fullName: 'SEPTI MUJIANTI', gender: 'P', className: '8A' },
+    { fullName: 'SIFA NURKHALIFAH', gender: 'P', className: '8A' },
+    { fullName: 'SITI AISYAH', gender: 'P', className: '8A' },
+    { fullName: 'ZAHRA TUSSYITA', gender: 'P', className: '8A' },
   ];
 
   public static readonly OFFICIAL_SMP_ROOM_3_STUDENTS = [
-    { fullName: 'AJENG ALIFATUL KHOIR', gender: 'P', className: 'VIII A' },
-    { fullName: 'AZZAHRA ASHILA ROHMAH', gender: 'P', className: 'VIII A' },
-    { fullName: 'FUJI HIKMAH', gender: 'P', className: 'VIII A' },
-    { fullName: 'SEPTI MUJIANTI', gender: 'P', className: 'VIII A' },
-    { fullName: 'SIFA NURKHALIFAH', gender: 'P', className: 'VIII A' },
-    { fullName: 'AULIA RAHMADHANI', gender: 'P', className: 'VIII A' },
-    { fullName: 'CINTA LAURA SAFITRI', gender: 'P', className: 'VIII A' },
-    { fullName: 'DINA MARLIANA', gender: 'P', className: 'VIII A' },
-    { fullName: 'FITRI HANDAYANI', gender: 'P', className: 'VIII A' },
-    { fullName: 'HANI ANGGRAENI', gender: 'P', className: 'VIII A' },
-    { fullName: 'INTAN NURAINI', gender: 'P', className: 'VIII A' },
-    { fullName: 'LESTARI DEWI', gender: 'P', className: 'VIII A' },
-    { fullName: 'MAULIDA ZAHRA', gender: 'P', className: 'VIII A' },
-    { fullName: 'NADIA PUTRI', gender: 'P', className: 'VIII A' },
-    { fullName: 'REVALINA SALSABILA', gender: 'P', className: 'VIII A' },
-    { fullName: 'ZASKIA MECCA', gender: 'P', className: 'VIII A' },
+    { fullName: 'ABILA YAZID RIZAQI', gender: 'L', className: '8B' },
+    { fullName: 'ADITYA PRATAMA', gender: 'L', className: '8B' },
+    { fullName: 'AKBAR AZHI MUGHNI', gender: 'L', className: '8B' },
+    { fullName: 'ANDIKA PRATAMA', gender: 'L', className: '8B' },
+    { fullName: 'BAGAS DWI CAHYO', gender: 'L', className: '8B' },
+    { fullName: 'DIMAS ANUGRAH', gender: 'L', className: '8B' },
+    { fullName: 'FAIRUZ PRASETIA', gender: 'L', className: '8B' },
+    { fullName: 'FARDHAN HANIF', gender: 'L', className: '8B' },
+    { fullName: 'FARIZ ABQORI MAULANA', gender: 'L', className: '8B' },
+    { fullName: 'FITRA RAMADHAN', gender: 'L', className: '8B' },
+    { fullName: 'GALIH RAKASIWI', gender: 'L', className: '8B' },
+    { fullName: 'IFHAM FATHAR MUBAROK', gender: 'L', className: '8B' },
+    { fullName: 'MARVHEL PUTRA IHSANUL ALIM', gender: 'L', className: '8B' },
+    { fullName: 'MUHAMAD IBNU ZIKRA', gender: 'L', className: '8B' },
+    { fullName: 'MUHAMAD RAKA ADITYA', gender: 'L', className: '8B' },
+    { fullName: 'ROMADONI', gender: 'L', className: '8B' },
+    { fullName: 'WILDAN KHOER BASUKI', gender: 'L', className: '8B' },
+  ];
+
+  public static readonly OFFICIAL_SMP_ROOM_4_STUDENTS = [
+    { fullName: 'ALYA NUR AZIZAH', gender: 'P', className: '9A' },
+    { fullName: 'ANISA RAHMAWATI', gender: 'P', className: '9A' },
+    { fullName: 'AULIA RAHMADHANI', gender: 'P', className: '9A' },
+    { fullName: 'CINTA LAURA SAFITRI', gender: 'P', className: '9A' },
+    { fullName: 'DELIA PUTRI', gender: 'P', className: '9A' },
+    { fullName: 'DINA MARLIANA', gender: 'P', className: '9A' },
+    { fullName: 'ENENG SITI FATIMAH', gender: 'P', className: '9A' },
+    { fullName: 'FITRI HANDAYANI', gender: 'P', className: '9A' },
+    { fullName: 'FITRIA NINGSIH', gender: 'P', className: '9A' },
+    { fullName: 'HANI ANGGRAENI', gender: 'P', className: '9A' },
+    { fullName: 'INTAN NURAINI', gender: 'P', className: '9A' },
+    { fullName: 'LESTARI INDAH', gender: 'P', className: '9A' },
+    { fullName: 'MUTIARA RAMADHANI', gender: 'P', className: '9A' },
+    { fullName: 'NADIA OKTAVIA', gender: 'P', className: '9A' },
+    { fullName: 'RATNA SARI', gender: 'P', className: '9A' },
+    { fullName: 'TIARA LESTARI', gender: 'P', className: '9A' },
+  ];
+
+  public static readonly OFFICIAL_SMP_ROOM_5_STUDENTS = [
+    { fullName: 'ADITYA NUGRAHA', gender: 'L', className: '9B' },
+    { fullName: 'ALDI MAULANA', gender: 'L', className: '9B' },
+    { fullName: 'ARYA PUTRA PRATAMA', gender: 'L', className: '9B' },
+    { fullName: 'BAYU SETIAWAN', gender: 'L', className: '9B' },
+    { fullName: 'DANI RAMDANI', gender: 'L', className: '9B' },
+    { fullName: 'EKO PRASETYO', gender: 'L', className: '9B' },
+    { fullName: 'FACHRI HIDAYAT', gender: 'L', className: '9B' },
+    { fullName: 'FAJAR SIDIK', gender: 'L', className: '9B' },
+    { fullName: 'GILANG RAMADHAN', gender: 'L', className: '9B' },
+    { fullName: 'HENDRA WIJAYA', gender: 'L', className: '9B' },
+    { fullName: 'ILHAM SAPUTRA', gender: 'L', className: '9B' },
+    { fullName: 'KEVIN PRATAMA', gender: 'L', className: '9B' },
+    { fullName: 'M. RIZKY MAULANA', gender: 'L', className: '9B' },
+    { fullName: 'RENDI SETIAWAN', gender: 'L', className: '9B' },
+    { fullName: 'YUSUF MAULANA', gender: 'L', className: '9B' },
   ];
 
   public static readonly OFFICIAL_SMA_ROOM_1_STUDENTS = [
@@ -767,6 +807,36 @@ export class ExamAdministrativeDocsService {
     { fullName: 'RIZKI RAMADHAN', gender: 'L', className: '10' },
     { fullName: 'SITI NURHALIZA', gender: 'P', className: '10' },
     { fullName: 'TIARA ANDINI', gender: 'P', className: '10' },
+  ];
+
+  public static readonly OFFICIAL_SMA_ROOM_2_STUDENTS = [
+    { fullName: 'ALIF MAULANA', gender: 'L', className: '11' },
+    { fullName: 'ANNISA FITRIANI', gender: 'P', className: '11' },
+    { fullName: 'BINTANG RAMADHAN', gender: 'L', className: '11' },
+    { fullName: 'CANTIKA DEWI', gender: 'P', className: '11' },
+    { fullName: 'DICKY CHANDRA', gender: 'L', className: '11' },
+    { fullName: 'ELSA PUTRI', gender: 'P', className: '11' },
+    { fullName: 'FAJAR HIDAYAT', gender: 'L', className: '11' },
+    { fullName: 'GISKA AMALIA', gender: 'P', className: '11' },
+    { fullName: 'HANIF PRATAMA', gender: 'L', className: '11' },
+    { fullName: 'INDAH KUSUMA', gender: 'P', className: '11' },
+    { fullName: 'JULIAN SAPUTRA', gender: 'L', className: '11' },
+    { fullName: 'KARINA SALSABILA', gender: 'P', className: '11' },
+  ];
+
+  public static readonly OFFICIAL_SMA_ROOM_3_STUDENTS = [
+    { fullName: 'LUTHFI HAKIM', gender: 'L', className: '12' },
+    { fullName: 'MELANI SUKMA', gender: 'P', className: '12' },
+    { fullName: 'NAUFAL AZHAR', gender: 'L', className: '12' },
+    { fullName: 'OKTA VIANI', gender: 'P', className: '12' },
+    { fullName: 'PANDU WIJAYA', gender: 'L', className: '12' },
+    { fullName: 'QORI NURUL', gender: 'P', className: '12' },
+    { fullName: 'RAFFI AHMAD', gender: 'L', className: '12' },
+    { fullName: 'SAFIRA MAHARANI', gender: 'P', className: '12' },
+    { fullName: 'TAUFIQ HIDAYAT', gender: 'L', className: '12' },
+    { fullName: 'ULFAH DWI', gender: 'P', className: '12' },
+    { fullName: 'VINO BASTIAN', gender: 'L', className: '12' },
+    { fullName: 'WIDYA ASTUTI', gender: 'P', className: '12' },
   ];
 
   public static resolveRoomStudents(
@@ -791,45 +861,80 @@ export class ExamAdministrativeDocsService {
       });
       rooms = Array.from(rSet);
     }
-    if (rooms.length === 0) {
-      const count = scheduleData.config.totalRooms || 3;
-      for (let i = 1; i <= count; i++) {
-        rooms.push(`Ruang ${String(i).padStart(2, '0')}`);
+
+    // Untuk SMP, wajib sediakan minimal 5 ruangan (Ruang 1 : Kelas 7, Ruang 2 : Kelas 8A, dst sampai Ruang 5 : Kelas 9B)
+    // Untuk SMA, minimal 3 ruangan (Kelas 10, Kelas 11, Kelas 12)
+    const minRooms = isSma ? 3 : 5;
+    const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms, rooms.length);
+    for (let i = 1; i <= targetRoomCount; i++) {
+      const standardName = `Ruang ${String(i).padStart(2, '0')}`;
+      if (!rooms.some((r) => r.toLowerCase().replace(/[^a-z0-9]/g, '') === standardName.toLowerCase().replace(/[^a-z0-9]/g, ''))) {
+        rooms.push(standardName);
       }
     }
+
     rooms.sort((a, b) => {
       const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
       const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
       return numA - numB;
     });
 
-    // 2. Susun daftar siswa per ruangan
+    // 2. Susun daftar siswa per ruangan - PER KELAS (BUKAN 16-16 PER RUANGAN)
+    // Ruang 1: Kelas 7
+    // Ruang 2: Kelas 8A
+    // Ruang 3: Kelas 8B
+    // Ruang 4: Kelas 9A
+    // Ruang 5: Kelas 9B
     const rawStudentMap: Record<string, Array<{ fullName: string; gender: string; className: string }>> = {};
+    rooms.forEach((r) => { rawStudentMap[r] = []; });
+
+    const getTargetRoomForStudent = (
+      st: { roomName?: string; className?: string; class?: string; kelas?: string }
+    ): string => {
+      if (st.roomName) {
+        const found = rooms.find(
+          (r) => r.toLowerCase().replace(/[^a-z0-9]/g, '') === st.roomName!.toLowerCase().replace(/[^a-z0-9]/g, '')
+        );
+        if (found) return found;
+      }
+
+      const rawCls = (st.className || (st as any).class || (st as any).kelas || '').trim().toUpperCase();
+      const clsNorm = rawCls.replace(/\s+/g, '');
+
+      if (isSma) {
+        if (/^10|X$|X[A-Z]/.test(clsNorm)) return rooms[0] || 'Ruang 01';
+        if (/^11|XI$|XI[A-Z]/.test(clsNorm)) return rooms[1] || 'Ruang 02';
+        if (/^12|XII$|XII[A-Z]/.test(clsNorm)) return rooms[2] || 'Ruang 03';
+        return rooms[0] || 'Ruang 01';
+      }
+
+      // SMP mapping deterministik per kelas:
+      // Ruang 1 -> Kelas 7
+      // Ruang 2 -> Kelas 8A
+      // Ruang 3 -> Kelas 8B
+      // Ruang 4 -> Kelas 9A
+      // Ruang 5 -> Kelas 9B
+      if (/^8A|VIIIA/.test(clsNorm)) return rooms[1] || 'Ruang 02';
+      if (/^8B|VIIIB/.test(clsNorm)) return rooms[2] || 'Ruang 03';
+      if (/^9A|IXA/.test(clsNorm)) return rooms[3] || 'Ruang 04';
+      if (/^9B|IXB/.test(clsNorm)) return rooms[4] || 'Ruang 05';
+      if (/^7|VII/.test(clsNorm)) return rooms[0] || 'Ruang 01';
+      if (/^8|VIII/.test(clsNorm)) return rooms[1] || 'Ruang 02';
+      if (/^9|IX/.test(clsNorm)) return rooms[3] || 'Ruang 04';
+
+      return rooms[0] || 'Ruang 01';
+    };
 
     if (options?.studentsList && options.studentsList.length > 0) {
-      const hasRoomAssignment = options.studentsList.some((s) => s.roomName);
-      if (hasRoomAssignment) {
-        options.studentsList.forEach((st) => {
-          const rName = st.roomName || rooms[0];
-          if (!rawStudentMap[rName]) rawStudentMap[rName] = [];
-          rawStudentMap[rName].push({
-            fullName: st.fullName,
-            gender: st.gender || 'L',
-            className: st.className,
-          });
+      options.studentsList.forEach((st) => {
+        const targetRoom = getTargetRoomForStudent(st);
+        if (!rawStudentMap[targetRoom]) rawStudentMap[targetRoom] = [];
+        rawStudentMap[targetRoom].push({
+          fullName: st.fullName,
+          gender: st.gender || 'L',
+          className: st.className,
         });
-      } else {
-        const capacityPerRoom = Math.ceil(options.studentsList.length / Math.max(1, rooms.length));
-        rooms.forEach((rName, rIdx) => {
-          rawStudentMap[rName] = options.studentsList!
-            .slice(rIdx * capacityPerRoom, (rIdx + 1) * capacityPerRoom)
-            .map((st) => ({
-              fullName: st.fullName,
-              gender: st.gender || 'L',
-              className: st.className,
-            }));
-        });
-      }
+      });
     } else {
       let cachedStudents: any[] = [];
       try {
@@ -853,40 +958,48 @@ export class ExamAdministrativeDocsService {
         });
 
         const studentsToUse = levelFiltered.length > 0 ? levelFiltered : cachedStudents;
-        const capacityPerRoom = 16;
-        rooms.forEach((rName, rIdx) => {
-          const chunk = studentsToUse.slice(rIdx * capacityPerRoom, (rIdx + 1) * capacityPerRoom);
-          if (chunk.length > 0) {
-            rawStudentMap[rName] = chunk.map((s) => ({
-              fullName: s.fullName || s.name || 'Siswa',
-              gender: s.gender || (s.className === '8A' || s.className === '9A' || s.className === 'VII A' ? 'P' : 'L'),
-              className: s.className || s.kelas || 'VII A',
-            }));
-          }
+        studentsToUse.forEach((s) => {
+          const targetRoom = getTargetRoomForStudent(s);
+          if (!rawStudentMap[targetRoom]) rawStudentMap[targetRoom] = [];
+          rawStudentMap[targetRoom].push({
+            fullName: s.fullName || s.name || 'Siswa',
+            gender: s.gender || (/8A|9A/i.test(s.className || '') ? 'P' : 'L'),
+            className: s.className || s.kelas || (targetRoom === rooms[0] ? '7' : '8A'),
+          });
         });
       }
 
-      if (!rawStudentMap[rooms[0]] || rawStudentMap[rooms[0]].length === 0) {
-        if (isSma) {
+      // Pastikan setiap ruangan terisi lengkap dengan daftar resmi per kelas (bukan 16-16)
+      if (isSma) {
+        if (!rawStudentMap[rooms[0]] || rawStudentMap[rooms[0]].length === 0) {
           rawStudentMap[rooms[0]] = this.OFFICIAL_SMA_ROOM_1_STUDENTS;
-          if (rooms[1]) rawStudentMap[rooms[1]] = this.OFFICIAL_SMA_ROOM_1_STUDENTS.map((s) => ({ ...s, className: '11' }));
-          if (rooms[2]) rawStudentMap[rooms[2]] = this.OFFICIAL_SMA_ROOM_1_STUDENTS.map((s) => ({ ...s, className: '12' }));
-        } else {
+        }
+        if (rooms[1] && (!rawStudentMap[rooms[1]] || rawStudentMap[rooms[1]].length === 0)) {
+          rawStudentMap[rooms[1]] = this.OFFICIAL_SMA_ROOM_2_STUDENTS;
+        }
+        if (rooms[2] && (!rawStudentMap[rooms[2]] || rawStudentMap[rooms[2]].length === 0)) {
+          rawStudentMap[rooms[2]] = this.OFFICIAL_SMA_ROOM_3_STUDENTS;
+        }
+      } else {
+        if (!rawStudentMap[rooms[0]] || rawStudentMap[rooms[0]].length === 0) {
           rawStudentMap[rooms[0]] = this.OFFICIAL_SMP_ROOM_1_STUDENTS;
-          if (rooms[1]) rawStudentMap[rooms[1]] = this.OFFICIAL_SMP_ROOM_2_STUDENTS;
-          if (rooms[2]) rawStudentMap[rooms[2]] = this.OFFICIAL_SMP_ROOM_3_STUDENTS;
-          for (let i = 3; i < rooms.length; i++) {
-            rawStudentMap[rooms[i]] = this.OFFICIAL_SMP_ROOM_3_STUDENTS.map((s) => ({
-              ...s,
-              fullName: `${s.fullName} ${i + 1}`,
-              className: `IX ${String.fromCharCode(65 + (i % 2))}`,
-            }));
-          }
+        }
+        if (rooms[1] && (!rawStudentMap[rooms[1]] || rawStudentMap[rooms[1]].length === 0)) {
+          rawStudentMap[rooms[1]] = this.OFFICIAL_SMP_ROOM_2_STUDENTS;
+        }
+        if (rooms[2] && (!rawStudentMap[rooms[2]] || rawStudentMap[rooms[2]].length === 0)) {
+          rawStudentMap[rooms[2]] = this.OFFICIAL_SMP_ROOM_3_STUDENTS;
+        }
+        if (rooms[3] && (!rawStudentMap[rooms[3]] || rawStudentMap[rooms[3]].length === 0)) {
+          rawStudentMap[rooms[3]] = this.OFFICIAL_SMP_ROOM_4_STUDENTS;
+        }
+        if (rooms[4] && (!rawStudentMap[rooms[4]] || rawStudentMap[rooms[4]].length === 0)) {
+          rawStudentMap[rooms[4]] = this.OFFICIAL_SMP_ROOM_5_STUDENTS;
         }
       }
     }
 
-    // 3. Penomoran Peserta Sekuensial: 13-0820-001 dari peserta pertama Ruang 1
+    // 3. Penomoran Peserta Sekuensial: 13-0820-001 dari peserta pertama Ruang 1 berlanjut ke seluruh ruangan
     let globalIndex = 1;
     const finalMap: Record<string, Array<{
       urut: number;

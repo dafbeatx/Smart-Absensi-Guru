@@ -67,7 +67,11 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   const [includeNumberPrefix, setIncludeNumberPrefix] = useState<boolean>(true);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Extract rooms for dropdown
+  const isSma = useMemo(() => {
+    return scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+  }, [scheduleData.config.selectedClasses]);
+
+  // Extract rooms for dropdown: SMP defaults to 5 rooms (Kelas 7, 8A, 8B, 9A, 9B), SMA to 3 rooms (Kelas 10, 11, 12)
   const availableRooms = useMemo(() => {
     const rSet = new Set<string>();
     if (scheduleData.proctorSchedules) {
@@ -75,14 +79,20 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
         if (p.roomName) rSet.add(p.roomName);
       });
     }
-    if (rSet.size === 0) {
-      const count = scheduleData.config.totalRooms || 3;
-      for (let i = 1; i <= count; i++) {
-        rSet.add(`Ruang ${String(i).padStart(2, '0')}`);
+    const minRooms = isSma ? 3 : 5;
+    const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms, rSet.size);
+    for (let i = 1; i <= targetRoomCount; i++) {
+      const standardName = `Ruang ${String(i).padStart(2, '0')}`;
+      if (!Array.from(rSet).some((r) => r.toLowerCase().replace(/[^a-z0-9]/g, '') === standardName.toLowerCase().replace(/[^a-z0-9]/g, ''))) {
+        rSet.add(standardName);
       }
     }
-    return Array.from(rSet);
-  }, [scheduleData]);
+    return Array.from(rSet).sort((a, b) => {
+      const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
+      const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
+      return numA - numB;
+    });
+  }, [scheduleData, isSma]);
 
   // Options payload for generator
   const docOptions: AdminDocOptions = useMemo(() => {
@@ -382,12 +392,17 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                     onChange={(e) => setSelectedRoom(e.target.value)}
                     className="text-xs font-bold bg-white border border-slate-300 rounded-xl px-2 py-1 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 shadow-2xs cursor-pointer"
                   >
-                    <option value="ALL">Semua Ruang (Batch)</option>
-                    {availableRooms.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
+                    <option value="ALL">Semua Ruangan (1 - {availableRooms.length})</option>
+                    {availableRooms.map((r, idx) => {
+                      const classLabel = isSma
+                        ? (idx === 0 ? 'Kelas 10' : idx === 1 ? 'Kelas 11' : idx === 2 ? 'Kelas 12' : '')
+                        : (idx === 0 ? 'Kelas 7' : idx === 1 ? 'Kelas 8A' : idx === 2 ? 'Kelas 8B' : idx === 3 ? 'Kelas 9A' : idx === 4 ? 'Kelas 9B' : '');
+                      return (
+                        <option key={r} value={r}>
+                          {r} {classLabel ? `(${classLabel})` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
