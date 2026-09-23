@@ -62,6 +62,8 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 }) => {
   const [activeDocType, setActiveDocType] = useState<AdminDocType>(initialDocType);
   const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
+  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [includeNumberPrefix, setIncludeNumberPrefix] = useState<boolean>(true);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Extract rooms for dropdown
@@ -87,8 +89,10 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       committeeHeadName: officialSignatoryOptions?.committeeHeadName,
       kepsekName: officialSignatoryOptions?.kepsekName,
       roomFilter: selectedRoom,
+      orientation: pageOrientation,
+      includeNumberPrefix,
     };
-  }, [officialSignatoryOptions, selectedRoom]);
+  }, [officialSignatoryOptions, selectedRoom, pageOrientation, includeNumberPrefix]);
 
   // Generate live HTML string for the current active doc
   const currentHtml = useMemo(() => {
@@ -149,7 +153,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     const academicYear = (scheduleData.config.academicYear || '2026/2027').replace('/', '-');
     const fileName = `${filePrefix[activeDocType]}_${examType}_${academicYear}.doc`;
 
-    ExamAdministrativeDocsService.exportToWord(currentHtml, fileName);
+    ExamAdministrativeDocsService.exportToWord(currentHtml, fileName, pageOrientation);
     showToast(`Dokumen Word (${fileName}) berhasil diunduh.`);
   };
 
@@ -288,27 +292,69 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             </button>
           </div>
 
-          {/* ROOM SELECTOR FILTER (KHUSUS DOKUMEN SERAH TERIMA SOAL & LJK) */}
-          {activeDocType === 'HANDOVER_DOCS' && (
-            <div className="flex items-center gap-2 self-end md:self-auto">
-              <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
-                <DoorOpen className="w-3.5 h-3.5 text-slate-500" />
-                Pilihan Ruang:
-              </span>
-              <select
-                value={selectedRoom}
-                onChange={(e) => setSelectedRoom(e.target.value)}
-                className="text-xs font-bold bg-white border border-slate-300 rounded-xl px-2.5 py-1 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 shadow-2xs cursor-pointer"
-              >
-                <option value="ALL">Semua Ruangan (Batch Print)</option>
-                {availableRooms.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+          {/* CONTROLS (ORIENTASI & FILTER) */}
+          <div className="flex items-center flex-wrap gap-2.5 self-end md:self-auto">
+            {/* RADIO BUTTON ORIENTASI KERTAS */}
+            <div className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-xl border border-slate-300 shadow-2xs">
+              <span className="text-[11px] font-bold text-slate-700">Orientasi:</span>
+              <label className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-800 cursor-pointer select-none">
+                <input
+                  type="radio"
+                  name="pageOrientation"
+                  value="portrait"
+                  checked={pageOrientation === 'portrait'}
+                  onChange={() => setPageOrientation('portrait')}
+                  className="w-3.5 h-3.5 text-teal-600 focus:ring-teal-500 cursor-pointer"
+                />
+                <span>Portrait</span>
+              </label>
+              <label className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-800 cursor-pointer select-none ml-1">
+                <input
+                  type="radio"
+                  name="pageOrientation"
+                  value="landscape"
+                  checked={pageOrientation === 'landscape'}
+                  onChange={() => setPageOrientation('landscape')}
+                  className="w-3.5 h-3.5 text-teal-600 focus:ring-teal-500 cursor-pointer"
+                />
+                <span>Landscape</span>
+              </label>
             </div>
-          )}
+
+            {/* ROOM SELECTOR FILTER (KHUSUS DOKUMEN SERAH TERIMA SOAL & LJK) */}
+            {activeDocType === 'HANDOVER_DOCS' && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                    <DoorOpen className="w-3.5 h-3.5 text-slate-500" />
+                    Ruang:
+                  </span>
+                  <select
+                    value={selectedRoom}
+                    onChange={(e) => setSelectedRoom(e.target.value)}
+                    className="text-xs font-bold bg-white border border-slate-300 rounded-xl px-2 py-1 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30 shadow-2xs cursor-pointer"
+                  >
+                    <option value="ALL">Semua Ruang (Batch)</option>
+                    {availableRooms.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <label className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer select-none bg-white px-2 py-1 rounded-xl border border-slate-300 shadow-2xs">
+                  <input
+                    type="checkbox"
+                    checked={includeNumberPrefix}
+                    onChange={(e) => setIncludeNumberPrefix(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
+                  />
+                  <span>No. Urut (1, 2)</span>
+                </label>
+              </>
+            )}
+          </div>
         </div>
 
         {/* TOAST ALERT NOTIFICATION */}
@@ -321,11 +367,19 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
         {/* LIVE A4 DOCUMENT PREVIEW (ISOLATED IFRAME WYSIWYG) */}
         <div className="flex-1 bg-slate-100/80 p-3 sm:p-6 overflow-y-auto flex justify-center">
-          <div className="w-full max-w-[210mm] bg-white shadow-xl rounded-sm border border-slate-300/80 min-h-[297mm] overflow-hidden flex flex-col">
+          <div
+            className={`w-full bg-white shadow-xl rounded-sm border border-slate-300/80 overflow-hidden flex flex-col transition-all duration-200 ${
+              pageOrientation === 'landscape'
+                ? 'max-w-[297mm] min-h-[210mm]'
+                : 'max-w-[210mm] min-h-[297mm]'
+            }`}
+          >
             <iframe
               title="Pratinjau Dokumen Administrasi Ujian"
               srcDoc={currentHtml}
-              className="w-full flex-1 border-none min-h-200"
+              className={`w-full flex-1 border-none ${
+                pageOrientation === 'landscape' ? 'min-h-160' : 'min-h-200'
+              }`}
               style={{ backgroundColor: '#ffffff' }}
             />
           </div>
@@ -338,7 +392,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             <span>Data dokumen disinkronkan otomatis dari jadwal aktif & panitia terdaftar.</span>
           </div>
           <div className="font-semibold text-slate-700">
-            Tipografi: Times New Roman | Kertas: A4 Portrait
+            Tipografi: Times New Roman | Kertas: A4 {pageOrientation === 'landscape' ? 'Landscape (Melebar)' : 'Portrait (Tegak)'}
           </div>
         </div>
       </div>

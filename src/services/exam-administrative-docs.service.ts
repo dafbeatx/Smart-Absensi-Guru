@@ -35,6 +35,8 @@ export interface AdminDocOptions {
   kepsekName?: string;
   roomFilter?: string; // 'ALL' or 'Ruang 01', 'Ruang 1', etc.
   totalRegisteredStudents?: number | Record<string, number>; // total or per subject
+  orientation?: 'portrait' | 'landscape';
+  includeNumberPrefix?: boolean;
 }
 
 export interface ExamDayInfo {
@@ -135,18 +137,19 @@ export class ExamAdministrativeDocsService {
   /**
    * Common CSS for official A4 school documents
    */
-  public static getOfficialDocumentStyles(): string {
+  public static getOfficialDocumentStyles(orientation: 'portrait' | 'landscape' = 'portrait'): string {
+    const isLandscape = orientation === 'landscape';
     return `
       @page {
-        size: A4 portrait;
-        margin: 12mm 15mm 12mm 15mm;
+        size: A4 ${orientation};
+        margin: ${isLandscape ? '10mm 15mm 10mm 15mm' : '12mm 15mm 12mm 15mm'};
       }
       * {
         box-sizing: border-box;
       }
       body {
         font-family: 'Times New Roman', Times, serif;
-        font-size: 11pt;
+        font-size: ${isLandscape ? '10.5pt' : '11pt'};
         color: #000000;
         background-color: #ffffff;
         margin: 0;
@@ -155,7 +158,7 @@ export class ExamAdministrativeDocsService {
       }
       .page-container {
         width: 100%;
-        max-width: 210mm;
+        max-width: ${isLandscape ? '297mm' : '210mm'};
         margin: 0 auto;
         padding: 10px 0;
         background: #ffffff;
@@ -358,7 +361,7 @@ export class ExamAdministrativeDocsService {
         <meta charset="utf-8">
         <title>Daftar Hadir Pengawas - ${institutionName}</title>
         <style>
-          ${this.getOfficialDocumentStyles()}
+          ${this.getOfficialDocumentStyles(options?.orientation)}
         </style>
       </head>
       <body>
@@ -439,52 +442,66 @@ export class ExamAdministrativeDocsService {
         ? scheduleData.subjectSchedules.filter((s) => s.date === day.date)
         : [];
 
-      const subjectLines: string[] = [];
-      const codeLines: string[] = [];
-      const proctorLines: string[] = [];
-      const sigLines: string[] = [];
+      const showNumbers = options?.includeNumberPrefix !== false;
+      const rowItemStyle = 'min-height: 28px; line-height: 24px; padding: 2px 0;';
+
+      const subjectDivs: string[] = [];
+      const codeDivs: string[] = [];
+      const proctorDivs: string[] = [];
+      const sigDivs: string[] = [];
 
       if (dutiesThisDay.length > 0) {
         dutiesThisDay.forEach((duty, idx) => {
-          subjectLines.push(`${idx + 1}. ${duty.subject}`);
-          codeLines.push(`${idx + 1}.`);
-          proctorLines.push(`${idx + 1}. ${duty.mainProctorName || '-'}`);
-          sigLines.push(`${idx + 1}.`);
+          const numPrefix = showNumbers ? `${idx + 1}.` : '&nbsp;';
+          subjectDivs.push(`<div style="${rowItemStyle}">${idx + 1}. ${duty.subject}</div>`);
+          codeDivs.push(`<div style="${rowItemStyle}" class="text-center">${numPrefix}</div>`);
+          proctorDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
+          sigDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
         });
       } else if (subjectsThisDay.length > 0) {
         const distinctSubj = Array.from(new Set(subjectsThisDay.map((s) => s.subject)));
         distinctSubj.forEach((subj, idx) => {
-          subjectLines.push(`${idx + 1}. ${subj}`);
-          codeLines.push(`${idx + 1}.`);
-          proctorLines.push(`${idx + 1}.`);
-          sigLines.push(`${idx + 1}.`);
+          const numPrefix = showNumbers ? `${idx + 1}.` : '&nbsp;';
+          subjectDivs.push(`<div style="${rowItemStyle}">${idx + 1}. ${subj}</div>`);
+          codeDivs.push(`<div style="${rowItemStyle}" class="text-center">${numPrefix}</div>`);
+          proctorDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
+          sigDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
         });
       } else {
-        subjectLines.push('1.');
-        codeLines.push('1.');
-        proctorLines.push('1.');
-        sigLines.push('1.');
+        const numPrefix = showNumbers ? '1.' : '&nbsp;';
+        subjectDivs.push(`<div style="${rowItemStyle}">1.</div>`);
+        codeDivs.push(`<div style="${rowItemStyle}" class="text-center">${numPrefix}</div>`);
+        proctorDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
+        sigDivs.push(`<div style="${rowItemStyle}">${numPrefix}</div>`);
       }
 
-      const subjectCellHtml = subjectLines.join('<br>');
-      const codeCellHtml = codeLines.join('<br>');
-      const proctorCellHtml = proctorLines.join('<br>');
-      const sigCellHtml = sigLines.join('<br>');
+      const subjectCellHtml = subjectDivs.join('');
+      const codeCellHtml = codeDivs.join('');
+      const proctorCellHtml = proctorDivs.join('');
+      const sigCellHtml = sigDivs.join('');
+
+      const isLandscape = options?.orientation === 'landscape';
+      const proctorColWidth = isLandscape ? '220px' : '160px';
+      const sigColWidth = isLandscape ? '160px' : '120px';
 
       const rowHtml = `
         <tr>
           <td class="text-center" style="width: 32px; vertical-align: top;">${dIdx + 1}</td>
-          <td style="width: 160px; font-weight: 500; vertical-align: top; white-space: nowrap;">${day.dateFormattedLong}</td>
+          <td style="width: 170px; font-weight: 500; vertical-align: top; white-space: nowrap;">${day.dateFormattedLong}</td>
           <td style="vertical-align: top;">${subjectCellHtml}</td>
           <td style="width: 70px; vertical-align: top;" class="text-center">${codeCellHtml}</td>
-          <td style="width: 160px; vertical-align: top;">${proctorCellHtml}</td>
-          <td style="width: 120px; vertical-align: top;" class="text-left">${sigCellHtml}</td>
+          <td style="width: ${proctorColWidth}; vertical-align: top;">${proctorCellHtml}</td>
+          <td style="width: ${sigColWidth}; vertical-align: top;" class="text-left">${sigCellHtml}</td>
         </tr>
       `;
 
       table1Rows += rowHtml;
       table2Rows += rowHtml;
     });
+
+    const isLandscape = options?.orientation === 'landscape';
+    const proctorColWidth = isLandscape ? '220px' : '160px';
+    const sigColWidth = isLandscape ? '160px' : '120px';
 
     const badgeText = roomName.toUpperCase().startsWith('RUANG')
       ? roomName.toUpperCase()
@@ -508,11 +525,11 @@ export class ExamAdministrativeDocsService {
           <thead>
             <tr>
               <th style="width: 32px;">No.</th>
-              <th style="width: 160px;">Hari,Tanggal</th>
+              <th style="width: 170px;">Hari,Tanggal</th>
               <th>Mata Pelajaran</th>
               <th style="width: 70px;">No.Kode</th>
-              <th style="width: 160px;">Nama Pengawas</th>
-              <th style="width: 120px;">Tanda Tangan</th>
+              <th style="width: ${proctorColWidth};">Nama Pengawas</th>
+              <th style="width: ${sigColWidth};">Tanda Tangan</th>
             </tr>
           </thead>
           <tbody>
@@ -525,11 +542,11 @@ export class ExamAdministrativeDocsService {
           <thead>
             <tr>
               <th style="width: 32px;">No.</th>
-              <th style="width: 160px;">Hari,Tanggal</th>
+              <th style="width: 170px;">Hari,Tanggal</th>
               <th>Mata Pelajaran</th>
               <th style="width: 70px;">No.Kode</th>
-              <th style="width: 160px;">Nama Pengawas</th>
-              <th style="width: 120px;">Tanda Tangan</th>
+              <th style="width: ${proctorColWidth};">Nama Pengawas</th>
+              <th style="width: ${sigColWidth};">Tanda Tangan</th>
             </tr>
           </thead>
           <tbody>
@@ -593,7 +610,7 @@ export class ExamAdministrativeDocsService {
         <meta charset="utf-8">
         <title>Daftar Serah Terima Naskah Soal & LJK - ${institutionName}</title>
         <style>
-          ${this.getOfficialDocumentStyles()}
+          ${this.getOfficialDocumentStyles(options?.orientation)}
         </style>
       </head>
       <body>
@@ -677,7 +694,7 @@ export class ExamAdministrativeDocsService {
         <meta charset="utf-8">
         <title>Rekapitulasi Kehadiran Peserta Ujian - ${institutionName}</title>
         <style>
-          ${this.getOfficialDocumentStyles()}
+          ${this.getOfficialDocumentStyles(options?.orientation)}
         </style>
       </head>
       <body>
@@ -824,7 +841,7 @@ export class ExamAdministrativeDocsService {
         <meta charset="utf-8">
         <title>Daftar Hadir Panitia - ${institutionName}</title>
         <style>
-          ${this.getOfficialDocumentStyles()}
+          ${this.getOfficialDocumentStyles(options?.orientation)}
         </style>
       </head>
       <body>
@@ -896,7 +913,12 @@ export class ExamAdministrativeDocsService {
   /**
    * Generates editable Microsoft Word (.doc) file and triggers download
    */
-  public static exportToWord(htmlContent: string, fileName: string): void {
+  public static exportToWord(
+    htmlContent: string,
+    fileName: string,
+    orientation: 'portrait' | 'landscape' = 'portrait'
+  ): void {
+    const isLandscape = orientation === 'landscape';
     const wordXmlHtml = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
@@ -912,15 +934,17 @@ export class ExamAdministrativeDocsService {
         <![endif]-->
         <style>
           @page Section1 {
-            size: 210mm 297mm; /* A4 Portrait */
+            size: ${isLandscape ? '297mm 210mm' : '210mm 297mm'}; /* A4 */
             margin: 1.5cm 1.5cm 1.5cm 1.5cm;
             mso-header-margin: 0.5in;
             mso-footer-margin: 0.5in;
+            mso-paper-source: 0;
+            mso-page-orientation: ${orientation};
           }
           div.Section1 { page: Section1; }
           body {
             font-family: 'Times New Roman', Times, serif;
-            font-size: 11pt;
+            font-size: ${isLandscape ? '10.5pt' : '11pt'};
             color: #000000;
           }
           table { border-collapse: collapse; width: 100%; }
@@ -1082,7 +1106,7 @@ export class ExamAdministrativeDocsService {
           const dutiesThisDay = roomDuties.filter((d) => d.date === day.date);
           const subjStr = dutiesThisDay.map((d, i) => `${i + 1}. ${d.subject}`).join('\n') || '-';
           const codeStr = dutiesThisDay.map((_, i) => `${i + 1}.`).join('\n') || '1.';
-          const proctorStr = dutiesThisDay.map((d, i) => `${i + 1}. ${d.mainProctorName}`).join('\n') || '-';
+          const proctorStr = dutiesThisDay.map((_, i) => `${i + 1}.`).join('\n') || '1.';
           const sigStr = dutiesThisDay.map((_, i) => `${i + 1}.`).join('\n') || '1.';
 
           table1Rows.push([

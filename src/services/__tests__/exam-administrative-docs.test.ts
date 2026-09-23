@@ -270,11 +270,22 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   );
 
   assert(
-    '7. generateSingleRoomHandoverHtml populates correct proctors and subjects for room',
+    '7. generateSingleRoomHandoverHtml populates scheduled subjects and leaves proctor names empty for handwriting',
     doc2SingleHtml.includes('1. PAI & PB') &&
       doc2SingleHtml.includes('2. IPA') &&
-      doc2SingleHtml.includes('Farhan Sopian Sahid, S.Pd.I'),
-    'Doc 2 failed to match room proctor duties'
+      !doc2SingleHtml.includes('Farhan Sopian Sahid, S.Pd.I'),
+    'Doc 2 should not pre-fill proctor names in physical handover sheet'
+  );
+
+  const doc2LandscapeHtml = ExamAdministrativeDocsService.generateHandoverDocsHtml(
+    sampleScheduleData,
+    { orientation: 'landscape', roomFilter: 'Ruang 01' }
+  );
+  assert(
+    '7b. generateHandoverDocsHtml supports landscape orientation styling and 297mm width',
+    doc2LandscapeHtml.includes('size: A4 landscape') &&
+      doc2LandscapeHtml.includes('max-width: 297mm'),
+    'Doc 2 missing landscape page style'
   );
 
   const doc2BatchHtml = ExamAdministrativeDocsService.generateHandoverDocsHtml(sampleScheduleData, {
