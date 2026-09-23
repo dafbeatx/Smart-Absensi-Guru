@@ -388,6 +388,24 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
     'exportToExcel HANDOVER_DOCS threw an error'
   );
 
+  const handoverWs = ExamAdministrativeDocsService.buildHandoverDocsWorksheet(
+    'Ruang 01',
+    sampleScheduleData
+  );
+
+  assert(
+    '14b. buildHandoverDocsWorksheet produces pixel-perfect sheet with styles, badge, and merges',
+    handoverWs['E8']?.v === 'RUANG 01' &&
+      handoverWs['E8']?.s?.font?.color?.rgb === 'C00000' &&
+      handoverWs['E8']?.s?.fill?.fgColor?.rgb === 'D9E1F2' &&
+      handoverWs['A10']?.v?.includes('Daftar Pengambilan Naskah Soal') &&
+      handoverWs['A10']?.s?.fill?.fgColor?.rgb === '1F4E78' &&
+      handoverWs['A12']?.s?.fill?.fgColor?.rgb === '8EAADB' &&
+      handoverWs['C14']?.v?.includes('PAI & PB') &&
+      Boolean(handoverWs['!merges'] && handoverWs['!merges'].length >= 10),
+    'Handover worksheet missing exact colors, badge, or row-by-row structure'
+  );
+
   let excelRecapWorked = true;
   try {
     ExamAdministrativeDocsService.exportToExcel('STUDENT_ATTENDANCE_SUMMARY', {
