@@ -363,6 +363,29 @@ export class SupabaseProvider implements IDataProvider {
         if (user) {
           const localAssignments = this.getLocalTeachingAssignments();
           const localSubj = localAssignments[user.id] || (user.nip ? localAssignments[user.nip] : undefined);
+          let teachingAssignment = user.teaching_assignment || localSubj || undefined;
+
+          // Auto-infer from position if teaching_assignment is unset
+          if (!teachingAssignment && user.position) {
+            const posMatch = user.position.match(/guru\s+(?:mapel\s+|mata\s+pelajaran\s+|bidang\s+studi\s+)?(.+)/i);
+            if (posMatch && posMatch[1]) {
+              const candidate = posMatch[1].trim();
+              if (!/^(utama|pendidik|honorer|tetap|piket|wali\s+kelas|kelas)/i.test(candidate)) {
+                teachingAssignment = candidate;
+              }
+            }
+          }
+
+          // Canonical fallback for known permanent faculty members
+          if (!teachingAssignment && user.full_name) {
+            const lower = user.full_name.toLowerCase();
+            if (lower.includes('widianingsih') || lower.includes('widia')) {
+              teachingAssignment = 'IPA – Ilmu Pengetahuan Alam';
+            } else if (lower.includes('ridho') || lower.includes('farizi')) {
+              teachingAssignment = 'Akhlak lil Banin';
+            }
+          }
+
           return {
             id: user.id,
             nip: user.nip,
@@ -372,7 +395,7 @@ export class SupabaseProvider implements IDataProvider {
             position: user.position,
             avatar_url: user.avatar_url || null,
             is_active: user.account_status === 'ACTIVE',
-            teaching_assignment: user.teaching_assignment || localSubj || undefined,
+            teaching_assignment: teachingAssignment,
             created_at: user.created_at,
           };
         }
@@ -1924,6 +1947,29 @@ export class SupabaseProvider implements IDataProvider {
 
     const result: UserProfile[] = (data || []).map((row) => {
       const localSubj = localAssignments[row.id] || (row.nip ? localAssignments[row.nip] : undefined);
+      let teachingAssignment = row.teaching_assignment || localSubj || undefined;
+
+      // Auto-infer from position if teaching_assignment is unset
+      if (!teachingAssignment && row.position) {
+        const posMatch = row.position.match(/guru\s+(?:mapel\s+|mata\s+pelajaran\s+|bidang\s+studi\s+)?(.+)/i);
+        if (posMatch && posMatch[1]) {
+          const candidate = posMatch[1].trim();
+          if (!/^(utama|pendidik|honorer|tetap|piket|wali\s+kelas|kelas)/i.test(candidate)) {
+            teachingAssignment = candidate;
+          }
+        }
+      }
+
+      // Canonical fallback for known permanent faculty members
+      if (!teachingAssignment && row.full_name) {
+        const lower = row.full_name.toLowerCase();
+        if (lower.includes('widianingsih') || lower.includes('widia')) {
+          teachingAssignment = 'IPA – Ilmu Pengetahuan Alam';
+        } else if (lower.includes('ridho') || lower.includes('farizi')) {
+          teachingAssignment = 'Akhlak lil Banin';
+        }
+      }
+
       return {
         id: row.id,
         nip: row.nip,
@@ -1933,7 +1979,7 @@ export class SupabaseProvider implements IDataProvider {
         position: row.position,
         avatar_url: row.avatar_url || null,
         is_active: row.account_status === 'ACTIVE',
-        teaching_assignment: row.teaching_assignment || localSubj || undefined,
+        teaching_assignment: teachingAssignment,
         created_at: row.created_at,
       };
     });

@@ -7,6 +7,7 @@
 import type { ExamScheduleData, ExamProctorItem, ExamSubjectScheduleItem } from '../types/exam-schedule.types';
 import type { UserProfile } from '../types/database.types';
 import { ExamSchedulerService } from './exam-scheduler.service';
+import { normalizeSubjectName } from '../config/school-subjects.config';
 
 export interface TeacherLegendItem {
   no: number;
@@ -77,6 +78,123 @@ export class ExamMatrixBuilderService {
   }
 
   /**
+   * Resolves a teacher's subject with multi-tier resilience:
+   * 1. Profile teaching_assignment (single or array)
+   * 2. Profile position (e.g. "Guru Mapel IPA", "Guru Mapel Akhlak lil Banin")
+   * 3. Substring match across allTeachers list
+   * 4. Cached teaching schedules from localStorage
+   * 5. Canonical school faculty dictionary (Widianingsih -> IPA, Ridho -> Akhlak lil Banin, etc.)
+   * 6. Formats output with canonical official school subject labels (e.g. "IPA – Ilmu Pengetahuan Alam")
+   */
+  public static resolveTeacherSubject(
+    profile: UserProfile | undefined,
+    teacherName: string,
+    allTeachers: UserProfile[] = []
+  ): string {
+    let rawSubject = '';
+
+    // 1. Explicit teaching_assignment in profile
+    if (profile?.teaching_assignment) {
+      rawSubject = Array.isArray(profile.teaching_assignment)
+        ? profile.teaching_assignment.join(', ')
+        : String(profile.teaching_assignment).trim();
+    }
+
+    // 2. Extract from position (e.g. "Guru Mapel IPA", "Guru Mapel Akhlak lil Banin")
+    if (!rawSubject && profile?.position) {
+      const pos = profile.position.trim();
+      const posMatch = pos.match(/guru\s+(?:mapel\s+|mata\s+pelajaran\s+|bidang\s+studi\s+)?(.+)/i);
+      if (posMatch && posMatch[1]) {
+        const candidate = posMatch[1].trim();
+        if (!/^(utama|pendidik|honorer|tetap|piket|wali\s+kelas|kelas)/i.test(candidate)) {
+          rawSubject = candidate;
+        }
+      }
+    }
+
+    // 3. Fallback: Search allTeachers if profile had no subject or was not found
+    if (!rawSubject && allTeachers.length > 0) {
+      const normTarget = ExamSchedulerService.normalizeTeacherName(teacherName);
+      const matched = allTeachers.find((t) => {
+        if (!t.full_name) return false;
+        const norm = ExamSchedulerService.normalizeTeacherName(t.full_name);
+        return norm === normTarget || (norm.length >= 4 && (norm.includes(normTarget) || normTarget.includes(norm)));
+      });
+      if (matched) {
+        if (matched.teaching_assignment) {
+          rawSubject = Array.isArray(matched.teaching_assignment)
+            ? matched.teaching_assignment.join(', ')
+            : String(matched.teaching_assignment).trim();
+        } else if (matched.position) {
+          const posMatch = matched.position.match(/guru\s+(?:mapel\s+|mata\s+pelajaran\s+|bidang\s+studi\s+)?(.+)/i);
+          if (posMatch && posMatch[1] && !/^(utama|pendidik|honorer|tetap|piket|wali\s+kelas|kelas)/i.test(posMatch[1].trim())) {
+            rawSubject = posMatch[1].trim();
+          }
+        }
+      }
+    }
+
+    // 4. Cached teaching schedules from localStorage
+    if (!rawSubject && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const cached = localStorage.getItem('smart_absensi_teaching_schedules');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            const normTarget = ExamSchedulerService.normalizeTeacherName(teacherName);
+            const slot = parsed.find((s: any) => {
+              if (profile?.id && (s.teacher_id === profile.id || s.user_id === profile.id)) return true;
+              const slotTeacherNorm = ExamSchedulerService.normalizeTeacherName(s.teacher_name || s.teacher || '');
+              return slotTeacherNorm && (slotTeacherNorm === normTarget || normTarget.includes(slotTeacherNorm));
+            });
+            if (slot && (slot.subject || slot.subject_name)) {
+              rawSubject = (slot.subject || slot.subject_name).trim();
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // 5. Canonical school faculty map fallback
+    if (!rawSubject) {
+      const norm = ExamSchedulerService.normalizeTeacherName(teacherName);
+      if (norm.includes('widianingsih') || norm.includes('widia')) {
+        rawSubject = 'IPA';
+      } else if (norm.includes('ridho') || norm.includes('farizi')) {
+        rawSubject = 'Akhlak lil Banin';
+      } else if (norm.includes('fitri ani') || norm.includes('rahayu')) {
+        rawSubject = 'MTK';
+      } else if (norm.includes('iqbal') || norm.includes('gustiawan')) {
+        rawSubject = 'Hadits';
+      } else if (norm.includes('mawar') || norm.includes('andinia')) {
+        rawSubject = 'BTQ';
+      } else if (norm.includes('mira') || norm.includes('nurdianti')) {
+        rawSubject = 'B. Arab, PAI';
+      } else if (norm.includes('nurul') || norm.includes('farhiya') || norm.includes('fahriya')) {
+        rawSubject = 'PP';
+      } else if (norm.includes('qodiatul') || norm.includes('asrof') || norm.includes('ramadhoni')) {
+        rawSubject = 'IPS';
+      } else if (norm.includes('septi') || norm.includes('nur aeni')) {
+        rawSubject = 'B. Indonesia';
+      } else if (norm.includes('dafa') || norm.includes('maulana')) {
+        rawSubject = 'Informatika';
+      } else if (norm.includes('adi') || norm.includes('prasetyo')) {
+        rawSubject = 'B. Inggris';
+      }
+    }
+
+    if (!rawSubject || rawSubject === '-') return '-';
+
+    // 6. Normalize with official school subject labels
+    const parts = rawSubject.split(/[,&/]/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      return parts.map((p) => normalizeSubjectName(p) || p).join(', ');
+    }
+
+    return normalizeSubjectName(rawSubject) || rawSubject;
+  }
+
+  /**
    * Builds the complete official matrix representation matching the school layout.
    */
   public static buildMatrix(
@@ -110,20 +228,34 @@ export class ExamMatrixBuilderService {
       }
     });
 
+    const findProfile = (id?: string, name?: string): UserProfile | undefined => {
+      if (id && teacherProfileMap.has(id)) return teacherProfileMap.get(id);
+      if (name) {
+        const lower = name.toLowerCase().trim();
+        if (teacherProfileMap.has(lower)) return teacherProfileMap.get(lower);
+        const norm = ExamSchedulerService.normalizeTeacherName(name);
+        if (teacherProfileMap.has(norm)) return teacherProfileMap.get(norm);
+
+        const matched = allTeachers.find((t) => {
+          if (!t.full_name) return false;
+          const tNorm = ExamSchedulerService.normalizeTeacherName(t.full_name);
+          return (
+            (tNorm.length >= 3 && norm.length >= 3 && (tNorm.includes(norm) || norm.includes(tNorm))) ||
+            t.full_name.toLowerCase().includes(lower) ||
+            lower.includes(t.full_name.toLowerCase())
+          );
+        });
+        if (matched) return matched;
+      }
+      return undefined;
+    };
+
     // Extract proctors from actual assignments (main and secondary proctors)
     proctorSchedules.forEach((p) => {
       if (p.mainProctorId && p.mainProctorName) {
         if (!teacherMap.has(p.mainProctorId)) {
-          const profile =
-            teacherProfileMap.get(p.mainProctorId) ||
-            teacherProfileMap.get(p.mainProctorName.toLowerCase().trim()) ||
-            teacherProfileMap.get(ExamSchedulerService.normalizeTeacherName(p.mainProctorName));
-          let subject = '-';
-          if (profile?.teaching_assignment) {
-            subject = Array.isArray(profile.teaching_assignment)
-              ? profile.teaching_assignment.join(', ')
-              : String(profile.teaching_assignment);
-          }
+          const profile = findProfile(p.mainProctorId, p.mainProctorName);
+          const subject = this.resolveTeacherSubject(profile, p.mainProctorName, allTeachers);
           teacherMap.set(p.mainProctorId, {
             userId: p.mainProctorId,
             fullName: p.mainProctorName,
@@ -134,16 +266,8 @@ export class ExamMatrixBuilderService {
 
       if (p.secondaryProctorId && p.secondaryProctorName) {
         if (!teacherMap.has(p.secondaryProctorId)) {
-          const profile =
-            teacherProfileMap.get(p.secondaryProctorId) ||
-            teacherProfileMap.get(p.secondaryProctorName.toLowerCase().trim()) ||
-            teacherProfileMap.get(ExamSchedulerService.normalizeTeacherName(p.secondaryProctorName));
-          let subject = '-';
-          if (profile?.teaching_assignment) {
-            subject = Array.isArray(profile.teaching_assignment)
-              ? profile.teaching_assignment.join(', ')
-              : String(profile.teaching_assignment);
-          }
+          const profile = findProfile(p.secondaryProctorId, p.secondaryProctorName);
+          const subject = this.resolveTeacherSubject(profile, p.secondaryProctorName, allTeachers);
           teacherMap.set(p.secondaryProctorId, {
             userId: p.secondaryProctorId,
             fullName: p.secondaryProctorName,

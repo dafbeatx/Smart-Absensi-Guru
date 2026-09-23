@@ -24,7 +24,7 @@ export class ExamSchedulerService {
   public static normalizeTeacherName(name: string): string {
     return (name || '')
       .toLowerCase()
-      .replace(/\b(s\.?pd|s\.?mat|s\.?e|g\.?r|s\.?si|s\.?kom|s\.?ag|m\.?pd|drs|dra|h\.|hj\.|m\.?m|s\.?pd\.?i)\b/gi, '')
+      .replace(/\b(s\.?pd\.?i|s\.?pd|s\.?mat|s\.?e|g\.?r|s\.?si|s\.?i|s\.?kom|s\.?ag|s\.?sos|s\.?hum|s\.?fil|m\.?pd|m\.?m|drs|dra|h\.|hj\.)\b/gi, '')
       .replace(/\bm\.?\s*iqbal\b/gi, 'muhammad iqbal')
       .replace(/\bfarhiya\b/gi, 'fahriya')
       .replace(/[.,]/g, ' ')

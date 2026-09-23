@@ -189,5 +189,117 @@ export const runExamMatrixTestSuite = async (): Promise<{
     assert('Exam Matrix 05: Error testing Word HTML generation', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 6: resolveTeacherSubject Resolves Bu Widia and Pak Ridho Accurately
+  // ---------------------------------------------------------------------------
+  try {
+    const widiaProfileWithoutSubject: Partial<UserProfile> = {
+      id: 'usr_widia',
+      full_name: 'Widianingsih, S.Si., G.r',
+      position: 'Guru Mapel IPA',
+    };
+    const widiaSubject1 = ExamMatrixBuilderService.resolveTeacherSubject(
+      widiaProfileWithoutSubject as UserProfile,
+      'Widianingsih, S.I., G.r'
+    );
+    const widiaSubject2 = ExamMatrixBuilderService.resolveTeacherSubject(
+      undefined,
+      'Widianingsih, S.I., G.r'
+    );
+
+    const ridhoSubject = ExamMatrixBuilderService.resolveTeacherSubject(
+      undefined,
+      'Ridho Maulana Al Farizi'
+    );
+
+    assert(
+      'Exam Matrix 06: resolveTeacherSubject accurately resolves Bu Widianingsih to IPA and Pak Ridho to Akhlak',
+      widiaSubject1 === 'IPA – Ilmu Pengetahuan Alam' &&
+      widiaSubject2 === 'IPA – Ilmu Pengetahuan Alam' &&
+      ridhoSubject === 'Akhlak lil Banin',
+      `Widia from position: ${widiaSubject1}, Widia fallback: ${widiaSubject2}, Ridho: ${ridhoSubject}`
+    );
+  } catch (err: any) {
+    assert('Exam Matrix 06: Error in resolveTeacherSubject test', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 7: Matrix Builder Legend Renders Bu Widia with Canonical Subject
+  // ---------------------------------------------------------------------------
+  try {
+    const scheduleWithWidia: typeof scheduleData = {
+      ...scheduleData,
+      proctorSchedules: [
+        {
+          id: 'ps_widia_1',
+          date: '2026-06-01',
+          dayName: 'Senin',
+          sessionNumber: 1,
+          startTime: '08:00',
+          endTime: '09:30',
+          roomName: 'Ruang 1',
+          className: '7A',
+          subject: 'IPA',
+          mainProctorId: 'usr_widia',
+          mainProctorName: 'Widianingsih, S.I., G.r',
+        },
+        {
+          id: 'ps_ridho_1',
+          date: '2026-06-01',
+          dayName: 'Senin',
+          sessionNumber: 1,
+          startTime: '08:00',
+          endTime: '09:30',
+          roomName: 'Ruang 2',
+          className: '7B',
+          subject: 'Akhlak',
+          mainProctorId: 'usr_ridho',
+          mainProctorName: 'Ridho Maulana Al Farizi',
+        },
+      ],
+    };
+
+    const matrixWithWidia = ExamMatrixBuilderService.buildMatrix(
+      scheduleWithWidia,
+      sampleTeachers,
+      'SMP Terpadu Al - Ittihadiyah'
+    );
+
+    const widiaLegend = matrixWithWidia.teacherLegend.find((t) =>
+      t.fullName.toLowerCase().includes('widianingsih')
+    );
+    const ridhoLegend = matrixWithWidia.teacherLegend.find((t) =>
+      t.fullName.toLowerCase().includes('ridho')
+    );
+
+    assert(
+      'Exam Matrix 07: Matrix builder legend contains Bu Widianingsih (IPA) and Pak Ridho (Akhlak) with zero empty dashes',
+      Boolean(widiaLegend && widiaLegend.subject === 'IPA – Ilmu Pengetahuan Alam') &&
+      Boolean(ridhoLegend && ridhoLegend.subject === 'Akhlak lil Banin'),
+      `Widia legend: ${widiaLegend?.fullName} -> ${widiaLegend?.subject}, Ridho legend: ${ridhoLegend?.fullName} -> ${ridhoLegend?.subject}`
+    );
+  } catch (err: any) {
+    assert('Exam Matrix 07: Error testing matrix builder legend with Widia', false, err?.message);
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 8: Degree Normalization Handles S.I., S.Si., S.Pd.I Correctly
+  // ---------------------------------------------------------------------------
+  try {
+    const normWidia1 = ExamSchedulerService.normalizeTeacherName('Widianingsih, S.I., G.r');
+    const normWidia2 = ExamSchedulerService.normalizeTeacherName('Widianingsih, S.Si., G.r');
+    const normFarhan = ExamSchedulerService.normalizeTeacherName('Farhan Sopian Sahid, S.Pd.I');
+
+    assert(
+      'Exam Matrix 08: normalizeTeacherName strips S.I., S.Si., and S.Pd.I symmetrically',
+      normWidia1 === 'widianingsih' &&
+      normWidia2 === 'widianingsih' &&
+      normFarhan === 'farhan sopian sahid',
+      `normWidia1: "${normWidia1}", normWidia2: "${normWidia2}", normFarhan: "${normFarhan}"`
+    );
+  } catch (err: any) {
+    assert('Exam Matrix 08: Error testing normalizeTeacherName', false, err?.message);
+  }
+
   return { passed, failed, results };
 };

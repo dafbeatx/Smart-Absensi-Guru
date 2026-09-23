@@ -1454,11 +1454,38 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getAllUsers(_token: string): Promise<UserProfile[]> {
+    const enrichUsers = (users: UserProfile[]): UserProfile[] => {
+      return users.map((u) => {
+        let teaching = u.teaching_assignment;
+        if (!teaching && u.position) {
+          const posMatch = u.position.match(/guru\s+(?:mapel\s+|mata\s+pelajaran\s+|bidang\s+studi\s+)?(.+)/i);
+          if (posMatch && posMatch[1]) {
+            const candidate = posMatch[1].trim();
+            if (!/^(utama|pendidik|honorer|tetap|piket|wali\s+kelas|kelas)/i.test(candidate)) {
+              teaching = candidate;
+            }
+          }
+        }
+        if (!teaching && u.full_name) {
+          const lower = u.full_name.toLowerCase();
+          if (lower.includes('widianingsih') || lower.includes('widia')) {
+            teaching = 'IPA – Ilmu Pengetahuan Alam';
+          } else if (lower.includes('ridho') || lower.includes('farizi')) {
+            teaching = 'Akhlak lil Banin';
+          }
+        }
+        return {
+          ...u,
+          teaching_assignment: teaching,
+        };
+      });
+    };
+
     const saved = safeGetStorage('smart_absensi_teachers');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return enrichUsers(parsed);
       } catch (e) {
         console.warn('Failed to parse cached teachers:', e);
       }
@@ -1498,11 +1525,31 @@ export class MockProvider implements IDataProvider {
         created_at: new Date().toISOString(),
       },
     ];
-    safeSetStorage('smart_absensi_teachers', JSON.stringify(defaultUsers));
-    return defaultUsers;
+    const enriched = enrichUsers(defaultUsers);
+    safeSetStorage('smart_absensi_teachers', JSON.stringify(enriched));
+    return enriched;
   }
 
   public async createUser(user: Partial<UserProfile>, _token: string): Promise<UserProfile> {
+    let teachingAssignment = user.teaching_assignment || undefined;
+    if (!teachingAssignment && user.position) {
+      const posMatch = user.position.match(/guru\s+(?:mapel\s+|mata\s+pelajaran\s+|bidang\s+studi\s+)?(.+)/i);
+      if (posMatch && posMatch[1]) {
+        const candidate = posMatch[1].trim();
+        if (!/^(utama|pendidik|honorer|tetap|piket|wali\s+kelas|kelas)/i.test(candidate)) {
+          teachingAssignment = candidate;
+        }
+      }
+    }
+    if (!teachingAssignment && user.full_name) {
+      const lower = user.full_name.toLowerCase();
+      if (lower.includes('widianingsih') || lower.includes('widia')) {
+        teachingAssignment = 'IPA – Ilmu Pengetahuan Alam';
+      } else if (lower.includes('ridho') || lower.includes('farizi')) {
+        teachingAssignment = 'Akhlak lil Banin';
+      }
+    }
+
     const newUser: UserProfile = {
       id: user.id || 'usr_mock_' + Date.now(),
       nip: user.nip ? user.nip.trim() : null,
@@ -1512,7 +1559,7 @@ export class MockProvider implements IDataProvider {
       position: user.position || '',
       avatar_url: user.avatar_url || null,
       is_active: user.is_active !== undefined ? user.is_active : true,
-      teaching_assignment: user.teaching_assignment || undefined,
+      teaching_assignment: teachingAssignment,
       created_at: new Date().toISOString(),
     };
     const allUsers = await this.getAllUsers(_token);
