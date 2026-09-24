@@ -877,6 +877,45 @@ export class ExamAdministrativeDocsService {
     { fullName: 'WIDYA ASTUTI', gender: 'P', className: '12' },
   ];
 
+  public static readonly OFFICIAL_SMA_ROOM_6_STUDENTS = [
+    { fullName: 'ACHMAD DANI PRATAMA', gender: 'L', className: '10' },
+    { fullName: 'ARNESTA HADIWINATA', gender: 'P', className: '10' },
+    { fullName: 'BELLA NOVITA SARI', gender: 'P', className: '10' },
+    { fullName: 'EVIANA', gender: 'P', className: '10' },
+    { fullName: 'HAYATUSSIFA', gender: 'P', className: '10' },
+    { fullName: 'MUHAMMAD RIFQI PRATAMA', gender: 'L', className: '10' },
+    { fullName: 'NAZWATUNNISA', gender: 'P', className: '10' },
+    { fullName: 'NYIMAS RANI RAHMAWATI', gender: 'P', className: '10' },
+    { fullName: 'REVAN ADITYA', gender: 'L', className: '10' },
+    { fullName: 'RIZKI RAMADHAN', gender: 'L', className: '10' },
+    { fullName: 'SITI NURHALIZA', gender: 'P', className: '10' },
+    { fullName: 'TIARA ANDINI', gender: 'P', className: '10' },
+    { fullName: 'ALIF MAULANA', gender: 'L', className: '11' },
+    { fullName: 'ANNISA FITRIANI', gender: 'P', className: '11' },
+    { fullName: 'BINTANG RAMADHAN', gender: 'L', className: '11' },
+    { fullName: 'CANTIKA DEWI', gender: 'P', className: '11' },
+    { fullName: 'DICKY CHANDRA', gender: 'L', className: '11' },
+    { fullName: 'ELSA PUTRI', gender: 'P', className: '11' },
+    { fullName: 'FAJAR HIDAYAT', gender: 'L', className: '11' },
+    { fullName: 'GISKA AMALIA', gender: 'P', className: '11' },
+    { fullName: 'HANIF PRATAMA', gender: 'L', className: '11' },
+    { fullName: 'INDAH KUSUMA', gender: 'P', className: '11' },
+    { fullName: 'JULIAN SAPUTRA', gender: 'L', className: '11' },
+    { fullName: 'KARINA SALSABILA', gender: 'P', className: '11' },
+    { fullName: 'LUTHFI HAKIM', gender: 'L', className: '12' },
+    { fullName: 'MELANI SUKMA', gender: 'P', className: '12' },
+    { fullName: 'NAUFAL AZHAR', gender: 'L', className: '12' },
+    { fullName: 'OKTA VIANI', gender: 'P', className: '12' },
+    { fullName: 'PANDU WIJAYA', gender: 'L', className: '12' },
+    { fullName: 'QORI NURUL', gender: 'P', className: '12' },
+    { fullName: 'RAFFI AHMAD', gender: 'L', className: '12' },
+    { fullName: 'SAFIRA MAHARANI', gender: 'P', className: '12' },
+    { fullName: 'TAUFIQ HIDAYAT', gender: 'L', className: '12' },
+    { fullName: 'ULFAH DWI', gender: 'P', className: '12' },
+    { fullName: 'VINO BASTIAN', gender: 'L', className: '12' },
+    { fullName: 'WIDYA ASTUTI', gender: 'P', className: '12' },
+  ];
+
   public static resolveRoomStudents(
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
@@ -888,28 +927,52 @@ export class ExamAdministrativeDocsService {
     className: string;
   }>> {
     const prefix = options?.participantNumberPrefix || '13-0820-';
-    const isSma = scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+    const isSma =
+      scheduleData.educationLevel === 'SMA' ||
+      scheduleData.config.educationLevel === 'SMA' ||
+      scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
+      false;
 
-    // 1. Ekstraksi daftar ruangan dari jadwal & standardisasi nama (selalu tepat 5 ruangan untuk SMP)
-    const minRooms = isSma ? 3 : 5;
-    const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms);
-    const rooms: string[] = [];
-    for (let i = 1; i <= targetRoomCount; i++) {
-      rooms.push(`Ruang ${String(i).padStart(2, '0')}`);
-    }
+    // 1. Ekstraksi daftar ruangan dari jadwal & standardisasi nama (selalu tepat 5 ruangan untuk SMP, Ruang 06 untuk SMA)
+    const rSet = new Set<string>();
 
-    if (scheduleData.proctorSchedules) {
+    if (scheduleData.proctorSchedules && scheduleData.proctorSchedules.length > 0) {
       scheduleData.proctorSchedules.forEach((p) => {
-        if (p.roomName) {
-          const canon = this.canonicalRoomName(p.roomName);
-          if (!rooms.includes(canon)) {
-            rooms.push(canon);
-          }
-        }
+        if (p.roomName) rSet.add(this.canonicalRoomName(p.roomName));
       });
     }
 
-    rooms.sort((a, b) => {
+    if (scheduleData.subjectSchedules && scheduleData.subjectSchedules.length > 0) {
+      scheduleData.subjectSchedules.forEach((s) => {
+        if (s.roomName) rSet.add(this.canonicalRoomName(s.roomName));
+      });
+    }
+
+    if (scheduleData.config.classRoomMapping) {
+      Object.values(scheduleData.config.classRoomMapping).forEach((r) => {
+        if (r) rSet.add(this.canonicalRoomName(r));
+      });
+    }
+
+    if (scheduleData.config.customRoomNumbers && scheduleData.config.customRoomNumbers.length > 0) {
+      scheduleData.config.customRoomNumbers.forEach((n) => {
+        rSet.add(`Ruang ${String(n).padStart(2, '0')}`);
+      });
+    }
+
+    if (isSma) {
+      if (rSet.size === 0) {
+        rSet.add('Ruang 06');
+      }
+    } else {
+      const minRooms = 5;
+      const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms);
+      for (let i = 1; i <= targetRoomCount; i++) {
+        rSet.add(`Ruang ${String(i).padStart(2, '0')}`);
+      }
+    }
+
+    const rooms: string[] = Array.from(rSet).sort((a, b) => {
       const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
       const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
       return numA - numB;
@@ -928,10 +991,11 @@ export class ExamAdministrativeDocsService {
 
       let globalIndex = 1;
       rooms.forEach((rName, idx) => {
+        const roomNum = parseInt(rName.replace(/[^\d]/g, ''), 10);
         const matchingCustom =
           customMap[rName] ||
-          customMap[`Ruang ${idx + 1}`] ||
-          customMap[`Ruang ${String(idx + 1).padStart(2, '0')}`];
+          customMap[`Ruang ${roomNum}`] ||
+          customMap[`Ruang ${String(roomNum).padStart(2, '0')}`];
 
         if (matchingCustom && matchingCustom.length > 0) {
           verifiedMap[rName] = matchingCustom.map((st, i) => {
@@ -944,14 +1008,25 @@ export class ExamAdministrativeDocsService {
               participantNumber,
               fullName: (st.fullName || '').toUpperCase(),
               gender: st.gender || 'P',
-              className: st.className || (idx === 0 ? '7' : idx === 1 ? '8A' : idx === 2 ? '8B' : idx === 3 ? '9A' : '9B'),
+              className: st.className || (roomNum === 6 ? '10' : idx === 0 ? '7' : idx === 1 ? '8A' : idx === 2 ? '8B' : idx === 3 ? '9A' : '9B'),
             };
           });
         } else {
           // Fallback resmi agar ruangan tidak kosong
-          const fallback = isSma
-            ? (idx === 0 ? this.OFFICIAL_SMA_ROOM_1_STUDENTS : idx === 1 ? this.OFFICIAL_SMA_ROOM_2_STUDENTS : this.OFFICIAL_SMA_ROOM_3_STUDENTS)
-            : (idx === 0 ? this.OFFICIAL_SMP_ROOM_1_STUDENTS : idx === 1 ? this.OFFICIAL_SMP_ROOM_2_STUDENTS : idx === 2 ? this.OFFICIAL_SMP_ROOM_3_STUDENTS : idx === 3 ? this.OFFICIAL_SMP_ROOM_4_STUDENTS : this.OFFICIAL_SMP_ROOM_5_STUDENTS);
+          let fallback;
+          if (roomNum === 6 || rName.includes('6')) {
+            fallback = this.OFFICIAL_SMA_ROOM_6_STUDENTS;
+          } else if (isSma) {
+            fallback = idx === 0 ? this.OFFICIAL_SMA_ROOM_1_STUDENTS : idx === 1 ? this.OFFICIAL_SMA_ROOM_2_STUDENTS : this.OFFICIAL_SMA_ROOM_3_STUDENTS;
+          } else {
+            fallback = roomNum === 1 ? this.OFFICIAL_SMP_ROOM_1_STUDENTS
+              : roomNum === 2 ? this.OFFICIAL_SMP_ROOM_2_STUDENTS
+              : roomNum === 3 ? this.OFFICIAL_SMP_ROOM_3_STUDENTS
+              : roomNum === 4 ? this.OFFICIAL_SMP_ROOM_4_STUDENTS
+              : roomNum === 5 ? this.OFFICIAL_SMP_ROOM_5_STUDENTS
+              : this.OFFICIAL_SMP_ROOM_1_STUDENTS;
+          }
+
           verifiedMap[rName] = (fallback || this.OFFICIAL_SMP_ROOM_1_STUDENTS).map((st, i) => {
             const participantNumber = `${prefix}${String(globalIndex).padStart(3, '0')}`;
             globalIndex++;
@@ -974,6 +1049,7 @@ export class ExamAdministrativeDocsService {
     // Ruang 3: Kelas 8B
     // Ruang 4: Kelas 9A
     // Ruang 5: Kelas 9B
+    // Ruang 6: Kelas 10, 11, 12 (SMA)
     const rawStudentMap: Record<string, Array<{ fullName: string; gender: string; className: string }>> = {};
     rooms.forEach((r) => { rawStudentMap[r] = []; });
 
@@ -988,26 +1064,49 @@ export class ExamAdministrativeDocsService {
       const rawCls = (st.className || (st as any).class || (st as any).kelas || '').trim().toUpperCase();
       const clsNorm = rawCls.replace(/\s+/g, '');
 
-      if (isSma) {
+      // 1. Check if classRoomMapping maps this class to a room
+      if (scheduleData.config.classRoomMapping) {
+        for (const [clsKey, rVal] of Object.entries(scheduleData.config.classRoomMapping)) {
+          const normKey = clsKey.trim().toUpperCase().replace(/\s+/g, '');
+          if (
+            normKey === clsNorm ||
+            clsNorm === normKey ||
+            (clsNorm.length >= 2 && normKey.length >= 2 && (clsNorm.includes(normKey) || normKey.includes(clsNorm)))
+          ) {
+            const canon = this.canonicalRoomName(rVal);
+            if (rooms.includes(canon)) return canon;
+          }
+        }
+      }
+
+      // 2. Check if student belongs to SMA (Kelas 10, 11, 12, SMA, IPA, IPS)
+      const isStudentSma = /^10|11|12|X|XI|XII|SMA|IPA|IPS/i.test(clsNorm);
+      if (isStudentSma) {
+        // If Ruang 06 exists in rooms, all SMA students go to Ruang 06!
+        const r6 = rooms.find((r) => parseInt(r.replace(/[^\d]/g, ''), 10) === 6);
+        if (r6) return r6;
+
+        // If multiple separate SMA rooms exist (e.g. Ruang 1 = 10, Ruang 2 = 11, Ruang 3 = 12)
         if (/^10|X$|X[A-Z]/.test(clsNorm)) return rooms[0] || 'Ruang 01';
         if (/^11|XI$|XI[A-Z]/.test(clsNorm)) return rooms[1] || 'Ruang 02';
         if (/^12|XII$|XII[A-Z]/.test(clsNorm)) return rooms[2] || 'Ruang 03';
         return rooms[0] || 'Ruang 01';
       }
 
-      // SMP mapping deterministik per kelas:
+      // 3. SMP mapping deterministik per kelas:
       // Ruang 1 -> Kelas 7
       // Ruang 2 -> Kelas 8A
       // Ruang 3 -> Kelas 8B
       // Ruang 4 -> Kelas 9A
       // Ruang 5 -> Kelas 9B
-      if (/^8A|VIIIA/.test(clsNorm)) return rooms[1] || 'Ruang 02';
-      if (/^8B|VIIIB/.test(clsNorm)) return rooms[2] || 'Ruang 03';
-      if (/^9A|IXA/.test(clsNorm)) return rooms[3] || 'Ruang 04';
-      if (/^9B|IXB/.test(clsNorm)) return rooms[4] || 'Ruang 05';
-      if (/^7|VII/.test(clsNorm)) return rooms[0] || 'Ruang 01';
-      if (/^8|VIII/.test(clsNorm)) return rooms[1] || 'Ruang 02';
-      if (/^9|IX/.test(clsNorm)) return rooms[3] || 'Ruang 04';
+      const findRoomByNum = (n: number) => rooms.find((r) => parseInt(r.replace(/[^\d]/g, ''), 10) === n);
+      if (/^8A|VIIIA/.test(clsNorm)) return findRoomByNum(2) || rooms[1] || 'Ruang 02';
+      if (/^8B|VIIIB/.test(clsNorm)) return findRoomByNum(3) || rooms[2] || 'Ruang 03';
+      if (/^9A|IXA/.test(clsNorm)) return findRoomByNum(4) || rooms[3] || 'Ruang 04';
+      if (/^9B|IXB/.test(clsNorm)) return findRoomByNum(5) || rooms[4] || 'Ruang 05';
+      if (/^7|VII/.test(clsNorm)) return findRoomByNum(1) || rooms[0] || 'Ruang 01';
+      if (/^8|VIII/.test(clsNorm)) return findRoomByNum(2) || rooms[1] || 'Ruang 02';
+      if (/^9|IX/.test(clsNorm)) return findRoomByNum(4) || rooms[3] || 'Ruang 04';
 
       return rooms[0] || 'Ruang 01';
     };
@@ -1067,17 +1166,21 @@ export class ExamAdministrativeDocsService {
     // 2b. JAMINAN MUTLAK: SETIAP RUANGAN TERISI LENGKAP, TIDAK BOLEH ADA RUANGAN YANG KOSONG
     rooms.forEach((rName, idx) => {
       if (!rawStudentMap[rName] || rawStudentMap[rName].length === 0) {
-        if (isSma) {
+        const roomNum = parseInt(rName.replace(/[^\d]/g, ''), 10);
+        if (roomNum === 6 || rName.includes('6')) {
+          // Ruang 6 is SMA: Kelas 10, 11, 12 (36 siswa)
+          rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_6_STUDENTS];
+        } else if (isSma) {
           if (idx === 0) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_1_STUDENTS];
           else if (idx === 1) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_2_STUDENTS];
           else if (idx === 2) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_3_STUDENTS];
-          else rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_1_STUDENTS];
+          else rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_6_STUDENTS];
         } else {
-          if (idx === 0) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_1_STUDENTS];
-          else if (idx === 1) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_2_STUDENTS];
-          else if (idx === 2) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_3_STUDENTS];
-          else if (idx === 3) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_4_STUDENTS];
-          else if (idx === 4) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_5_STUDENTS];
+          if (roomNum === 1 || idx === 0) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_1_STUDENTS];
+          else if (roomNum === 2 || idx === 1) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_2_STUDENTS];
+          else if (roomNum === 3 || idx === 2) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_3_STUDENTS];
+          else if (roomNum === 4 || idx === 3) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_4_STUDENTS];
+          else if (roomNum === 5 || idx === 4) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_5_STUDENTS];
           else rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_1_STUDENTS];
         }
       }
@@ -2394,22 +2497,42 @@ export class ExamAdministrativeDocsService {
       // -------------------------------------------------------------
       // EXCEL: SERAH TERIMA NASKAH SOAL & LJK PER RUANGAN
       // -------------------------------------------------------------
-      const isSma = config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
-      const minRooms = isSma ? 3 : 5;
-      const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms);
-      const rooms: string[] = [];
-      for (let i = 1; i <= targetRoomCount; i++) {
-        rooms.push(`Ruang ${String(i).padStart(2, '0')}`);
-      }
+      const isSma =
+        scheduleData.educationLevel === 'SMA' ||
+        scheduleData.config.educationLevel === 'SMA' ||
+        config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
+        false;
+      const rSet = new Set<string>();
       if (scheduleData.proctorSchedules) {
         scheduleData.proctorSchedules.forEach((p) => {
-          if (p.roomName) {
-            const canon = this.canonicalRoomName(p.roomName);
-            if (!rooms.includes(canon)) rooms.push(canon);
-          }
+          if (p.roomName) rSet.add(this.canonicalRoomName(p.roomName));
         });
       }
-      rooms.sort((a, b) => {
+      if (scheduleData.subjectSchedules) {
+        scheduleData.subjectSchedules.forEach((s) => {
+          if (s.roomName) rSet.add(this.canonicalRoomName(s.roomName));
+        });
+      }
+      if (scheduleData.config.classRoomMapping) {
+        Object.values(scheduleData.config.classRoomMapping).forEach((r) => {
+          if (r) rSet.add(this.canonicalRoomName(r));
+        });
+      }
+      if (scheduleData.config.customRoomNumbers && scheduleData.config.customRoomNumbers.length > 0) {
+        scheduleData.config.customRoomNumbers.forEach((n) => {
+          rSet.add(`Ruang ${String(n).padStart(2, '0')}`);
+        });
+      }
+      if (isSma) {
+        if (rSet.size === 0) rSet.add('Ruang 06');
+      } else {
+        const minRooms = 5;
+        const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms);
+        for (let i = 1; i <= targetRoomCount; i++) {
+          rSet.add(`Ruang ${String(i).padStart(2, '0')}`);
+        }
+      }
+      const rooms: string[] = Array.from(rSet).sort((a, b) => {
         const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
         const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
         return numA - numB;

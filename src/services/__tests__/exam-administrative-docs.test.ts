@@ -11,6 +11,7 @@
 import { ExamAdministrativeDocsService } from '../exam-administrative-docs.service';
 import type { ExamScheduleData, ExamCommitteeMember } from '../../types/exam-schedule.types';
 import type { ExamInvigilationMatrix } from '../exam-matrix-builder.service';
+import { ExamScheduleRepository } from '../../repositories/ExamScheduleRepository';
 
 export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   passed: number;
@@ -382,6 +383,76 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
       r5Students[0].participantNumber === '13-0820-068' &&
       r5Students[14].participantNumber === '13-0820-082',
     `Sequential participant numbering across rooms failed: R1[0]=${r1Students[0]?.participantNumber}, R2[0]=${r2Students[0]?.participantNumber}, R5[end]=${r5Students[14]?.participantNumber}`
+  );
+
+  // -------------------------------------------------------------
+  // TEST 5c: Document - Daftar Hadir Peserta Ujian Ruang 6 (SMA)
+  // Verifikasi Ruang 6 SMA berisi 36 siswa gabungan Kelas 10, 11, dan 12
+  // -------------------------------------------------------------
+  const smaScheduleData = ExamScheduleRepository.createCanonicalSmaSchedule('2026/2027', 'ASTS');
+  const smaRoomStudentsMap = ExamAdministrativeDocsService.resolveRoomStudents(smaScheduleData);
+  const smaRooms = Object.keys(smaRoomStudentsMap);
+  const r6Students = smaRoomStudentsMap['Ruang 06'] || [];
+
+  const k10Count = r6Students.filter((s) => s.className === '10').length;
+  const k11Count = r6Students.filter((s) => s.className === '11').length;
+  const k12Count = r6Students.filter((s) => s.className === '12').length;
+
+  assert(
+    '10e. resolveRoomStudents allocates SMA schedule to Ruang 06 with exactly 36 students (12 Kelas 10, 12 Kelas 11, 12 Kelas 12)',
+    smaRooms.length === 1 &&
+      smaRooms[0] === 'Ruang 06' &&
+      r6Students.length === 36 &&
+      k10Count === 12 &&
+      k11Count === 12 &&
+      k12Count === 12,
+    `SMA room resolution failed: rooms=${smaRooms.join(', ')}, total=${r6Students.length} (K10=${k10Count}, K11=${k11Count}, K12=${k12Count})`
+  );
+
+  const docRosterR6Html = ExamAdministrativeDocsService.generateStudentAttendanceRosterHtml(
+    smaScheduleData,
+    { roomFilter: 'Ruang 06' }
+  );
+
+  assert(
+    '10f. generateStudentAttendanceRosterHtml for Ruang 06 renders RUANG 06 badge and contains all 36 SMA students',
+    docRosterR6Html.includes('RUANG 06') &&
+      docRosterR6Html.includes('ACHMAD DANI PRATAMA') &&
+      docRosterR6Html.includes('ALIF MAULANA') &&
+      docRosterR6Html.includes('WIDYA ASTUTI') &&
+      docRosterR6Html.includes('13-0820-036'),
+    'Ruang 06 roster HTML missing RUANG 06 badge or expected student entries'
+  );
+
+  // Cross-level check: SMP schedule that includes Ruang 6 cross-level proctor
+  const crossLevelSchedule: ExamScheduleData = {
+    ...sampleScheduleData,
+    proctorSchedules: [
+      ...sampleScheduleData.proctorSchedules,
+      {
+        id: 'ps_cross_r6',
+        date: '2026-09-28',
+        dayName: 'Senin',
+        sessionNumber: 1,
+        startTime: '07:30',
+        endTime: '09:00',
+        roomName: 'Ruang 6',
+        className: '10, 11, 12',
+        subject: 'PAI & PB',
+        mainProctorId: 'usr_04',
+        mainProctorName: 'Dafa Maulana',
+      },
+    ],
+  };
+  const crossLevelMap = ExamAdministrativeDocsService.resolveRoomStudents(crossLevelSchedule);
+  const crossR6Students = crossLevelMap['Ruang 06'] || [];
+
+  assert(
+    '10g. resolveRoomStudents populates Ruang 06 with SMA students when present in cross-level schedule',
+    crossR6Students.length === 36 &&
+      crossR6Students[0].fullName === 'ACHMAD DANI PRATAMA' &&
+      crossR6Students[35].fullName === 'WIDYA ASTUTI',
+    `Cross-level Ruang 06 population failed: count=${crossR6Students.length}`
   );
 
   // -------------------------------------------------------------

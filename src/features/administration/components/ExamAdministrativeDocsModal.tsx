@@ -72,38 +72,85 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   initialDocType = 'PROCTOR_ATTENDANCE',
   officialSignatoryOptions,
 }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('PREVIEW');
-  const [activeDocType, setActiveDocType] = useState<AdminDocType>(initialDocType);
-  const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
-  const [activeEditRoom, setActiveEditRoom] = useState<string>('Ruang 01');
-  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
-  const [includeNumberPrefix, setIncludeNumberPrefix] = useState<boolean>(true);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-
   const isSma = useMemo(() => {
-    return scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
-  }, [scheduleData.config.selectedClasses]);
+    return (
+      scheduleData.educationLevel === 'SMA' ||
+      scheduleData.config.educationLevel === 'SMA' ||
+      scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
+      false
+    );
+  }, [scheduleData]);
 
-  // Extract rooms: SMP strictly 5 rooms (Kelas 7, 8A, 8B, 9A, 9B), SMA strictly 3 rooms (Kelas 10, 11, 12)
+  // Extract rooms: SMP strictly 5 rooms (Kelas 7, 8A, 8B, 9A, 9B), SMA strictly Ruang 06 (or configured rooms)
   const availableRooms = useMemo(() => {
     const rSet = new Set<string>();
-    const minRooms = isSma ? 3 : 5;
-    const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms);
-    for (let i = 1; i <= targetRoomCount; i++) {
-      rSet.add(`Ruang ${String(i).padStart(2, '0')}`);
-    }
-    if (scheduleData.proctorSchedules) {
+
+    if (scheduleData.proctorSchedules && scheduleData.proctorSchedules.length > 0) {
       scheduleData.proctorSchedules.forEach((p) => {
         if (p.roomName) {
           rSet.add(ExamAdministrativeDocsService.canonicalRoomName(p.roomName));
         }
       });
     }
+
+    if (scheduleData.subjectSchedules && scheduleData.subjectSchedules.length > 0) {
+      scheduleData.subjectSchedules.forEach((s) => {
+        if (s.roomName) {
+          rSet.add(ExamAdministrativeDocsService.canonicalRoomName(s.roomName));
+        }
+      });
+    }
+
+    if (scheduleData.config.classRoomMapping) {
+      Object.values(scheduleData.config.classRoomMapping).forEach((r) => {
+        if (r) rSet.add(ExamAdministrativeDocsService.canonicalRoomName(r));
+      });
+    }
+
+    if (scheduleData.config.customRoomNumbers && scheduleData.config.customRoomNumbers.length > 0) {
+      scheduleData.config.customRoomNumbers.forEach((n) => {
+        rSet.add(`Ruang ${String(n).padStart(2, '0')}`);
+      });
+    }
+
+    if (isSma) {
+      if (rSet.size === 0) {
+        rSet.add('Ruang 06');
+      }
+    } else {
+      const minRooms = 5;
+      const targetRoomCount = Math.max(minRooms, scheduleData.config.totalRooms || minRooms);
+      for (let i = 1; i <= targetRoomCount; i++) {
+        rSet.add(`Ruang ${String(i).padStart(2, '0')}`);
+      }
+    }
+
     return Array.from(rSet).sort((a, b) => {
       const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
       const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
       return numA - numB;
     });
+  }, [scheduleData, isSma]);
+
+  const [viewMode, setViewMode] = useState<ViewMode>('PREVIEW');
+  const [activeDocType, setActiveDocType] = useState<AdminDocType>(initialDocType);
+  const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
+  const [activeEditRoom, setActiveEditRoom] = useState<string>(() => availableRooms[0] || 'Ruang 01');
+  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [includeNumberPrefix, setIncludeNumberPrefix] = useState<boolean>(true);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Synchronize activeEditRoom whenever availableRooms updates
+  useEffect(() => {
+    if (availableRooms.length > 0 && !availableRooms.includes(activeEditRoom)) {
+      setActiveEditRoom(availableRooms[0]);
+    }
+  }, [availableRooms, activeEditRoom]);
+
+  // Storage key scoped to education level and schedule to prevent cross-level roster overwrites
+  const storageKey = useMemo(() => {
+    const level = scheduleData.educationLevel || scheduleData.config.educationLevel || (isSma ? 'SMA' : 'SMP');
+    return `smart_absensi_exam_student_roster_${level}_${scheduleData.id || 'default'}`;
   }, [scheduleData, isSma]);
 
   // Custom Editable Roster state (persisted to localStorage)
@@ -116,7 +163,9 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   }>>>(() => {
     try {
       if (typeof localStorage !== 'undefined') {
-        const saved = localStorage.getItem('smart_absensi_exam_student_roster_custom');
+        const level = scheduleData.educationLevel || scheduleData.config.educationLevel || (isSma ? 'SMA' : 'SMP');
+        const key = `smart_absensi_exam_student_roster_${level}_${scheduleData.id || 'default'}`;
+        const saved = localStorage.getItem(key);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
@@ -134,12 +183,12 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   useEffect(() => {
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('smart_absensi_exam_student_roster_custom', JSON.stringify(customRosterMap));
+        localStorage.setItem(storageKey, JSON.stringify(customRosterMap));
       }
     } catch (e) {
       console.warn('Gagal menyimpan custom roster ke localStorage:', e);
     }
-  }, [customRosterMap]);
+  }, [customRosterMap, storageKey]);
 
   // Zero-Empty-Room Guarantee: ensure every room in availableRooms has populated students
   useEffect(() => {
@@ -243,9 +292,13 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       }
       const newGlobalIdx = totalBefore + roomList.length + 1;
       const roomIdx = availableRooms.indexOf(room);
-      const defaultClass = isSma
-        ? (roomIdx === 0 ? '10' : roomIdx === 1 ? '11' : '12')
-        : (roomIdx === 0 ? '7' : roomIdx === 1 ? '8A' : roomIdx === 2 ? '8B' : roomIdx === 3 ? '9A' : '9B');
+      const roomNum = parseInt(room.replace(/[^\d]/g, ''), 10);
+      const defaultClass =
+        roomNum === 6
+          ? '10'
+          : isSma
+          ? (roomIdx === 0 ? '10' : roomIdx === 1 ? '11' : '12')
+          : (roomIdx === 0 ? '7' : roomIdx === 1 ? '8A' : roomIdx === 2 ? '8B' : roomIdx === 3 ? '9A' : '9B');
 
       const newStudent = {
         urut: roomList.length + 1,
@@ -298,7 +351,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       });
       return newMap;
     });
-    showToast('Nomor peserta berhasil diurutkan berurutan (13-0820-001 dst.) dari Ruang 1 sampai Ruang 5!');
+    showToast('Nomor peserta berhasil diurutkan berurutan (13-0820-001 dst.) untuk seluruh ruangan!');
   };
 
   const handleResetRoom = (room: string) => {
@@ -311,15 +364,16 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   };
 
   const handleResetAllRooms = () => {
-    if (window.confirm('Reset seluruh daftar siswa di semua 5 ruangan ke data resmi awal? Perubahan kustom Anda akan dihapus.')) {
+    if (window.confirm(`Reset seluruh daftar siswa di semua ${availableRooms.length} ruangan ke data resmi awal? Perubahan kustom Anda akan dihapus.`)) {
       try {
         if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(storageKey);
           localStorage.removeItem('smart_absensi_exam_student_roster_custom');
         }
       } catch {}
       const defaultMap = ExamAdministrativeDocsService.resolveRoomStudents(scheduleData, { includeNumberPrefix: true });
       setCustomRosterMap(defaultMap);
-      showToast('Seluruh daftar siswa 5 ruangan berhasil di-reset ke data resmi default.');
+      showToast(`Seluruh daftar siswa ${availableRooms.length} ruangan berhasil di-reset ke data resmi default.`);
     }
   };
 
@@ -533,9 +587,13 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                 >
                   <option value="ALL">Semua Ruangan (1 - {availableRooms.length})</option>
                   {availableRooms.map((r, idx) => {
-                    const classLabel = isSma
-                      ? (idx === 0 ? 'Kelas 10' : idx === 1 ? 'Kelas 11' : idx === 2 ? 'Kelas 12' : '')
-                      : (idx === 0 ? 'Kelas 7' : idx === 1 ? 'Kelas 8A' : idx === 2 ? 'Kelas 8B' : idx === 3 ? 'Kelas 9A' : idx === 4 ? 'Kelas 9B' : '');
+                    const roomNum = parseInt(r.replace(/[^\d]/g, ''), 10);
+                    const classLabel =
+                      roomNum === 6
+                        ? 'Kelas 10, 11, 12'
+                        : isSma
+                        ? (idx === 0 ? 'Kelas 10' : idx === 1 ? 'Kelas 11' : idx === 2 ? 'Kelas 12' : '')
+                        : (idx === 0 ? 'Kelas 7' : idx === 1 ? 'Kelas 8A' : idx === 2 ? 'Kelas 8B' : idx === 3 ? 'Kelas 9A' : idx === 4 ? 'Kelas 9B' : '');
                     return (
                       <option key={r} value={r}>
                         {r} {classLabel ? `(${classLabel})` : ''}
@@ -661,9 +719,13 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                   Pilih Ruangan:
                 </span>
                 {availableRooms.map((r, idx) => {
-                  const classLabel = isSma
-                    ? (idx === 0 ? 'Kelas 10' : idx === 1 ? 'Kelas 11' : 'Kelas 12')
-                    : (idx === 0 ? 'Kelas 7' : idx === 1 ? 'Kelas 8A' : idx === 2 ? 'Kelas 8B' : idx === 3 ? 'Kelas 9A' : 'Kelas 9B');
+                  const roomNum = parseInt(r.replace(/[^\d]/g, ''), 10);
+                  const classLabel =
+                    roomNum === 6
+                      ? 'Kelas 10, 11, 12'
+                      : isSma
+                      ? (idx === 0 ? 'Kelas 10' : idx === 1 ? 'Kelas 11' : 'Kelas 12')
+                      : (idx === 0 ? 'Kelas 7' : idx === 1 ? 'Kelas 8A' : idx === 2 ? 'Kelas 8B' : idx === 3 ? 'Kelas 9A' : 'Kelas 9B');
                   const count = (customRosterMap[r] || []).length;
                   const isActive = activeEditRoom === r;
 
@@ -720,7 +782,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                   type="button"
                   onClick={handleRenumberAllSequentially}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                  title="Urutkan ulang nomor peserta 13-0820-001 dari siswa pertama Ruang 1 sampai Ruang 5"
+                  title="Urutkan ulang nomor peserta 13-0820-001 dari siswa pertama sampai ruangan terakhir"
                 >
                   <Hash className="w-3.5 h-3.5 text-sky-700" />
                   <span>Urutkan No. Peserta (13-0820-001 dst.)</span>
@@ -742,10 +804,10 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                   type="button"
                   onClick={handleResetAllRooms}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors cursor-pointer"
-                  title="Reset seluruh daftar siswa 5 ruangan ke data resmi default"
+                  title={`Reset seluruh daftar siswa ${availableRooms.length} ruangan ke data resmi default`}
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset Semua 5 Ruangan</span>
+                  <span>Reset Semua {availableRooms.length} Ruangan</span>
                 </button>
               </div>
             </div>
