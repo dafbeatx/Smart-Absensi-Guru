@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { StudentItem } from '../../../types/database.types';
 import { StudentRepository, STUDENTS_UPDATED_EVENT } from '../../../repositories/StudentRepository';
+import { formatClassDisplay } from '../../../utils/class.utils';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Modal } from '../../../components/ui/Modal';
@@ -410,15 +411,20 @@ export const StudentManagement: React.FC = () => {
   const handleDeleteStudent = async () => {
     if (!deleteTarget) return;
     const targetId = deleteTarget.id;
+    const targetClass = deleteTarget.className;
+    const targetName = deleteTarget.fullName;
     setIsSaving(true);
     try {
       setStudents((prev) => prev.filter((s) => s.id !== targetId));
       setDeleteTarget(null);
 
-      const ok = await StudentRepository.deleteStudent(targetId);
+      const ok = await StudentRepository.deleteStudent(targetId, undefined, {
+        className: targetClass,
+        fullName: targetName,
+      });
       if (!ok) throw new Error('Gagal menghapus data siswa di server');
       SoundService.playSuccess();
-      showToast('success', 'Berhasil Dihapus', `Data siswa "${deleteTarget.fullName}" berhasil dihapus`);
+      showToast('success', 'Berhasil Dihapus', `Data siswa "${targetName}" berhasil dihapus`);
       await loadData(true);
     } catch (err: any) {
       console.error('Delete student error:', err);
@@ -776,7 +782,7 @@ export const StudentManagement: React.FC = () => {
                       {/* Kelas */}
                       <td className="py-3 px-4">
                         <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200/70 whitespace-nowrap">
-                          Kelas {std.className}
+                          {formatClassDisplay(std.className)}
                         </span>
                       </td>
 
@@ -885,7 +891,7 @@ export const StudentManagement: React.FC = () => {
                       </div>
                     </div>
                     <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200/70 shrink-0">
-                      Kelas {std.className}
+                      {formatClassDisplay(std.className)}
                     </span>
                   </div>
 

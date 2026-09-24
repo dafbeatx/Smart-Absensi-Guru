@@ -150,7 +150,7 @@ export interface IDataProvider {
   saveStudents(students: StudentItem[], token?: string): Promise<boolean>;
   createStudent(student: Omit<StudentItem, 'id' | 'created_at'>, token?: string): Promise<StudentItem>;
   updateStudent(id: string, updates: Partial<StudentItem>, token?: string): Promise<boolean>;
-  deleteStudent(id: string, token?: string): Promise<boolean>;
+  deleteStudent(id: string, token?: string, studentInfo?: { className?: string; fullName?: string }): Promise<boolean>;
   syncStudentsFromGradeMaster(academicYear?: string, token?: string): Promise<{ syncedCount: number; classesCount: number }>;
   recordStudentRfidAttendance(rfidUid: string, subject?: string, token?: string): Promise<{
     success: boolean;

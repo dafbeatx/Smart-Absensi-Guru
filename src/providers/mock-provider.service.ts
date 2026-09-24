@@ -63,6 +63,14 @@ import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
 import { NotificationService } from '../services/notification-permission.service';
 import { getTodayDateInJakarta, getCurrentTimeInJakarta, timeToMinutes, generatePaydayEventsForYear } from '../utils/time.utils';
+import { normalizeClassCode } from '../utils/class.utils';
+import {
+  getStudentNaturalKey,
+  getDeletedStudentKeys,
+  recordDeletedStudentKey,
+  removeDeletedStudentKey,
+  deduplicateStudents,
+} from '../utils/student-dedup.utils';
 import {
   normalizeDayOfWeek,
   getDayNameIndonesian,
@@ -2144,7 +2152,7 @@ export class MockProvider implements IDataProvider {
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? deduplicateStudents(parsed) : [];
     } catch {
       return [];
     }
@@ -2154,7 +2162,8 @@ export class MockProvider implements IDataProvider {
     students: StudentItem[],
     _token?: string
   ): Promise<boolean> {
-    safeSetStorage('smart_absensi_students', JSON.stringify(students));
+    const deduped = deduplicateStudents(students);
+    safeSetStorage('smart_absensi_students', JSON.stringify(deduped));
     return true;
   }
 
@@ -2162,10 +2171,18 @@ export class MockProvider implements IDataProvider {
     student: Omit<StudentItem, 'id' | 'created_at'>,
     token?: string
   ): Promise<StudentItem> {
+    removeDeletedStudentKey(student.className, student.fullName);
     const list = await this.getStudents(token);
+    const cleanClass = normalizeClassCode(student.className) || student.className;
+    const cleanName = student.fullName.trim().replace(/\s+/g, ' ');
+    const safeHash = Math.abs(
+      cleanName.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)
+    ).toString(36);
     const newStudent: StudentItem = {
       ...student,
-      id: `std_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      className: cleanClass,
+      fullName: cleanName,
+      id: `std_${cleanClass.toLowerCase()}_${Date.now()}_${safeHash}`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -2187,10 +2204,25 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
-  public async deleteStudent(id: string, token?: string): Promise<boolean> {
-    const list = await this.getStudents(token);
-    const filtered = list.filter((s) => s.id !== id);
-    if (filtered.length === list.length) return false;
+  public async deleteStudent(
+    id: string,
+    token?: string,
+    studentInfo?: { className?: string; fullName?: string }
+  ): Promise<boolean> {
+    const raw = safeGetStorage('smart_absensi_students');
+    let rawList: StudentItem[] = [];
+    try {
+      rawList = raw ? JSON.parse(raw) : [];
+    } catch {
+      rawList = [];
+    }
+    const target = rawList.find((s) => s.id === id);
+    const targetClass = studentInfo?.className || target?.className;
+    const targetName = studentInfo?.fullName || target?.fullName;
+    if (targetClass && targetName) {
+      recordDeletedStudentKey(targetClass, targetName);
+    }
+    const filtered = rawList.filter((s) => s.id !== id);
     await this.saveStudents(filtered, token);
     return true;
   }
@@ -2242,33 +2274,71 @@ export class MockProvider implements IDataProvider {
       { name: 'NYIMAS RANI RAHMAWATI', class: 'SMA' },
     ];
 
+    const deletedKeys = getDeletedStudentKeys();
     const currentList = await this.getStudents(token);
-    const existingRfid = new Map<string, string>();
+
+    // Map existing students by natural key
+    const existingMap = new Map<string, StudentItem>();
     currentList.forEach((s) => {
-      if (s.rfidUid) existingRfid.set(`${s.className}|||${s.fullName}`, s.rfidUid);
+      const key = getStudentNaturalKey(s.className, s.fullName);
+      if (!deletedKeys.has(key)) {
+        existingMap.set(key, s);
+      }
     });
 
-    const synced: StudentItem[] = defaultRoster.map((item, idx) => {
-      const key = `${item.class}|||${item.name}`;
-      return {
-        id: `std_mock_${item.class.toLowerCase()}_${String(idx + 1).padStart(3, '0')}`,
-        nisn: '',
+    // Build merged roster without duplicates and without deleted students
+    const rosterMap = new Map<string, { name: string; class: string }>();
+    defaultRoster.forEach((item) => {
+      const normClass = normalizeClassCode(item.class);
+      const normName = item.name.trim().replace(/\s+/g, ' ').toUpperCase();
+      const key = `${normClass}|||${normName}`;
+      if (!deletedKeys.has(key)) {
+        rosterMap.set(key, { name: normName, class: normClass });
+      }
+    });
+
+    const synced: StudentItem[] = [];
+
+    // 1. Process all students from roster
+    for (const [key, item] of rosterMap.entries()) {
+      const existing = existingMap.get(key);
+      const safeHash = Math.abs(
+        item.name.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)
+      ).toString(36);
+      const deterministicId = `std_mock_${item.class.toLowerCase()}_${safeHash}`;
+
+      synced.push({
+        id: existing?.id || deterministicId,
+        nisn: existing?.nisn || '',
         fullName: item.name,
         className: item.class,
         academicYear,
-        gender: item.class === '8A' || item.class === '9A' ? 'P' : 'L',
-        rfidUid: existingRfid.get(key) || undefined,
-        cardStatus: 'ACTIVE',
-        attendanceRate: 100,
-        created_at: new Date().toISOString(),
+        gender: existing?.gender || (item.class === '8A' || item.class === '9A' ? 'P' : 'L'),
+        rfidUid: existing?.rfidUid || undefined,
+        cardStatus: existing?.cardStatus || 'ACTIVE',
+        attendanceRate: existing?.attendanceRate ?? 100,
+        address: existing?.address,
+        notes: existing?.notes,
+        created_at: existing?.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      };
-    });
+      });
+      existingMap.delete(key);
+    }
 
-    await this.saveStudents(synced, token);
-    const classes = new Set(synced.map((s) => s.className));
+    // 2. Also preserve any existing students not in default roster (e.g. manually added students)
+    for (const remaining of existingMap.values()) {
+      const key = getStudentNaturalKey(remaining.className, remaining.fullName);
+      if (!deletedKeys.has(key)) {
+        synced.push(remaining);
+      }
+    }
+
+    const dedupedSynced = deduplicateStudents(synced, deletedKeys);
+
+    await this.saveStudents(dedupedSynced, token);
+    const classes = new Set(dedupedSynced.map((s) => s.className));
     return {
-      syncedCount: synced.length,
+      syncedCount: dedupedSynced.length,
       classesCount: classes.size,
     };
   }

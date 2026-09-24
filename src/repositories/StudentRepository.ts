@@ -2,6 +2,25 @@ import { ProviderFactory } from '../providers/provider-factory';
 import type { StudentItem } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
 import { areClassCodesEqual, normalizeClassCode } from '../utils/class.utils';
+import {
+  DELETED_STUDENTS_STORAGE_KEY,
+  getStudentNaturalKey,
+  getDeletedStudentKeys,
+  recordDeletedStudentKey,
+  removeDeletedStudentKey,
+  clearDeletedStudentKeys,
+  deduplicateStudents,
+} from '../utils/student-dedup.utils';
+
+export {
+  DELETED_STUDENTS_STORAGE_KEY,
+  getStudentNaturalKey,
+  getDeletedStudentKeys,
+  recordDeletedStudentKey,
+  removeDeletedStudentKey,
+  clearDeletedStudentKeys,
+  deduplicateStudents,
+};
 
 export const STUDENTS_STORAGE_KEY = 'smart_absensi_students';
 export const STUDENTS_UPDATED_EVENT = 'smart_absensi_students_updated';
@@ -51,14 +70,17 @@ export const clearExamRosterCaches = (): void => {
 export class StudentRepository {
   /**
    * Retrieves all students from the active provider with local caching & fallback.
+   * Enforces deduplication and filters out deleted students.
    */
   public static async getStudents(token?: string): Promise<StudentItem[]> {
+    const deletedKeys = getDeletedStudentKeys();
     try {
       const provider = ProviderFactory.getProvider();
       const students = await provider.getStudents(token);
       if (Array.isArray(students)) {
-        safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(students));
-        return students;
+        const cleaned = deduplicateStudents(students, deletedKeys);
+        safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
+        return cleaned;
       }
     } catch (err) {
       logger.warn('StudentRepository', 'Failed to fetch students from provider, using fallback:', err);
@@ -69,7 +91,9 @@ export class StudentRepository {
       const saved = safeGetStorage(STUDENTS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return deduplicateStudents(parsed, deletedKeys);
+        }
       }
     } catch (err) {
       logger.error('StudentRepository', 'Failed to parse cached students:', err);
@@ -207,20 +231,23 @@ export class StudentRepository {
    */
   public static async saveStudents(students: StudentItem[], token?: string): Promise<boolean> {
     try {
+      const deletedKeys = getDeletedStudentKeys();
+      const cleaned = deduplicateStudents(students, deletedKeys);
+
       // 1. Save to local storage for instant responsiveness
-      safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(students));
+      safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
       clearExamRosterCaches();
 
       // 2. Dispatch cross-tab / window sync event
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
-          new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: students })
+          new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: cleaned })
         );
       }
 
       // 3. Persist to active cloud provider
       const provider = ProviderFactory.getProvider();
-      await provider.saveStudents(students, token);
+      await provider.saveStudents(cleaned, token);
       return true;
     } catch (err) {
       logger.error('StudentRepository', 'Failed to save students:', err);
@@ -236,16 +263,20 @@ export class StudentRepository {
     token?: string
   ): Promise<StudentItem> {
     clearExamRosterCaches();
+    // Un-tombstone if re-adding a previously deleted student
+    removeDeletedStudentKey(student.className, student.fullName);
+
     const provider = ProviderFactory.getProvider();
     const created = await provider.createStudent(student, token);
 
     try {
       const freshList = await provider.getStudents(token);
       if (Array.isArray(freshList) && freshList.length > 0) {
-        safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(freshList));
+        const cleaned = deduplicateStudents(freshList);
+        safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
-            new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: freshList })
+            new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: cleaned })
           );
         }
         return created;
@@ -258,7 +289,8 @@ export class StudentRepository {
     const existing = await this.getStudents(token);
     if (!existing.some((s) => s.id === created.id)) {
       existing.unshift(created);
-      safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(existing));
+      const cleaned = deduplicateStudents(existing);
+      safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
     }
 
     if (typeof window !== 'undefined') {
@@ -286,11 +318,12 @@ export class StudentRepository {
       try {
         const freshList = await provider.getStudents(token);
         if (Array.isArray(freshList) && freshList.length > 0) {
-          safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(freshList));
+          const cleaned = deduplicateStudents(freshList);
+          safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
           clearExamRosterCaches();
           if (typeof window !== 'undefined') {
             window.dispatchEvent(
-              new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: freshList })
+              new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: cleaned })
             );
           }
           return true;
@@ -303,11 +336,12 @@ export class StudentRepository {
       const idx = existing.findIndex((s) => s.id === id);
       if (idx !== -1) {
         existing[idx] = { ...existing[idx], ...updates };
-        safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(existing));
+        const cleaned = deduplicateStudents(existing);
+        safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
         clearExamRosterCaches();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
-            new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: existing })
+            new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: cleaned })
           );
         }
       }
@@ -318,21 +352,52 @@ export class StudentRepository {
 
   /**
    * Deletes a student record by ID.
+   * Registers a persistent tombstone so GradeMaster sync never resurrects this student.
    */
-  public static async deleteStudent(id: string, token?: string): Promise<boolean> {
+  public static async deleteStudent(
+    id: string,
+    token?: string,
+    studentInfo?: { className?: string; fullName?: string }
+  ): Promise<boolean> {
     clearExamRosterCaches();
+
+    // 1. Identify target student info to register tombstone
+    let targetClass = studentInfo?.className;
+    let targetName = studentInfo?.fullName;
+
+    if (!targetClass || !targetName) {
+      try {
+        const existing = await this.getStudents(token);
+        const match = existing.find((s) => s.id === id);
+        if (match) {
+          targetClass = match.className;
+          targetName = match.fullName;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (targetClass && targetName) {
+      recordDeletedStudentKey(targetClass, targetName);
+    }
+
     const provider = ProviderFactory.getProvider();
-    const success = await provider.deleteStudent(id, token);
+    const success = await provider.deleteStudent(id, token, {
+      className: targetClass,
+      fullName: targetName,
+    });
 
     if (success) {
       try {
         const freshList = await provider.getStudents(token);
         if (Array.isArray(freshList)) {
-          safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(freshList));
+          const cleaned = deduplicateStudents(freshList);
+          safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
           clearExamRosterCaches();
           if (typeof window !== 'undefined') {
             window.dispatchEvent(
-              new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: freshList })
+              new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: cleaned })
             );
           }
           return true;
@@ -343,11 +408,12 @@ export class StudentRepository {
 
       const existing = await this.getStudents(token);
       const filtered = existing.filter((s) => s.id !== id);
-      safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(filtered));
+      const cleaned = deduplicateStudents(filtered);
+      safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
       clearExamRosterCaches();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
-          new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: filtered })
+          new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: cleaned })
         );
       }
     }
@@ -399,6 +465,7 @@ export class StudentRepository {
 
   /**
    * Synchronizes active students directly from GradeMaster (Year 2026/2027).
+   * Enforces zero duplicate names and guarantees deleted students stay deleted.
    */
   public static async syncFromGradeMaster(
     academicYear = '2026/2027',
@@ -406,16 +473,20 @@ export class StudentRepository {
   ): Promise<{ syncedCount: number; classesCount: number }> {
     clearExamRosterCaches();
     const provider = ProviderFactory.getProvider();
-    const result = await provider.syncStudentsFromGradeMaster(academicYear, token);
+    await provider.syncStudentsFromGradeMaster(academicYear, token);
     const updated = await provider.getStudents(token);
-    safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(updated));
+    const cleaned = deduplicateStudents(updated);
+    safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(cleaned));
     clearExamRosterCaches();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
-        new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: updated })
+        new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: cleaned })
       );
     }
-    return result;
+    return {
+      syncedCount: cleaned.length,
+      classesCount: new Set(cleaned.map((s) => normalizeClassCode(s.className))).size,
+    };
   }
 
   /**

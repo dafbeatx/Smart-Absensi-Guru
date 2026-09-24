@@ -85,6 +85,13 @@ import {
 } from '../utils/teaching-schedule.utils';
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
+import {
+  getStudentNaturalKey,
+  getDeletedStudentKeys,
+  recordDeletedStudentKey,
+  removeDeletedStudentKey,
+  deduplicateStudents,
+} from '../utils/student-dedup.utils';
 import { getInitialSeedTeacherPointLogs, getSafeInitialTeacherPointLogs } from '../utils/teacher-point-seed.utils';
 import { resolveBehaviorLogType } from '../utils/student-behavior.utils';
 
@@ -3809,19 +3816,80 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   // ── STUDENT DIRECTORY & RFID ATTENDANCE API ──────────────────────────────
+
+  private async getDeletedStudentCloudTombstones(): Promise<Set<string>> {
+    const result = new Set<string>();
+    try {
+      const { data } = await this.client
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'deleted_student_keys')
+        .maybeSingle();
+      if (data?.value) {
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        if (Array.isArray(parsed)) {
+          parsed.forEach((k: string) => result.add(String(k)));
+        }
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Failed to fetch deleted_student_keys from system_settings:', err);
+    }
+    // Also include local storage tombstones for multi-layer redundancy
+    try {
+      const localKeys = getDeletedStudentKeys();
+      localKeys.forEach((k) => result.add(k));
+    } catch {
+      // ignore
+    }
+    return result;
+  }
+
+  private async addDeletedStudentCloudTombstone(naturalKey: string): Promise<void> {
+    try {
+      recordDeletedStudentKey(naturalKey.split('|||')[0], naturalKey.split('|||')[1]);
+      const set = await this.getDeletedStudentCloudTombstones();
+      set.add(naturalKey);
+      await this.client.from('system_settings').upsert({
+        key: 'deleted_student_keys',
+        value: JSON.stringify(Array.from(set)),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Failed to persist deleted student tombstone to system_settings:', err);
+    }
+  }
+
+  private async removeDeletedStudentCloudTombstone(naturalKey: string): Promise<void> {
+    try {
+      removeDeletedStudentKey(naturalKey.split('|||')[0], naturalKey.split('|||')[1]);
+      const set = await this.getDeletedStudentCloudTombstones();
+      if (set.delete(naturalKey)) {
+        await this.client.from('system_settings').upsert({
+          key: 'deleted_student_keys',
+          value: JSON.stringify(Array.from(set)),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Failed to remove deleted student tombstone from system_settings:', err);
+    }
+  }
+
   public async getStudents(_token?: string): Promise<StudentItem[]> {
     return this.dedupeRequest('getStudents', async () => {
       try {
+        const deletedKeys = await this.getDeletedStudentCloudTombstones();
+
         // 1. Try fetching from public.students (safe columns without last_tap_at which may not exist yet)
         const { data, error } = await this.client
           .from('students')
           .select('id, nisn, full_name, class_name, academic_year, gender, rfid_uid, card_status, attendance_rate, address, notes, created_at, updated_at')
           .order('class_name', { ascending: true })
           .order('full_name', { ascending: true })
-          .limit(200);
+          .limit(1000);
 
         if (!error && data && data.length > 0) {
-          return (data as any[]).map((row) => ({
+          const rawStudents: StudentItem[] = (data as any[]).map((row) => ({
             id: row.id,
             nisn: row.nisn || '',
             fullName: row.full_name,
@@ -3837,6 +3905,9 @@ export class SupabaseProvider implements IDataProvider {
             created_at: row.created_at,
             updated_at: row.updated_at,
           }));
+
+          const cleanList = deduplicateStudents(rawStudents, deletedKeys);
+          return cleanList;
         }
 
       // 2. If table doesn't exist yet or is empty, auto-read from gm_behaviors (Active Academic Year 2026/2027)
@@ -3850,8 +3921,9 @@ export class SupabaseProvider implements IDataProvider {
         activeBehaviors.forEach((b: any) => {
           if (!b.student_name || !b.class_name) return;
           const cleanName = b.student_name.trim().toUpperCase();
-          const cleanClass = b.class_name.trim().toUpperCase();
+          const cleanClass = normalizeClassCode(b.class_name);
           const key = `${cleanClass}|||${cleanName}`;
+          if (deletedKeys.has(key)) return;
           if (!uniqueMap.has(key)) {
             const hashId = `std_${cleanClass.toLowerCase()}_${Math.abs(
               cleanName.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0)
@@ -3871,7 +3943,7 @@ export class SupabaseProvider implements IDataProvider {
           }
         });
 
-        const activeList = Array.from(uniqueMap.values()).sort((a, b) =>
+        const activeList = deduplicateStudents(Array.from(uniqueMap.values()), deletedKeys).sort((a, b) =>
           a.className.localeCompare(b.className) || a.fullName.localeCompare(b.fullName)
         );
 
@@ -3896,11 +3968,14 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<boolean> {
     try {
-      const dbRows = students.map((s) => ({
-        id: s.id || `std_${s.className.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      const deletedKeys = await this.getDeletedStudentCloudTombstones();
+      const dedupedList = deduplicateStudents(students, deletedKeys);
+
+      const dbRows = dedupedList.map((s) => ({
+        id: s.id || `std_${(normalizeClassCode(s.className) || 'all').toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         nisn: s.nisn ? s.nisn.trim() : null,
-        full_name: s.fullName.trim(),
-        class_name: s.className.trim(),
+        full_name: s.fullName.trim().replace(/\s+/g, ' ').toUpperCase(),
+        class_name: normalizeClassCode(s.className) || s.className.trim(),
         academic_year: s.academicYear || '2026/2027',
         gender: s.gender || 'L',
         rfid_uid: s.rfidUid ? s.rfidUid.trim().toUpperCase() : null,
@@ -3932,13 +4007,22 @@ export class SupabaseProvider implements IDataProvider {
     student: Omit<StudentItem, 'id' | 'created_at'>,
     token?: string
   ): Promise<StudentItem> {
-    const generatedId = `std_${(student.className || 'all').toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const cleanClass = normalizeClassCode(student.className) || student.className.trim();
+    const cleanName = student.fullName.trim().replace(/\s+/g, ' ');
+    const naturalKey = `${cleanClass}|||${cleanName.toUpperCase()}`;
+    await this.removeDeletedStudentCloudTombstone(naturalKey);
+
+    const safeHash = Math.abs(
+      cleanName.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)
+    ).toString(36);
+    const generatedId = `std_${cleanClass.toLowerCase()}_${Date.now()}_${safeHash}`;
+
     try {
       const rowPayload = {
         id: generatedId,
         nisn: student.nisn ? student.nisn.trim() : null,
-        full_name: student.fullName.trim(),
-        class_name: student.className.trim(),
+        full_name: cleanName,
+        class_name: cleanClass,
         academic_year: student.academicYear || '2026/2027',
         gender: student.gender || 'L',
         rfid_uid: student.rfidUid ? student.rfidUid.trim().toUpperCase() : null,
@@ -4065,9 +4149,28 @@ export class SupabaseProvider implements IDataProvider {
     return dbSuccess || true;
   }
 
-  public async deleteStudent(id: string, token?: string): Promise<boolean> {
+  public async deleteStudent(
+    id: string,
+    token?: string,
+    studentInfo?: { className?: string; fullName?: string }
+  ): Promise<boolean> {
     let dbSuccess = false;
+    let targetClass = studentInfo?.className;
+    let targetName = studentInfo?.fullName;
+
     try {
+      if (!targetClass || !targetName) {
+        const { data: stdRow } = await this.client
+          .from('students')
+          .select('class_name, full_name')
+          .eq('id', id)
+          .maybeSingle();
+        if (stdRow) {
+          targetClass = stdRow.class_name;
+          targetName = stdRow.full_name;
+        }
+      }
+
       const { error } = await this.client
         .from('students')
         .delete()
@@ -4078,12 +4181,17 @@ export class SupabaseProvider implements IDataProvider {
       } else {
         logger.warn('SupabaseProvider', 'deleteStudent DB error:', error.message);
       }
+
+      if (targetClass && targetName) {
+        const naturalKey = getStudentNaturalKey(targetClass, targetName);
+        await this.addDeletedStudentCloudTombstone(naturalKey);
+      }
     } catch (err) {
       logger.warn('SupabaseProvider', 'deleteStudent DB exception:', err);
     }
 
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
-    await mockProv.deleteStudent(id, token);
+    await mockProv.deleteStudent(id, token, { className: targetClass, fullName: targetName });
 
     return dbSuccess || true;
   }
@@ -4093,7 +4201,10 @@ export class SupabaseProvider implements IDataProvider {
     _token?: string
   ): Promise<{ syncedCount: number; classesCount: number }> {
     try {
-      // Pull active 2026/2027 students from gm_behaviors
+      // 1. Load cloud and local tombstones
+      const deletedKeys = await this.getDeletedStudentCloudTombstones();
+
+      // 2. Pull active students from gm_behaviors
       const { data: behaviors, error: bErr } = await this.client
         .from('gm_behaviors')
         .select('student_name, class_name, academic_year')
@@ -4101,67 +4212,114 @@ export class SupabaseProvider implements IDataProvider {
 
       if (bErr) throw bErr;
 
-      // Also fetch gm_student_accounts for 2026/2027
+      // 3. Also fetch gm_student_accounts for academicYear
       const { data: accounts } = await this.client
         .from('gm_student_accounts')
         .select('student_name, class_name, academic_year')
         .eq('academic_year', academicYear);
 
-      // Merge and deduplicate
+      // 4. Merge and deduplicate raw entries
       const mergedMap = new Map<string, { fullName: string; className: string }>();
 
-      (behaviors || []).forEach((b: any) => {
-        if (!b.student_name || !b.class_name) return;
-        const cName = b.student_name.trim().toUpperCase();
-        const cClass = b.class_name.trim().toUpperCase();
-        mergedMap.set(`${cClass}|||${cName}`, { fullName: cName, className: cClass });
+      const processEntry = (rawName?: string, rawClass?: string) => {
+        if (!rawName || !rawClass) return;
+        const normName = rawName.trim().replace(/\s+/g, ' ').toUpperCase();
+        const normClass = normalizeClassCode(rawClass);
+        if (!normName || !normClass) return;
+
+        const naturalKey = `${normClass}|||${normName}`;
+        // If deleted by admin, SKIP IT! NEVER RESURRECT!
+        if (deletedKeys.has(naturalKey)) return;
+
+        if (!mergedMap.has(naturalKey)) {
+          mergedMap.set(naturalKey, { fullName: normName, className: normClass });
+        }
+      };
+
+      (behaviors || []).forEach((b: any) => processEntry(b.student_name, b.class_name));
+      (accounts || []).forEach((a: any) => processEntry(a.student_name, a.class_name));
+
+      // 5. Query existing students from students table to match IDs and find duplicates
+      const { data: existingRows } = await this.client
+        .from('students')
+        .select('id, nisn, full_name, class_name, academic_year, gender, rfid_uid, card_status, attendance_rate, address, notes, created_at, updated_at')
+        .limit(2000);
+
+      const existingByKey = new Map<string, any[]>();
+      const duplicateIdsToDelete: string[] = [];
+
+      (existingRows || []).forEach((row: any) => {
+        const normClass = normalizeClassCode(row.class_name);
+        const normName = (row.full_name || '').trim().replace(/\s+/g, ' ').toUpperCase();
+        const naturalKey = `${normClass}|||${normName}`;
+
+        // If this existing DB record belongs to a deleted student, clean it up!
+        if (deletedKeys.has(naturalKey)) {
+          duplicateIdsToDelete.push(row.id);
+          return;
+        }
+
+        const list = existingByKey.get(naturalKey) || [];
+        list.push(row);
+        existingByKey.set(naturalKey, list);
       });
 
-      (accounts || []).forEach((a: any) => {
-        if (!a.student_name || !a.class_name) return;
-        const cName = a.student_name.trim().toUpperCase();
-        const cClass = a.class_name.trim().toUpperCase();
-        const key = `${cClass}|||${cName}`;
-        if (!mergedMap.has(key)) {
-          mergedMap.set(key, { fullName: cName, className: cClass });
+      // For any key with multiple existing rows in DB, pick the primary and mark others for deletion
+      const primaryExistingMap = new Map<string, any>();
+      for (const [key, rows] of existingByKey.entries()) {
+        rows.sort((a, b) => {
+          if (a.rfid_uid && !b.rfid_uid) return -1;
+          if (!a.rfid_uid && b.rfid_uid) return 1;
+          if (a.nisn && !b.nisn) return -1;
+          if (!a.nisn && b.nisn) return 1;
+          return (a.created_at || '').localeCompare(b.created_at || '');
+        });
+        primaryExistingMap.set(key, rows[0]);
+        for (let i = 1; i < rows.length; i++) {
+          duplicateIdsToDelete.push(rows[i].id);
         }
-      });
+      }
 
-      const existingStudents = await this.getStudents();
-      const existingRfidByStudent = new Map<string, string>();
-      const existingGenderByStudent = new Map<string, 'L' | 'P'>();
-      existingStudents.forEach((s) => {
-        const studentKey = `${s.className.toUpperCase()}|||${s.fullName.toUpperCase()}`;
-        if (s.rfidUid) {
-          existingRfidByStudent.set(studentKey, s.rfidUid);
+      // 6. Delete duplicate / tombstoned rows from DB if any exist
+      if (duplicateIdsToDelete.length > 0) {
+        logger.info('SupabaseProvider', `Cleaning up ${duplicateIdsToDelete.length} duplicate/tombstoned student rows in DB`);
+        try {
+          await this.client.from('students').delete().in('id', duplicateIdsToDelete);
+        } catch (delErr) {
+          logger.warn('SupabaseProvider', 'Failed to batch delete duplicate student IDs:', delErr);
         }
-        if (s.gender) {
-          existingGenderByStudent.set(studentKey, s.gender);
-        }
-      });
+      }
 
-      const syncedList: StudentItem[] = Array.from(mergedMap.values()).map((item, idx) => {
-        const studentKey = `${item.className.toUpperCase()}|||${item.fullName.toUpperCase()}`;
-        const preservedRfid = existingRfidByStudent.get(studentKey);
-        const preservedGender = existingGenderByStudent.get(studentKey);
-        const isFemaleClass = item.className.toUpperCase() === '8A' || item.className.toUpperCase() === '9A';
-        const defaultGender: 'L' | 'P' = preservedGender || (isFemaleClass ? 'P' : 'L');
+      // 7. Construct syncedList
+      const syncedList: StudentItem[] = Array.from(mergedMap.entries()).map(([naturalKey, item]) => {
+        const existing = primaryExistingMap.get(naturalKey);
+        const isFemaleClass = item.className === '8A' || item.className === '9A';
+        const defaultGender: 'L' | 'P' = existing?.gender || (isFemaleClass ? 'P' : 'L');
+
+        // Deterministic stable ID if genuinely new
+        const safeHash = Math.abs(
+          item.fullName.split('').reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)
+        ).toString(36);
+        const deterministicId = `std_${item.className.toLowerCase()}_${safeHash}`;
+
         return {
-          id: `std_${item.className.toLowerCase()}_${String(idx + 1).padStart(3, '0')}`,
-          nisn: '',
+          id: existing?.id || deterministicId,
+          nisn: existing?.nisn || '',
           fullName: item.fullName,
           className: item.className,
           academicYear: academicYear,
           gender: defaultGender,
-          rfidUid: preservedRfid || undefined,
-          cardStatus: 'ACTIVE',
-          attendanceRate: 100,
-          created_at: new Date().toISOString(),
+          rfidUid: existing?.rfid_uid || undefined,
+          cardStatus: existing?.card_status || 'ACTIVE',
+          attendanceRate: existing?.attendance_rate != null ? Number(existing.attendance_rate) : 100,
+          address: existing?.address || undefined,
+          notes: existing?.notes || undefined,
+          created_at: existing?.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
       });
 
-      // Save to students table
+      // 8. Save syncedList using saveStudents
       await this.saveStudents(syncedList);
 
       const uniqueClasses = new Set(syncedList.map((s) => s.className));
