@@ -47,6 +47,7 @@ import {
   type AdminDocType,
   type AdminDocOptions,
 } from '../../../services/exam-administrative-docs.service';
+import { STUDENTS_UPDATED_EVENT } from '../../../repositories/StudentRepository';
 
 interface ExamAdministrativeDocsModalProps {
   isOpen: boolean;
@@ -222,6 +223,42 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       });
     }
   }, [availableRooms, scheduleData, customRosterMap]);
+
+  // Sinkronisasi otomatis: ketika admin menambahkan/mengedit/menghapus siswa
+  // di Direktori Siswa & RFID, invalidasi cache roster admin lalu regenerasi
+  // dari resolveRoomStudents (yang membaca data siswa terbaru dari localStorage)
+  useEffect(() => {
+    const handleStudentsUpdated = () => {
+      // Hapus cache roster lama agar resolveRoomStudents membaca data siswa terbaru
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(storageKey);
+        }
+      } catch { /* ignore */ }
+
+      // Regenerasi roster dari data siswa terbaru
+      const freshMap = ExamAdministrativeDocsService.resolveRoomStudents(
+        scheduleData,
+        { includeNumberPrefix: true }
+      );
+      setCustomRosterMap(freshMap);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener(STUDENTS_UPDATED_EVENT, handleStudentsUpdated);
+      // Juga dengarkan event storage lintas tab/window
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === 'smart_absensi_students') {
+          handleStudentsUpdated();
+        }
+      };
+      window.addEventListener('storage', handleStorage);
+      return () => {
+        window.removeEventListener(STUDENTS_UPDATED_EVENT, handleStudentsUpdated);
+        window.removeEventListener('storage', handleStorage);
+      };
+    }
+  }, [scheduleData, storageKey]);
 
   // Options payload for generator and exports
   const docOptions: AdminDocOptions = useMemo(() => {
