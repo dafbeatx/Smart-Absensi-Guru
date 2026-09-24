@@ -1626,27 +1626,11 @@ export class ExamAdministrativeDocsService {
     const rowCount = Math.max(4, Math.ceil(totalStudents / 5));
 
     // Seating grid mapper (5 columns):
-    // Row 0: 0..4 (L -> R)
-    // Row 1: 9..5 (R -> L)
-    // Row 2: 10..14 (L -> R)
-    // Row 3: 15..19 (L -> R, student 16 is in Col 0!)
-    // Row 4: 24..20 (R -> L)
-    // Row 5: 25..29 (L -> R)
+    // Even rows (r = 0, 2, 4, 6...): Left -> Right (idx = r * 5 + c)
+    // Odd rows (r = 1, 3, 5, 7...): Right -> Left (idx = (r + 1) * 5 - 1 - c)
     const getStudentAt = (r: number, c: number): typeof students[0] | undefined => {
-      let idx: number;
-      if (r === 0) {
-        idx = c;
-      } else if (r === 1) {
-        idx = 9 - c;
-      } else if (r === 2) {
-        idx = 10 + c;
-      } else if (r === 3) {
-        idx = 15 + c;
-      } else if (r === 4) {
-        idx = 24 - c;
-      } else {
-        idx = 25 + c;
-      }
+      const isEvenRow = r % 2 === 0;
+      const idx = isEvenRow ? r * 5 + c : (r + 1) * 5 - 1 - c;
       return students[idx];
     };
 
@@ -2584,14 +2568,12 @@ export class ExamAdministrativeDocsService {
     const totalStudents = students.length;
     const rowCount = Math.max(4, Math.ceil(totalStudents / 5));
 
+    // Seating grid mapper (5 columns):
+    // Even rows (r = 0, 2, 4, 6...): Left -> Right (idx = r * 5 + c)
+    // Odd rows (r = 1, 3, 5, 7...): Right -> Left (idx = (r + 1) * 5 - 1 - c)
     const getStudentAt = (r: number, c: number): typeof students[0] | undefined => {
-      let idx: number;
-      if (r === 0) idx = c;
-      else if (r === 1) idx = 9 - c;
-      else if (r === 2) idx = 10 + c;
-      else if (r === 3) idx = 15 + c;
-      else if (r === 4) idx = 24 - c;
-      else idx = 25 + c;
+      const isEvenRow = r % 2 === 0;
+      const idx = isEvenRow ? r * 5 + c : (r + 1) * 5 - 1 - c;
       return students[idx];
     };
 

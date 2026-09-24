@@ -826,6 +826,49 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
     'exportToExcel SEATING_LAYOUT threw an error'
   );
 
+  // TEST 12b: Seating layout with 35 students (continuous snake, no repeating 30)
+  const sample35Students = Array.from({ length: 35 }, (_, i) => ({
+    urut: i + 1,
+    participantNumber: `13-0820-${String(i + 1).padStart(3, '0')}`,
+    fullName: `SISWA ${i + 1}`,
+    gender: i < 18 ? 'L' : 'P',
+    className: '7',
+  }));
+
+  const seatingHtml35 = ExamAdministrativeDocsService.generateSingleRoomSeatingLayoutHtml(
+    'Ruang 01',
+    sample35Students,
+    sampleScheduleData
+  );
+
+  // Check all numbers 001 to 035 exist exactly once
+  const matches030 = (seatingHtml35.match(/13 - 0820 - 030/g) || []).length;
+  const matches031 = (seatingHtml35.match(/13 - 0820 - 031/g) || []).length;
+  const matches035 = (seatingHtml35.match(/13 - 0820 - 035/g) || []).length;
+
+  assert(
+    '30. Seating layout with 35 students continues seamlessly after 30 to 31..35 without duplicating 30',
+    matches030 === 1 && matches031 === 1 && matches035 === 1,
+    `Seating layout 35 students failed count: 030 count=${matches030} (expected 1), 031 count=${matches031} (expected 1), 035 count=${matches035} (expected 1)`
+  );
+
+  const seatingWs35 = ExamAdministrativeDocsService.buildSeatingLayoutWorksheet(
+    'Ruang 01',
+    sample35Students,
+    sampleScheduleData
+  );
+
+  // In Row 6 (desk row 5, Excel currRow = 8 + 5*2 = 18): Col 1 (B, col index 1) is 030
+  // In Row 7 (desk row 6, Excel currRow = 8 + 6*2 = 20): Col 1 (B, col index 1) is 031
+  const cellR6C1 = seatingWs35['B19']?.v || seatingWs35['B18']?.v || '';
+  const cellR7C1 = seatingWs35['B21']?.v || seatingWs35['B20']?.v || '';
+
+  assert(
+    '31. Seating worksheet with 35 students places 030 and 031 in column 1 on consecutive desk rows',
+    cellR6C1.includes('030') && cellR7C1.includes('031'),
+    `Seating worksheet 35 students desk row 6/7 failed: R6C1='${cellR6C1}' (expected 030), R7C1='${cellR7C1}' (expected 031)`
+  );
+
   // Clean up any test files written by XLSX.writeFile during node execution if created
   try {
     const fs = await import('fs');
