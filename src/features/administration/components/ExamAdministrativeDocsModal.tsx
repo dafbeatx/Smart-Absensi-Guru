@@ -150,7 +150,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   // Storage key scoped to education level and schedule to prevent cross-level roster overwrites
   const storageKey = useMemo(() => {
     const level = scheduleData.educationLevel || scheduleData.config.educationLevel || (isSma ? 'SMA' : 'SMP');
-    return `smart_absensi_exam_student_roster_${level}_${scheduleData.id || 'default'}`;
+    return `smart_absensi_exam_student_roster_v2_${level}_${scheduleData.id || 'default'}`;
   }, [scheduleData, isSma]);
 
   // Custom Editable Roster state (persisted to localStorage)
@@ -164,12 +164,18 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     try {
       if (typeof localStorage !== 'undefined') {
         const level = scheduleData.educationLevel || scheduleData.config.educationLevel || (isSma ? 'SMA' : 'SMP');
-        const key = `smart_absensi_exam_student_roster_${level}_${scheduleData.id || 'default'}`;
+        const key = `smart_absensi_exam_student_roster_v2_${level}_${scheduleData.id || 'default'}`;
         const saved = localStorage.getItem(key);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-            return parsed;
+            // Check if any room has empty array or SMP Ruang 3 has outdated 8B
+            const isStaleSmpOrder = !isSma && (parsed['Ruang 03'] || parsed['Ruang 3'] || []).some(
+              (s: any) => s.className === '8B'
+            );
+            if (!isStaleSmpOrder) {
+              return parsed;
+            }
           }
         }
       }
@@ -298,7 +304,12 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
           ? '10'
           : isSma
           ? (roomIdx === 0 ? '10' : roomIdx === 1 ? '11' : '12')
-          : (roomIdx === 0 ? '7' : roomIdx === 1 ? '8A' : roomIdx === 2 ? '8B' : roomIdx === 3 ? '9A' : '9B');
+          : (roomNum === 1 || roomIdx === 0 ? '7'
+            : roomNum === 2 || roomIdx === 1 ? '8A'
+            : roomNum === 3 || roomIdx === 2 ? '9A'
+            : roomNum === 4 || roomIdx === 3 ? '9B'
+            : roomNum === 5 || roomIdx === 4 ? '8B'
+            : '7');
 
       const newStudent = {
         urut: roomList.length + 1,
@@ -368,6 +379,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       try {
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem(storageKey);
+          localStorage.removeItem(`smart_absensi_exam_student_roster_${isSma ? 'SMA' : 'SMP'}_${scheduleData.id || 'default'}`);
           localStorage.removeItem('smart_absensi_exam_student_roster_custom');
         }
       } catch {}
@@ -540,7 +552,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               }`}
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Review & Edit Siswa (SMP 5 Ruang)</span>
+              <span>Review & Edit Siswa ({isSma ? 'SMA Ruang 6' : 'SMP 5 Ruang'})</span>
             </button>
           </div>
 
@@ -593,7 +605,12 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                         ? 'Kelas 10, 11, 12'
                         : isSma
                         ? (idx === 0 ? 'Kelas 10' : idx === 1 ? 'Kelas 11' : idx === 2 ? 'Kelas 12' : '')
-                        : (idx === 0 ? 'Kelas 7' : idx === 1 ? 'Kelas 8A' : idx === 2 ? 'Kelas 8B' : idx === 3 ? 'Kelas 9A' : idx === 4 ? 'Kelas 9B' : '');
+                        : (roomNum === 1 || idx === 0 ? 'Kelas 7'
+                          : roomNum === 2 || idx === 1 ? 'Kelas 8A'
+                          : roomNum === 3 || idx === 2 ? 'Kelas 9A'
+                          : roomNum === 4 || idx === 3 ? 'Kelas 9B'
+                          : roomNum === 5 || idx === 4 ? 'Kelas 8B'
+                          : '');
                     return (
                       <option key={r} value={r}>
                         {r} {classLabel ? `(${classLabel})` : ''}
@@ -725,7 +742,12 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                       ? 'Kelas 10, 11, 12'
                       : isSma
                       ? (idx === 0 ? 'Kelas 10' : idx === 1 ? 'Kelas 11' : 'Kelas 12')
-                      : (idx === 0 ? 'Kelas 7' : idx === 1 ? 'Kelas 8A' : idx === 2 ? 'Kelas 8B' : idx === 3 ? 'Kelas 9A' : 'Kelas 9B');
+                      : (roomNum === 1 || idx === 0 ? 'Kelas 7'
+                        : roomNum === 2 || idx === 1 ? 'Kelas 8A'
+                        : roomNum === 3 || idx === 2 ? 'Kelas 9A'
+                        : roomNum === 4 || idx === 3 ? 'Kelas 9B'
+                        : roomNum === 5 || idx === 4 ? 'Kelas 8B'
+                        : '');
                   const count = (customRosterMap[r] || []).length;
                   const isActive = activeEditRoom === r;
 

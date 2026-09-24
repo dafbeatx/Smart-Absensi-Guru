@@ -776,26 +776,6 @@ export class ExamAdministrativeDocsService {
   ];
 
   public static readonly OFFICIAL_SMP_ROOM_3_STUDENTS = [
-    { fullName: 'ABILA YAZID RIZAQI', gender: 'L', className: '8B' },
-    { fullName: 'ADITYA PRATAMA', gender: 'L', className: '8B' },
-    { fullName: 'AKBAR AZHI MUGHNI', gender: 'L', className: '8B' },
-    { fullName: 'ANDIKA PRATAMA', gender: 'L', className: '8B' },
-    { fullName: 'BAGAS DWI CAHYO', gender: 'L', className: '8B' },
-    { fullName: 'DIMAS ANUGRAH', gender: 'L', className: '8B' },
-    { fullName: 'FAIRUZ PRASETIA', gender: 'L', className: '8B' },
-    { fullName: 'FARDHAN HANIF', gender: 'L', className: '8B' },
-    { fullName: 'FARIZ ABQORI MAULANA', gender: 'L', className: '8B' },
-    { fullName: 'FITRA RAMADHAN', gender: 'L', className: '8B' },
-    { fullName: 'GALIH RAKASIWI', gender: 'L', className: '8B' },
-    { fullName: 'IFHAM FATHAR MUBAROK', gender: 'L', className: '8B' },
-    { fullName: 'MARVHEL PUTRA IHSANUL ALIM', gender: 'L', className: '8B' },
-    { fullName: 'MUHAMAD IBNU ZIKRA', gender: 'L', className: '8B' },
-    { fullName: 'MUHAMAD RAKA ADITYA', gender: 'L', className: '8B' },
-    { fullName: 'ROMADONI', gender: 'L', className: '8B' },
-    { fullName: 'WILDAN KHOER BASUKI', gender: 'L', className: '8B' },
-  ];
-
-  public static readonly OFFICIAL_SMP_ROOM_4_STUDENTS = [
     { fullName: 'ALYA NUR AZIZAH', gender: 'P', className: '9A' },
     { fullName: 'ANISA RAHMAWATI', gender: 'P', className: '9A' },
     { fullName: 'AULIA RAHMADHANI', gender: 'P', className: '9A' },
@@ -814,7 +794,7 @@ export class ExamAdministrativeDocsService {
     { fullName: 'TIARA LESTARI', gender: 'P', className: '9A' },
   ];
 
-  public static readonly OFFICIAL_SMP_ROOM_5_STUDENTS = [
+  public static readonly OFFICIAL_SMP_ROOM_4_STUDENTS = [
     { fullName: 'ADITYA NUGRAHA', gender: 'L', className: '9B' },
     { fullName: 'ALDI MAULANA', gender: 'L', className: '9B' },
     { fullName: 'ARYA PUTRA PRATAMA', gender: 'L', className: '9B' },
@@ -830,6 +810,26 @@ export class ExamAdministrativeDocsService {
     { fullName: 'M. RIZKY MAULANA', gender: 'L', className: '9B' },
     { fullName: 'RENDI SETIAWAN', gender: 'L', className: '9B' },
     { fullName: 'YUSUF MAULANA', gender: 'L', className: '9B' },
+  ];
+
+  public static readonly OFFICIAL_SMP_ROOM_5_STUDENTS = [
+    { fullName: 'ABILA YAZID RIZAQI', gender: 'L', className: '8B' },
+    { fullName: 'ADITYA PRATAMA', gender: 'L', className: '8B' },
+    { fullName: 'AKBAR AZHI MUGHNI', gender: 'L', className: '8B' },
+    { fullName: 'ANDIKA PRATAMA', gender: 'L', className: '8B' },
+    { fullName: 'BAGAS DWI CAHYO', gender: 'L', className: '8B' },
+    { fullName: 'DIMAS ANUGRAH', gender: 'L', className: '8B' },
+    { fullName: 'FAIRUZ PRASETIA', gender: 'L', className: '8B' },
+    { fullName: 'FARDHAN HANIF', gender: 'L', className: '8B' },
+    { fullName: 'FARIZ ABQORI MAULANA', gender: 'L', className: '8B' },
+    { fullName: 'FITRA RAMADHAN', gender: 'L', className: '8B' },
+    { fullName: 'GALIH RAKASIWI', gender: 'L', className: '8B' },
+    { fullName: 'IFHAM FATHAR MUBAROK', gender: 'L', className: '8B' },
+    { fullName: 'MARVHEL PUTRA IHSANUL ALIM', gender: 'L', className: '8B' },
+    { fullName: 'MUHAMAD IBNU ZIKRA', gender: 'L', className: '8B' },
+    { fullName: 'MUHAMAD RAKA ADITYA', gender: 'L', className: '8B' },
+    { fullName: 'ROMADONI', gender: 'L', className: '8B' },
+    { fullName: 'WILDAN KHOER BASUKI', gender: 'L', className: '8B' },
   ];
 
   public static readonly OFFICIAL_SMA_ROOM_1_STUDENTS = [
@@ -1008,7 +1008,14 @@ export class ExamAdministrativeDocsService {
               participantNumber,
               fullName: (st.fullName || '').toUpperCase(),
               gender: st.gender || 'P',
-              className: st.className || (roomNum === 6 ? '10' : idx === 0 ? '7' : idx === 1 ? '8A' : idx === 2 ? '8B' : idx === 3 ? '9A' : '9B'),
+              className: st.className || (
+                roomNum === 6 ? '10' :
+                roomNum === 1 || idx === 0 ? '7' :
+                roomNum === 2 || idx === 1 ? '8A' :
+                roomNum === 3 || idx === 2 ? '9A' :
+                roomNum === 4 || idx === 3 ? '9B' :
+                roomNum === 5 || idx === 4 ? '8B' : '7'
+              ),
             };
           });
         } else {
@@ -1043,12 +1050,12 @@ export class ExamAdministrativeDocsService {
       return verifiedMap;
     }
 
-    // 2. Susun daftar siswa per ruangan - PER KELAS (BUKAN 16-16 PER RUANGAN)
+    // 2. Susun daftar siswa per ruangan - PER KELAS
     // Ruang 1: Kelas 7
     // Ruang 2: Kelas 8A
-    // Ruang 3: Kelas 8B
-    // Ruang 4: Kelas 9A
-    // Ruang 5: Kelas 9B
+    // Ruang 3: Kelas 9A
+    // Ruang 4: Kelas 9B
+    // Ruang 5: Kelas 8B
     // Ruang 6: Kelas 10, 11, 12 (SMA)
     const rawStudentMap: Record<string, Array<{ fullName: string; gender: string; className: string }>> = {};
     rooms.forEach((r) => { rawStudentMap[r] = []; });
@@ -1093,20 +1100,20 @@ export class ExamAdministrativeDocsService {
         return rooms[0] || 'Ruang 01';
       }
 
-      // 3. SMP mapping deterministik per kelas:
+      // 3. SMP mapping deterministik per kelas (sesuai nomor ruangan fisik):
       // Ruang 1 -> Kelas 7
       // Ruang 2 -> Kelas 8A
-      // Ruang 3 -> Kelas 8B
-      // Ruang 4 -> Kelas 9A
-      // Ruang 5 -> Kelas 9B
+      // Ruang 3 -> Kelas 9A
+      // Ruang 4 -> Kelas 9B
+      // Ruang 5 -> Kelas 8B
       const findRoomByNum = (n: number) => rooms.find((r) => parseInt(r.replace(/[^\d]/g, ''), 10) === n);
       if (/^8A|VIIIA/.test(clsNorm)) return findRoomByNum(2) || rooms[1] || 'Ruang 02';
-      if (/^8B|VIIIB/.test(clsNorm)) return findRoomByNum(3) || rooms[2] || 'Ruang 03';
-      if (/^9A|IXA/.test(clsNorm)) return findRoomByNum(4) || rooms[3] || 'Ruang 04';
-      if (/^9B|IXB/.test(clsNorm)) return findRoomByNum(5) || rooms[4] || 'Ruang 05';
+      if (/^8B|VIIIB/.test(clsNorm)) return findRoomByNum(5) || rooms[4] || 'Ruang 05';
+      if (/^9A|IXA/.test(clsNorm)) return findRoomByNum(3) || rooms[2] || 'Ruang 03';
+      if (/^9B|IXB/.test(clsNorm)) return findRoomByNum(4) || rooms[3] || 'Ruang 04';
       if (/^7|VII/.test(clsNorm)) return findRoomByNum(1) || rooms[0] || 'Ruang 01';
       if (/^8|VIII/.test(clsNorm)) return findRoomByNum(2) || rooms[1] || 'Ruang 02';
-      if (/^9|IX/.test(clsNorm)) return findRoomByNum(4) || rooms[3] || 'Ruang 04';
+      if (/^9|IX/.test(clsNorm)) return findRoomByNum(3) || rooms[2] || 'Ruang 03';
 
       return rooms[0] || 'Ruang 01';
     };
@@ -1157,7 +1164,14 @@ export class ExamAdministrativeDocsService {
           rawStudentMap[targetRoom].push({
             fullName: s.fullName || s.name || 'Siswa',
             gender: s.gender || (/8A|9A/i.test(s.className || '') ? 'P' : 'L'),
-            className: s.className || s.kelas || (targetRoom === rooms[0] ? '7' : '8A'),
+            className: s.className || s.kelas || (
+              targetRoom.includes('6') ? '10' :
+              targetRoom.includes('1') ? '7' :
+              targetRoom.includes('2') ? '8A' :
+              targetRoom.includes('3') ? '9A' :
+              targetRoom.includes('4') ? '9B' :
+              targetRoom.includes('5') ? '8B' : '7'
+            ),
           });
         }
       });
