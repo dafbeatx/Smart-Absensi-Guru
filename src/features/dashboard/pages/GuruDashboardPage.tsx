@@ -686,6 +686,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       case 'direktori_siswa':
         setIsStudentDirectoryModalOpen(true);
         break;
+      case 'homeroom_plan':
+        setIsHomeroomModalOpen(true);
+        break;
       case 'kalender':
         setIsEventsCalendarModalOpen(true);
         break;
@@ -4342,6 +4345,35 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </div>
                     <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
                       Siswa
+                    </span>
+                  </button>
+
+                  {/* Ruang Wali Kelas (Rencana Studi Kelas 9) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (effectiveUser) {
+                        WebTrafficService.recordFeatureVisit({
+                          user_id: effectiveUser.id,
+                          user_name: effectiveUser.full_name,
+                          user_npp: effectiveUser.nip,
+                          user_role: effectiveUser.role,
+                          feature_id: 'homeroom_plan',
+                        });
+                      }
+                      setIsHomeroomModalOpen(true);
+                    }}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    title="Ruang Wali Kelas: Rencana Studi Siswa"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-purple-700 to-indigo-900 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <GraduationCap className="w-6 h-6 stroke-[1.8] text-purple-200" />
+                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-purple-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                        Kls 9
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-purple-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Wali Kelas
                     </span>
                   </button>
 

@@ -11,7 +11,7 @@ interface StudentPlanDetailDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   studentId: string | null;
-  token: string;
+  token?: string;
   onPlanUpdated: () => void;
 }
 
@@ -34,21 +34,26 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
   const [verifyMode, setVerifyMode] = useState<'verified' | 'needs_revision'>('verified');
   const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
 
+  const effectiveToken =
+    token ||
+    (typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_token') : null) ||
+    'mock_token';
+
   useEffect(() => {
-    if (isOpen && studentId && token) {
+    if (isOpen && studentId) {
       loadDetail(studentId);
     } else {
       setDetail(null);
       setError(null);
       setActiveTab('CHOICES');
     }
-  }, [isOpen, studentId, token]);
+  }, [isOpen, studentId]);
 
   const loadDetail = async (id: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await HomeroomRepository.getStudentDetail(id, token);
+      const data = await HomeroomRepository.getStudentDetail(id, effectiveToken);
       setDetail(data);
     } catch (err: any) {
       setError(err?.message || 'Gagal memuat rincian rencana pendidikan lanjutan.');
@@ -63,7 +68,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
   };
 
   const handleConfirmVerification = async (dto: VerifyPlanDTO) => {
-    await HomeroomRepository.verifyPlan(dto, token);
+    await HomeroomRepository.verifyPlan(dto, effectiveToken);
     if (studentId) {
       await loadDetail(studentId);
     }
@@ -73,7 +78,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
   const handleDownloadDoc = async (documentId: string, filename: string) => {
     setDownloadingDocId(documentId);
     try {
-      const url = await HomeroomRepository.getDocumentUrl(documentId, token);
+      const url = await HomeroomRepository.getDocumentUrl(documentId, effectiveToken);
       if (typeof window !== 'undefined') {
         const a = document.createElement('a');
         a.href = url;

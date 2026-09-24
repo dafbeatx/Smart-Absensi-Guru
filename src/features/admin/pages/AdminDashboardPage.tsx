@@ -50,6 +50,8 @@ import { WebTrafficService } from '../../../services/web-traffic.service';
 import { AdministrationHubView } from '../../administration/components/AdministrationHubView';
 import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal';
 import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
+import { HomeroomModal } from '../../homeroom/components/HomeroomModal';
+import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -57,7 +59,7 @@ export interface AdminDashboardPageProps {
 }
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenScanner, onSwitchToGuruView }) => {
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const { showToast } = useToastStore();
 
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
@@ -65,6 +67,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
+  const [isHomeroomModalOpen, setIsHomeroomModalOpen] = useState(false);
+  const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [selectedCorrectionTeacher, setSelectedCorrectionTeacher] = useState<UserProfile | undefined>(undefined);
   const [selectedCorrectionDate, setSelectedCorrectionDate] = useState<string | undefined>(undefined);
@@ -708,6 +712,19 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                   setActiveTab('CALENDAR');
                 } else if (actionId === 'rekap') {
                   setActiveTab('ATTENDANCE_TRACKING');
+                } else if (actionId === 'homeroom_plan') {
+                  if (user) {
+                    WebTrafficService.recordFeatureVisit({
+                      user_id: user.id,
+                      user_name: user.full_name,
+                      user_npp: user.nip,
+                      user_role: user.role,
+                      feature_id: 'homeroom_plan',
+                    });
+                  }
+                  setIsHomeroomModalOpen(true);
+                } else if (actionId === 'materials') {
+                  setIsTeachingMaterialsModalOpen(true);
                 }
               }}
               onBackToDashboard={() => setActiveTab('DASHBOARD')}
@@ -1006,6 +1023,25 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         allRegisteredTeachers={teachers}
         allPointLogs={allTeacherPointLogs}
       />
+
+      {/* Modal Ruang Wali Kelas: Rencana Lanjutan Studi Siswa Kelas 9 */}
+      {user && (
+        <HomeroomModal
+          isOpen={isHomeroomModalOpen}
+          onClose={() => setIsHomeroomModalOpen(false)}
+          user={user}
+          token={token || ''}
+        />
+      )}
+
+      {/* Modal Modul & Bahan Ajar KBM */}
+      {user && (
+        <TeachingMaterialsModal
+          isOpen={isTeachingMaterialsModalOpen}
+          onClose={() => setIsTeachingMaterialsModalOpen(false)}
+          user={user}
+        />
+      )}
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
       <OfflineSyncIndicator />

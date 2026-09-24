@@ -12,8 +12,9 @@ import { Button } from '../../../components/ui/Button';
 interface HomeroomModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: UserProfile;
-  token: string;
+  user?: UserProfile | null;
+  token?: string;
+  defaultClassName?: string;
 }
 
 type FilterStatus = 'ALL' | PlanStatus;
@@ -23,7 +24,10 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
   onClose,
   user,
   token,
+  defaultClassName = '9A',
 }) => {
+  const isPrivileged = user?.role === 'ADMIN' || user?.role === 'OPERATOR' || user?.role === 'KEPSEK';
+  const [selectedClass, setSelectedClass] = useState<string>(defaultClassName);
   const [loading, setLoading] = useState(false);
   const [overview, setOverview] = useState<HomeroomOverview | null>(null);
   const [students, setStudents] = useState<HomeroomStudentItem[]>([]);
@@ -34,14 +38,18 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const loadData = useCallback(async () => {
-    if (!token) return;
+  const loadData = useCallback(async (cls?: string) => {
+    const effectiveToken =
+      token ||
+      (typeof window !== 'undefined' ? localStorage.getItem('smart_absensi_token') : null) ||
+      'mock_token';
+    const targetClass = cls || (isPrivileged ? selectedClass : undefined);
     setLoading(true);
     setError(null);
     try {
       const [overviewData, studentsData] = await Promise.all([
-        HomeroomRepository.getOverview(token),
-        HomeroomRepository.getStudents(token),
+        HomeroomRepository.getOverview(effectiveToken, targetClass),
+        HomeroomRepository.getStudents(effectiveToken, targetClass),
       ]);
       setOverview(overviewData);
       setStudents(studentsData);
@@ -50,10 +58,10 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, isPrivileged, selectedClass]);
 
   useEffect(() => {
-    if (isOpen && token) {
+    if (isOpen) {
       loadData();
     } else {
       setOverview(null);
@@ -62,7 +70,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
       setSearchQuery('');
       setStatusFilter('ALL');
     }
-  }, [isOpen, token, loadData]);
+  }, [isOpen, loadData]);
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
@@ -99,29 +107,60 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
     >
       <div className="bg-slate-50 w-full max-w-4xl h-[92vh] max-h-[840px] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
         {/* Modal Header */}
-        <div className="px-5 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="px-5 py-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xl shrink-0">
               🎓
             </div>
-            <div>
-              <h1 id="homeroom-modal-title" className="text-base font-bold text-slate-800 tracking-tight">
-                Ruang Wali Kelas: Rencana Studi Siswa
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5 font-medium">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 id="homeroom-modal-title" className="text-base font-bold text-slate-800 tracking-tight truncate">
+                  Ruang Wali Kelas: Rencana Studi Siswa
+                </h1>
+                {isPrivileged && (
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold bg-purple-100 text-purple-700 rounded-md border border-purple-200 shrink-0">
+                    Mode Admin
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
                 {overview
                   ? `Rombel ${overview.assignedClass} • Angkatan ${overview.targetGraduationYear} • ${overview.teacherName}`
-                  : `Wali Kelas: ${user.full_name}`}
+                  : `Wali Kelas: ${user?.full_name || 'Administrator'}`}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-            aria-label="Tutup Ruang Wali Kelas"
-          >
-            ✕
-          </button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {isPrivileged && (
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                {['9A', '9B'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setSelectedClass(c);
+                      loadData(c);
+                    }}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      selectedClass === c
+                        ? 'bg-white text-emerald-800 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Kelas {c}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              aria-label="Tutup Ruang Wali Kelas"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Modal Subheader: KPI Strip */}
@@ -224,8 +263,15 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
           )}
 
           {error && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 leading-relaxed text-center">
-              ⚠️ {error}
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 leading-relaxed text-center flex flex-col items-center gap-2">
+              <span>⚠️ {error}</span>
+              <button
+                type="button"
+                onClick={() => loadData()}
+                className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Coba Lagi
+              </button>
             </div>
           )}
 

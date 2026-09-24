@@ -156,6 +156,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     colorClass: 'from-blue-700 to-indigo-900',
   },
   {
+    id: 'homeroom_plan',
+    title: 'Ruang Wali Kelas',
+    category: 'Kesiswaan & Rombel',
+    description: 'Pemantauan dan verifikasi rencana studi siswa kelas 9',
+    icon: GraduationCap,
+    colorClass: 'from-purple-700 to-indigo-900',
+  },
+  {
     id: 'student_kiosk',
     title: 'Kiosk RFID',
     category: 'Kesiswaan & Rombel',
@@ -264,7 +272,7 @@ export const QUICK_ICON_STEPS: QuickIconStep[] = [
     id: 4,
     title: 'Kesiswaan & Rombel',
     category: 'Kesiswaan & Rombel',
-    itemIds: ['direktori_siswa', 'student_kiosk', 'student_good', 'student_discipline'], // 4 items
+    itemIds: ['direktori_siswa', 'homeroom_plan', 'student_kiosk', 'student_good', 'student_discipline'], // 5 items
   },
   {
     id: 5,
