@@ -27,6 +27,7 @@ import { normalizeClassCode } from '../utils/class.utils';
 export type AdminDocType =
   | 'PROCTOR_ATTENDANCE'
   | 'STUDENT_ATTENDANCE_ROSTER'
+  | 'SEATING_LAYOUT'
   | 'HANDOVER_DOCS'
   | 'STUDENT_ATTENDANCE_SUMMARY'
   | 'COMMITTEE_ATTENDANCE';
@@ -1577,6 +1578,224 @@ export class ExamAdministrativeDocsService {
   }
 
   // =========================================================================
+  // DOCUMENT: DENAH TEMPAT DUDUK PESERTA UJIAN (PER RUANGAN)
+  // Sesuai format fisik ASTS SMP Terpadu Al-Ittihadiyah / SMA Terpadu As Salaam
+  // A4 Landscape dengan 5 Kolom Meja Berurutan (Pola Zig-Zag / Snake)
+  // Label Front: Ruang 01, Papan Tulis, Pengawas I & Pengawas II
+  // Format No. Peserta: 13 - 0820 - 001
+  // =========================================================================
+
+  public static formatSeatingParticipantNumber(
+    rawNum?: string,
+    fallbackUrut?: number,
+    prefix: string = '13-0820-'
+  ): string {
+    const base = rawNum && rawNum.trim() !== ''
+      ? rawNum.trim()
+      : (fallbackUrut ? `${prefix}${String(fallbackUrut).padStart(3, '0')}` : '');
+    // Standardize: Ensure single spaces around every hyphen, e.g. "13 - 0820 - 001"
+    return base.replace(/\s*-\s*/g, ' - ').trim();
+  }
+
+  public static generateSingleRoomSeatingLayoutHtml(
+    roomName: string,
+    students: Array<{
+      urut: number;
+      participantNumber: string;
+      fullName: string;
+      gender: string;
+      className: string;
+    }>,
+    scheduleData: ExamScheduleData,
+    _options?: AdminDocOptions
+  ): string {
+    const config = scheduleData.config;
+    const academicYear = config.academicYear || '2025/2026';
+    const examType = config.examType || 'ASTS';
+    let examTitle = config.examTitle || `ASESMEN SUMATIF TENGAH SEMESTER (${examType})`;
+    if (!examTitle.includes('(') && !examTitle.includes(examType)) {
+      examTitle = `${examTitle} (${examType})`;
+    }
+
+    const roomNumMatch = roomName.match(/\d+/);
+    const roomNumStr = roomNumMatch ? String(parseInt(roomNumMatch[0], 10)).padStart(2, '0') : '';
+    const roomBadge = roomNumStr ? `RUANG ${roomNumStr}` : roomName.toUpperCase();
+
+    // Determine row count: at least 4 rows (as in photo with 16 students), or more if > 20 students
+    const totalStudents = students.length;
+    const rowCount = Math.max(4, Math.ceil(totalStudents / 5));
+
+    // Seating grid mapper (5 columns):
+    // Row 0: 0..4 (L -> R)
+    // Row 1: 9..5 (R -> L)
+    // Row 2: 10..14 (L -> R)
+    // Row 3: 15..19 (L -> R, student 16 is in Col 0!)
+    // Row 4: 24..20 (R -> L)
+    // Row 5: 25..29 (L -> R)
+    const getStudentAt = (r: number, c: number): typeof students[0] | undefined => {
+      let idx: number;
+      if (r === 0) {
+        idx = c;
+      } else if (r === 1) {
+        idx = 9 - c;
+      } else if (r === 2) {
+        idx = 10 + c;
+      } else if (r === 3) {
+        idx = 15 + c;
+      } else if (r === 4) {
+        idx = 24 - c;
+      } else {
+        idx = 25 + c;
+      }
+      return students[idx];
+    };
+
+    let deskRowsHtml = '';
+    for (let r = 0; r < rowCount; r++) {
+      let cellsHtml = '';
+      for (let c = 0; c < 5; c++) {
+        const st = getStudentAt(r, c);
+        if (st) {
+          const numFormatted = this.formatSeatingParticipantNumber(st.participantNumber, st.urut);
+          cellsHtml += `
+            <td style="width: 20%; border: 1.5pt solid #000000; padding: 10px 4px; text-align: center; font-size: 11pt; font-weight: bold; font-family: 'Times New Roman', serif; background-color: #ffffff; vertical-align: middle; height: 38px; white-space: nowrap;">
+              ${numFormatted}
+            </td>
+          `;
+        } else {
+          cellsHtml += `
+            <td style="width: 20%; border: none; padding: 10px 4px; text-align: center; height: 38px; background-color: transparent;"></td>
+          `;
+        }
+      }
+      deskRowsHtml += `
+        <tr>
+          ${cellsHtml}
+        </tr>
+      `;
+    }
+
+    return `
+      <div class="page-container seating-layout-page" style="width: 100%; max-width: 297mm; min-height: 200mm; margin: 0 auto; padding: 10mm 15mm; font-family: 'Times New Roman', serif; box-sizing: border-box;">
+        <!-- Header Section -->
+        <div class="doc-header" style="text-align: center; margin-bottom: 22px;">
+          <h1 style="font-size: 14pt; font-weight: bold; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+            DENAH TEMPAT DUDUK
+          </h1>
+          <h2 style="font-size: 12.5pt; font-weight: bold; margin: 0 0 4px 0; text-transform: uppercase;">
+            PESERTA ${examTitle}
+          </h2>
+          <div style="font-size: 11.5pt; font-weight: bold; text-transform: uppercase;">
+            TAHUN ${academicYear}
+          </div>
+        </div>
+
+        <!-- Seating Grid Table (Unified table for perfect alignment across Print, PDF, and Word) -->
+        <table style="width: 100%; border: none; border-collapse: separate; border-spacing: 14px 10px; margin-top: 5px;">
+          <colgroup>
+            <col style="width: 20%;">
+            <col style="width: 20%;">
+            <col style="width: 20%;">
+            <col style="width: 20%;">
+            <col style="width: 20%;">
+          </colgroup>
+
+          <!-- Top Row: Ruang Badge on Left, Papan Tulis in Center -->
+          <tr>
+            <td style="border: none; text-align: left; vertical-align: middle; padding: 0 4px;">
+              <span style="font-size: 20pt; font-weight: bold; letter-spacing: 1px; line-height: 1;">
+                ${roomBadge}
+              </span>
+            </td>
+            <td colspan="3" style="border: none; text-align: center; vertical-align: middle; padding: 0;">
+              <div style="display: inline-block; border: 1.5pt solid #000000; padding: 6px 36px; font-size: 11pt; font-weight: bold; letter-spacing: 1.5px; background-color: #ffffff; min-width: 180px; box-sizing: border-box;">
+                PAPAN TULIS
+              </div>
+            </td>
+            <td style="border: none; padding: 0;"></td>
+          </tr>
+
+          <!-- Spacer Row -->
+          <tr style="height: 6px;">
+            <td colspan="5" style="border: none; padding: 0;"></td>
+          </tr>
+
+          <!-- Proctors Row: Pengawas I above Column 1, Pengawas II above Column 5 -->
+          <tr>
+            <td style="border: 1.5pt solid #000000; padding: 6px 4px; text-align: center; font-size: 10.5pt; font-weight: bold; background-color: #ffffff; vertical-align: middle; height: 32px;">
+              PENGAWAS I
+            </td>
+            <td colspan="3" style="border: none; padding: 0;"></td>
+            <td style="border: 1.5pt solid #000000; padding: 6px 4px; text-align: center; font-size: 10.5pt; font-weight: bold; background-color: #ffffff; vertical-align: middle; height: 32px;">
+              PENGAWAS II
+            </td>
+          </tr>
+
+          <!-- Spacer Row before Desks -->
+          <tr style="height: 8px;">
+            <td colspan="5" style="border: none; padding: 0;"></td>
+          </tr>
+
+          <!-- Desk Rows -->
+          ${deskRowsHtml}
+        </table>
+      </div>
+    `;
+  }
+
+  public static generateSeatingLayoutHtml(
+    scheduleData: ExamScheduleData,
+    options?: AdminDocOptions
+  ): string {
+    const orientation = 'landscape';
+    const branding = getDynamicBranding();
+    const isSma =
+      scheduleData.educationLevel === 'SMA' ||
+      scheduleData.config.educationLevel === 'SMA' ||
+      scheduleData.config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
+      false;
+    const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
+
+    const roomStudentMap = this.resolveRoomStudents(scheduleData, options);
+    const rooms = Object.keys(roomStudentMap);
+
+    const selectedRoom = options?.roomFilter;
+    const roomsToRender =
+      selectedRoom && selectedRoom !== 'ALL'
+        ? rooms.filter((r) => this.canonicalRoomName(r).toLowerCase() === this.canonicalRoomName(selectedRoom).toLowerCase())
+        : rooms;
+
+    const sections = roomsToRender.map((r, idx) => {
+      const students = roomStudentMap[r] || [];
+      const roomHtml = this.generateSingleRoomSeatingLayoutHtml(r, students, scheduleData, {
+        ...options,
+        orientation,
+      });
+      const isLast = idx === roomsToRender.length - 1;
+      return `
+        ${roomHtml}
+        ${!isLast ? '<br clear="all" style="page-break-before: always; mso-break-type: section-break;" /><div class="page-break"></div>' : ''}
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html lang="id">
+      <head>
+        <meta charset="utf-8">
+        <title>Denah Tempat Duduk Peserta - ${institutionName}</title>
+        <style>
+          ${this.getOfficialDocumentStyles(orientation)}
+        </style>
+      </head>
+      <body>
+        ${sections}
+      </body>
+      </html>
+    `;
+  }
+
+  // =========================================================================
   // DOCUMENT 3: BERITA ACARA REKAPITULASI KEHADIRAN PESERTA UJIAN
   // =========================================================================
 
@@ -2221,6 +2440,222 @@ export class ExamAdministrativeDocsService {
   }
 
   /**
+   * Generates a fully-styled, pixel-perfect Excel worksheet for Denah Tempat Duduk Peserta Ujian (per room)
+   * matching physical school layouts (A4 Landscape, 5 desk columns, Papan Tulis, Pengawas I & II).
+   */
+  public static buildSeatingLayoutWorksheet(
+    roomName: string,
+    students: Array<{
+      urut: number;
+      participantNumber: string;
+      fullName: string;
+      gender: string;
+      className: string;
+    }>,
+    scheduleData: ExamScheduleData,
+    _options?: AdminDocOptions
+  ): any {
+    const config = scheduleData.config;
+    const academicYear = config.academicYear || '2025/2026';
+    const examType = config.examType || 'ASTS';
+    let examTitle = config.examTitle || `ASESMEN SUMATIF TENGAH SEMESTER (${examType})`;
+    if (!examTitle.includes('(') && !examTitle.includes(examType)) {
+      examTitle = `${examTitle} (${examType})`;
+    }
+
+    const roomNumMatch = roomName.match(/\d+/);
+    const roomNumStr = roomNumMatch ? String(parseInt(roomNumMatch[0], 10)).padStart(2, '0') : '';
+    const roomBadge = roomNumStr ? `RUANG ${roomNumStr}` : roomName.toUpperCase();
+
+    const ws: any = {};
+    const merges: any[] = [];
+    const rowHeights: { hpt: number }[] = [];
+
+    const BORDER_THIN = {
+      top: { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left: { style: 'thin', color: { rgb: '000000' } },
+      right: { style: 'thin', color: { rgb: '000000' } },
+    };
+
+    const STYLE_TITLE_1 = {
+      font: { name: 'Times New Roman', sz: 13, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+
+    const STYLE_TITLE_2 = {
+      font: { name: 'Times New Roman', sz: 12, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+
+    const STYLE_TITLE_3 = {
+      font: { name: 'Times New Roman', sz: 11, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+
+    const STYLE_RUANG = {
+      font: { name: 'Times New Roman', sz: 18, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+    };
+
+    const STYLE_PAPAN_TULIS = {
+      font: { name: 'Times New Roman', sz: 11, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: BORDER_THIN,
+    };
+
+    const STYLE_PENGAWAS = {
+      font: { name: 'Times New Roman', sz: 10.5, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: BORDER_THIN,
+    };
+
+    const STYLE_DESK = {
+      font: { name: 'Times New Roman', sz: 11, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: BORDER_THIN,
+    };
+
+    const setCell = (c: number, r: number, val: any, style?: any) => {
+      const ref = XLSX.utils.encode_cell({ c, r });
+      ws[ref] = { v: val ?? '', t: typeof val === 'number' ? 'n' : 's', s: style || {} };
+    };
+
+    const mergeRange = (sc: number, sr: number, ec: number, er: number, val?: any, style?: any) => {
+      merges.push({ s: { c: sc, r: sr }, e: { c: ec, r: er } });
+      for (let r = sr; r <= er; r++) {
+        for (let c = sc; c <= ec; c++) {
+          const ref = XLSX.utils.encode_cell({ c, r });
+          if (!ws[ref]) ws[ref] = { v: '', t: 's', s: style || {} };
+          else if (style) ws[ref].s = { ...ws[ref].s, ...style };
+        }
+      }
+      if (val !== undefined) setCell(sc, sr, val, style);
+    };
+
+    // Columns:
+    // Col 0 (A): Margin (wch: 3)
+    // Col 1-2 (B-C): Desk Col 1 (PENGAWAS I, Desk 1) (wch: 11, 11)
+    // Col 3 (D): Aisle (wch: 3)
+    // Col 4-5 (E-F): Desk Col 2 (wch: 11, 11)
+    // Col 6 (G): Aisle (wch: 3)
+    // Col 7-8 (H-I): Desk Col 3 (wch: 11, 11)
+    // Col 9 (J): Aisle (wch: 3)
+    // Col 10-11 (K-L): Desk Col 4 (wch: 11, 11)
+    // Col 12 (M): Aisle (wch: 3)
+    // Col 13-14 (N-O): Desk Col 5 (PENGAWAS II, Desk 5) (wch: 11, 11)
+    // Col 15 (P): Margin (wch: 3)
+    const deskCols = [
+      { start: 1, end: 2 },
+      { start: 4, end: 5 },
+      { start: 7, end: 8 },
+      { start: 10, end: 11 },
+      { start: 13, end: 14 },
+    ];
+
+    // Titles (Rows 0-2)
+    mergeRange(1, 0, 14, 0, 'DENAH TEMPAT DUDUK', STYLE_TITLE_1);
+    rowHeights[0] = { hpt: 20 };
+    mergeRange(1, 1, 14, 1, `PESERTA ${examTitle.toUpperCase()}`, STYLE_TITLE_2);
+    rowHeights[1] = { hpt: 18 };
+    mergeRange(1, 2, 14, 2, `TAHUN ${academicYear}`, STYLE_TITLE_3);
+    rowHeights[2] = { hpt: 18 };
+
+    // Spacer
+    rowHeights[3] = { hpt: 12 };
+
+    // Row 4: Ruang Badge (B-C) & Papan Tulis (G-J)
+    mergeRange(1, 4, 3, 4, roomBadge, STYLE_RUANG);
+    mergeRange(6, 4, 9, 4, 'PAPAN TULIS', STYLE_PAPAN_TULIS);
+    rowHeights[4] = { hpt: 24 };
+
+    // Spacer
+    rowHeights[5] = { hpt: 8 };
+
+    // Row 6: Pengawas I (B-C) & Pengawas II (N-O)
+    mergeRange(1, 6, 2, 6, 'PENGAWAS I', STYLE_PENGAWAS);
+    mergeRange(13, 6, 14, 6, 'PENGAWAS II', STYLE_PENGAWAS);
+    rowHeights[6] = { hpt: 22 };
+
+    // Spacer
+    rowHeights[7] = { hpt: 12 };
+
+    // Desk Rows mapper:
+    const totalStudents = students.length;
+    const rowCount = Math.max(4, Math.ceil(totalStudents / 5));
+
+    const getStudentAt = (r: number, c: number): typeof students[0] | undefined => {
+      let idx: number;
+      if (r === 0) idx = c;
+      else if (r === 1) idx = 9 - c;
+      else if (r === 2) idx = 10 + c;
+      else if (r === 3) idx = 15 + c;
+      else if (r === 4) idx = 24 - c;
+      else idx = 25 + c;
+      return students[idx];
+    };
+
+    let currRow = 8;
+    for (let r = 0; r < rowCount; r++) {
+      rowHeights[currRow] = { hpt: 26 };
+      for (let c = 0; c < 5; c++) {
+        const st = getStudentAt(r, c);
+        const colDef = deskCols[c];
+        if (st) {
+          const numFormatted = this.formatSeatingParticipantNumber(st.participantNumber, st.urut);
+          mergeRange(colDef.start, currRow, colDef.end, currRow, numFormatted, STYLE_DESK);
+        }
+      }
+      currRow++;
+
+      // Spacer between desk rows (except after last row)
+      if (r < rowCount - 1) {
+        rowHeights[currRow] = { hpt: 10 };
+        currRow++;
+      }
+    }
+
+    ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 15, r: currRow - 1 } });
+    ws['!cols'] = [
+      { wch: 3 },  // A
+      { wch: 11 }, // B
+      { wch: 11 }, // C
+      { wch: 3 },  // D
+      { wch: 11 }, // E
+      { wch: 11 }, // F
+      { wch: 3 },  // G
+      { wch: 11 }, // H
+      { wch: 11 }, // I
+      { wch: 3 },  // J
+      { wch: 11 }, // K
+      { wch: 11 }, // L
+      { wch: 3 },  // M
+      { wch: 11 }, // N
+      { wch: 11 }, // O
+      { wch: 3 },  // P
+    ];
+    ws['!rows'] = rowHeights;
+    ws['!merges'] = merges;
+    ws['!pageSetup'] = {
+      paperSize: 9, // ISO A4
+      orientation: 'landscape',
+      fitToWidth: 1,
+      fitToHeight: 1,
+      scale: 90,
+    };
+    ws['!margins'] = {
+      left: 0.5,
+      right: 0.5,
+      top: 0.5,
+      bottom: 0.5,
+      header: 0.3,
+      footer: 0.3,
+    };
+
+    return ws;
+  }
+
+  /**
    * Generates a fully-styled, pixel-perfect Excel worksheet for Document 2
    * (Daftar Serah Terima Naskah Soal & Lembar Jawaban) matching physical school & Ministry layouts.
    */
@@ -2727,6 +3162,27 @@ export class ExamAdministrativeDocsService {
       });
 
       const filename = fileNameOverride || `Daftar_Hadir_Peserta_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}_A4.xlsx`;
+      XLSX.writeFile(wb, filename);
+
+    } else if (docType === 'SEATING_LAYOUT') {
+      // -------------------------------------------------------------
+      // EXCEL: DENAH TEMPAT DUDUK PESERTA UJIAN (PER RUANGAN)
+      // -------------------------------------------------------------
+      const roomStudentMap = this.resolveRoomStudents(scheduleData, options);
+      const rooms = Object.keys(roomStudentMap);
+      const selectedRoom = options?.roomFilter;
+      const roomsToExport = selectedRoom && selectedRoom !== 'ALL'
+        ? rooms.filter((r) => this.canonicalRoomName(r).toLowerCase() === this.canonicalRoomName(selectedRoom).toLowerCase())
+        : rooms;
+
+      roomsToExport.forEach((roomName) => {
+        const students = roomStudentMap[roomName] || [];
+        const ws = this.buildSeatingLayoutWorksheet(roomName, students, scheduleData, options);
+        const safeSheetName = `Denah_${roomName.replace(/[^\w]/g, '_')}`.substring(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+      });
+
+      const filename = fileNameOverride || `Denah_Tempat_Duduk_${config.examType || 'ASTS'}_${academicYear.replace('/', '-')}_A4.xlsx`;
       XLSX.writeFile(wb, filename);
 
     } else if (docType === 'HANDOVER_DOCS') {

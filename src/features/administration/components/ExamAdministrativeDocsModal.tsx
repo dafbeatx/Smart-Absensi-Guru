@@ -1,12 +1,13 @@
 /**
  * SMART ABSENSI GURU — EXAM ADMINISTRATIVE DOCUMENTS MODAL
  * Interactive modal dialog providing live A4 preview and 1-click export
- * for the 5 official Indonesian school exam documents:
+ * for the 6 official Indonesian school exam documents:
  * 1. Daftar Hadir Pengawas Ujian
  * 2. Daftar Hadir Peserta Ujian (Per Ruang / Semua Ruang)
- * 3. Daftar Serah Terima Naskah Soal & LJK (Per Ruang / Semua Ruang)
- * 4. Berita Acara Rekapitulasi Kehadiran Peserta Ujian
- * 5. Daftar Hadir Panitia Ujian
+ * 3. Denah Tempat Duduk Peserta Ujian (Per Ruang / Semua Ruang)
+ * 4. Daftar Serah Terima Naskah Soal & LJK (Per Ruang / Semua Ruang)
+ * 5. Berita Acara Rekapitulasi Kehadiran Peserta Ujian
+ * 6. Daftar Hadir Panitia Ujian
  *
  * Supported Actions:
  * - Review & In-Place Edit Roster Siswa (No. Peserta 13-0820-001, Nama, L/P, Kelas)
@@ -37,6 +38,7 @@ import {
   Eye,
   Hash,
   RefreshCw,
+  LayoutGrid,
 } from 'lucide-react';
 import type {
   ExamScheduleData,
@@ -139,7 +141,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
   const [activeEditRoom, setActiveEditRoom] = useState<string>(() => availableRooms[0] || 'Ruang 01');
   const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>(
-    initialDocType === 'STUDENT_ATTENDANCE_ROSTER' ? 'landscape' : 'portrait'
+    initialDocType === 'STUDENT_ATTENDANCE_ROSTER' || initialDocType === 'SEATING_LAYOUT' ? 'landscape' : 'portrait'
   );
   const [includeNumberPrefix, setIncludeNumberPrefix] = useState<boolean>(true);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -329,6 +331,11 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
         );
       case 'STUDENT_ATTENDANCE_ROSTER':
         return ExamAdministrativeDocsService.generateStudentAttendanceRosterHtml(
+          scheduleData,
+          docOptions
+        );
+      case 'SEATING_LAYOUT':
+        return ExamAdministrativeDocsService.generateSeatingLayoutHtml(
           scheduleData,
           docOptions
         );
@@ -522,6 +529,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     const titles: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar Hadir Pengawas',
       STUDENT_ATTENDANCE_ROSTER: 'Daftar Hadir Peserta Ujian',
+      SEATING_LAYOUT: 'Denah Tempat Duduk Peserta Ujian',
       HANDOVER_DOCS: 'Daftar Serah Terima Naskah Soal & LJK',
       STUDENT_ATTENDANCE_SUMMARY: 'Rekapitulasi Kehadiran Peserta Ujian',
       COMMITTEE_ATTENDANCE: 'Daftar Hadir Panitia Ujian',
@@ -533,6 +541,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     const filePrefix: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar_Hadir_Pengawas',
       STUDENT_ATTENDANCE_ROSTER: selectedRoom === 'ALL' ? 'Daftar_Hadir_Peserta_Semua_Ruang' : `Daftar_Hadir_Peserta_${selectedRoom.replace(/\s+/g, '_')}`,
+      SEATING_LAYOUT: selectedRoom === 'ALL' ? 'Denah_Tempat_Duduk_Semua_Ruang' : `Denah_Tempat_Duduk_${selectedRoom.replace(/\s+/g, '_')}`,
       HANDOVER_DOCS: selectedRoom === 'ALL' ? 'Serah_Terima_Naskah_LJK_Semua_Ruang' : `Serah_Terima_${selectedRoom.replace(/\s+/g, '_')}`,
       STUDENT_ATTENDANCE_SUMMARY: 'Rekapitulasi_Kehadiran_Peserta_Ujian',
       COMMITTEE_ATTENDANCE: 'Daftar_Hadir_Panitia',
@@ -550,6 +559,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     const filePrefix: Record<AdminDocType, string> = {
       PROCTOR_ATTENDANCE: 'Daftar_Hadir_Pengawas',
       STUDENT_ATTENDANCE_ROSTER: selectedRoom === 'ALL' ? 'Daftar_Hadir_Peserta_Semua_Ruang' : `Daftar_Hadir_Peserta_${selectedRoom.replace(/\s+/g, '_')}`,
+      SEATING_LAYOUT: selectedRoom === 'ALL' ? 'Denah_Tempat_Duduk_Semua_Ruang' : `Denah_Tempat_Duduk_${selectedRoom.replace(/\s+/g, '_')}`,
       HANDOVER_DOCS: selectedRoom === 'ALL' ? 'Serah_Terima_Naskah_LJK_Semua_Ruang' : `Serah_Terima_${selectedRoom.replace(/\s+/g, '_')}`,
       STUDENT_ATTENDANCE_SUMMARY: 'Rekapitulasi_Kehadiran_Peserta_Ujian',
       COMMITTEE_ATTENDANCE: 'Daftar_Hadir_Panitia',
@@ -724,7 +734,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             </div>
 
             {/* PREVIEW ROOM SELECTOR */}
-            {viewMode === 'PREVIEW' && (activeDocType === 'HANDOVER_DOCS' || activeDocType === 'STUDENT_ATTENDANCE_ROSTER') && (
+            {viewMode === 'PREVIEW' && (activeDocType === 'HANDOVER_DOCS' || activeDocType === 'STUDENT_ATTENDANCE_ROSTER' || activeDocType === 'SEATING_LAYOUT') && (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
                   <DoorOpen className="w-3.5 h-3.5 text-slate-500" />
@@ -823,6 +833,22 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
             <button
               type="button"
+              onClick={() => {
+                setActiveDocType('SEATING_LAYOUT');
+                setPageOrientation('landscape');
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                activeDocType === 'SEATING_LAYOUT'
+                  ? 'bg-white text-teal-700 shadow-xs border border-slate-200/80 ring-1 ring-teal-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 text-teal-600" />
+              <span>3. Denah Tempat Duduk</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveDocType('HANDOVER_DOCS')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 activeDocType === 'HANDOVER_DOCS'
@@ -831,7 +857,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               }`}
             >
               <ClipboardCheck className="w-3.5 h-3.5 text-teal-600" />
-              <span>3. Serah Terima Soal & LJK</span>
+              <span>4. Serah Terima Soal & LJK</span>
             </button>
 
             <button
@@ -847,7 +873,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5 text-teal-600" />
-              <span>4. Rekap Kehadiran Siswa</span>
+              <span>5. Rekap Kehadiran Siswa</span>
             </button>
 
             <button
@@ -863,7 +889,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-              <span>5. Daftar Hadir Panitia</span>
+              <span>6. Daftar Hadir Panitia</span>
             </button>
           </div>
         )}

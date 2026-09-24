@@ -746,10 +746,90 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
     `Expected 15 students in Ruang 02 with SISWA BARU KELAS 8A, got ${dynamicR2Students.length}`
   );
 
+  // -------------------------------------------------------------
+  // TEST 12: Denah Tempat Duduk Peserta Ujian (HTML, Excel, Word)
+  // -------------------------------------------------------------
+  const sample16Students = Array.from({ length: 16 }, (_, i) => ({
+    urut: i + 1,
+    participantNumber: `13-0820-${String(i + 1).padStart(3, '0')}`,
+    fullName: `SISWA ${i + 1}`,
+    gender: i < 10 ? 'L' : 'P',
+    className: '7',
+  }));
+
+  const seatingHtmlR1 = ExamAdministrativeDocsService.generateSingleRoomSeatingLayoutHtml(
+    'Ruang 01',
+    sample16Students,
+    sampleScheduleData
+  );
+
+  assert(
+    '25. generateSingleRoomSeatingLayoutHtml contains DENAH TEMPAT DUDUK, RUANG 01, PAPAN TULIS, and PENGAWAS I & II',
+    seatingHtmlR1.includes('DENAH TEMPAT DUDUK') &&
+      seatingHtmlR1.includes('RUANG 01') &&
+      seatingHtmlR1.includes('PAPAN TULIS') &&
+      seatingHtmlR1.includes('PENGAWAS I') &&
+      seatingHtmlR1.includes('PENGAWAS II'),
+    'Seating layout HTML missing main titles, PAPAN TULIS, or PENGAWAS I/II'
+  );
+
+  assert(
+    '26. Seating grid formats participant numbers with spaces and places 016 in Row 4 Col 1 matching photo',
+    seatingHtmlR1.includes('13 - 0820 - 001') &&
+      seatingHtmlR1.includes('13 - 0820 - 005') &&
+      seatingHtmlR1.includes('13 - 0820 - 006') &&
+      seatingHtmlR1.includes('13 - 0820 - 010') &&
+      seatingHtmlR1.includes('13 - 0820 - 011') &&
+      seatingHtmlR1.includes('13 - 0820 - 015') &&
+      seatingHtmlR1.includes('13 - 0820 - 016'),
+    'Seating layout HTML missing formatted participant numbers 13 - 0820 - 001..016'
+  );
+
+  const fullSeatingBatchHtml = ExamAdministrativeDocsService.generateSeatingLayoutHtml(sampleScheduleData, {
+    roomFilter: 'ALL',
+  });
+  assert(
+    '27. generateSeatingLayoutHtml with ALL rooms produces multi-room page breaks in landscape',
+    fullSeatingBatchHtml.includes('class="page-break"') &&
+      fullSeatingBatchHtml.includes('size: A4 landscape'),
+    'Batch seating layout missing page breaks or landscape CSS'
+  );
+
+  const seatingWs = ExamAdministrativeDocsService.buildSeatingLayoutWorksheet(
+    'Ruang 01',
+    sample16Students,
+    sampleScheduleData
+  );
+  assert(
+    '28. buildSeatingLayoutWorksheet produces ISO A4 Landscape sheet with PAPAN TULIS and desk merges',
+    seatingWs['!pageSetup']?.paperSize === 9 &&
+      seatingWs['!pageSetup']?.orientation === 'landscape' &&
+      Array.isArray(seatingWs['!merges']) &&
+      seatingWs['!merges'].length >= 5,
+    'Seating worksheet missing A4 landscape setup or merges'
+  );
+
+  let exportExcelSeatingPassed = false;
+  try {
+    ExamAdministrativeDocsService.exportToExcel(
+      'SEATING_LAYOUT',
+      { scheduleData: sampleScheduleData },
+      'test_seating_layout.xlsx'
+    );
+    exportExcelSeatingPassed = true;
+  } catch {
+    exportExcelSeatingPassed = false;
+  }
+  assert(
+    '29. exportToExcel executes successfully for SEATING_LAYOUT',
+    exportExcelSeatingPassed,
+    'exportToExcel SEATING_LAYOUT threw an error'
+  );
+
   // Clean up any test files written by XLSX.writeFile during node execution if created
   try {
     const fs = await import('fs');
-    ['test_proctor_attendance.xlsx', 'test_student_roster.xlsx', 'test_handover_docs.xlsx', 'test_recap_docs.xlsx', 'test_committee_docs.xlsx'].forEach((f) => {
+    ['test_proctor_attendance.xlsx', 'test_student_roster.xlsx', 'test_seating_layout.xlsx', 'test_handover_docs.xlsx', 'test_recap_docs.xlsx', 'test_committee_docs.xlsx'].forEach((f) => {
       if (fs.existsSync(f)) {
         fs.unlinkSync(f);
       }
