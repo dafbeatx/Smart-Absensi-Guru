@@ -167,7 +167,9 @@ export class ExamCommitteeRepository {
         );
         if (member) {
           roleName =
-            member.role === 'KETUA'
+            member.role === 'PENANGGUNG_JAWAB'
+              ? 'Penanggung Jawab Panitia Ujian'
+              : member.role === 'KETUA'
               ? 'Ketua Panitia Ujian'
               : member.role === 'SEKRETARIS'
               ? 'Sekretaris Panitia Ujian'
@@ -178,7 +180,9 @@ export class ExamCommitteeRepository {
               : 'Panitia Ujian';
         } else if (user.position && user.position.toLowerCase().includes('panitia')) {
           const pos = user.position.toLowerCase();
-          roleName = pos.includes('ketua')
+          roleName = pos.includes('penanggung') || pos.includes('jawab')
+            ? 'Penanggung Jawab Panitia Ujian'
+            : pos.includes('ketua')
             ? 'Ketua Panitia Ujian'
             : pos.includes('sekretaris')
             ? 'Sekretaris Panitia Ujian'
@@ -213,7 +217,9 @@ export class ExamCommitteeRepository {
       let roleName = 'Panitia Ujian';
       if (member) {
         roleName =
-          member.role === 'KETUA'
+          member.role === 'PENANGGUNG_JAWAB'
+            ? 'Penanggung Jawab Panitia Ujian'
+            : member.role === 'KETUA'
             ? 'Ketua Panitia Ujian'
             : member.role === 'SEKRETARIS'
             ? 'Sekretaris Panitia Ujian'
@@ -224,7 +230,9 @@ export class ExamCommitteeRepository {
             : 'Panitia Ujian';
       } else if (user.position && user.position.toLowerCase().includes('panitia')) {
         const pos = user.position.toLowerCase();
-        roleName = pos.includes('ketua')
+        roleName = pos.includes('penanggung') || pos.includes('jawab')
+          ? 'Penanggung Jawab Panitia Ujian'
+          : pos.includes('ketua')
           ? 'Ketua Panitia Ujian'
           : pos.includes('sekretaris')
           ? 'Sekretaris Panitia Ujian'
@@ -284,7 +292,9 @@ export class ExamCommitteeRepository {
 
     if (member) {
       roleLabel =
-        member.role === 'KETUA'
+        member.role === 'PENANGGUNG_JAWAB'
+          ? 'Penanggung Jawab Panitia Ujian'
+          : member.role === 'KETUA'
           ? 'Ketua Panitia Ujian'
           : member.role === 'SEKRETARIS'
           ? 'Sekretaris Panitia Ujian'
@@ -295,7 +305,10 @@ export class ExamCommitteeRepository {
           : 'Panitia Ujian';
     } else if (user.position && user.position.toLowerCase().includes('panitia')) {
       const pos = user.position.toLowerCase();
-      if (pos.includes('ketua')) {
+      if (pos.includes('penanggung') || pos.includes('jawab')) {
+        roleCode = 'PENANGGUNG_JAWAB';
+        roleLabel = 'Penanggung Jawab Panitia Ujian';
+      } else if (pos.includes('ketua')) {
         roleCode = 'KETUA';
         roleLabel = 'Ketua Panitia Ujian';
       } else if (pos.includes('sekretaris')) {

@@ -2385,7 +2385,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     <span>Surat Keputusan (SK) Kepala Sekolah</span>
                   </div>
                   <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                    {committeeInfo.role === 'KETUA' ? (
+                    {committeeInfo.role === 'PENANGGUNG_JAWAB' ? (
+                      <>
+                        Ditetapkan sebagai <strong className="text-indigo-950 font-bold">Penanggung Jawab</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Bertanggung jawab penuh atas keseluruhan kebijakan, legalitas, kelancaran, dan penjaminan mutu asesmen di satuan pendidikan.
+                      </>
+                    ) : committeeInfo.role === 'KETUA' ? (
                       <>
                         Ditetapkan oleh <strong className="text-slate-900 font-bold">Kepala Sekolah</strong> sebagai <strong className="text-indigo-950 font-bold">Ketua Panitia</strong> pelaksanaan Asesmen Sekolah (ASTS/ASAS). Berwenang memimpin kepanitiaan, perencanaan jadwal, koordinasi ruang rombel, dan pengesahan pengawas ujian.
                       </>

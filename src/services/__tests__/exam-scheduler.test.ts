@@ -526,6 +526,10 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     await ExamCommitteeRepository.setTeacherCommitteeRole(teacherUser, 'KETUA', testAcademicYear);
     const updatedRole = await ExamCommitteeRepository.getTeacherCommitteeRole(teacherUser, testAcademicYear);
 
+    // Assign as PENANGGUNG_JAWAB
+    await ExamCommitteeRepository.setTeacherCommitteeRole(teacherUser, 'PENANGGUNG_JAWAB', testAcademicYear);
+    const pjRole = await ExamCommitteeRepository.getTeacherCommitteeRole(teacherUser, testAcademicYear);
+
     // Position-based fallback test (without repository entry)
     const positionOnlyUser = {
       id: 'teacher_pos_comm',
@@ -535,6 +539,16 @@ export const runExamSchedulerTestSuite = async (): Promise<{
       position: 'Guru Bahasa Inggris / Bendahara Panitia Ujian',
     } as unknown as UserProfile;
     const posRole = await ExamCommitteeRepository.getTeacherCommitteeRole(positionOnlyUser, testAcademicYear);
+
+    // Position-based Penanggung Jawab fallback test
+    const pjPosUser = {
+      id: 'teacher_pos_pj',
+      full_name: 'Drs. H. Mulyadi, M.Pd',
+      nip: 'NPP001',
+      role: 'KEPSEK',
+      position: 'Kepala Sekolah / Penanggung Jawab Panitia Ujian',
+    } as unknown as UserProfile;
+    const pjPosRole = await ExamCommitteeRepository.getTeacherCommitteeRole(pjPosUser, testAcademicYear);
 
     // Unassign (NONE)
     await ExamCommitteeRepository.setTeacherCommitteeRole(teacherUser, 'NONE', testAcademicYear);
@@ -547,15 +561,20 @@ export const runExamSchedulerTestSuite = async (): Promise<{
       assignedRole?.roleLabel === 'Sekretaris Panitia Ujian' &&
       updatedRole?.role === 'KETUA' &&
       updatedRole?.roleLabel === 'Ketua Panitia Ujian' &&
+      pjRole?.role === 'PENANGGUNG_JAWAB' &&
+      pjRole?.roleLabel === 'Penanggung Jawab Panitia Ujian' &&
       posRole?.isCommittee === true &&
       posRole?.role === 'BENDAHARA' &&
       posRole?.roleLabel === 'Bendahara Panitia Ujian' &&
+      pjPosRole?.isCommittee === true &&
+      pjPosRole?.role === 'PENANGGUNG_JAWAB' &&
+      pjPosRole?.roleLabel === 'Penanggung Jawab Panitia Ujian' &&
       unassignedRole === null;
 
     assert(
       'Exam Scheduler 18: Dynamic committee assignment, role retrieval, and position fallback work seamlessly',
       isTest18Valid,
-      `Assigned: ${assignedRole?.roleLabel}, Updated: ${updatedRole?.roleLabel}, Pos: ${posRole?.roleLabel}, Unassigned: ${unassignedRole === null}`
+      `Assigned: ${assignedRole?.roleLabel}, Updated: ${updatedRole?.roleLabel}, PJ: ${pjRole?.roleLabel}, Pos: ${posRole?.roleLabel}, PosPJ: ${pjPosRole?.roleLabel}, Unassigned: ${unassignedRole === null}`
     );
   } catch (err: any) {
     assert('Exam Scheduler 18: Error testing dynamic committee assignment', false, err?.message);

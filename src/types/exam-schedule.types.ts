@@ -7,7 +7,7 @@ export type ExamType = 'ASTS' | 'ASAS' | 'ASAJ' | 'HARIAN';
 
 export type EducationLevel = 'SMP' | 'SMA';
 
-export type CommitteeRole = 'KETUA' | 'SEKRETARIS' | 'BENDAHARA' | 'ANGGOTA';
+export type CommitteeRole = 'PENANGGUNG_JAWAB' | 'KETUA' | 'SEKRETARIS' | 'BENDAHARA' | 'ANGGOTA';
 
 export interface ExamCommitteeMember {
   id: string;

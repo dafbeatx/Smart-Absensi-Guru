@@ -1935,7 +1935,8 @@ export class ExamAdministrativeDocsService {
 
       const mapped = committeeMembers.map((m) => {
         let jabatanLabel = 'Anggota';
-        if (m.role === 'KETUA') jabatanLabel = 'Ketua';
+        if (m.role === 'PENANGGUNG_JAWAB') jabatanLabel = 'Penanggung Jawab';
+        else if (m.role === 'KETUA') jabatanLabel = 'Ketua';
         else if (m.role === 'SEKRETARIS') jabatanLabel = 'Sekretaris';
         else if (m.role === 'BENDAHARA') jabatanLabel = 'Bendahara';
         else if (m.fullName.includes('Farhan') || m.fullName.toLowerCase().includes('kepala')) {
@@ -3388,7 +3389,8 @@ export class ExamAdministrativeDocsService {
 
       let items = (committeeMembers || []).map((m) => {
         let jabatanLabel = 'Anggota';
-        if (m.role === 'KETUA') jabatanLabel = 'Ketua';
+        if (m.role === 'PENANGGUNG_JAWAB') jabatanLabel = 'Penanggung Jawab';
+        else if (m.role === 'KETUA') jabatanLabel = 'Ketua';
         else if (m.role === 'SEKRETARIS') jabatanLabel = 'Sekretaris';
         else if (m.role === 'BENDAHARA') jabatanLabel = 'Bendahara';
         else if (m.fullName.includes('Farhan') || m.fullName.toLowerCase().includes('kepala')) {

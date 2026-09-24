@@ -1161,8 +1161,24 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
     const kepsekTeacher = teachers.find(
       (t) => t.role === 'KEPSEK' || t.position?.toLowerCase().includes('kepala sekolah')
     );
-    const kepsekName = kepsekTeacher?.full_name || 'Farhan Sopian Sahid, S.Pd.I';
-    const kepsekNpp = kepsekTeacher?.nip || kepsekTeacher?.npp || undefined;
+    const penanggungJawabComm = committeeMembers.find(
+      (c) => c.role === 'PENANGGUNG_JAWAB' && c.isActive
+    );
+    const penanggungJawabTeacher = penanggungJawabComm
+      ? teachers.find((t) => t.id === penanggungJawabComm.userId)
+      : undefined;
+
+    const kepsekName =
+      penanggungJawabComm?.fullName ||
+      kepsekTeacher?.full_name ||
+      'Farhan Sopian Sahid, S.Pd.I';
+    const kepsekNpp =
+      penanggungJawabComm?.npp ||
+      penanggungJawabTeacher?.nip ||
+      penanggungJawabTeacher?.npp ||
+      kepsekTeacher?.nip ||
+      kepsekTeacher?.npp ||
+      undefined;
 
     const ketuaComm = committeeMembers.find((c) => c.role === 'KETUA' && c.isActive);
     const ketuaTeacher = ketuaComm ? teachers.find((t) => t.id === ketuaComm.userId) : undefined;
@@ -4193,6 +4209,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                             }}
                             className="bg-white border border-purple-300 rounded-lg px-2.5 py-1 text-xs font-bold text-purple-900 focus:outline-none"
                           >
+                            <option value="PENANGGUNG_JAWAB">Penanggung Jawab</option>
                             <option value="KETUA">Ketua Panitia</option>
                             <option value="SEKRETARIS">Sekretaris</option>
                             <option value="BENDAHARA">Bendahara</option>

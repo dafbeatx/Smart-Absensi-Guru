@@ -145,6 +145,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
     (committeeMembers || []).forEach((m) => {
       if (m.isActive) {
         const label =
+          m.role === 'PENANGGUNG_JAWAB' ? 'Penanggung Jawab' :
           m.role === 'KETUA' ? 'Ketua Panitia' :
           m.role === 'SEKRETARIS' ? 'Sekretaris Panitia' :
           m.role === 'BENDAHARA' ? 'Bendahara Panitia' : 'Anggota Panitia';
@@ -1228,6 +1229,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option value="NONE">- Tidak Ada SK Kepanitiaan -</option>
+              <option value="PENANGGUNG_JAWAB">Penanggung Jawab Ujian</option>
               <option value="KETUA">Ketua Panitia Ujian</option>
               <option value="SEKRETARIS">Sekretaris Panitia Ujian</option>
               <option value="BENDAHARA">Bendahara Panitia Ujian</option>
@@ -1436,6 +1438,7 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option value="NONE">- Tidak Ada SK Kepanitiaan -</option>
+              <option value="PENANGGUNG_JAWAB">Penanggung Jawab Ujian</option>
               <option value="KETUA">Ketua Panitia Ujian</option>
               <option value="SEKRETARIS">Sekretaris Panitia Ujian</option>
               <option value="BENDAHARA">Bendahara Panitia Ujian</option>
