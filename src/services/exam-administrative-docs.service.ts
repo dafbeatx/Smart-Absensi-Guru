@@ -732,8 +732,116 @@ export class ExamAdministrativeDocsService {
   // =========================================================================
   // DOCUMENT: DAFTAR HADIR PESERTA UJIAN (PER RUANGAN)
   // Sesuai format fisik ASTS SMP Terpadu Al-Ittihadiyah / SMA Terpadu As Salaam
+  // Format Landscape A4 dengan 13 Kolom Mata Pelajaran (Tanda Tangan Siswa)
   // Nomor peserta: 13-0820-001 (dimulai dari peserta 1 di Ruang 1 secara sekuensial)
   // =========================================================================
+
+  public static readonly OFFICIAL_SMP_ASTS_SUBJECTS = [
+    'PAI & BP',
+    'IPA',
+    'MTK',
+    'B. Arab',
+    'Pancasila',
+    'B. Indo',
+    'IPS',
+    'B. Sunda',
+    'B. Ingg',
+    'SBK',
+    'PJOK',
+    'ALK',
+    'Informatika',
+  ];
+
+  public static readonly OFFICIAL_SMA_ASTS_SUBJECTS = [
+    'PAI & BP',
+    'MTK',
+    'B. Indo',
+    'B. Ingg',
+    'Fisika',
+    'Kimia',
+    'Biologi',
+    'Sejarah',
+    'Pancasila',
+    'B. Sunda',
+    'B. Arab',
+    'Informatika',
+    'PJOK',
+  ];
+
+  public static compactSubjectName(subject: string): string {
+    const s = subject.trim();
+    const lower = s.toLowerCase();
+    if (/pendidikan agama|pai/i.test(lower)) return 'PAI & BP';
+    if (/matematika|mtk/i.test(lower)) return 'MTK';
+    if (/bahasa indonesia|b\.?\s*indo/i.test(lower)) return 'B. Indo';
+    if (/bahasa inggris|b\.?\s*ingg/i.test(lower)) return 'B. Ingg';
+    if (/bahasa arab|b\.?\s*arab/i.test(lower)) return 'B. Arab';
+    if (/bahasa sunda|b\.?\s*sunda/i.test(lower)) return 'B. Sunda';
+    if (/pancasila|pkn/i.test(lower)) return 'Pancasila';
+    if (/informatika|komputer|tik/i.test(lower)) return 'Informatika';
+    if (/pjok|penjas/i.test(lower)) return 'PJOK';
+    if (/seni budaya|sbk|seni/i.test(lower)) return 'SBK';
+    if (/al-qur|alk|quran/i.test(lower)) return 'ALK';
+    if (/ilmu pengetahuan alam|^ipa$/i.test(lower)) return 'IPA';
+    if (/ilmu pengetahuan sosial|^ips$/i.test(lower)) return 'IPS';
+    if (/fisika/i.test(lower)) return 'Fisika';
+    if (/kimia/i.test(lower)) return 'Kimia';
+    if (/biologi/i.test(lower)) return 'Biologi';
+    if (/sosiologi/i.test(lower)) return 'Sosiologi';
+    if (/ekonomi/i.test(lower)) return 'Ekonomi';
+    if (/geografi/i.test(lower)) return 'Geografi';
+    if (/sejarah/i.test(lower)) return 'Sejarah';
+    if (/pkwu|prakarya/i.test(lower)) return 'PKWU';
+    if (s.length <= 11) return s;
+    return s.substring(0, 11);
+  }
+
+  public static extractRosterSubjects(scheduleData: ExamScheduleData, isSma: boolean): string[] {
+    const extracted: string[] = [];
+    if (scheduleData.subjectSchedules && scheduleData.subjectSchedules.length > 0) {
+      scheduleData.subjectSchedules.forEach((sub) => {
+        if (sub.subject && sub.subject.trim()) {
+          const compacted = this.compactSubjectName(sub.subject);
+          if (!extracted.includes(compacted)) {
+            extracted.push(compacted);
+          }
+        }
+      });
+    }
+    // Jika mata pelajaran di jadwal kurang dari 5, gunakan daftar 13 mapel fisik sekolah
+    if (extracted.length < 5) {
+      return isSma ? [...this.OFFICIAL_SMA_ASTS_SUBJECTS] : [...this.OFFICIAL_SMP_ASTS_SUBJECTS];
+    }
+    return extracted;
+  }
+
+  public static resolveFullSignDate(scheduleData: ExamScheduleData, optionDate?: string): string {
+    if (optionDate && optionDate.trim()) {
+      const trimmed = optionDate.trim();
+      if (/^\d+\s+/.test(trimmed)) return trimmed;
+      const days = this.extractExamDays(scheduleData);
+      if (days.length > 0) {
+        const parts = days[0].date.split('-');
+        const d = parts[2] ? parseInt(parts[2], 10) : 2;
+        return `${d} ${trimmed}`;
+      }
+      return `2 ${trimmed}`;
+    }
+    const days = this.extractExamDays(scheduleData);
+    if (days.length > 0) {
+      const parts = days[0].date.split('-');
+      const y = parts[0];
+      const m = parts[1];
+      const d = parts[2] ? parseInt(parts[2], 10) : 2;
+      const months = [
+        '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      const mName = months[parseInt(m, 10)] || 'Maret';
+      return `${d} ${mName} ${y}`;
+    }
+    return '2 Maret 2026';
+  }
 
   public static readonly OFFICIAL_SMP_ROOM_1_STUDENTS = [
     // Laki-laki (13 Siswa)
@@ -1286,85 +1394,107 @@ export class ExamAdministrativeDocsService {
       className: string;
     }>,
     scheduleData: ExamScheduleData,
-    _options?: AdminDocOptions
+    options?: AdminDocOptions
   ): string {
     const branding = getDynamicBranding();
     const config = scheduleData.config;
-    const isSma = config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+    const isSma =
+      scheduleData.educationLevel === 'SMA' ||
+      scheduleData.config.educationLevel === 'SMA' ||
+      config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
+      false;
     const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
     const academicYear = config.academicYear || '2025/2026';
     const semesterStr = config.semester ? config.semester.toUpperCase() : 'GENAP';
 
-    let examTitle = config.examTitle || `ASESMEN SUMATIF TENGAH SEMESTER (${config.examType || 'ASTS'})`;
+    let examTitle = config.examTitle || 'ASESMEN SUMATIF TENGAH SEMESTER';
     if (!examTitle.toUpperCase().includes('GENAP') && !examTitle.toUpperCase().includes('GANJIL')) {
       examTitle = `${examTitle} ${semesterStr}`;
+    }
+    if (!examTitle.toUpperCase().includes('ASTS') && !examTitle.toUpperCase().includes('ASAS')) {
+      examTitle = `${examTitle} (${config.examType || 'ASTS'})`;
+    } else if (!examTitle.includes('(')) {
+      examTitle = `${examTitle} (${config.examType || 'ASTS'})`;
     }
 
     const roomNumMatch = roomName.match(/\d+/);
     const roomNumStr = roomNumMatch ? String(parseInt(roomNumMatch[0], 10)).padStart(2, '0') : '';
-    const roomBadge = roomNumStr ? `RUANG ${roomNumStr}` : roomName.toUpperCase();
+    const roomBadge = roomNumStr ? `Ruang ${roomNumStr}` : roomName;
+
+    const subjects = this.extractRosterSubjects(scheduleData, isSma);
+
+    const city = options?.city || 'Bogor';
+    const signDate = this.resolveFullSignDate(scheduleData, options?.signDateMonthYear);
+    const committeeHead = this.resolveCommitteeHead(undefined, options?.committeeHeadName);
+
+    const subjectHeadersHtml = subjects.map((s) => `
+      <th style="border: 1pt solid #000000; padding: 3px 1px; text-align: center; font-weight: bold; font-size: 8pt; line-height: 1.15; word-break: break-word; background-color: #ffffff; color: #000000;">
+        ${s}
+      </th>
+    `).join('');
 
     const rowsHtml = students.map((s) => `
-      <tr>
-        <td style="border: 1pt solid #000000; text-align: center; padding: 4px; font-size: 10pt;">${s.urut}</td>
-        <td style="border: 1pt solid #000000; text-align: center; padding: 4px 6px; font-size: 10pt; font-family: 'Times New Roman', serif; font-weight: 500;">${s.participantNumber}</td>
-        <td style="border: 1pt solid #000000; text-align: left; padding: 4px 8px; font-size: 10pt; text-transform: uppercase;">${s.fullName}</td>
-        <td style="border: 1pt solid #000000; text-align: center; padding: 4px; font-size: 10pt;">${s.gender}</td>
-        <td style="border: 1pt solid #000000; text-align: center; padding: 4px 6px; font-size: 10pt;">${s.className}</td>
+      <tr style="height: 24px;">
+        <td style="border: 1pt solid #000000; text-align: center; padding: 2px 1px; font-size: 8.5pt;">${s.urut}</td>
+        <td style="border: 1pt solid #000000; text-align: center; padding: 2px 2px; font-size: 8.5pt; font-family: 'Times New Roman', serif;">${s.participantNumber}</td>
+        <td style="border: 1pt solid #000000; text-align: left; padding: 2px 4px; font-size: 8.5pt; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${s.fullName}</td>
+        <td style="border: 1pt solid #000000; text-align: center; padding: 2px 1px; font-size: 8.5pt;">${s.gender}</td>
+        ${subjects.map(() => `<td style="border: 1pt solid #000000; text-align: center; padding: 0; font-size: 8pt; background-color: #ffffff;">&nbsp;</td>`).join('')}
       </tr>
     `).join('');
 
     return `
       <div class="page-container" style="font-family: 'Times New Roman', Times, serif; color: #000000; background: #ffffff;">
-        <div class="doc-header" style="text-align: center; margin-bottom: 16px;">
-          <h1 style="font-size: 13.5pt; font-weight: bold; margin: 0 0 2px 0; text-transform: uppercase; font-family: 'Times New Roman', serif; letter-spacing: 0.3px;">
-            DAFTAR HADIR PESERTA
-          </h1>
-          <h2 style="font-size: 12.5pt; font-weight: bold; margin: 0 0 2px 0; text-transform: uppercase; font-family: 'Times New Roman', serif;">
-            ${examTitle}
-          </h2>
-          <div style="font-size: 13pt; font-weight: bold; margin: 0 0 2px 0; text-transform: uppercase; font-family: 'Times New Roman', serif; letter-spacing: 0.3px;">
-            ${institutionName}
-          </div>
-          <div style="font-size: 11.5pt; font-weight: bold; margin: 0; font-family: 'Times New Roman', serif;">
-            Tahun Pelajaran ${academicYear}
-          </div>
-        </div>
-
-        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 6px;">
+        <!-- Header: 2 Columns (Titles left, Room Badge right) -->
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 8px; font-family: 'Times New Roman', serif;">
           <tr style="border: none;">
-            <td style="border: none; width: 60%; padding: 0;"></td>
-            <td style="border: none; width: 40%; text-align: right; padding: 0;" align="right">
-              <span style="font-size: 17pt; font-weight: bold; font-family: 'Times New Roman', serif; letter-spacing: 0.5px; color: #000000;">
+            <td style="border: none; width: 70%; vertical-align: top; text-align: left; padding: 0;">
+              <div style="font-size: 13.5pt; font-weight: bold; text-transform: uppercase; margin: 0; line-height: 1.25; letter-spacing: 0.3px;">
+                DAFTAR HADIR PESERTA
+              </div>
+              <div style="font-size: 12pt; font-weight: bold; text-transform: uppercase; margin: 0; line-height: 1.25;">
+                ${examTitle}
+              </div>
+              <div style="font-size: 12.5pt; font-weight: bold; text-transform: uppercase; margin: 0; line-height: 1.25; letter-spacing: 0.3px;">
+                ${institutionName}
+              </div>
+              <div style="font-size: 11pt; font-weight: bold; margin: 0; line-height: 1.25;">
+                Tahun Pelajaran ${academicYear}
+              </div>
+            </td>
+            <td style="border: none; width: 30%; vertical-align: middle; text-align: right; padding: 0;" align="right">
+              <div class="room-badge" data-room="${roomBadge.toUpperCase()}" style="font-size: 24pt; font-weight: bold; font-family: 'Times New Roman', serif; letter-spacing: 0.5px; color: #000000; white-space: nowrap;">
                 ${roomBadge}
-              </span>
+              </div>
             </td>
           </tr>
         </table>
 
+        <!-- Main Table with 13 Subjects -->
         <table class="doc-table" style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', serif; border: 1pt solid #000000;">
           <thead>
             <tr style="background-color: transparent;">
-              <th colspan="2" style="border: 1pt solid #000000; padding: 5px 4px; text-align: center; font-weight: bold; font-size: 10.5pt; width: 190px;">
-                NOMOR
+              <th colspan="2" style="border: 1pt solid #000000; padding: 4px 2px; text-align: center; font-weight: bold; font-size: 9.5pt; width: 120px; background-color: #ffffff; color: #000000;">
+                NO
               </th>
-              <th rowspan="2" style="border: 1pt solid #000000; padding: 5px 8px; text-align: center; font-weight: bold; font-size: 10.5pt;">
+              <th rowspan="2" style="border: 1pt solid #000000; padding: 4px 6px; text-align: center; font-weight: bold; font-size: 9.5pt; width: 195px; background-color: #ffffff; color: #000000;">
                 NAMA PESERTA
               </th>
-              <th rowspan="2" style="border: 1pt solid #000000; padding: 5px 4px; text-align: center; font-weight: bold; font-size: 10.5pt; width: 55px;">
+              <th rowspan="2" style="border: 1pt solid #000000; padding: 4px 2px; text-align: center; font-weight: bold; font-size: 9.5pt; width: 30px; background-color: #ffffff; color: #000000;">
                 L/P
               </th>
-              <th rowspan="2" style="border: 1pt solid #000000; padding: 5px 6px; text-align: center; font-weight: bold; font-size: 10.5pt; width: 85px;">
-                KELAS
+              <th colspan="${subjects.length}" style="border: 1pt solid #000000; padding: 4px 2px; text-align: center; font-weight: bold; font-size: 9.5pt; background-color: #ffffff; color: #000000;">
+                MATA PELAJARAN
               </th>
             </tr>
             <tr style="background-color: transparent;">
-              <th style="border: 1pt solid #000000; padding: 4px; text-align: center; font-weight: bold; font-size: 10pt; width: 48px;">
+              <th style="border: 1pt solid #000000; padding: 3px 2px; text-align: center; font-weight: bold; font-size: 9pt; width: 32px; background-color: #ffffff; color: #000000;">
                 URUT
               </th>
-              <th style="border: 1pt solid #000000; padding: 4px; text-align: center; font-weight: bold; font-size: 10pt; width: 142px;">
+              <th style="border: 1pt solid #000000; padding: 3px 4px; text-align: center; font-weight: bold; font-size: 9pt; width: 88px; background-color: #ffffff; color: #000000;">
                 PESERTA
               </th>
+              ${subjectHeadersHtml}
             </tr>
           </thead>
           <tbody>
@@ -1372,15 +1502,15 @@ export class ExamAdministrativeDocsService {
           </tbody>
         </table>
 
-        <!-- Proctor Signatory Block -->
-        <table style="width: 100%; border: none; border-collapse: collapse; margin-top: 24px; font-family: 'Times New Roman', serif; font-size: 10.5pt; page-break-inside: avoid;">
+        <!-- Signatory Block (Bottom Right) -->
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-top: 14px; font-family: 'Times New Roman', serif; font-size: 10pt; page-break-inside: avoid;">
           <tr style="border: none;">
-            <td style="border: none; width: 60%; vertical-align: top; padding: 0;"></td>
-            <td style="border: none; width: 40%; text-align: center; vertical-align: top; padding: 0;">
-              <div>Pengawas Ruang,</div>
-              <div style="height: 52px;"></div>
-              <div style="font-weight: bold; text-decoration: underline;">( .................................................... )</div>
-              <div style="font-size: 9.5pt; margin-top: 2px;">NPP. ........................................</div>
+            <td style="border: none; width: 72%; padding: 0;"></td>
+            <td style="border: none; width: 28%; text-align: left; vertical-align: top; padding: 0;">
+              <div>${city}, ${signDate}</div>
+              <div>Ketua Pelaksana</div>
+              <div style="height: 48px;"></div>
+              <div style="font-weight: bold; text-decoration: underline;">${committeeHead}</div>
             </td>
           </tr>
         </table>
@@ -1392,9 +1522,14 @@ export class ExamAdministrativeDocsService {
     scheduleData: ExamScheduleData,
     options?: AdminDocOptions
   ): string {
+    const orientation = options?.orientation || 'landscape';
     const branding = getDynamicBranding();
     const config = scheduleData.config;
-    const isSma = config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+    const isSma =
+      scheduleData.educationLevel === 'SMA' ||
+      scheduleData.config.educationLevel === 'SMA' ||
+      config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
+      false;
     const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
 
     const roomStudentMap = this.resolveRoomStudents(scheduleData, options);
@@ -1408,7 +1543,10 @@ export class ExamAdministrativeDocsService {
 
     const sections = roomsToRender.map((r, idx) => {
       const students = roomStudentMap[r] || [];
-      const roomHtml = this.generateSingleRoomAttendanceRosterHtml(r, students, scheduleData, options);
+      const roomHtml = this.generateSingleRoomAttendanceRosterHtml(r, students, scheduleData, {
+        ...options,
+        orientation,
+      });
       const isLast = idx === roomsToRender.length - 1;
       return `
         ${roomHtml}
@@ -1423,7 +1561,7 @@ export class ExamAdministrativeDocsService {
         <meta charset="utf-8">
         <title>Daftar Hadir Peserta - ${institutionName}</title>
         <style>
-          ${this.getOfficialDocumentStyles(options?.orientation)}
+          ${this.getOfficialDocumentStyles(orientation)}
         </style>
       </head>
       <body>
@@ -1876,23 +2014,40 @@ export class ExamAdministrativeDocsService {
       className: string;
     }>,
     scheduleData: ExamScheduleData,
-    _options?: AdminDocOptions
+    options?: AdminDocOptions
   ): any {
     const branding = getDynamicBranding();
     const config = scheduleData.config;
-    const isSma = config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) || false;
+    const isSma =
+      scheduleData.educationLevel === 'SMA' ||
+      scheduleData.config.educationLevel === 'SMA' ||
+      config.selectedClasses?.some((c) => /10|11|12|sma|ipa|ips/i.test(c)) ||
+      false;
     const institutionName = branding.institutionName || (isSma ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
     const academicYear = config.academicYear || '2025/2026';
     const semesterStr = config.semester ? config.semester.toUpperCase() : 'GENAP';
 
-    let examTitle = config.examTitle || `ASESMEN SUMATIF TENGAH SEMESTER (${config.examType || 'ASTS'})`;
+    let examTitle = config.examTitle || 'ASESMEN SUMATIF TENGAH SEMESTER';
     if (!examTitle.toUpperCase().includes('GENAP') && !examTitle.toUpperCase().includes('GANJIL')) {
       examTitle = `${examTitle} ${semesterStr}`;
+    }
+    if (!examTitle.toUpperCase().includes('ASTS') && !examTitle.toUpperCase().includes('ASAS')) {
+      examTitle = `${examTitle} (${config.examType || 'ASTS'})`;
+    } else if (!examTitle.includes('(')) {
+      examTitle = `${examTitle} (${config.examType || 'ASTS'})`;
     }
 
     const roomNumMatch = roomName.match(/\d+/);
     const roomNumStr = roomNumMatch ? String(parseInt(roomNumMatch[0], 10)).padStart(2, '0') : '';
-    const roomBadge = roomNumStr ? `RUANG ${roomNumStr}` : roomName.toUpperCase();
+    const roomBadge = roomNumStr ? `Ruang ${roomNumStr}` : roomName;
+
+    const subjects = this.extractRosterSubjects(scheduleData, isSma);
+    const totalCols = 4 + subjects.length; // 4 identity columns + subjects
+    const lastColIdx = totalCols - 1;
+
+    const city = options?.city || 'Bogor';
+    const signDate = this.resolveFullSignDate(scheduleData, options?.signDateMonthYear);
+    const committeeHead = this.resolveCommitteeHead(undefined, options?.committeeHeadName);
 
     const ws: any = {};
     const merges: any[] = [];
@@ -1905,48 +2060,55 @@ export class ExamAdministrativeDocsService {
       right: { style: 'thin', color: { rgb: '000000' } },
     };
 
-    const STYLE_TITLE_HEADER = {
-      font: { name: 'Times New Roman', sz: 13, bold: true, color: { rgb: '000000' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
+    const STYLE_TITLE_LEFT = {
+      font: { name: 'Times New Roman', sz: 12.5, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
     };
 
-    const STYLE_SUBTITLE_HEADER = {
-      font: { name: 'Times New Roman', sz: 12, bold: true, color: { rgb: '000000' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
+    const STYLE_SUBTITLE_LEFT = {
+      font: { name: 'Times New Roman', sz: 11, bold: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
     };
 
     const STYLE_TH = {
-      font: { name: 'Times New Roman', sz: 10.5, bold: true, color: { rgb: '000000' } },
+      font: { name: 'Times New Roman', sz: 9.5, bold: true, color: { rgb: '000000' } },
+      fill: { fgColor: { rgb: 'FFFFFF' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: BORDER_THIN,
+    };
+
+    const STYLE_TH_SUB = {
+      font: { name: 'Times New Roman', sz: 8.5, bold: true, color: { rgb: '000000' } },
       fill: { fgColor: { rgb: 'FFFFFF' } },
       alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
       border: BORDER_THIN,
     };
 
     const STYLE_TD_CENTER = {
-      font: { name: 'Times New Roman', sz: 10, color: { rgb: '000000' } },
+      font: { name: 'Times New Roman', sz: 9, color: { rgb: '000000' } },
       alignment: { horizontal: 'center', vertical: 'center' },
       border: BORDER_THIN,
     };
 
     const STYLE_TD_LEFT = {
-      font: { name: 'Times New Roman', sz: 10, color: { rgb: '000000' } },
+      font: { name: 'Times New Roman', sz: 9, color: { rgb: '000000' } },
       alignment: { horizontal: 'left', vertical: 'center' },
       border: BORDER_THIN,
     };
 
     const STYLE_ROOM_BADGE = {
-      font: { name: 'Times New Roman', sz: 16, bold: true, color: { rgb: '000000' } },
+      font: { name: 'Times New Roman', sz: 20, bold: true, color: { rgb: '000000' } },
       alignment: { horizontal: 'right', vertical: 'center' },
     };
 
-    const STYLE_SIGN_TEXT = {
-      font: { name: 'Times New Roman', sz: 10.5, color: { rgb: '000000' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
+    const STYLE_SIGN_TEXT_LEFT = {
+      font: { name: 'Times New Roman', sz: 10, color: { rgb: '000000' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
     };
 
-    const STYLE_SIGN_NAME = {
-      font: { name: 'Times New Roman', sz: 10.5, bold: true, underline: true, color: { rgb: '000000' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
+    const STYLE_SIGN_NAME_LEFT = {
+      font: { name: 'Times New Roman', sz: 10, bold: true, underline: true, color: { rgb: '000000' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
     };
 
     const setCell = (c: number, r: number, val: any, style?: any) => {
@@ -1966,78 +2128,86 @@ export class ExamAdministrativeDocsService {
       if (val !== undefined) setCell(sc, sr, val, style);
     };
 
-    // Header Titles (Rows 0-3)
-    mergeRange(0, 0, 4, 0, 'DAFTAR HADIR PESERTA', STYLE_TITLE_HEADER);
-    rowHeights[0] = { hpt: 20 };
-    mergeRange(0, 1, 4, 1, examTitle.toUpperCase(), STYLE_SUBTITLE_HEADER);
-    rowHeights[1] = { hpt: 19 };
-    mergeRange(0, 2, 4, 2, institutionName.toUpperCase(), STYLE_SUBTITLE_HEADER);
-    rowHeights[2] = { hpt: 19 };
-    mergeRange(0, 3, 4, 3, `Tahun Pelajaran ${academicYear}`, STYLE_SUBTITLE_HEADER);
-    rowHeights[3] = { hpt: 19 };
+    // Header Titles (Left side: Rows 0-3)
+    mergeRange(0, 0, 4, 0, 'DAFTAR HADIR PESERTA', STYLE_TITLE_LEFT);
+    rowHeights[0] = { hpt: 18 };
+    mergeRange(0, 1, 4, 1, examTitle.toUpperCase(), STYLE_SUBTITLE_LEFT);
+    rowHeights[1] = { hpt: 16 };
+    mergeRange(0, 2, 4, 2, institutionName.toUpperCase(), STYLE_SUBTITLE_LEFT);
+    rowHeights[2] = { hpt: 16 };
+    mergeRange(0, 3, 4, 3, `Tahun Pelajaran ${academicYear}`, STYLE_SUBTITLE_LEFT);
+    rowHeights[3] = { hpt: 16 };
 
-    rowHeights[4] = { hpt: 10 }; // spacer
+    // Room Label on Right (Cols lastColIdx - 3 to lastColIdx, Rows 0-2)
+    const badgeColStart = Math.max(5, lastColIdx - 3);
+    mergeRange(badgeColStart, 0, lastColIdx, 2, roomBadge, STYLE_ROOM_BADGE);
 
-    // Room Label on Right (Column 3-4, Row 5)
-    mergeRange(3, 5, 4, 5, roomBadge, STYLE_ROOM_BADGE);
-    rowHeights[5] = { hpt: 22 };
+    rowHeights[4] = { hpt: 8 }; // spacer
 
-    // Table Headers (Rows 6 & 7)
-    mergeRange(0, 6, 1, 6, 'NOMOR', STYLE_TH);
-    mergeRange(2, 6, 2, 7, 'NAMA PESERTA', STYLE_TH);
-    mergeRange(3, 6, 3, 7, 'L/P', STYLE_TH);
-    mergeRange(4, 6, 4, 7, 'KELAS', STYLE_TH);
-    rowHeights[6] = { hpt: 18 };
+    // Table Headers (Row 5 & 6)
+    // Row 5: NO (cols 0-1), NAMA PESERTA (col 2), L/P (col 3), MATA PELAJARAN (cols 4..lastColIdx)
+    mergeRange(0, 5, 1, 5, 'NO', STYLE_TH);
+    mergeRange(2, 5, 2, 6, 'NAMA PESERTA', STYLE_TH);
+    mergeRange(3, 5, 3, 6, 'L/P', STYLE_TH);
+    mergeRange(4, 5, lastColIdx, 5, 'MATA PELAJARAN', STYLE_TH);
+    rowHeights[5] = { hpt: 18 };
 
-    setCell(0, 7, 'URUT', STYLE_TH);
-    setCell(1, 7, 'PESERTA', STYLE_TH);
-    rowHeights[7] = { hpt: 18 };
+    // Row 6: URUT (col 0), PESERTA (col 1), Subjects (cols 4..lastColIdx)
+    setCell(0, 6, 'URUT', STYLE_TH);
+    setCell(1, 6, 'PESERTA', STYLE_TH);
+    subjects.forEach((sub, sIdx) => {
+      setCell(4 + sIdx, 6, sub, STYLE_TH_SUB);
+    });
+    rowHeights[6] = { hpt: 20 };
 
-    // Data rows (Row 8+)
-    let currRow = 8;
+    // Data rows (Row 7+)
+    let currRow = 7;
     students.forEach((st) => {
       setCell(0, currRow, st.urut, STYLE_TD_CENTER);
       setCell(1, currRow, st.participantNumber, STYLE_TD_CENTER);
       setCell(2, currRow, st.fullName.toUpperCase(), STYLE_TD_LEFT);
       setCell(3, currRow, st.gender, STYLE_TD_CENTER);
-      setCell(4, currRow, st.className, STYLE_TD_CENTER);
-      rowHeights[currRow] = { hpt: 20 };
+      for (let sIdx = 0; sIdx < subjects.length; sIdx++) {
+        setCell(4 + sIdx, currRow, '', STYLE_TD_CENTER);
+      }
+      rowHeights[currRow] = { hpt: 19 };
       currRow++;
     });
 
-    // Proctor Signatory
+    // Signatory Block (Bottom Right)
+    rowHeights[currRow] = { hpt: 12 }; currRow++;
+    const signColStart = Math.max(0, lastColIdx - 4);
+    mergeRange(signColStart, currRow, lastColIdx, currRow, `${city}, ${signDate}`, STYLE_SIGN_TEXT_LEFT);
     rowHeights[currRow] = { hpt: 16 }; currRow++;
-    mergeRange(3, currRow, 4, currRow, 'Pengawas Ruang,', STYLE_SIGN_TEXT);
+    mergeRange(signColStart, currRow, lastColIdx, currRow, 'Ketua Pelaksana', STYLE_SIGN_TEXT_LEFT);
+    rowHeights[currRow] = { hpt: 16 }; currRow++;
     rowHeights[currRow] = { hpt: 18 }; currRow++;
-    rowHeights[currRow] = { hpt: 22 }; currRow++;
-    rowHeights[currRow] = { hpt: 22 }; currRow++;
-    mergeRange(3, currRow, 4, currRow, '( .................................................... )', STYLE_SIGN_NAME);
     rowHeights[currRow] = { hpt: 18 }; currRow++;
-    mergeRange(3, currRow, 4, currRow, 'NPP. ........................................', STYLE_SIGN_TEXT);
+    mergeRange(signColStart, currRow, lastColIdx, currRow, committeeHead, STYLE_SIGN_NAME_LEFT);
     rowHeights[currRow] = { hpt: 18 };
 
-    ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 4, r: currRow } });
+    ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: lastColIdx, r: currRow } });
     ws['!cols'] = [
-      { wch: 8 },  // URUT
-      { wch: 18 }, // PESERTA
-      { wch: 36 }, // NAMA PESERTA
-      { wch: 8 },  // L/P
-      { wch: 14 }, // KELAS
+      { wch: 6 },  // URUT
+      { wch: 15 }, // PESERTA
+      { wch: 30 }, // NAMA PESERTA
+      { wch: 6 },  // L/P
+      ...subjects.map(() => ({ wch: 10 })), // Subjects
     ];
     ws['!rows'] = rowHeights;
     ws['!merges'] = merges;
     ws['!pageSetup'] = {
-      paperSize: 9, // ISO A4 (210 x 297 mm)
-      orientation: 'portrait',
+      paperSize: 9, // ISO A4
+      orientation: 'landscape',
       fitToWidth: 1,
       fitToHeight: 0,
-      scale: 100,
+      scale: 85,
     };
     ws['!margins'] = {
       left: 0.5,
       right: 0.5,
-      top: 0.6,
-      bottom: 0.6,
+      top: 0.5,
+      bottom: 0.5,
       header: 0.3,
       footer: 0.3,
     };

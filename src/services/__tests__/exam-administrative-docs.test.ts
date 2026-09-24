@@ -338,13 +338,17 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   assert(
     '10b. generateStudentAttendanceRosterHtml matches physical sheet layout and headers',
     docRosterHtml.includes('DAFTAR HADIR PESERTA') &&
-      docRosterHtml.includes('RUANG 01') &&
-      docRosterHtml.includes('NOMOR') &&
+      (docRosterHtml.includes('RUANG 01') || docRosterHtml.includes('Ruang 01')) &&
+      docRosterHtml.includes('NO') &&
       docRosterHtml.includes('URUT') &&
       docRosterHtml.includes('PESERTA') &&
       docRosterHtml.includes('NAMA PESERTA') &&
       docRosterHtml.includes('L/P') &&
-      docRosterHtml.includes('KELAS'),
+      docRosterHtml.includes('MATA PELAJARAN') &&
+      docRosterHtml.includes('PAI & BP') &&
+      docRosterHtml.includes('Informatika') &&
+      docRosterHtml.includes('Ketua Pelaksana') &&
+      docRosterHtml.includes('Adi Prasetyo, S.Pd'),
     'Roster HTML missing title, room badge, or column headers'
   );
 
@@ -563,14 +567,20 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   );
 
   assert(
-    '14d. buildStudentAttendanceRosterWorksheet contains titles, Ruang 01 badge, and 13-0820-001 participant',
+    '14d. buildStudentAttendanceRosterWorksheet contains titles, Ruang 01 badge, MATA PELAJARAN, and 13-0820-001 participant',
     studentWs['A1']?.v === 'DAFTAR HADIR PESERTA' &&
-      studentWs['D6']?.v === 'RUANG 01' &&
-      studentWs['A7']?.v === 'NOMOR' &&
-      studentWs['C7']?.v === 'NAMA PESERTA' &&
-      studentWs['B9']?.v === '13-0820-001' &&
-      studentWs['C9']?.v === 'AFHTAR SHAKIL' &&
-      studentWs['D9']?.v === 'L',
+      (studentWs['N1']?.v === 'Ruang 01' || studentWs['N1']?.v === 'RUANG 01') &&
+      studentWs['A6']?.v === 'NO' &&
+      studentWs['C6']?.v === 'NAMA PESERTA' &&
+      studentWs['D6']?.v === 'L/P' &&
+      studentWs['E6']?.v === 'MATA PELAJARAN' &&
+      studentWs['A7']?.v === 'URUT' &&
+      studentWs['B7']?.v === 'PESERTA' &&
+      studentWs['E7']?.v === 'PAI & BP' &&
+      studentWs['B8']?.v === '13-0820-001' &&
+      studentWs['C8']?.v === 'AFHTAR SHAKIL' &&
+      studentWs['D8']?.v === 'L' &&
+      studentWs['!pageSetup']?.orientation === 'landscape',
     'Student attendance worksheet missing header, badge, or participant row'
   );
 

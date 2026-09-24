@@ -136,7 +136,9 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   const [activeDocType, setActiveDocType] = useState<AdminDocType>(initialDocType);
   const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
   const [activeEditRoom, setActiveEditRoom] = useState<string>(() => availableRooms[0] || 'Ruang 01');
-  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [pageOrientation, setPageOrientation] = useState<'portrait' | 'landscape'>(
+    initialDocType === 'STUDENT_ATTENDANCE_ROSTER' ? 'landscape' : 'portrait'
+  );
   const [includeNumberPrefix, setIncludeNumberPrefix] = useState<boolean>(true);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -698,7 +700,10 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
           <div className="px-4 sm:px-6 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
             <button
               type="button"
-              onClick={() => setActiveDocType('PROCTOR_ATTENDANCE')}
+              onClick={() => {
+                setActiveDocType('PROCTOR_ATTENDANCE');
+                setPageOrientation('portrait');
+              }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 activeDocType === 'PROCTOR_ATTENDANCE'
                   ? 'bg-white text-teal-700 shadow-xs border border-slate-200/80 ring-1 ring-teal-500/20'
@@ -711,7 +716,10 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
             <button
               type="button"
-              onClick={() => setActiveDocType('STUDENT_ATTENDANCE_ROSTER')}
+              onClick={() => {
+                setActiveDocType('STUDENT_ATTENDANCE_ROSTER');
+                setPageOrientation('landscape');
+              }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 activeDocType === 'STUDENT_ATTENDANCE_ROSTER'
                   ? 'bg-white text-teal-700 shadow-xs border border-slate-200/80 ring-1 ring-teal-500/20'
@@ -737,7 +745,10 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
             <button
               type="button"
-              onClick={() => setActiveDocType('STUDENT_ATTENDANCE_SUMMARY')}
+              onClick={() => {
+                setActiveDocType('STUDENT_ATTENDANCE_SUMMARY');
+                setPageOrientation('portrait');
+              }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 activeDocType === 'STUDENT_ATTENDANCE_SUMMARY'
                   ? 'bg-white text-teal-700 shadow-xs border border-slate-200/80 ring-1 ring-teal-500/20'
@@ -750,7 +761,10 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
             <button
               type="button"
-              onClick={() => setActiveDocType('COMMITTEE_ATTENDANCE')}
+              onClick={() => {
+                setActiveDocType('COMMITTEE_ATTENDANCE');
+                setPageOrientation('portrait');
+              }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 activeDocType === 'COMMITTEE_ATTENDANCE'
                   ? 'bg-white text-teal-700 shadow-xs border border-slate-200/80 ring-1 ring-teal-500/20'
