@@ -105,7 +105,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
       aria-modal="true"
       aria-labelledby="homeroom-modal-title"
     >
-      <div className="bg-slate-50 w-full max-w-4xl h-[92vh] max-h-[840px] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+      <div className="bg-slate-50 w-full max-w-4xl h-[92vh] max-h-210 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
         {/* Modal Header */}
         <div className="px-5 py-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -241,13 +241,13 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
           </div>
 
           {/* Search Input */}
-          <div className="relative min-w-[200px] sm:w-64">
+          <div className="relative min-w-50 sm:w-64">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari nama atau NISN..."
-              className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-slate-400 bg-slate-50"
+              className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-400 bg-slate-50"
             />
             <span className="absolute left-2.5 top-2.5 text-xs text-slate-400">🔍</span>
           </div>
