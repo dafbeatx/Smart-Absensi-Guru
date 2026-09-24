@@ -125,13 +125,24 @@ export async function authenticateUser(req: any): Promise<AuthContext> {
   const tokenHash = hashSessionToken(rawToken);
 
   try {
-    const { data: session, error } = await serverSupabase
+    let { data: session, error } = await serverSupabase
       .from('user_sessions')
       .select('id, user_id, device_uuid, expires_at, revoked_at, users:user_id(id, nip, full_name, role, position, account_status, avatar_url, phone_number)')
       .eq('token_hash', tokenHash)
       .maybeSingle();
 
     if (error || !session) {
+      const { data: directSess } = await serverSupabase
+        .from('user_sessions')
+        .select('id, user_id, device_uuid, expires_at, revoked_at')
+        .eq('token_hash', tokenHash)
+        .maybeSingle();
+      if (directSess) {
+        session = directSess;
+      }
+    }
+
+    if (!session) {
       return {
         ok: false,
         status: 401,
@@ -159,7 +170,18 @@ export async function authenticateUser(req: any): Promise<AuthContext> {
       };
     }
 
-    const user = Array.isArray(session.users) ? session.users[0] : session.users;
+    let user = Array.isArray(session.users) ? session.users[0] : session.users;
+    if (!user && session.user_id) {
+      const { data: directUser } = await serverSupabase
+        .from('users')
+        .select('id, nip, full_name, role, position, account_status, avatar_url, phone_number')
+        .eq('id', session.user_id)
+        .maybeSingle();
+      if (directUser) {
+        user = directUser;
+      }
+    }
+
     if (!user) {
       return {
         ok: false,
