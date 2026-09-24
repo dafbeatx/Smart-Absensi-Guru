@@ -4185,6 +4185,27 @@ export class SupabaseProvider implements IDataProvider {
       if (targetClass && targetName) {
         const naturalKey = getStudentNaturalKey(targetClass, targetName);
         await this.addDeletedStudentCloudTombstone(naturalKey);
+
+        const cleanName = targetName.trim().replace(/\s+/g, ' ');
+        // Purge any other duplicate rows in students table matching full_name
+        try {
+          await this.client
+            .from('students')
+            .delete()
+            .ilike('full_name', cleanName);
+        } catch (cleanErr) {
+          logger.warn('SupabaseProvider', 'Purge duplicate student rows error:', cleanErr);
+        }
+
+        // Purge matching student account in GradeMaster
+        try {
+          await this.client
+            .from('gm_student_accounts')
+            .delete()
+            .ilike('student_name', cleanName);
+        } catch (gmAccErr) {
+          logger.debug('SupabaseProvider', 'Cleanup gm_student_accounts note:', gmAccErr);
+        }
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'deleteStudent DB exception:', err);

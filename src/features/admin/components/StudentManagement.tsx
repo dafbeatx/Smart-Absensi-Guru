@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { StudentItem } from '../../../types/database.types';
-import { StudentRepository, STUDENTS_UPDATED_EVENT } from '../../../repositories/StudentRepository';
+import { StudentRepository, STUDENTS_UPDATED_EVENT, getStudentNaturalKey } from '../../../repositories/StudentRepository';
 import { formatClassDisplay } from '../../../utils/class.utils';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -413,9 +413,16 @@ export const StudentManagement: React.FC = () => {
     const targetId = deleteTarget.id;
     const targetClass = deleteTarget.className;
     const targetName = deleteTarget.fullName;
+    const targetKey = getStudentNaturalKey(targetClass, targetName);
     setIsSaving(true);
     try {
-      setStudents((prev) => prev.filter((s) => s.id !== targetId));
+      setStudents((prev) =>
+        prev.filter((s) => {
+          if (s.id === targetId) return false;
+          if (getStudentNaturalKey(s.className, s.fullName) === targetKey) return false;
+          return true;
+        })
+      );
       setDeleteTarget(null);
 
       const ok = await StudentRepository.deleteStudent(targetId, undefined, {

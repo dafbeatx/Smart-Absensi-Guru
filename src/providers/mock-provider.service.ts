@@ -2219,10 +2219,18 @@ export class MockProvider implements IDataProvider {
     const target = rawList.find((s) => s.id === id);
     const targetClass = studentInfo?.className || target?.className;
     const targetName = studentInfo?.fullName || target?.fullName;
+    let targetNaturalKey: string | null = null;
     if (targetClass && targetName) {
+      targetNaturalKey = getStudentNaturalKey(targetClass, targetName);
       recordDeletedStudentKey(targetClass, targetName);
     }
-    const filtered = rawList.filter((s) => s.id !== id);
+    const filtered = rawList.filter((s) => {
+      if (s.id === id) return false;
+      if (targetNaturalKey && getStudentNaturalKey(s.className, s.fullName) === targetNaturalKey) {
+        return false;
+      }
+      return true;
+    });
     await this.saveStudents(filtered, token);
     return true;
   }

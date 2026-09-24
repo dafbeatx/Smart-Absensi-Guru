@@ -23,6 +23,7 @@ import type {
 import type { ExamInvigilationMatrix } from './exam-matrix-builder.service';
 import { SIGNATORY_OFFICIALS, getDynamicBranding } from '../lib/excel-generator.lib';
 import { normalizeClassCode } from '../utils/class.utils';
+import { getDeletedStudentKeys, getStudentNaturalKey } from '../utils/student-dedup.utils';
 
 export type AdminDocType =
   | 'PROCTOR_ATTENDANCE'
@@ -1123,15 +1124,20 @@ export class ExamAdministrativeDocsService {
           customMap[`Ruang ${String(roomNum).padStart(2, '0')}`];
 
         if (matchingCustom && matchingCustom.length > 0) {
-          let sortedCustom = matchingCustom;
+          const deletedKeys = getDeletedStudentKeys();
+          const cleanCustom = matchingCustom.filter((st) => {
+            const key = getStudentNaturalKey(st.className, st.fullName);
+            return !deletedKeys.has(key);
+          });
+          let sortedCustom = cleanCustom;
           if (roomNum === 1 || idx === 0) {
-            const males = matchingCustom
+            const males = cleanCustom
               .filter((s) => (s.gender || 'L').toUpperCase() === 'L')
               .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'id'));
-            const females = matchingCustom
+            const females = cleanCustom
               .filter((s) => (s.gender || '').toUpperCase() === 'P')
               .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'id'));
-            const others = matchingCustom
+            const others = cleanCustom
               .filter((s) => (s.gender || '').toUpperCase() !== 'L' && (s.gender || '').toUpperCase() !== 'P')
               .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'id'));
             sortedCustom = [...males, ...females, ...others];
@@ -1173,7 +1179,13 @@ export class ExamAdministrativeDocsService {
               : this.OFFICIAL_SMP_ROOM_1_STUDENTS;
           }
 
-          verifiedMap[rName] = (fallback || this.OFFICIAL_SMP_ROOM_1_STUDENTS).map((st, i) => {
+          const deletedKeys = getDeletedStudentKeys();
+          const activeFallback = (fallback || this.OFFICIAL_SMP_ROOM_1_STUDENTS).filter((st) => {
+            const key = getStudentNaturalKey(st.className, st.fullName);
+            return !deletedKeys.has(key);
+          });
+
+          verifiedMap[rName] = activeFallback.map((st, i) => {
             const participantNumber = `${prefix}${String(globalIndex).padStart(3, '0')}`;
             globalIndex++;
             return {
@@ -1278,16 +1290,24 @@ export class ExamAdministrativeDocsService {
         ? options.studentsList
         : cachedStudents;
 
-    if (sourceStudents.length > 0) {
+    const deletedKeys = getDeletedStudentKeys();
+    const cleanSourceStudents = sourceStudents.filter((s) => {
+      const rawCls = s.className || (s as any).kelas || '';
+      const rawName = s.fullName || (s as any).name || '';
+      const key = getStudentNaturalKey(rawCls, rawName);
+      return !deletedKeys.has(key);
+    });
+
+    if (cleanSourceStudents.length > 0) {
       const targetLevel = isSma ? 'SMA' : 'SMP';
-      const levelFiltered = sourceStudents.filter((s) => {
+      const levelFiltered = cleanSourceStudents.filter((s) => {
         const rawCls = s.className || s.kelas || '';
         const normCls = normalizeClassCode(rawCls);
         const isClsSma = /^10|11|12|SMA|IPA|IPS/i.test(normCls) || /10|11|12|X|XI|XII|SMA|IPA|IPS/i.test(rawCls);
         return targetLevel === 'SMA' ? isClsSma : !isClsSma;
       });
 
-      const studentsToUse = levelFiltered.length > 0 ? levelFiltered : sourceStudents;
+      const studentsToUse = levelFiltered.length > 0 ? levelFiltered : cleanSourceStudents;
       studentsToUse.forEach((s) => {
         const targetRoom = getTargetRoomForStudent(s);
         const normClass = normalizeClassCode(s.className || s.kelas || '') || (
@@ -1319,22 +1339,28 @@ export class ExamAdministrativeDocsService {
     rooms.forEach((rName, idx) => {
       if (!rawStudentMap[rName] || rawStudentMap[rName].length === 0) {
         const roomNum = parseInt(rName.replace(/[^\d]/g, ''), 10);
+        let fallbackList: Array<{ fullName: string; gender: string; className: string }> = [];
         if (roomNum === 6 || rName.includes('6')) {
           // Ruang 6 is SMA: Kelas 10, 11, 12 (36 siswa)
-          rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_6_STUDENTS];
+          fallbackList = this.OFFICIAL_SMA_ROOM_6_STUDENTS;
         } else if (isSma) {
-          if (idx === 0) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_1_STUDENTS];
-          else if (idx === 1) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_2_STUDENTS];
-          else if (idx === 2) rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_3_STUDENTS];
-          else rawStudentMap[rName] = [...this.OFFICIAL_SMA_ROOM_6_STUDENTS];
+          if (idx === 0) fallbackList = this.OFFICIAL_SMA_ROOM_1_STUDENTS;
+          else if (idx === 1) fallbackList = this.OFFICIAL_SMA_ROOM_2_STUDENTS;
+          else if (idx === 2) fallbackList = this.OFFICIAL_SMA_ROOM_3_STUDENTS;
+          else fallbackList = this.OFFICIAL_SMA_ROOM_6_STUDENTS;
         } else {
-          if (roomNum === 1 || idx === 0) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_1_STUDENTS];
-          else if (roomNum === 2 || idx === 1) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_2_STUDENTS];
-          else if (roomNum === 3 || idx === 2) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_3_STUDENTS];
-          else if (roomNum === 4 || idx === 3) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_4_STUDENTS];
-          else if (roomNum === 5 || idx === 4) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_5_STUDENTS];
-          else rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_1_STUDENTS];
+          if (roomNum === 1 || idx === 0) fallbackList = this.OFFICIAL_SMP_ROOM_1_STUDENTS;
+          else if (roomNum === 2 || idx === 1) fallbackList = this.OFFICIAL_SMP_ROOM_2_STUDENTS;
+          else if (roomNum === 3 || idx === 2) fallbackList = this.OFFICIAL_SMP_ROOM_3_STUDENTS;
+          else if (roomNum === 4 || idx === 3) fallbackList = this.OFFICIAL_SMP_ROOM_4_STUDENTS;
+          else if (roomNum === 5 || idx === 4) fallbackList = this.OFFICIAL_SMP_ROOM_5_STUDENTS;
+          else fallbackList = this.OFFICIAL_SMP_ROOM_1_STUDENTS;
         }
+        const activeFallback = fallbackList.filter((st) => {
+          const key = getStudentNaturalKey(st.className, st.fullName);
+          return !deletedKeys.has(key);
+        });
+        rawStudentMap[rName] = [...activeFallback];
       }
     });
 

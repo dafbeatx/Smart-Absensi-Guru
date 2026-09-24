@@ -10,7 +10,7 @@ export const DELETED_STUDENTS_STORAGE_KEY = 'smart_absensi_deleted_students';
 
 const memoryStore = new Map<string, string>();
 
-const safeGetStorage = (key: string): string | null => {
+export const safeGetStorage = (key: string): string | null => {
   try {
     if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.getItem === 'function') {
       const val = localStorage.getItem(key);
@@ -22,7 +22,7 @@ const safeGetStorage = (key: string): string | null => {
   return memoryStore.get(key) || null;
 };
 
-const safeSetStorage = (key: string, value: string): void => {
+export const safeSetStorage = (key: string, value: string): void => {
   memoryStore.set(key, value);
   try {
     if (typeof localStorage !== 'undefined' && localStorage && typeof localStorage.setItem === 'function') {

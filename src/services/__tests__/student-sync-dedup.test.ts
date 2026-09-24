@@ -9,7 +9,8 @@
  */
 
 import { StudentRepository, clearDeletedStudentKeys, getDeletedStudentKeys } from '../../repositories/StudentRepository';
-import { deduplicateStudents, getStudentNaturalKey } from '../../utils/student-dedup.utils';
+import { deduplicateStudents, getStudentNaturalKey, safeSetStorage } from '../../utils/student-dedup.utils';
+import { ExamAdministrativeDocsService } from '../exam-administrative-docs.service';
 import type { TestResultItem } from '../test-runner.service';
 import type { StudentItem } from '../../types/database.types';
 
@@ -214,6 +215,85 @@ export const runStudentSyncDedupTestSuite = async (): Promise<{
       'Sync 05: Re-added student remains safely in directory without duplicates',
       matchingFinal.length === 1,
       `Matching count: ${matchingFinal.length} (Expected exactly 1)`
+    );
+
+    // =========================================================================
+    // Test 7: Deleting a student purges any duplicate IDs in storage
+    // =========================================================================
+    const currentList = await StudentRepository.getStudents();
+    const dup1: StudentItem = {
+      id: 'std_dup_01',
+      nisn: '',
+      fullName: 'ROMADONA',
+      className: '8A',
+      academicYear: '2026/2027',
+      gender: 'P',
+      cardStatus: 'ACTIVE',
+      attendanceRate: 100,
+      created_at: new Date().toISOString(),
+    };
+    const dup2: StudentItem = {
+      id: 'std_dup_02',
+      nisn: '',
+      fullName: 'ROMADONA',
+      className: '8A',
+      academicYear: '2026/2027',
+      gender: 'P',
+      cardStatus: 'ACTIVE',
+      attendanceRate: 100,
+      created_at: new Date().toISOString(),
+    };
+    const rawMockList = [...currentList, dup1, dup2];
+    safeSetStorage('smart_absensi_students', JSON.stringify(rawMockList));
+
+    await StudentRepository.deleteStudent(dup1.id, undefined, {
+      className: dup1.className,
+      fullName: dup1.fullName,
+    });
+
+    const listAfterDeleteDups = await StudentRepository.getStudents();
+    const hasRomadona = listAfterDeleteDups.some(
+      (s) => s.fullName.toUpperCase().includes('ROMADONA')
+    );
+
+    assert(
+      'Purge 01: Deleting a student eliminates all duplicate ID entries matching natural key',
+      !hasRomadona,
+      `ROMADONA found: ${hasRomadona}, Remaining: ${listAfterDeleteDups.length}`
+    );
+
+    // =========================================================================
+    // Test 8: Deleted student never appears in exam room rosters
+    // =========================================================================
+    const examScheduleFixture: any = {
+      id: 'sch_sync_test',
+      config: {
+        examType: 'ASTS',
+        academicYear: '2026/2027',
+        totalRooms: 5,
+      },
+    };
+
+    const customMapWithDeleted: any = {
+      'Ruang 02': [
+        { urut: 1, participantNumber: '13-0820-031', fullName: 'ROMADONA', gender: 'P', className: '8A' },
+        { urut: 2, participantNumber: '13-0820-032', fullName: 'BILQIS NUR AZIZAH', gender: 'P', className: '8A' },
+      ],
+    };
+
+    const resolvedMap = ExamAdministrativeDocsService.resolveRoomStudents(examScheduleFixture, {
+      customRoomStudentsMap: customMapWithDeleted,
+    });
+
+    const r2Resolved = resolvedMap['Ruang 02'] || [];
+    const containsDeletedInExam = r2Resolved.some(
+      (s) => s.fullName.toUpperCase().includes('ROMADONA')
+    );
+
+    assert(
+      'Exam 01: Deleted student is completely excluded from exam room rosters and seating',
+      !containsDeletedInExam && r2Resolved.some((s) => s.fullName.includes('BILQIS')),
+      `Contains deleted: ${containsDeletedInExam}, R2 count: ${r2Resolved.length}`
     );
 
   } catch (err: unknown) {
