@@ -722,6 +722,30 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
     'Official styles do not enforce @page A4 portrait with margins'
   );
 
+  // -------------------------------------------------------------
+  // TEST 11: Dynamic Student Directory Sync & Class Normalization
+  // -------------------------------------------------------------
+  const sample15Students8A = [
+    ...ExamAdministrativeDocsService.OFFICIAL_SMP_ROOM_2_STUDENTS.slice(0, 14),
+    { fullName: 'SISWA BARU KELAS 8A', gender: 'P', className: 'Kelas 8A' },
+  ];
+  const dynamicStudentsList = [
+    ...ExamAdministrativeDocsService.OFFICIAL_SMP_ROOM_1_STUDENTS,
+    ...sample15Students8A,
+  ];
+
+  const resolvedDynamicMap = ExamAdministrativeDocsService.resolveRoomStudents(sampleScheduleData, {
+    studentsList: dynamicStudentsList,
+  });
+
+  const dynamicR2Students = resolvedDynamicMap['Ruang 02'] || [];
+  assert(
+    '24. resolveRoomStudents synchronizes with studentsList, normalizes "Kelas 8A", and includes 15 students in Ruang 02',
+    dynamicR2Students.length === 15 &&
+      dynamicR2Students.some((s) => s.fullName === 'SISWA BARU KELAS 8A'),
+    `Expected 15 students in Ruang 02 with SISWA BARU KELAS 8A, got ${dynamicR2Students.length}`
+  );
+
   // Clean up any test files written by XLSX.writeFile during node execution if created
   try {
     const fs = await import('fs');

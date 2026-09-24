@@ -31,6 +31,23 @@ const safeSetStorage = (key: string, value: string): void => {
   }
 };
 
+export const clearExamRosterCaches = (): void => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('smart_absensi_exam_student_roster_') || k === 'smart_absensi_exam_student_roster_custom')) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    }
+  } catch {
+    // ignore
+  }
+};
+
 export class StudentRepository {
   /**
    * Retrieves all students from the active provider with local caching & fallback.
@@ -192,6 +209,7 @@ export class StudentRepository {
     try {
       // 1. Save to local storage for instant responsiveness
       safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(students));
+      clearExamRosterCaches();
 
       // 2. Dispatch cross-tab / window sync event
       if (typeof window !== 'undefined') {
@@ -217,6 +235,7 @@ export class StudentRepository {
     student: Omit<StudentItem, 'id' | 'created_at'>,
     token?: string
   ): Promise<StudentItem> {
+    clearExamRosterCaches();
     const provider = ProviderFactory.getProvider();
     const created = await provider.createStudent(student, token);
 
@@ -259,6 +278,7 @@ export class StudentRepository {
     updates: Partial<StudentItem>,
     token?: string
   ): Promise<boolean> {
+    clearExamRosterCaches();
     const provider = ProviderFactory.getProvider();
     const success = await provider.updateStudent(id, updates, token);
 
@@ -267,6 +287,7 @@ export class StudentRepository {
         const freshList = await provider.getStudents(token);
         if (Array.isArray(freshList) && freshList.length > 0) {
           safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(freshList));
+          clearExamRosterCaches();
           if (typeof window !== 'undefined') {
             window.dispatchEvent(
               new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: freshList })
@@ -283,6 +304,7 @@ export class StudentRepository {
       if (idx !== -1) {
         existing[idx] = { ...existing[idx], ...updates };
         safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(existing));
+        clearExamRosterCaches();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: existing })
@@ -298,6 +320,7 @@ export class StudentRepository {
    * Deletes a student record by ID.
    */
   public static async deleteStudent(id: string, token?: string): Promise<boolean> {
+    clearExamRosterCaches();
     const provider = ProviderFactory.getProvider();
     const success = await provider.deleteStudent(id, token);
 
@@ -306,6 +329,7 @@ export class StudentRepository {
         const freshList = await provider.getStudents(token);
         if (Array.isArray(freshList)) {
           safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(freshList));
+          clearExamRosterCaches();
           if (typeof window !== 'undefined') {
             window.dispatchEvent(
               new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: freshList })
@@ -320,6 +344,7 @@ export class StudentRepository {
       const existing = await this.getStudents(token);
       const filtered = existing.filter((s) => s.id !== id);
       safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(filtered));
+      clearExamRosterCaches();
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: filtered })
@@ -379,10 +404,12 @@ export class StudentRepository {
     academicYear = '2026/2027',
     token?: string
   ): Promise<{ syncedCount: number; classesCount: number }> {
+    clearExamRosterCaches();
     const provider = ProviderFactory.getProvider();
     const result = await provider.syncStudentsFromGradeMaster(academicYear, token);
     const updated = await provider.getStudents(token);
     safeSetStorage(STUDENTS_STORAGE_KEY, JSON.stringify(updated));
+    clearExamRosterCaches();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent(STUDENTS_UPDATED_EVENT, { detail: updated })

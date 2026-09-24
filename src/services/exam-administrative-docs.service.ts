@@ -22,6 +22,7 @@ import type {
 } from '../types/exam-schedule.types';
 import type { ExamInvigilationMatrix } from './exam-matrix-builder.service';
 import { SIGNATORY_OFFICIALS, getDynamicBranding } from '../lib/excel-generator.lib';
+import { normalizeClassCode } from '../utils/class.utils';
 
 export type AdminDocType =
   | 'PROCTOR_ATTENDANCE'
@@ -1205,17 +1206,20 @@ export class ExamAdministrativeDocsService {
         if (rooms.includes(canon)) return canon;
       }
 
-      const rawCls = (st.className || (st as any).class || (st as any).kelas || '').trim().toUpperCase();
-      const clsNorm = rawCls.replace(/\s+/g, '');
+      const rawCls = (st.className || (st as any).class || (st as any).kelas || '').trim();
+      const normCls = normalizeClassCode(rawCls);
+      const rawUpper = rawCls.toUpperCase().replace(/\s+/g, '');
 
       // 1. Check if classRoomMapping maps this class to a room
       if (scheduleData.config.classRoomMapping) {
         for (const [clsKey, rVal] of Object.entries(scheduleData.config.classRoomMapping)) {
-          const normKey = clsKey.trim().toUpperCase().replace(/\s+/g, '');
+          const normKey = normalizeClassCode(clsKey);
+          const rawKey = clsKey.trim().toUpperCase().replace(/\s+/g, '');
           if (
-            normKey === clsNorm ||
-            clsNorm === normKey ||
-            (clsNorm.length >= 2 && normKey.length >= 2 && (clsNorm.includes(normKey) || normKey.includes(clsNorm)))
+            (normKey && normKey === normCls) ||
+            (rawKey && rawKey === rawUpper) ||
+            (normCls.length >= 2 && normKey.length >= 2 && (normCls.includes(normKey) || normKey.includes(normCls))) ||
+            (rawUpper.length >= 2 && rawKey.length >= 2 && (rawUpper.includes(rawKey) || rawKey.includes(rawUpper)))
           ) {
             const canon = this.canonicalRoomName(rVal);
             if (rooms.includes(canon)) return canon;
@@ -1224,16 +1228,16 @@ export class ExamAdministrativeDocsService {
       }
 
       // 2. Check if student belongs to SMA (Kelas 10, 11, 12, SMA, IPA, IPS)
-      const isStudentSma = /^10|11|12|X|XI|XII|SMA|IPA|IPS/i.test(clsNorm);
+      const isStudentSma = /^10|11|12|SMA|IPA|IPS/i.test(normCls) || /10|11|12|X|XI|XII|SMA|IPA|IPS/i.test(rawUpper);
       if (isStudentSma) {
         // If Ruang 06 exists in rooms, all SMA students go to Ruang 06!
         const r6 = rooms.find((r) => parseInt(r.replace(/[^\d]/g, ''), 10) === 6);
         if (r6) return r6;
 
         // If multiple separate SMA rooms exist (e.g. Ruang 1 = 10, Ruang 2 = 11, Ruang 3 = 12)
-        if (/^10|X$|X[A-Z]/.test(clsNorm)) return rooms[0] || 'Ruang 01';
-        if (/^11|XI$|XI[A-Z]/.test(clsNorm)) return rooms[1] || 'Ruang 02';
-        if (/^12|XII$|XII[A-Z]/.test(clsNorm)) return rooms[2] || 'Ruang 03';
+        if (/^10/.test(normCls)) return rooms[0] || 'Ruang 01';
+        if (/^11/.test(normCls)) return rooms[1] || 'Ruang 02';
+        if (/^12/.test(normCls)) return rooms[2] || 'Ruang 03';
         return rooms[0] || 'Ruang 01';
       }
 
@@ -1244,28 +1248,16 @@ export class ExamAdministrativeDocsService {
       // Ruang 4 -> Kelas 9B
       // Ruang 5 -> Kelas 8B
       const findRoomByNum = (n: number) => rooms.find((r) => parseInt(r.replace(/[^\d]/g, ''), 10) === n);
-      if (/^8A|VIIIA/.test(clsNorm)) return findRoomByNum(2) || rooms[1] || 'Ruang 02';
-      if (/^8B|VIIIB/.test(clsNorm)) return findRoomByNum(5) || rooms[4] || 'Ruang 05';
-      if (/^9A|IXA/.test(clsNorm)) return findRoomByNum(3) || rooms[2] || 'Ruang 03';
-      if (/^9B|IXB/.test(clsNorm)) return findRoomByNum(4) || rooms[3] || 'Ruang 04';
-      if (/^7|VII/.test(clsNorm)) return findRoomByNum(1) || rooms[0] || 'Ruang 01';
-      if (/^8|VIII/.test(clsNorm)) return findRoomByNum(2) || rooms[1] || 'Ruang 02';
-      if (/^9|IX/.test(clsNorm)) return findRoomByNum(3) || rooms[2] || 'Ruang 03';
+      if (/^8A/i.test(normCls) || /^8A|VIIIA/i.test(rawUpper)) return findRoomByNum(2) || rooms[1] || 'Ruang 02';
+      if (/^8B/i.test(normCls) || /^8B|VIIIB/i.test(rawUpper)) return findRoomByNum(5) || rooms[4] || 'Ruang 05';
+      if (/^9A/i.test(normCls) || /^9A|IXA/i.test(rawUpper)) return findRoomByNum(3) || rooms[2] || 'Ruang 03';
+      if (/^9B/i.test(normCls) || /^9B|IXB/i.test(rawUpper)) return findRoomByNum(4) || rooms[3] || 'Ruang 04';
+      if (/^7/i.test(normCls) || /^7|VII/i.test(rawUpper)) return findRoomByNum(1) || rooms[0] || 'Ruang 01';
+      if (/^8/i.test(normCls) || /^8|VIII/i.test(rawUpper)) return findRoomByNum(2) || rooms[1] || 'Ruang 02';
+      if (/^9/i.test(normCls) || /^9|IX/i.test(rawUpper)) return findRoomByNum(3) || rooms[2] || 'Ruang 03';
 
       return rooms[0] || 'Ruang 01';
     };
-
-    if (options?.studentsList && options.studentsList.length > 0) {
-      options.studentsList.forEach((st) => {
-        const targetRoom = getTargetRoomForStudent(st);
-        if (!rawStudentMap[targetRoom]) rawStudentMap[targetRoom] = [];
-        rawStudentMap[targetRoom].push({
-          fullName: st.fullName,
-          gender: st.gender || 'L',
-          className: st.className,
-        });
-      });
-    }
 
     let cachedStudents: any[] = [];
     try {
@@ -1280,17 +1272,32 @@ export class ExamAdministrativeDocsService {
       }
     } catch {}
 
-    if (cachedStudents.length > 0) {
+    const sourceStudents: any[] =
+      options?.studentsList && options.studentsList.length > 0
+        ? options.studentsList
+        : cachedStudents;
+
+    if (sourceStudents.length > 0) {
       const targetLevel = isSma ? 'SMA' : 'SMP';
-      const levelFiltered = cachedStudents.filter((s) => {
-        const cls = s.className || s.kelas || '';
-        const isClsSma = /10|11|12|sma|ipa|ips/i.test(cls);
+      const levelFiltered = sourceStudents.filter((s) => {
+        const rawCls = s.className || s.kelas || '';
+        const normCls = normalizeClassCode(rawCls);
+        const isClsSma = /^10|11|12|SMA|IPA|IPS/i.test(normCls) || /10|11|12|X|XI|XII|SMA|IPA|IPS/i.test(rawCls);
         return targetLevel === 'SMA' ? isClsSma : !isClsSma;
       });
 
-      const studentsToUse = levelFiltered.length > 0 ? levelFiltered : cachedStudents;
+      const studentsToUse = levelFiltered.length > 0 ? levelFiltered : sourceStudents;
       studentsToUse.forEach((s) => {
         const targetRoom = getTargetRoomForStudent(s);
+        const normClass = normalizeClassCode(s.className || s.kelas || '') || (
+          targetRoom.includes('6') ? '10' :
+          targetRoom.includes('1') ? '7' :
+          targetRoom.includes('2') ? '8A' :
+          targetRoom.includes('3') ? '9A' :
+          targetRoom.includes('4') ? '9B' :
+          targetRoom.includes('5') ? '8B' : '7'
+        );
+
         // Hindari duplikasi jika sudah ada siswa bernama sama di ruangan
         const existingInRoom = rawStudentMap[targetRoom] || [];
         const isAlreadyAdded = existingInRoom.some(
@@ -1299,16 +1306,9 @@ export class ExamAdministrativeDocsService {
         if (!isAlreadyAdded) {
           if (!rawStudentMap[targetRoom]) rawStudentMap[targetRoom] = [];
           rawStudentMap[targetRoom].push({
-            fullName: s.fullName || s.name || 'Siswa',
-            gender: s.gender || (/8A|9A/i.test(s.className || '') ? 'P' : 'L'),
-            className: s.className || s.kelas || (
-              targetRoom.includes('6') ? '10' :
-              targetRoom.includes('1') ? '7' :
-              targetRoom.includes('2') ? '8A' :
-              targetRoom.includes('3') ? '9A' :
-              targetRoom.includes('4') ? '9B' :
-              targetRoom.includes('5') ? '8B' : '7'
-            ),
+            fullName: (s.fullName || s.name || 'Siswa').toUpperCase(),
+            gender: s.gender || (/8A|9A/i.test(normClass) ? 'P' : 'L'),
+            className: normClass,
           });
         }
       });
@@ -1338,10 +1338,11 @@ export class ExamAdministrativeDocsService {
     });
 
     // 2c. ATURAN RESMI: Khusus Kelas 7 (Ruang 1), urutkan siswa LAKI-LAKI terlebih dahulu (A-Z), baru PEREMPUAN (A-Z)
+    // Untuk ruangan lainnya (Ruang 2: 8A, Ruang 3: 9A, Ruang 4: 9B, Ruang 5: 8B, Ruang 6: SMA), urutkan secara alfabetis A-Z
     rooms.forEach((rName, idx) => {
       const roomNum = parseInt(rName.replace(/[^\d]/g, ''), 10);
+      const currentList = rawStudentMap[rName] || [];
       if (roomNum === 1 || idx === 0) {
-        const currentList = rawStudentMap[rName] || [];
         const males = currentList
           .filter((s) => (s.gender || 'L').toUpperCase() === 'L')
           .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
@@ -1352,6 +1353,10 @@ export class ExamAdministrativeDocsService {
           .filter((s) => (s.gender || '').toUpperCase() !== 'L' && (s.gender || '').toUpperCase() !== 'P')
           .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
         rawStudentMap[rName] = [...males, ...females, ...others];
+      } else {
+        rawStudentMap[rName] = [...currentList].sort((a, b) =>
+          a.fullName.localeCompare(b.fullName, 'id')
+        );
       }
     });
 

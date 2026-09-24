@@ -16,7 +16,7 @@
  * - Unduh Excel (.xlsx A4 Page Setup)
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   X,
   Printer,
@@ -36,6 +36,7 @@ import {
   RotateCcw,
   Eye,
   Hash,
+  RefreshCw,
 } from 'lucide-react';
 import type {
   ExamScheduleData,
@@ -47,7 +48,7 @@ import {
   type AdminDocType,
   type AdminDocOptions,
 } from '../../../services/exam-administrative-docs.service';
-import { STUDENTS_UPDATED_EVENT } from '../../../repositories/StudentRepository';
+import { StudentRepository, STUDENTS_UPDATED_EVENT } from '../../../repositories/StudentRepository';
 
 interface ExamAdministrativeDocsModalProps {
   isOpen: boolean;
@@ -164,6 +165,9 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     gender: string;
     className: string;
   }>>>(() => {
+    // 1. Ambil resolusi default langsung dari direktori siswa terbaru
+    const freshFromDir = ExamAdministrativeDocsService.resolveRoomStudents(scheduleData, { includeNumberPrefix: true });
+
     try {
       if (typeof localStorage !== 'undefined') {
         const level = scheduleData.educationLevel || scheduleData.config.educationLevel || (isSma ? 'SMA' : 'SMP');
@@ -182,7 +186,29 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               !r1List.some((s: any) => s.gender === 'L') ||
               r1List[0].gender === 'P'
             );
-            if (!isStaleSmpOrder && !isStaleClass7Gender) {
+
+            // Periksa apakah jumlah atau susunan siswa di saved berbeda dengan direktori siswa terbaru
+            // Jika ada selisih (misal admin baru menambahkan siswa di direktori siswa),
+            // maka cache saved sudah USANG (stale) dan WAJIB menggunakan freshFromDir!
+            let isRosterStale = false;
+            for (const roomKey of Object.keys(freshFromDir)) {
+              const freshList = freshFromDir[roomKey] || [];
+              const savedList = parsed[roomKey] || parsed[`Ruang ${parseInt(roomKey.replace(/\D/g, ''), 10)}`] || [];
+              if (freshList.length !== savedList.length) {
+                isRosterStale = true;
+                break;
+              }
+              const savedNames = new Set(savedList.map((s: any) => (s.fullName || '').toUpperCase()));
+              for (const st of freshList) {
+                if (!savedNames.has((st.fullName || '').toUpperCase())) {
+                  isRosterStale = true;
+                  break;
+                }
+              }
+              if (isRosterStale) break;
+            }
+
+            if (!isStaleSmpOrder && !isStaleClass7Gender && !isRosterStale) {
               return parsed;
             }
           }
@@ -191,7 +217,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     } catch (e) {
       console.warn('Gagal membaca custom roster tersimpan:', e);
     }
-    return ExamAdministrativeDocsService.resolveRoomStudents(scheduleData, { includeNumberPrefix: true });
+    return freshFromDir;
   });
 
   // Persist custom roster to localStorage on any modification
@@ -224,24 +250,42 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     }
   }, [availableRooms, scheduleData, customRosterMap]);
 
-  // Sinkronisasi otomatis: ketika admin menambahkan/mengedit/menghapus siswa
-  // di Direktori Siswa & RFID, invalidasi cache roster admin lalu regenerasi
-  // dari resolveRoomStudents (yang membaca data siswa terbaru dari localStorage)
-  useEffect(() => {
-    const handleStudentsUpdated = () => {
-      // Hapus cache roster lama agar resolveRoomStudents membaca data siswa terbaru
+  // Sinkronisasi otomatis: ambil data siswa terkini dari StudentRepository saat modal terbuka
+  // dan dengarkan perubahan real-time dari Direktori Siswa & RFID
+  const syncWithStudentDirectory = useCallback(async (showNotice = false) => {
+    try {
+      const freshStudents = await StudentRepository.getStudents();
+      const freshMap = ExamAdministrativeDocsService.resolveRoomStudents(
+        scheduleData,
+        {
+          includeNumberPrefix: true,
+          studentsList: freshStudents && freshStudents.length > 0 ? freshStudents : undefined,
+        }
+      );
+
       try {
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem(storageKey);
+          localStorage.setItem(storageKey, JSON.stringify(freshMap));
         }
       } catch { /* ignore */ }
 
-      // Regenerasi roster dari data siswa terbaru
-      const freshMap = ExamAdministrativeDocsService.resolveRoomStudents(
-        scheduleData,
-        { includeNumberPrefix: true }
-      );
       setCustomRosterMap(freshMap);
+      if (showNotice) {
+        showToast('Berhasil disinkronkan dengan data terbaru Direktori Siswa & RFID!');
+      }
+    } catch (err) {
+      console.warn('Gagal sinkron data siswa ke dokumen administrasi:', err);
+    }
+  }, [scheduleData, storageKey]);
+
+  useEffect(() => {
+    if (isOpen) {
+      syncWithStudentDirectory();
+    }
+
+    const handleStudentsUpdated = () => {
+      syncWithStudentDirectory();
     };
 
     if (typeof window !== 'undefined') {
@@ -258,7 +302,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
         window.removeEventListener('storage', handleStorage);
       };
     }
-  }, [scheduleData, storageKey]);
+  }, [isOpen, syncWithStudentDirectory]);
 
   // Options payload for generator and exports
   const docOptions: AdminDocOptions = useMemo(() => {
@@ -601,6 +645,16 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
 
             <button
               type="button"
+              onClick={() => syncWithStudentDirectory(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+              title="Sinkronkan ulang daftar siswa dari Direktori Siswa & RFID terbaru"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
+              <span>Sinkron Siswa</span>
+            </button>
+
+            <button
+              type="button"
               onClick={onClose}
               className="w-8 h-8 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors ml-1 cursor-pointer"
             >
@@ -920,6 +974,16 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => syncWithStudentDirectory(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold transition-colors cursor-pointer"
+                  title="Sinkronkan seluruh ruangan dengan data terbaru dari Direktori Siswa & RFID"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Sinkron Direktori Siswa</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => handleResetRoom(activeEditRoom)}
