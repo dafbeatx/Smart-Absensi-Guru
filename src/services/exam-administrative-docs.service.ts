@@ -736,22 +736,37 @@ export class ExamAdministrativeDocsService {
   // =========================================================================
 
   public static readonly OFFICIAL_SMP_ROOM_1_STUDENTS = [
-    { fullName: 'AMANDA HASNA MIRZA', gender: 'P', className: '7' },
-    { fullName: 'BILQIS AINUN NISSA', gender: 'P', className: '7' },
-    { fullName: 'CASKIA APRILIA', gender: 'P', className: '7' },
-    { fullName: 'DONA', gender: 'P', className: '7' },
-    { fullName: 'KIRANA AURA ANWARUDIN', gender: 'P', className: '7' },
-    { fullName: 'NAJWA NUR FADILLAH', gender: 'P', className: '7' },
-    { fullName: 'NENG KASIH', gender: 'P', className: '7' },
-    { fullName: 'NATASYA HOLIVAH', gender: 'P', className: '7' },
-    { fullName: 'RADISTI PUTRI RIANTI', gender: 'P', className: '7' },
-    { fullName: 'RIZKA LIANA HAKIM', gender: 'P', className: '7' },
-    { fullName: 'SANTIKA', gender: 'P', className: '7' },
-    { fullName: 'SUCI RAHMAWATI', gender: 'P', className: '7' },
-    { fullName: 'TASYIRA AFIFA', gender: 'P', className: '7' },
-    { fullName: 'WANDA INDRIANI', gender: 'P', className: '7' },
-    { fullName: 'YOLA AULIA SANTOSO', gender: 'P', className: '7' },
-    { fullName: 'YUNA HANDAYANI', gender: 'P', className: '7' },
+    // Laki-laki (13 Siswa)
+    { fullName: 'AFHTAR SHAKIL', gender: 'L', className: '7' },
+    { fullName: 'AKBAR AZHI MUGHNI', gender: 'L', className: '7' },
+    { fullName: 'AL-DAFI PUTRA ASYABANI', gender: 'L', className: '7' },
+    { fullName: 'FATTURAHMAN RANGGA', gender: 'L', className: '7' },
+    { fullName: 'HANIFAH AL-QUSYARI', gender: 'L', className: '7' },
+    { fullName: 'IFHAM FATHAR MUBAROK', gender: 'L', className: '7' },
+    { fullName: 'MUHAMAD ARDHIANSYAH', gender: 'L', className: '7' },
+    { fullName: 'MUHAMAD IBNU ZIKRA', gender: 'L', className: '7' },
+    { fullName: 'MUHAMAD MILAN AZKA', gender: 'L', className: '7' },
+    { fullName: 'MUHAMAD RIDWAN AULAH', gender: 'L', className: '7' },
+    { fullName: 'MUHAMMAD HAMDAN ZULFAN', gender: 'L', className: '7' },
+    { fullName: 'MUHAMMAD NABIEL ALQARANI', gender: 'L', className: '7' },
+    { fullName: 'MUHAMMAD RIAN', gender: 'L', className: '7' },
+    // Perempuan (16 Siswa)
+    { fullName: 'ADIBA KHANSA AZ-ZAHRA', gender: 'P', className: '7' },
+    { fullName: 'CALISA CANIA MARYAM', gender: 'P', className: '7' },
+    { fullName: 'DELISA QEREN SURFINA', gender: 'P', className: '7' },
+    { fullName: 'FITRIANI AZAHRA', gender: 'P', className: '7' },
+    { fullName: 'HILYA HIMMATUL ALIYAH', gender: 'P', className: '7' },
+    { fullName: 'KEISHA PUTRI ELIANA', gender: 'P', className: '7' },
+    { fullName: 'KINARA AZZAHRA', gender: 'P', className: '7' },
+    { fullName: 'NAIRA RUBBIATUL HIKMAH', gender: 'P', className: '7' },
+    { fullName: 'NAZMA MARATUN SOLIHAH', gender: 'P', className: '7' },
+    { fullName: 'SELA MUTIA NUR AZIMAH', gender: 'P', className: '7' },
+    { fullName: 'SHIRIN FATINA JASMIN', gender: 'P', className: '7' },
+    { fullName: 'SITI NADIPATUL MALA', gender: 'P', className: '7' },
+    { fullName: "SYA'DATUN NISA", gender: 'P', className: '7' },
+    { fullName: 'TASYA NURASRI SETIAWAN', gender: 'P', className: '7' },
+    { fullName: 'VIODORA SHAKILA NUR ZAFIRA', gender: 'P', className: '7' },
+    { fullName: 'ZAHROFAL MAULA', gender: 'P', className: '7' },
   ];
 
   public static readonly OFFICIAL_SMP_ROOM_2_STUDENTS = [
@@ -998,13 +1013,27 @@ export class ExamAdministrativeDocsService {
           customMap[`Ruang ${String(roomNum).padStart(2, '0')}`];
 
         if (matchingCustom && matchingCustom.length > 0) {
-          verifiedMap[rName] = matchingCustom.map((st, i) => {
+          let sortedCustom = matchingCustom;
+          if (roomNum === 1 || idx === 0) {
+            const males = matchingCustom
+              .filter((s) => (s.gender || 'L').toUpperCase() === 'L')
+              .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'id'));
+            const females = matchingCustom
+              .filter((s) => (s.gender || '').toUpperCase() === 'P')
+              .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'id'));
+            const others = matchingCustom
+              .filter((s) => (s.gender || '').toUpperCase() !== 'L' && (s.gender || '').toUpperCase() !== 'P')
+              .sort((a, b) => (a.fullName || '').localeCompare(b.fullName || '', 'id'));
+            sortedCustom = [...males, ...females, ...others];
+          }
+
+          verifiedMap[rName] = sortedCustom.map((st, i) => {
             const participantNumber = st.participantNumber && st.participantNumber.trim() !== ''
               ? st.participantNumber
               : `${prefix}${String(globalIndex).padStart(3, '0')}`;
             globalIndex++;
             return {
-              urut: st.urut || i + 1,
+              urut: i + 1,
               participantNumber,
               fullName: (st.fullName || '').toUpperCase(),
               gender: st.gender || 'P',
@@ -1197,6 +1226,24 @@ export class ExamAdministrativeDocsService {
           else if (roomNum === 5 || idx === 4) rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_5_STUDENTS];
           else rawStudentMap[rName] = [...this.OFFICIAL_SMP_ROOM_1_STUDENTS];
         }
+      }
+    });
+
+    // 2c. ATURAN RESMI: Khusus Kelas 7 (Ruang 1), urutkan siswa LAKI-LAKI terlebih dahulu (A-Z), baru PEREMPUAN (A-Z)
+    rooms.forEach((rName, idx) => {
+      const roomNum = parseInt(rName.replace(/[^\d]/g, ''), 10);
+      if (roomNum === 1 || idx === 0) {
+        const currentList = rawStudentMap[rName] || [];
+        const males = currentList
+          .filter((s) => (s.gender || 'L').toUpperCase() === 'L')
+          .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+        const females = currentList
+          .filter((s) => (s.gender || '').toUpperCase() === 'P')
+          .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+        const others = currentList
+          .filter((s) => (s.gender || '').toUpperCase() !== 'L' && (s.gender || '').toUpperCase() !== 'P')
+          .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+        rawStudentMap[rName] = [...males, ...females, ...others];
       }
     });
 

@@ -150,7 +150,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
   // Storage key scoped to education level and schedule to prevent cross-level roster overwrites
   const storageKey = useMemo(() => {
     const level = scheduleData.educationLevel || scheduleData.config.educationLevel || (isSma ? 'SMA' : 'SMP');
-    return `smart_absensi_exam_student_roster_v2_${level}_${scheduleData.id || 'default'}`;
+    return `smart_absensi_exam_student_roster_v3_${level}_${scheduleData.id || 'default'}`;
   }, [scheduleData, isSma]);
 
   // Custom Editable Roster state (persisted to localStorage)
@@ -164,7 +164,7 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
     try {
       if (typeof localStorage !== 'undefined') {
         const level = scheduleData.educationLevel || scheduleData.config.educationLevel || (isSma ? 'SMA' : 'SMP');
-        const key = `smart_absensi_exam_student_roster_v2_${level}_${scheduleData.id || 'default'}`;
+        const key = `smart_absensi_exam_student_roster_v3_${level}_${scheduleData.id || 'default'}`;
         const saved = localStorage.getItem(key);
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -173,7 +173,13 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
             const isStaleSmpOrder = !isSma && (parsed['Ruang 03'] || parsed['Ruang 3'] || []).some(
               (s: any) => s.className === '8B'
             );
-            if (!isStaleSmpOrder) {
+            // Invalidate cache if SMP Ruang 01 has no males or first student is not male
+            const r1List = parsed['Ruang 01'] || parsed['Ruang 1'] || [];
+            const isStaleClass7Gender = !isSma && r1List.length > 0 && (
+              !r1List.some((s: any) => s.gender === 'L') ||
+              r1List[0].gender === 'P'
+            );
+            if (!isStaleSmpOrder && !isStaleClass7Gender) {
               return parsed;
             }
           }
@@ -349,7 +355,21 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       let globalIdx = 1;
       const newMap: typeof prev = {};
       availableRooms.forEach((r) => {
-        const list = prev[r] || [];
+        let list = prev[r] ? [...prev[r]] : [];
+        const roomNum = parseInt(r.replace(/[^\d]/g, ''), 10);
+        // Khusus Kelas 7 (Ruang 1): Laki-laki terlebih dahulu baru Perempuan
+        if (roomNum === 1 || r === availableRooms[0]) {
+          const males = list
+            .filter((s) => (s.gender || 'L').toUpperCase() === 'L')
+            .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+          const females = list
+            .filter((s) => (s.gender || '').toUpperCase() === 'P')
+            .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+          const others = list
+            .filter((s) => (s.gender || '').toUpperCase() !== 'L' && (s.gender || '').toUpperCase() !== 'P')
+            .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+          list = [...males, ...females, ...others];
+        }
         newMap[r] = list.map((s, idx) => {
           const participantNumber = `13-0820-${String(globalIdx).padStart(3, '0')}`;
           globalIdx++;
@@ -362,7 +382,32 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
       });
       return newMap;
     });
-    showToast('Nomor peserta berhasil diurutkan berurutan (13-0820-001 dst.) untuk seluruh ruangan!');
+    showToast('Nomor peserta berhasil diurutkan berurutan (Kelas 7: Laki-laki lalu Perempuan)!');
+  };
+
+  const handleSortClass7Gender = () => {
+    const room = availableRooms.find((r) => parseInt(r.replace(/[^\d]/g, ''), 10) === 1) || availableRooms[0] || 'Ruang 01';
+    setCustomRosterMap((prev) => {
+      const list = prev[room] ? [...prev[room]] : [];
+      const males = list
+        .filter((s) => (s.gender || 'L').toUpperCase() === 'L')
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+      const females = list
+        .filter((s) => (s.gender || '').toUpperCase() === 'P')
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+      const others = list
+        .filter((s) => (s.gender || '').toUpperCase() !== 'L' && (s.gender || '').toUpperCase() !== 'P')
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, 'id'));
+      const sorted = [...males, ...females, ...others].map((s, idx) => ({
+        ...s,
+        urut: idx + 1,
+      }));
+      return {
+        ...prev,
+        [room]: sorted,
+      };
+    });
+    showToast('Kelas 7 (Ruang 01) berhasil diurutkan: Laki-laki terlebih dahulu (A-Z), baru Perempuan (A-Z)!');
   };
 
   const handleResetRoom = (room: string) => {
@@ -809,6 +854,18 @@ export const ExamAdministrativeDocsModal: React.FC<ExamAdministrativeDocsModalPr
                   <Hash className="w-3.5 h-3.5 text-sky-700" />
                   <span>Urutkan No. Peserta (13-0820-001 dst.)</span>
                 </button>
+
+                {(parseInt(activeEditRoom.replace(/[^\d]/g, ''), 10) === 1 || activeEditRoom === availableRooms[0]) && (
+                  <button
+                    type="button"
+                    onClick={handleSortClass7Gender}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                    title="Urutkan siswa Kelas 7: Laki-laki terlebih dahulu (A-Z), baru Perempuan (A-Z)"
+                  >
+                    <Users className="w-3.5 h-3.5 text-indigo-700" />
+                    <span>Urutkan Laki-laki Dulu</span>
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">

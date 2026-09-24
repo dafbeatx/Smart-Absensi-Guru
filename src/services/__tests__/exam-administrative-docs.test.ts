@@ -356,9 +356,13 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   const r5Students = roomStudentsMap['Ruang 05'] || [];
 
   assert(
-    '10c. resolveRoomStudents allocates 5 rooms per class with exact class rosters (R1=7, R2=8A, R3=9A, R4=9B, R5=8B)',
-    r1Students.length === 16 &&
+    '10c. resolveRoomStudents allocates 5 rooms per class with exact class rosters (R1=7 [13L+16P], R2=8A, R3=9A, R4=9B, R5=8B)',
+    r1Students.length === 29 &&
       r1Students.every((s) => s.className === '7') &&
+      r1Students.slice(0, 13).every((s) => s.gender === 'L') &&
+      r1Students.slice(13).every((s) => s.gender === 'P') &&
+      r1Students[0].fullName === 'AFHTAR SHAKIL' &&
+      r1Students[13].fullName === 'ADIBA KHANSA AZ-ZAHRA' &&
       r2Students.length === 18 &&
       r2Students.every((s) => s.className === '8A') &&
       r3Students.length === 16 &&
@@ -373,16 +377,16 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
   assert(
     '10d. resolveRoomStudents numbers participants sequentially from 13-0820-001 continuously through Ruang 5 (R1: 7, R2: 8A, R3: 9A, R4: 9B, R5: 8B)',
     r1Students[0].participantNumber === '13-0820-001' &&
-      r1Students[15].participantNumber === '13-0820-016' &&
-      r2Students[0].participantNumber === '13-0820-017' &&
-      r2Students[17].participantNumber === '13-0820-034' &&
-      r3Students[0].participantNumber === '13-0820-035' &&
-      r3Students[15].participantNumber === '13-0820-050' &&
-      r4Students[0].participantNumber === '13-0820-051' &&
-      r4Students[14].participantNumber === '13-0820-065' &&
-      r5Students[0].participantNumber === '13-0820-066' &&
-      r5Students[16].participantNumber === '13-0820-082',
-    `Sequential participant numbering across rooms failed: R1[0]=${r1Students[0]?.participantNumber}, R2[0]=${r2Students[0]?.participantNumber}, R3[end]=${r3Students[15]?.participantNumber}, R4[end]=${r4Students[14]?.participantNumber}, R5[end]=${r5Students[16]?.participantNumber}`
+      r1Students[28].participantNumber === '13-0820-029' &&
+      r2Students[0].participantNumber === '13-0820-030' &&
+      r2Students[17].participantNumber === '13-0820-047' &&
+      r3Students[0].participantNumber === '13-0820-048' &&
+      r3Students[15].participantNumber === '13-0820-063' &&
+      r4Students[0].participantNumber === '13-0820-064' &&
+      r4Students[14].participantNumber === '13-0820-078' &&
+      r5Students[0].participantNumber === '13-0820-079' &&
+      r5Students[16].participantNumber === '13-0820-095',
+    `Sequential participant numbering across rooms failed: R1[0]=${r1Students[0]?.participantNumber}, R1[end]=${r1Students[28]?.participantNumber}, R2[0]=${r2Students[0]?.participantNumber}, R5[end]=${r5Students[16]?.participantNumber}`
   );
 
   // -------------------------------------------------------------
@@ -565,7 +569,8 @@ export const runExamAdministrativeDocsTestSuite = async (): Promise<{
       studentWs['A7']?.v === 'NOMOR' &&
       studentWs['C7']?.v === 'NAMA PESERTA' &&
       studentWs['B9']?.v === '13-0820-001' &&
-      studentWs['C9']?.v === 'AMANDA HASNA MIRZA',
+      studentWs['C9']?.v === 'AFHTAR SHAKIL' &&
+      studentWs['D9']?.v === 'L',
     'Student attendance worksheet missing header, badge, or participant row'
   );
 
