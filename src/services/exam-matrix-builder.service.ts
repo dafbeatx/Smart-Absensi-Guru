@@ -250,10 +250,29 @@ export class ExamMatrixBuilderService {
       return undefined;
     };
 
+    // Track normalized names to prevent the same person from appearing twice
+    // (e.g. when a teacher has different userIds across SMP/SMA or main/secondary slots)
+    const seenNormalizedNames = new Set<string>();
+
+    const isAlreadySeen = (name: string): boolean => {
+      const norm = ExamSchedulerService.normalizeTeacherName(name);
+      if (!norm || norm.length < 3) return false;
+      for (const existing of seenNormalizedNames) {
+        if (existing === norm) return true;
+        if (existing.length >= 4 && norm.length >= 4 && (existing.includes(norm) || norm.includes(existing))) return true;
+      }
+      return false;
+    };
+
+    const markSeen = (name: string): void => {
+      const norm = ExamSchedulerService.normalizeTeacherName(name);
+      if (norm && norm.length >= 3) seenNormalizedNames.add(norm);
+    };
+
     // Extract proctors from actual assignments (main and secondary proctors)
     proctorSchedules.forEach((p) => {
       if (p.mainProctorId && p.mainProctorName) {
-        if (!teacherMap.has(p.mainProctorId)) {
+        if (!teacherMap.has(p.mainProctorId) && !isAlreadySeen(p.mainProctorName)) {
           const profile = findProfile(p.mainProctorId, p.mainProctorName);
           const subject = this.resolveTeacherSubject(profile, p.mainProctorName, allTeachers);
           teacherMap.set(p.mainProctorId, {
@@ -261,11 +280,12 @@ export class ExamMatrixBuilderService {
             fullName: p.mainProctorName,
             subject,
           });
+          markSeen(p.mainProctorName);
         }
       }
 
       if (p.secondaryProctorId && p.secondaryProctorName) {
-        if (!teacherMap.has(p.secondaryProctorId)) {
+        if (!teacherMap.has(p.secondaryProctorId) && !isAlreadySeen(p.secondaryProctorName)) {
           const profile = findProfile(p.secondaryProctorId, p.secondaryProctorName);
           const subject = this.resolveTeacherSubject(profile, p.secondaryProctorName, allTeachers);
           teacherMap.set(p.secondaryProctorId, {
@@ -273,6 +293,7 @@ export class ExamMatrixBuilderService {
             fullName: p.secondaryProctorName,
             subject,
           });
+          markSeen(p.secondaryProctorName);
         }
       }
     });
@@ -288,6 +309,7 @@ export class ExamMatrixBuilderService {
       const code = String(idx + 1).padStart(2, '0');
       teacherCodeMap.set(t.userId, code);
       teacherCodeMap.set(t.fullName.toLowerCase().trim(), code);
+      teacherCodeMap.set(ExamSchedulerService.normalizeTeacherName(t.fullName), code);
       return {
         no: idx + 1,
         userId: t.userId,
@@ -295,6 +317,21 @@ export class ExamMatrixBuilderService {
         subject: t.subject || '-',
         code,
       };
+    });
+
+    // Map any alternate userIds (deduplicated away) to the correct code via name match
+    proctorSchedules.forEach((p) => {
+      const mapAlternateId = (id: string, name: string) => {
+        if (id && name && !teacherCodeMap.has(id)) {
+          const norm = ExamSchedulerService.normalizeTeacherName(name);
+          const code = teacherCodeMap.get(norm) || teacherCodeMap.get(name.toLowerCase().trim());
+          if (code) teacherCodeMap.set(id, code);
+        }
+      };
+      mapAlternateId(p.mainProctorId, p.mainProctorName);
+      if (p.secondaryProctorId && p.secondaryProctorName) {
+        mapAlternateId(p.secondaryProctorId, p.secondaryProctorName);
+      }
     });
 
     // ── 2. DETERMINE DISTINCT ROOMS ──────────────────────────────────────────
