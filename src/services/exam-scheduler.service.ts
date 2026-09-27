@@ -224,22 +224,22 @@ export class ExamSchedulerService {
         const baseSlot = config.sessionSlots?.find((s) => s.sessionNumber === sNum);
         const isFriday = dateInfo.dayName.toLowerCase() === 'jumat';
 
-        let defStart = '07:30';
+        let defStart = '08:00';
         let defEnd = '09:30';
         if (isFriday) {
           if (sNum === 1) { defStart = '07:15'; defEnd = '08:45'; }
           else if (sNum === 2) { defStart = '09:00'; defEnd = '10:30'; }
-          else if (sNum === 3) { defStart = '13:30'; defEnd = '15:00'; }
-          else { defStart = '15:15'; defEnd = '16:30'; }
+          else if (sNum === 3) { defStart = '11:00'; defEnd = '12:00'; }
+          else { defStart = '13:00'; defEnd = '14:30'; }
         } else {
-          if (sNum === 1) { defStart = '07:30'; defEnd = '09:00'; }
-          else if (sNum === 2) { defStart = '09:30'; defEnd = '11:00'; }
-          else if (sNum === 3) { defStart = '11:15'; defEnd = '12:45'; }
-          else { defStart = '13:15'; defEnd = '14:45'; }
+          if (sNum === 1) { defStart = '08:00'; defEnd = '09:30'; }
+          else if (sNum === 2) { defStart = '10:00'; defEnd = '11:00'; }
+          else if (sNum === 3) { defStart = '11:00'; defEnd = '12:00'; }
+          else { defStart = '13:00'; defEnd = '14:30'; }
         }
 
-        const finalStart = customSlot?.startTime || (isFriday ? defStart : (baseSlot?.startTime || defStart));
-        const finalEnd = customSlot?.endTime || (isFriday ? defEnd : (baseSlot?.endTime || defEnd));
+        const finalStart = customSlot?.startTime || (isFriday ? (customSlot?.startTime || defStart) : (baseSlot?.startTime || defStart));
+        const finalEnd = customSlot?.endTime || (isFriday ? (customSlot?.endTime || defEnd) : (baseSlot?.endTime || defEnd));
 
         allSlots.push({
           date: dateInfo.date,

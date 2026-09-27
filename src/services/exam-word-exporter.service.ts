@@ -311,8 +311,11 @@ export class ExamWordExporterService {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
+    body, .paper-page, table, th, td, div, p, span, h1, h2, h3, h4, ol, li, strong, b {
+      font-family: 'Times New Roman', Times, Georgia, serif !important;
+    }
     body {
-      font-family: 'Times New Roman', Times, Georgia, serif;
+      font-family: 'Times New Roman', Times, Georgia, serif !important;
       font-size: 10pt;
       line-height: 1.25;
       color: #000000;
@@ -334,7 +337,7 @@ export class ExamWordExporterService {
       gap: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       z-index: 9999;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
     .btn-action {
       display: inline-flex;
@@ -347,6 +350,7 @@ export class ExamWordExporterService {
       cursor: pointer;
       border: none;
       transition: all 0.15s ease;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
     .btn-print {
       background: #059669;
@@ -367,6 +371,7 @@ export class ExamWordExporterService {
       padding: 12mm 14mm;
       box-shadow: 0 4px 15px rgba(0,0,0,0.08);
       position: relative;
+      font-family: 'Times New Roman', Times, Georgia, serif !important;
     }
 
     .doc-header {
@@ -601,10 +606,10 @@ export class ExamWordExporterService {
           <tr>
             <td class="text-center">${idx + 1}</td>
             <td class="font-bold">${d.dayName}, ${d.date}</td>
-            <td class="text-center font-code">${d.startTime} - ${d.endTime} (Sesi ${d.sessionNumber})</td>
+            <td class="text-center font-code">${(d.startTime || '08:00').replace(':', '.')} - ${(d.endTime || '09:30').replace(':', '.')} (Sesi ${d.sessionNumber})</td>
             <td>${d.subject}</td>
-            <td class="text-center font-bold" style="background-color: #f1f5f9;">
-              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:800; padding:1px 5px; border-radius:3px; background:${d.educationLevel === 'SMA' ? '#dbeafe; color:#1e40af;' : '#ccfbf1; color:#0f766e;'} margin-right:4px;">${d.educationLevel}</span>` : ''}${d.roomName}
+            <td class="text-center font-bold" style="background-color: #f8fafc;">
+              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:bold; padding:1px 5px; border-radius:3px; border: 1px solid #000000; margin-right:4px;">${d.educationLevel}</span>` : ''}${d.roomName}
             </td>
             <td class="text-center font-code font-bold">${d.teacherCode || safeCode}</td>
           </tr>
@@ -618,32 +623,140 @@ export class ExamWordExporterService {
   <meta charset="utf-8">
   <title>Kartu Tugas Mengawas - ${teacherName}</title>
   <style>
-    @page { size: A4 portrait; margin: 15mm; }
+    @page { size: A4 portrait; margin: 10mm 12mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11pt; color: #0f172a; margin: 0; padding: 0; background: #f8fafc; }
-    .no-print-bar { position: sticky; top: 0; background: #023246; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
-    .btn-action { padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; border: none; font-size: 13px; }
+    body, .paper-page, table, th, td, div, p, span, h1, h2, h3, h4, ol, li, strong, b, .font-code, .rules-box, .sig-area, .teacher-badge {
+      font-family: 'Times New Roman', Times, Georgia, serif !important;
+    }
+    body {
+      font-size: 10pt;
+      line-height: 1.25;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+      background: #f8fafc;
+    }
+    .no-print-bar {
+      position: sticky;
+      top: 0;
+      background: #023246;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
+    .btn-action {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      font-size: 13px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
     .btn-print { background: #059669; color: white; }
     .btn-close { background: rgba(255,255,255,0.15); color: white; }
-    .paper-page { background: white; width: 210mm; min-height: 297mm; margin: 20px auto; padding: 16mm 18mm; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-    .doc-header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 16px; }
-    .doc-header h1 { font-size: 13pt; margin: 0; font-weight: 900; }
-    .doc-header h2 { font-size: 11pt; margin: 3px 0; color: #1e293b; }
-    .doc-header h3 { font-size: 12.5pt; margin: 0; color: #0369a1; }
-    .teacher-badge { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 16px; }
-    table, th, td { border: 1px solid #1e293b; }
-    th, td { padding: 6px 8px; font-size: 9.5pt; vertical-align: middle; }
-    th { background: #f1f5f9; font-weight: 800; text-align: center; }
+    .paper-page {
+      background: white;
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      padding: 12mm 14mm;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      position: relative;
+      font-family: 'Times New Roman', Times, Georgia, serif !important;
+    }
+    .doc-header {
+      text-align: center;
+      border-bottom: 2px solid #000000;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+    }
+    .doc-header h1 {
+      font-size: 13pt;
+      margin: 0;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #000000;
+    }
+    .doc-header h2 {
+      font-size: 11pt;
+      margin: 2px 0;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #000000;
+    }
+    .doc-header h3 {
+      font-size: 12pt;
+      margin: 0;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #000000;
+    }
+    .teacher-badge {
+      background: #ffffff;
+      border: 1px solid #000000;
+      border-radius: 4px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      margin-bottom: 16px;
+    }
+    table, th, td {
+      border: 1px solid #000000;
+    }
+    th, td {
+      padding: 5px 8px;
+      font-size: 9.5pt;
+      vertical-align: middle;
+      color: #000000;
+    }
+    th {
+      background: #f8fafc;
+      font-weight: bold;
+      text-align: center;
+      color: #000000;
+    }
     .text-center { text-align: center; }
     .font-bold { font-weight: bold; }
-    .font-code { font-family: monospace; font-size: 10pt; }
-    .rules-box { background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 6px; padding: 10px 14px; font-size: 8.5pt; margin-top: 14px; line-height: 1.4; }
-    .sig-area { display: flex; justify-content: space-between; margin-top: 24px; font-size: 9.5pt; }
+    .font-code { font-size: 10pt; font-weight: bold; }
+    .rules-box {
+      background: #ffffff;
+      border: 1px solid #000000;
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 9pt;
+      margin-top: 14px;
+      line-height: 1.4;
+      color: #000000;
+    }
+    .sig-area {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+      font-size: 9.5pt;
+      color: #000000;
+    }
     @media print {
       body { background: white !important; }
       .no-print-bar { display: none !important; }
-      .paper-page { margin: 0 !important; padding: 0 !important; box-shadow: none !important; width: 100% !important; }
+      .paper-page {
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        width: 100% !important;
+      }
     }
   </style>
 </head>
@@ -664,12 +777,12 @@ export class ExamWordExporterService {
     </div>
     <div class="teacher-badge">
       <div>
-        <div style="font-size: 12pt; font-weight: 800;">${teacherName}</div>
-        <div style="color: #64748b; font-size: 9pt;">Pendidik / Pengawas Ruangan Ujian</div>
+        <div style="font-size: 12pt; font-weight: bold; color: #000000;">${teacherName}</div>
+        <div style="color: #333333; font-size: 9pt;">Pendidik / Pengawas Ruangan Ujian</div>
       </div>
       <div style="text-align: right;">
-        <div style="font-size: 11pt; font-weight: 900; color: #0284c7;">Kode Pengawas: ${safeCode}</div>
-        <div style="color: #64748b; font-size: 9pt;">Total Tugas: ${duties.length} Sesi</div>
+        <div style="font-size: 11pt; font-weight: bold; color: #000000;">Kode Pengawas: ${safeCode}</div>
+        <div style="color: #333333; font-size: 9pt;">Total Tugas: ${duties.length} Sesi</div>
       </div>
     </div>
     <table>
@@ -698,17 +811,17 @@ export class ExamWordExporterService {
     <div class="sig-area">
       <div style="text-align: center; min-width: 240px;">
         <div>Mengetahui,</div>
-        <div style="font-weight: 800;">Kepala Sekolah</div>
+        <div style="font-weight: bold;">Kepala Sekolah</div>
         <div style="height: 50px;"></div>
-        <div style="font-weight: 800; text-decoration: underline; white-space: nowrap;">${actualKepsekName}</div>
-        <div style="font-size: 8.5pt; color: #64748b;">${formattedKepsekNpp}</div>
+        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${actualKepsekName}</div>
+        <div style="font-size: 8.5pt; color: #333333;">${formattedKepsekNpp}</div>
       </div>
       <div style="text-align: center; min-width: 240px;">
         <div>Bogor, September 2026</div>
-        <div style="font-weight: 800;">Guru Pengawas,</div>
+        <div style="font-weight: bold;">Guru Pengawas,</div>
         <div style="height: 50px;"></div>
-        <div style="font-weight: 800; text-decoration: underline; white-space: nowrap;">${teacherName}</div>
-        <div style="font-size: 8.5pt; color: #64748b;">Kode Pengawas: ${safeCode}</div>
+        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${teacherName}</div>
+        <div style="font-size: 8.5pt; color: #333333;">Kode Pengawas: ${safeCode}</div>
       </div>
     </div>
   </div>
@@ -771,10 +884,10 @@ export class ExamWordExporterService {
           <tr>
             <td class="text-center">${idx + 1}</td>
             <td class="font-bold">${d.dayName}, ${d.date}</td>
-            <td class="text-center font-code">${d.startTime} - ${d.endTime} (Sesi ${d.sessionNumber})</td>
+            <td class="text-center font-code">${(d.startTime || '08:00').replace(':', '.')} - ${(d.endTime || '09:30').replace(':', '.')} (Sesi ${d.sessionNumber})</td>
             <td>${d.subject}</td>
-            <td class="text-center font-bold" style="background-color: #f1f5f9;">
-              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:800; padding:1px 5px; border-radius:3px; background:${d.educationLevel === 'SMA' ? '#dbeafe; color:#1e40af;' : '#ccfbf1; color:#0f766e;'} margin-right:4px;">${d.educationLevel}</span>` : ''}${d.roomName}
+            <td class="text-center font-bold" style="background-color: #f8fafc;">
+              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:bold; padding:1px 5px; border-radius:3px; border: 1px solid #000000; margin-right:4px;">${d.educationLevel}</span>` : ''}${d.roomName}
             </td>
             <td class="text-center font-code font-bold">${d.teacherCode || safeCode}</td>
           </tr>
@@ -788,24 +901,108 @@ export class ExamWordExporterService {
   <meta charset="utf-8">
   <title>Surat Tugas Mengawas - ${teacherName}</title>
   <style>
-    @page { size: A4 portrait; margin: 15mm; }
+    @page { size: A4 portrait; margin: 10mm 12mm; }
     * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11pt; color: #0f172a; margin: 0; padding: 0; background: #ffffff; }
-    .paper-page { background: white; width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm 18mm; }
-    .doc-header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 16px; }
-    .doc-header h1 { font-size: 13pt; margin: 0; font-weight: 900; }
-    .doc-header h2 { font-size: 11pt; margin: 3px 0; color: #1e293b; }
-    .doc-header h3 { font-size: 12.5pt; margin: 0; color: #0369a1; }
-    .teacher-badge { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 16px; }
-    table, th, td { border: 1px solid #1e293b; }
-    th, td { padding: 6px 8px; font-size: 9.5pt; vertical-align: middle; }
-    th { background: #f1f5f9; font-weight: 800; text-align: center; }
+    body, .paper-page, table, th, td, div, p, span, h1, h2, h3, h4, ol, li, strong, b, .font-code, .rules-box, .sig-area, .teacher-badge {
+      font-family: 'Times New Roman', Times, Georgia, serif !important;
+    }
+    body {
+      font-size: 10pt;
+      line-height: 1.25;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+    .paper-page {
+      background: white;
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 12mm 14mm;
+      box-sizing: border-box;
+      font-family: 'Times New Roman', Times, Georgia, serif !important;
+    }
+    .doc-header {
+      text-align: center;
+      border-bottom: 2px solid #000000;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+    }
+    .doc-header h1 {
+      font-size: 13pt;
+      margin: 0;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #000000;
+    }
+    .doc-header h2 {
+      font-size: 11pt;
+      margin: 2px 0;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #000000;
+    }
+    .doc-header h3 {
+      font-size: 12pt;
+      margin: 0;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #000000;
+    }
+    .teacher-badge {
+      background: #ffffff;
+      border: 1px solid #000000;
+      border-radius: 4px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      margin-bottom: 16px;
+    }
+    table, th, td {
+      border: 1px solid #000000;
+    }
+    th, td {
+      padding: 5px 8px;
+      font-size: 9.5pt;
+      vertical-align: middle;
+      color: #000000;
+    }
+    th {
+      background: #f8fafc;
+      font-weight: bold;
+      text-align: center;
+      color: #000000;
+    }
     .text-center { text-align: center; }
     .font-bold { font-weight: bold; }
-    .font-code { font-family: monospace; font-size: 10pt; }
-    .rules-box { background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 6px; padding: 10px 14px; font-size: 8.5pt; margin-top: 14px; line-height: 1.4; }
-    .sig-area { display: flex; justify-content: space-between; margin-top: 24px; font-size: 9.5pt; }
+    .font-code { font-size: 10pt; font-weight: bold; }
+    .rules-box {
+      background: #ffffff;
+      border: 1px solid #000000;
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 9pt;
+      margin-top: 14px;
+      line-height: 1.4;
+      color: #000000;
+    }
+    .sig-area {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+      font-size: 9.5pt;
+      color: #000000;
+    }
     @media print {
       body { background: white !important; }
       .paper-page { margin: 0 !important; padding: 0 !important; box-shadow: none !important; width: 100% !important; }
@@ -821,12 +1018,12 @@ export class ExamWordExporterService {
     </div>
     <div class="teacher-badge">
       <div>
-        <div style="font-size: 12pt; font-weight: 800;">${teacherName}</div>
-        <div style="color: #64748b; font-size: 9pt;">Pendidik / Pengawas Ruangan Ujian</div>
+        <div style="font-size: 12pt; font-weight: bold; color: #000000;">${teacherName}</div>
+        <div style="color: #333333; font-size: 9pt;">Pendidik / Pengawas Ruangan Ujian</div>
       </div>
       <div style="text-align: right;">
-        <div style="font-size: 11pt; font-weight: 900; color: #0284c7;">Kode Pengawas: ${safeCode}</div>
-        <div style="color: #64748b; font-size: 9pt;">Total Tugas: ${duties.length} Sesi</div>
+        <div style="font-size: 11pt; font-weight: bold; color: #000000;">Kode Pengawas: ${safeCode}</div>
+        <div style="color: #333333; font-size: 9pt;">Total Tugas: ${duties.length} Sesi</div>
       </div>
     </div>
     <table>
@@ -855,17 +1052,17 @@ export class ExamWordExporterService {
     <div class="sig-area">
       <div style="text-align: center; min-width: 240px;">
         <div>Mengetahui,</div>
-        <div style="font-weight: 800;">Kepala Sekolah</div>
+        <div style="font-weight: bold;">Kepala Sekolah</div>
         <div style="height: 50px;"></div>
-        <div style="font-weight: 800; text-decoration: underline; white-space: nowrap;">${actualKepsekName}</div>
-        <div style="font-size: 8.5pt; color: #64748b;">${formattedKepsekNpp}</div>
+        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${actualKepsekName}</div>
+        <div style="font-size: 8.5pt; color: #333333;">${formattedKepsekNpp}</div>
       </div>
       <div style="text-align: center; min-width: 240px;">
         <div>Bogor, September 2026</div>
-        <div style="font-weight: 800;">Guru Pengawas,</div>
+        <div style="font-weight: bold;">Guru Pengawas,</div>
         <div style="height: 50px;"></div>
-        <div style="font-weight: 800; text-decoration: underline; white-space: nowrap;">${teacherName}</div>
-        <div style="font-size: 8.5pt; color: #64748b;">Kode Pengawas: ${safeCode}</div>
+        <div style="font-weight: bold; text-decoration: underline; white-space: nowrap;">${teacherName}</div>
+        <div style="font-size: 8.5pt; color: #333333;">Kode Pengawas: ${safeCode}</div>
       </div>
     </div>
   </div>

@@ -48,6 +48,9 @@ export async function exportHtmlToPdf(
   container.style.width = orientation === 'landscape' ? '1123px' : '794px';
   container.style.backgroundColor = '#ffffff';
   container.style.color = '#000000';
+  if (htmlContent.includes('Times New Roman')) {
+    container.style.fontFamily = "'Times New Roman', Times, Georgia, serif";
+  }
   container.style.zIndex = '-9999';
   container.style.overflow = 'visible';
   container.innerHTML = htmlContent;
@@ -91,8 +94,8 @@ export async function exportHtmlToPdf(
     const pageWidth = orientation === 'landscape' ? 297 : 210;
     const pageHeight = orientation === 'landscape' ? 210 : 297;
 
-    // 4. Check for distinct sheets/pages (e.g. .a4-sheet or .page-container)
-    const distinctSheets = container.querySelectorAll<HTMLElement>('.a4-sheet, .page-container, .cert-container');
+    // 4. Check for distinct sheets/pages (e.g. .a4-sheet, .page-container, .paper-page, or .cert-container)
+    const distinctSheets = container.querySelectorAll<HTMLElement>('.a4-sheet, .page-container, .cert-container, .paper-page');
 
     if (distinctSheets.length > 0) {
       for (let i = 0; i < distinctSheets.length; i++) {
@@ -100,6 +103,11 @@ export async function exportHtmlToPdf(
           pdf.addPage('a4', orientation);
         }
         const sheet = distinctSheets[i];
+        sheet.style.margin = '0';
+        sheet.style.boxShadow = 'none';
+        if (htmlContent.includes('Times New Roman')) {
+          sheet.style.fontFamily = "'Times New Roman', Times, Georgia, serif";
+        }
         const canvas = await html2canvas(sheet, {
           scale,
           useCORS: true,

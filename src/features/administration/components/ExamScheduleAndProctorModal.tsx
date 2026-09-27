@@ -281,10 +281,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [formEndDate, setFormEndDate] = useState<string>(() => getSmartDefaultExamEndDate(getSmartDefaultExamStartDate()));
   const [sessionsPerDay, setSessionsPerDay] = useState<number>(3);
   const [sessionSlots, setSessionSlots] = useState<SessionTimeSlot[]>([
-    { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:00' },
-    { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '09:30', endTime: '11:00' },
-    { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:15', endTime: '12:45' },
-    { sessionNumber: 4, sessionName: 'Sesi 4 (Tambahan)', startTime: '13:15', endTime: '14:45' },
+    { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '08:00', endTime: '09:30' },
+    { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '10:00', endTime: '11:00' },
+    { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:00', endTime: '12:00' },
+    { sessionNumber: 4, sessionName: 'Sesi 4 (Tambahan)', startTime: '13:00', endTime: '14:30' },
   ]);
   const [sessionMode, setSessionMode] = useState<'UNIFORM' | 'PER_DAY'>('PER_DAY');
   const [dayOverrides, setDayOverrides] = useState<DaySessionOverride[]>([]);
@@ -802,13 +802,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     const slots: SessionTimeSlot[] = [];
     for (let i = 1; i <= num; i++) {
       if (i === 1) {
-        slots.push({ sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:00' });
+        slots.push({ sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '08:00', endTime: '09:30' });
       } else if (i === 2) {
-        slots.push({ sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '09:30', endTime: '11:00' });
+        slots.push({ sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '10:00', endTime: '11:00' });
       } else if (i === 3) {
-        slots.push({ sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:15', endTime: '12:45' });
+        slots.push({ sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:00', endTime: '12:00' });
       } else {
-        slots.push({ sessionNumber: i, sessionName: `Sesi ${i}`, startTime: '13:15', endTime: '14:45' });
+        slots.push({ sessionNumber: i, sessionName: `Sesi ${i}`, startTime: '13:00', endTime: '14:30' });
       }
     }
     setSessionSlots(slots);
@@ -2477,20 +2477,20 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                               {/* Session Breakdown List */}
                               <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200/70">
                                 {Array.from({ length: currentCount }, (_, i) => i + 1).map((sNum) => {
-                                  let sStart = '07:30';
-                                  let sEnd = '09:00';
+                                  let sStart = '08:00';
+                                  let sEnd = '09:30';
                                   if (isFriday) {
-                                    if (sNum === 1) { sStart = '07:15'; sEnd = '08:45'; }
-                                    else if (sNum === 2) { sStart = '09:00'; sEnd = '10:30'; }
-                                    else if (sNum === 3) { sStart = '13:30'; sEnd = '15:00'; }
-                                    else { sStart = '15:15'; sEnd = '16:30'; }
+                                    if (sNum === 1) { sStart = '08:00'; sEnd = '09:30'; }
+                                    else if (sNum === 2) { sStart = '10:00'; sEnd = '11:00'; }
+                                    else if (sNum === 3) { sStart = '11:00'; sEnd = '12:00'; }
+                                    else { sStart = '13:00'; sEnd = '14:30'; }
                                   } else {
                                     const slot = sessionSlots.find((s) => s.sessionNumber === sNum);
                                     if (slot) { sStart = slot.startTime; sEnd = slot.endTime; }
-                                    else if (sNum === 1) { sStart = '07:30'; sEnd = '09:00'; }
-                                    else if (sNum === 2) { sStart = '09:30'; sEnd = '11:00'; }
-                                    else if (sNum === 3) { sStart = '11:15'; sEnd = '12:45'; }
-                                    else { sStart = '13:15'; sEnd = '14:45'; }
+                                    else if (sNum === 1) { sStart = '08:00'; sEnd = '09:30'; }
+                                    else if (sNum === 2) { sStart = '10:00'; sEnd = '11:00'; }
+                                    else if (sNum === 3) { sStart = '11:00'; sEnd = '12:00'; }
+                                    else { sStart = '13:00'; sEnd = '14:30'; }
                                   }
 
                                   return (
@@ -3926,7 +3926,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                         </td>
                                       </>
                                     )}
-                                    <td className="border border-slate-400 py-2 px-2 text-center font-mono text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                                    <td className="border border-slate-400 py-2 px-2 text-center text-[11px] font-bold text-slate-800 whitespace-nowrap">
                                       {slot.timeRange}
                                     </td>
                                     <td className="border border-slate-400 py-2 px-3 font-semibold text-slate-800">
@@ -3938,14 +3938,14 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       return (
                                         <td
                                           key={col.key}
-                                          className="border border-slate-400 py-1.5 px-1.5 text-center align-middle whitespace-nowrap"
+                                          className="border border-slate-400 py-1.5 px-1.5 text-center align-middle whitespace-nowrap font-bold"
                                         >
                                           {code && code !== '-' ? (
-                                            <span className="inline-block px-1.5 py-0.5 rounded font-mono font-black text-xs bg-teal-50 text-teal-900 border border-teal-200">
+                                            <span className="inline-block px-1.5 py-0.5 rounded font-black text-xs bg-teal-50 text-teal-900 border border-teal-200">
                                               {code}
                                             </span>
                                           ) : (
-                                            <span className="text-slate-300 font-mono">-</span>
+                                            <span className="text-slate-400">-</span>
                                           )}
                                         </td>
                                       );
@@ -3989,7 +3989,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                               ) : (
                                 invigilationMatrix.teacherLegend.map((item, idx) => (
                                   <tr key={item.userId || idx} className="hover:bg-slate-50/90 transition-colors">
-                                    <td className="border border-slate-400 py-1.5 px-2.5 text-center text-slate-600 font-mono font-medium">
+                                    <td className="border border-slate-400 py-1.5 px-2.5 text-center text-slate-700 font-bold">
                                       {item.no || idx + 1}
                                     </td>
                                     <td className="border border-slate-400 py-1.5 px-3 font-bold text-slate-900">
@@ -3999,7 +3999,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       {item.subject}
                                     </td>
                                     <td className="border border-slate-400 py-1.5 px-3 text-center">
-                                      <span className="inline-block px-2.5 py-0.5 rounded font-mono font-black text-xs bg-slate-100 text-teal-900 border border-slate-300">
+                                      <span className="inline-block px-2.5 py-0.5 rounded font-black text-xs bg-slate-100 text-teal-900 border border-slate-300">
                                         {item.code}
                                       </span>
                                     </td>

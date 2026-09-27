@@ -72,8 +72,8 @@ export class ExamMatrixBuilderService {
    * Normalize time format to dot notation: "08:00 - 09:30" -> "08.00 - 09.30"
    */
   public static formatTimeRange(start: string, end: string): string {
-    const s = (start || '07:30').replace(':', '.');
-    const e = (end || '09:00').replace(':', '.');
+    const s = (start || '08:00').replace(':', '.');
+    const e = (end || '09:30').replace(':', '.');
     return `${s} - ${e}`;
   }
 

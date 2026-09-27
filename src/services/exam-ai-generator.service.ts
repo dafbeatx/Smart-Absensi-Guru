@@ -363,8 +363,9 @@ Aturan:
     "includeSaturday": false,
     "sessionsPerDay": 2,
     "sessionSlots": [
-      { "sessionNumber": 1, "sessionName": "Sesi 1 (Pagi)", "startTime": "07:30", "endTime": "09:00" },
-      { "sessionNumber": 2, "sessionName": "Sesi 2 (Siang)", "startTime": "09:30", "endTime": "11:00" }
+      { "sessionNumber": 1, "sessionName": "Sesi 1 (Pagi)", "startTime": "08:00", "endTime": "09:30" },
+      { "sessionNumber": 2, "sessionName": "Sesi 2 (Siang)", "startTime": "10:00", "endTime": "11:00" },
+      { "sessionNumber": 3, "sessionName": "Sesi 3 (Siang)", "startTime": "11:00", "endTime": "12:00" }
     ],
     "dayOverrides": [
       { "date": "YYYY-MM-DD", "dayName": "Jumat", "sessionsCount": 1 }
@@ -532,10 +533,10 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
 
     // 5. Default session time slots (sized to cover the max sessions needed)
     const sessionSlots: SessionTimeSlot[] = [
-      { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:00' },
-      { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '09:30', endTime: '11:00' },
-      { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:15', endTime: '12:45' },
-      { sessionNumber: 4, sessionName: 'Sesi 4 (Tambahan)', startTime: '13:15', endTime: '14:45' },
+      { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '08:00', endTime: '09:30' },
+      { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '10:00', endTime: '11:00' },
+      { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:00', endTime: '12:00' },
+      { sessionNumber: 4, sessionName: 'Sesi 4 (Tambahan)', startTime: '13:00', endTime: '14:30' },
     ].slice(0, Math.max(effectiveMaxSessions, 2));
 
     // 6. Day Overrides — apply per-day overrides detected from prompt
