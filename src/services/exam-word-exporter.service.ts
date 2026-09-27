@@ -578,6 +578,8 @@ export class ExamWordExporterService {
       endTime: string;
       roomName: string;
       subject: string;
+      educationLevel?: 'SMP' | 'SMA';
+      teacherCode?: string;
     }>,
     institutionName = 'SMA TERPADU AS SALAAM',
     examTitle = 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)',
@@ -601,8 +603,10 @@ export class ExamWordExporterService {
             <td class="font-bold">${d.dayName}, ${d.date}</td>
             <td class="text-center font-code">${d.startTime} - ${d.endTime} (Sesi ${d.sessionNumber})</td>
             <td>${d.subject}</td>
-            <td class="text-center font-bold" style="background-color: #f1f5f9;">${d.roomName}</td>
-            <td class="text-center font-code font-bold">${safeCode}</td>
+            <td class="text-center font-bold" style="background-color: #f1f5f9;">
+              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:800; padding:1px 5px; border-radius:3px; background:${d.educationLevel === 'SMA' ? '#dbeafe; color:#1e40af;' : '#ccfbf1; color:#0f766e;'} margin-right:4px;">${d.educationLevel}</span>` : ''}${d.roomName}
+            </td>
+            <td class="text-center font-code font-bold">${d.teacherCode || safeCode}</td>
           </tr>
         `
       )
@@ -745,6 +749,8 @@ export class ExamWordExporterService {
       endTime: string;
       roomName: string;
       subject: string;
+      educationLevel?: 'SMP' | 'SMA';
+      teacherCode?: string;
     }>,
     institutionName = 'SMA TERPADU AS SALAAM',
     examTitle = 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)',
@@ -767,8 +773,10 @@ export class ExamWordExporterService {
             <td class="font-bold">${d.dayName}, ${d.date}</td>
             <td class="text-center font-code">${d.startTime} - ${d.endTime} (Sesi ${d.sessionNumber})</td>
             <td>${d.subject}</td>
-            <td class="text-center font-bold" style="background-color: #f1f5f9;">${d.roomName}</td>
-            <td class="text-center font-code font-bold">${safeCode}</td>
+            <td class="text-center font-bold" style="background-color: #f1f5f9;">
+              ${d.educationLevel ? `<span style="display:inline-block; font-size:7.5pt; font-weight:800; padding:1px 5px; border-radius:3px; background:${d.educationLevel === 'SMA' ? '#dbeafe; color:#1e40af;' : '#ccfbf1; color:#0f766e;'} margin-right:4px;">${d.educationLevel}</span>` : ''}${d.roomName}
+            </td>
+            <td class="text-center font-code font-bold">${d.teacherCode || safeCode}</td>
           </tr>
         `
       )

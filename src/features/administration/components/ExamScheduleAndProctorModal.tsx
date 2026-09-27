@@ -50,6 +50,7 @@ import type {
   SessionTimeSlot,
   DaySessionOverride,
   EducationLevel,
+  ExamProctorItem,
 } from '../../../types/exam-schedule.types';
 import { ExamCommitteeRepository } from '../../../repositories/ExamCommitteeRepository';
 import { ExamScheduleRepository } from '../../../repositories/ExamScheduleRepository';
@@ -225,6 +226,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   // Saved schedule data
   const [scheduleData, setScheduleData] = useState<ExamScheduleData | null>(null);
   const [otherScheduleData, setOtherScheduleData] = useState<ExamScheduleData | null>(null);
+  const [smpScheduleData, setSmpScheduleData] = useState<ExamScheduleData | null>(null);
+  const [smaScheduleData, setSmaScheduleData] = useState<ExamScheduleData | null>(null);
+  const [myScheduleLevelFilter, setMyScheduleLevelFilter] = useState<'ALL' | 'SMP' | 'SMA'>('ALL');
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -598,6 +602,13 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       }
     }
     setScheduleData(saved);
+    if (newLevel === 'SMA') {
+      setSmaScheduleData(saved);
+      setOtherScheduleData(smpScheduleData);
+    } else {
+      setSmpScheduleData(saved);
+      setOtherScheduleData(smaScheduleData);
+    }
     if (saved) {
       setActiveTab((prev) => (prev === 'form' || prev === 'ai_prompt' ? 'subjects' : prev));
     }
@@ -725,21 +736,38 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       // 5. Load subjects for academic year (Zero Egress Priority)
       loadSubjectsForYear(formAcademicYear);
 
-      // 6. Load existing schedule if available for selectedLevel
-      let saved = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, selectedLevel);
-      if (!saved) {
-        const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
-        const altSaved = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, selectedLevel);
-        if (altSaved) {
-          saved = altSaved;
-          setSelectedExamType(altType);
-          setFormExamType(altType);
-        } else if (selectedLevel === 'SMA') {
-          saved = ExamScheduleRepository.createCanonicalSmaSchedule(activeAcademicYear, selectedExamType);
-          await ExamScheduleRepository.saveSchedule(saved, 'SMA');
-        }
-      }
-      setScheduleData(saved);
+      // 6. Load existing schedule for BOTH SMP and SMA
+      const [smpSaved, smaSaved] = await Promise.all([
+        (async () => {
+          let s = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, 'SMP');
+          if (!s) {
+            const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
+            s = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, 'SMP');
+          }
+          return s;
+        })(),
+        (async () => {
+          let s = await ExamScheduleRepository.getSchedule(activeAcademicYear, selectedExamType, 'SMA');
+          if (!s) {
+            const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
+            s = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, 'SMA');
+            if (!s) {
+              s = ExamScheduleRepository.createCanonicalSmaSchedule(activeAcademicYear, selectedExamType);
+              await ExamScheduleRepository.saveSchedule(s, 'SMA');
+            }
+          }
+          return s;
+        })(),
+      ]);
+
+      setSmpScheduleData(smpSaved);
+      setSmaScheduleData(smaSaved);
+
+      const activeSaved = selectedLevel === 'SMA' ? smaSaved : smpSaved;
+      const otherSaved = selectedLevel === 'SMA' ? smpSaved : smaSaved;
+      setScheduleData(activeSaved);
+      setOtherScheduleData(otherSaved);
+      const saved = activeSaved;
       if (saved?.config) {
         if (saved.config.totalRooms) setTotalRooms(saved.config.totalRooms);
         if (saved.config.roomFormat) setRoomFormat(saved.config.roomFormat);
@@ -1131,17 +1159,74 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
     }
   };
 
-  // Filter my personal schedule (Logged in teacher's assigned duties)
-  const myProctorAssignments = useMemo(() => {
-    if (!scheduleData || !currentUser) return [];
-    return scheduleData.proctorSchedules.filter(
-      (p) =>
-        p.mainProctorId === currentUser.id ||
-        p.secondaryProctorId === currentUser.id ||
-        p.backupProctorId === currentUser.id ||
-        p.mainProctorName.toLowerCase().trim() === currentUser.full_name?.toLowerCase().trim()
-    );
-  }, [scheduleData, currentUser]);
+  // Extract user duties for a given schedule and level
+  const extractUserDuties = useCallback(
+    (sched: ExamScheduleData | null, level: EducationLevel): ExamProctorItem[] => {
+      if (!sched || !currentUser) return [];
+      const targetId = (currentUser.id || '').toLowerCase().trim();
+      const targetName = (currentUser.full_name || '').toLowerCase().trim();
+      const cleanTarget = ExamSchedulerService.normalizeTeacherName(currentUser.full_name || '');
+
+      return (sched.proctorSchedules || [])
+        .filter((p) => {
+          const matchMainId = Boolean(targetId && p.mainProctorId?.toLowerCase().trim() === targetId);
+          const matchSecId = Boolean(targetId && p.secondaryProctorId?.toLowerCase().trim() === targetId);
+          const matchBackupId = Boolean(targetId && p.backupProctorId?.toLowerCase().trim() === targetId);
+
+          const mainTrim = (p.mainProctorName || '').toLowerCase().trim();
+          const secTrim = (p.secondaryProctorName || '').toLowerCase().trim();
+          const pMainClean = ExamSchedulerService.normalizeTeacherName(p.mainProctorName || '');
+          const pSecClean = ExamSchedulerService.normalizeTeacherName(p.secondaryProctorName || '');
+
+          const matchMainName = Boolean(
+            mainTrim &&
+              (mainTrim === targetName ||
+                (cleanTarget && pMainClean && (pMainClean.includes(cleanTarget) || cleanTarget.includes(pMainClean))))
+          );
+
+          const matchSecName = Boolean(
+            secTrim &&
+              (secTrim === targetName ||
+                (cleanTarget && pSecClean && (pSecClean.includes(cleanTarget) || cleanTarget.includes(pSecClean))))
+          );
+
+          return matchMainId || matchSecId || matchBackupId || matchMainName || matchSecName;
+        })
+        .map((p) => ({
+          ...p,
+          educationLevel: level,
+        }));
+    },
+    [currentUser]
+  );
+
+  const mySmpDuties = useMemo(() => {
+    return extractUserDuties(smpScheduleData, 'SMP');
+  }, [smpScheduleData, extractUserDuties]);
+
+  const mySmaDuties = useMemo(() => {
+    return extractUserDuties(smaScheduleData, 'SMA');
+  }, [smaScheduleData, extractUserDuties]);
+
+  // Combined duties from both SMP and SMA, sorted chronologically
+  const myCombinedDuties = useMemo(() => {
+    const combined = [...mySmpDuties, ...mySmaDuties];
+    return combined.sort((a, b) => {
+      const dateCmp = a.date.localeCompare(b.date);
+      if (dateCmp !== 0) return dateCmp;
+      return a.sessionNumber - b.sessionNumber;
+    });
+  }, [mySmpDuties, mySmaDuties]);
+
+  // Filtered duties currently displayed in "Jadwal Saya" tab
+  const displayedMyDuties = useMemo(() => {
+    if (myScheduleLevelFilter === 'SMP') return mySmpDuties;
+    if (myScheduleLevelFilter === 'SMA') return mySmaDuties;
+    return myCombinedDuties;
+  }, [myScheduleLevelFilter, mySmpDuties, mySmaDuties, myCombinedDuties]);
+
+  // Unified alias so all tabs (badge count, roster banner) reflect duties across both levels
+  const myProctorAssignments = myCombinedDuties;
 
   // Build Official Invigilation Matrix (Official School Layout)
   const effectiveInstitutionName = useMemo(() => {
@@ -1155,6 +1240,33 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
     if (!scheduleData) return null;
     return ExamMatrixBuilderService.buildMatrix(scheduleData, teachers, effectiveInstitutionName);
   }, [scheduleData, teachers, effectiveInstitutionName]);
+
+  const smpMatrix = useMemo(() => {
+    if (!smpScheduleData) return null;
+    return ExamMatrixBuilderService.buildMatrix(smpScheduleData, teachers, 'SMP Terpadu Al-Ittihadiyah');
+  }, [smpScheduleData, teachers]);
+
+  const smaMatrix = useMemo(() => {
+    if (!smaScheduleData) return null;
+    return ExamMatrixBuilderService.buildMatrix(smaScheduleData, teachers, 'SMA Terpadu As Salaam');
+  }, [smaScheduleData, teachers]);
+
+  const resolveTeacherCodeForDuty = useCallback(
+    (duty: ExamProctorItem) => {
+      const matrix = duty.educationLevel === 'SMA' ? smaMatrix : smpMatrix;
+      const cleanTarget = ExamSchedulerService.normalizeTeacherName(currentUser?.full_name || '');
+      const entry = matrix?.teacherLegend?.find((l) => {
+        if (currentUser?.id && l.userId === currentUser.id) return true;
+        const cleanL = ExamSchedulerService.normalizeTeacherName(l.fullName || '');
+        return (
+          l.fullName === currentUser?.full_name ||
+          (cleanTarget && cleanL && (cleanTarget.includes(cleanL) || cleanL.includes(cleanTarget)))
+        );
+      });
+      return entry?.code || '-';
+    },
+    [smaMatrix, smpMatrix, currentUser]
+  );
 
   // Resolves official school signatories (Kepala Sekolah & Ketua Panitia) dynamically
   const officialSignatoryOptions = useMemo(() => {
@@ -3494,7 +3606,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                         </span>
                       </div>
 
-                      {myProctorAssignments.length > 0 && (
+                      {myCombinedDuties.length > 0 && (
                         <div className="mt-3 p-3 rounded-xl bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200/80 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <span className="text-lg">⭐</span>
@@ -3503,14 +3615,17 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                 Tugas Mengawas Anda ({currentUser.full_name || 'Guru'})
                               </p>
                               <p className="text-[11px] text-amber-800">
-                                Anda terjadwal di <strong className="font-extrabold">{myProctorAssignments.length} sesi ujian</strong>.
+                                Anda terjadwal di <strong className="font-extrabold">{myCombinedDuties.length} sesi ujian</strong>
+                                {mySmpDuties.length > 0 && mySmaDuties.length > 0 && (
+                                  <span> ({mySmpDuties.length} SMP • {mySmaDuties.length} SMA)</span>
+                                )}.
                               </p>
                             </div>
                           </div>
                           <button
                             type="button"
                             onClick={() => setActiveTab('my_schedule')}
-                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shrink-0 transition-colors shadow-2xs"
+                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shrink-0 transition-colors shadow-2xs cursor-pointer"
                           >
                             Jadwal Saya
                           </button>
@@ -4019,37 +4134,54 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: JADWAL MENGAWAS SAYA (PERSONAL VIEW) */}
+        {/* TAB 4: JADWAL MENGAWAS SAYA (PERSONAL VIEW across SMP & SMA) */}
         {/* ========================================================================= */}
         {activeTab === 'my_schedule' && (
           <div className="max-w-4xl mx-auto space-y-4 animate-fadeIn">
-            <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex items-center justify-between">
+            <div className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-200 font-bold">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-200 font-bold shrink-0">
                   <UserCheck className="w-5 h-5" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">{currentUser?.full_name || 'Bapak/Ibu Guru'}</h4>
                   <p className="text-[11px] text-slate-500">
-                    NPP: {currentUser?.nip || currentUser?.npp || '-'} • Total Tugas Mengawas: <strong className="text-teal-700">{myProctorAssignments.length} Sesi</strong>
+                    NPP: {currentUser?.nip || currentUser?.npp || '-'} • Total Tugas Mengawas:{' '}
+                    <strong className="text-teal-700 font-extrabold">{myCombinedDuties.length} Sesi</strong>
+                    {mySmpDuties.length > 0 && mySmaDuties.length > 0 && (
+                      <span className="text-slate-600 font-medium"> ({mySmpDuties.length} Sesi SMP • {mySmaDuties.length} Sesi SMA)</span>
+                    )}
                   </p>
                 </div>
               </div>
 
-              {myProctorAssignments.length > 0 && (
-                <div className="flex items-center gap-2">
+              {displayedMyDuties.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => {
-                      const teacherCode = invigilationMatrix?.teacherLegend?.find(
-                        (l) => l.fullName === currentUser?.full_name || l.fullName?.toLowerCase().includes((currentUser?.full_name || '').toLowerCase())
-                      )?.code;
+                      const institutionForDoc =
+                        myScheduleLevelFilter === 'SMP'
+                          ? 'SMP Terpadu Al-Ittihadiyah'
+                          : myScheduleLevelFilter === 'SMA'
+                          ? 'SMA Terpadu As Salaam'
+                          : 'SMP & SMA Terpadu As Salaam';
+                      const titleForDoc =
+                        myScheduleLevelFilter === 'SMP'
+                          ? (smpScheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian SMP')
+                          : myScheduleLevelFilter === 'SMA'
+                          ? (smaScheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian SMA')
+                          : 'Jadwal Tugas Mengawas Ujian (SMP & SMA)';
+                      const dutiesWithCodes = displayedMyDuties.map((d) => ({
+                        ...d,
+                        teacherCode: resolveTeacherCodeForDuty(d),
+                      }));
                       ExamWordExporterService.downloadTeacherDutySlip(
                         currentUser?.full_name || 'Bapak/Ibu Guru',
-                        teacherCode,
-                        myProctorAssignments,
-                        effectiveInstitutionName,
-                        scheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian',
+                        resolveTeacherCodeForDuty(displayedMyDuties[0]),
+                        dutiesWithCodes,
+                        institutionForDoc,
+                        titleForDoc,
                         officialSignatoryOptions.kepsekName,
                         officialSignatoryOptions.kepsekNpp
                       );
@@ -4065,15 +4197,28 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                   <button
                     type="button"
                     onClick={() => {
-                      const teacherCode = invigilationMatrix?.teacherLegend?.find(
-                        (l) => l.fullName === currentUser?.full_name || l.fullName?.toLowerCase().includes((currentUser?.full_name || '').toLowerCase())
-                      )?.code;
+                      const institutionForDoc =
+                        myScheduleLevelFilter === 'SMP'
+                          ? 'SMP Terpadu Al-Ittihadiyah'
+                          : myScheduleLevelFilter === 'SMA'
+                          ? 'SMA Terpadu As Salaam'
+                          : 'SMP & SMA Terpadu As Salaam';
+                      const titleForDoc =
+                        myScheduleLevelFilter === 'SMP'
+                          ? (smpScheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian SMP')
+                          : myScheduleLevelFilter === 'SMA'
+                          ? (smaScheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian SMA')
+                          : 'Jadwal Tugas Mengawas Ujian (SMP & SMA)';
+                      const dutiesWithCodes = displayedMyDuties.map((d) => ({
+                        ...d,
+                        teacherCode: resolveTeacherCodeForDuty(d),
+                      }));
                       ExamWordExporterService.printTeacherDutySlip(
                         currentUser?.full_name || 'Bapak/Ibu Guru',
-                        teacherCode,
-                        myProctorAssignments,
-                        effectiveInstitutionName,
-                        scheduleData?.config.examTitle || 'Jadwal Tugas Mengawas Ujian',
+                        resolveTeacherCodeForDuty(displayedMyDuties[0]),
+                        dutiesWithCodes,
+                        institutionForDoc,
+                        titleForDoc,
                         officialSignatoryOptions.kepsekName,
                         officialSignatoryOptions.kepsekNpp
                       );
@@ -4087,42 +4232,147 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               )}
             </div>
 
-            {myProctorAssignments.length === 0 ? (
+            {/* Level Filter Switcher Pills (Semua / SMP / SMA) */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setMyScheduleLevelFilter('ALL')}
+                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  myScheduleLevelFilter === 'ALL'
+                    ? 'bg-[#023246] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <span>Semua Jenjang</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                  myScheduleLevelFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {myCombinedDuties.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMyScheduleLevelFilter('SMP')}
+                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  myScheduleLevelFilter === 'SMP'
+                    ? 'bg-teal-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <span>🏫 SMP</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                  myScheduleLevelFilter === 'SMP' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {mySmpDuties.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMyScheduleLevelFilter('SMA')}
+                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  myScheduleLevelFilter === 'SMA'
+                    ? 'bg-blue-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <span>🎓 SMA</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                  myScheduleLevelFilter === 'SMA' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {mySmaDuties.length}
+                </span>
+              </button>
+            </div>
+
+            {displayedMyDuties.length === 0 ? (
               <div className="bg-white rounded-2xl p-10 text-center border border-slate-200/90 shadow-xs space-y-2">
                 <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-                <h4 className="text-sm font-bold text-slate-800">Tidak Ada Tugas Mengawas untuk Akun Anda</h4>
+                <h4 className="text-sm font-bold text-slate-800">
+                  {myScheduleLevelFilter === 'ALL'
+                    ? 'Tidak Ada Tugas Mengawas untuk Akun Anda (SMP maupun SMA)'
+                    : `Tidak Ada Tugas Mengawas untuk Akun Anda pada Jenjang ${myScheduleLevelFilter}`}
+                </h4>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Anda tidak dijadwalkan mengawas ruangan pada periode asesmen ini (mungkin bertugas sebagai Panitia Ujian atau guru non-pengawas).
+                  {myScheduleLevelFilter === 'ALL'
+                    ? 'Anda tidak dijadwalkan mengawas ruangan pada periode asesmen ini (mungkin bertugas sebagai Panitia Ujian atau guru non-pengawas).'
+                    : `Anda tidak memiliki penugasan mengawas pada jenjang ${myScheduleLevelFilter}. Silakan periksa tab jenjang lainnya.`}
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {myProctorAssignments.map((duty, idx) => (
-                  <div key={duty.id} className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3 hover:border-teal-400/50 transition-all">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
-                        Tugas #{idx + 1}
-                      </span>
-                      <span className="text-xs font-mono font-bold text-slate-600">
-                        {duty.startTime} - {duty.endTime} WIB
-                      </span>
-                    </div>
+                {displayedMyDuties.map((duty, idx) => {
+                  const isSma = duty.educationLevel === 'SMA';
+                  const code = resolveTeacherCodeForDuty(duty);
 
-                    <div>
-                      <h5 className="text-sm font-bold text-slate-900">{duty.dayName}, {duty.date}</h5>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        <strong className="text-teal-700">Sesi {duty.sessionNumber}</strong> • Mapel: <strong className="text-slate-900">{duty.subject}</strong>
-                      </p>
-                    </div>
+                  return (
+                    <div
+                      key={duty.id || `${duty.educationLevel}_${duty.date}_${duty.sessionNumber}_${idx}`}
+                      className={`bg-white rounded-2xl p-4 border shadow-xs space-y-3 transition-all ${
+                        isSma
+                          ? 'border-blue-200/90 hover:border-blue-400/80 bg-linear-to-br from-white via-blue-50/20 to-white'
+                          : 'border-teal-200/90 hover:border-teal-400/80 bg-linear-to-br from-white via-teal-50/20 to-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${
+                              isSma
+                                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                : 'bg-teal-50 text-teal-800 border-teal-200'
+                            }`}
+                          >
+                            Tugas #{idx + 1}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border flex items-center gap-1 ${
+                              isSma
+                                ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                : 'bg-teal-100 text-teal-900 border-teal-300'
+                            }`}
+                          >
+                            {isSma ? '🎓 SMA' : '🏫 SMP'}
+                          </span>
+                          {code && code !== '-' && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-black bg-amber-100 text-amber-900 border border-amber-300">
+                              Kode {code}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs font-mono font-bold text-slate-600">
+                          {duty.startTime} - {duty.endTime} WIB
+                        </span>
+                      </div>
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-500 font-medium">Lokasi Tugas:</span>
-                      <span className="font-black text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
-                        {duty.roomName} ({duty.className})
-                      </span>
+                      <div>
+                        <h5 className="text-sm font-bold text-slate-900">
+                          {duty.dayName}, {duty.date}
+                        </h5>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          <strong className={isSma ? 'text-blue-700 font-extrabold' : 'text-teal-700 font-extrabold'}>
+                            Sesi {duty.sessionNumber}
+                          </strong>{' '}
+                          • Mapel: <strong className="text-slate-900">{duty.subject}</strong>
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-medium truncate">
+                          {isSma ? 'SMA Terpadu As Salaam' : 'SMP Terpadu Al-Ittihadiyah'}:
+                        </span>
+                        <span
+                          className={`font-black px-2.5 py-1 rounded-md border shrink-0 ${
+                            isSma
+                              ? 'text-blue-900 bg-blue-50 border-blue-200'
+                              : 'text-teal-900 bg-teal-50 border-teal-200'
+                          }`}
+                        >
+                          {duty.roomName} ({duty.className})
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

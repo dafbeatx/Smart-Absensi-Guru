@@ -375,67 +375,150 @@ export class ExamScheduleRepository {
     teacherCode?: string;
   } | null> {
     const examTypes = ['ASTS', 'ASAS'];
-    const levelsToScan: ('SMP' | 'SMA')[] = level ? [level] : ['SMA', 'SMP'];
     const targetKey = (teacherIdOrName || '').toLowerCase().trim();
     const targetName = (teacherFullName || '').toLowerCase().trim();
     const cleanTargetName = this.normalizeTeacherName(teacherFullName || (!teacherIdOrName.startsWith('usr_') ? teacherIdOrName : ''));
     if (!targetKey && !targetName && !cleanTargetName) return null;
 
-    for (const lvl of levelsToScan) {
-      for (const eType of examTypes) {
-        const schedule = await this.getSchedule(academicYear, eType, lvl);
-        if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
-          continue;
-        }
+    // If level is not specified, aggregate duties across both SMP and SMA
+    if (!level) {
+      const allDuties: ExamProctorItem[] = [];
+      let baseSchedule: ExamScheduleData | null = null;
+      let primaryTeacherCode: string | undefined = undefined;
 
-        const duties = schedule.proctorSchedules.filter((p) => {
-          const matchMainId = Boolean(targetKey && p.mainProctorId?.toLowerCase().trim() === targetKey);
-          const matchSecId = Boolean(targetKey && p.secondaryProctorId?.toLowerCase().trim() === targetKey);
+      for (const lvl of ['SMP', 'SMA'] as const) {
+        for (const eType of examTypes) {
+          const schedule = await this.getSchedule(academicYear, eType, lvl);
+          if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
+            continue;
+          }
+          if (!baseSchedule) baseSchedule = schedule;
 
-          const mainTrimmed = p.mainProctorName?.toLowerCase().trim();
-          const secTrimmed = p.secondaryProctorName?.toLowerCase().trim();
+          const duties = schedule.proctorSchedules.filter((p) => {
+            const matchMainId = Boolean(targetKey && p.mainProctorId?.toLowerCase().trim() === targetKey);
+            const matchSecId = Boolean(targetKey && p.secondaryProctorId?.toLowerCase().trim() === targetKey);
+            const matchBackupId = Boolean(targetKey && p.backupProctorId?.toLowerCase().trim() === targetKey);
 
-          const pMainClean = this.normalizeTeacherName(p.mainProctorName);
-          const pSecClean = this.normalizeTeacherName(p.secondaryProctorName);
+            const mainTrimmed = p.mainProctorName?.toLowerCase().trim();
+            const secTrimmed = p.secondaryProctorName?.toLowerCase().trim();
 
-          const matchMainName = Boolean(
-            mainTrimmed && mainTrimmed.length > 2 && (
-              (targetName && (mainTrimmed.includes(targetName) || targetName.includes(mainTrimmed))) ||
-              (cleanTargetName && pMainClean && (pMainClean.includes(cleanTargetName) || cleanTargetName.includes(pMainClean)))
-            )
-          );
+            const pMainClean = this.normalizeTeacherName(p.mainProctorName);
+            const pSecClean = this.normalizeTeacherName(p.secondaryProctorName);
 
-          const matchSecName = Boolean(
-            secTrimmed && secTrimmed.length > 2 && (
-              (targetName && (secTrimmed.includes(targetName) || targetName.includes(secTrimmed))) ||
-              (cleanTargetName && pSecClean && (pSecClean.includes(cleanTargetName) || cleanTargetName.includes(pSecClean)))
-            )
-          );
-
-          return matchMainId || matchMainName || matchSecId || matchSecName;
-        });
-
-        if (duties.length > 0) {
-          // Derive deterministic teacher code (01, 02...) matching matrix proctor legend
-          const allProctorNames = Array.from(
-            new Set(schedule.proctorSchedules.map((p) => p.mainProctorName.trim()))
-          ).sort((a, b) => a.localeCompare(b, 'id'));
-          const idx = allProctorNames.findIndex((n) => {
-            const nTrim = n.toLowerCase().trim();
-            const nClean = this.normalizeTeacherName(n);
-            return (
-              (targetName && nTrim.length > 2 && (nTrim.includes(targetName) || targetName.includes(nTrim))) ||
-              (cleanTargetName && nClean.length > 2 && (nClean.includes(cleanTargetName) || cleanTargetName.includes(nClean)))
+            const matchMainName = Boolean(
+              mainTrimmed && mainTrimmed.length > 2 && (
+                (targetName && (mainTrimmed.includes(targetName) || targetName.includes(mainTrimmed))) ||
+                (cleanTargetName && pMainClean && (pMainClean.includes(cleanTargetName) || cleanTargetName.includes(pMainClean)))
+              )
             );
-          });
-          const teacherCode = idx !== -1 ? String(idx + 1).padStart(2, '0') : undefined;
 
-          return {
-            schedule,
-            duties,
-            teacherCode,
-          };
+            const matchSecName = Boolean(
+              secTrimmed && secTrimmed.length > 2 && (
+                (targetName && (secTrimmed.includes(targetName) || targetName.includes(secTrimmed))) ||
+                (cleanTargetName && pSecClean && (pSecClean.includes(cleanTargetName) || cleanTargetName.includes(pSecClean)))
+              )
+            );
+
+            return matchMainId || matchMainName || matchSecId || matchSecName || matchBackupId;
+          }).map((d) => ({
+            ...d,
+            educationLevel: lvl,
+          }));
+
+          if (duties.length > 0) {
+            allDuties.push(...duties);
+
+            if (!primaryTeacherCode) {
+              const allProctorNames = Array.from(
+                new Set(schedule.proctorSchedules.map((p) => p.mainProctorName.trim()))
+              ).sort((a, b) => a.localeCompare(b, 'id'));
+              const idx = allProctorNames.findIndex((n) => {
+                const nTrim = n.toLowerCase().trim();
+                const nClean = this.normalizeTeacherName(n);
+                return (
+                  (targetName && nTrim.length > 2 && (nTrim.includes(targetName) || targetName.includes(nTrim))) ||
+                  (cleanTargetName && nClean.length > 2 && (nClean.includes(cleanTargetName) || cleanTargetName.includes(nClean)))
+                );
+              });
+              if (idx !== -1) primaryTeacherCode = String(idx + 1).padStart(2, '0');
+            }
+          }
         }
+      }
+
+      if (allDuties.length > 0 && baseSchedule) {
+        allDuties.sort((a, b) => {
+          const dateCmp = a.date.localeCompare(b.date);
+          if (dateCmp !== 0) return dateCmp;
+          return a.sessionNumber - b.sessionNumber;
+        });
+        return {
+          schedule: baseSchedule,
+          duties: allDuties,
+          teacherCode: primaryTeacherCode,
+        };
+      }
+      return null;
+    }
+
+    // Specific single level requested
+    for (const eType of examTypes) {
+      const schedule = await this.getSchedule(academicYear, eType, level);
+      if (!schedule || !schedule.proctorSchedules || schedule.proctorSchedules.length === 0) {
+        continue;
+      }
+
+      const duties = schedule.proctorSchedules.filter((p) => {
+        const matchMainId = Boolean(targetKey && p.mainProctorId?.toLowerCase().trim() === targetKey);
+        const matchSecId = Boolean(targetKey && p.secondaryProctorId?.toLowerCase().trim() === targetKey);
+        const matchBackupId = Boolean(targetKey && p.backupProctorId?.toLowerCase().trim() === targetKey);
+
+        const mainTrimmed = p.mainProctorName?.toLowerCase().trim();
+        const secTrimmed = p.secondaryProctorName?.toLowerCase().trim();
+
+        const pMainClean = this.normalizeTeacherName(p.mainProctorName);
+        const pSecClean = this.normalizeTeacherName(p.secondaryProctorName);
+
+        const matchMainName = Boolean(
+          mainTrimmed && mainTrimmed.length > 2 && (
+            (targetName && (mainTrimmed.includes(targetName) || targetName.includes(mainTrimmed))) ||
+            (cleanTargetName && pMainClean && (pMainClean.includes(cleanTargetName) || cleanTargetName.includes(pMainClean)))
+          )
+        );
+
+        const matchSecName = Boolean(
+          secTrimmed && secTrimmed.length > 2 && (
+            (targetName && (secTrimmed.includes(targetName) || targetName.includes(secTrimmed))) ||
+            (cleanTargetName && pSecClean && (pSecClean.includes(cleanTargetName) || cleanTargetName.includes(pSecClean)))
+          )
+        );
+
+        return matchMainId || matchMainName || matchSecId || matchSecName || matchBackupId;
+      }).map((d) => ({
+        ...d,
+        educationLevel: level,
+      }));
+
+      if (duties.length > 0) {
+        // Derive deterministic teacher code (01, 02...) matching matrix proctor legend
+        const allProctorNames = Array.from(
+          new Set(schedule.proctorSchedules.map((p) => p.mainProctorName.trim()))
+        ).sort((a, b) => a.localeCompare(b, 'id'));
+        const idx = allProctorNames.findIndex((n) => {
+          const nTrim = n.toLowerCase().trim();
+          const nClean = this.normalizeTeacherName(n);
+          return (
+            (targetName && nTrim.length > 2 && (nTrim.includes(targetName) || targetName.includes(nTrim))) ||
+            (cleanTargetName && nClean.length > 2 && (nClean.includes(cleanTargetName) || cleanTargetName.includes(nClean)))
+          );
+        });
+        const teacherCode = idx !== -1 ? String(idx + 1).padStart(2, '0') : undefined;
+
+        return {
+          schedule,
+          duties,
+          teacherCode,
+        };
       }
     }
 

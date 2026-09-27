@@ -526,9 +526,31 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   } | null>(null);
   const [smpSchoolSchedule, setSmpSchoolSchedule] = useState<ExamScheduleData | null>(null);
   const [smaSchoolSchedule, setSmaSchoolSchedule] = useState<ExamScheduleData | null>(null);
-  const [selectedExamDutyLevel, setSelectedExamDutyLevel] = useState<'SMP' | 'SMA'>('SMP');
+  const [selectedExamDutyLevel, setSelectedExamDutyLevel] = useState<'ALL' | 'SMP' | 'SMA'>('ALL');
 
-  const activeExamDuty = selectedExamDutyLevel === 'SMP' ? smpExamDuty : smaExamDuty;
+  const combinedExamDuties = useMemo(() => {
+    const smpDuties = (smpExamDuty?.duties || []).map((d) => ({ ...d, educationLevel: 'SMP' as const }));
+    const smaDuties = (smaExamDuty?.duties || []).map((d) => ({ ...d, educationLevel: 'SMA' as const }));
+    const combined = [...smpDuties, ...smaDuties];
+    return combined.sort((a, b) => {
+      const dateCmp = a.date.localeCompare(b.date);
+      if (dateCmp !== 0) return dateCmp;
+      return a.sessionNumber - b.sessionNumber;
+    });
+  }, [smpExamDuty, smaExamDuty]);
+
+  const activeExamDuty = useMemo(() => {
+    if (selectedExamDutyLevel === 'SMP') return smpExamDuty;
+    if (selectedExamDutyLevel === 'SMA') return smaExamDuty;
+    if (smpExamDuty && smaExamDuty) {
+      return {
+        schedule: smpExamDuty.schedule,
+        duties: combinedExamDuties,
+        teacherCode: smpExamDuty.teacherCode || smaExamDuty.teacherCode,
+      };
+    }
+    return smpExamDuty || smaExamDuty;
+  }, [selectedExamDutyLevel, smpExamDuty, smaExamDuty, combinedExamDuties]);
 
   const hasMultipleLevels = Boolean(smpExamDuty || smpSchoolSchedule) && Boolean(smaExamDuty || smaSchoolSchedule);
   const shouldShowDutyCard = Boolean(smpExamDuty || smaExamDuty || smpSchoolSchedule || smaSchoolSchedule);
@@ -559,13 +581,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           setSmpSchoolSchedule(smpSched);
           setSmaSchoolSchedule(smaSched);
           // Auto-select level based on available duties:
-          if (smpData && !smaData) {
+          if (smpData && smaData) {
+            setSelectedExamDutyLevel('ALL');
+          } else if (smpData && !smaData) {
             setSelectedExamDutyLevel('SMP');
           } else if (!smpData && smaData) {
             setSelectedExamDutyLevel('SMA');
           } else if (!smpData && !smaData) {
             if (smpSched && !smaSched) setSelectedExamDutyLevel('SMP');
             else if (!smpSched && smaSched) setSelectedExamDutyLevel('SMA');
+            else setSelectedExamDutyLevel('ALL');
           }
         }
       } catch (err) {
@@ -2461,32 +2486,43 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 id="teacher-exam-duty-card"
                 className="bg-white rounded-2xl p-3.5 sm:p-4 border border-teal-600/30 shadow-xs space-y-3 animate-fadeIn"
               >
-                {/* Level Switcher (SMP vs SMA) if multiple levels exist */}
+                {/* Level Switcher (SMP vs SMA vs SEMUA) if multiple levels exist */}
                 {hasMultipleLevels && (
-                  <div className="w-full sm:w-auto grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
+                  <div className="w-full sm:w-auto grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExamDutyLevel('ALL')}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        selectedExamDutyLevel === 'ALL'
+                          ? 'bg-[#023246] text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      <span className="truncate">Semua ({(smpExamDuty?.duties.length || 0) + (smaExamDuty?.duties.length || 0)})</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setSelectedExamDutyLevel('SMP')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
                         selectedExamDutyLevel === 'SMP'
                           ? 'bg-teal-700 text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                       }`}
                     >
                       <span>🏫</span>
-                      <span className="truncate">Jadwal SMP ({smpExamDuty?.duties.length || 0} Sesi)</span>
+                      <span className="truncate">SMP ({smpExamDuty?.duties.length || 0})</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedExamDutyLevel('SMA')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
                         selectedExamDutyLevel === 'SMA'
                           ? 'bg-blue-700 text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                       }`}
                     >
                       <span>🎓</span>
-                      <span className="truncate">Jadwal SMA ({smaExamDuty?.duties.length || 0} Sesi)</span>
+                      <span className="truncate">SMA ({smaExamDuty?.duties.length || 0})</span>
                     </button>
                   </div>
                 )}
@@ -2512,19 +2548,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       className={`group relative rounded-xl p-3 sm:p-3.5 border transition-all cursor-pointer select-none ${
                         selectedExamDutyLevel === 'SMA'
                           ? 'bg-linear-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 border-blue-200 hover:border-blue-400 hover:shadow-xs active:scale-[0.99]'
+                          : selectedExamDutyLevel === 'ALL'
+                          ? 'bg-linear-to-br from-sky-50/70 via-slate-50 to-teal-50/50 border-sky-300/80 hover:border-sky-400 hover:shadow-xs active:scale-[0.99]'
                           : 'bg-linear-to-br from-teal-50/70 via-slate-50 to-emerald-50/50 border-teal-200 hover:border-teal-400 hover:shadow-xs active:scale-[0.99]'
                       }`}
                       title="Klik untuk membuka jadwal mengawas asli & rincian lengkap"
                     >
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`w-10 h-10 rounded-xl ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700' : 'bg-teal-700'} text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
+                          <div className={`w-10 h-10 rounded-xl ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700' : selectedExamDutyLevel === 'ALL' ? 'bg-[#023246]' : 'bg-teal-700'} text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
                             <CalendarCheck className="w-5 h-5 text-white" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className={`px-2 py-0.5 rounded-md ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-teal-100 text-teal-900 border-teal-300'} text-[10px] font-black tracking-wider uppercase border`}>
-                                TUGAS MENGAWAS ({selectedExamDutyLevel})
+                              <span className={`px-2 py-0.5 rounded-md ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : selectedExamDutyLevel === 'ALL' ? 'bg-sky-100 text-sky-900 border-sky-300' : 'bg-teal-100 text-teal-900 border-teal-300'} text-[10px] font-black tracking-wider uppercase border`}>
+                                TUGAS MENGAWAS ({selectedExamDutyLevel === 'ALL' ? 'SMP & SMA' : selectedExamDutyLevel})
                               </span>
                               {activeExamDuty.teacherCode && (
                                 <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-black border border-amber-300">
@@ -2532,11 +2570,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                                 </span>
                               )}
                               <span className="text-[10px] text-slate-500 font-semibold">
-                                T.A. {activeExamDuty.schedule.config.academicYear}
+                                T.A. {activeExamDuty.schedule?.config?.academicYear || '2026/2027'}
                               </span>
                             </div>
                             <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-snug mt-0.5 line-clamp-1">
-                              {activeExamDuty.schedule.config.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`}
+                              {selectedExamDutyLevel === 'ALL'
+                                ? 'Jadwal Tugas Mengawas Ujian (SMP & SMA Terpadu)'
+                                : (activeExamDuty.schedule?.config?.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`)}
                             </h3>
                             <p className="text-[11px] text-slate-500 font-medium">
                               Bapak/Ibu: <strong className="text-slate-800">{effectiveUser?.full_name}</strong>
@@ -2552,7 +2592,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                               HARI INI
                             </span>
                           ) : (
-                            <span className={`px-2.5 py-0.5 rounded-full ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-teal-100 text-teal-900 border-teal-300'} border text-[10px] font-extrabold shrink-0`}>
+                            <span className={`px-2.5 py-0.5 rounded-full ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-900 border-blue-300' : selectedExamDutyLevel === 'ALL' ? 'bg-sky-100 text-sky-900 border-sky-300' : 'bg-teal-100 text-teal-900 border-teal-300'} border text-[10px] font-extrabold shrink-0`}>
                               {activeExamDuty.duties.length} Sesi
                             </span>
                           )}
@@ -2576,8 +2616,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                               >
                                 <span className="text-slate-500 font-medium">{duty.dayName}:</span>
                                 <span className="text-slate-900 font-black">{duty.subject}</span>
-                                <span className={`px-1 py-0.2 rounded text-[9px] font-black ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-100 text-blue-800' : 'bg-teal-100 text-teal-800'}`}>
-                                  {duty.roomName || `R.${duty.className}`}
+                                <span className={`px-1 py-0.2 rounded text-[9px] font-black ${duty.educationLevel === 'SMA' || (selectedExamDutyLevel === 'SMA') ? 'bg-blue-100 text-blue-800' : 'bg-teal-100 text-teal-800'}`}>
+                                  {duty.educationLevel ? `${duty.educationLevel} • ` : ''}{duty.roomName || `R.${duty.className}`}
                                 </span>
                               </div>
                             );
@@ -2598,16 +2638,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         onClick={() => {
                           const institutionForSlip = selectedExamDutyLevel === 'SMA'
                             ? 'SMA Terpadu As Salaam'
+                            : selectedExamDutyLevel === 'ALL'
+                            ? 'SMP & SMA Terpadu As Salaam'
                             : 'SMP Terpadu Al-Ittihadiyah';
+                          const titleForSlip = selectedExamDutyLevel === 'ALL'
+                            ? 'Jadwal Tugas Mengawas Ujian (SMP & SMA)'
+                            : (activeExamDuty.schedule?.config?.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`);
                           ExamWordExporterService.printTeacherDutySlip(
                             effectiveUser?.full_name || 'Bapak/Ibu Guru',
                             activeExamDuty.teacherCode,
                             activeExamDuty.duties,
                             institutionForSlip,
-                            activeExamDuty.schedule.config.examTitle || `Jadwal Tugas Mengawas Ujian (${selectedExamDutyLevel})`
+                            titleForSlip
                           );
                         }}
-                        className={`h-11 px-3 ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700 hover:bg-blue-800' : 'bg-teal-700 hover:bg-teal-800'} active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer`}
+                        className={`h-11 px-3 ${selectedExamDutyLevel === 'SMA' ? 'bg-blue-700 hover:bg-blue-800' : selectedExamDutyLevel === 'ALL' ? 'bg-[#023246] hover:bg-[#03445e]' : 'bg-teal-700 hover:bg-teal-800'} active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer`}
                       >
                         <Printer className="w-3.5 h-3.5 text-teal-200" />
                         <span>Cetak Kartu (A4)</span>
@@ -2631,7 +2676,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   /* Informative state when teacher has no duty in selected level */
                   <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center space-y-2 bg-slate-50/70">
                     <p className="text-xs font-semibold text-slate-600">
-                      Tidak ada penugasan mengawas untuk Anda di jenjang <strong className="text-slate-900">{selectedExamDutyLevel}</strong>.
+                      Tidak ada penugasan mengawas untuk Anda di jenjang <strong className="text-slate-900">{selectedExamDutyLevel === 'ALL' ? 'SMP maupun SMA' : selectedExamDutyLevel}</strong>.
                     </p>
                     <button
                       type="button"
@@ -2643,7 +2688,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       className="h-9 px-3 bg-white hover:bg-slate-100 text-teal-800 border border-slate-300 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
                     >
                       <Calendar className="w-3.5 h-3.5 text-teal-700" />
-                      <span>Lihat Roster Sekolah ({selectedExamDutyLevel})</span>
+                      <span>Lihat Roster Sekolah ({selectedExamDutyLevel === 'ALL' ? 'SMP' : selectedExamDutyLevel})</span>
                     </button>
                   </div>
                 )}
@@ -6083,7 +6128,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           isOpen={isExamScheduleModalOpen}
           onClose={() => setIsExamScheduleModalOpen(false)}
           currentUser={effectiveUser}
-          initialLevel={selectedExamDutyLevel}
+          initialLevel={selectedExamDutyLevel === 'SMA' ? 'SMA' : 'SMP'}
           initialTab={examScheduleInitialTab}
           readOnly={isExamScheduleReadOnly}
         />
