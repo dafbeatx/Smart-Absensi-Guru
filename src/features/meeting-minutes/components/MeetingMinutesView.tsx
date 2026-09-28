@@ -280,7 +280,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-[480px] mx-auto px-4 py-4 space-y-4 pb-28 text-[#023246] animate-fadeIn">
+    <div className="w-full max-w-120 mx-auto px-4 py-4 space-y-4 pb-28 text-[#023246] animate-fadeIn">
       {/* ── TOP NAV BAR (NON-POPUP FULL VIEW) ───────────────────────────── */}
       <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200/90 shadow-xs flex items-center justify-between gap-3">
         <button
@@ -292,7 +292,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
               onBack();
             }
           }}
-          className="inline-flex items-center gap-2 h-11 px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200 text-xs font-bold text-[#023246] transition-all cursor-pointer min-h-[44px]"
+          className="inline-flex items-center gap-2 h-11 px-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200 text-xs font-bold text-[#023246] transition-all cursor-pointer min-h-11"
         >
           <ArrowLeft className="w-4 h-4 text-[#023246]" />
           <span>{selectedMinuteId ? 'Daftar Notulen' : 'Kembali'}</span>
@@ -307,7 +307,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
       </div>
 
       {/* ── HERO BANNER ─────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-[#023246] via-[#18536B] to-[#023246] rounded-2xl p-4 text-white shadow-sm space-y-2">
+      <div className="bg-linear-to-br from-[#023246] via-[#18536B] to-[#023246] rounded-2xl p-4 text-white shadow-sm space-y-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 border border-white/15">
@@ -448,7 +448,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
           </section>
 
           {/* Kartu 2: Ringkasan Eksekutif */}
-          <section className="bg-gradient-to-br from-teal-50/70 via-white to-sky-50/50 rounded-2xl p-4 border border-teal-200/90 shadow-xs space-y-2">
+          <section className="bg-linear-to-br from-teal-50/70 via-white to-sky-50/50 rounded-2xl p-4 border border-teal-200/90 shadow-xs space-y-2">
             <div className="flex items-center gap-1.5 text-teal-900 text-xs font-black uppercase tracking-wider">
               <Sparkles className="w-4 h-4 text-teal-600" />
               <span>Ringkasan Eksekutif (AI Summary)</span>
@@ -603,7 +603,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('ARCHIVE')}
-              className={`h-11 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px] ${
+              className={`h-11 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-11 ${
                 activeTab === 'ARCHIVE'
                   ? 'bg-white text-[#023246] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -616,7 +616,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('RECORD')}
-              className={`h-11 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px] ${
+              className={`h-11 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-11 ${
                 activeTab === 'RECORD'
                   ? 'bg-[#023246] text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -639,7 +639,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cari topik rapat, pimpinan, atau notulis..."
-                    className="w-full h-11 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                    className="w-full h-11 pl-9 pr-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#023246]"
                   />
                 </div>
 
@@ -805,7 +805,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     placeholder="Misal: Rapat Pleno Koordinasi KBM & Kurikulum"
-                    className="w-full h-11 px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                    className="w-full h-11 px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246]"
                   />
                 </div>
 
@@ -938,7 +938,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
 - Soal kumpul ke bu dewi maks tgl 29
 - Pengawas wajib hadir jam 07.45
 - Keputusan: siswa izin wajib konfirmasi H-1"
-                    className="w-full p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#023246] leading-relaxed resize-y"
+                    className="w-full p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#023246] leading-relaxed resize-y"
                   />
                 </div>
 
@@ -947,10 +947,10 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
                   type="button"
                   disabled={isProcessingAI || !formRoughNotes.trim()}
                   onClick={handleTriggerAI}
-                  className={`w-full h-12 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md min-h-[48px] ${
+                  className={`w-full h-12 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md min-h-12 ${
                     isProcessingAI
                       ? 'bg-slate-300 text-slate-600 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-teal-700 via-[#18536B] to-[#023246] hover:brightness-110 text-white active:scale-[0.98]'
+                      : 'bg-linear-to-r from-teal-700 via-[#18536B] to-[#023246] hover:brightness-110 text-white active:scale-[0.98]'
                   }`}
                 >
                   <Sparkles
@@ -1028,7 +1028,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
                     type="button"
                     disabled={isSaving}
                     onClick={handleSaveMinute}
-                    className="w-full h-12 rounded-xl bg-[#023246] hover:bg-[#03445e] active:scale-[0.98] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md min-h-[48px]"
+                    className="w-full h-12 rounded-xl bg-[#023246] hover:bg-[#03445e] active:scale-[0.98] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md min-h-12"
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     <span>
