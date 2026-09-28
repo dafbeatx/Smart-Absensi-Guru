@@ -2442,7 +2442,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                         return next;
                                       });
                                     }}
-                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-teal-500 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs"
+                                    className="w-full bg-white border border-slate-300 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all shadow-2xs"
                                   />
                                 </div>
                                 <div className="pt-4 text-slate-400 shrink-0">
@@ -2463,7 +2463,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                         return next;
                                       });
                                     }}
-                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-teal-500 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs"
+                                    className="w-full bg-white border border-slate-300 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all shadow-2xs"
                                   />
                                 </div>
                               </div>
@@ -2646,7 +2646,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       return next;
                                     });
                                   }}
-                                  className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-teal-500 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs"
+                                  className="w-full bg-white border border-slate-300 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all shadow-2xs"
                                 />
                               </div>
                               <div className="pt-4 text-slate-400 shrink-0">
@@ -2667,7 +2667,7 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                       return next;
                                     });
                                   }}
-                                  className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-teal-500 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs"
+                                  className="w-full bg-white border border-slate-300 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all shadow-2xs"
                                 />
                               </div>
                             </div>
