@@ -689,6 +689,202 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
     setToast({ text: `Rombel ${norm} berhasil ditambahkan ke daftar!`, type: 'success' });
   }, [customClassInput, availableClasses, selectedClasses]);
 
+  // ── QUICK PRESETS & SMART SUGGESTIONS (SARAN SATSET) ───────────────────────
+  // 1. Standar Sekolah 5 Hari (ASTS / ASAS: 11 Mapel, 3 Sesi biasa, 2 Sesi Jumat)
+  const applySatsetStandardSchool = useCallback(() => {
+    const monday = getSmartDefaultExamStartDate();
+    const friday = getSmartDefaultExamEndDate(monday);
+    setFormStartDate(monday);
+    setFormEndDate(friday);
+    setIncludeSaturday(false);
+    setSessionMode('PER_DAY');
+
+    setSessionSlots([
+      { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '08:00', endTime: '09:30' },
+      { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '10:00', endTime: '11:00' },
+      { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:00', endTime: '12:00' },
+      { sessionNumber: 4, sessionName: 'Sesi 4 (Tambahan)', startTime: '13:00', endTime: '14:30' },
+    ]);
+
+    const examDays = ExamSchedulerService.getValidExamDates(monday, friday, false);
+    setDayOverrides(
+      examDays.map((d) => ({
+        date: d.date,
+        dayName: d.dayName,
+        sessionsCount: d.dayName.toLowerCase() === 'jumat' ? 2 : 3,
+      }))
+    );
+
+    const targetClasses = availableClasses.length > 0
+      ? availableClasses
+      : (selectedLevel === 'SMA' ? ['10', '11', '12'] : DEFAULT_CLASSES);
+    setSelectedClasses(targetClasses);
+    setTotalRooms(targetClasses.length);
+    const newMapping: Record<string, string> = {};
+    targetClasses.forEach((cls, idx) => {
+      newMapping[cls] = roomFormat === 'DOUBLE_DIGIT'
+        ? `Ruang ${String(idx + 1).padStart(2, '0')}`
+        : `Ruang ${idx + 1}`;
+    });
+    setClassRoomMapping(newMapping);
+
+    const standardSubs = selectedLevel === 'SMA'
+      ? ['PAI', 'Biologi', 'Matematika', 'Pendidikan Pancasila', 'B. Indonesia', 'Akuntansi', 'B. Arab', 'B. Inggris', 'Ekonomi', 'Informatika', 'Hadits', 'BTQ']
+      : CANONICAL_SCHOOL_SUBJECTS.slice(0, 11);
+    const validSubs = standardSubs.filter((s) => availableSubjects.includes(s));
+    setSelectedSubjects(validSubs.length > 0 ? validSubs : availableSubjects.slice(0, 11));
+
+    setExcludeOwnSubject(true);
+    setExcludeCommitteeProctor(true);
+    setAssignBackupProctor(true);
+    setProctorsPerRoom(1);
+
+    setToast({
+      text: '✨ Template Standar Sekolah (5 Hari, 11 Mapel, 1 Kelas = 1 Ruangan) berhasil diterapkan!',
+      type: 'success',
+    });
+  }, [availableClasses, availableSubjects, roomFormat, selectedLevel]);
+
+  // 2. Ujian Ringkas (2 Sesi per Hari, Jumat 1 Sesi)
+  const applySatsetCompactExam = useCallback(() => {
+    const monday = getSmartDefaultExamStartDate();
+    const friday = getSmartDefaultExamEndDate(monday);
+    setFormStartDate(monday);
+    setFormEndDate(friday);
+    setIncludeSaturday(false);
+    setSessionMode('PER_DAY');
+
+    const examDays = ExamSchedulerService.getValidExamDates(monday, friday, false);
+    setDayOverrides(
+      examDays.map((d) => ({
+        date: d.date,
+        dayName: d.dayName,
+        sessionsCount: d.dayName.toLowerCase() === 'jumat' ? 1 : 2,
+      }))
+    );
+
+    const targetClasses = availableClasses.length > 0 ? availableClasses : DEFAULT_CLASSES;
+    setSelectedClasses(targetClasses);
+    setTotalRooms(targetClasses.length);
+    setSelectedSubjects(availableSubjects.slice(0, 9));
+
+    setExcludeOwnSubject(true);
+    setExcludeCommitteeProctor(true);
+    setAssignBackupProctor(true);
+    setProctorsPerRoom(1);
+
+    setToast({
+      text: '⚡ Template Ujian Ringkas (2 Sesi/Hari, 9 Mapel) berhasil diterapkan!',
+      type: 'success',
+    });
+  }, [availableClasses, availableSubjects]);
+
+  // 3. Asesmen Akhir Jenjang (ASAJ / Khusus Kelas Akhir)
+  const applySatsetFinalGradeExam = useCallback(() => {
+    setFormExamType('ASAJ');
+    const monday = getSmartDefaultExamStartDate();
+    const friday = getSmartDefaultExamEndDate(monday);
+    setFormStartDate(monday);
+    setFormEndDate(friday);
+    setIncludeSaturday(false);
+    setSessionMode('PER_DAY');
+
+    const examDays = ExamSchedulerService.getValidExamDates(monday, friday, false);
+    setDayOverrides(
+      examDays.map((d) => ({
+        date: d.date,
+        dayName: d.dayName,
+        sessionsCount: 2,
+      }))
+    );
+
+    const finalGradeFilter = selectedLevel === 'SMP' ? '9' : '12';
+    const finalClasses = availableClasses.filter((c) => c.includes(finalGradeFilter));
+    const targetClasses = finalClasses.length > 0 ? finalClasses : availableClasses;
+    setSelectedClasses(targetClasses);
+    setTotalRooms(targetClasses.length);
+    setSelectedSubjects(availableSubjects.slice(0, 10));
+
+    setExcludeOwnSubject(true);
+    setExcludeCommitteeProctor(true);
+    setAssignBackupProctor(true);
+    setProctorsPerRoom(1);
+
+    setToast({
+      text: `🎓 Template ASAJ Tingkat Akhir (Kelas ${finalGradeFilter}) berhasil diterapkan!`,
+      type: 'success',
+    });
+  }, [availableClasses, availableSubjects, selectedLevel]);
+
+  // 4. Pulihkan dari Jadwal Terakhir (jika scheduleData ada)
+  const applyRestoreFromCurrentSchedule = useCallback(() => {
+    if (!scheduleData) {
+      setToast({ text: 'Tidak ada data jadwal tersimpan untuk dipulihkan.', type: 'error' });
+      return;
+    }
+    const cfg = scheduleData.config;
+    setFormExamType(cfg.examType);
+    setFormStartDate(cfg.startDate);
+    setFormEndDate(cfg.endDate);
+    setIncludeSaturday(cfg.includeSaturday || false);
+    if (cfg.sessionsPerDay) setSessionsPerDay(cfg.sessionsPerDay);
+    if (cfg.sessionSlots) setSessionSlots(cfg.sessionSlots);
+    if (cfg.dayOverrides && cfg.dayOverrides.length > 0) {
+      setSessionMode('PER_DAY');
+      setDayOverrides(cfg.dayOverrides);
+    }
+    if (cfg.selectedClasses) setSelectedClasses(cfg.selectedClasses);
+    if (cfg.totalRooms) setTotalRooms(cfg.totalRooms);
+    if (cfg.roomFormat) setRoomFormat(cfg.roomFormat);
+    if (cfg.classRoomMapping) setClassRoomMapping(cfg.classRoomMapping);
+    if (cfg.selectedSubjects) setSelectedSubjects(cfg.selectedSubjects);
+    if (cfg.proctorsPerRoom) setProctorsPerRoom(cfg.proctorsPerRoom);
+    if (cfg.excludeOwnSubject !== undefined) setExcludeOwnSubject(cfg.excludeOwnSubject);
+    if (cfg.excludeCommitteeProctor !== undefined) setExcludeCommitteeProctor(cfg.excludeCommitteeProctor);
+    if (cfg.assignBackupProctor !== undefined) setAssignBackupProctor(cfg.assignBackupProctor);
+    if (cfg.aiCustomPrompt) setAiCustomPrompt(cfg.aiCustomPrompt);
+
+    setToast({
+      text: '📋 Parameter berhasil disinkronkan dengan jadwal tersimpan saat ini.',
+      type: 'success',
+    });
+  }, [scheduleData]);
+
+  // Helper 1-Klik: 1 Kelas = 1 Ruang
+  const handleAutoAssignOneClassOneRoom = useCallback(() => {
+    const targetClasses = selectedClasses.length > 0 ? selectedClasses : availableClasses;
+    if (targetClasses.length === 0) {
+      setToast({ text: 'Pilih rombel terlebih dahulu!', type: 'error' });
+      return;
+    }
+    setTotalRooms(targetClasses.length);
+    const newMapping: Record<string, string> = {};
+    targetClasses.forEach((cls, idx) => {
+      newMapping[cls] = roomFormat === 'DOUBLE_DIGIT'
+        ? `Ruang ${String(idx + 1).padStart(2, '0')}`
+        : `Ruang ${idx + 1}`;
+    });
+    setClassRoomMapping(newMapping);
+    setToast({ text: `⚡ Berhasil: ${targetClasses.length} kelas dialokasikan masing-masing 1 ruangan.`, type: 'success' });
+  }, [selectedClasses, availableClasses, roomFormat]);
+
+  // Helper 1-Klik: Pilih Mapel Sesuai Kapasitas Slot
+  const handleAutoSelectSubjectsByCapacity = useCallback(() => {
+    if (totalSlotsCapacity <= 0) return;
+    const targetCount = Math.min(totalSlotsCapacity, availableSubjects.length);
+    setSelectedSubjects(availableSubjects.slice(0, targetCount));
+    setToast({ text: `⚡ Berhasil memilih ${targetCount} mapel sesuai kapasitas slot (${totalSlotsCapacity} sesi).`, type: 'success' });
+  }, [totalSlotsCapacity, availableSubjects]);
+
+  // Helper 1-Klik: Terapkan Aturan Standar Anti-Bentrok
+  const handleApplyDefaultProctorRules = useCallback(() => {
+    setExcludeOwnSubject(true);
+    setExcludeCommitteeProctor(true);
+    setAssignBackupProctor(true);
+    setProctorsPerRoom(1);
+    setToast({ text: '⚡ Aturan standar anti-bentrok berhasil diterapkan!', type: 'success' });
+  }, []);
+
   // Load initial data
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
@@ -2182,6 +2378,126 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
               </div>
             )}
 
+            {/* ⚡ Quick Setup & Satset Presets Recommendation Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 text-white shadow-md space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
+                    <Zap className="w-5 h-5 text-teal-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                        Rekomendasi Setup Cepat (Satset 1-Klik)
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-teal-400 text-slate-950">
+                        Anti Ribet
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Pilih template skenario ujian di bawah untuk mengisi tanggal, sesi harian, rombel, ruangan, dan mapel secara optimal dalam sekali klik.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                {/* Option 1: Standar Sekolah */}
+                <div className="bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl p-3.5 transition-all flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>Standar ASTS / ASAS</span>
+                      </span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-teal-400/20 text-teal-300 border border-teal-400/30 rounded">
+                        Paling Cocok
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-snug">
+                      5 Hari (Senin–Jumat) &bull; 11 Mapel Pokok &bull; Senin–Kamis 3 Sesi, Jumat 2 Sesi &bull; 1 Kelas = 1 Ruang.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={applySatsetStandardSchool}
+                    className="w-full py-2 px-3 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Terapkan Standar Sekolah</span>
+                  </button>
+                </div>
+
+                {/* Option 2: Ujian Ringkas */}
+                <div className="bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl p-3.5 transition-all flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-sky-300 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                        <span>Ujian Ringkas (2 Sesi)</span>
+                      </span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-sky-400/20 text-sky-300 border border-sky-400/30 rounded">
+                        Beban Santai
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-snug">
+                      5 Hari &bull; 9 Mapel &bull; Senin–Kamis 2 Sesi (selesai 11.30 WIB), Jumat 1 Sesi &bull; Jadwal lebih longgar.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={applySatsetCompactExam}
+                    className="w-full py-2 px-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Terapkan Ujian Ringkas</span>
+                  </button>
+                </div>
+
+                {/* Option 3: Tingkat Akhir (ASAJ) */}
+                <div className="bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl p-3.5 transition-all flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>Ujian Akhir (ASAJ / US)</span>
+                      </span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 rounded">
+                        Kelas {selectedLevel === 'SMP' ? '9' : '12'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-snug">
+                      Khusus rombel tingkat akhir &bull; 2 Sesi per hari &bull; Pengawas cadangan piket otomatis aktif.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={applySatsetFinalGradeExam}
+                    className="w-full py-2 px-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                  >
+                    <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Terapkan Setup ASAJ</span>
+                  </button>
+                </div>
+              </div>
+
+              {scheduleData && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-800 text-xs">
+                  <span className="text-slate-400 text-[11px]">
+                    Ingin menggunakan seluruh konfigurasi dari jadwal yang tersimpan saat ini?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={applyRestoreFromCurrentSchedule}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-teal-300 text-[11px] font-bold transition-colors flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3 text-teal-400" />
+                    <span>Salin Semua dari Jadwal Aktif</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Main 2-Column Responsive Layout for Desktop / Laptop / Tablet */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* LEFT COLUMN: Waktu, Periode & Pengaturan Sesi Harian (lg:col-span-7) */}
@@ -2887,13 +3203,23 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                           <span className="text-[11px] font-bold text-slate-700">
                             Alokasi Ruangan per Kelas:
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setClassRoomMapping({})}
-                            className="text-[10px] text-slate-500 hover:text-teal-700 font-bold cursor-pointer"
-                          >
-                            Reset Alokasi
-                          </button>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={handleAutoAssignOneClassOneRoom}
+                              className="text-[10px] text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded-md font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <Zap className="w-3 h-3 text-teal-600" />
+                              <span>Satset: 1 Kelas = 1 Ruang</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setClassRoomMapping({})}
+                              className="text-[10px] text-slate-500 hover:text-slate-700 font-bold px-1.5 py-0.5 cursor-pointer"
+                            >
+                              Reset Alokasi
+                            </button>
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
@@ -2951,23 +3277,35 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <p className="text-[11px] text-slate-500">
                       Pilih mapel kurikulum atau tambahkan mapel kustom:
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedSubjects.length === availableSubjects.length) {
-                          setSelectedSubjects([]);
-                        } else {
-                          setSelectedSubjects([...availableSubjects]);
-                        }
-                      }}
-                      className="text-[11px] font-bold text-teal-700 hover:text-teal-800 cursor-pointer"
-                    >
-                      {selectedSubjects.length === availableSubjects.length ? 'Batal Semua' : 'Pilih Semua'}
-                    </button>
+                    <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-auto">
+                      {totalSlotsCapacity > 0 && totalSlotsCapacity < availableSubjects.length && (
+                        <button
+                          type="button"
+                          onClick={handleAutoSelectSubjectsByCapacity}
+                          className="text-[10px] text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded-md font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Zap className="w-3 h-3 text-teal-600" />
+                          <span>Pas Kapasitas ({totalSlotsCapacity} Mapel)</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedSubjects.length === availableSubjects.length) {
+                            setSelectedSubjects([]);
+                          } else {
+                            setSelectedSubjects([...availableSubjects]);
+                          }
+                        }}
+                        className="text-[11px] font-bold text-teal-700 hover:text-teal-800 cursor-pointer"
+                      >
+                        {selectedSubjects.length === availableSubjects.length ? 'Batal Semua' : 'Pilih Semua'}
+                      </button>
+                    </div>
                   </div>
 
                   {/* List of subject cards */}
@@ -3042,14 +3380,24 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
 
                 {/* 5. Aturan Cerdas Pengawas & Instruksi AI */}
                 <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
-                  <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                  <div className="pb-3 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
                     <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                       <ShieldAlert className="w-4 h-4 text-amber-600" />
                       5. Aturan Pengawas & Otomasi AI
                     </span>
-                    <span className="text-[11px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
-                      Langkah 3
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleApplyDefaultProctorRules}
+                        className="text-[10px] text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded-md font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Check className="w-3 h-3 text-teal-600" />
+                        <span>Rekomendasi Standar</span>
+                      </button>
+                      <span className="text-[11px] text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                        Langkah 3
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-2.5 text-xs">
