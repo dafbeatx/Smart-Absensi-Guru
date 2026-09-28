@@ -155,35 +155,40 @@ export class ExamMatrixBuilderService {
       } catch {}
     }
 
-    // 5. Canonical school faculty map fallback
+    // 5. Canonical school faculty map fallback matching official physical paper legend
     if (!rawSubject) {
       const norm = ExamSchedulerService.normalizeTeacherName(teacherName);
       if (norm.includes('widianingsih') || norm.includes('widia')) {
-        rawSubject = 'IPA';
+        rawSubject = 'IPA – Ilmu Pengetahuan Alam';
       } else if (norm.includes('ridho') || norm.includes('farizi')) {
         rawSubject = 'Akhlak lil Banin';
       } else if (norm.includes('fitri ani') || norm.includes('rahayu')) {
-        rawSubject = 'MTK';
+        rawSubject = 'MTK – Matematika';
       } else if (norm.includes('iqbal') || norm.includes('gustiawan')) {
         rawSubject = 'Hadits';
       } else if (norm.includes('mawar') || norm.includes('andinia')) {
-        rawSubject = 'BTQ';
+        rawSubject = "BTQ – Baca Tulis Al-Qur'an";
       } else if (norm.includes('mira') || norm.includes('nurdianti')) {
-        rawSubject = 'B. Arab, PAI';
+        rawSubject = 'B. Arab – Bahasa Arab, PAI – Pendidikan Agama Islam';
       } else if (norm.includes('nurul') || norm.includes('farhiya') || norm.includes('fahriya')) {
-        rawSubject = 'PP';
+        rawSubject = 'PP – Pendidikan Pancasila';
       } else if (norm.includes('qodiatul') || norm.includes('asrof') || norm.includes('ramadhoni')) {
-        rawSubject = 'IPS';
+        rawSubject = 'IPS – Ilmu Pengetahuan Sosial';
       } else if (norm.includes('septi') || norm.includes('nur aeni')) {
-        rawSubject = 'B. Indonesia';
+        rawSubject = 'B. Indonesia – Bahasa Indonesia';
       } else if (norm.includes('dafa') || norm.includes('maulana')) {
         rawSubject = 'Informatika';
       } else if (norm.includes('adi') || norm.includes('prasetyo')) {
-        rawSubject = 'B. Inggris';
+        rawSubject = 'B. Inggris – Bahasa Inggris';
       }
     }
 
     if (!rawSubject || rawSubject === '-') return '-';
+
+    // If already contains expanded dash notation matching official document, return directly
+    if (rawSubject.includes('–') || rawSubject.includes(' - ')) {
+      return rawSubject;
+    }
 
     // 6. Normalize with official school subject labels
     const parts = rawSubject.split(/[,&/]/).map((p) => p.trim()).filter(Boolean);
@@ -213,7 +218,14 @@ export class ExamMatrixBuilderService {
       ? 'ASESMEN SUMATIF TENGAH SEMESTER (ASTS)'
       : config.examTitle || `UJIAN ${config.examType}`;
 
-    const subTitle = `${examName} ${config.semester ? config.semester.toUpperCase() : 'GENAP'}`;
+    const semesterLabel =
+      config.semester === '1' || config.semester?.toLowerCase() === 'ganjil'
+        ? 'GANJIL'
+        : config.semester === '2' || config.semester?.toLowerCase() === 'genap'
+        ? 'GENAP'
+        : config.semester?.toUpperCase() || 'GANJIL';
+
+    const subTitle = `${examName} ${semesterLabel}`;
 
     // ── 1. GATHER ALL DISTINCT TEACHERS ASSIGNED AS PROCTORS ──────────────────
     const teacherMap = new Map<string, { userId: string; fullName: string; subject: string }>();

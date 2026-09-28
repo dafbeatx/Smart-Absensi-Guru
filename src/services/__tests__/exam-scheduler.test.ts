@@ -1341,12 +1341,12 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 31: Error verifying SMP synchronized schedule', false, err?.message);
   }
 
-  // Test 32: Standardized Session Times (Sesi 1: 08:00 - 09:30, Sesi 2: 10:00 - 11:00, Sesi 3: 11:00 - 12:00)
+  // Test 32: Verified Session Hours (SMP & SMA official timetable matching physical photo)
   try {
     const smpSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASTS', 'SMP');
     const smaSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASTS', 'SMA');
 
-    const verifySessions = (sched: ExamScheduleData | null, _name: string) => {
+    const verifySmpSessions = (sched: ExamScheduleData | null) => {
       if (!sched) return false;
       const s1 = sched.proctorSchedules.filter((p) => p.sessionNumber === 1);
       const s2 = sched.proctorSchedules.filter((p) => p.sessionNumber === 2);
@@ -1359,11 +1359,28 @@ export const runExamSchedulerTestSuite = async (): Promise<{
       return s1Valid && s2Valid && s3Valid;
     };
 
-    const smpTimesOk = verifySessions(smpSchedule, 'SMP');
-    const smaTimesOk = verifySessions(smaSchedule, 'SMA');
+    const verifySmaSessions = (sched: ExamScheduleData | null) => {
+      if (!sched) return false;
+      const jumatS1 = sched.proctorSchedules.find((p) => p.dayName.toLowerCase() === 'jumat' && p.sessionNumber === 1);
+      const jumatS2 = sched.proctorSchedules.find((p) => p.dayName.toLowerCase() === 'jumat' && p.sessionNumber === 2);
+      const seninS1 = sched.proctorSchedules.find((p) => p.dayName.toLowerCase() === 'senin' && p.sessionNumber === 1);
+      const seninS2 = sched.proctorSchedules.find((p) => p.dayName.toLowerCase() === 'senin' && p.sessionNumber === 2);
+      const rabuS3 = sched.proctorSchedules.find((p) => p.dayName.toLowerCase() === 'rabu' && p.sessionNumber === 3);
+
+      const jumatValid = jumatS1?.startTime === '07:15' && jumatS1?.endTime === '08:45' &&
+                         jumatS2?.startTime === '09:00' && jumatS2?.endTime === '10:30';
+      const weekdayValid = seninS1?.startTime === '07:30' && seninS1?.endTime === '09:00' &&
+                           seninS2?.startTime === '09:30' && seninS2?.endTime === '11:00' &&
+                           rabuS3?.startTime === '11:15' && rabuS3?.endTime === '12:45';
+
+      return Boolean(jumatValid && weekdayValid);
+    };
+
+    const smpTimesOk = verifySmpSessions(smpSchedule);
+    const smaTimesOk = verifySmaSessions(smaSchedule);
 
     assert(
-      'Exam Scheduler 32: Both SMP and SMA strictly adhere to exact session hours (Sesi 1: 08:00 - 09:30, Sesi 2: 10:00 - 11:00, Sesi 3: 11:00 - 12:00)',
+      'Exam Scheduler 32: SMA strictly adheres to exact session hours from official photo (07:30-09:00, 09:30-11:00, 11:15-12:45, Jumat 07:15-08:45, 09:00-10:30)',
       smpTimesOk && smaTimesOk,
       `smpTimesOk: ${smpTimesOk}, smaTimesOk: ${smaTimesOk}`
     );

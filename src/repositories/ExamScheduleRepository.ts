@@ -16,8 +16,11 @@ export interface CanonicalSmaSlot {
   subject: string;
   startTime: string;
   endTime: string;
+  roomName: string;
+  className: string;
   proctorId: string;
   proctorName: string;
+  proctorCode: string;
 }
 
 export interface CanonicalSmpSlot {
@@ -36,18 +39,39 @@ export interface CanonicalSmpSlot {
 }
 
 export const CANONICAL_SMA_SLOTS: CanonicalSmaSlot[] = [
-  { dayIndex: 0, date: '2026-09-28', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '08:00', endTime: '09:30', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r' },
-  { dayIndex: 0, date: '2026-09-28', dayName: 'Senin', sessionNumber: 2, subject: 'Biologi', startTime: '10:00', endTime: '11:00', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r' },
-  { dayIndex: 1, date: '2026-09-29', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '08:00', endTime: '09:30', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r' },
-  { dayIndex: 1, date: '2026-09-29', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '10:00', endTime: '11:00', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd' },
-  { dayIndex: 2, date: '2026-09-30', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '08:00', endTime: '09:30', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r' },
-  { dayIndex: 2, date: '2026-09-30', dayName: 'Rabu', sessionNumber: 2, subject: 'Akuntansi', startTime: '10:00', endTime: '11:00', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r' },
-  { dayIndex: 2, date: '2026-09-30', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:00', endTime: '12:00', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi' },
-  { dayIndex: 3, date: '2026-10-01', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '08:00', endTime: '09:30', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi' },
-  { dayIndex: 3, date: '2026-10-01', dayName: 'Kamis', sessionNumber: 2, subject: 'Ekonomi', startTime: '10:00', endTime: '11:00', proctorId: 'usr_guru_002', proctorName: 'Muhammad Iqbal Gustiawan, S.Pd., G.r' },
-  { dayIndex: 3, date: '2026-10-01', dayName: 'Kamis', sessionNumber: 3, subject: 'Informatika', startTime: '11:00', endTime: '12:00', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r' },
-  { dayIndex: 4, date: '2026-10-02', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '08:00', endTime: '09:30', proctorId: 'usr_guru_002', proctorName: 'Muhammad Iqbal Gustiawan, S.Pd., G.r' },
-  { dayIndex: 4, date: '2026-10-02', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ', startTime: '10:00', endTime: '11:00', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi' },
+  // ── SENIN, 28 SEPTEMBER 2026 ──────────────────────────────────────────────
+  // Sesi 1 (07:30 - 09:00): PAI -> Pengawas 04 (Nurul Farhiya, S.Pd., G.r)
+  { dayIndex: 0, date: '2026-09-28', dayName: 'Senin', sessionNumber: 1, subject: 'PAI', startTime: '07:30', endTime: '09:00', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '04' },
+  // Sesi 2 (09:30 - 11:00): Biologi -> Pengawas 05 (Qodiatul Asrof Ramadhoni, S.E., G.r)
+  { dayIndex: 0, date: '2026-09-28', dayName: 'Senin', sessionNumber: 2, subject: 'Biologi', startTime: '09:30', endTime: '11:00', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '05' },
+
+  // ── SELASA, 29 SEPTEMBER 2026 ─────────────────────────────────────────────
+  // Sesi 1 (07:30 - 09:00): Matematika -> Pengawas 05 (Qodiatul Asrof Ramadhoni, S.E., G.r)
+  { dayIndex: 1, date: '2026-09-29', dayName: 'Selasa', sessionNumber: 1, subject: 'Matematika', startTime: '07:30', endTime: '09:00', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '05' },
+  // Sesi 2 (09:30 - 11:00): Pendidikan Pancasila -> Pengawas 01 (Dafa Maulana, S.Pd)
+  { dayIndex: 1, date: '2026-09-29', dayName: 'Selasa', sessionNumber: 2, subject: 'Pendidikan Pancasila', startTime: '09:30', endTime: '11:00', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_admin_001', proctorName: 'Dafa Maulana, S.Pd', proctorCode: '01' },
+
+  // ── RABU, 30 SEPTEMBER 2026 ───────────────────────────────────────────────
+  // Sesi 1 (07:30 - 09:00): B. Indonesia -> Pengawas 05 (Qodiatul Asrof Ramadhoni, S.E., G.r)
+  { dayIndex: 2, date: '2026-09-30', dayName: 'Rabu', sessionNumber: 1, subject: 'B. Indonesia', startTime: '07:30', endTime: '09:00', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_op_002', proctorName: 'Qodiatul Asrof Ramadhoni, S.E., G.r', proctorCode: '05' },
+  // Sesi 2 (09:30 - 11:00): Akuntansi -> Pengawas 02 (Mawar Andinia, S.Pd., G.r)
+  { dayIndex: 2, date: '2026-09-30', dayName: 'Rabu', sessionNumber: 2, subject: 'Akuntansi', startTime: '09:30', endTime: '11:00', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_guru_010', proctorName: 'Mawar Andinia, S.Pd., G.r', proctorCode: '02' },
+  // Sesi 3 (11:15 - 12:45): B. Arab -> Pengawas 06 (Ridho Maulana Al Farizi)
+  { dayIndex: 2, date: '2026-09-30', dayName: 'Rabu', sessionNumber: 3, subject: 'B. Arab', startTime: '11:15', endTime: '12:45', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '06' },
+
+  // ── KAMIS, 1 OKTOBER 2026 ─────────────────────────────────────────────────
+  // Sesi 1 (07:30 - 09:00): B. Inggris -> Pengawas 06 (Ridho Maulana Al Farizi)
+  { dayIndex: 3, date: '2026-10-01', dayName: 'Kamis', sessionNumber: 1, subject: 'B. Inggris', startTime: '07:30', endTime: '09:00', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '06' },
+  // Sesi 2 (09:30 - 11:00): Ekonomi -> Pengawas 03 (Muhammad Iqbal Gustiawan, S.Pd., G.r)
+  { dayIndex: 3, date: '2026-10-01', dayName: 'Kamis', sessionNumber: 2, subject: 'Ekonomi', startTime: '09:30', endTime: '11:00', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_guru_002', proctorName: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', proctorCode: '03' },
+  // Sesi 3 (11:15 - 12:45): Informatika -> Pengawas 04 (Nurul Farhiya, S.Pd., G.r)
+  { dayIndex: 3, date: '2026-10-01', dayName: 'Kamis', sessionNumber: 3, subject: 'Informatika', startTime: '11:15', endTime: '12:45', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_guru_006', proctorName: 'Nurul Farhiya, S.Pd., G.r', proctorCode: '04' },
+
+  // ── JUM'AT, 2 OKTOBER 2026 ────────────────────────────────────────────────
+  // Sesi 1 (07:15 - 08:45): Hadits -> Pengawas 03 (Muhammad Iqbal Gustiawan, S.Pd., G.r)
+  { dayIndex: 4, date: '2026-10-02', dayName: 'Jumat', sessionNumber: 1, subject: 'Hadits', startTime: '07:15', endTime: '08:45', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_guru_002', proctorName: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', proctorCode: '03' },
+  // Sesi 2 (09:00 - 10:30): BTQ -> Pengawas 06 (Ridho Maulana Al Farizi)
+  { dayIndex: 4, date: '2026-10-02', dayName: 'Jumat', sessionNumber: 2, subject: 'BTQ', startTime: '09:00', endTime: '10:30', roomName: 'Ruang 06', className: '10, 11, 12', proctorId: 'usr_1786512137742', proctorName: 'Ridho Maulana Al Farizi', proctorCode: '06' },
 ];
 
 /**
@@ -195,60 +219,88 @@ export class ExamScheduleRepository {
     }
 
     const uniqueDates = Array.from(new Set(schedule.subjectSchedules.map((s) => s.date))).sort();
+    const classes = schedule.config?.selectedClasses?.length ? schedule.config.selectedClasses : ['10', '11', '12'];
 
-    const updatedSubjects = schedule.subjectSchedules.map((item) => {
-      let canonical = CANONICAL_SMA_SLOTS.find(
-        (c) => c.dayName.toLowerCase() === item.dayName.toLowerCase() && c.sessionNumber === item.sessionNumber
-      );
-      if (!canonical) {
-        const dateIdx = uniqueDates.indexOf(item.date);
-        if (dateIdx >= 0) {
-          canonical = CANONICAL_SMA_SLOTS.find(
-            (c) => c.dayIndex === dateIdx && c.sessionNumber === item.sessionNumber
-          );
+    let updatedSubjects: ExamSubjectScheduleItem[] = [];
+    if (!schedule.subjectSchedules || schedule.subjectSchedules.length < 12) {
+      classes.forEach((cls) => {
+        CANONICAL_SMA_SLOTS.forEach((slot, idx) => {
+          updatedSubjects.push({
+            id: `subj_sma_${cls}_${slot.date}_s${slot.sessionNumber}_${idx}`,
+            date: slot.date,
+            dayName: slot.dayName,
+            sessionNumber: slot.sessionNumber,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            className: cls,
+            subject: slot.subject,
+            roomName: 'Ruang 06',
+            isLabRequired: false,
+          });
+        });
+      });
+    } else {
+      updatedSubjects = schedule.subjectSchedules.map((item) => {
+        let canonical = CANONICAL_SMA_SLOTS.find(
+          (c) => c.dayName.toLowerCase() === item.dayName.toLowerCase() && c.sessionNumber === item.sessionNumber
+        );
+        if (!canonical) {
+          const dateIdx = uniqueDates.indexOf(item.date);
+          if (dateIdx >= 0) {
+            canonical = CANONICAL_SMA_SLOTS.find(
+              (c) => c.dayIndex === dateIdx && c.sessionNumber === item.sessionNumber
+            );
+          }
         }
-      }
 
-      if (canonical) {
+        if (canonical) {
+          return {
+            ...item,
+            subject: canonical.subject,
+            startTime: canonical.startTime,
+            endTime: canonical.endTime,
+            roomName: 'Ruang 06',
+          };
+        }
         return {
           ...item,
-          subject: canonical.subject,
-          startTime: canonical.startTime,
-          endTime: canonical.endTime,
-          roomName: item.roomName || 'Ruang 6',
+          roomName: 'Ruang 06',
         };
-      }
-      return item;
-    });
+      });
+    }
 
-    const updatedProctors = (schedule.proctorSchedules || []).map((proctor) => {
-      let canonical = CANONICAL_SMA_SLOTS.find(
-        (c) => c.dayName.toLowerCase() === proctor.dayName.toLowerCase() && c.sessionNumber === proctor.sessionNumber
+    // Synchronize all 12 canonical proctor slots strictly matching official document
+    const updatedProctors: ExamProctorItem[] = CANONICAL_SMA_SLOTS.map((slot) => {
+      const existing = (schedule.proctorSchedules || []).find(
+        (p) =>
+          (p.date === slot.date || p.dayName.toLowerCase() === slot.dayName.toLowerCase()) &&
+          p.sessionNumber === slot.sessionNumber
       );
-      if (!canonical) {
-        const dateIdx = uniqueDates.indexOf(proctor.date);
-        if (dateIdx >= 0) {
-          canonical = CANONICAL_SMA_SLOTS.find(
-            (c) => c.dayIndex === dateIdx && c.sessionNumber === proctor.sessionNumber
-          );
-        }
-      }
-      if (canonical) {
-        return {
-          ...proctor,
-          subject: canonical.subject,
-          startTime: canonical.startTime,
-          endTime: canonical.endTime,
-          roomName: proctor.roomName || 'Ruang 6',
-        };
-      }
-      return proctor;
+      return {
+        id: existing?.id || `proc_sma_${slot.date}_s${slot.sessionNumber}_r06`,
+        date: slot.date,
+        dayName: slot.dayName,
+        sessionNumber: slot.sessionNumber,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        roomName: 'Ruang 06',
+        className: existing?.className || slot.className || '10, 11, 12',
+        subject: slot.subject,
+        mainProctorId: slot.proctorId,
+        mainProctorName: slot.proctorName,
+        secondaryProctorId: existing?.secondaryProctorId,
+        secondaryProctorName: existing?.secondaryProctorName,
+        backupProctorId: existing?.backupProctorId,
+        backupProctorName: existing?.backupProctorName,
+        educationLevel: 'SMA' as const,
+      };
     });
 
     const canonicalSubjectNames = Array.from(new Set(CANONICAL_SMA_SLOTS.map((c) => c.subject)));
 
     return {
       ...schedule,
+      educationLevel: 'SMA',
       subjectSchedules: updatedSubjects,
       proctorSchedules: updatedProctors,
       config: {
@@ -256,30 +308,40 @@ export class ExamScheduleRepository {
         selectedSubjects: canonicalSubjectNames,
         totalRooms: 1,
         educationLevel: 'SMA',
+        roomFormat: 'DOUBLE_DIGIT',
+        classRoomMapping: { '10': 'Ruang 06', '11': 'Ruang 06', '12': 'Ruang 06' },
         sessionSlots: [
-          { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '08:00', endTime: '09:30' },
-          { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '10:00', endTime: '11:00' },
-          { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:00', endTime: '12:00' },
+          { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:00' },
+          { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '09:30', endTime: '11:00' },
+          { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:15', endTime: '12:45' },
         ],
         dayOverrides: [
           { date: uniqueDates[0] || '2026-09-28', dayName: 'Senin', sessionsCount: 2 },
           { date: uniqueDates[1] || '2026-09-29', dayName: 'Selasa', sessionsCount: 2 },
           { date: uniqueDates[2] || '2026-09-30', dayName: 'Rabu', sessionsCount: 3 },
           { date: uniqueDates[3] || '2026-10-01', dayName: 'Kamis', sessionsCount: 3 },
-          { date: uniqueDates[4] || '2026-10-02', dayName: 'Jumat', sessionsCount: 2 },
+          {
+            date: uniqueDates[4] || '2026-10-02',
+            dayName: 'Jumat',
+            sessionsCount: 2,
+            sessionSlots: [
+              { sessionNumber: 1, sessionName: 'Sesi 1 (Khusus Jumat)', startTime: '07:15', endTime: '08:45' },
+              { sessionNumber: 2, sessionName: 'Sesi 2 (Khusus Jumat)', startTime: '09:00', endTime: '10:30' },
+            ],
+          },
         ],
       },
       summary: {
         ...schedule.summary,
         totalSubjects: canonicalSubjectNames.length,
         totalSessions: CANONICAL_SMA_SLOTS.length,
-        averageSessionsPerTeacher: schedule.summary?.averageSessionsPerTeacher || 2,
+        averageSessionsPerTeacher: 2,
       },
     };
   }
 
   /**
-   * Generates a fully populated, 100% conflict-free canonical SMA schedule for Ruang 6 (Classes 10, 11, 12).
+   * Generates a fully populated, 100% conflict-free canonical SMA schedule for Ruang 06 (Classes 10, 11, 12).
    */
   public static createCanonicalSmaSchedule(academicYear: string = '2026/2027', examType: string = 'ASTS'): ExamScheduleData {
     const classes = ['10', '11', '12'];
@@ -296,20 +358,20 @@ export class ExamScheduleRepository {
           endTime: slot.endTime,
           className: cls,
           subject: slot.subject,
-          roomName: 'Ruang 6',
+          roomName: 'Ruang 06',
           isLabRequired: false,
         });
       });
     });
 
     const proctorSchedules: ExamProctorItem[] = CANONICAL_SMA_SLOTS.map((slot) => ({
-      id: `proc_sma_${slot.date}_s${slot.sessionNumber}_r6`,
+      id: `proc_sma_${slot.date}_s${slot.sessionNumber}_r06`,
       date: slot.date,
       dayName: slot.dayName,
       sessionNumber: slot.sessionNumber,
       startTime: slot.startTime,
       endTime: slot.endTime,
-      roomName: 'Ruang 6',
+      roomName: 'Ruang 06',
       className: '10, 11, 12',
       subject: slot.subject,
       mainProctorId: slot.proctorId,
@@ -326,14 +388,14 @@ export class ExamScheduleRepository {
         academicYear,
         examType: examType as any,
         examTitle: `Asesmen Sumatif Tengah Semester (${examType}) SMA`,
-        semester: '1',
+        semester: 'Ganjil',
         startDate: '2026-09-28',
         endDate: '2026-10-02',
         sessionsPerDay: 3,
         sessionSlots: [
-          { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '08:00', endTime: '09:30' },
-          { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '10:00', endTime: '11:00' },
-          { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:00', endTime: '12:00' },
+          { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '07:30', endTime: '09:00' },
+          { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '09:30', endTime: '11:00' },
+          { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:15', endTime: '12:45' },
         ],
         selectedClasses: classes,
         selectedSubjects: canonicalSubjectNames,
@@ -343,15 +405,23 @@ export class ExamScheduleRepository {
         excludeCommitteeProctor: false,
         assignBackupProctor: false,
         totalRooms: 1,
-        roomFormat: 'NUMERIC',
-        classRoomMapping: { '10': 'Ruang 6', '11': 'Ruang 6', '12': 'Ruang 6' },
+        roomFormat: 'DOUBLE_DIGIT',
+        classRoomMapping: { '10': 'Ruang 06', '11': 'Ruang 06', '12': 'Ruang 06' },
         educationLevel: 'SMA',
         dayOverrides: [
           { date: '2026-09-28', dayName: 'Senin', sessionsCount: 2 },
           { date: '2026-09-29', dayName: 'Selasa', sessionsCount: 2 },
           { date: '2026-09-30', dayName: 'Rabu', sessionsCount: 3 },
           { date: '2026-10-01', dayName: 'Kamis', sessionsCount: 3 },
-          { date: '2026-10-02', dayName: 'Jumat', sessionsCount: 2 },
+          {
+            date: '2026-10-02',
+            dayName: 'Jumat',
+            sessionsCount: 2,
+            sessionSlots: [
+              { sessionNumber: 1, sessionName: 'Sesi 1 (Khusus Jumat)', startTime: '07:15', endTime: '08:45' },
+              { sessionNumber: 2, sessionName: 'Sesi 2 (Khusus Jumat)', startTime: '09:00', endTime: '10:30' },
+            ],
+          },
         ],
       },
       subjectSchedules,
@@ -616,6 +686,11 @@ export class ExamScheduleRepository {
    */
   public static normalizeScheduleSessionTimes(schedule: ExamScheduleData): ExamScheduleData {
     if (!schedule) return schedule;
+
+    // For SMA, preserve canonical timetable matching physical photo strictly
+    if (schedule.educationLevel === 'SMA' || schedule.config?.educationLevel === 'SMA') {
+      return this.syncSmaScheduleSubjects(schedule);
+    }
 
     const getCanonicalTimes = (sNum: number) => {
       if (sNum === 1) return { startTime: '08:00', endTime: '09:30' };
@@ -966,7 +1041,17 @@ export class ExamScheduleRepository {
       }));
 
       if (duties.length > 0) {
-        // Derive deterministic teacher code (01, 02...) matching matrix proctor legend
+        // Derive deterministic teacher code matching canonical schedule
+        const canonicalSlots = level === 'SMA' ? CANONICAL_SMA_SLOTS : CANONICAL_SMP_SLOTS;
+        const matchedCanonical = canonicalSlots.find((s) => {
+          const sTrim = s.proctorName.toLowerCase().trim();
+          const sClean = this.normalizeTeacherName(s.proctorName);
+          return (
+            (targetName && sTrim.length > 2 && (sTrim.includes(targetName) || targetName.includes(sTrim))) ||
+            (cleanTargetName && sClean.length > 2 && (sClean.includes(cleanTargetName) || cleanTargetName.includes(sClean)))
+          );
+        });
+
         const allProctorNames = Array.from(
           new Set(schedule.proctorSchedules.map((p) => p.mainProctorName.trim()))
         ).sort((a, b) => a.localeCompare(b, 'id'));
@@ -978,7 +1063,8 @@ export class ExamScheduleRepository {
             (cleanTargetName && nClean.length > 2 && (nClean.includes(cleanTargetName) || cleanTargetName.includes(nClean)))
           );
         });
-        const teacherCode = idx !== -1 ? String(idx + 1).padStart(2, '0') : undefined;
+        const fallbackCode = idx !== -1 ? String(idx + 1).padStart(2, '0') : undefined;
+        const teacherCode = matchedCanonical?.proctorCode || fallbackCode;
 
         return {
           schedule,

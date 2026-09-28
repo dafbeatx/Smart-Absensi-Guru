@@ -950,54 +950,68 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   // Get canonical 100% verified sample prompt for current education level
   const getSamplePromptText = useCallback((): string => {
     if (selectedLevel === 'SMA') {
-      return `Tolong buatkan jadwal pengawasan ujian ASTS SMA Terpadu As Salaam tanggal 28 September sampai 2 Oktober 2026 untuk kelas 10, 11, 12 (Ruang 6).
+      return `Tolong buatkan jadwal pengawasan ujian ASTS SMA Terpadu As Salaam tanggal 28 September sampai 2 Oktober 2026 untuk kelas 10, 11, 12 (Ruang 06 / R 06).
+
+Waktu sesi:
+- Senin s.d. Kamis:
+  • Sesi 1: 07.30 - 09.00
+  • Sesi 2: 09.30 - 11.00
+  • Sesi 3: 11.15 - 12.45
+- Khusus Jum'at:
+  • Sesi 1: 07.15 - 08.45
+  • Sesi 2: 09.00 - 10.30
 
 Pembagian sesi per hari:
-- Senin: 2 sesi (1. PAI, 2. Biologi)
-- Selasa: 2 sesi (1. Matematika, 2. Pendidikan Pancasila)
-- Rabu: 3 sesi (1. B. Indonesia, 2. Akuntansi, 3. B. Arab)
-- Kamis: 3 sesi (1. B. Inggris, 2. Ekonomi, 3. Informatika)
-- Jumat: 2 sesi (1. Hadits, 2. BTQ)
+- Senin, 28 September 2026: 2 sesi (1. PAI, 2. Biologi)
+- Selasa, 29 September 2026: 2 sesi (1. Matematika, 2. Pendidikan Pancasila)
+- Rabu, 30 September 2026: 3 sesi (1. B. Indonesia, 2. Akuntansi, 3. B. Arab)
+- Kamis, 1 Oktober 2026: 3 sesi (1. B. Inggris, 2. Ekonomi, 3. Informatika)
+- Jum'at, 2 Oktober 2026: 2 sesi (1. Hadits, 2. BTQ)
 
-Alokasi guru pengawas per mata pelajaran P6:
-PAI: P6 = Nurul Farhiya
-Biologi: P6 = Qodiatul Asrof Ramadhoni
-Matematika: P6 = Qodiatul Asrof Ramadhoni
-Pendidikan Pancasila: P6 = Dafa Maulana
-B. Indonesia: P6 = Qodiatul Asrof Ramadhoni
-Akuntansi: P6 = Mawar Andinia
-B. Arab: P6 = Ridho Maulana Al Farizi
-B. Inggris: P6 = Ridho Maulana Al Farizi
-Ekonomi: P6 = M. Iqbal Gustiawan
-Informatika: P6 = Nurul Farhiya
-Hadits: P6 = M. Iqbal Gustiawan
-BTQ: P6 = Ridho Maulana Al Farizi
+Alokasi guru pengawas per mata pelajaran P6 (Ruang 06):
+PAI: P6 = Nurul Farhiya, S.Pd., G.r (Kode 04)
+Biologi: P6 = Qodiatul Asrof Ramadhoni, S.E., G.r (Kode 05)
+Matematika: P6 = Qodiatul Asrof Ramadhoni, S.E., G.r (Kode 05)
+Pendidikan Pancasila: P6 = Dafa Maulana, S.Pd (Kode 01)
+B. Indonesia: P6 = Qodiatul Asrof Ramadhoni, S.E., G.r (Kode 05)
+Akuntansi: P6 = Mawar Andinia, S.Pd., G.r (Kode 02)
+B. Arab: P6 = Ridho Maulana Al Farizi (Kode 06)
+B. Inggris: P6 = Ridho Maulana Al Farizi (Kode 06)
+Ekonomi: P6 = Muhammad Iqbal Gustiawan, S.Pd., G.r (Kode 03)
+Informatika: P6 = Nurul Farhiya, S.Pd., G.r (Kode 04)
+Hadits: P6 = Muhammad Iqbal Gustiawan, S.Pd., G.r (Kode 03)
+BTQ: P6 = Ridho Maulana Al Farizi (Kode 06)
 
 Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan guru pengawas untuk masing-masing mata pelajaran.`;
     }
 
     return `Buatkan jadwal pengawasan ujian ASTS SMP Terpadu Al-Ittihadiyah tanggal 28 September sampai 2 Oktober 2026 untuk kelas 7A, 7B, 8A, 8B, 9A, 9B (Ruang 1 sampai Ruang 5).
 
-Pembagian sesi per hari:
-- Senin: 2 sesi (2 mata pelajaran)
-- Selasa: 2 sesi (2 mata pelajaran)
-- Rabu: 3 sesi (3 mata pelajaran)
-- Kamis: 3 sesi (3 mata pelajaran)
-- Jumat: 2 sesi (2 mata pelajaran)
+Waktu sesi:
+- Sesi 1: 08.00 - 09.30
+- Sesi 2: 10.00 - 11.00
+- Sesi 3: 11.00 - 12.00
 
-Alokasi pengawas per mapel:
-PAI: P1 = Fitri Ani Rahayu, S.Mat, P2 = Qodiatul Asrof Ramadhoni, S.E., G.r, P3 = Widianingsih, S.I., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = M. Iqbal Gustiawan, S.Pd., G.r.
-IPA: P1 = Widianingsih, S.I., G.r, P2 = Nurul Farhiya, S.Pd., G.r, P3 = Ridho Maulana Al Farizi, P4 = Fitri Ani Rahayu, S.Mat, P5 = Adi Prasetyo, S.Pd., G.r.
-MTK: P1 = Septi Nur Aeni, S.E, P2 = Fitri Ani Rahayu, S.Mat, P3 = M. Iqbal Gustiawan, S.Pd., G.r, P4 = Mira Nurdianti, S.Pd, P5 = Adi Prasetyo, S.Pd., G.r.
-PP: P1 = Widianingsih, S.I., G.r, P2 = Ridho Maulana Al Farizi, P3 = Septi Nur Aeni, S.E, P4 = Qodiatul Asrof Ramadhoni, S.E., G.r, P5 = Nurul Farhiya, S.Pd., G.r.
-B. Indonesia: P1 = Nurul Farhiya, S.Pd., G.r, P2 = Dafa Maulana, S.Pd, P3 = Fitri Ani Rahayu, S.Mat, P4 = Mawar Andinia, S.Pd., G.r, P5 = Adi Prasetyo, S.Pd., G.r.
+Pembagian sesi per hari:
+- Senin, 28 September 2026: 2 sesi (1. PAI, 2. IPA)
+- Selasa, 29 September 2026: 2 sesi (1. MTK, 2. PP)
+- Rabu, 30 September 2026: 3 sesi (1. B. Indonesia, 2. IPS, 3. B. Arab)
+- Kamis, 1 Oktober 2026: 3 sesi (1. B. Inggris, 2. SBPK, 3. Informatika)
+- Jum'at, 2 Oktober 2026: 2 sesi (1. Hadits, 2. BTQ)
+
+Alokasi pengawas per mapel (P1 s/d P5 untuk Ruang 1 s/d Ruang 5):
+PAI: P1 = Dafa Maulana, S.Pd, P2 = Qodiatul Asrof Ramadhoni, S.E., G.r, P3 = Widianingsih, S.I., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = M. Iqbal Gustiawan, S.Pd., G.r.
+IPA: P1 = Widianingsih, S.I., G.r, P2 = Nurul Farhiya, S.Pd., G.r, P3 = Ridho Maulana Al Farizi, P4 = Qodiatul Asrof Ramadhoni, S.E., G.r, P5 = Adi Prasetyo, S.Pd., G.r.
+MTK: P1 = Nurul Farhiya, S.Pd., G.r, P2 = Fitri Ani Rahayu, S.Mat, P3 = M. Iqbal Gustiawan, S.Pd., G.r, P4 = Mira Nurdianti, S.Pd, P5 = Adi Prasetyo, S.Pd., G.r.
+PP: P1 = Widianingsih, S.I., G.r, P2 = Ridho Maulana Al Farizi, P3 = Septi Nur Aeni, S.E, P4 = Fitri Ani Rahayu, S.Mat, P5 = Nurul Farhiya, S.Pd., G.r.
+B. Indonesia: P1 = M. Iqbal Gustiawan, S.Pd., G.r., P2 = Dafa Maulana, S.Pd, P3 = Fitri Ani Rahayu, S.Mat, P4 = Mawar Andinia, S.Pd., G.r, P5 = Adi Prasetyo, S.Pd., G.r.
 IPS: P1 = Ridho Maulana Al Farizi, P2 = Septi Nur Aeni, S.E, P3 = Widianingsih, S.I., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = Fitri Ani Rahayu, S.Mat.
-B. Arab: P1 = Qodiatul Asrof Ramadhoni, S.E., G.r, P2 = Widianingsih, S.I., G.r, P3 = Nurul Farhiya, S.Pd., G.r, P4 = M. Iqbal Gustiawan, S.Pd., G.r, P5 = Adi Prasetyo, S.Pd., G.r.
+B. Arab: P1 = Qodiatul Asrof Ramadhoni, S.E., G.r, P2 = Widianingsih, S.I., G.r, P3 = Septi Nur Aeni, S.E, P4 = M. Iqbal Gustiawan, S.Pd., G.r., P5 = Adi Prasetyo, S.Pd., G.r.
 B. Inggris: P1 = Nurul Farhiya, S.Pd., G.r, P2 = Widianingsih, S.I., G.r, P3 = Fitri Ani Rahayu, S.Mat, P4 = Mira Nurdianti, S.Pd, P5 = Adi Prasetyo, S.Pd., G.r.
 SBPK: P1 = Fitri Ani Rahayu, S.Mat, P2 = Mawar Andinia, S.Pd., G.r, P3 = Qodiatul Asrof Ramadhoni, S.E., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = Widianingsih, S.I., G.r.
 Informatika: P1 = Qodiatul Asrof Ramadhoni, S.E., G.r, P2 = Septi Nur Aeni, S.E, P3 = Dafa Maulana, S.Pd, P4 = Fitri Ani Rahayu, S.Mat, P5 = M. Iqbal Gustiawan, S.Pd., G.r.
 Hadits: P1 = Widianingsih, S.I., G.r, P2 = Mawar Andinia, S.Pd., G.r, P3 = Ridho Maulana Al Farizi, P4 = Nurul Farhiya, S.Pd., G.r, P5 = Mira Nurdianti, S.Pd.
-BTQ: P1 = M. Iqbal Gustiawan, S.Pd., G.r, P2 = Mira Nurdianti, S.Pd, P3 = Qodiatul Asrof Ramadhoni, S.E., G.r, P4 = Dafa Maulana, S.Pd, P5 = Mawar Andinia, S.Pd., G.r.
+BTQ: P1 = Nurul Farhiya, S.Pd., G.r, P2 = Mira Nurdianti, S.Pd, P3 = Qodiatul Asrof Ramadhoni, S.E., G.r, P4 = Fitri Ani Rahayu, S.Mat, P5 = Mawar Andinia, S.Pd., G.r.
 
 Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi pengawas setiap mata pelajaran persis seperti data di atas.`;
   }, [selectedLevel]);
