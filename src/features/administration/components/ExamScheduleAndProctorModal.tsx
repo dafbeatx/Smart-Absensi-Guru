@@ -64,7 +64,6 @@ import type { AdminDocType } from '../../../services/exam-administrative-docs.se
 import {
   ExamScheduleAIGeneratorService,
   getExamAIPromptPresets,
-  EXAM_AI_PROMPT_PRESETS,
 } from '../../../services/exam-ai-generator.service';
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
@@ -599,6 +598,9 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
       } else if (newLevel === 'SMA') {
         saved = ExamScheduleRepository.createCanonicalSmaSchedule(targetYear, targetType);
         await ExamScheduleRepository.saveSchedule(saved, 'SMA');
+      } else if (newLevel === 'SMP') {
+        saved = ExamScheduleRepository.createCanonicalSmpSchedule(targetYear, targetType);
+        await ExamScheduleRepository.saveSchedule(saved, 'SMP');
       }
     }
     setScheduleData(saved);
@@ -743,6 +745,10 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
           if (!s) {
             const altType = selectedExamType === 'ASTS' ? 'ASAS' : 'ASTS';
             s = await ExamScheduleRepository.getSchedule(activeAcademicYear, altType, 'SMP');
+            if (!s) {
+              s = ExamScheduleRepository.createCanonicalSmpSchedule(activeAcademicYear, selectedExamType);
+              await ExamScheduleRepository.saveSchedule(s, 'SMP');
+            }
           }
           return s;
         })(),
@@ -2046,8 +2052,11 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedPresetId(EXAM_AI_PROMPT_PRESETS[0].id);
-                      setAiPromptInput(EXAM_AI_PROMPT_PRESETS[0].prompt);
+                      const presets = getExamAIPromptPresets(selectedLevel);
+                      if (presets.length > 0) {
+                        setSelectedPresetId(presets[0].id);
+                        setAiPromptInput(presets[0].prompt);
+                      }
                     }}
                     disabled={isGeneratingAI}
                     className="px-3 py-2 rounded-xl text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-40 transition-colors"

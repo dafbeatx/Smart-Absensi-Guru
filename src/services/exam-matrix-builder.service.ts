@@ -206,7 +206,7 @@ export class ExamMatrixBuilderService {
 
     const institutionName =
       institutionNameOverride ||
-      (config.educationLevel === 'SMA' ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL - ITTIHADIYAH');
+      (config.educationLevel === 'SMA' ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH');
     const examName = config.examType === 'ASAS'
       ? 'ASESMEN SUMATIF AKHIR SEMESTER (ASAS)'
       : config.examType === 'ASTS'

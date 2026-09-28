@@ -31,11 +31,35 @@ export interface AIPromptPreset {
 export const EXAM_AI_PROMPT_PRESETS_SMP: AIPromptPreset[] = [
   {
     id: 'asts_smp_standard_5days',
-    title: 'ASTS SMP Standar (Kelas 7-9, 5 Hari)',
+    title: 'ASTS SMP Standar (5 Ruang, 5 Hari, 12 Mapel)',
     badge: 'SMP Al-Ittihadiyah',
-    description: 'Senin s/d Jumat, 2 sesi/hari (Jumat 1 sesi), kelas 7A-9B, pembagian pengawas merata & adil.',
+    description: 'Senin s/d Jumat, Ruang 1-5, sesi 1 (08.00-09.30), sesi 2 (10.00-11.00), sesi 3 (11.00-12.00).',
     prompt:
-      'Buatkan jadwal ASTS (Asesmen Sumatif Tengah Semester) ganjil SMP Terpadu Al-Ittihadiyah untuk kelas 7A, 7B, 8A, 8B, 9A, 9B dari tanggal 29 September sampai 3 Oktober 2026. 2 sesi per hari (sesi 1 jam 07:30 - 09:00, sesi 2 jam 09:30 - 11:00), khusus hari Jumat 1 sesi saja (07:15 - 08:45). Mapel: PAI, Matematika, Bahasa Indonesia, IPA, IPS, Bahasa Inggris, PJOK, Seni Budaya, Informatika, PKn, Bahasa Arab. Bagi rata seluruh guru sebagai pengawas, 1 guru per ruang, jangan tugaskan guru mengawas mata pelajarannya sendiri.',
+      'Tolong buatkan jadwal pengawasan ujian ASTS SMP Terpadu Al-Ittihadiyah tanggal 28 September sampai 2 Oktober 2026 untuk Ruang 1, Ruang 2, Ruang 3, Ruang 4, Ruang 5.\n\n' +
+      'Waktu sesi:\n' +
+      '- Sesi 1: 08.00 - 09.30\n' +
+      '- Sesi 2: 10.00 - 11.00\n' +
+      '- Sesi 3: 11.00 - 12.00\n\n' +
+      'Pembagian sesi per hari:\n' +
+      '- Senin, 28 September 2026: 2 sesi (1. PAI, 2. IPA)\n' +
+      '- Selasa, 29 September 2026: 2 sesi (1. MTK, 2. PP)\n' +
+      '- Rabu, 30 September 2026: 3 sesi (1. B. Indonesia, 2. IPS, 3. B. Arab)\n' +
+      '- Kamis, 1 Oktober 2026: 3 sesi (1. B. Inggris, 2. SBPK, 3. Informatika)\n' +
+      '- Jum\'at, 2 Oktober 2026: 2 sesi (1. Hadits, 2. BTQ)\n\n' +
+      'Alokasi guru pengawas per mata pelajaran (P1 = Ruang 1, P2 = Ruang 2, P3 = Ruang 3, P4 = Ruang 4, P5 = Ruang 5):\n' +
+      'PAI: P1 = Dafa Maulana, P2 = Qodiatul Asrof Ramadhoni, P3 = Widianingsih, P4 = Adi Prasetyo, P5 = M. Iqbal Gustiawan\n' +
+      'IPA: P1 = Widianingsih, P2 = Nurul Farhiya, P3 = Ridho Maulana Al Farizi, P4 = Qodiatul Asrof Ramadhoni, P5 = Adi Prasetyo\n' +
+      'MTK: P1 = Nurul Farhiya, P2 = Fitri Ani Rahayu, P3 = M. Iqbal Gustiawan, P4 = Mira Nurdianti, P5 = Adi Prasetyo\n' +
+      'PP: P1 = Widianingsih, P2 = Ridho Maulana Al Farizi, P3 = Septi Nur Aeni, P4 = Fitri Ani Rahayu, P5 = Nurul Farhiya\n' +
+      'B. Indonesia: P1 = M. Iqbal Gustiawan, P2 = Dafa Maulana, P3 = Fitri Ani Rahayu, P4 = Mawar Andinia, P5 = Adi Prasetyo\n' +
+      'IPS: P1 = Ridho Maulana Al Farizi, P2 = Septi Nur Aeni, P3 = Widianingsih, P4 = Adi Prasetyo, P5 = Fitri Ani Rahayu\n' +
+      'B. Arab: P1 = Qodiatul Asrof Ramadhoni, P2 = Widianingsih, P3 = Septi Nur Aeni, P4 = M. Iqbal Gustiawan, P5 = Adi Prasetyo\n' +
+      'B. Inggris: P1 = Nurul Farhiya, P2 = Widianingsih, P3 = Fitri Ani Rahayu, P4 = Mira Nurdianti, P5 = Adi Prasetyo\n' +
+      'SBPK: P1 = Fitri Ani Rahayu, P2 = Mawar Andinia, P3 = Qodiatul Asrof Ramadhoni, P4 = Adi Prasetyo, P5 = Widianingsih\n' +
+      'Informatika: P1 = Qodiatul Asrof Ramadhoni, P2 = Septi Nur Aeni, P3 = Dafa Maulana, P4 = Fitri Ani Rahayu, P5 = M. Iqbal Gustiawan\n' +
+      'Hadits: P1 = Widianingsih, P2 = Mawar Andinia, P3 = Ridho Maulana Al Farizi, P4 = Nurul Farhiya, P5 = Mira Nurdianti\n' +
+      'BTQ: P1 = Nurul Farhiya, P2 = Mira Nurdianti, P3 = Qodiatul Asrof Ramadhoni, P4 = Fitri Ani Rahayu, P5 = Mawar Andinia\n\n' +
+      'Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan ruang dan guru pengawas untuk masing-masing mata pelajaran.',
   },
   {
     id: 'asts_smp_quick_all',
@@ -43,7 +67,7 @@ export const EXAM_AI_PROMPT_PRESETS_SMP: AIPromptPreset[] = [
     badge: 'Instan SMP',
     description: 'Jadwal otomatis 5 hari kerja untuk seluruh rombel SMP yang aktif.',
     prompt:
-      'Buatkan jadwal ASTS kilat untuk semua rombel SMP yang ada, 2 sesi per hari, hari Jumat 1 sesi, semua guru aktif ditugaskan mengawas secara adil dan merata, 1 pengawas per ruang, jangan mengawas mapel sendiri.',
+      'Buatkan jadwal ASTS kilat untuk semua rombel SMP yang ada, sesi 1: 08.00 - 09.30, sesi 2: 10.00 - 11.00, sesi 3: 11.00 - 12.00, semua guru aktif ditugaskan mengawas secara adil dan merata, 1 pengawas per ruang, jangan mengawas mapel sendiri.',
   },
   {
     id: 'asas_smp_6days_saturday',
@@ -51,7 +75,7 @@ export const EXAM_AI_PROMPT_PRESETS_SMP: AIPromptPreset[] = [
     badge: 'Semester SMP',
     description: 'Senin s/d Sabtu, 2 sesi per hari, seluruh mata pelajaran pokok SMP dan muatan lokal.',
     prompt:
-      'Buatkan jadwal ASAS (Asesmen Sumatif Akhir Semester) SMP selama 6 hari dari Senin sampai Sabtu, sertakan hari Sabtu, 2 sesi per hari, 1 pengawas per ruang, seluruh mata pelajaran lengkap, tetapkan pengawas cadangan.',
+      'Buatkan jadwal ASAS (Asesmen Sumatif Akhir Semester) SMP selama 6 hari dari Senin sampai Sabtu, sertakan hari Sabtu, sesi 1: 08.00 - 09.30, sesi 2: 10.00 - 11.00, 1 pengawas per ruang, seluruh mata pelajaran lengkap, tetapkan pengawas cadangan.',
   },
   {
     id: 'asts_smp_morning_3sessions',
@@ -59,7 +83,7 @@ export const EXAM_AI_PROMPT_PRESETS_SMP: AIPromptPreset[] = [
     badge: '3 Sesi SMP',
     description: '3 sesi per hari (Jumat 2 sesi), alokasi ruang dan pengawas SMP proporsional.',
     prompt:
-      'Buatkan jadwal ASTS intensif SMP 3 sesi per hari mulai jam 07:30 WIB, khusus hari Jumat 2 sesi sebelum sholat Jumat. Rombel SMP lengkap, 1 pengawas per ruang, bagi rata jadwal mengawas antar guru.',
+      'Buatkan jadwal ASTS intensif SMP 3 sesi per hari (sesi 1: 08.00 - 09.30, sesi 2: 10.00 - 11.00, sesi 3: 11.00 - 12.00), khusus hari Jumat 2 sesi sebelum sholat Jumat. Rombel SMP lengkap, 1 pengawas per ruang, bagi rata jadwal mengawas antar guru.',
   },
 ];
 
@@ -68,9 +92,33 @@ export const EXAM_AI_PROMPT_PRESETS_SMA: AIPromptPreset[] = [
     id: 'asts_sma_standard_5days',
     title: 'ASTS SMA Standar (Ruang 6, 5 Hari, 12 Mapel)',
     badge: 'SMA As Salaam',
-    description: 'Senin s/d Jumat, mapel resmi SMA: PAI, Biologi, Matematika, PP, B. Indonesia, Akuntansi, dll.',
+    description: 'Senin s/d Jumat, Ruang 6, sesi 1 (08.00-09.30), sesi 2 (10.00-11.00), sesi 3 (11.00-12.00).',
     prompt:
-      'Tolong buatkan jadwal pengawasan ujian ASTS SMA Terpadu As Salaam tanggal 28 September sampai 2 Oktober 2026 untuk kelas 10, 11, 12 (Ruang 6).\n\nPembagian sesi per hari:\n- Senin: 2 sesi (1. PAI, 2. Biologi)\n- Selasa: 2 sesi (1. Matematika, 2. Pendidikan Pancasila)\n- Rabu: 3 sesi (1. B. Indonesia, 2. Akuntansi, 3. B. Arab)\n- Kamis: 3 sesi (1. B. Inggris, 2. Ekonomi, 3. Informatika)\n- Jumat: 2 sesi (1. Hadits, 2. BTQ)\n\nAlokasi guru pengawas per mata pelajaran P6:\nPAI: P6 = Nurul Farhiya\nBiologi: P6 = Qodiatul Asrof Ramadhoni\nMatematika: P6 = Qodiatul Asrof Ramadhoni\nPendidikan Pancasila: P6 = Dafa Maulana\nB. Indonesia: P6 = Qodiatul Asrof Ramadhoni\nAkuntansi: P6 = Mawar Andinia\nB. Arab: P6 = Ridho Maulana Al Farizi\nB. Inggris: P6 = Ridho Maulana Al Farizi\nEkonomi: P6 = M. Iqbal Gustiawan\nInformatika: P6 = Nurul Farhiya\nHadits: P6 = M. Iqbal Gustiawan\nBTQ: P6 = Ridho Maulana Al Farizi\n\nMohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan guru pengawas untuk masing-masing mata pelajaran.',
+      'Tolong buatkan jadwal pengawasan ujian ASTS SMA Terpadu As Salaam tanggal 28 September sampai 2 Oktober 2026 untuk kelas 10, 11, 12 (Ruang 6).\n\n' +
+      'Waktu sesi:\n' +
+      '- Sesi 1: 08.00 - 09.30\n' +
+      '- Sesi 2: 10.00 - 11.00\n' +
+      '- Sesi 3: 11.00 - 12.00\n\n' +
+      'Pembagian sesi per hari:\n' +
+      '- Senin, 28 September 2026: 2 sesi (1. PAI, 2. Biologi)\n' +
+      '- Selasa, 29 September 2026: 2 sesi (1. Matematika, 2. Pendidikan Pancasila)\n' +
+      '- Rabu, 30 September 2026: 3 sesi (1. B. Indonesia, 2. Akuntansi, 3. B. Arab)\n' +
+      '- Kamis, 1 Oktober 2026: 3 sesi (1. B. Inggris, 2. Ekonomi, 3. Informatika)\n' +
+      '- Jum\'at, 2 Oktober 2026: 2 sesi (1. Hadits, 2. BTQ)\n\n' +
+      'Alokasi guru pengawas per mata pelajaran P6:\n' +
+      'PAI: P6 = Nurul Farhiya\n' +
+      'Biologi: P6 = Qodiatul Asrof Ramadhoni\n' +
+      'Matematika: P6 = Qodiatul Asrof Ramadhoni\n' +
+      'Pendidikan Pancasila: P6 = Dafa Maulana\n' +
+      'B. Indonesia: P6 = Qodiatul Asrof Ramadhoni\n' +
+      'Akuntansi: P6 = Mawar Andinia\n' +
+      'B. Arab: P6 = Ridho Maulana Al Farizi\n' +
+      'B. Inggris: P6 = Ridho Maulana Al Farizi\n' +
+      'Ekonomi: P6 = Muhammad Iqbal Gustiawan\n' +
+      'Informatika: P6 = Nurul Farhiya\n' +
+      'Hadits: P6 = Muhammad Iqbal Gustiawan\n' +
+      'BTQ: P6 = Ridho Maulana Al Farizi\n\n' +
+      'Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan guru pengawas untuk masing-masing mata pelajaran.',
   },
   {
     id: 'asts_sma_quick_all',
@@ -78,7 +126,7 @@ export const EXAM_AI_PROMPT_PRESETS_SMA: AIPromptPreset[] = [
     badge: 'Instan SMA',
     description: 'Jadwal otomatis 5 hari kerja untuk seluruh rombel SMA (10, 11, 12) dan guru aktif.',
     prompt:
-      'Buatkan jadwal ASTS kilat untuk semua rombel SMA yang ada, 2 sesi per hari, hari Jumat 1 sesi, semua guru aktif ditugaskan mengawas secara adil dan merata, 1 pengawas per ruang, jangan mengawas mapel sendiri.',
+      'Buatkan jadwal ASTS kilat untuk semua rombel SMA yang ada, sesi 1: 08.00 - 09.30, sesi 2: 10.00 - 11.00, sesi 3: 11.00 - 12.00, semua guru aktif ditugaskan mengawas secara adil dan merata, 1 pengawas per ruang, jangan mengawas mapel sendiri.',
   },
   {
     id: 'asas_sma_6days_saturday',
@@ -86,7 +134,7 @@ export const EXAM_AI_PROMPT_PRESETS_SMA: AIPromptPreset[] = [
     badge: 'Semester SMA',
     description: 'Senin s/d Sabtu, 2 sesi per hari, seluruh mata pelajaran SMA lengkap dan tetapkan pengawas cadangan.',
     prompt:
-      'Buatkan jadwal ASAS (Asesmen Sumatif Akhir Semester) SMA selama 6 hari dari Senin sampai Sabtu, sertakan hari Sabtu, 2 sesi per hari, 1 pengawas per ruang, seluruh mata pelajaran SMA lengkap, tetapkan pengawas cadangan.',
+      'Buatkan jadwal ASAS (Asesmen Sumatif Akhir Semester) SMA selama 6 hari dari Senin sampai Sabtu, sertakan hari Sabtu, sesi 1: 08.00 - 09.30, sesi 2: 10.00 - 11.00, 1 pengawas per ruang, seluruh mata pelajaran SMA lengkap, tetapkan pengawas cadangan.',
   },
   {
     id: 'asts_sma_morning_3sessions',
@@ -94,7 +142,7 @@ export const EXAM_AI_PROMPT_PRESETS_SMA: AIPromptPreset[] = [
     badge: '3 Sesi SMA',
     description: '3 sesi per hari (Jumat 2 sesi), alokasi ruang dan pengawas SMA proporsional.',
     prompt:
-      'Buatkan jadwal ASTS intensif SMA 3 sesi per hari mulai jam 07:30 WIB, khusus hari Jumat 2 sesi sebelum sholat Jumat. Rombel SMA lengkap, 1 pengawas per ruang, bagi rata jadwal mengawas antar guru.',
+      'Buatkan jadwal ASTS intensif SMA 3 sesi per hari (sesi 1: 08.00 - 09.30, sesi 2: 10.00 - 11.00, sesi 3: 11.00 - 12.00), khusus hari Jumat 2 sesi sebelum sholat Jumat. Rombel SMA lengkap, 1 pengawas per ruang, bagi rata jadwal mengawas antar guru.',
   },
 ];
 
@@ -646,16 +694,17 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
               ]
             : [
                 'PAI',
-                'PKn',
-                'Bahasa Indonesia',
-                'Matematika',
                 'IPA',
+                'MTK',
+                'PP',
+                'B. Indonesia',
                 'IPS',
-                'Bahasa Inggris',
+                'B. Arab',
+                'B. Inggris',
+                'SBPK',
                 'Informatika',
-                'Seni Budaya',
-                'PJOK',
-                'Bahasa Arab',
+                'Hadits',
+                'BTQ',
               ];
       }
 

@@ -1290,6 +1290,87 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 30: Error verifying SMA synchronized schedule', false, err?.message);
   }
 
+  // Test 31: Cross-layer Synchronization for SMP Schedule (Senin-Jumat 12 Subjects & 5 Rooms)
+  try {
+    const canonicalSmp = ExamScheduleRepository.createCanonicalSmpSchedule(testAcademicYear, 'ASTS');
+    await ExamScheduleRepository.saveSchedule(canonicalSmp, 'SMP');
+    const smpSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASTS', 'SMP');
+
+    const proctorsSeninS1 = smpSchedule?.proctorSchedules.filter((p) => p.dayName.toLowerCase() === 'senin' && p.sessionNumber === 1);
+    const r1 = proctorsSeninS1?.find((p) => p.roomName === 'Ruang 1');
+    const r2 = proctorsSeninS1?.find((p) => p.roomName === 'Ruang 2');
+    const r3 = proctorsSeninS1?.find((p) => p.roomName === 'Ruang 3');
+    const r4 = proctorsSeninS1?.find((p) => p.roomName === 'Ruang 4');
+    const r5 = proctorsSeninS1?.find((p) => p.roomName === 'Ruang 5');
+
+    const isSeninS1Valid = Boolean(
+      r1?.mainProctorName.includes('Dafa Maulana') &&
+      r2?.mainProctorName.includes('Qodiatul Asrof') &&
+      r3?.mainProctorName.includes('Widianingsih') &&
+      r4?.mainProctorName.includes('Adi Prasetyo') &&
+      r5?.mainProctorName.includes('Iqbal')
+    );
+
+    const proctorsJumatS2 = smpSchedule?.proctorSchedules.filter((p) => p.dayName.toLowerCase() === 'jumat' && p.sessionNumber === 2);
+    const jR1 = proctorsJumatS2?.find((p) => p.roomName === 'Ruang 1');
+    const jR2 = proctorsJumatS2?.find((p) => p.roomName === 'Ruang 2');
+    const jR3 = proctorsJumatS2?.find((p) => p.roomName === 'Ruang 3');
+    const jR4 = proctorsJumatS2?.find((p) => p.roomName === 'Ruang 4');
+    const jR5 = proctorsJumatS2?.find((p) => p.roomName === 'Ruang 5');
+
+    const isJumatS2Valid = Boolean(
+      jR1?.mainProctorName.includes('Nurul Farhiya') &&
+      jR2?.mainProctorName.includes('Mira Nurdianti') &&
+      jR3?.mainProctorName.includes('Qodiatul Asrof') &&
+      jR4?.mainProctorName.includes('Fitri Ani') &&
+      jR5?.mainProctorName.includes('Mawar Andinia')
+    );
+
+    assert(
+      'Exam Scheduler 31: SMP schedule is 100% synchronized with official photo across 5 rooms (Ruang 1-5) and 12 subjects',
+      Boolean(
+        smpSchedule &&
+        smpSchedule.proctorSchedules.length === 60 &&
+        smpSchedule.config.totalRooms === 5 &&
+        isSeninS1Valid &&
+        isJumatS2Valid
+      ),
+      `Proctor count: ${smpSchedule?.proctorSchedules.length}, TotalRooms: ${smpSchedule?.config.totalRooms}, SeninS1Valid: ${isSeninS1Valid}, JumatS2Valid: ${isJumatS2Valid}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 31: Error verifying SMP synchronized schedule', false, err?.message);
+  }
+
+  // Test 32: Standardized Session Times (Sesi 1: 08:00 - 09:30, Sesi 2: 10:00 - 11:00, Sesi 3: 11:00 - 12:00)
+  try {
+    const smpSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASTS', 'SMP');
+    const smaSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASTS', 'SMA');
+
+    const verifySessions = (sched: ExamScheduleData | null, _name: string) => {
+      if (!sched) return false;
+      const s1 = sched.proctorSchedules.filter((p) => p.sessionNumber === 1);
+      const s2 = sched.proctorSchedules.filter((p) => p.sessionNumber === 2);
+      const s3 = sched.proctorSchedules.filter((p) => p.sessionNumber === 3);
+
+      const s1Valid = s1.every((p) => p.startTime === '08:00' && p.endTime === '09:30');
+      const s2Valid = s2.every((p) => p.startTime === '10:00' && p.endTime === '11:00');
+      const s3Valid = s3.every((p) => p.startTime === '11:00' && p.endTime === '12:00');
+
+      return s1Valid && s2Valid && s3Valid;
+    };
+
+    const smpTimesOk = verifySessions(smpSchedule, 'SMP');
+    const smaTimesOk = verifySessions(smaSchedule, 'SMA');
+
+    assert(
+      'Exam Scheduler 32: Both SMP and SMA strictly adhere to exact session hours (Sesi 1: 08:00 - 09:30, Sesi 2: 10:00 - 11:00, Sesi 3: 11:00 - 12:00)',
+      smpTimesOk && smaTimesOk,
+      `smpTimesOk: ${smpTimesOk}, smaTimesOk: ${smaTimesOk}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 32: Error verifying session hours', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
 
