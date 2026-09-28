@@ -522,8 +522,8 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
       const fullMatch = mm[0];
       const count = parseInt(mm[1], 10);
       if (count >= 1 && count <= 4) {
-        const daysFound = fullMatch.match(/\b(senin|selasa|rabu|kamis|jumat|sabtu)\b/gi) || [];
-        daysFound.forEach((d) => {
+        const daysFound: string[] = (fullMatch.match(/\b(senin|selasa|rabu|kamis|jumat|sabtu)\b/gi) || []) as string[];
+        daysFound.forEach((d: string) => {
           const dk = d.toLowerCase();
           if (dayNameMap[dk]) perDaySessionOverrides.set(dk, count);
         });
