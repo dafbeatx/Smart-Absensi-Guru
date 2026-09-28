@@ -143,9 +143,9 @@ export class MeetingMinutesRepository {
 
     try {
       const stored = localStorage.getItem(MEETING_MINUTES_STORAGE_KEY);
-      if (stored) {
+      if (stored !== null) {
         const parsed: MeetingMinute[] = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed.sort((a, b) => {
             const dateCmp = b.date.localeCompare(a.date);
             if (dateCmp !== 0) return dateCmp;
@@ -157,7 +157,7 @@ export class MeetingMinutesRepository {
       console.warn('Failed to parse meeting minutes from storage:', err);
     }
 
-    // Seed initial demo data
+    // Seed initial demo data only on first ever initialization when key is null
     this.saveToStorage(SEED_MINUTES);
     return SEED_MINUTES;
   }

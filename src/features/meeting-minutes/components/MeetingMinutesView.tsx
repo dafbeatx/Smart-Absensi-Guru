@@ -293,11 +293,17 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
   };
 
   // Delete minute
-  const handleDeleteMinute = (minuteId: string) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus notulen rapat ini?')) {
+  const handleDeleteMinute = (minuteId: string, title?: string) => {
+    const confirmMsg = title
+      ? `Hapus notulen rapat "${title}" dari arsip?\n\nData yang dihapus tidak dapat dikembalikan.`
+      : 'Apakah Anda yakin ingin menghapus notulen rapat ini?';
+    if (window.confirm(confirmMsg)) {
       MeetingMinutesRepository.deleteMinute(minuteId);
-      setSelectedMinuteId(null);
-      showToast('info', 'Notulen Dihapus', 'Notulen rapat telah dihapus dari arsip.');
+      if (selectedMinuteId === minuteId) {
+        setSelectedMinuteId(null);
+      }
+      setMinutes(MeetingMinutesRepository.getAllMinutes());
+      showToast('info', 'Notulen Dihapus', 'Notulen rapat telah berhasil dihapus dari arsip.');
     }
   };
 
@@ -484,7 +490,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
                   activeMinute.createdByUserId === currentUser?.id) && (
                   <button
                     type="button"
-                    onClick={() => handleDeleteMinute(activeMinute.id)}
+                    onClick={() => handleDeleteMinute(activeMinute.id, activeMinute.title)}
                     className="h-10 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-95 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -865,10 +871,24 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
                               ) : (
                                 <span className="text-[11px] text-slate-400">Tanpa tugas khusus</span>
                               )}
-                              <span className="text-xs font-bold text-teal-800 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
-                                <span>Buka Risalah</span>
-                                <span>→</span>
-                              </span>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMinute(minute.id, minute.title);
+                                  }}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-90 transition-all cursor-pointer"
+                                  title="Hapus Notulen Ini"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                                <span className="text-xs font-bold text-teal-800 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                                  <span>Buka Risalah</span>
+                                  <span>→</span>
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1673,6 +1693,17 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
                                 {pendingTasks > 0 ? `${pendingTasks} Tindak Lanjut` : '✓ Selesai'}
                               </span>
                             )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteMinute(minute.id, minute.title);
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-90 transition-all cursor-pointer"
+                              title="Hapus Notulen Ini"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                             <span className="text-[11px] font-bold text-teal-800 group-hover:translate-x-0.5 transition-transform">
                               Buka →
                             </span>
