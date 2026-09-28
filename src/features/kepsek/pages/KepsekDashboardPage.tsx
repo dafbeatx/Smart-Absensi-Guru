@@ -35,6 +35,7 @@ import {
 } from '../../../utils/teacher-appreciation.utils';
 import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-seed.utils';
 import type { TeacherPointLog } from '../../../types/database.types';
+import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -525,6 +526,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       badgeVariant: 'RED',
     },
     {
+      id: 'NOTULEN',
+      label: 'Notulen Rapat AI',
+      icon: '📝',
+    },
+    {
       id: 'APPROVALS',
       label: 'Persetujuan Izin/Cuti',
       icon: '📝',
@@ -829,6 +835,14 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           {/* TAB: COMPLAINTS (KOTAK ASPIRASI GURU) */}
           {activeTab === 'COMPLAINTS' && <AnonymousComplaintManagement role="KEPSEK" />}
+
+          {/* TAB: NOTULEN RAPAT AI */}
+          {activeTab === 'NOTULEN' && (
+            <MeetingMinutesView
+              currentUser={user}
+              onBack={() => setActiveTab('DASHBOARD')}
+            />
+          )}
 
           {/* TAB 3: APPROVALS */}
           {(activeTab === 'APPROVALS' || activeTab === 'APPROVAL') && (

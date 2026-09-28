@@ -29,6 +29,7 @@ import {
   QrCode,
   FolderCheck,
   CalendarCheck,
+  NotebookPen,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
@@ -146,6 +147,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     description: 'Jadwal ujian ASTS/ASAS & pembagian tugas pengawas guru berbasis AI (Hak Panitia)',
     icon: CalendarCheck,
     colorClass: 'from-[#023246] to-[#18536B]',
+  },
+  {
+    id: 'notulen',
+    title: 'Notulen',
+    category: 'Akademik & Nilai',
+    description: 'Notulen rapat AI & arsip risalah rapat sekolah untuk seluruh guru',
+    icon: NotebookPen,
+    colorClass: 'from-[#18536B] to-[#023246]',
   },
   {
     id: 'direktori_siswa',

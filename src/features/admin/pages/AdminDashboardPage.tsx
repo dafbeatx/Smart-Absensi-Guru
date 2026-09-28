@@ -52,6 +52,7 @@ import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal
 import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
 import { HomeroomModal } from '../../homeroom/components/HomeroomModal';
 import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
+import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -490,6 +491,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       icon: '📁',
     },
     {
+      id: 'NOTULEN',
+      label: 'Notulen Rapat AI',
+      icon: '📝',
+    },
+    {
       id: 'TRAFFIC',
       label: 'Trafik Fitur Guru',
       icon: '📊',
@@ -728,6 +734,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 }
               }}
               onBackToDashboard={() => setActiveTab('DASHBOARD')}
+            />
+          )}
+
+          {/* TAB: NOTULEN RAPAT AI */}
+          {activeTab === 'NOTULEN' && (
+            <MeetingMinutesView
+              currentUser={user}
+              onBack={() => setActiveTab('DASHBOARD')}
             />
           )}
 

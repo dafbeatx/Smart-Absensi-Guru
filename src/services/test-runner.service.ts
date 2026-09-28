@@ -44,6 +44,7 @@ import { runExamAIGeneratorTestSuite } from './__tests__/exam-ai-generator.test'
 import { runTeachingAssignmentTestSuite } from './__tests__/teaching-assignment-integration.test';
 import { runExamAdministrativeDocsTestSuite } from './__tests__/exam-administrative-docs.test';
 import { runStudentSyncDedupTestSuite } from './__tests__/student-sync-dedup.test';
+import { runMeetingMinutesTestSuite } from './__tests__/meeting-minutes.test';
 
 export interface TestResultItem {
   testName: string;
@@ -125,6 +126,7 @@ export class MasterTestRunner {
       { name: 'Teacher Teaching Assignment Engine & Prepopulation (Phase 4.8)', fn: runTeachingAssignmentTestSuite },
       { name: 'Exam Administrative Physical Documents Engine (A4/Word/Excel Suite 41)', fn: runExamAdministrativeDocsTestSuite },
       { name: 'Student Directory & Sync Deduplication Engine (Zero Duplicate & Tombstone)', fn: runStudentSyncDedupTestSuite },
+      { name: 'Meeting Minutes & Notulen Rapat AI Restructuring Engine (Phase 4.9)', fn: runMeetingMinutesTestSuite },
     ];
 
     let totalPassed = 0;

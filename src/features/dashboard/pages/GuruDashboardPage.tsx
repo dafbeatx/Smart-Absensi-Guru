@@ -36,6 +36,7 @@ import { StudentBehaviorView } from '../../guru/components/StudentBehaviorView';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
 import { AdministrationHubModal } from '../../administration/components/AdministrationHubModal';
 import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
+import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
 import {
   CustomizeQuickIconsModal,
   ALL_QUICK_ICONS,
@@ -79,6 +80,7 @@ import {
   Printer,
   Award,
   Coffee,
+  NotebookPen,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -299,7 +301,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN'>('HOME');
+  const [notulenReturnTarget, setNotulenReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [studentBehaviorReturnTarget, setStudentBehaviorReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [aboutReturnTarget, setAboutReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
   const [educationReturnTarget, setEducationReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('PROFIL');
@@ -701,6 +704,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         break;
       case 'administrasi':
         setIsAdministrationModalOpen(true);
+        break;
+      case 'notulen':
+        setNotulenReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+        setBerandaLayer('NOTULEN');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'koreksi':
         handleOpenCorrectionModal();
@@ -4450,6 +4458,34 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </span>
                   </button>
 
+                  {/* Notulen Rapat AI */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (effectiveUser) {
+                        WebTrafficService.recordFeatureVisit({
+                          user_id: effectiveUser.id,
+                          user_name: effectiveUser.full_name,
+                          user_npp: effectiveUser.nip,
+                          user_role: effectiveUser.role,
+                          feature_id: 'notulen',
+                        });
+                      }
+                      setNotulenReturnTarget('ALL_FEATURES');
+                      setBerandaLayer('NOTULEN');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    title="Notulen Rapat AI & Arsip Risalah Sekolah"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0">
+                      <NotebookPen className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-[#023246] transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Notulen
+                    </span>
+                  </button>
+
                   {/* Koreksi Soal & Input Nilai (In-App) */}
                   <button
                     type="button"
@@ -4875,6 +4911,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             }
             initialTab={studentBehaviorInitialTab}
             currentTeacherName={effectiveUser?.full_name || 'Guru'}
+          />
+        )}
+
+        {/* ── LAYER: NOTULEN RAPAT AI (DEDICATED FULL VIEW - NON-POPUP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'NOTULEN' && (
+          <MeetingMinutesView
+            currentUser={effectiveUser}
+            onBack={() => {
+              setBerandaLayer(notulenReturnTarget);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
