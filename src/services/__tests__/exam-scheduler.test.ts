@@ -1388,6 +1388,34 @@ export const runExamSchedulerTestSuite = async (): Promise<{
     assert('Exam Scheduler 32: Error verifying session hours', false, err?.message);
   }
 
+  // Test 33: Cross-Level Proctor Conflict Diagnosis (SMP vs SMA)
+  try {
+    const smpSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASTS', 'SMP');
+    const smaSchedule = await ExamScheduleRepository.getSchedule(testAcademicYear, 'ASTS', 'SMA');
+
+    const conflicts = ExamScheduleRepository.detectCrossLevelProctorConflicts(smpSchedule, smaSchedule);
+
+    const hasExactSingleConflict = conflicts.length === 1;
+    const firstConflict = conflicts[0];
+    const isQodiatulMondayS2 = Boolean(
+      firstConflict &&
+      firstConflict.dayName === 'Senin' &&
+      firstConflict.sessionNumber === 2 &&
+      firstConflict.teacherName.includes('Qodiatul Asrof') &&
+      firstConflict.smpDuty.roomName === 'Ruang 4' &&
+      firstConflict.smaDuty.roomName === 'Ruang 06' &&
+      firstConflict.availableReplacementTeachers.length >= 5
+    );
+
+    assert(
+      'Exam Scheduler 33: Accurately diagnoses exactly 1 cross-level proctor collision on physical paper (Qodiatul Asrof Ramadhoni on Senin Sesi 2: SMP Ruang 4 vs SMA Ruang 06)',
+      hasExactSingleConflict && isQodiatulMondayS2,
+      `Found ${conflicts.length} conflicts. First: ${firstConflict?.teacherName} on ${firstConflict?.dayName} S${firstConflict?.sessionNumber}`
+    );
+  } catch (err: any) {
+    assert('Exam Scheduler 33: Error diagnosing cross-level proctor conflicts', false, err?.message);
+  }
+
   return { passed, failed, results };
 };
 

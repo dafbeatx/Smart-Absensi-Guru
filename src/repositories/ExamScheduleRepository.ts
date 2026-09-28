@@ -38,6 +38,32 @@ export interface CanonicalSmpSlot {
   proctorCode: string;
 }
 
+export interface CrossLevelConflictItem {
+  dayName: string;
+  date: string;
+  sessionNumber: number;
+  timeRange: string;
+  teacherId: string;
+  teacherName: string;
+  smpDuty: {
+    roomName: string;
+    className: string;
+    subject: string;
+    proctorCode: string;
+  };
+  smaDuty: {
+    roomName: string;
+    className: string;
+    subject: string;
+    proctorCode: string;
+  };
+  availableReplacementTeachers: Array<{
+    userId: string;
+    fullName: string;
+    smpCode?: string;
+  }>;
+}
+
 export const CANONICAL_SMA_SLOTS: CanonicalSmaSlot[] = [
   // ── SENIN, 28 SEPTEMBER 2026 ──────────────────────────────────────────────
   // Sesi 1 (07:30 - 09:00): PAI -> Pengawas 04 (Nurul Farhiya, S.Pd., G.r)
@@ -1075,6 +1101,100 @@ export class ExamScheduleRepository {
     }
 
     return null;
+  }
+
+  /**
+   * Diagnoses cross-level proctor conflicts between SMP and SMA schedules.
+   * Compares each session where the same teacher is scheduled simultaneously in both schools.
+   */
+  public static detectCrossLevelProctorConflicts(
+    smpSchedule: ExamScheduleData | null,
+    smaSchedule: ExamScheduleData | null
+  ): CrossLevelConflictItem[] {
+    if (!smpSchedule || !smaSchedule) return [];
+
+    const conflicts: CrossLevelConflictItem[] = [];
+
+    // Distinct teachers across SMP canonical roster to compute free teachers
+    const allSmpTeachers = Array.from(
+      new Map(
+        CANONICAL_SMP_SLOTS.map((s) => [
+          s.proctorId || this.normalizeTeacherName(s.proctorName),
+          { userId: s.proctorId, fullName: s.proctorName, smpCode: s.proctorCode },
+        ])
+      ).values()
+    );
+
+    (smaSchedule.proctorSchedules || []).forEach((smaSlot) => {
+      const smaTeacherClean = this.normalizeTeacherName(smaSlot.mainProctorName);
+      if (!smaTeacherClean) return;
+
+      const overlappingSmpSlots = (smpSchedule.proctorSchedules || []).filter(
+        (smpSlot) =>
+          (smpSlot.date === smaSlot.date || smpSlot.dayName.toLowerCase() === smaSlot.dayName.toLowerCase()) &&
+          smpSlot.sessionNumber === smaSlot.sessionNumber
+      );
+
+      overlappingSmpSlots.forEach((smpSlot) => {
+        const smpTeacherClean = this.normalizeTeacherName(smpSlot.mainProctorName);
+        const isSameTeacher =
+          (smaSlot.mainProctorId && smpSlot.mainProctorId && smaSlot.mainProctorId === smpSlot.mainProctorId) ||
+          smaTeacherClean === smpTeacherClean ||
+          (smaTeacherClean.length >= 4 && smpTeacherClean.length >= 4 && (smaTeacherClean.includes(smpTeacherClean) || smpTeacherClean.includes(smaTeacherClean)));
+
+        if (isSameTeacher) {
+          // Identify teachers who are completely free during this session in both schools
+          const busyIdsOrNames = new Set<string>();
+          overlappingSmpSlots.forEach((s) => {
+            busyIdsOrNames.add(s.mainProctorId);
+            busyIdsOrNames.add(this.normalizeTeacherName(s.mainProctorName));
+          });
+          busyIdsOrNames.add(smaSlot.mainProctorId);
+          busyIdsOrNames.add(smaTeacherClean);
+
+          const freeTeachers = allSmpTeachers.filter((t) => {
+            const tNorm = this.normalizeTeacherName(t.fullName);
+            return !busyIdsOrNames.has(t.userId) && !busyIdsOrNames.has(tNorm);
+          });
+
+          const smpCanonical = CANONICAL_SMP_SLOTS.find(
+            (c) =>
+              (c.date === smpSlot.date || c.dayName.toLowerCase() === smpSlot.dayName.toLowerCase()) &&
+              c.sessionNumber === smpSlot.sessionNumber &&
+              c.roomName === smpSlot.roomName
+          );
+          const smaCanonical = CANONICAL_SMA_SLOTS.find(
+            (c) =>
+              (c.date === smaSlot.date || c.dayName.toLowerCase() === smaSlot.dayName.toLowerCase()) &&
+              c.sessionNumber === smaSlot.sessionNumber
+          );
+
+          conflicts.push({
+            dayName: smaSlot.dayName,
+            date: smaSlot.date,
+            sessionNumber: smaSlot.sessionNumber,
+            timeRange: `${smaSlot.startTime || '09:30'} - ${smaSlot.endTime || '11:00'}`,
+            teacherId: smaSlot.mainProctorId,
+            teacherName: smaSlot.mainProctorName,
+            smpDuty: {
+              roomName: smpSlot.roomName,
+              className: smpSlot.className || '-',
+              subject: smpSlot.subject,
+              proctorCode: smpCanonical?.proctorCode || '08',
+            },
+            smaDuty: {
+              roomName: smaSlot.roomName,
+              className: smaSlot.className || '10, 11, 12',
+              subject: smaSlot.subject,
+              proctorCode: smaCanonical?.proctorCode || '05',
+            },
+            availableReplacementTeachers: freeTeachers,
+          });
+        }
+      });
+    });
+
+    return conflicts;
   }
 
   /**

@@ -1271,6 +1271,10 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
     return ExamMatrixBuilderService.buildMatrix(smaScheduleData, teachers, 'SMA Terpadu As Salaam');
   }, [smaScheduleData, teachers]);
 
+  const crossLevelConflicts = useMemo(() => {
+    return ExamScheduleRepository.detectCrossLevelProctorConflicts(smpScheduleData, smaScheduleData);
+  }, [smpScheduleData, smaScheduleData]);
+
   const resolveTeacherCodeForDuty = useCallback(
     (duty: ExamProctorItem) => {
       const matrix = duty.educationLevel === 'SMA' ? smaMatrix : smpMatrix;
@@ -3871,6 +3875,45 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       <span className="text-sm">👉</span>
                       <span>Geser tabel ke samping untuk melihat seluruh ruang ujian (R 01 s.d. {invigilationMatrix.rooms[invigilationMatrix.rooms.length - 1]?.label || 'R 10'}).</span>
                     </div>
+
+                    {/* Cross-Level Conflict Alert Banner */}
+                    {crossLevelConflicts.length > 0 && (
+                      <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl text-xs space-y-2.5 shadow-xs">
+                        <div className="flex items-center gap-2 text-amber-950 font-black text-sm">
+                          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                          <span>Peringatan Evaluasi: Terdeteksi {crossLevelConflicts.length} Jadwal Bentrok Guru Pengawas Lintas Jenjang (SMP & SMA) pada Dokumen Fisik!</span>
+                        </div>
+                        {crossLevelConflicts.map((c, idx) => (
+                          <div key={idx} className="bg-white/90 p-3.5 rounded-xl border border-amber-200 text-slate-800 space-y-2 shadow-2xs">
+                            <p className="font-extrabold text-slate-900 text-xs">
+                              • Guru <span className="text-rose-700 underline decoration-rose-300 font-black">{c.teacherName}</span> tertulis mengawas di 2 tempat sekaligus pada waktu yang sama: <span className="text-teal-900 font-bold">{c.dayName}, {c.date} (Sesi {c.sessionNumber} • {c.timeRange})</span>
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                              <div className="p-2.5 bg-teal-50/80 border border-teal-200 rounded-lg space-y-0.5">
+                                <div className="font-black text-teal-950 flex items-center justify-between">
+                                  <span>SMP Terpadu Al-Ittihadiyah</span>
+                                  <span className="px-1.5 py-0.2 bg-teal-200 text-teal-900 rounded font-black text-[10px]">Kode {c.smpDuty.proctorCode}</span>
+                                </div>
+                                <div className="text-teal-800 font-medium">Ruang: <strong>{c.smpDuty.roomName}</strong> ({c.smpDuty.className}) • Mapel: <strong>{c.smpDuty.subject}</strong></div>
+                              </div>
+                              <div className="p-2.5 bg-indigo-50/80 border border-indigo-200 rounded-lg space-y-0.5">
+                                <div className="font-black text-indigo-950 flex items-center justify-between">
+                                  <span>SMA Terpadu As Salaam</span>
+                                  <span className="px-1.5 py-0.2 bg-indigo-200 text-indigo-900 rounded font-black text-[10px]">Kode {c.smaDuty.proctorCode}</span>
+                                </div>
+                                <div className="text-indigo-800 font-medium">Ruang: <strong>{c.smaDuty.roomName}</strong> ({c.smaDuty.className}) • Mapel: <strong>{c.smaDuty.subject}</strong></div>
+                              </div>
+                            </div>
+                            {c.availableReplacementTeachers.length > 0 && (
+                              <div className="text-[11px] text-emerald-800 pt-1 border-t border-slate-100 flex items-start gap-1.5">
+                                <span className="font-bold shrink-0">💡 Guru yang Bebas Tugas di Sesi Ini:</span>
+                                <span>{c.availableReplacementTeachers.map((t) => `${t.fullName} (Kode ${t.smpCode || '-'})`).join(', ')}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Paper Container Preview */}
                     <div
