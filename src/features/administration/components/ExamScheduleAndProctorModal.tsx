@@ -33,6 +33,7 @@ import {
   Smartphone,
   ClipboardCheck,
   ArrowLeftRight,
+  ArrowRight,
   Edit3,
   ChevronDown,
   GraduationCap,
@@ -2321,7 +2322,8 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        <span>🗓️ Kustom Per Hari</span>
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Kustom Per Hari</span>
                         <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
                           sessionMode === 'PER_DAY' ? 'bg-white/20 text-white' : 'bg-teal-50 text-teal-700'
                         }`}>
@@ -2331,13 +2333,14 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       <button
                         type="button"
                         onClick={() => setSessionMode('UNIFORM')}
-                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                           sessionMode === 'UNIFORM'
                             ? 'bg-teal-600 text-white shadow-2xs'
                             : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        <span>⚖️ Seragam Semua Hari</span>
+                        <Sliders className="w-3.5 h-3.5" />
+                        <span>Seragam Semua Hari</span>
                       </button>
                     </div>
                   </div>
@@ -2346,20 +2349,23 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                     <div className="space-y-4">
                       {/* Quick Preset Buttons */}
                       <div className="flex items-center gap-2 flex-wrap p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl">
-                        <span className="text-[11px] font-bold text-slate-500 mr-1">Preset Cepat:</span>
+                        <span className="text-[11px] font-bold text-slate-500 mr-1 flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Preset Cepat:</span>
+                        </span>
                         <button
                           type="button"
                           onClick={applyPresetFriday2}
                           className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
                         >
-                          ⚡ Hari Biasa 3 Sesi, Jumat 2 Sesi
+                          Hari Biasa 3 Sesi, Jumat 2 Sesi
                         </button>
                         <button
                           type="button"
                           onClick={applyPresetFriday1}
                           className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 transition-colors shadow-2xs cursor-pointer"
                         >
-                          ⚡ Hari Biasa 2 Sesi, Jumat 1 Sesi
+                          Hari Biasa 2 Sesi, Jumat 1 Sesi
                         </button>
                         <button
                           type="button"
@@ -2378,71 +2384,104 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                       </div>
 
                       {/* Master Session Time Slots */}
-                      <div className="p-3.5 bg-slate-50/70 border border-slate-200 rounded-xl space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                          <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                            <span>⏰</span>
-                            <span>Jam Pelaksanaan Tiap Sesi (Senin - Kamis & Sabtu)</span>
-                          </span>
-                          <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md font-bold border border-teal-200">
+                      <div className="p-3.5 sm:p-4 bg-slate-50/70 border border-slate-200/90 rounded-2xl space-y-3.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-200/60">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-md bg-teal-50 text-teal-700 border border-teal-200/80 flex items-center justify-center shrink-0">
+                              <Clock className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-slate-800 block">
+                                Jam Pelaksanaan Tiap Sesi (Senin - Kamis & Sabtu)
+                              </span>
+                              <span className="text-[10px] text-slate-500">
+                                Jam operasional standar tiap sesi ujian
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md font-bold border border-teal-200 self-start sm:self-auto shadow-2xs">
                             1 sesi = 1 mapel
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {sessionSlots.map((slot, idx) => (
-                            <div key={slot.sessionNumber} className="bg-white p-3 rounded-xl border border-slate-200 space-y-2 shadow-2xs">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                  <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-800 flex items-center justify-center font-bold text-[11px] border border-teal-200 shrink-0">
+                            <div key={slot.sessionNumber} className="bg-white p-3 rounded-xl border border-slate-200/90 space-y-2.5 shadow-2xs hover:border-slate-300 transition-colors">
+                              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-800 font-bold text-xs flex items-center justify-center border border-teal-200/80 shrink-0">
                                     {slot.sessionNumber}
                                   </span>
-                                  <span>{slot.sessionNumber === 1 ? 'Sesi Pagi' : slot.sessionNumber === 2 ? 'Sesi Siang' : slot.sessionNumber === 3 ? 'Sesi Siang II' : 'Sesi Tambahan'}</span>
-                                </span>
-                                <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  <span className="text-xs font-bold text-slate-800">
+                                    {slot.sessionNumber === 1
+                                      ? 'Sesi 1 (Pagi)'
+                                      : slot.sessionNumber === 2
+                                      ? 'Sesi 2 (Siang)'
+                                      : slot.sessionNumber === 3
+                                      ? 'Sesi 3 (Siang II)'
+                                      : 'Sesi 4 (Tambahan)'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200/60">
                                   {getSessionDurationText(slot.startTime, slot.endTime)}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="time"
-                                  value={formatTimeForInput(slot.startTime, '07:30')}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setSessionSlots((prev) => {
-                                      const next = [...prev];
-                                      next[idx].startTime = val;
-                                      return next;
-                                    });
-                                  }}
-                                  className="w-full bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-1 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                                />
-                                <span className="text-[10px] text-slate-400 font-bold shrink-0">s/d</span>
-                                <input
-                                  type="time"
-                                  value={formatTimeForInput(slot.endTime, '09:00')}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setSessionSlots((prev) => {
-                                      const next = [...prev];
-                                      next[idx].endTime = val;
-                                      return next;
-                                    });
-                                  }}
-                                  className="w-full bg-slate-50 border border-slate-300 rounded-lg py-1.5 px-1 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                                />
+                              <div className="flex items-center gap-2 pt-0.5">
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                                    Mulai
+                                  </span>
+                                  <input
+                                    type="time"
+                                    value={formatTimeForInput(slot.startTime, '08:00')}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setSessionSlots((prev) => {
+                                        const next = [...prev];
+                                        next[idx].startTime = val;
+                                        return next;
+                                      });
+                                    }}
+                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-teal-500 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs"
+                                  />
+                                </div>
+                                <div className="pt-4 text-slate-400 shrink-0">
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                                    Selesai
+                                  </span>
+                                  <input
+                                    type="time"
+                                    value={formatTimeForInput(slot.endTime, '09:30')}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setSessionSlots((prev) => {
+                                        const next = [...prev];
+                                        next[idx].endTime = val;
+                                        return next;
+                                      });
+                                    }}
+                                    className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-teal-500 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs"
+                                  />
+                                </div>
                               </div>
                             </div>
                           ))}
                         </div>
 
-                        <div className="p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between text-[11px] text-amber-900 flex-wrap gap-2">
-                          <span className="font-bold flex items-center gap-1.5">
-                            <span>🕌</span>
-                            <span>Khusus Hari Jumat (Otomatis Selesai Sebelum Sholat Jumat):</span>
-                          </span>
-                          <span className="font-mono font-semibold bg-white/80 px-2 py-0.5 rounded border border-amber-200">
-                            Sesi 1: 07:15 - 08:45 | Sesi 2: 09:00 - 10:30 WIB
+                        <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between text-xs text-amber-950 gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-md bg-amber-100/90 flex items-center justify-center text-amber-800 shrink-0">
+                              <Info className="w-3.5 h-3.5" />
+                            </div>
+                            <span className="font-bold text-[11px] text-amber-900">
+                              Khusus Hari Jumat (Maks. 2 Sesi Sebelum Sholat Jumat):
+                            </span>
+                          </div>
+                          <span className="font-mono text-[11px] font-bold bg-white/90 text-amber-900 px-2.5 py-1 rounded-lg border border-amber-200/80 self-start sm:self-auto shadow-2xs">
+                            Sesi 1: 08:00 – 09:30 &bull; Sesi 2: 10:00 – 11:00 WIB
                           </span>
                         </div>
                       </div>
@@ -2532,9 +2571,9 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                                   );
                                 })}
                                 {isFriday && (
-                                  <p className="text-[10px] text-amber-800 font-bold flex items-center gap-1 pt-0.5">
-                                    <span>🕌</span>
-                                    <span>Selesai 10:30 (Sebelum Jumatan)</span>
+                                  <p className="text-[10px] text-amber-800 font-bold flex items-center gap-1.5 pt-0.5">
+                                    <Info className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                    <span>Selesai maks. 11:00 (Sebelum Sholat Jumat)</span>
                                   </p>
                                 )}
                               </div>
@@ -2575,40 +2614,62 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {sessionSlots.map((slot, idx) => (
-                          <div key={slot.sessionNumber} className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs space-y-2">
-                            <span className="text-[11px] font-black text-teal-700 uppercase tracking-wider block">
-                              {slot.sessionName}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="time"
-                                value={slot.startTime}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setSessionSlots((prev) => {
-                                    const next = [...prev];
-                                    next[idx].startTime = val;
-                                    return next;
-                                  });
-                                }}
-                                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-800"
-                              />
-                              <span className="text-xs text-slate-400">s/d</span>
-                              <input
-                                type="time"
-                                value={slot.endTime}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setSessionSlots((prev) => {
-                                    const next = [...prev];
-                                    next[idx].endTime = val;
-                                    return next;
-                                  });
-                                }}
-                                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold text-slate-800"
-                              />
+                          <div key={slot.sessionNumber} className="bg-white p-3 rounded-xl border border-slate-200/90 space-y-2.5 shadow-2xs hover:border-slate-300 transition-colors">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-800 font-bold text-xs flex items-center justify-center border border-teal-200/80 shrink-0">
+                                  {slot.sessionNumber}
+                                </span>
+                                <span className="text-xs font-bold text-slate-800">
+                                  {slot.sessionName}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200/60">
+                                {getSessionDurationText(slot.startTime, slot.endTime)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 pt-0.5">
+                              <div className="flex-1 min-w-0">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                                  Mulai
+                                </span>
+                                <input
+                                  type="time"
+                                  value={formatTimeForInput(slot.startTime, '08:00')}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSessionSlots((prev) => {
+                                      const next = [...prev];
+                                      next[idx].startTime = val;
+                                      return next;
+                                    });
+                                  }}
+                                  className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-teal-500 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs"
+                                />
+                              </div>
+                              <div className="pt-4 text-slate-400 shrink-0">
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                                  Selesai
+                                </span>
+                                <input
+                                  type="time"
+                                  value={formatTimeForInput(slot.endTime, '09:30')}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSessionSlots((prev) => {
+                                      const next = [...prev];
+                                      next[idx].endTime = val;
+                                      return next;
+                                    });
+                                  }}
+                                  className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-teal-500 rounded-lg py-1.5 px-2 text-xs text-center font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-all shadow-2xs"
+                                />
+                              </div>
                             </div>
                           </div>
                         ))}
