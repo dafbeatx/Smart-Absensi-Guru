@@ -741,6 +741,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           {activeTab === 'NOTULEN' && (
             <MeetingMinutesView
               currentUser={user}
+              layoutMode="desktop"
               onBack={() => setActiveTab('DASHBOARD')}
             />
           )}

@@ -4918,6 +4918,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {activeTab === 'BERANDA' && berandaLayer === 'NOTULEN' && (
           <MeetingMinutesView
             currentUser={effectiveUser}
+            layoutMode="mobile"
             onBack={() => {
               setBerandaLayer(notulenReturnTarget);
               window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -840,6 +840,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
           {activeTab === 'NOTULEN' && (
             <MeetingMinutesView
               currentUser={user}
+              layoutMode="desktop"
               onBack={() => setActiveTab('DASHBOARD')}
             />
           )}

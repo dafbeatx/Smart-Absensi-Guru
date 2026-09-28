@@ -8,6 +8,7 @@ export interface AIRestructureInput {
   leaderName?: string;
   secretaryName?: string;
   date?: string;
+  attendeesSummary?: string;
 }
 
 export class MeetingMinutesAIService {
