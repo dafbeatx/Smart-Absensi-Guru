@@ -75,6 +75,23 @@ const TestRunnerModal = lazyRetry(
   'TestRunnerModal'
 );
 
+const WeeklyResearchSurveyModal = lazyRetry(
+  () =>
+    import('./features/survey/components/WeeklyResearchSurveyModal').then((m) => ({
+      default: m.WeeklyResearchSurveyModal,
+    })),
+  'WeeklyResearchSurveyModal'
+);
+
+const MonthlySurveyAnalyticsModal = lazyRetry(
+  () =>
+    import('./features/survey/components/MonthlySurveyAnalyticsModal').then((m) => ({
+      default: m.MonthlySurveyAnalyticsModal,
+    })),
+  'MonthlySurveyAnalyticsModal'
+);
+
+import { shouldTriggerFridaySurvey } from './services/research-survey.service';
 
 export const App: React.FC = () => {
   const { isAuthenticated, user, token } = useAuthStore();
@@ -82,6 +99,8 @@ export const App: React.FC = () => {
   const [isPreviewGuruMode, setIsPreviewGuruMode] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
   const [isPreviewScannerBlocked, setIsPreviewScannerBlocked] = useState(false);
+  const [isFridaySurveyOpen, setIsFridaySurveyOpen] = useState(false);
+  const [isSurveyAnalyticsOpen, setIsSurveyAnalyticsOpen] = useState(false);
 
   const userId = user?.id;
   const userPhone = user?.phone_number;
@@ -159,6 +178,44 @@ export const App: React.FC = () => {
       TelegramService.stopPolling();
     };
   }, []);
+
+  useEffect(() => {
+    const handleCheckInCompleted = () => {
+      if (userId && shouldTriggerFridaySurvey({ userId, action: 'CHECK_IN' })) {
+        setIsFridaySurveyOpen(true);
+      }
+    };
+
+    const handleOpenSurveyAnalytics = () => {
+      setIsSurveyAnalyticsOpen(true);
+    };
+
+    window.addEventListener('smart_absensi_checkin_completed', handleCheckInCompleted);
+    window.addEventListener('smart_absensi_open_survey_analytics', handleOpenSurveyAnalytics);
+
+    // Initial check for Friday: if user already checked in today and hasn't filled the survey
+    if (userId) {
+      try {
+        const raw =
+          localStorage.getItem('smart_absensi_today_record') ||
+          localStorage.getItem('smart_absensi_my_today_record');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (
+            parsed?.check_in_time &&
+            shouldTriggerFridaySurvey({ userId, hasCheckedInToday: true })
+          ) {
+            setIsFridaySurveyOpen(true);
+          }
+        }
+      } catch {}
+    }
+
+    return () => {
+      window.removeEventListener('smart_absensi_checkin_completed', handleCheckInCompleted);
+      window.removeEventListener('smart_absensi_open_survey_analytics', handleOpenSurveyAnalytics);
+    };
+  }, [userId]);
 
   useEffect(() => {
     // Android Hardware Back Button Listener (Capacitor Native)
@@ -385,6 +442,28 @@ export const App: React.FC = () => {
 
       {/* 🍪 Banner Persetujuan & Pengelolaan Cookie Mikro (Hemat Egress Mobile) */}
       <CookieConsentBanner />
+
+      {/* 📋 Mandatory Friday TAM Evaluation Survey Modal (100% Anonymous) */}
+      {isFridaySurveyOpen && (
+        <Suspense fallback={null}>
+          <WeeklyResearchSurveyModal
+            isOpen={isFridaySurveyOpen}
+            userId={userId || ''}
+            userRole={userRole || 'GURU'}
+            onCompleted={() => setIsFridaySurveyOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      {/* 📊 Monthly TAM Quantitative Research Analytics Modal (Admin, Kepsek, Guru) */}
+      {isSurveyAnalyticsOpen && (
+        <Suspense fallback={null}>
+          <MonthlySurveyAnalyticsModal
+            isOpen={isSurveyAnalyticsOpen}
+            onClose={() => setIsSurveyAnalyticsOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

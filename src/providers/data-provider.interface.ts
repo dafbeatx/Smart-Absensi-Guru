@@ -38,6 +38,8 @@ import type {
   CreateExamSessionDTO,
   GradedStudentScoreRecord,
   SaveGradedStudentDTO,
+  SubmitWeeklySurveyDTO,
+  WeeklySurveySummary,
 } from '../types/database.types';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
@@ -220,6 +222,10 @@ export interface IDataProvider {
   saveMeetingMinute(minute: MeetingMinute, token?: string): Promise<MeetingMinute>;
   deleteMeetingMinute(minuteId: string, token?: string): Promise<boolean>;
   subscribeToMeetingMinutesUpdates?(callback: (event: { eventType: string; payload?: any }) => void): () => void;
+
+  // Weekly Research Survey & TAM Evaluation API (100% Anonymous Quantitative Research)
+  submitWeeklySurvey(dto: SubmitWeeklySurveyDTO): Promise<boolean>;
+  getMonthlySurveySummary(month: number, year: number): Promise<WeeklySurveySummary>;
 }
 
 

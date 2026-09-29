@@ -5752,6 +5752,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </button>
               </div>
 
+              {/* Riset & Evaluasi Mingguan (TAM Kuesioner) Card */}
+              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📊</span>
+                    <span className="font-extrabold text-xs text-emerald-950">Riset TAM &amp; Evaluasi Sekolah</span>
+                  </div>
+                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    100% Anonim
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Evaluasi efektivitas, kemudahan, dan pembuktian hipotesis kuantitatif pemanfaatan aplikasi sekolah setiap hari Jumat.
+                </p>
+                <button
+                  type="button"
+                  id="btn-guru-open-survey-analytics"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_analytics'));
+                  }}
+                  className="w-full mt-1 py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
+                >
+                  <span>📈</span> Lihat Rekapitulasi &amp; Hasil Riset Bulanan
+                </button>
+              </div>
+
               {/* Tentang Aplikasi & Pengembang Section */}
               <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-[#023246]/5 border border-[#023246]/15 space-y-2">
                 <div className="flex items-center justify-between">

@@ -176,6 +176,18 @@ export class AttendanceRepository {
 
       logger.info('AttendanceRepository', 'scanAttendance success:', result);
 
+      const attendanceAction = result.attendance_action || 'CHECK_IN';
+      if (typeof window !== 'undefined' && attendanceAction === 'CHECK_IN') {
+        window.dispatchEvent(
+          new CustomEvent('smart_absensi_checkin_completed', {
+            detail: {
+              userId: dto.user_id,
+              action: attendanceAction,
+            },
+          })
+        );
+      }
+
       // Dispatch Telegram attendance notification
       const currentUser = useAuthStore.getState().user;
       TelegramService.sendAttendanceNotification({

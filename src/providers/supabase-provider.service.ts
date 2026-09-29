@@ -48,7 +48,11 @@ import type {
   CreateExamSessionDTO,
   GradedStudentScoreRecord,
   SaveGradedStudentDTO,
+  SubmitWeeklySurveyDTO,
+  WeeklySurveySummary,
+  WeeklySurveyResponse,
 } from '../types/database.types';
+import { calculateSurveySummary } from '../services/research-survey.service';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type {
   ScanAttendanceDTO,
@@ -7256,6 +7260,67 @@ export class SupabaseProvider implements IDataProvider {
         logger.warn('SupabaseProvider', 'Error removing meeting_minutes realtime channel:', e);
       }
     };
+  }
+
+  // ── Weekly Research Survey & TAM Evaluation API (100% Anonymous Quantitative Research) ──
+
+  public async submitWeeklySurvey(dto: SubmitWeeklySurveyDTO): Promise<boolean> {
+    const today = dto.date || getTodayDateInJakarta();
+    const dateObj = new Date(today);
+    const m = dto.month || (isNaN(dateObj.getTime()) ? new Date().getMonth() + 1 : dateObj.getMonth() + 1);
+    const y = dto.year || (isNaN(dateObj.getTime()) ? new Date().getFullYear() : dateObj.getFullYear());
+    const day = isNaN(dateObj.getTime()) ? new Date().getDate() : dateObj.getDate();
+    const weekNumber = dto.week_number || Math.ceil(day / 7);
+
+    try {
+      const { error } = await this.client
+        .from('weekly_research_surveys')
+        .insert({
+          date: today,
+          role: dto.role,
+          q1_usefulness: Number(dto.q1_usefulness) || 5,
+          q2_motivation: Number(dto.q2_motivation) || 5,
+          q3_ease_of_use: Number(dto.q3_ease_of_use) || 5,
+          q4_fairness: Number(dto.q4_fairness) || 5,
+          q5_impact: Number(dto.q5_impact) || 5,
+          next_week_evaluation: (dto.next_week_evaluation || '').trim(),
+          week_number: weekNumber,
+          month: m,
+          year: y,
+          created_at: new Date().toISOString(),
+        });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'submitWeeklySurvey error, syncing to local MockProvider:', error.message);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'submitWeeklySurvey DB exception:', err);
+    }
+
+    // Always update local cache/mock provider for instant offline/PWA resilience
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.submitWeeklySurvey(dto);
+  }
+
+  public async getMonthlySurveySummary(month: number, year: number): Promise<WeeklySurveySummary> {
+    try {
+      const { data, error } = await this.client
+        .from('weekly_research_surveys')
+        .select('*')
+        .eq('month', month)
+        .eq('year', year)
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return calculateSurveySummary(data as WeeklySurveyResponse[], month, year);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getMonthlySurveySummary DB exception:', err);
+    }
+
+    // Fallback to local storage via MockProvider
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getMonthlySurveySummary(month, year);
   }
 }
 

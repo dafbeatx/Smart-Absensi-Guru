@@ -763,3 +763,82 @@ export interface StudentCalculationResult {
   lps: number;
 }
 
+// ── Weekly Quantitative Research & TAM Survey Types ──
+
+export interface WeeklySurveyResponse {
+  id: string;
+  date: string; // YYYY-MM-DD
+  role: RoleCode;
+  q1_usefulness: number; // 1-5
+  q2_motivation: number; // 1-5
+  q3_ease_of_use: number; // 1-5
+  q4_fairness: number; // 1-5
+  q5_impact: number; // 1-5
+  next_week_evaluation: string;
+  week_number: number;
+  month: number;
+  year: number;
+  created_at: string;
+}
+
+export interface SubmitWeeklySurveyDTO {
+  role: RoleCode;
+  q1_usefulness: number;
+  q2_motivation: number;
+  q3_ease_of_use: number;
+  q4_fairness: number;
+  q5_impact: number;
+  next_week_evaluation: string;
+  date?: string;
+  week_number?: number;
+  month?: number;
+  year?: number;
+}
+
+export interface SurveyHypothesisResult {
+  code: 'H1' | 'H2' | 'H3';
+  title: string;
+  description: string;
+  targetMetric: string;
+  meanScore: number;
+  threshold: number;
+  isConfirmed: boolean;
+  statusText: string;
+}
+
+export interface SurveyIndicatorSummary {
+  mean: number;
+  positivePercentage: number;
+  title: string;
+}
+
+export interface SurveyAnonymousEvaluation {
+  id: string;
+  role: RoleCode;
+  date: string;
+  evaluationText: string;
+  createdAt: string;
+}
+
+export interface WeeklySurveySummary {
+  month: number;
+  year: number;
+  totalRespondents: number;
+  roleBreakdown: {
+    guru: number;
+    admin: number;
+    kepsek: number;
+  };
+  indicators: {
+    q1_usefulness: SurveyIndicatorSummary;
+    q2_motivation: SurveyIndicatorSummary;
+    q3_ease_of_use: SurveyIndicatorSummary;
+    q4_fairness: SurveyIndicatorSummary;
+    q5_impact: SurveyIndicatorSummary;
+  };
+  overallMean: number;
+  hypotheses: SurveyHypothesisResult[];
+  evaluations: SurveyAnonymousEvaluation[];
+}
+
+

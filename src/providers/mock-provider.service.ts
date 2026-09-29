@@ -44,7 +44,11 @@ import type {
   CreateExamSessionDTO,
   GradedStudentScoreRecord,
   SaveGradedStudentDTO,
+  SubmitWeeklySurveyDTO,
+  WeeklySurveySummary,
+  WeeklySurveyResponse,
 } from '../types/database.types';
+import { calculateSurveySummary } from '../services/research-survey.service';
 import type { LoginDTO, LoginResponseDTO } from '../repositories/AuthRepository';
 import type { ScanAttendanceDTO, AttendanceResponseDTO, CorrectAttendanceDTO } from '../repositories/AttendanceRepository';
 import type { SubmitLeaveDTO } from '../repositories/LeaveRepository';
@@ -3577,6 +3581,56 @@ export class MockProvider implements IDataProvider {
     _callback: (event: { eventType: string; payload?: any }) => void
   ): () => void {
     return () => {};
+  }
+
+  // ── Weekly Research Survey & TAM Evaluation Mock Implementation ──
+  private mockWeeklySurveys: WeeklySurveyResponse[] = [];
+
+  private getStoredSurveys(): WeeklySurveyResponse[] {
+    const raw = safeGetStorage('smart_absensi_weekly_surveys');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return this.mockWeeklySurveys;
+  }
+
+  public async submitWeeklySurvey(dto: SubmitWeeklySurveyDTO): Promise<boolean> {
+    const surveys = this.getStoredSurveys();
+    const today = dto.date || getTodayDateInJakarta();
+    const dateObj = new Date(today);
+    const m = dto.month || (isNaN(dateObj.getTime()) ? new Date().getMonth() + 1 : dateObj.getMonth() + 1);
+    const y = dto.year || (isNaN(dateObj.getTime()) ? new Date().getFullYear() : dateObj.getFullYear());
+    const day = isNaN(dateObj.getTime()) ? new Date().getDate() : dateObj.getDate();
+    const weekNumber = dto.week_number || Math.ceil(day / 7);
+
+    const record: WeeklySurveyResponse = {
+      id: `survey-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      date: today,
+      role: dto.role,
+      q1_usefulness: Number(dto.q1_usefulness) || 5,
+      q2_motivation: Number(dto.q2_motivation) || 5,
+      q3_ease_of_use: Number(dto.q3_ease_of_use) || 5,
+      q4_fairness: Number(dto.q4_fairness) || 5,
+      q5_impact: Number(dto.q5_impact) || 5,
+      next_week_evaluation: (dto.next_week_evaluation || '').trim(),
+      week_number: weekNumber,
+      month: m,
+      year: y,
+      created_at: new Date().toISOString(),
+    };
+
+    surveys.push(record);
+    this.mockWeeklySurveys = surveys;
+    safeSetStorage('smart_absensi_weekly_surveys', JSON.stringify(surveys));
+    return true;
+  }
+
+  public async getMonthlySurveySummary(month: number, year: number): Promise<WeeklySurveySummary> {
+    const surveys = this.getStoredSurveys();
+    return calculateSurveySummary(surveys, month, year);
   }
 }
 

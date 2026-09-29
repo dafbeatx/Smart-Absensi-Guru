@@ -46,6 +46,7 @@ import { runExamAdministrativeDocsTestSuite } from './__tests__/exam-administrat
 import { runStudentSyncDedupTestSuite } from './__tests__/student-sync-dedup.test';
 import { runMeetingMinutesTestSuite } from './__tests__/meeting-minutes.test';
 import { runAttendanceTimeWindowTestSuite } from './__tests__/attendance-time-window.test';
+import { runResearchSurveyTestSuite } from './__tests__/research-survey.test';
 
 export interface TestResultItem {
   testName: string;
@@ -129,6 +130,7 @@ export class MasterTestRunner {
       { name: 'Student Directory & Sync Deduplication Engine (Zero Duplicate & Tombstone)', fn: runStudentSyncDedupTestSuite },
       { name: 'Meeting Minutes & Notulen Rapat AI Restructuring Engine (Phase 4.9)', fn: runMeetingMinutesTestSuite },
       { name: 'Attendance Jakarta Time Window & Double Attendance Prevention (Phase 5.0)', fn: runAttendanceTimeWindowTestSuite },
+      { name: 'Weekly Research Survey & Quantitative TAM Evaluation Engine (Phase 5.1)', fn: runResearchSurveyTestSuite },
     ];
 
     let totalPassed = 0;

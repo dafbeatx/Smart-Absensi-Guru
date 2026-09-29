@@ -558,6 +558,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'EXPORT', label: 'Laporan', icon: '📊', hasDropdown: true },
     { id: 'SETTINGS', label: 'Pengaturan', icon: '⚙️', hasDropdown: true },
     { id: 'SARPRAS', label: 'Inventaris Sarpras', icon: '📦' },
+    { id: 'SURVEY_RESEARCH', label: 'Riset & Kuesioner TAM', icon: '📊' },
     { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
     { id: 'SYSTEM_HEALTH', label: 'Kesehatan Cloud & AI', icon: '🩺' },
     { id: 'ABOUT', label: 'Tentang Aplikasi', icon: 'ℹ️' },
@@ -566,6 +567,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   ];
 
   const handleSelectSidebarTab = (id: string) => {
+    if (id === 'SURVEY_RESEARCH') {
+      window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_analytics'));
+      return;
+    }
     if (id === 'APPLY_LEAVE') {
       setIsLeaveModalOpen(true);
       return;

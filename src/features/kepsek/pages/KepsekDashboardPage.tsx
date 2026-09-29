@@ -550,6 +550,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       label: 'Inventaris Sarpras',
       icon: '📦',
     },
+    {
+      id: 'SURVEY_RESEARCH',
+      label: 'Riset & Kuesioner TAM',
+      icon: '📊',
+    },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 
@@ -567,6 +572,10 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         onSelectTab={(id) => {
           if (id === 'LEADERBOARD') {
             setIsLeaderboardModalOpen(true);
+            return;
+          }
+          if (id === 'SURVEY_RESEARCH') {
+            window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_analytics'));
             return;
           }
           setActiveTab(id as typeof activeTab);
