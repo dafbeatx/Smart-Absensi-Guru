@@ -222,6 +222,21 @@ export interface TeacherDisciplineLeaderboardResult {
 }
 
 /**
+ * Menormalisasi nama guru untuk perbandingan deterministik:
+ * Mengabaikan gelar akademik (S.Pd, S.Mat, S.E, S.Si, M.Pd, S.Pd.I, S.Kom, G.r, Drs., H.)
+ * dan menstandarisasi singkatan M. / Muhammad.
+ */
+export function normalizeTeacherName(name: string): string {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/\b(muhammad|muhamad|mohammad|mochamad|moch\.|muh\.)\b/gi, 'm')
+    .replace(/(,\s*)?(s\.pd|s\.mat|s\.e|s\.si|m\.pd|s\.pd\.i|s\.kom|g\.r|drs\.|h\.)(\.?)(\s*)/gi, '')
+    .replace(/[^a-z0-9]/gi, '')
+    .trim();
+}
+
+/**
  * Mendapatkan Leaderboard Monitoring Performa Disiplin Internal Sekolah
  * 100% sinkron dengan database riil Supabase:
  * 1. CURRENT_MONTH: Bulan Berjalan (September 2026, 5 hari kerja efektif berlalu: 1-7 September)
@@ -623,11 +638,13 @@ export function getTeacherDisciplineLeaderboard(
         continue;
       }
 
+      const normReg = normalizeTeacherName(reg.full_name || '');
       const existingIdx = teachers.findIndex(
         (t) =>
           t.id === reg.id ||
           (reg.nip && t.nip && reg.nip.replace(/\s+/g, '') === t.nip.replace(/\s+/g, '')) ||
-          (reg.full_name && t.name && reg.full_name.trim().toLowerCase() === t.name.trim().toLowerCase())
+          (reg.full_name && t.name && reg.full_name.trim().toLowerCase() === t.name.trim().toLowerCase()) ||
+          (normReg && normReg === normalizeTeacherName(t.name))
       );
 
       if (existingIdx !== -1) {
@@ -697,11 +714,14 @@ export function getTeacherDisciplineLeaderboard(
         }
 
         const pts = Math.max(0, logs.reduce((sum, l) => sum + (Number(l.points) || 0), 0));
-        const onTime = logs.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
-        const late = logs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
-        const piket = logs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
-        const earlyBird = logs.filter((l) => l.activity_type === 'EARLY_BIRD_BONUS').length;
-        const streak = logs.filter((l) => l.activity_type === 'STREAK_MILESTONE').length;
+        // Khusus bulan lampau (Agustus), jika log adalah catatan rekapitulasi agregat (1 baris rekapitulasi akumulasi resmi),
+        // pertahankan rincian kehadiran riil (hadirTepatWaktuCount, terlambatCount, piketCount, dll) dari master baseline
+        const isAggregateSummary = !isCurrent && logs.length === 1 && (logs[0].title?.includes('Rekap') || logs[0].points >= 100);
+        const onTime = isAggregateSummary ? t.hadirTepatWaktuCount : logs.filter((l) => l.activity_type === 'CHECK_IN_ON_TIME').length;
+        const late = isAggregateSummary ? t.terlambatCount : logs.filter((l) => l.activity_type === 'CHECK_IN_LATE').length;
+        const piket = isAggregateSummary ? t.piketCount : logs.filter((l) => l.activity_type === 'DUTY_PIKET').length;
+        const earlyBird = isAggregateSummary ? (t.earlyBirdCount ?? 0) : logs.filter((l) => l.activity_type === 'EARLY_BIRD_BONUS').length;
+        const streak = isAggregateSummary ? (t.streakCount ?? 0) : logs.filter((l) => l.activity_type === 'STREAK_MILESTONE').length;
 
         return {
           ...t,
@@ -723,10 +743,12 @@ export function getTeacherDisciplineLeaderboard(
     };
 
     // Cari apakah currentUser cocok dengan salah satu guru di daftar
+    const normUser = normalizeTeacherName(currentUser.full_name || '');
     const matchedIdx = teachers.findIndex(
       (t) =>
         (currentUser.id && t.id === currentUser.id) ||
         (currentUser.full_name && t.name && t.name.trim().toLowerCase() === currentUser.full_name.trim().toLowerCase()) ||
+        (normUser && normUser === normalizeTeacherName(t.name)) ||
         (currentUser.nip && t.nip && t.nip.replace(/\s+/g, '') === currentUser.nip.replace(/\s+/g, ''))
     );
 
@@ -798,21 +820,24 @@ export function getTeacherDisciplineLeaderboard(
       ((currentUser as any).role !== 'KEPSEK' && (currentUser as any).role !== 'ADMIN')
     ) {
       // Akun guru lain yang terdaftar secara dinamis dan belum ada di teachers
+      // Poin bulan berjalan diambil dari currentUserScore, sedangkan bulan lampau (Agustus) hanya dari buku besar log bulan tersebut
+      const userResolvedPoints = isCurrent ? (Number(currentUserScore?.totalPoints) || 0) : 0;
+      const userResolvedLevel = isCurrent ? (currentUserScore?.level || '🥉 Pendidik Berkomitmen') : '🏖️ Sedang Cuti Resmi';
       teachers.push({
         id: currentUser.id || 'usr_current',
         name: currentUser.full_name || 'Guru Pendidik',
         nip: currentUser.nip || null,
         position: currentUser.position || 'Guru Pengajar',
         avatar_url: currentUser.avatar_url || null,
-        totalPoints: Number(currentUserScore?.totalPoints) || 0,
-        level: currentUserScore?.level || '🥉 Pendidik Berkomitmen',
+        totalPoints: userResolvedPoints,
+        level: userResolvedLevel,
         rank: teachers.length + 1,
-        hadirTepatWaktuCount: currentUserScore?.hadirTepatWaktuCount ?? 0,
-        terlambatCount: currentUserScore?.terlambatCount ?? 0,
-        piketCount: currentUserScore?.piketCount ?? 0,
-        earlyBirdCount: currentUserScore?.earlyBirdCount ?? 0,
-        streakCount: currentUserScore?.streakCount ?? 0,
-        topBadge: { icon: activeBadge.icon, title: activeBadge.title },
+        hadirTepatWaktuCount: isCurrent ? (currentUserScore?.hadirTepatWaktuCount ?? 0) : 0,
+        terlambatCount: isCurrent ? (currentUserScore?.terlambatCount ?? 0) : 0,
+        piketCount: isCurrent ? (currentUserScore?.piketCount ?? 0) : 0,
+        earlyBirdCount: isCurrent ? (currentUserScore?.earlyBirdCount ?? 0) : 0,
+        streakCount: isCurrent ? (currentUserScore?.streakCount ?? 0) : 0,
+        topBadge: isCurrent ? { icon: activeBadge.icon, title: activeBadge.title } : { icon: '🏖️', title: 'Sedang Cuti Resmi' },
         isCurrentUser: true,
       });
     }
@@ -920,7 +945,8 @@ export function getTeacherDisciplineLeaderboard(
         (p) =>
           (p.id && t.id === p.id) ||
           (p.nip && t.nip && p.nip.replace(/\s+/g, '') === t.nip.replace(/\s+/g, '')) ||
-          (p.full_name && t.name && p.full_name.trim().toLowerCase() === t.name.trim().toLowerCase())
+          (p.full_name && t.name && p.full_name.trim().toLowerCase() === t.name.trim().toLowerCase()) ||
+          (p.full_name && normalizeTeacherName(p.full_name) === normalizeTeacherName(t.name))
       );
       if (matched && matched.avatar_url) {
         resolvedAvatar = matched.avatar_url;
@@ -931,7 +957,8 @@ export function getTeacherDisciplineLeaderboard(
       const isMe =
         (currentUser.id && t.id === currentUser.id) ||
         (currentUser.nip && t.nip && currentUser.nip.replace(/\s+/g, '') === t.nip.replace(/\s+/g, '')) ||
-        (currentUser.full_name && t.name && currentUser.full_name.trim().toLowerCase() === t.name.trim().toLowerCase());
+        (currentUser.full_name && t.name && currentUser.full_name.trim().toLowerCase() === t.name.trim().toLowerCase()) ||
+        (currentUser.full_name && normalizeTeacherName(currentUser.full_name) === normalizeTeacherName(t.name));
       if (isMe) {
         resolvedAvatar = currentUser.avatar_url;
       }

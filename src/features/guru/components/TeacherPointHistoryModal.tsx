@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { TeacherPointLog, UserProfile, TeacherPointActivityType } from '../../../types/database.types';
+import { getTeacherDisciplineLeaderboard, normalizeTeacherName } from '../../../utils/teacher-appreciation.utils';
 import {
   X,
   Clock,
@@ -144,6 +145,19 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
       ? (teacher as any).totalPoints
       : 0;
 
+  // Skor akumulasi resmi bulan Agustus 2026 yang terverifikasi deterministik
+  const augustVerifiedPoints = useMemo(() => {
+    const prevBoard = getTeacherDisciplineLeaderboard(null, null, 'PREVIOUS_MONTH');
+    const norm = normalizeTeacherName(teacherName);
+    const item = prevBoard.leaderboard.find(
+      (t) =>
+        (teacher?.id && t.id === teacher.id) ||
+        (teacher?.nip && t.nip && teacher.nip.replace(/\s+/g, '') === t.nip.replace(/\s+/g, '')) ||
+        (norm && norm === normalizeTeacherName(t.name))
+    );
+    return item ? item.totalPoints : 0;
+  }, [teacher?.id, teacher?.nip, teacherName]);
+
   // 1. Filter log berdasarkan periode bulan yang dipilih (reset awal bulan per tanggal 1)
   const periodFilteredLogs = useMemo(() => {
     let logs = pointHistory || [];
@@ -152,18 +166,18 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
     }
 
     // Jika memilih bulan Agustus 2026 dan belum ada baris transaksi harian granular di database,
-    // sediakan rekap transaksi resmi terverifikasi agar poin tidak menjadi 0 kosong
-    if (selectedPeriod === '2026-08' && logs.length === 0 && fallbackPoints > 0) {
+    // sediakan rekap transaksi resmi terverifikasi agar poin tidak menjadi 0 kosong atau tertukar dengan bulan berjalan
+    if (selectedPeriod === '2026-08' && logs.length === 0 && augustVerifiedPoints > 0) {
       logs = [
         {
           id: `aug_recap_${teacher?.id || 't'}`,
           user_id: teacher?.id || '',
           teacher_name: teacherName,
           date: '2026-08-31',
-          points: fallbackPoints,
+          points: augustVerifiedPoints,
           activity_type: 'CHECK_IN_ON_TIME' as TeacherPointActivityType,
           title: 'Rekap Akumulasi Poin Disiplin Final (Agustus 2026)',
-          description: `Rekapitulasi resmi performa kehadiran dan kedisiplinan sebulan penuh bulan Agustus 2026 (${fallbackPoints} Poin Terverifikasi)`,
+          description: `Rekapitulasi resmi performa kehadiran dan kedisiplinan sebulan penuh bulan Agustus 2026 (${augustVerifiedPoints} Poin Terverifikasi)`,
           created_at: '2026-08-31T17:00:00.000Z',
         },
       ];
@@ -187,8 +201,12 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
     if (currentLogs.length > 0) {
       return Math.max(0, currentLogs.reduce((sum, p) => sum + (p.points || 0), 0));
     }
-    // Jika memilih bulan Agustus 2026 atau bulan awal, dan ada saldo poin tercatat dari profil guru
-    if ((selectedPeriod === '2026-08' || selectedPeriod === defaultPeriodStr) && fallbackPoints > 0) {
+    // Jika memilih bulan Agustus 2026, gunakan nilai terverifikasi resmi Agustus
+    if (selectedPeriod === '2026-08') {
+      return augustVerifiedPoints;
+    }
+    // Jika memilih bulan awal, dan ada saldo poin tercatat dari profil guru
+    if (selectedPeriod === defaultPeriodStr && fallbackPoints > 0) {
       return fallbackPoints;
     }
     return 0;

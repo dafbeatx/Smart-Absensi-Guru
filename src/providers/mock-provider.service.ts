@@ -147,7 +147,7 @@ export class MockProvider implements IDataProvider {
       '081213134916': { id: 'usr_guru_003', name: 'Adi Prasetyo, S.Pd., G.r', role: 'GURU', position: 'Guru Mapel Bahasa Inggris' },
       '081802107009': { id: 'usr_op_002', name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', role: 'ADMIN', position: 'Operator Sekolah' },
       '08159185700':  { id: 'usr_guru_004', name: 'Mira Nurdianti, S.Pd', role: 'GURU', position: 'Tata Usaha (TU)' },
-      '0881024136818':{ id: 'usr_guru_005', name: 'Fitri Ani Rahayu', role: 'GURU', position: 'Guru Mapel Matematika' },
+      '0881024136818':{ id: 'usr_guru_005', name: 'Fitri Ani Rahayu, S.Mat', role: 'GURU', position: 'Guru Mapel Matematika' },
       '089611651623': { id: 'usr_guru_006', name: 'Nurul Fahriya, S.Pd., G.r', role: 'GURU', position: 'Wakasek Kurikulum' },
       '08989462357':  { id: 'usr_guru_007', name: 'Septi Nur Aeni, S.E', role: 'GURU', position: 'Guru Mapel B. Indonesia' },
       '081646035486': { id: 'usr_guru_008', name: 'Windiani, S.E., G.r', role: 'GURU', position: 'Bendahara Sekolah' },

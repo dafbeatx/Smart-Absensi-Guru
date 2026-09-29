@@ -1272,5 +1272,81 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     assert('Point History Seed: Guard', false, String(err));
   }
 
+  // 42. August Leaderboard Parity: Admin vs Guru View 100% Identik untuk Bulan Agustus
+  try {
+    const mockProv = new MockProvider();
+    const allUsers = await mockProv.getAllUsers('mock-token');
+    const allLogs = await mockProv.getTeacherPointHistory('ALL');
+
+    const adminUser = allUsers.find((u) => u.role === 'ADMIN') || {
+      id: 'usr_admin_001',
+      full_name: 'Dafa Maulana, S.Pd',
+      role: 'ADMIN',
+    };
+
+    const fitriUser = {
+      id: 'usr_guru_005',
+      full_name: 'Fitri Ani Rahayu, S.Mat',
+      role: 'GURU',
+    };
+
+    // Skor September milik guru yang aktif di dashboard berjalan
+    const guruSeptScore = {
+      totalPoints: 330,
+      hadirTepatWaktuCount: 9,
+      terlambatCount: 4,
+      piketCount: 3,
+      badges: [],
+      pointHistory: [],
+    };
+
+    const adminAugView = getTeacherDisciplineLeaderboard(
+      adminUser as any,
+      null,
+      'PREVIOUS_MONTH',
+      allLogs,
+      allUsers
+    );
+
+    const guruAugView = getTeacherDisciplineLeaderboard(
+      fitriUser as any,
+      guruSeptScore as any,
+      'PREVIOUS_MONTH',
+      allLogs,
+      allUsers
+    );
+
+    // 1. Verifikasi Juara 1 adalah Fitri Ani Rahayu dengan 415 Poin & 14 Hari On-Time di kedua tampilan
+    assert(
+      'August Parity: Juara 1 Agustus (Fitri Ani Rahayu, 415 Poin, 14 Hari On-Time) 100% identik di Admin dan Guru',
+      adminAugView.topTeacher.id === 'usr_guru_005' &&
+      adminAugView.topTeacher.totalPoints === 415 &&
+      adminAugView.topTeacher.hadirTepatWaktuCount === 14 &&
+      guruAugView.topTeacher.id === 'usr_guru_005' &&
+      guruAugView.topTeacher.totalPoints === 415 &&
+      guruAugView.topTeacher.hadirTepatWaktuCount === 14,
+      `Admin Top: ${adminAugView.topTeacher.name} (${adminAugView.topTeacher.totalPoints} pts, ${adminAugView.topTeacher.hadirTepatWaktuCount} on-time), Guru Top: ${guruAugView.topTeacher.name} (${guruAugView.topTeacher.totalPoints} pts, ${guruAugView.topTeacher.hadirTepatWaktuCount} on-time)`
+    );
+
+    // 2. Verifikasi urutan peringkat dan poin seluruh guru 100% persis sama
+    const adminRoster = adminAugView.leaderboard.map((t) => `${t.rank}:${t.id}:${t.totalPoints}:${t.hadirTepatWaktuCount}`).join('|');
+    const guruRoster = guruAugView.leaderboard.map((t) => `${t.rank}:${t.id}:${t.totalPoints}:${t.hadirTepatWaktuCount}`).join('|');
+
+    assert(
+      'August Parity: Seluruh peringkat & perolehan poin guru bulan Agustus 100% konsisten antara Admin dan Guru',
+      adminRoster === guruRoster,
+      `Rosters match exactly: ${adminRoster.slice(0, 80)}...`
+    );
+
+    // 3. Verifikasi rank personal guru yang login dihitung akurat (#1 untuk Fitri)
+    assert(
+      'August Parity: Peringkat personal guru yang login (#1 untuk Fitri Ani Rahayu) akurat dan sinkron',
+      guruAugView.currentUserRank === 1,
+      `Fitri Current Rank in August: #${guruAugView.currentUserRank}`
+    );
+  } catch (err: unknown) {
+    assert('August Leaderboard Parity: Guard', false, String(err));
+  }
+
   return { passed, failed, results };
 };

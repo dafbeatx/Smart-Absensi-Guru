@@ -35,6 +35,7 @@ export interface TeacherDisciplineBadgeModalProps {
   isFullscreen?: boolean;
   allRegisteredTeachers?: UserProfile[];
   allPointLogs?: TeacherPointLog[];
+  initialPeriod?: DisciplinePeriodType;
 }
 
 type TabKey = 'LEADERBOARD' | 'HISTORY' | 'RULES' | 'BADGES' | 'MESSAGE';
@@ -78,10 +79,18 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   isFullscreen = false,
   allRegisteredTeachers: allRegisteredTeachersProp,
   allPointLogs: allPointLogsProp,
+  initialPeriod = 'CURRENT_MONTH',
 }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('LEADERBOARD');
-  const [selectedPeriod, setSelectedPeriod] = useState<DisciplinePeriodType>('CURRENT_MONTH');
+  const [selectedPeriod, setSelectedPeriod] = useState<DisciplinePeriodType>(initialPeriod);
   const [historyFilterScope, setHistoryFilterScope] = useState<'CURRENT_MONTH' | 'ALL'>('CURRENT_MONTH');
+
+  // Sinkronkan selectedPeriod saat modal dibuka dengan initialPeriod baru
+  useEffect(() => {
+    if (isOpen && initialPeriod) {
+      setSelectedPeriod(initialPeriod);
+    }
+  }, [isOpen, initialPeriod]);
 
   // Layer detail state: when teacher card is clicked, open clear detail chart view
   const [selectedTeacher, setSelectedTeacher] = useState<TeacherLeaderboardItem | null>(null);
@@ -393,18 +402,21 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     if (currentUserLeaderboardItem && typeof currentUserLeaderboardItem.totalPoints === 'number') {
       return currentUserLeaderboardItem.totalPoints;
     }
-    if (currentUserScore && typeof currentUserScore.totalPoints === 'number') {
+    if (selectedPeriod === 'CURRENT_MONTH' && currentUserScore && typeof currentUserScore.totalPoints === 'number') {
       return currentUserScore.totalPoints;
     }
     return 0;
-  }, [currentUserLeaderboardItem, currentUserScore]);
+  }, [currentUserLeaderboardItem, currentUserScore, selectedPeriod]);
 
   const resolvedUserOnTimeCount = useMemo(() => {
     if (currentUserLeaderboardItem && typeof currentUserLeaderboardItem.hadirTepatWaktuCount === 'number') {
       return currentUserLeaderboardItem.hadirTepatWaktuCount;
     }
-    return currentUserScore?.hadirTepatWaktuCount ?? 0;
-  }, [currentUserLeaderboardItem, currentUserScore]);
+    if (selectedPeriod === 'CURRENT_MONTH') {
+      return currentUserScore?.hadirTepatWaktuCount ?? 0;
+    }
+    return 0;
+  }, [currentUserLeaderboardItem, currentUserScore, selectedPeriod]);
 
   // Seluruh log milik currentUser
   const myAllLogs = useMemo(() => {

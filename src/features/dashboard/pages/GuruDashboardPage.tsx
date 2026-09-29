@@ -128,6 +128,8 @@ import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
   formatShortTeacherName,
+  normalizeTeacherName,
+  type DisciplinePeriodType,
 } from '../../../utils/teacher-appreciation.utils';
 import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-seed.utils';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
@@ -1712,23 +1714,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     pointHistory
   );
 
-  // Teacher Discipline Leaderboard & Top Teacher Recognition
+  // Teacher Discipline Leaderboard & Top Teacher Recognition (Sinkron dengan selectedMonth)
+  const disciplinePeriod: DisciplinePeriodType = selectedMonth === 8 ? 'PREVIOUS_MONTH' : 'CURRENT_MONTH';
   const disciplineLeaderboard = useMemo(() => {
-    return getTeacherDisciplineLeaderboard(effectiveUser, appreciationScore, 'CURRENT_MONTH', allTeacherPointLogs, allRegisteredTeachers);
-  }, [effectiveUser, appreciationScore, allTeacherPointLogs, allRegisteredTeachers]);
+    return getTeacherDisciplineLeaderboard(
+      effectiveUser,
+      selectedMonth === 8 ? null : appreciationScore,
+      disciplinePeriod,
+      allTeacherPointLogs,
+      allRegisteredTeachers
+    );
+  }, [effectiveUser, appreciationScore, disciplinePeriod, selectedMonth, allTeacherPointLogs, allRegisteredTeachers]);
 
   const currentUserLeaderboardItem = useMemo(() => {
     if (!disciplineLeaderboard?.leaderboard) return null;
+    const normUser = effectiveUser?.full_name ? normalizeTeacherName(effectiveUser.full_name) : '';
     return disciplineLeaderboard.leaderboard.find(
       (item) =>
         item.isCurrentUser ||
         item.id === effectiveUser?.id ||
         (effectiveUser?.nip && item.nip && item.nip.replace(/\s+/g, '') === effectiveUser.nip.replace(/\s+/g, '')) ||
-        (effectiveUser?.full_name && item.name && effectiveUser.full_name.trim().toLowerCase() === item.name.trim().toLowerCase())
+        (effectiveUser?.full_name && item.name && effectiveUser.full_name.trim().toLowerCase() === item.name.trim().toLowerCase()) ||
+        (normUser && normUser === normalizeTeacherName(item.name))
     );
   }, [disciplineLeaderboard?.leaderboard, effectiveUser?.id, effectiveUser?.nip, effectiveUser?.full_name]);
 
-  const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? appreciationScore?.totalPoints ?? 0;
+  const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? (selectedMonth === 8 ? 0 : (appreciationScore?.totalPoints ?? 0));
 
   // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
   // Piagam resmi dan selebrasi penghargaan hanya aktif jika telah memasuki akhir bulan
@@ -3507,7 +3518,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-amber-900 text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase">
                     <span className="text-sm">👑</span>
-                    <span>Poin Terbanyak Bulan Berjalan</span>
+                    <span>{selectedMonth === 8 ? 'Poin Tertinggi Rekap Agustus' : 'Poin Terbanyak Bulan Berjalan'}</span>
                   </div>
                   <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors shrink-0">
                     <span>Rincian</span>
@@ -6283,6 +6294,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         currentUserScore={appreciationScore ? { ...appreciationScore, totalPoints: effectiveTotalPoints } : undefined}
         allRegisteredTeachers={allRegisteredTeachers}
         allPointLogs={allTeacherPointLogs}
+        initialPeriod={selectedMonth === 8 ? 'PREVIOUS_MONTH' : 'CURRENT_MONTH'}
       />
 
       {/* 14b. Modal Riwayat Pendapatan Poin Transparan Disiplin Guru */}
@@ -6293,7 +6305,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           ...effectiveUser,
           totalPoints: effectiveTotalPoints,
         }}
-        pointHistory={pointHistory}
+        pointHistory={pointHistory.length > 0 ? pointHistory : allTeacherPointLogs.filter((l) => l.user_id === effectiveUser?.id)}
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
       />
