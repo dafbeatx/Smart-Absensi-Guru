@@ -135,8 +135,11 @@ const SEED_MINUTES: MeetingMinute[] = [
 ];
 
 export class MeetingMinutesRepository {
+  private static isSyncing = false;
+  private static realtimeUnsubscribe: (() => void) | null = null;
+
   /**
-   * Retrieves all meeting minutes from persistent storage with fallback seeds
+   * Retrieves all meeting minutes from persistent local storage with fallback seeds (instant UI)
    */
   public static getAllMinutes(): MeetingMinute[] {
     if (typeof window === 'undefined') return SEED_MINUTES;
@@ -145,7 +148,7 @@ export class MeetingMinutesRepository {
       const stored = localStorage.getItem(MEETING_MINUTES_STORAGE_KEY);
       if (stored !== null) {
         const parsed: MeetingMinute[] = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.sort((a, b) => {
             const dateCmp = b.date.localeCompare(a.date);
             if (dateCmp !== 0) return dateCmp;
@@ -160,6 +163,114 @@ export class MeetingMinutesRepository {
     // Seed initial demo data only on first ever initialization when key is null
     this.saveToStorage(SEED_MINUTES);
     return SEED_MINUTES;
+  }
+
+  /**
+   * Fetches latest minutes from Supabase cloud database, performs auto-recovery
+   * for minutes created locally on mobile HP that haven't been uploaded yet,
+   * merges data, updates local cache, and dispatches UI update event.
+   */
+  public static async fetchAndSyncMinutes(): Promise<MeetingMinute[]> {
+    if (this.isSyncing) return this.getAllMinutes();
+    this.isSyncing = true;
+
+    try {
+      const provider = ProviderFactory.getProvider();
+      const cloudMinutes = await provider.getMeetingMinutes();
+      const localMinutes = this.getAllMinutes();
+
+      // Step 1: Detect local minutes created on this device (e.g. mobile HP)
+      // that are NOT yet in the cloud database, and push them to cloud!
+      const cloudIdMap = new Map(cloudMinutes.map((m) => [m.id, m]));
+      const newlyPushedMinutes: MeetingMinute[] = [];
+
+      for (const localMin of localMinutes) {
+        const isSeed = localMin.id.startsWith('min_seed_');
+        if (!cloudIdMap.has(localMin.id) && !isSeed) {
+          try {
+            const uploaded = await provider.saveMeetingMinute(localMin);
+            newlyPushedMinutes.push(uploaded || localMin);
+          } catch (e) {
+            console.warn('Failed to push offline local minute to cloud:', e);
+          }
+        }
+      }
+
+      // Step 2: Combine cloud minutes + any newly pushed or local minutes
+      const combinedMap = new Map<string, MeetingMinute>();
+
+      for (const cm of cloudMinutes) {
+        combinedMap.set(cm.id, cm);
+      }
+      for (const npm of newlyPushedMinutes) {
+        combinedMap.set(npm.id, npm);
+      }
+
+      // If cloud is completely empty and no user minutes exist, preserve demo seeds
+      if (combinedMap.size === 0) {
+        for (const sm of SEED_MINUTES) {
+          combinedMap.set(sm.id, sm);
+        }
+      }
+
+      // Step 3: For local minutes already in combinedMap, merge readBy & resolve fresher updatedAt
+      for (const lm of localMinutes) {
+        const existing = combinedMap.get(lm.id);
+        if (existing) {
+          const mergedReadBy = Array.from(new Set([...(existing.readBy || []), ...(lm.readBy || [])]));
+          const localTime = new Date(lm.updatedAt || 0).getTime();
+          const cloudTime = new Date(existing.updatedAt || 0).getTime();
+          if (localTime > cloudTime) {
+            const updated = { ...lm, readBy: mergedReadBy };
+            combinedMap.set(lm.id, updated);
+            provider.saveMeetingMinute(updated).catch(() => {});
+          } else {
+            combinedMap.set(lm.id, { ...existing, readBy: mergedReadBy });
+          }
+        }
+      }
+
+      const mergedList = Array.from(combinedMap.values()).sort((a, b) => {
+        const dateCmp = b.date.localeCompare(a.date);
+        if (dateCmp !== 0) return dateCmp;
+        return b.startTime.localeCompare(a.startTime);
+      });
+
+      this.saveToStorage(mergedList);
+      this.dispatchUpdateEvent();
+      return mergedList;
+    } catch (err) {
+      console.warn('Error during fetchAndSyncMinutes:', err);
+      return this.getAllMinutes();
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  /**
+   * Initializes real-time listener for meeting minutes updates across all connected devices
+   */
+  public static initRealtimeSubscription(): () => void {
+    if (typeof window === 'undefined') return () => {};
+    if (this.realtimeUnsubscribe) return this.realtimeUnsubscribe;
+
+    try {
+      const provider = ProviderFactory.getProvider();
+      if (provider.subscribeToMeetingMinutesUpdates) {
+        this.realtimeUnsubscribe = provider.subscribeToMeetingMinutesUpdates(() => {
+          this.fetchAndSyncMinutes().catch(() => {});
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to init meeting minutes realtime subscription:', e);
+    }
+
+    return () => {
+      if (this.realtimeUnsubscribe) {
+        this.realtimeUnsubscribe();
+        this.realtimeUnsubscribe = null;
+      }
+    };
   }
 
   /**
@@ -191,7 +302,7 @@ export class MeetingMinutesRepository {
     this.saveToStorage(all);
     this.dispatchUpdateEvent();
 
-    // Async cloud sync if Supabase is active
+    // Direct cloud sync
     this.syncCloudMinute(updatedMinute).catch((err) => {
       console.warn('Async cloud sync error for meeting minute:', err);
     });
@@ -249,8 +360,10 @@ export class MeetingMinutesRepository {
     if (!minute.readBy) minute.readBy = [];
     if (!minute.readBy.includes(userId)) {
       minute.readBy.push(userId);
+      minute.updatedAt = new Date().toISOString();
       this.saveToStorage(all);
       this.dispatchUpdateEvent();
+      this.syncCloudMinute(minute).catch(() => {});
     }
   }
 
@@ -270,6 +383,7 @@ export class MeetingMinutesRepository {
 
     this.saveToStorage(all);
     this.dispatchUpdateEvent();
+    this.syncCloudMinute(minute).catch(() => {});
   }
 
   /**
@@ -282,6 +396,16 @@ export class MeetingMinutesRepository {
 
     this.saveToStorage(filtered);
     this.dispatchUpdateEvent();
+
+    try {
+      const provider = ProviderFactory.getProvider();
+      provider.deleteMeetingMinute(minuteId).catch((err) => {
+        console.warn('Async cloud delete error for meeting minute:', err);
+      });
+    } catch {
+      // Fallback silently
+    }
+
     return true;
   }
 
@@ -353,11 +477,9 @@ _Dicatat resmi melalui Smart Absensi Notulen AI_`;
   private static async syncCloudMinute(minute: MeetingMinute): Promise<void> {
     try {
       const provider = ProviderFactory.getProvider();
-      if ((provider as any).saveMeetingMinute) {
-        await (provider as any).saveMeetingMinute(minute);
-      }
-    } catch {
-      // Fallback silently
+      await provider.saveMeetingMinute(minute);
+    } catch (err) {
+      console.warn('Async cloud sync error for meeting minute:', err);
     }
   }
 }

@@ -59,6 +59,7 @@ import type {
   ExamCommitteeMember,
   ExamScheduleData,
 } from '../types/exam-schedule.types';
+import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
 import { NotificationService } from '../services/notification-permission.service';
@@ -3514,6 +3515,43 @@ export class MockProvider implements IDataProvider {
       }
     } catch {}
     return true;
+  }
+
+  // ── Meeting Minutes & Notulen AI Persistence API (Mock) ───────────────────
+  private mockMeetingMinutes: MeetingMinute[] = [];
+
+  public async getMeetingMinutes(_token?: string): Promise<MeetingMinute[]> {
+    const raw = safeGetStorage('smart_absensi_meeting_minutes');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return this.mockMeetingMinutes;
+  }
+
+  public async saveMeetingMinute(minute: MeetingMinute, _token?: string): Promise<MeetingMinute> {
+    const idx = this.mockMeetingMinutes.findIndex((m) => m.id === minute.id);
+    if (idx >= 0) {
+      this.mockMeetingMinutes[idx] = minute;
+    } else {
+      this.mockMeetingMinutes.unshift(minute);
+    }
+    safeSetStorage('smart_absensi_meeting_minutes', JSON.stringify(this.mockMeetingMinutes));
+    return minute;
+  }
+
+  public async deleteMeetingMinute(minuteId: string, _token?: string): Promise<boolean> {
+    this.mockMeetingMinutes = this.mockMeetingMinutes.filter((m) => m.id !== minuteId);
+    safeSetStorage('smart_absensi_meeting_minutes', JSON.stringify(this.mockMeetingMinutes));
+    return true;
+  }
+
+  public subscribeToMeetingMinutesUpdates?(
+    _callback: (event: { eventType: string; payload?: any }) => void
+  ): () => void {
+    return () => {};
   }
 }
 

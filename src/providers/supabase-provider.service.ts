@@ -71,6 +71,7 @@ import type {
   ExamCommitteeMember,
   ExamScheduleData,
 } from '../types/exam-schedule.types';
+import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
 import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
 import { logger } from '../utils/logger.utils';
@@ -7087,6 +7088,145 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     return true;
+  }
+
+  // ── Meeting Minutes & Notulen AI Persistence API (Cloud Multi-Device Sync) ──
+  private mapDbRowToMeetingMinute(row: any): MeetingMinute {
+    return {
+      id: row.id,
+      title: row.title || '',
+      meetingType: row.meeting_type || 'DEWAN_GURU',
+      date: typeof row.date === 'string' ? row.date.slice(0, 10) : String(row.date),
+      startTime: row.start_time || '00:00',
+      endTime: row.end_time || '00:00',
+      location: row.location || '',
+      leaderName: row.leader_name || '',
+      secretaryName: row.secretary_name || '',
+      attendeesSummary: row.attendees_summary || undefined,
+      roughNotes: row.rough_notes || '',
+      formattedContent: row.formatted_content || {
+        executiveSummary: '',
+        agendaPoints: [],
+        keyDecisions: [],
+        actionItems: [],
+      },
+      status: row.status || 'PUBLISHED',
+      readBy: Array.isArray(row.read_by) ? row.read_by : [],
+      createdByUserId: row.created_by_user_id || '',
+      createdByName: row.created_by_name || '',
+      createdAt: row.created_at || new Date().toISOString(),
+      updatedAt: row.updated_at || new Date().toISOString(),
+    };
+  }
+
+  public async getMeetingMinutes(_token?: string): Promise<MeetingMinute[]> {
+    try {
+      const { data, error } = await this.client
+        .from('meeting_minutes')
+        .select('*')
+        .order('date', { ascending: false })
+        .order('start_time', { ascending: false });
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'Query meeting_minutes failed:', error);
+        throw error;
+      }
+
+      if (Array.isArray(data)) {
+        return data.map((row) => this.mapDbRowToMeetingMinute(row));
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getMeetingMinutes error, falling back to local storage cache:', err);
+    }
+    return [];
+  }
+
+  public async saveMeetingMinute(minute: MeetingMinute, _token?: string): Promise<MeetingMinute> {
+    const payload = {
+      id: minute.id,
+      title: minute.title,
+      meeting_type: minute.meetingType,
+      date: minute.date,
+      start_time: minute.startTime,
+      end_time: minute.endTime,
+      location: minute.location,
+      leader_name: minute.leaderName,
+      secretary_name: minute.secretaryName,
+      attendees_summary: minute.attendeesSummary || null,
+      rough_notes: minute.roughNotes,
+      formatted_content: minute.formattedContent || {},
+      status: minute.status || 'PUBLISHED',
+      read_by: Array.isArray(minute.readBy) ? minute.readBy : [],
+      created_by_user_id: minute.createdByUserId,
+      created_by_name: minute.createdByName,
+      created_at: minute.createdAt || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { data, error } = await this.client
+        .from('meeting_minutes')
+        .upsert(payload, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'Upsert to meeting_minutes table failed:', error);
+        throw error;
+      }
+
+      const saved = data ? this.mapDbRowToMeetingMinute(data) : minute;
+      return saved;
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'saveMeetingMinute error, keeping local copy:', err);
+      return minute;
+    }
+  }
+
+  public async deleteMeetingMinute(minuteId: string, _token?: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('meeting_minutes')
+        .delete()
+        .eq('id', minuteId);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'Delete meeting_minute failed:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'deleteMeetingMinute error:', err);
+      return false;
+    }
+  }
+
+  public subscribeToMeetingMinutesUpdates(
+    callback: (event: { eventType: string; payload?: any }) => void
+  ): () => void {
+    const channelId = `realtime_meeting_minutes_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const channel = this.client
+      .channel(channelId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'meeting_minutes' },
+        (payload) => {
+          logger.info('SupabaseProvider', 'Realtime change detected in meeting_minutes:', payload.eventType);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('smart_absensi_meeting_minutes_updated'));
+          }
+          callback({ eventType: payload.eventType, payload });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        this.client.removeChannel(channel);
+      } catch (e) {
+        logger.warn('SupabaseProvider', 'Error removing meeting_minutes realtime channel:', e);
+      }
+    };
   }
 }
 

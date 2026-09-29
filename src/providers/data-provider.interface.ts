@@ -53,6 +53,7 @@ import type {
   ExamCommitteeMember,
   ExamScheduleData,
 } from '../types/exam-schedule.types';
+import type { MeetingMinute } from '../types/meeting-minutes.types';
 
 export interface IDataProvider {
   // Auth API
@@ -213,6 +214,12 @@ export interface IDataProvider {
   getExamSchedule(academicYear: string, examType: string, token?: string, level?: 'SMP' | 'SMA'): Promise<ExamScheduleData | null>;
   saveExamSchedule(schedule: ExamScheduleData, token?: string, level?: 'SMP' | 'SMA'): Promise<boolean>;
   deleteExamSchedule(academicYear: string, examType: string, token?: string, level?: 'SMP' | 'SMA'): Promise<boolean>;
+
+  // Meeting Minutes & Notulen AI Persistence API (Cloud Multi-Device Sync)
+  getMeetingMinutes(token?: string): Promise<MeetingMinute[]>;
+  saveMeetingMinute(minute: MeetingMinute, token?: string): Promise<MeetingMinute>;
+  deleteMeetingMinute(minuteId: string, token?: string): Promise<boolean>;
+  subscribeToMeetingMinutesUpdates?(callback: (event: { eventType: string; payload?: any }) => void): () => void;
 }
 
 

@@ -143,6 +143,22 @@ export async function runMeetingMinutesTestSuite(): Promise<TestSuiteResult> {
       'MeetingMinutesRepository: exportAsText generates clean WhatsApp-ready message'
     );
 
+    // Test 7: Cloud Synchronization & Multi-Device Auto-Recovery
+    const synced = await MeetingMinutesRepository.fetchAndSyncMinutes();
+    assert(
+      Array.isArray(synced) && synced.length > 0,
+      'MeetingMinutesRepository: fetchAndSyncMinutes reconciles cloud and local storage successfully',
+      `Synced count: ${synced.length}`
+    );
+
+    // Test 8: Realtime Subscription Setup
+    const unsub = MeetingMinutesRepository.initRealtimeSubscription();
+    assert(
+      typeof unsub === 'function',
+      'MeetingMinutesRepository: initRealtimeSubscription returns teardown function'
+    );
+    unsub();
+
     // Clean up created test item
     MeetingMinutesRepository.deleteMinute(created.id);
   } catch (err: any) {

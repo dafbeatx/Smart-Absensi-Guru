@@ -20,6 +20,7 @@ import {
   ListTodo,
   Layers,
   CheckCheck,
+  RefreshCw,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import type {
@@ -94,21 +95,65 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [showRawNotesInDetail, setShowRawNotesInDetail] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   // Reload minutes listener
   const refreshMinutes = useCallback(() => {
     setMinutes(MeetingMinutesRepository.getAllMinutes());
   }, []);
 
+  // Fetch from cloud on mount, focus, & subscribe to real-time changes
   useEffect(() => {
+    let isMounted = true;
+    const syncData = async (silent = true) => {
+      if (!silent) setIsSyncingCloud(true);
+      try {
+        const synced = await MeetingMinutesRepository.fetchAndSyncMinutes();
+        if (isMounted) {
+          setMinutes(synced);
+        }
+      } catch (err) {
+        console.warn('Background sync minutes error:', err);
+      } finally {
+        if (isMounted && !silent) setIsSyncingCloud(false);
+      }
+    };
+
+    // Initial background sync (auto-recovering any local minutes from HP to Cloud)
+    syncData(false);
+
+    // Initialize realtime Supabase listener
+    const unsubRealtime = MeetingMinutesRepository.initRealtimeSubscription();
+
     const handleUpdate = () => refreshMinutes();
+    const handleFocus = () => syncData(true);
+
     window.addEventListener(MEETING_MINUTES_UPDATED_EVENT, handleUpdate);
     window.addEventListener('storage', handleUpdate);
+    window.addEventListener('focus', handleFocus);
+
     return () => {
+      isMounted = false;
+      unsubRealtime();
       window.removeEventListener(MEETING_MINUTES_UPDATED_EVENT, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [refreshMinutes]);
+
+  // Manual trigger for user to force re-sync
+  const handleManualSync = async () => {
+    setIsSyncingCloud(true);
+    try {
+      const synced = await MeetingMinutesRepository.fetchAndSyncMinutes();
+      setMinutes(synced);
+      showToast('success', 'Sinkronisasi Cloud Berhasil', 'Data risalah rapat tersinkron penuh dengan server.');
+    } catch {
+      showToast('error', 'Gagal Sinkron', 'Tidak dapat menghubungkan ke server cloud saat ini.');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
 
   // Mark as read when opening a specific minute
   useEffect(() => {
@@ -350,6 +395,17 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={isSyncingCloud}
+                title="Sinkronkan risalah rapat dengan server cloud Supabase"
+                className="text-xs py-2.5 px-3.5 font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all cursor-pointer flex items-center gap-2 shadow-2xs disabled:opacity-60"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-cyan-600 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+                <span>{isSyncingCloud ? 'Sinkron Cloud...' : 'Sinkron Cloud'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -968,8 +1024,7 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
                           value={formDate}
                           onChange={(e) => setFormDate(e.target.value)}
                           className="w-full h-11 px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#023246]"
-                        >
-                        </input>
+                        />
                       </div>
                     </div>
 
@@ -1234,11 +1289,22 @@ export const MeetingMinutesView: React.FC<MeetingMinutesViewProps> = ({
           <span>{selectedMinuteId ? 'Daftar Notulen' : 'Kembali'}</span>
         </button>
 
-        <div className="text-right">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
-            Modul Resmi
-          </span>
-          <span className="text-xs font-black text-[#023246]">Notulen Rapat AI</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleManualSync}
+            disabled={isSyncingCloud}
+            title="Sinkronkan Cloud"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200 text-[#023246] transition-all cursor-pointer min-h-11 disabled:opacity-60"
+          >
+            <RefreshCw className={`w-4 h-4 text-cyan-700 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="text-right">
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+              Modul Resmi
+            </span>
+            <span className="text-xs font-black text-[#023246]">Notulen Rapat AI</span>
+          </div>
         </div>
       </div>
 
