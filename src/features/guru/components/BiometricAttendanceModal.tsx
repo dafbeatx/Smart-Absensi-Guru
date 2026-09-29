@@ -516,15 +516,39 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
             </div>
 
             {/* Alert Pesan Error jika gagal */}
-            {bioError && (
-              <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 text-xs flex items-start gap-2">
-                <span className="shrink-0 mt-0.5">⚠️</span>
-                <div className="space-y-1">
-                  <p className="font-bold text-amber-900">Perhatian:</p>
-                  <p className="text-[11px] text-amber-800 leading-relaxed">{bioError}</p>
+            {bioError && (() => {
+              const isTiming = bioError.includes('absensi pulang') ||
+                bioError.includes('06.00') ||
+                bioError.includes('absensi ganda') ||
+                bioError.includes('harus nanti') ||
+                bioError.includes('belum dibuka');
+
+              return (
+                <div className={`p-3.5 rounded-2xl border ${isTiming ? 'bg-amber-50/90 border-amber-300 text-amber-950 shadow-2xs' : 'bg-rose-50 border-rose-300 text-rose-950'} text-xs space-y-2 text-left`}>
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-xl shrink-0">{isTiming ? '⏰' : '⚠️'}</span>
+                    <div className="space-y-1 flex-1">
+                      <p className={`font-black ${isTiming ? 'text-amber-900' : 'text-rose-900'}`}>
+                        {isTiming ? 'Jadwal Presensi Belum Sesuai' : 'Kendala Verifikasi:'}
+                      </p>
+                      <p className={`text-[11px] ${isTiming ? 'text-amber-900' : 'text-rose-800'} leading-relaxed whitespace-pre-line font-medium`}>
+                        {bioError}
+                      </p>
+                    </div>
+                  </div>
+
+                  {isTiming && (
+                    <div className="bg-white/80 border border-amber-200 rounded-xl p-2 text-[10.5px] text-slate-700 space-y-1">
+                      <span className="font-bold text-amber-900 block">Jadwal Presensi Sekolah (GMT+7 Jakarta):</span>
+                      <div className="grid grid-cols-2 gap-1 text-[10px]">
+                        <div>• Masuk: <strong>Mulai 06.00 WIB</strong></div>
+                        <div>• Pulang: <strong>Mulai 12.00 WIB</strong> <span className="text-amber-800 font-semibold">(Jum'at 10.00)</span></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Peringatan jika browser tidak mendukung WebAuthn */}
             {!isBiometricSupported && (

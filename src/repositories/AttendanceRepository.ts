@@ -29,6 +29,8 @@ export interface ScanAttendanceDTO {
   photoPromise?: Promise<Blob | null>;
   /** Optional intended attendance action to assist logging in case of failure */
   attempt_action?: 'CHECK_IN' | 'CHECK_OUT';
+  /** Optional bypass flag for automated test suites or admin override */
+  bypass_time_window?: boolean;
 }
 
 export interface AttendanceResponseDTO {

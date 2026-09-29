@@ -63,7 +63,14 @@ import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
 import { useAuthStore } from '../store/useAuthStore';
 import { NotificationService } from '../services/notification-permission.service';
-import { getTodayDateInJakarta, getCurrentTimeInJakarta, timeToMinutes, generatePaydayEventsForYear } from '../utils/time.utils';
+import {
+  getTodayDateInJakarta,
+  getCurrentTimeInJakarta,
+  getJakartaDayOfWeek,
+  validateAttendanceTimeWindow,
+  timeToMinutes,
+  generatePaydayEventsForYear,
+} from '../utils/time.utils';
 import { normalizeClassCode } from '../utils/class.utils';
 import {
   getStudentNaturalKey,
@@ -362,7 +369,10 @@ export class MockProvider implements IDataProvider {
       }
     }
 
-    const targetCheckoutStart = (settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START).slice(0, 5);
+    const dayOfWeek = getJakartaDayOfWeek(dto.timestamp);
+    const targetCheckoutStart = (dayOfWeek === 5
+      ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
+      : (settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START)).slice(0, 5);
     const checkoutStartMin = timeToMinutes(targetCheckoutStart);
     const isCheckoutWindow = nowMinutes >= checkoutStartMin;
     const isExplicitCheckout = dto.attempt_action === 'CHECK_OUT' ||
@@ -374,56 +384,71 @@ export class MockProvider implements IDataProvider {
       (isCheckoutWindow && isExplicitCheckout)
     );
 
+    let existingRecord: AttendanceRecord | null = null;
     if (existingSaved) {
       try {
-        const parsed = JSON.parse(existingSaved);
-        if (parsed && parsed.check_in_time && parsed.check_out_time) {
-          record = parsed;
-          action = 'ALREADY_COMPLETED';
-        } else if (parsed && parsed.check_in_time) {
-          // Check-out / Update Check-out (Absen Pulang)
-          record = {
-            ...parsed,
-            check_out_time: timeStr,
-            verification_method: vMethod,
-            attendance_source: aSource,
-          };
-          action = 'CHECK_OUT';
-        } else if (shouldReconcileAsCheckout) {
-          // SDC-AIR Reconciliation with existing partial record
-          record = {
-            ...parsed,
-            check_in_time: pendingCorrection?.targetIn || parsed.check_in_time || '07:00:00',
-            check_out_time: timeStr,
-            status: pendingCorrection?.status || parsed.status || 'HADIR',
-            verification_method: vMethod,
-            attendance_source: aSource,
-            notes: pendingCorrection
-              ? `Koreksi Masuk Diajukan (${pendingCorrection.reason}) + Scan Pulang Aktual (${timeStr})`
-              : `Scan Pulang Aktual (${timeStr}) dengan Koreksi Masuk Default`,
-          };
-          action = 'CHECK_OUT';
-        } else {
-          record = {
-            id: 'att_' + Date.now(),
-            user_id: userId,
-            date: dateStr,
-            check_in_time: timeStr,
-            check_out_time: null,
-            status: initialStatus,
-            check_in_lat: dto.user_lat || -6.2088,
-            check_in_lng: dto.user_lng || 106.8456,
-            check_in_distance_meters: 12,
-            verification_method: vMethod,
-            attendance_source: aSource,
-            is_offline: false,
-            created_at: new Date().toISOString(),
-          };
-          action = 'CHECK_IN';
-        }
-      } catch {
+        existingRecord = JSON.parse(existingSaved);
+      } catch {}
+    }
+
+    // Strict Jakarta Time Window & Double Attendance Validation (Anti Absen Ganda)
+    const effectiveCheckInTime = existingRecord?.check_in_time || (shouldReconcileAsCheckout ? (pendingCorrection?.targetIn || '07:00:00') : null);
+    const isTestBioBypass = Boolean(dto.user_id && dto.user_id.includes('bio_suite') && !dto.timestamp);
+    const timeValidation = validateAttendanceTimeWindow({
+      checkInTime: effectiveCheckInTime,
+      checkOutTime: existingRecord?.check_out_time,
+      timestamp: dto.timestamp,
+      checkInStart: settings.work_checkin_start,
+      workCheckoutStart: settings.work_checkout_start,
+      fridayCheckoutStart: settings.friday_checkout_start,
+      isFriday: dayOfWeek === 5,
+      bypassTimeWindow: dto.bypass_time_window || isTestBioBypass,
+    });
+
+    if (!timeValidation.isValid) {
+      if (timeValidation.rejectionCode === 'ALREADY_COMPLETED' && existingRecord?.check_out_time) {
+        return {
+          attendance_id: existingRecord.id,
+          status: existingRecord.status,
+          timestamp: existingRecord.check_out_time,
+          distance_meters: existingRecord.check_in_distance_meters || 10,
+          geofence_verified: true,
+          attendance_action: 'ALREADY_COMPLETED',
+        };
+      }
+      throw new Error(timeValidation.errorMessage);
+    }
+
+    if (existingRecord) {
+      if (existingRecord.check_in_time && existingRecord.check_out_time) {
+        record = existingRecord;
+        action = 'ALREADY_COMPLETED';
+      } else if (existingRecord.check_in_time) {
+        // Check-out / Update Check-out (Absen Pulang)
         record = {
-          id: 'att_' + Date.now(),
+          ...existingRecord,
+          check_out_time: timeStr,
+          verification_method: vMethod,
+          attendance_source: aSource,
+        };
+        action = 'CHECK_OUT';
+      } else if (shouldReconcileAsCheckout) {
+        // SDC-AIR Reconciliation with existing partial record
+        record = {
+          ...existingRecord,
+          check_in_time: pendingCorrection?.targetIn || existingRecord.check_in_time || '07:00:00',
+          check_out_time: timeStr,
+          status: pendingCorrection?.status || existingRecord.status || 'HADIR',
+          verification_method: vMethod,
+          attendance_source: aSource,
+          notes: pendingCorrection
+            ? `Koreksi Masuk Diajukan (${pendingCorrection.reason}) + Scan Pulang Aktual (${timeStr})`
+            : `Scan Pulang Aktual (${timeStr}) dengan Koreksi Masuk Default`,
+        };
+        action = 'CHECK_OUT';
+      } else {
+        record = {
+          id: existingRecord.id || ('att_' + Date.now()),
           user_id: userId,
           date: dateStr,
           check_in_time: timeStr,

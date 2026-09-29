@@ -45,6 +45,7 @@ import { runTeachingAssignmentTestSuite } from './__tests__/teaching-assignment-
 import { runExamAdministrativeDocsTestSuite } from './__tests__/exam-administrative-docs.test';
 import { runStudentSyncDedupTestSuite } from './__tests__/student-sync-dedup.test';
 import { runMeetingMinutesTestSuite } from './__tests__/meeting-minutes.test';
+import { runAttendanceTimeWindowTestSuite } from './__tests__/attendance-time-window.test';
 
 export interface TestResultItem {
   testName: string;
@@ -127,6 +128,7 @@ export class MasterTestRunner {
       { name: 'Exam Administrative Physical Documents Engine (A4/Word/Excel Suite 41)', fn: runExamAdministrativeDocsTestSuite },
       { name: 'Student Directory & Sync Deduplication Engine (Zero Duplicate & Tombstone)', fn: runStudentSyncDedupTestSuite },
       { name: 'Meeting Minutes & Notulen Rapat AI Restructuring Engine (Phase 4.9)', fn: runMeetingMinutesTestSuite },
+      { name: 'Attendance Jakarta Time Window & Double Attendance Prevention (Phase 5.0)', fn: runAttendanceTimeWindowTestSuite },
     ];
 
     let totalPassed = 0;

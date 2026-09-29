@@ -1,6 +1,7 @@
 import React from 'react';
 import { Clock, AlertTriangle, Fingerprint, QrCode, ShieldCheck, FileText } from 'lucide-react';
-import { getCurrentTimeInJakarta } from '../../../utils/time.utils';
+import { getCurrentTimeInJakarta, getJakartaDayOfWeek } from '../../../utils/time.utils';
+import { CONSTANTS } from '../../../config/constants';
 import { AttendancePolicyService } from '../../../services/attendance-policy.service';
 import type { AttendanceRecord, SystemSettings } from '../../../types/database.types';
 
@@ -28,22 +29,21 @@ export const CheckoutReminderBanner: React.FC<CheckoutReminderBannerProps> = ({
     return null;
   }
 
-  const now = new Date();
-  const dayOfWeek = now.getDay();
+  const dayOfWeek = getJakartaDayOfWeek();
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     return null; // Akhir pekan
   }
 
   const isFriday = dayOfWeek === 5;
-  const currentTime = getCurrentTimeInJakarta(); // Format "HH:mm"
+  const currentTime = getCurrentTimeInJakarta().slice(0, 5); // Format "HH:mm"
 
   // Jam Target Pulang Resmi
-  const targetCheckoutTime = isFriday
-    ? settings?.friday_checkout_start || '11:00'
-    : settings?.work_checkout_start || '13:00';
+  const targetCheckoutTime = (isFriday
+    ? settings?.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START
+    : settings?.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START).slice(0, 5);
 
-  // Jam Peringatan 1 Jam Sebelumnya (Jumat: 10:00, Senin-Kamis: 12:00)
-  const earlyWarningThreshold = isFriday ? '10:00' : '12:00';
+  // Jam Peringatan 1 Jam Sebelumnya (Jumat: 09:00, Senin-Kamis: 11:00)
+  const earlyWarningThreshold = isFriday ? '09:00' : '11:00';
 
   // Periksa apakah waktu saat ini sudah memasuki window peringatan (>= threshold)
   if (currentTime < earlyWarningThreshold) {

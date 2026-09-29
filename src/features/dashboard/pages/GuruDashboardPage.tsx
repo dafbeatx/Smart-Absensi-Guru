@@ -93,7 +93,17 @@ import { GPSService } from '../../../services/gps.service';
 import type { GPSCoordinates } from '../../../services/gps.service';
 import { CONSTANTS } from '../../../config/constants';
 import { handleAppError } from '../../../utils/error.utils';
-import { isDateOffDay, getTodayDateInJakarta, getTomorrowDateInJakarta, getCurrentTimeInJakarta, getMonthWorkingDays, getPaydayReminderInfo, evaluateDisciplinePeriodTiming } from '../../../utils/time.utils';
+import {
+  isDateOffDay,
+  getTodayDateInJakarta,
+  getTomorrowDateInJakarta,
+  getCurrentTimeInJakarta,
+  getJakartaDayOfWeek,
+  formatTimeForInput,
+  getMonthWorkingDays,
+  getPaydayReminderInfo,
+  evaluateDisciplinePeriodTiming,
+} from '../../../utils/time.utils';
 import { getEffectiveAllowedRadius } from '../../../utils/geofence.utils';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { SoundService } from '../../../services/audio.service';
@@ -2948,12 +2958,15 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
             {/* 🌟 1. CARD LOG PRESENSI HARI INI (DEVICE LOG TODAY MODEL) ─────────── */}
             {(() => {
-              const isFriday = new Date().getDay() === 5;
-              const checkoutStart = isFriday
+              const isFriday = getJakartaDayOfWeek() === 5;
+              const checkoutStart = (isFriday
                 ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
-                : settings.work_checkout_start;
+                : (settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START)).slice(0, 5);
+              const checkinStart = (settings.work_checkin_start || CONSTANTS.DEFAULTS.WORK_CHECKIN_START).slice(0, 5);
 
               const todayDateJakarta = getTodayDateInJakarta();
+              const nowTimeJakarta = getCurrentTimeInJakarta().slice(0, 5);
+
               const pendingCorrectionToday = (() => {
                 try {
                   if (!effectiveUser?.id) return null;
@@ -2967,7 +2980,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               let statusLabel = 'Belum Absen';
               let statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
               let ctaText = 'Absen Masuk Sekarang';
-              let ctaAction = handleOpenAttendanceChoice;
+              let ctaAction: () => void = handleOpenAttendanceChoice;
               let isCtaDisabled = false;
 
               if (isTodayOff.isOff) {
@@ -2981,7 +2994,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 ctaText = 'Lihat Rekap Kehadiran Hari Ini';
                 ctaAction = () => setIsRecapModalOpen(true);
               } else if (todayAttendance?.check_in_time) {
-                const nowTimeJakarta = getCurrentTimeInJakarta();
                 const isReadyToCheckout = nowTimeJakarta >= checkoutStart;
 
                 if (isReadyToCheckout) {
@@ -2993,10 +3005,16 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   statusLabel = 'Sudah Check-in';
                   statusBadgeStyle = 'bg-emerald-50 text-emerald-800 border-emerald-200';
                   ctaText = `Absen Pulang (Mulai ${checkoutStart} WIB)`;
-                  ctaAction = handleOpenAttendanceChoice;
+                  ctaAction = () => {
+                    const dayLabel = isFriday ? "hari Jum'at" : "hari ini";
+                    showToast(
+                      'warning',
+                      'Absensi Pulang Belum Dibuka',
+                      `Anda sudah melakukan absensi masuk pada pukul ${formatTimeForInput(todayAttendance.check_in_time)} WIB. Jadwal absensi pulang ${dayLabel} baru dibuka mulai pukul ${checkoutStart} WIB ke atas (Waktu Jakarta). Anda harus melakukan absensi pulang nanti saat jam kepulangan telah tiba.`
+                    );
+                  };
                 }
               } else if (pendingCorrectionToday?.checkInTime) {
-                const nowTimeJakarta = getCurrentTimeInJakarta();
                 const isReadyToCheckout = nowTimeJakarta >= checkoutStart;
 
                 if (isReadyToCheckout) {
@@ -3008,7 +3026,29 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   statusLabel = 'Koreksi Masuk Diajukan';
                   statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
                   ctaText = `Absen Pulang (Mulai ${checkoutStart} WIB)`;
-                  ctaAction = handleOpenAttendanceChoice;
+                  ctaAction = () => {
+                    const dayLabel = isFriday ? "hari Jum'at" : "hari ini";
+                    showToast(
+                      'warning',
+                      'Absensi Pulang Belum Dibuka',
+                      `Koreksi jam masuk telah diajukan. Jadwal absensi pulang ${dayLabel} baru dibuka mulai pukul ${checkoutStart} WIB ke atas (Waktu Jakarta). Anda harus melakukan absensi pulang nanti saat jam kepulangan telah tiba.`
+                    );
+                  };
+                }
+              } else {
+                // Belum absen masuk: periksa apakah jam sekarang < checkinStart (06:00 WIB)
+                const isBeforeCheckin = nowTimeJakarta < checkinStart;
+                if (isBeforeCheckin) {
+                  statusLabel = 'Belum Dibuka';
+                  statusBadgeStyle = 'bg-amber-50 text-amber-800 border-amber-200';
+                  ctaText = `Absen Masuk (Buka ${checkinStart} WIB)`;
+                  ctaAction = () => {
+                    showToast(
+                      'warning',
+                      'Presensi Masuk Belum Dibuka',
+                      `Presensi masuk sekolah hanya dapat dilakukan mulai pukul ${checkinStart} WIB ke atas (Waktu Jakarta). Harap menunggu hingga jam presensi resmi dibuka.`
+                    );
+                  };
                 }
               }
 

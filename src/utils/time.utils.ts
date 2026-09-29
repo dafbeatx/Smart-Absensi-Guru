@@ -214,6 +214,187 @@ export function getCurrentTimeInJakarta(timeZone: string = 'Asia/Jakarta'): stri
 }
 
 /**
+ * Returns time string formatted as "HH:mm:ss" strictly in Asia/Jakarta timezone (WIB/GMT+7)
+ * for a specific Date, ISO string, or current time if omitted.
+ */
+export function getTimeInJakarta(dateOrStr?: Date | string, timeZone: string = 'Asia/Jakarta'): string {
+  try {
+    let d = new Date();
+    if (dateOrStr instanceof Date) {
+      d = dateOrStr;
+    } else if (typeof dateOrStr === 'string' && dateOrStr.trim()) {
+      const clean = dateOrStr.trim();
+      if (/^\d{1,2}[:.]\d{2}([:.]\d{2})?$/.test(clean)) {
+        const parts = clean.replace(/\./g, ':').split(':');
+        const h = parts[0].padStart(2, '0');
+        const m = parts[1].padStart(2, '0');
+        const s = (parts[2] || '00').padStart(2, '0');
+        return `${h}:${m}:${s}`;
+      }
+      const parsed = new Date(clean);
+      if (!isNaN(parsed.getTime())) {
+        d = parsed;
+      }
+    }
+
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    return formatter.format(d);
+  } catch {
+    const d = dateOrStr instanceof Date ? dateOrStr : new Date();
+    return [d.getHours(), d.getMinutes(), d.getSeconds()]
+      .map((n) => String(n).padStart(2, '0'))
+      .join(':');
+  }
+}
+
+/**
+ * Returns day of week (0=Sunday, 1=Monday, ..., 5=Friday, 6=Saturday) strictly in Asia/Jakarta timezone (WIB).
+ */
+export function getJakartaDayOfWeek(dateOrStr?: Date | string): number {
+  try {
+    const dateStr = getTodayDateInJakarta(dateOrStr);
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    }
+    const d = dateOrStr instanceof Date ? dateOrStr : new Date();
+    return d.getDay();
+  } catch {
+    return new Date().getDay();
+  }
+}
+
+export interface ValidateAttendanceTimeWindowParams {
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  timestamp?: string | Date;
+  checkInStart?: string;
+  workCheckoutStart?: string;
+  fridayCheckoutStart?: string;
+  isFriday?: boolean;
+  bypassTimeWindow?: boolean;
+}
+
+export interface AttendanceTimeWindowValidationResult {
+  isValid: boolean;
+  action: 'CHECK_IN' | 'CHECK_OUT';
+  rejectionCode?: 'BEFORE_CHECKIN_START' | 'CHECKOUT_TOO_EARLY' | 'ALREADY_COMPLETED';
+  errorMessage?: string;
+  currentJakartaTime: string;
+  targetCheckoutStart: string;
+  isFriday: boolean;
+}
+
+/**
+ * Validates attendance scan time window against Jakarta time rules:
+ * 1. Check-In is ONLY permitted starting from 06:00 WIB onwards.
+ * 2. Check-Out window:
+ *    - Friday: >= 10:00 WIB onwards
+ *    - Other days: >= 12:00 WIB onwards
+ * 3. Double-attendance protection:
+ *    - If already checked in and attempts scan before checkout window -> REJECT ("harus nanti absensi pulang")
+ *    - If both check-in and check-out are already completed -> REJECT (presensi lengkap, tidak bisa absen 2x)
+ */
+export function validateAttendanceTimeWindow(
+  params: ValidateAttendanceTimeWindowParams
+): AttendanceTimeWindowValidationResult {
+  const currentJakartaTime = getTimeInJakarta(params.timestamp);
+  const currentMin = timeToMinutes(currentJakartaTime);
+  const isFri = typeof params.isFriday === 'boolean'
+    ? params.isFriday
+    : (getJakartaDayOfWeek(params.timestamp) === 5);
+
+  const cinStart = (params.checkInStart || CONSTANTS.DEFAULTS.WORK_CHECKIN_START).slice(0, 5);
+  const coutStart = (isFri
+    ? (params.fridayCheckoutStart || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
+    : (params.workCheckoutStart || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START)).slice(0, 5);
+
+  const cinStartMin = timeToMinutes(cinStart);
+  const coutStartMin = timeToMinutes(coutStart);
+
+  if (params.bypassTimeWindow) {
+    return {
+      isValid: true,
+      action: params.checkInTime ? 'CHECK_OUT' : 'CHECK_IN',
+      currentJakartaTime,
+      targetCheckoutStart: coutStart,
+      isFriday: isFri,
+    };
+  }
+
+  // 1. Belum pernah check-in hari ini -> Absen Masuk
+  if (!params.checkInTime) {
+    if (currentMin < cinStartMin) {
+      return {
+        isValid: false,
+        action: 'CHECK_IN',
+        rejectionCode: 'BEFORE_CHECKIN_START',
+        errorMessage: `Absensi Ditolak! Presensi masuk belum dibuka. Presensi masuk sekolah hanya dapat dilakukan mulai pukul ${cinStart} WIB ke atas (Waktu Jakarta).`,
+        currentJakartaTime,
+        targetCheckoutStart: coutStart,
+        isFriday: isFri,
+      };
+    }
+    return {
+      isValid: true,
+      action: 'CHECK_IN',
+      currentJakartaTime,
+      targetCheckoutStart: coutStart,
+      isFriday: isFri,
+    };
+  }
+
+  // 2. Sudah pernah check-in hari ini
+  // A. Cek apakah check-out juga sudah lengkap hari ini
+  if (params.checkOutTime) {
+    const formattedIn = formatTimeForInput(params.checkInTime);
+    const formattedOut = formatTimeForInput(params.checkOutTime);
+    return {
+      isValid: false,
+      action: 'CHECK_OUT',
+      rejectionCode: 'ALREADY_COMPLETED',
+      errorMessage: `Absensi Ditolak! Anda sudah menyelesaikan presensi masuk (${formattedIn} WIB) dan presensi pulang (${formattedOut} WIB) hari ini. Presensi harian Anda telah lengkap dan tidak dapat melakukan absensi ganda.`,
+      currentJakartaTime,
+      targetCheckoutStart: coutStart,
+      isFriday: isFri,
+    };
+  }
+
+  // B. Cek apakah jam saat ini sudah mencapai jam kepulangan resmi (Jumat >= 10:00, Hari Lain >= 12:00)
+  if (currentMin < coutStartMin) {
+    const formattedIn = formatTimeForInput(params.checkInTime);
+    const dayLabel = isFri ? "hari Jum'at" : "hari ini";
+    return {
+      isValid: false,
+      action: 'CHECK_OUT',
+      rejectionCode: 'CHECKOUT_TOO_EARLY',
+      errorMessage: `Absensi Ditolak! Anda sudah melakukan absensi masuk pada pukul ${formattedIn} WIB. Jadwal absensi pulang ${dayLabel} baru dibuka mulai pukul ${coutStart} WIB ke atas (Waktu Jakarta). Anda harus melakukan absensi pulang nanti saat jam kepulangan telah tiba.`,
+      currentJakartaTime,
+      targetCheckoutStart: coutStart,
+      isFriday: isFri,
+    };
+  }
+
+  // C. Waktu kepulangan sudah tiba dan belum check-out -> Valid Absen Pulang
+  return {
+    isValid: true,
+    action: 'CHECK_OUT',
+    currentJakartaTime,
+    targetCheckoutStart: coutStart,
+    isFriday: isFri,
+  };
+}
+
+/**
  * Returns tomorrow's date string formatted as "YYYY-MM-DD" strictly in Asia/Jakarta timezone (WIB/GMT+7).
  */
 export function getTomorrowDateInJakarta(timeZone: string = 'Asia/Jakarta'): string {

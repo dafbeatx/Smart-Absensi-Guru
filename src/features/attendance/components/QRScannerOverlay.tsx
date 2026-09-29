@@ -359,7 +359,10 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       const errMsg = err && typeof err === 'object' && 'message' in err
         ? String((err as { message: string }).message)
         : 'Gagal menyimpan data absensi ke server. Silakan coba beberapa saat lagi.';
-      setRejectionReason(`Gagal Menyimpan Absensi!\n\n${errMsg}`);
+      const cleanReason = errMsg.startsWith('Absensi Ditolak!')
+        ? errMsg
+        : `Gagal Menyimpan Absensi!\n\n${errMsg}`;
+      setRejectionReason(cleanReason);
       setIsRejectionModalOpen(true);
       isProcessingRef.current = false;
       return;
@@ -857,104 +860,159 @@ export const QRScannerOverlay: React.FC<QRScannerOverlayProps> = ({
       </Modal>
 
       {/* Rejection Modal Overlay with AI Diagnostic Engine & 4 Recovery Actions */}
+      {/* Rejection Modal Overlay with AI Diagnostic Engine & Timing Policy Guidance */}
       <Modal isOpen={isRejectionModalOpen} onClose={() => setIsRejectionModalOpen(false)} maxWidth="lg">
-        <div className="space-y-3.5 py-1">
-          {/* Sleek Horizontal Header */}
-          <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
-            <div className="w-10 h-10 bg-red-100 text-red-600 rounded-2xl flex shrink-0 items-center justify-center text-xl font-black ring-4 ring-red-50">
-              ✕
-            </div>
-            <div className="flex-1 min-w-0 text-left">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="font-black text-red-600 text-base tracking-tight">ABSENSI DITOLAK!</h3>
-                <span className="px-2.5 py-0.5 bg-red-600 text-white font-extrabold text-[10px] rounded-full shrink-0">
-                  REJECTED
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-medium truncate">Kendala verifikasi lokasi GPS atau pembacaan barcode fisik</p>
-            </div>
-          </div>
+        {(() => {
+          const reasonText = rejectionReason || '';
+          const isTimingRejection = reasonText.includes('absensi pulang') ||
+            reasonText.includes('06.00') ||
+            reasonText.includes('absensi ganda') ||
+            reasonText.includes('harus nanti') ||
+            reasonText.includes('belum dibuka');
 
-          {/* Unified AI & System Diagnostic Card */}
-          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 p-3.5 space-y-2 text-xs">
-            {/* System Error Message */}
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Keterangan Sistem:</span>
-              <p className="font-semibold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200/80 text-[11px] leading-relaxed">
-                {rejectionReason}
-              </p>
-            </div>
-
-            {/* Groq AI Smart Diagnosis & Action Suggestion */}
-            {aiDiagnosis && (
-              <div className="bg-linear-to-r from-emerald-50/90 to-teal-50/90 p-3 rounded-xl border border-emerald-200 space-y-1.5 mt-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-emerald-950 text-[11px] flex items-center gap-1.5">
-                    <span>🤖</span>
-                    <span>{aiDiagnosis.diagnosisTitle}</span>
-                  </span>
-                  <span className="px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-black rounded-full">
-                    Groq AI
-                  </span>
+          return (
+            <div className="space-y-3.5 py-1">
+              {/* Sleek Horizontal Header */}
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
+                <div className={`w-10 h-10 ${isTimingRejection ? 'bg-amber-100 text-amber-700 ring-amber-50' : 'bg-red-100 text-red-600 ring-red-50'} rounded-2xl flex shrink-0 items-center justify-center text-xl font-black ring-4`}>
+                  {isTimingRejection ? '⏰' : '✕'}
                 </div>
-                <p className="text-[11px] text-slate-700 font-medium bg-white/90 p-2 rounded-lg border border-emerald-200/60 leading-relaxed">
-                  💡 <strong>Saran AI:</strong> {aiDiagnosis.actionSuggestion}
-                </p>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className={`font-black ${isTimingRejection ? 'text-amber-800' : 'text-red-600'} text-base tracking-tight`}>
+                      {isTimingRejection ? 'JADWAL PRESENSI BELUM SESUAI' : 'ABSENSI DITOLAK!'}
+                    </h3>
+                    <span className={`px-2.5 py-0.5 ${isTimingRejection ? 'bg-amber-600' : 'bg-red-600'} text-white font-extrabold text-[10px] rounded-full shrink-0`}>
+                      {isTimingRejection ? 'WAKTU BELUM TIBA' : 'REJECTED'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium truncate">
+                    {isTimingRejection
+                      ? 'Ketentuan waktu presensi masuk & pulang resmi (GMT+7 Jakarta / WIB)'
+                      : 'Kendala verifikasi lokasi GPS atau pembacaan barcode fisik'}
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* 4 Action Recovery Palette */}
-          <div className="pt-1">
-            <span className="text-[11px] font-bold text-slate-500 block mb-1.5 text-left">Pilihan Pemulihan Instan:</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRejectionModalOpen(false);
-                  fetchGPSLocation();
-                }}
-                className="py-2.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
-              >
-                <span>🔄</span>
-                <span>Pindai Ulang</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRejectionModalOpen(false);
-                  setIsManualModalOpen(true);
-                }}
-                className="py-2.5 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
-              >
-                <span>⌨️</span>
-                <span>Kode Manual</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRejectionModalOpen(false);
-                  fetchGPSLocation();
-                }}
-                className="py-2.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
-              >
-                <span>📍</span>
-                <span>Ukur Ulang GPS</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRejectionModalOpen(false);
-                  setIsCorrectionModalOpen(true);
-                }}
-                className="py-2.5 px-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
-              >
-                <span>⚡</span>
-                <span>Koreksi AI</span>
-              </button>
+              {/* Unified AI & System Diagnostic Card */}
+              <div className="bg-slate-50 rounded-2xl border border-slate-200/80 p-3.5 space-y-2 text-xs">
+                {/* System Error Message */}
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Keterangan Sistem:</span>
+                  <p className="font-semibold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200/80 text-[11px] leading-relaxed whitespace-pre-line">
+                    {rejectionReason}
+                  </p>
+                </div>
+
+                {/* Info Card Waktu Resmi Presensi Sekolah */}
+                {isTimingRejection && (
+                  <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 space-y-1 text-slate-700">
+                    <span className="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                      <span>⏰</span>
+                      <span>Ketentuan Jam Presensi Sekolah (GMT+7 Jakarta)</span>
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-[10.5px]">
+                      <div className="bg-white/80 p-1.5 rounded-lg border border-amber-200/50">
+                        <span className="text-slate-500 block font-medium">Presensi Masuk:</span>
+                        <strong className="text-emerald-800 font-bold">Mulai 06.00 WIB</strong>
+                      </div>
+                      <div className="bg-white/80 p-1.5 rounded-lg border border-amber-200/50">
+                        <span className="text-slate-500 block font-medium">Presensi Pulang:</span>
+                        <strong className="text-indigo-900 font-bold">Mulai 12.00 WIB</strong>
+                        <span className="text-[9.5px] text-amber-800 block">(Jum'at: 10.00 WIB)</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Groq AI Smart Diagnosis & Action Suggestion */}
+                {!isTimingRejection && aiDiagnosis && (
+                  <div className="bg-linear-to-r from-emerald-50/90 to-teal-50/90 p-3 rounded-xl border border-emerald-200 space-y-1.5 mt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-emerald-950 text-[11px] flex items-center gap-1.5">
+                        <span>🤖</span>
+                        <span>{aiDiagnosis.diagnosisTitle}</span>
+                      </span>
+                      <span className="px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-black rounded-full">
+                        Groq AI
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-700 font-medium bg-white/90 p-2 rounded-lg border border-emerald-200/60 leading-relaxed">
+                      💡 <strong>Saran AI:</strong> {aiDiagnosis.actionSuggestion}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              {isTimingRejection ? (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRejectionModalOpen(false);
+                      onClose();
+                    }}
+                    className="w-full py-3 bg-[#023246] hover:bg-[#0D7A5F] active:scale-[0.98] text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>✓</span>
+                    <span>Mengerti, Saya Akan Absen Pulang Nanti</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-1">
+                  <span className="text-[11px] font-bold text-slate-500 block mb-1.5 text-left">Pilihan Pemulihan Instan:</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRejectionModalOpen(false);
+                        fetchGPSLocation();
+                      }}
+                      className="py-2.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                    >
+                      <span>🔄</span>
+                      <span>Pindai Ulang</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRejectionModalOpen(false);
+                        setIsManualModalOpen(true);
+                      }}
+                      className="py-2.5 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
+                    >
+                      <span>⌨️</span>
+                      <span>Kode Manual</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRejectionModalOpen(false);
+                        fetchGPSLocation();
+                      }}
+                      className="py-2.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
+                    >
+                      <span>📍</span>
+                      <span>Ukur Ulang GPS</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRejectionModalOpen(false);
+                        setIsCorrectionModalOpen(true);
+                      }}
+                      className="py-2.5 px-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95 shadow-xs"
+                    >
+                      <span>⚡</span>
+                      <span>Koreksi AI</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+          );
+        })()}
       </Modal>
 
       {/* Manual QR Code Input Modal */}

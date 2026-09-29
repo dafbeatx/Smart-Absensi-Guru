@@ -55,7 +55,13 @@ import type {
   AttendanceResponseDTO,
   CorrectAttendanceDTO,
 } from '../repositories/AttendanceRepository';
-import { timeToMinutes, getTodayDateInJakarta, getCurrentTimeInJakarta } from '../utils/time.utils';
+import {
+  timeToMinutes,
+  getTodayDateInJakarta,
+  getCurrentTimeInJakarta,
+  getJakartaDayOfWeek,
+  validateAttendanceTimeWindow,
+} from '../utils/time.utils';
 import { NotificationService } from '../services/notification-permission.service';
 import { hashPin } from '../utils/hash.utils';
 import { useAuthStore } from '../store/useAuthStore';
@@ -620,8 +626,8 @@ export class SupabaseProvider implements IDataProvider {
 
     const attId = `att_${userId}_${todayStr}`;
 
-    // Determine check-out open time based on day of week (Friday vs Monday-Thursday)
-    const dayOfWeek = new Date().getDay(); // 5 = Friday
+    // Determine check-out open time based on Jakarta timezone (Friday vs other days)
+    const dayOfWeek = getJakartaDayOfWeek(dto.timestamp); // 5 = Friday
     const targetCheckoutStart = dayOfWeek === 5
       ? (settings.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START)
       : (settings.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
@@ -644,6 +650,34 @@ export class SupabaseProvider implements IDataProvider {
       .limit(1);
 
     const existing = existingRecords?.[0] || null;
+
+    // Strict Jakarta Time Window & Double Attendance Validation (Anti Absen Ganda)
+    const timeValidation = validateAttendanceTimeWindow({
+      checkInTime: existing?.check_in_time,
+      checkOutTime: existing?.check_out_time,
+      timestamp: dto.timestamp,
+      checkInStart: settings.work_checkin_start,
+      workCheckoutStart: settings.work_checkout_start,
+      fridayCheckoutStart: settings.friday_checkout_start,
+      isFriday: dayOfWeek === 5,
+      bypassTimeWindow: dto.bypass_time_window,
+    });
+
+    if (!timeValidation.isValid && !isOfflineSync) {
+      if (timeValidation.rejectionCode === 'ALREADY_COMPLETED' && existing?.check_out_time) {
+        logger.info('SupabaseProvider', 'Attendance already completed for today', { userId, date: todayStr });
+        return {
+          attendance_id: existing.id,
+          status: (existing.status as AttendanceStatus) || status,
+          timestamp: `${existing.check_out_time} (Tersinkron)`,
+          distance_meters: distanceMeters,
+          geofence_verified: true,
+          attendance_action: 'ALREADY_COMPLETED',
+        };
+      }
+      logger.warn('SupabaseProvider', 'Attendance rejected by time window policy:', timeValidation.errorMessage);
+      throw new Error(timeValidation.errorMessage);
+    }
 
     if (existing) {
       if (existing.check_in_time) {
@@ -673,10 +707,7 @@ export class SupabaseProvider implements IDataProvider {
           };
         }
 
-        const isEarlyCheckout = !isCheckoutWindow;
-        const checkoutLabel = isEarlyCheckout
-          ? `${displayTime} WIB (Pulang Awal < ${targetCheckoutStart})`
-          : `${displayTime} WIB (Absen Pulang)`;
+        const checkoutLabel = `${displayTime} WIB (Absen Pulang)`;
 
         const vMethod: VerificationMethod = dto.verification_method || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC_GPS' : 'QR_GPS');
         const aSource: AttendanceSource = dto.attendance_source || (dto.qr_seed?.includes('BIOMETRIC') ? 'BIOMETRIC' : 'QR');
@@ -730,10 +761,8 @@ export class SupabaseProvider implements IDataProvider {
         }
 
         // AUTOMATIC TEACHER POINT RECORDING (Check-out Pulang Sekolah) — Non-blocking async
-        const checkoutPts = isEarlyCheckout ? 5 : 10;
-        const checkoutTitle = isEarlyCheckout
-          ? 'Presensi Pulang Sekolah (Sebelum Jam Dinas)'
-          : 'Presensi Pulang Tuntas Bertugas';
+        const checkoutPts = 10;
+        const checkoutTitle = 'Presensi Pulang Tuntas Bertugas';
         const checkoutDesc = `Tercatat menyelesaikan dinas sekolah pada pukul ${displayTime} WIB via ${vMethod || 'QR'}`;
 
         this.recordTeacherPoint({
