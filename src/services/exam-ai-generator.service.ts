@@ -37,29 +37,29 @@ export const EXAM_AI_PROMPT_PRESETS_SMP: AIPromptPreset[] = [
     prompt:
       'Tolong buatkan jadwal pengawasan ujian ASTS SMP Terpadu Al-Ittihadiyah tanggal 28 September sampai 2 Oktober 2026 untuk Ruang 1, Ruang 2, Ruang 3, Ruang 4, Ruang 5.\n\n' +
       'Waktu sesi:\n' +
-      '- Sesi 1: 08.00 - 09.30\n' +
-      '- Sesi 2: 10.00 - 11.00\n' +
-      '- Sesi 3: 11.00 - 12.00\n\n' +
+      '* Sesi 1: 08.00 - 09.30\n' +
+      '* Sesi 2: 10.00 - 11.00\n' +
+      '* Sesi 3: 11.00 - 12.00\n\n' +
       'Pembagian sesi per hari:\n' +
-      '- Senin, 28 September 2026: 2 sesi (1. PAI, 2. IPA)\n' +
-      '- Selasa, 29 September 2026: 2 sesi (1. MTK, 2. PP)\n' +
-      '- Rabu, 30 September 2026: 3 sesi (1. B. Indonesia, 2. IPS, 3. B. Arab)\n' +
-      '- Kamis, 1 Oktober 2026: 3 sesi (1. B. Inggris, 2. SBPK, 3. Informatika)\n' +
-      '- Jum\'at, 2 Oktober 2026: 2 sesi (1. Hadits, 2. BTQ)\n\n' +
+      '* Senin, 28 September 2026: 2 sesi (1. PAI, 2. IPA)\n' +
+      '* Selasa, 29 September 2026: 2 sesi (1. MTK, 2. PP)\n' +
+      '* Rabu, 30 September 2026: 3 sesi (1. B. Indonesia, 2. IPS, 3. B. Arab)\n' +
+      '* Kamis, 1 Oktober 2026: 3 sesi (1. B. Inggris, 2. SBPK, 3. Informatika)\n' +
+      '* Jum\'at, 2 Oktober 2026: 2 sesi (1. Hadits, 2. BTQ)\n\n' +
       'Alokasi guru pengawas per mata pelajaran (P1 = Ruang 1, P2 = Ruang 2, P3 = Ruang 3, P4 = Ruang 4, P5 = Ruang 5):\n' +
-      'PAI: P1 = Dafa Maulana, P2 = Qodiatul Asrof Ramadhoni, P3 = Widianingsih, P4 = Adi Prasetyo, P5 = M. Iqbal Gustiawan\n' +
-      'IPA: P1 = Widianingsih, P2 = Nurul Farhiya, P3 = Ridho Maulana Al Farizi, P4 = Qodiatul Asrof Ramadhoni, P5 = Adi Prasetyo\n' +
-      'MTK: P1 = Nurul Farhiya, P2 = Fitri Ani Rahayu, P3 = M. Iqbal Gustiawan, P4 = Mira Nurdianti, P5 = Adi Prasetyo\n' +
-      'PP: P1 = Widianingsih, P2 = Ridho Maulana Al Farizi, P3 = Septi Nur Aeni, P4 = Fitri Ani Rahayu, P5 = Nurul Farhiya\n' +
-      'B. Indonesia: P1 = M. Iqbal Gustiawan, P2 = Dafa Maulana, P3 = Fitri Ani Rahayu, P4 = Mawar Andinia, P5 = Adi Prasetyo\n' +
-      'IPS: P1 = Ridho Maulana Al Farizi, P2 = Septi Nur Aeni, P3 = Widianingsih, P4 = Adi Prasetyo, P5 = Fitri Ani Rahayu\n' +
-      'B. Arab: P1 = Qodiatul Asrof Ramadhoni, P2 = Widianingsih, P3 = Septi Nur Aeni, P4 = M. Iqbal Gustiawan, P5 = Adi Prasetyo\n' +
-      'B. Inggris: P1 = Nurul Farhiya, P2 = Widianingsih, P3 = Fitri Ani Rahayu, P4 = Mira Nurdianti, P5 = Adi Prasetyo\n' +
-      'SBPK: P1 = Fitri Ani Rahayu, P2 = Mawar Andinia, P3 = Qodiatul Asrof Ramadhoni, P4 = Adi Prasetyo, P5 = Widianingsih\n' +
-      'Informatika: P1 = Qodiatul Asrof Ramadhoni, P2 = Septi Nur Aeni, P3 = Dafa Maulana, P4 = Fitri Ani Rahayu, P5 = M. Iqbal Gustiawan\n' +
-      'Hadits: P1 = Widianingsih, P2 = Mawar Andinia, P3 = Ridho Maulana Al Farizi, P4 = Nurul Farhiya, P5 = Mira Nurdianti\n' +
-      'BTQ: P1 = Nurul Farhiya, P2 = Mira Nurdianti, P3 = Qodiatul Asrof Ramadhoni, P4 = Fitri Ani Rahayu, P5 = Mawar Andinia\n\n' +
-      'Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan ruang dan guru pengawas untuk masing-masing mata pelajaran.',
+      'PAI: P1 = Fitri Ani Rahayu, S.Mat, P2 = Qodiatul Asrof Ramadhoni, S.E., G.r, P3 = Widianingsih, S.I., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = M. Iqbal Gustiawan, S.Pd., G.r\n' +
+      'IPA: P1 = Widianingsih, S.I., G.r, P2 = Nurul Farhiya, S.Pd., G.r, P3 = Ridho Maulana Al Farizi, P4 = Fitri Ani Rahayu, S.Mat, P5 = Adi Prasetyo, S.Pd., G.r\n' +
+      'MTK: P1 = Septi Nur Aeni, S.E, P2 = Fitri Ani Rahayu, S.Mat, P3 = M. Iqbal Gustiawan, S.Pd., G.r, P4 = Mira Nurdianti, S.Pd, P5 = Adi Prasetyo, S.Pd., G.r\n' +
+      'PP: P1 = Widianingsih, S.I., G.r, P2 = Ridho Maulana Al Farizi, P3 = Septi Nur Aeni, S.E, P4 = Qodiatul Asrof Ramadhoni, S.E., G.r, P5 = Nurul Farhiya, S.Pd., G.r\n' +
+      'B. Indonesia: P1 = Nurul Farhiya, S.Pd., G.r, P2 = Dafa Maulana, S.Pd, P3 = Fitri Ani Rahayu, S.Mat, P4 = Mawar Andinia, S.Pd., G.r, P5 = Adi Prasetyo, S.Pd., G.r\n' +
+      'IPS: P1 = Ridho Maulana Al Farizi, P2 = Septi Nur Aeni, S.E, P3 = Widianingsih, S.I., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = Fitri Ani Rahayu, S.Mat\n' +
+      'B. Arab: P1 = Qodiatul Asrof Ramadhoni, S.E., G.r, P2 = Widianingsih, S.I., G.r, P3 = Nurul Farhiya, S.Pd., G.r, P4 = M. Iqbal Gustiawan, S.Pd., G.r, P5 = Adi Prasetyo, S.Pd., G.r\n' +
+      'B. Inggris: P1 = Nurul Farhiya, S.Pd., G.r, P2 = Widianingsih, S.I., G.r, P3 = Fitri Ani Rahayu, S.Mat, P4 = Mira Nurdianti, S.Pd, P5 = Adi Prasetyo, S.Pd., G.r\n' +
+      'SBPK: P1 = Fitri Ani Rahayu, S.Mat, P2 = Mawar Andinia, S.Pd., G.r, P3 = Qodiatul Asrof Ramadhoni, S.E., G.r, P4 = Adi Prasetyo, S.Pd., G.r, P5 = Widianingsih, S.I., G.r\n' +
+      'Informatika: P1 = Qodiatul Asrof Ramadhoni, S.E., G.r, P2 = Septi Nur Aeni, S.E, P3 = Dafa Maulana, S.Pd, P4 = Fitri Ani Rahayu, S.Mat, P5 = M. Iqbal Gustiawan, S.Pd., G.r\n' +
+      'Hadits: P1 = Widianingsih, S.I., G.r, P2 = Mawar Andinia, S.Pd., G.r, P3 = Ridho Maulana Al Farizi, P4 = Nurul Farhiya, S.Pd., G.r, P5 = Mira Nurdianti, S.Pd\n' +
+      'BTQ: P1 = M. Iqbal Gustiawan, S.Pd., G.r, P2 = Mira Nurdianti, S.Pd, P3 = Qodiatul Asrof Ramadhoni, S.E., G.r, P4 = Dafa Maulana, S.Pd, P5 = Mawar Andinia, S.Pd., G.r\n\n' +
+      'Mohon terapkan penugasan pengawas di atas secara tepat tanpa mengubah urutan ruang, nama guru, gelar, maupun posisi P1 sampai P5 untuk masing-masing mata pelajaran. Pastikan setiap ruang mendapatkan satu pengawas pada setiap sesi dan tidak ada satu guru yang ditugaskan pada dua ruang dalam waktu yang sama.',
   },
   {
     id: 'asts_smp_quick_all',
@@ -246,6 +246,94 @@ export class ExamScheduleAIGeneratorService {
   }
 
   /**
+   * Parses custom session time slots from Indonesian prompt.
+   * e.g. "Sesi 1: 08.00 - 09.30", "Sesi 2: 10:00 - 11:00", etc.
+   */
+  public static parseSessionTimesFromPrompt(prompt: string): SessionTimeSlot[] {
+    const sessionRegex = /(?:sesi|session)\s*(\d+)\s*[:=\-]\s*(\d{1,2}[:.]\d{2})\s*(?:-|s\/?d|sampai)\s*(\d{1,2}[:.]\d{2})/gi;
+    const slots: SessionTimeSlot[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = sessionRegex.exec(prompt || '')) !== null) {
+      const sNum = parseInt(m[1], 10);
+      const start = m[2].replace('.', ':').padStart(5, '0');
+      const end = m[3].replace('.', ':').padStart(5, '0');
+      if (sNum >= 1 && sNum <= 6) {
+        slots.push({
+          sessionNumber: sNum,
+          sessionName: `Sesi ${sNum}`,
+          startTime: start,
+          endTime: end,
+        });
+      }
+    }
+    slots.sort((a, b) => a.sessionNumber - b.sessionNumber);
+    return slots;
+  }
+
+  /**
+   * Parses per-day session allocations and subject sequences from Indonesian prompt.
+   * Supports:
+   * "* Senin, 28 September 2026: 2 sesi (1. PAI, 2. IPA)"
+   * "* Jum'at, 2 Oktober 2026: 2 sesi (1. Hadits, 2. BTQ)"
+   */
+  public static parseDailySessionPlanFromPrompt(prompt: string): {
+    perDaySessions: Map<string, number>;
+    perDaySubjects: Map<string, string[]>;
+  } {
+    const dayNameMap: Record<string, string> = {
+      senin: 'senin',
+      selasa: 'selasa',
+      rabu: 'rabu',
+      kamis: 'kamis',
+      jumat: 'jumat',
+      "jum'at": 'jumat',
+      "jum’at": 'jumat',
+      sabtu: 'sabtu',
+    };
+
+    const perDaySessions = new Map<string, number>();
+    const perDaySubjects = new Map<string, string[]>();
+
+    const lines = (prompt || '').split(/\r?\n/);
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      const dayMatch = line.match(
+        /^[*\-•\s]*(senin|selasa|rabu|kamis|jum['’]?at|sabtu)\b(?:[^:\n]*?)[:=\-]\s*(\d+)\s*(?:sesi|mata\s*pelajaran|mapel)?(?:\s*\((.*?)\))?/i
+      );
+
+      if (dayMatch) {
+        const dayRaw = dayMatch[1].toLowerCase();
+        const dayKey = dayNameMap[dayRaw] || dayRaw;
+        const count = parseInt(dayMatch[2], 10);
+        const parenContent = dayMatch[3];
+
+        if (count >= 1 && count <= 6) {
+          perDaySessions.set(dayKey, count);
+        }
+
+        if (parenContent) {
+          const rawItems = parenContent.split(/[,;]/);
+          const subjs: string[] = [];
+          for (const item of rawItems) {
+            const cleanItem = item.replace(/^\s*\d+[\.\)]\s*/, '').trim();
+            if (cleanItem) subjs.push(cleanItem);
+          }
+          if (subjs.length > 0) {
+            perDaySubjects.set(dayKey, subjs);
+            if (!perDaySessions.has(dayKey)) {
+              perDaySessions.set(dayKey, subjs.length);
+            }
+          }
+        }
+      }
+    }
+
+    return { perDaySessions, perDaySubjects };
+  }
+
+  /**
    * Evaluates if prompt explicitly mentions teachers, proctors, or invigilator assignments.
    * If false, the AI scheduler will NOT generate proctor assignments (roster pengawas dikosongkan).
    */
@@ -358,6 +446,11 @@ export class ExamScheduleAIGeneratorService {
     if (params.educationLevel) {
       schedule.config.educationLevel = params.educationLevel;
       schedule.educationLevel = params.educationLevel;
+    }
+
+    if (parsedConfig.isCustomSchedule) {
+      schedule.isCustomSchedule = true;
+      schedule.config.isCustomSchedule = true;
     }
 
     // Attach AI optimization note
@@ -492,14 +585,17 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
       ? `Asesmen Sumatif Akhir Jenjang (ASAJ) ${effectiveLevel}`
       : `Asesmen Sumatif Tengah Semester (ASTS) ${effectiveLevel}`;
 
-    // 2. Detect Saturday inclusion (automatically included if custom matrix has > 10 subjects)
-    const includeSaturday =
-      (hasCustomMatrix && customMatrix.detectedSubjects.length > 10) ||
-      text.includes('sabtu') ||
-      text.includes('6 hari') ||
-      text.includes('enam hari') ||
-      text.includes('senin sampai sabtu') ||
-      text.includes('senin s/d sabtu');
+    // 2. Parse daily session plan and custom session times from prompt
+    const dailyPlan = this.parseDailySessionPlanFromPrompt(prompt);
+    const parsedSessionSlots = this.parseSessionTimesFromPrompt(prompt);
+
+    // 2b. Detect Saturday inclusion
+    const mentionsSaturday =
+      /\b(sabtu|enam\s*hari|6\s*hari|senin\s*(?:sampai|s\/?d|-)\s*sabtu)\b/i.test(prompt);
+    const preliminaryDates = this.extractDatesFromPrompt(prompt, false);
+    const isEndDateSaturday = new Date(preliminaryDates.endDate).getDay() === 6;
+
+    const includeSaturday = mentionsSaturday || isEndDateSaturday;
 
     // 3. Extract Dates
     const { startDate, endDate } = this.extractDatesFromPrompt(prompt, includeSaturday);
@@ -509,47 +605,50 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
     //           "Rabu dan Kamis terdiri dari 3 mata pelajaran", etc.
     const dayNameMap: Record<string, string> = {
       senin: 'Senin', selasa: 'Selasa', rabu: 'Rabu',
-      kamis: 'Kamis', jumat: 'Jumat', sabtu: 'Sabtu',
+      kamis: 'Kamis', jumat: 'Jumat', "jum'at": 'Jumat', "jum’at": 'Jumat', sabtu: 'Sabtu',
     };
     const perDaySessionOverrides = new Map<string, number>();
 
-    // Pattern 1: Multi-day lists or conjunctions, e.g.:
-    // "Rabu dan Kamis terdiri dari 3 mata pelajaran", "Rabu dan Kamis memiliki 3 mata pelajaran",
-    // "Senin, Selasa, dan Jumat masing-masing 2 mata pelajaran", "Rabu dan Kamis: 3 sesi"
-    const multiDayPattern = /(?:(?:senin|selasa|rabu|kamis|jumat|sabtu)(?:,\s*|\s+dan\s+|\s+))+\s*[:=\-]?\s*(?:masing-masing\s+|terdiri\s+dari\s+|memiliki\s+|sebanyak\s+|ada\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi;
+    // First populate from structured daily session plan if detected
+    dailyPlan.perDaySessions.forEach((count, dk) => {
+      perDaySessionOverrides.set(dk, count);
+    });
+
+    // Pattern 1: Multi-day lists or conjunctions
+    const multiDayPattern = /(?:(?:senin|selasa|rabu|kamis|jum['’]?at|sabtu)(?:,\s*|\s+dan\s+|\s+))+\s*[:=\-]?\s*(?:masing-masing\s+|terdiri\s+dari\s+|memiliki\s+|sebanyak\s+|ada\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi;
     let mm: RegExpExecArray | null;
     while ((mm = multiDayPattern.exec(text)) !== null) {
       const fullMatch = mm[0];
       const count = parseInt(mm[1], 10);
       if (count >= 1 && count <= 4) {
-        const daysFound: string[] = (fullMatch.match(/\b(senin|selasa|rabu|kamis|jumat|sabtu)\b/gi) || []) as string[];
+        const daysFound: string[] = (fullMatch.match(/\b(senin|selasa|rabu|kamis|jum['’]?at|sabtu)\b/gi) || []) as string[];
         daysFound.forEach((d: string) => {
-          const dk = d.toLowerCase();
-          if (dayNameMap[dk]) perDaySessionOverrides.set(dk, count);
+          const dk = d.toLowerCase().replace(/['’]/g, '');
+          if (!perDaySessionOverrides.has(dk) && dayNameMap[dk]) perDaySessionOverrides.set(dk, count);
         });
       }
     }
 
-    // Pattern 2: Single day with count (supports bullet points and colons):
-    // e.g. "- Senin: 2 sesi (2 mata pelajaran)", "Rabu 3 mata pelajaran", "Kamis: 3 sesi", "Senin 2 mapel"
-    const singleDayPattern = /\b(senin|selasa|rabu|kamis|jumat|sabtu)\s*[:=\-]?\s*(?:terdiri\s+dari\s+|memiliki\s+|hanya\s+|cukup\s+|sebanyak\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi;
+    // Pattern 2: Single day with count (supports bullet points, colons, and dates in between)
+    // e.g. "* Senin, 28 September 2026: 2 sesi", "Rabu 3 mata pelajaran", "Kamis: 3 sesi", "Senin 2 mapel"
+    const singleDayPattern = /\b(senin|selasa|rabu|kamis|jum['’]?at|sabtu)\b(?:[^:\n]*?)[:=\-]?\s*(?:terdiri\s+dari\s+|memiliki\s+|hanya\s+|cukup\s+|sebanyak\s+)?(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)/gi;
     let sm: RegExpExecArray | null;
     while ((sm = singleDayPattern.exec(text)) !== null) {
-      const dayKey = sm[1].toLowerCase();
+      const dayKey = sm[1].toLowerCase().replace(/['’]/g, '');
       const count = parseInt(sm[2], 10);
-      if (count >= 1 && count <= 4 && dayNameMap[dayKey]) {
+      if (count >= 1 && count <= 4 && dayNameMap[dayKey] && !perDaySessionOverrides.has(dayKey)) {
         perDaySessionOverrides.set(dayKey, count);
       }
     }
 
     // Pattern 3: Inverted count then day:
     // e.g. "3 mata pelajaran pada hari rabu dan kamis", "2 sesi untuk hari jumat"
-    const invertedPattern = /(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)\s*(?:per\s+hari\s+)?(?:pada\s+hari\s+|untuk\s+hari\s+|khusus\s+hari\s+|hari\s+)(senin|selasa|rabu|kamis|jumat|sabtu)/gi;
+    const invertedPattern = /(\d+)\s*(?:sesi|mata\s*pelajaran|mapel|mata\s*pel)\s*(?:per\s+hari\s+)?(?:pada\s+hari\s+|untuk\s+hari\s+|khusus\s+hari\s+|hari\s+)(senin|selasa|rabu|kamis|jum['’]?at|sabtu)/gi;
     let im: RegExpExecArray | null;
     while ((im = invertedPattern.exec(text)) !== null) {
       const count = parseInt(im[1], 10);
-      const dayKey = im[2].toLowerCase();
-      if (count >= 1 && count <= 4 && dayNameMap[dayKey]) {
+      const dayKey = im[2].toLowerCase().replace(/['’]/g, '');
+      if (count >= 1 && count <= 4 && dayNameMap[dayKey] && !perDaySessionOverrides.has(dayKey)) {
         perDaySessionOverrides.set(dayKey, count);
       }
     }
@@ -579,13 +678,23 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
       : sessionsPerDay;
     const effectiveMaxSessions = Math.max(sessionsPerDay, maxPerDayOverride);
 
-    // 5. Default session time slots (sized to cover the max sessions needed)
-    const sessionSlots: SessionTimeSlot[] = [
+    // 5. Default or prompt-parsed session time slots
+    const defaultSlots: SessionTimeSlot[] = [
       { sessionNumber: 1, sessionName: 'Sesi 1 (Pagi)', startTime: '08:00', endTime: '09:30' },
       { sessionNumber: 2, sessionName: 'Sesi 2 (Menjelang Siang)', startTime: '10:00', endTime: '11:00' },
       { sessionNumber: 3, sessionName: 'Sesi 3 (Siang)', startTime: '11:00', endTime: '12:00' },
       { sessionNumber: 4, sessionName: 'Sesi 4 (Tambahan)', startTime: '13:00', endTime: '14:30' },
-    ].slice(0, Math.max(effectiveMaxSessions, 2));
+    ];
+    let sessionSlots: SessionTimeSlot[] = parsedSessionSlots.length > 0
+      ? [...parsedSessionSlots]
+      : defaultSlots.slice(0, Math.max(effectiveMaxSessions, 2));
+
+    if (sessionSlots.length < effectiveMaxSessions) {
+      for (let s = sessionSlots.length + 1; s <= effectiveMaxSessions; s++) {
+        const def = defaultSlots[s - 1] || { sessionNumber: s, sessionName: `Sesi ${s}`, startTime: '13:00', endTime: '14:30' };
+        sessionSlots.push(def);
+      }
+    }
 
     // 6. Day Overrides — apply per-day overrides detected from prompt
     const validDates = ExamSchedulerService.getValidExamDates(startDate, endDate, includeSaturday);
@@ -607,7 +716,7 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
     }
 
     validDates.forEach((d) => {
-      const dayKey = d.dayName.toLowerCase();
+      const dayKey = d.dayName.toLowerCase().replace(/['’]/g, '');
       const isFriday = dayKey === 'jumat';
       // Priority: per-day override from prompt → Friday default → global sessionsPerDay
       const overrideCount = perDaySessionOverrides.get(dayKey);
@@ -618,6 +727,7 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
         date: d.date,
         dayName: d.dayName,
         sessionsCount: sessionsForDay,
+        sessionSlots: sessionSlots.slice(0, sessionsForDay),
       });
     });
 
@@ -670,8 +780,22 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
     }
 
     // 8. Extract Subjects
+    const orderedSubjectsFromPlan: string[] = [];
+    if (dailyPlan.perDaySubjects.size > 0) {
+      validDates.forEach((d) => {
+        const dayKey = d.dayName.toLowerCase().replace(/['’]/g, '');
+        const daySubjs = dailyPlan.perDaySubjects.get(dayKey);
+        if (daySubjs && daySubjs.length > 0) {
+          orderedSubjectsFromPlan.push(...daySubjs);
+        }
+      });
+    }
+
     let selectedSubjects = [...params.availableSubjects];
-    if (hasCustomMatrix) {
+    if (orderedSubjectsFromPlan.length > 0) {
+      // Prioritize explicit day-by-day plan subject sequence
+      selectedSubjects = orderedSubjectsFromPlan;
+    } else if (hasCustomMatrix) {
       // Strictly maintain the subjects and their exact sequence from user matrix
       selectedSubjects = [...customMatrix.detectedSubjects];
     } else {
@@ -782,6 +906,7 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
       customSubjectProctors: hasCustomMatrix ? customMatrix.customSubjectProctors : undefined,
       customRoomNumbers: hasCustomMatrix ? customMatrix.detectedRoomNumbers : undefined,
       skipProctorAssignment: !hasTeacherIntent,
+      isCustomSchedule: hasCustomMatrix || (dailyPlan.perDaySessions.size > 0),
     };
   }
 
@@ -861,6 +986,7 @@ Catatan Penting: Jika userPrompt TIDAK menyebutkan guru, pengawas, mengawas, pik
       excludeCommitteeProctor: raw?.excludeCommitteeProctor !== false,
       assignBackupProctor: raw?.assignBackupProctor !== false,
       aiCustomPrompt: params.prompt.trim(),
+      isCustomSchedule: fallback.isCustomSchedule ?? false,
     };
   }
 

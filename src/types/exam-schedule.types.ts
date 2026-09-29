@@ -95,6 +95,7 @@ export interface ExamScheduleFormConfig {
   customRoomNumbers?: number[]; // Nomor ruangan ujian yang terdeteksi dari matriks alokasi (misal [6] untuk SMA Ruang 6)
   skipProctorAssignment?: boolean; // Jika prompt AI tidak menyebutkan guru/pengawas, roster pengawas tidak dibuat
   existingCrossLevelProctors?: ExamProctorItem[]; // Jadwal pengawas dari jenjang lain (misal SMA Ruang 6 saat susun SMP) agar 100% bebas bentrok
+  isCustomSchedule?: boolean; // Menandakan jadwal dikustomisasi via AI prompt atau konfigurasi kustom (anti-overwrite)
 }
 
 export interface ExamScheduleSummary {
@@ -149,6 +150,7 @@ export interface ExamScheduleData {
   proctorSchedules: ExamProctorItem[];
   summary: ExamScheduleSummary;
   swapHistory?: ExamProctorSwapHistoryItem[];
+  isCustomSchedule?: boolean;
   isPublished?: boolean; // Status resmi diterbitkan ke guru
   publishedAt?: string;  // Waktu publikasi
   createdAt: string;

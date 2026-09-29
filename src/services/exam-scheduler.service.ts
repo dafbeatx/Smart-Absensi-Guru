@@ -238,8 +238,8 @@ export class ExamSchedulerService {
           else { defStart = '13:00'; defEnd = '14:30'; }
         }
 
-        const finalStart = customSlot?.startTime || (isFriday ? (customSlot?.startTime || defStart) : (baseSlot?.startTime || defStart));
-        const finalEnd = customSlot?.endTime || (isFriday ? (customSlot?.endTime || defEnd) : (baseSlot?.endTime || defEnd));
+        const finalStart = customSlot?.startTime || (isFriday ? defStart : (baseSlot?.startTime || defStart));
+        const finalEnd = customSlot?.endTime || (isFriday ? defEnd : (baseSlot?.endTime || defEnd));
 
         allSlots.push({
           date: dateInfo.date,
@@ -438,7 +438,10 @@ export class ExamSchedulerService {
 
             if (targetTeacherName && targetTeacherName !== '-') {
               const matched = this.findMatchingTeacher(targetTeacherName, allTeachers);
-              chosenProctor = matched;
+              chosenProctor = {
+                userId: matched.userId,
+                fullName: matched.fullName || targetTeacherName.trim(),
+              };
               const tl = teacherLoads.get(matched.userId);
               if (tl) {
                 tl.assignedCount++;

@@ -244,6 +244,16 @@ export class ExamScheduleRepository {
       return schedule;
     }
 
+    // Preserve custom generated schedules from prompt or custom matrix
+    if (
+      schedule.config?.customSubjectProctors ||
+      schedule.config?.aiCustomPrompt ||
+      schedule.config?.isCustomSchedule ||
+      schedule.isCustomSchedule
+    ) {
+      return schedule;
+    }
+
     const uniqueDates = Array.from(new Set(schedule.subjectSchedules.map((s) => s.date))).sort();
     const classes = schedule.config?.selectedClasses?.length ? schedule.config.selectedClasses : ['10', '11', '12'];
 
@@ -476,6 +486,16 @@ export class ExamScheduleRepository {
       return schedule;
     }
 
+    // Preserve custom generated schedules from prompt or custom matrix
+    if (
+      schedule.config?.customSubjectProctors ||
+      schedule.config?.aiCustomPrompt ||
+      schedule.config?.isCustomSchedule ||
+      schedule.isCustomSchedule
+    ) {
+      return schedule;
+    }
+
     const uniqueDates = Array.from(new Set(schedule.subjectSchedules.map((s) => s.date))).sort();
 
     // Map subjectSchedules to canonical subjects & times
@@ -539,9 +559,9 @@ export class ExamScheduleRepository {
           endTime: slot.endTime,
           roomName: slot.roomName,
           className: existing?.className || slot.className || (slot.roomName === 'Ruang 1' ? '7A' : slot.roomName === 'Ruang 2' ? '7B' : slot.roomName === 'Ruang 3' ? '8A' : slot.roomName === 'Ruang 4' ? '8B' : '9A, 9B'),
-          subject: slot.subject,
-          mainProctorId: slot.proctorId,
-          mainProctorName: slot.proctorName,
+          subject: existing?.subject || slot.subject,
+          mainProctorId: existing?.mainProctorId || slot.proctorId,
+          mainProctorName: existing?.mainProctorName || slot.proctorName,
           secondaryProctorId: existing?.secondaryProctorId,
           secondaryProctorName: existing?.secondaryProctorName,
           backupProctorId: existing?.backupProctorId,
@@ -713,6 +733,16 @@ export class ExamScheduleRepository {
   public static normalizeScheduleSessionTimes(schedule: ExamScheduleData): ExamScheduleData {
     if (!schedule) return schedule;
 
+    // Do not mutate custom schedule
+    if (
+      schedule.config?.customSubjectProctors ||
+      schedule.config?.aiCustomPrompt ||
+      schedule.config?.isCustomSchedule ||
+      schedule.isCustomSchedule
+    ) {
+      return schedule;
+    }
+
     // For SMA, preserve canonical timetable matching physical photo strictly
     if (schedule.educationLevel === 'SMA' || schedule.config?.educationLevel === 'SMA') {
       return this.syncSmaScheduleSubjects(schedule);
@@ -831,9 +861,19 @@ export class ExamScheduleRepository {
       }
     }
 
+    const isCustomSchedule = Boolean(
+      schedule?.config?.customSubjectProctors ||
+      schedule?.config?.aiCustomPrompt ||
+      schedule?.config?.isCustomSchedule ||
+      schedule?.isCustomSchedule
+    );
+
     // 3. For SMA: Synchronize subjects when schedule exists
     if (level === 'SMA') {
       if (schedule) {
+        if (isCustomSchedule) {
+          return schedule;
+        }
         const synced = this.normalizeScheduleSessionTimes(this.syncSmaScheduleSubjects(schedule));
         const key = this.getStorageKey(academicYear, examType, 'SMA');
         safeSetStorage(key, JSON.stringify(synced));
@@ -845,6 +885,9 @@ export class ExamScheduleRepository {
     // 4. For SMP: Synchronize subjects and proctor assignments when schedule exists
     if (level === 'SMP') {
       if (schedule) {
+        if (isCustomSchedule) {
+          return schedule;
+        }
         const synced = this.normalizeScheduleSessionTimes(this.syncSmpScheduleSubjects(schedule));
         const key = this.getStorageKey(academicYear, examType, 'SMP');
         safeSetStorage(key, JSON.stringify(synced));
@@ -854,6 +897,9 @@ export class ExamScheduleRepository {
     }
 
     if (schedule) {
+      if (isCustomSchedule) {
+        return schedule;
+      }
       return this.normalizeScheduleSessionTimes(schedule);
     }
 
@@ -866,12 +912,22 @@ export class ExamScheduleRepository {
   public static async saveSchedule(schedule: ExamScheduleData, level?: 'SMP' | 'SMA'): Promise<boolean> {
     try {
       const effectiveLevel = level || schedule.config.educationLevel || schedule.educationLevel;
-      const synced = effectiveLevel === 'SMA'
-        ? this.syncSmaScheduleSubjects(schedule)
-        : effectiveLevel === 'SMP'
-        ? this.syncSmpScheduleSubjects(schedule)
-        : schedule;
-      const finalSchedule = this.normalizeScheduleSessionTimes(synced);
+      const isCustomSchedule = Boolean(
+        schedule.config?.customSubjectProctors ||
+        schedule.config?.aiCustomPrompt ||
+        schedule.config?.isCustomSchedule ||
+        schedule.isCustomSchedule
+      );
+
+      const finalSchedule = isCustomSchedule
+        ? schedule
+        : this.normalizeScheduleSessionTimes(
+            effectiveLevel === 'SMA'
+              ? this.syncSmaScheduleSubjects(schedule)
+              : effectiveLevel === 'SMP'
+              ? this.syncSmpScheduleSubjects(schedule)
+              : schedule
+          );
 
       const key = this.getStorageKey(finalSchedule.config.academicYear, finalSchedule.config.examType, effectiveLevel);
       safeSetStorage(key, JSON.stringify(finalSchedule));
