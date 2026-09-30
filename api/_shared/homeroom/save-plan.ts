@@ -3,7 +3,7 @@
 // Saves and updates continuation plans, school choices, and interests for Academic Year 2026/2027
 
 import { serverSupabase } from '../session-auth.js';
-import { authenticateHomeroomTeacher, normalizeClassName } from '../homeroom-auth.js';
+import { authenticateHomeroomTeacher, normalizeClassName, type HomeroomAuthErrorContext } from '../homeroom-auth.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,10 +22,11 @@ export default async function handler(req: any, res: any) {
 
   const auth = await authenticateHomeroomTeacher(req);
   if (!auth.ok) {
-    return res.status(auth.status).json({
+    const authError = auth as HomeroomAuthErrorContext;
+    return res.status(authError.status).json({
       success: false,
-      errorCode: auth.errorCode,
-      errorMessage: auth.errorMessage,
+      errorCode: authError.errorCode,
+      errorMessage: authError.errorMessage,
     });
   }
 
