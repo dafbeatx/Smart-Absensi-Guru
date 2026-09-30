@@ -1683,7 +1683,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   useCrossDeviceSync({
     onSync: handleCrossDeviceSync,
-    cooldownMs: 30000,
+    cooldownMs: 180000,
     enabled: !isPreviewMode && !!effectiveUser?.id,
   });
 

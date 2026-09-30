@@ -10,7 +10,7 @@ export interface UseCrossDeviceSyncOptions {
   /**
    * Minimum interval (ms) between consecutive sync triggers.
    * Prevents spam-refreshing when user rapidly switches tabs/apps.
-   * @default 30000 (30 seconds)
+   * @default 180000 (3 minutes)
    */
   cooldownMs?: number;
 
@@ -30,15 +30,14 @@ export interface UseCrossDeviceSyncOptions {
  * won't see changes until they re-fetch from backend.
  *
  * This hook automatically triggers a backend re-fetch when:
- * 1. User switches back to the app tab (visibilitychange → visible)
- * 2. User taps back into the browser window (focus event — mobile app switching)
- * 3. Device reconnects to the internet (online event)
+ * 1. User deliberately switches back to the app tab (visibilitychange → visible)
+ * 2. Device reconnects to the internet (online event)
  *
- * A cooldown timer prevents excessive API calls when rapidly switching contexts.
+ * A 3-minute cooldown timer prevents excessive API calls and Supabase Log Ingestion bloat.
  */
 export function useCrossDeviceSync({
   onSync,
-  cooldownMs = 30000,
+  cooldownMs = 180000,
   enabled = true,
 }: UseCrossDeviceSyncOptions): void {
   const lastSyncRef = useRef<number>(0);
@@ -70,21 +69,15 @@ export function useCrossDeviceSync({
       }
     };
 
-    const handleFocus = () => {
-      triggerSync();
-    };
-
     const handleOnline = () => {
       triggerSync();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleOnline);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
     };
   }, [enabled, triggerSync]);

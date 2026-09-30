@@ -382,8 +382,8 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
     const handleVisibilityChange = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         const now = Date.now();
-        // Cooldown: at least 60 seconds between visibility refetches
-        if (now - lastVisibilitySync > 60000) {
+        // Cooldown: at least 5 minutes (300,000ms) between visibility refetches
+        if (now - lastVisibilitySync > 300000) {
           lastVisibilitySync = now;
           loadNotifications();
         }

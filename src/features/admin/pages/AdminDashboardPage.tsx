@@ -430,7 +430,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   useCrossDeviceSync({
     onSync: handleCrossDeviceSync,
-    cooldownMs: 30000,
+    cooldownMs: 180000,
     enabled: !!user?.id,
   });
 
@@ -443,7 +443,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   useLiveAttendanceSync({
     onSync: handleLiveAttendanceSync,
-    heartbeatIntervalMs: 180000,
+    heartbeatIntervalMs: 600000,
     enabled: !!user?.id,
   });
 

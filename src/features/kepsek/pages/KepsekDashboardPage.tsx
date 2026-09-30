@@ -390,14 +390,14 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   // Cross-device sync: auto-refresh data when Kepsek returns to the app
   useCrossDeviceSync({
     onSync: handleManualRefresh,
-    cooldownMs: 30000,
+    cooldownMs: 180000,
     enabled: !!user?.id,
   });
 
   // Real-time Supabase channel & heartbeat live tracking sync for Kepsek
   useLiveAttendanceSync({
     onSync: handleManualRefresh,
-    heartbeatIntervalMs: 180000,
+    heartbeatIntervalMs: 600000,
     enabled: !!user?.id,
   });
 

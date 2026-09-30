@@ -1054,7 +1054,7 @@ export class SupabaseProvider implements IDataProvider {
     const now = Date.now();
     if (cached) {
       const isComplete = Boolean(cached.data?.check_in_time && cached.data?.check_out_time);
-      const ttl = isComplete ? 300000 : 60000;
+      const ttl = isComplete ? 600000 : 180000; // 10 min if complete, 3 min if pending
       if (now - cached.timestamp < ttl) {
         return cached.data;
       }
@@ -1120,7 +1120,7 @@ export class SupabaseProvider implements IDataProvider {
 
     const cacheKey = `${userId}_${paddedMonth}_${year}`;
     const cached = this.cachedMonthlyAttendance.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < 60000) {
+    if (cached && Date.now() - cached.timestamp < 600000) { // 10 minutes TTL
       return cached.data;
     }
 
@@ -1811,7 +1811,7 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getUserLeaves(userId: string, _token: string): Promise<LeaveRequest[]> {
     const cached = this.cachedUserLeaves.get(userId);
-    if (cached && Date.now() - cached.timestamp < 60000) {
+    if (cached && Date.now() - cached.timestamp < 300000) { // 5 minutes TTL
       return cached.data;
     }
 
@@ -1949,7 +1949,7 @@ export class SupabaseProvider implements IDataProvider {
 
   public async getAllUsers(_token: string): Promise<UserProfile[]> {
     const now = Date.now();
-    if (this.cachedUsers && now - this.cachedUsersTimestamp < 60000) {
+    if (this.cachedUsers && now - this.cachedUsersTimestamp < 300000) { // 5 minutes TTL
       return this.cachedUsers;
     }
 
@@ -2465,7 +2465,7 @@ export class SupabaseProvider implements IDataProvider {
     if (!userId) return readsSet;
 
     const cached = this.cachedNotificationReads.get(userId);
-    if (cached && Date.now() - cached.timestamp < 45000) {
+    if (cached && Date.now() - cached.timestamp < 180000) { // 3 minutes TTL
       return new Set(cached.data);
     }
 
@@ -2495,7 +2495,7 @@ export class SupabaseProvider implements IDataProvider {
   public async getNotifications(userId: string, token: string, userRole?: string): Promise<AppNotification[]> {
     const cacheKey = `${userId}_${userRole || 'ALL'}`;
     const cached = this.cachedNotifications.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < 45000) {
+    if (cached && Date.now() - cached.timestamp < 180000) { // 3 minutes TTL
       return cached.data;
     }
 
@@ -5537,7 +5537,7 @@ export class SupabaseProvider implements IDataProvider {
   // TEACHER DISCIPLINE POINT HISTORY API (STRICT SERVERLESS PROXY /api/teacher-points)
   public async getTeacherPointHistory(userId: string, _token?: string): Promise<TeacherPointLog[]> {
     const cached = this.cachedTeacherPointHistory.get(userId);
-    const ttl = userId === 'ALL' ? 120000 : 60000;
+    const ttl = userId === 'ALL' ? 600000 : 300000; // 10 min for ALL, 5 min for individual user
     if (cached && Date.now() - cached.timestamp < ttl) {
       return cached.data;
     }
