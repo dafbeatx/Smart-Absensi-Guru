@@ -41,10 +41,10 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-9999 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-emerald-500/30 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header Ribbon */}
-        <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white p-5 text-center relative shadow-inner">
+        <div className="bg-linear-to-r from-emerald-800 via-emerald-700 to-teal-800 text-white p-5 text-center relative shadow-inner">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-emerald-200 hover:text-white bg-black/20 hover:bg-black/30 p-1.5 rounded-full transition-all cursor-pointer"
@@ -84,8 +84,8 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
           </div>
 
           {/* Document Metadata Grid */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl divide-y divide-slate-200/80 text-xs">
-            <div className="p-3 flex justify-between items-center gap-2">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl text-xs overflow-hidden">
+            <div className="p-3 flex justify-between items-center gap-2 border-b border-slate-200/80">
               <span className="text-slate-500 font-semibold flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-slate-400" /> Nomor Dokumen
               </span>
@@ -94,7 +94,7 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
               </span>
             </div>
 
-            <div className="p-3 flex justify-between items-center gap-2">
+            <div className="p-3 flex justify-between items-center gap-2 border-b border-slate-200/80">
               <span className="text-slate-500 font-semibold flex items-center gap-1.5">
                 <School className="w-4 h-4 text-slate-400" /> Lembaga / Sekolah
               </span>
@@ -103,7 +103,7 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
               </span>
             </div>
 
-            <div className="p-3 flex justify-between items-center gap-2">
+            <div className="p-3 flex justify-between items-center gap-2 border-b border-slate-200/80">
               <span className="text-slate-500 font-semibold flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-slate-400" /> Periode Laporan
               </span>
@@ -112,7 +112,7 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
               </span>
             </div>
 
-            <div className="p-3 flex justify-between items-center gap-2">
+            <div className="p-3 flex justify-between items-center gap-2 border-b border-slate-200/80">
               <span className="text-slate-500 font-semibold flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-slate-400" /> Jenis Laporan
               </span>
@@ -124,7 +124,7 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
             </div>
 
             {teacherName && (
-              <div className="p-3 flex justify-between items-center gap-2">
+              <div className="p-3 flex justify-between items-center gap-2 border-b border-slate-200/80">
                 <span className="text-slate-500 font-semibold flex items-center gap-1.5">
                   <UserCheck className="w-4 h-4 text-slate-400" /> Guru Bersangkutan
                 </span>
@@ -134,7 +134,7 @@ export const OfficialDocumentVerificationModal: React.FC<OfficialDocumentVerific
               </div>
             )}
 
-            <div className="p-3 flex justify-between items-center gap-2">
+            <div className="p-3 flex justify-between items-center gap-2 border-b border-slate-200/80">
               <span className="text-slate-500 font-semibold flex items-center gap-1.5">
                 <UserCheck className="w-4 h-4 text-slate-400" /> Penandatangan
               </span>
