@@ -47,6 +47,7 @@ import {
   OFFICIAL_SCHOOL_SUBJECTS,
   normalizeSubjectName,
 } from '../../../config/school-subjects.config';
+import { SemesterGradingExcelService } from '../../../services/semester-grading-excel.service';
 
 export type ModalLoadState =
   | 'IDLE'
@@ -763,6 +764,70 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     }
   };
 
+  const [isExportingOfficial, setIsExportingOfficial] = useState(false);
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
+
+  const handleImportExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeSession) return;
+    e.target.value = '';
+    setIsImportingExcel(true);
+    try {
+      const parsedSheets = await SemesterGradingExcelService.importScoresFromExcel(file);
+      const targetNorm = SemesterGradingExcelService.normalizeSheetClassName(activeSession.class_name);
+      const matchingSheet = parsedSheets.find(
+        (s) => SemesterGradingExcelService.normalizeSheetClassName(s.className) === targetNorm
+      );
+
+      if (!matchingSheet || matchingSheet.students.length === 0) {
+        setToastMessage({
+          text: `Sheet kelas "${activeSession.class_name}" tidak ditemukan atau belum ada data di file Excel.`,
+          type: 'error',
+        });
+        return;
+      }
+
+      const isAsas = /ASAS|PAS|UAS|AKHIR/i.test(activeSession.exam_type || '');
+      let importedCount = 0;
+
+      for (const st of matchingSheet.students) {
+        const score = isAsas ? st.asas : st.asts;
+        const effectiveScore = typeof score === 'number' ? score : (typeof st.finalScore === 'number' ? st.finalScore : null);
+        if (effectiveScore === null) continue;
+
+        await ExamCorrectionRepository.saveGradedStudent({
+          session_id: activeSession.id,
+          name: st.name,
+          mcq_answers: {},
+          essay_scores: [],
+          mcq_score: effectiveScore,
+          essay_score: 0,
+          final_score: effectiveScore,
+          csi: 0,
+          lps: 0,
+          correct: 0,
+          wrong: 0,
+        });
+        importedCount++;
+      }
+
+      const updated = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
+      setGradedStudents(updated);
+      setToastMessage({
+        text: `Berhasil mengimpor ${importedCount} nilai siswa dari file Excel kelas ${matchingSheet.className}!`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      logger.error('QuestionCorrectionModal', 'Import error:', err);
+      setToastMessage({
+        text: 'Gagal mengimpor file Excel: ' + (err?.message || 'Format tidak valid'),
+        type: 'error',
+      });
+    } finally {
+      setIsImportingExcel(false);
+    }
+  };
+
   // Class Summary for Recap
   const classSummary = useMemo(() => {
     const totalCount = Math.max(classStudents.length, gradedStudents.length);
@@ -955,14 +1020,27 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         </div>
 
         {activeTab === 'sessions' && !isCreatingSession && !isReadOnly && (
-          <button
-            type="button"
-            onClick={handleOpenCreateSession}
-            className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs shrink-0 min-h-9"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Buat Sesi Ujian</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => SemesterGradingExcelService.downloadCleanTemplate()}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-200 shadow-2xs shrink-0 min-h-9"
+              title="Unduh Berkas Blanko Format Penilaian ASTS & ASAS Resmi (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">Format Penilaian</span>
+              <span>Blanko (.xlsx)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenCreateSession}
+              className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs shrink-0 min-h-9"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Buat Sesi Ujian</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -1903,25 +1981,84 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 Total Nilai Terekam: <span className="text-slate-900 font-bold">{gradedStudents.length} Siswa</span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* 1. Official ASTS & ASAS Multi-Sheet Excel */}
+                <button
+                  type="button"
+                  disabled={isExportingOfficial}
+                  onClick={async () => {
+                    if (!activeSession) return;
+                    setIsExportingOfficial(true);
+                    try {
+                      await SemesterGradingExcelService.exportOfficialFormatExcel({
+                        session: activeSession,
+                        gradedStudents,
+                        subject: activeSession.subject,
+                        teacher: activeSession.teacher,
+                        kkm: Number(activeSession.kkm) || 75,
+                        academicYear,
+                        semester,
+                        className: activeSession.class_name,
+                      });
+                      setToastMessage({ text: 'Format resmi ASTS & ASAS (.xlsx) berhasil diunduh!', type: 'success' });
+                    } catch (err: any) {
+                      setToastMessage({ text: 'Gagal mengunduh format resmi: ' + (err?.message || 'Error'), type: 'error' });
+                    } finally {
+                      setIsExportingOfficial(false);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all min-h-10"
+                  title="Unduh file Excel multi-sheet resmi dengan format dan rumus identik FORMAT PENILAIAN ASTS & ASAS.xlsx"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+                  <span>{isExportingOfficial ? 'Memproses...' : 'Format Resmi ASTS & ASAS (.xlsx)'}</span>
+                </button>
+
+                {/* 2. Download Blank Template */}
+                <button
+                  type="button"
+                  onClick={() => SemesterGradingExcelService.downloadCleanTemplate()}
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all min-h-10 border border-slate-200 shadow-2xs"
+                  title="Unduh blanko format penilaian sekolah"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Blanko (.xlsx)</span>
+                </button>
+
+                {/* 3. Import from Excel ASTS/ASAS */}
+                <label className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all min-h-10 shadow-2xs">
+                  <RefreshCw className={`w-3.5 h-3.5 text-amber-600 ${isImportingExcel ? 'animate-spin' : ''}`} />
+                  <span>{isImportingExcel ? 'Mengimpor...' : 'Import Excel'}</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    disabled={isImportingExcel}
+                    className="hidden"
+                    onChange={handleImportExcelFile}
+                  />
+                </label>
+
+                {/* 4. Single-sheet quick recap */}
                 <button
                   type="button"
                   onClick={() => ExamCorrectionRepository.exportToExcel(activeSession, gradedStudents)}
                   disabled={gradedStudents.length === 0}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all min-h-10"
+                  className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 text-slate-700 text-xs font-medium flex items-center gap-1.5 border border-slate-200 shadow-2xs transition-all min-h-10"
+                  title="Ekspor rekapitulasi cepat tabel saat ini"
                 >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Ekspor Excel (.xlsx)</span>
+                  <span>Rekap Sesi</span>
                 </button>
 
+                {/* 5. CSV download */}
                 <button
                   type="button"
                   onClick={() => ExamCorrectionRepository.exportToCSV(activeSession, gradedStudents)}
                   disabled={gradedStudents.length === 0}
-                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all min-h-10 border border-slate-200 shadow-2xs"
+                  className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 text-slate-700 text-xs font-medium flex items-center gap-1.5 border border-slate-200 shadow-2xs transition-all min-h-10"
+                  title="Unduh format CSV"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Unduh CSV</span>
+                  <Download className="w-3.5 h-3.5 text-slate-400" />
+                  <span>CSV</span>
                 </button>
               </div>
             </div>

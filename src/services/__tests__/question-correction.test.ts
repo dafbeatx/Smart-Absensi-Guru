@@ -18,6 +18,7 @@ import {
   formatClassDisplay,
   resolveSchoolLevel,
 } from '../../utils/class.utils';
+import { SemesterGradingExcelService } from '../semester-grading-excel.service';
 
 export const runQuestionCorrectionTestSuite = async (): Promise<{
   passed: number;
@@ -419,6 +420,25 @@ export const runQuestionCorrectionTestSuite = async (): Promise<{
       'Ekspor CSV Metrics: Header dan data CSV menyertakan kolom CSI dan LPS',
       csvWithMetrics.includes('CSI,LPS') && csvWithMetrics.includes(',100,100'),
       `Preview CSV: ${csvWithMetrics.slice(0, 150)}`
+    );
+
+    // ── Test 22: SemesterGradingExcelService - Normalisasi Nama Sheet Kelas
+    const n7 = SemesterGradingExcelService.normalizeSheetClassName('Kelas 7');
+    const n8a = SemesterGradingExcelService.normalizeSheetClassName('Kelas 8A');
+    const nsma = SemesterGradingExcelService.normalizeSheetClassName('Kelas SMA');
+    assert(
+      'Semester Excel: Menormalkan nama kelas agar sesuai sheet template (7, 8A, SMA)',
+      n7 === '7' && n8a === '8A' && nsma === 'SMA',
+      `Hasil normalisasi: 7->${n7}, 8A->${n8a}, SMA->${nsma}`
+    );
+
+    // ── Test 23: Master Template Path & Canonical Classes
+    assert(
+      'Semester Excel: Memvalidasi kelas kanonikal (7, 8A, 8B, 9A, 9B, SMA) & template path',
+      SemesterGradingExcelService.CANONICAL_CLASSES.length === 6 &&
+        SemesterGradingExcelService.CANONICAL_CLASSES.includes('8A') &&
+        SemesterGradingExcelService.TEMPLATE_PATH.includes('FORMAT_PENILAIAN_ASTS_ASAS'),
+      `Canonical: ${SemesterGradingExcelService.CANONICAL_CLASSES.join(', ')}`
     );
   } catch (err: any) {
     assert('Fatal Execution: Question Correction Test Suite threw an uncaught error', false, err?.message);
