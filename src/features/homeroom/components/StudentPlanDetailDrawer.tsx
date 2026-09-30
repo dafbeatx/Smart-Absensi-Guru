@@ -5,6 +5,7 @@ import type {
 } from '../../../types/homeroom.types';
 import { HomeroomRepository } from '../../../repositories/HomeroomRepository';
 import { PlanVerificationModal } from './PlanVerificationModal';
+import { EditStudentPlanModal } from './EditStudentPlanModal';
 import { Button } from '../../../components/ui/Button';
 
 interface StudentPlanDetailDrawerProps {
@@ -33,6 +34,7 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [verifyMode, setVerifyMode] = useState<'verified' | 'needs_revision'>('verified');
   const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const effectiveToken =
     token ||
@@ -69,6 +71,13 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
 
   const handleConfirmVerification = async (dto: VerifyPlanDTO) => {
     await HomeroomRepository.verifyPlan(dto, effectiveToken);
+    if (studentId) {
+      await loadDetail(studentId);
+    }
+    onPlanUpdated();
+  };
+
+  const handlePlanSaved = async () => {
     if (studentId) {
       await loadDetail(studentId);
     }
@@ -124,24 +133,34 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
       <div className="bg-white w-full max-w-lg h-full flex flex-col shadow-2xl border-l border-slate-200 animate-in slide-in-from-right duration-250">
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={onClose}
-              className="p-1.5 -ml-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 rounded-lg transition-colors"
+              className="p-1.5 -ml-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 rounded-lg transition-colors cursor-pointer"
               aria-label="Tutup detail siswa"
             >
               ✕
             </button>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-sm font-bold text-slate-800 line-clamp-1">
                 {student?.fullName || 'Memuat Detail Siswa...'}
               </h2>
-              <p className="text-[11px] text-slate-600 mt-0.5">
-                NISN: {student?.nisn || '-'} • Rombel: {student?.className || '-'}
+              <p className="text-[11px] text-slate-600 mt-0.5 truncate">
+                NISN: {student?.nisn || '-'} • Rombel: {student?.className || '-'} • TA 2026/2027
               </p>
             </div>
           </div>
-          <div>{getStatusBadge(plan?.status)}</div>
+          <div className="flex items-center gap-2 shrink-0">
+            {getStatusBadge(plan?.status)}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsEditModalOpen(true)}
+              className="text-xs h-8 px-2.5 rounded-lg border-slate-200 text-emerald-700 hover:bg-emerald-50 font-bold"
+            >
+              ✏️ Edit
+            </Button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -239,8 +258,23 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
                   </div>
 
                   {detail.choices.length === 0 ? (
-                    <div className="text-center py-8 text-xs text-slate-400">
-                      Belum ada sekolah pilihan yang disimpan siswa.
+                    <div className="text-center py-8 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-3">
+                      <div className="w-10 h-10 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+                        📝
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-700">Belum Ada Rencana Studi</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Data rencana studi siswa untuk Tahun Ajaran 2026/2027 belum diisi.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="text-xs h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                      >
+                        ✏️ Isi / Edit Rencana Studi Sekarang
+                      </Button>
                     </div>
                   ) : (
                     detail.choices.map((c) => (
@@ -410,24 +444,41 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
           )}
         </div>
 
-        {/* Action Footer (Only active if plan exists) */}
-        {detail && plan?.id && (
-          <div className="p-4 border-t border-slate-200 bg-white flex gap-2.5 shrink-0">
+        {/* Action Footer (Always active & displays Edit button) */}
+        {detail && (
+          <div className="p-4 border-t border-slate-200 bg-white flex flex-wrap gap-2.5 shrink-0">
             <Button
               type="button"
-              variant="secondary"
-              onClick={() => handleOpenVerifyModal('needs_revision')}
-              className="flex-1 text-xs h-11 rounded-xl text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 font-semibold"
+              variant={!plan?.id ? 'primary' : 'secondary'}
+              onClick={() => setIsEditModalOpen(true)}
+              className={`text-xs h-11 rounded-xl font-bold border-slate-200 hover:bg-slate-100 ${
+                !plan?.id
+                  ? 'w-full bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
+                  : 'flex-1 text-slate-700'
+              }`}
             >
-              ✏️ Minta Revisi
+              ✏️ {plan?.id ? 'Edit Rencana' : 'Isi / Edit Rencana Studi'}
             </Button>
-            <Button
-              type="button"
-              onClick={() => handleOpenVerifyModal('verified')}
-              className="flex-1 text-xs h-11 rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 font-semibold shadow-xs shadow-emerald-600/30"
-            >
-              ✅ Setujui Rencana
-            </Button>
+
+            {plan?.id && (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleOpenVerifyModal('needs_revision')}
+                  className="flex-1 text-xs h-11 rounded-xl text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 font-semibold"
+                >
+                  ⚠️ Minta Revisi
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleOpenVerifyModal('verified')}
+                  className="flex-1 text-xs h-11 rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 font-semibold shadow-xs shadow-emerald-600/30"
+                >
+                  ✅ Setujui
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -467,6 +518,16 @@ export const StudentPlanDetailDrawer: React.FC<StudentPlanDetailDrawerProps> = (
         }
         mode={verifyMode}
         onConfirm={handleConfirmVerification}
+      />
+
+      {/* Edit Student Plan Modal */}
+      <EditStudentPlanModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        student={student || null}
+        detail={detail}
+        token={token}
+        onPlanSaved={handlePlanSaved}
       />
     </div>
   );

@@ -76,6 +76,8 @@ import type {
   StudentPlanDetail,
   VerifyPlanDTO,
   VerifyPlanResult,
+  SaveStudentPlanDTO,
+  SaveStudentPlanResult,
 } from '../types/homeroom.types';
 import type {
   ExamCommitteeMember,
@@ -6305,7 +6307,11 @@ export class SupabaseProvider implements IDataProvider {
 
   // ─── HOMEROOM & STUDENT CONTINUATION PLANS API ───────────────────────────
 
-  public async getHomeroomOverview(token: string, className?: string): Promise<HomeroomOverview> {
+  public async getHomeroomOverview(
+    token: string,
+    className?: string,
+    academicYear: string = '2026/2027'
+  ): Promise<HomeroomOverview> {
     const url = '/api/homeroom/overview' + (className ? `?class_name=${encodeURIComponent(className)}` : '');
     try {
       const resp = await fetch(url, {
@@ -6372,7 +6378,7 @@ export class SupabaseProvider implements IDataProvider {
           teacherName: 'Administrator Sekolah',
           teacherRole: 'ADMIN',
           assignedClass: targetClass,
-          academicYear: '2026/2027',
+          academicYear,
           targetGraduationYear: 2027,
           totalStudents: total,
           completionRate,
@@ -6383,29 +6389,16 @@ export class SupabaseProvider implements IDataProvider {
       console.warn('[SupabaseProvider] Direct Supabase homeroom overview fallback error:', e);
     }
 
-    // Secondary Fallback: Sediakan overview default aman
-    const targetClass = className || '9A';
-    return {
-      teacherId: 'usr_admin',
-      teacherName: 'Administrator Sekolah',
-      teacherRole: 'ADMIN',
-      assignedClass: targetClass,
-      academicYear: '2026/2027',
-      targetGraduationYear: 2027,
-      totalStudents: 4,
-      completionRate: 50,
-      stats: {
-        draft: 1,
-        submitted: 1,
-        pendingVerification: 1,
-        verified: 2,
-        needsRevision: 0,
-        parentAgreed: 3,
-      },
-    };
+    // Secondary Fallback: Sediakan overview aman tersinkron dengan Tahun Ajaran 2026/2027
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getHomeroomOverview(token, className, academicYear);
   }
 
-  public async getHomeroomStudents(token: string, className?: string): Promise<HomeroomStudentItem[]> {
+  public async getHomeroomStudents(
+    token: string,
+    className?: string,
+    academicYear: string = '2026/2027'
+  ): Promise<HomeroomStudentItem[]> {
     const url = '/api/homeroom/students' + (className ? `?class_name=${encodeURIComponent(className)}` : '');
     try {
       const resp = await fetch(url, {
@@ -6487,101 +6480,16 @@ export class SupabaseProvider implements IDataProvider {
       console.warn('[SupabaseProvider] Direct Supabase homeroom students fallback error:', e);
     }
 
-    // Secondary Fallback: Return sample roster matching target class
-    const targetClass = className || '9A';
-    return [
-      {
-        id: 'std_mock_001',
-        nis: '26001',
-        nisn: '0081112221',
-        fullName: 'Muhammad Rizky Pratama',
-        className: targetClass,
-        gender: 'L',
-        photoUrl: null,
-        plan: {
-          id: 'plan_mock_001',
-          continuationType: 'SMA_NEGERI',
-          status: 'verified',
-          parentAgreement: true,
-          submittedAt: '2026-09-01T08:00:00Z',
-          verifiedAt: '2026-09-05T10:00:00Z',
-          revisionNote: null,
-          firstChoice: {
-            schoolName: 'SMAN 1 Bogor',
-            schoolType: 'SMA',
-            majorName: 'MIPA',
-          },
-        },
-      },
-      {
-        id: 'std_mock_002',
-        nis: '26002',
-        nisn: '0081112222',
-        fullName: 'Aisyah Putri Azzahra',
-        className: targetClass,
-        gender: 'P',
-        photoUrl: null,
-        plan: {
-          id: 'plan_mock_002',
-          continuationType: 'SMK_NEGERI',
-          status: 'pending_verification',
-          parentAgreement: true,
-          submittedAt: '2026-09-10T09:30:00Z',
-          verifiedAt: null,
-          revisionNote: null,
-          firstChoice: {
-            schoolName: 'SMKN 1 Cibinong',
-            schoolType: 'SMK',
-            majorName: 'Rekayasa Perangkat Lunak',
-          },
-        },
-      },
-      {
-        id: 'std_mock_003',
-        nis: '26003',
-        nisn: '0081112223',
-        fullName: 'Fajar Nugraha',
-        className: targetClass,
-        gender: 'L',
-        photoUrl: null,
-        plan: {
-          id: 'plan_mock_003',
-          continuationType: 'PONDOK_PESANTREN',
-          status: 'needs_revision',
-          parentAgreement: false,
-          submittedAt: '2026-09-08T11:00:00Z',
-          verifiedAt: null,
-          revisionNote: 'Harap lampirkan surat persetujuan orang tua bermaterai.',
-          firstChoice: {
-            schoolName: 'Pondok Pesantren Darussalam Gontor',
-            schoolType: 'PESANTREN',
-            majorName: 'Keagamaan',
-          },
-        },
-      },
-      {
-        id: 'std_mock_004',
-        nis: '26004',
-        nisn: '0081112224',
-        fullName: 'Siti Nurhaliza',
-        className: targetClass,
-        gender: 'P',
-        photoUrl: null,
-        plan: {
-          id: null,
-          continuationType: 'BELUM_MENENTUKAN',
-          status: 'draft',
-          parentAgreement: false,
-          submittedAt: null,
-          verifiedAt: null,
-          revisionNote: null,
-          firstChoice: null,
-        },
-      },
-    ];
+    // Secondary Fallback: Return roster via mock provider synchronized with 2026/2027
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getHomeroomStudents(token, className, academicYear);
   }
 
-  public async getStudentPlanDetail(studentId: string, token: string): Promise<StudentPlanDetail> {
+  public async getStudentPlanDetail(
+    studentId: string,
+    token: string,
+    academicYear: string = '2026/2027'
+  ): Promise<StudentPlanDetail> {
     const url = `/api/homeroom/student-detail?student_id=${encodeURIComponent(studentId)}`;
     try {
       const resp = await fetch(url, {
@@ -6603,74 +6511,33 @@ export class SupabaseProvider implements IDataProvider {
     }
 
     // Default mock detail fallback
-    return {
-      student: {
-        id: studentId,
-        nis: '26001',
-        nisn: '0081112221',
-        fullName: 'Muhammad Rizky Pratama',
-        className: '9A',
-        gender: 'L',
-        photoUrl: null,
-      },
-      plan: {
-        id: 'plan_mock_001',
-        academicYear: '2026/2027',
-        graduationYear: 2027,
-        continuationType: 'SMA_NEGERI',
-        status: 'verified',
-        submittedAt: '2026-09-01T08:00:00Z',
-        verifiedAt: '2026-09-05T10:00:00Z',
-        verifiedByName: 'Ahmad Fauzi, S.Pd.',
-        revisionNote: null,
-        parentAgreement: true,
-      },
-      choices: [
-        {
-          id: 'choice_mock_001',
-          priority: 1,
-          schoolName: 'SMAN 1 Bogor',
-          schoolType: 'SMA_NEGERI',
-          majorName: 'MIPA',
-          registrationTrack: 'Prestasi Akademik',
-          notes: 'Pilihan utama',
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.getStudentPlanDetail(studentId, token, academicYear);
+  }
+
+  public async saveStudentPlan(dto: SaveStudentPlanDTO, token: string): Promise<SaveStudentPlanResult> {
+    try {
+      const resp = await fetch('/api/homeroom/save-plan', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-      ],
-      interests: [
-        {
-          id: 'interest_001',
-          interestField: 'Teknologi Informasi',
-          reason: 'Berminat pada pemrograman perangkat lunak',
-          careerGoal: 'Software Engineer',
-        },
-      ],
-      achievements: [
-        {
-          id: 'achieve_001',
-          achievementTitle: 'Juara Olimpiade Matematika',
-          achievementType: 'Akademik',
-          level: 'Kabupaten',
-          year: 2025,
-          organizer: 'Dinas Pendidikan',
-        },
-      ],
-      documents: [
-        {
-          id: 'doc_001',
-          studentId,
-          documentType: 'KARTU_KELUARGA',
-          versionNumber: 1,
-          isActive: true,
-          originalFilename: 'Dokumen_Siswa.pdf',
-          mimeType: 'application/pdf',
-          fileSizeBytes: 204800,
-          status: 'verified',
-          verificationNotes: 'Lengkap',
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      verificationLogs: [],
-    };
+        body: JSON.stringify(dto),
+      });
+
+      if (resp.ok) {
+        const json = await resp.json().catch(() => null);
+        if (json?.success) {
+          return json;
+        }
+      }
+    } catch (err) {
+      console.warn('[SupabaseProvider] saveStudentPlan API call error:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.saveStudentPlan(dto, token);
   }
 
   public async verifyStudentPlan(dto: VerifyPlanDTO, token: string): Promise<VerifyPlanResult> {

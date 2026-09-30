@@ -7,6 +7,7 @@ import studentsHandler from './_shared/homeroom/students.js';
 import studentDetailHandler from './_shared/homeroom/student-detail.js';
 import verifyPlanHandler from './_shared/homeroom/verify-plan.js';
 import documentDownloadHandler from './_shared/homeroom/document-download.js';
+import savePlanHandler from './_shared/homeroom/save-plan.js';
 
 export {
   overviewHandler,
@@ -14,6 +15,7 @@ export {
   studentDetailHandler,
   verifyPlanHandler,
   documentDownloadHandler,
+  savePlanHandler,
 };
 
 export default async function handler(req: any, res: any) {
@@ -50,6 +52,8 @@ export default async function handler(req: any, res: any) {
       return verifyPlanHandler(req, res);
     case 'document-download':
       return documentDownloadHandler(req, res);
+    case 'save-plan':
+      return savePlanHandler(req, res);
     default:
       return res.status(404).json({
         success: false,

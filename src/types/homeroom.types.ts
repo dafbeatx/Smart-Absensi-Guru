@@ -157,6 +157,35 @@ export interface VerifyPlanResult {
   result?: any;
 }
 
+export interface SaveStudentPlanDTO {
+  studentId: string;
+  academicYear?: string;
+  graduationYear?: number;
+  continuationType: ContinuationType;
+  status?: PlanStatus;
+  parentAgreement?: boolean;
+  notes?: string;
+  choices: Array<{
+    priority: number;
+    schoolName: string;
+    schoolType?: string;
+    majorName?: string | null;
+    registrationTrack?: string | null;
+    notes?: string | null;
+  }>;
+  interests?: Array<{
+    interestField: string;
+    careerGoal?: string | null;
+    reason?: string | null;
+  }>;
+}
+
+export interface SaveStudentPlanResult {
+  success: boolean;
+  message: string;
+  planId?: string;
+}
+
 export interface MasterSchool {
   id: string;
   npsn: string | null;

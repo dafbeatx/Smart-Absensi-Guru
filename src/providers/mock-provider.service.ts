@@ -58,7 +58,10 @@ import type {
   StudentPlanDetail,
   VerifyPlanDTO,
   VerifyPlanResult,
+  SaveStudentPlanDTO,
+  SaveStudentPlanResult,
 } from '../types/homeroom.types';
+import { areClassCodesEqual } from '../utils/class.utils';
 import type {
   ExamCommitteeMember,
   ExamScheduleData,
@@ -3219,108 +3222,140 @@ export class MockProvider implements IDataProvider {
 
   // ─── HOMEROOM & STUDENT CONTINUATION PLANS API ───────────────────────────
 
-  public async getHomeroomOverview(_token: string, className?: string): Promise<HomeroomOverview> {
+  public async getHomeroomOverview(
+    token: string,
+    className?: string,
+    academicYear: string = '2026/2027'
+  ): Promise<HomeroomOverview> {
     const targetClass = className || '9A';
+    const students = await this.getHomeroomStudents(token, targetClass, academicYear);
+    const totalStudents = students.length;
+
+    let draft = 0;
+    let submitted = 0;
+    let pendingVerification = 0;
+    let verified = 0;
+    let needsRevision = 0;
+    let parentAgreed = 0;
+
+    students.forEach((s) => {
+      const st = s.plan.status;
+      if (st === 'verified') verified++;
+      else if (st === 'needs_revision') needsRevision++;
+      else if (st === 'submitted') submitted++;
+      else if (st === 'pending_verification') pendingVerification++;
+      else draft++;
+
+      if (s.plan.parentAgreement) parentAgreed++;
+    });
+
+    const completionRate = totalStudents > 0 ? Math.round((verified / totalStudents) * 100) : 0;
+    const authUser = useAuthStore.getState().user;
+
     return {
-      teacherId: useAuthStore.getState().user?.id || 'usr_guru_001',
-      teacherName: useAuthStore.getState().user?.full_name || 'Ahmad Fauzi, S.Pd.',
-      teacherRole: 'GURU',
+      teacherId: authUser?.id || 'usr_guru_001',
+      teacherName: authUser?.full_name || 'Wali Kelas 9',
+      teacherRole: authUser?.role || 'GURU',
       assignedClass: targetClass,
-      academicYear: '2026/2027',
+      academicYear,
       targetGraduationYear: 2027,
-      totalStudents: 4,
-      completionRate: 50,
+      totalStudents,
+      completionRate,
       stats: {
-        draft: 1,
-        submitted: 1,
-        pendingVerification: 1,
-        verified: 2,
-        needsRevision: 0,
-        parentAgreed: 3,
+        draft,
+        submitted,
+        pendingVerification,
+        verified,
+        needsRevision,
+        parentAgreed,
       },
     };
   }
 
-  public async getHomeroomStudents(_token: string, className?: string): Promise<HomeroomStudentItem[]> {
+  public async getHomeroomStudents(
+    _token: string,
+    className?: string,
+    academicYear: string = '2026/2027'
+  ): Promise<HomeroomStudentItem[]> {
     const targetClass = className || '9A';
-    return [
-      {
-        id: 'std_mock_001',
-        nis: '26001',
-        nisn: '0081112221',
-        fullName: 'Muhammad Rizky Pratama',
-        className: targetClass,
-        gender: 'L',
-        photoUrl: null,
-        plan: {
-          id: 'plan_mock_001',
-          continuationType: 'SMA_NEGERI',
-          status: 'verified',
-          parentAgreement: true,
-          submittedAt: '2026-09-01T08:00:00Z',
-          verifiedAt: '2026-09-05T10:00:00Z',
-          revisionNote: null,
-          firstChoice: {
-            schoolName: 'SMAN 1 Bogor',
-            schoolType: 'SMA',
-            majorName: 'MIPA',
-          },
-        },
-      },
-      {
-        id: 'std_mock_002',
-        nis: '26002',
-        nisn: '0081112222',
-        fullName: 'Aisyah Putri Azzahra',
-        className: targetClass,
-        gender: 'P',
-        photoUrl: null,
-        plan: {
-          id: 'plan_mock_002',
-          continuationType: 'SMK_NEGERI',
-          status: 'pending_verification',
-          parentAgreement: true,
-          submittedAt: '2026-09-10T09:30:00Z',
-          verifiedAt: null,
-          revisionNote: null,
-          firstChoice: {
-            schoolName: 'SMKN 1 Cibinong',
-            schoolType: 'SMK',
-            majorName: 'Rekayasa Perangkat Lunak',
-          },
-        },
-      },
-      {
-        id: 'std_mock_003',
-        nis: '26003',
-        nisn: '0081112223',
-        fullName: 'Fajar Nugraha',
-        className: targetClass,
-        gender: 'L',
-        photoUrl: null,
-        plan: {
-          id: 'plan_mock_003',
-          continuationType: 'PONDOK_PESANTREN',
-          status: 'needs_revision',
-          parentAgreement: false,
-          submittedAt: '2026-09-08T11:00:00Z',
-          verifiedAt: null,
-          revisionNote: 'Harap lampirkan surat persetujuan orang tua bermaterai.',
-          firstChoice: {
-            schoolName: 'Pondok Pesantren Darussalam Gontor',
-            schoolType: 'PESANTREN',
-            majorName: 'Keagamaan',
-          },
-        },
-      },
-      {
-        id: 'std_mock_004',
-        nis: '26004',
-        nisn: '0081112224',
-        fullName: 'Siti Nurhaliza',
-        className: targetClass,
-        gender: 'P',
-        photoUrl: null,
+
+    // 1. Ambil data siswa aktif untuk tahun ajaran 2026/2027 dari store / StudentRepository
+    const allStudents = await this.getStudents();
+    let classStudents = allStudents.filter(
+      (s) =>
+        (s.academicYear === academicYear || !s.academicYear) &&
+        (targetClass === 'ALL' || areClassCodesEqual(s.className, targetClass))
+    );
+
+    // Jika direktori siswa kosong, sinkronkan dari daftar siswa resmi Tahun Ajaran 2026/2027
+    if (classStudents.length === 0) {
+      if (targetClass === '9A' || targetClass === 'ALL') {
+        const { ExamAdministrativeDocsService } = await import('../services/exam-administrative-docs.service');
+        const default9A = ExamAdministrativeDocsService.OFFICIAL_SMP_ROOM_3_STUDENTS.map((s, idx) => ({
+          id: `std_9a_${idx + 1}`,
+          nis: `260${String(idx + 1).padStart(2, '0')}`,
+          nisn: `00811122${String(idx + 1).padStart(2, '0')}`,
+          fullName: s.fullName,
+          className: '9A',
+          academicYear,
+          gender: s.gender as 'L' | 'P',
+          cardStatus: 'ACTIVE' as const,
+          attendanceRate: 100,
+        }));
+        classStudents = [...classStudents, ...default9A];
+      }
+      if (targetClass === '9B' || targetClass === 'ALL') {
+        const { ExamAdministrativeDocsService } = await import('../services/exam-administrative-docs.service');
+        const default9B = ExamAdministrativeDocsService.OFFICIAL_SMP_ROOM_4_STUDENTS.map((s, idx) => ({
+          id: `std_9b_${idx + 1}`,
+          nis: `260${String(idx + 20).padStart(2, '0')}`,
+          nisn: `00811123${String(idx + 1).padStart(2, '0')}`,
+          fullName: s.fullName,
+          className: '9B',
+          academicYear,
+          gender: s.gender as 'L' | 'P',
+          cardStatus: 'ACTIVE' as const,
+          attendanceRate: 100,
+        }));
+        classStudents = [...classStudents, ...default9B];
+      }
+    }
+
+    // 2. Ambil rencana studi yang tersimpan di storage untuk Tahun Ajaran 2026/2027
+    const plansKey = `smart_absensi_homeroom_plans_${academicYear.replace('/', '_')}`;
+    let savedPlans: Record<string, any> = {};
+    try {
+      const raw = safeGetStorage(plansKey);
+      if (raw) savedPlans = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+
+    // 3. Mapping siswa: jika data belum ada, KOSONGKAN TERLEBIH DAHULU
+    return classStudents.map((s) => {
+      const saved = savedPlans[s.id];
+      if (saved && saved.plan) {
+        return {
+          id: s.id,
+          nis: (s as any).nis || null,
+          nisn: s.nisn || null,
+          fullName: s.fullName,
+          className: s.className,
+          gender: s.gender || null,
+          photoUrl: (s as any).photoUrl || null,
+          plan: saved.plan,
+        };
+      }
+
+      // Default: DATA BELUM ADA -> KOSONGKAN TERLEBIH DAHULU
+      return {
+        id: s.id,
+        nis: (s as any).nis || null,
+        nisn: s.nisn || null,
+        fullName: s.fullName,
+        className: s.className,
+        gender: s.gender || null,
+        photoUrl: (s as any).photoUrl || null,
         plan: {
           id: null,
           continuationType: 'BELUM_MENENTUKAN',
@@ -3331,101 +3366,167 @@ export class MockProvider implements IDataProvider {
           revisionNote: null,
           firstChoice: null,
         },
-      },
-    ];
+      };
+    });
   }
 
-  public async getStudentPlanDetail(studentId: string, _token: string): Promise<StudentPlanDetail> {
+  public async getStudentPlanDetail(
+    studentId: string,
+    token: string,
+    academicYear: string = '2026/2027'
+  ): Promise<StudentPlanDetail> {
+    const plansKey = `smart_absensi_homeroom_plans_${academicYear.replace('/', '_')}`;
+    let savedPlans: Record<string, any> = {};
+    try {
+      const raw = safeGetStorage(plansKey);
+      if (raw) savedPlans = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+
+    // Cari info siswa dari getHomeroomStudents
+    const students = await this.getHomeroomStudents(token, 'ALL', academicYear);
+    const foundStudent = students.find((s) => s.id === studentId);
+
+    const saved = savedPlans[studentId];
+    if (saved) {
+      return {
+        student: {
+          id: studentId,
+          nis: foundStudent?.nis || '26001',
+          nisn: foundStudent?.nisn || null,
+          fullName: foundStudent?.fullName || 'Siswa',
+          className: foundStudent?.className || '9A',
+          gender: foundStudent?.gender || null,
+          photoUrl: foundStudent?.photoUrl || null,
+        },
+        plan: saved.plan,
+        choices: saved.choices || [],
+        interests: saved.interests || [],
+        achievements: saved.achievements || [],
+        documents: saved.documents || [],
+        verificationLogs: saved.verificationLogs || [],
+      };
+    }
+
+    // JIKA DATA BELUM ADA -> KOSONGKAN TERLEBIH DAHULU
     return {
       student: {
         id: studentId,
-        nis: '26001',
-        nisn: '0081112221',
-        fullName: 'Muhammad Rizky Pratama',
-        className: '9A',
-        gender: 'L',
-        photoUrl: null,
+        nis: foundStudent?.nis || null,
+        nisn: foundStudent?.nisn || null,
+        fullName: foundStudent?.fullName || 'Siswa Kelas 9',
+        className: foundStudent?.className || '9A',
+        gender: foundStudent?.gender || null,
+        photoUrl: foundStudent?.photoUrl || null,
       },
+      plan: null, // KOSONG!
+      choices: [],
+      interests: [],
+      achievements: [],
+      documents: [],
+      verificationLogs: [],
+    };
+  }
+
+  public async saveStudentPlan(dto: SaveStudentPlanDTO, _token: string): Promise<SaveStudentPlanResult> {
+    const academicYear = dto.academicYear || '2026/2027';
+    const plansKey = `smart_absensi_homeroom_plans_${academicYear.replace('/', '_')}`;
+    let savedPlans: Record<string, any> = {};
+    try {
+      const raw = safeGetStorage(plansKey);
+      if (raw) savedPlans = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+
+    const planId = `plan_${dto.studentId}_${Date.now()}`;
+    const firstChoice = dto.choices && dto.choices.length > 0 ? dto.choices[0] : null;
+
+    savedPlans[dto.studentId] = {
       plan: {
-        id: 'plan_mock_001',
-        academicYear: '2026/2027',
-        graduationYear: 2027,
-        continuationType: 'SMA_NEGERI',
-        status: 'verified',
-        submittedAt: '2026-09-01T08:00:00Z',
-        verifiedAt: '2026-09-05T10:00:00Z',
-        verifiedByName: 'Ahmad Fauzi, S.Pd.',
+        id: planId,
+        academicYear,
+        graduationYear: dto.graduationYear || 2027,
+        continuationType: dto.continuationType,
+        status: dto.status || 'draft',
+        parentAgreement: Boolean(dto.parentAgreement),
+        submittedAt: new Date().toISOString(),
+        verifiedAt: dto.status === 'verified' ? new Date().toISOString() : null,
+        verifiedByName: dto.status === 'verified' ? 'Wali Kelas 9' : null,
         revisionNote: null,
-        parentAgreement: true,
+        firstChoice: firstChoice
+          ? {
+              schoolName: firstChoice.schoolName,
+              schoolType: firstChoice.schoolType,
+              majorName: firstChoice.majorName || null,
+            }
+          : null,
       },
-      choices: [
-        {
-          id: 'choice_mock_001',
-          priority: 1,
-          schoolName: 'SMAN 1 Bogor',
-          schoolType: 'SMA_NEGERI',
-          majorName: 'MIPA',
-          registrationTrack: 'Prestasi Akademik',
-          notes: 'Pilihan utama jarak 2.5km',
-        },
-        {
-          id: 'choice_mock_002',
-          priority: 2,
-          schoolName: 'SMAN 3 Bogor',
-          schoolType: 'SMA_NEGERI',
-          majorName: 'MIPA',
-          registrationTrack: 'Zonasi',
-          notes: 'Pilihan cadangan',
-        },
-      ],
-      interests: [
-        {
-          id: 'interest_mock_001',
-          interestField: 'Sains & Teknologi Komputer',
-          reason: 'Tertarik mendalami rekayasa sistem kecerdasan buatan',
-          careerGoal: 'Software Engineer / AI Researcher',
-        },
-      ],
-      achievements: [
-        {
-          id: 'achieve_mock_001',
-          achievementTitle: 'Juara 1 Olimpiade Matematika Kabupaten Bogor',
-          achievementType: 'Akademik',
-          level: 'Kabupaten',
-          year: 2025,
-          organizer: 'Dinas Pendidikan Kab. Bogor',
-        },
-      ],
-      documents: [
-        {
-          id: 'doc_mock_001',
-          studentId,
-          documentType: 'KARTU_KELUARGA',
-          versionNumber: 1,
-          isActive: true,
-          originalFilename: 'KK_Rizky_Pratama.pdf',
-          mimeType: 'application/pdf',
-          fileSizeBytes: 245000,
-          status: 'verified',
-          verificationNotes: 'Sesuai data Disdukcapil',
-          createdAt: '2026-09-01T08:00:00Z',
-        },
-      ],
+      choices: dto.choices.map((c, i) => ({
+        id: `choice_${dto.studentId}_${i + 1}`,
+        priority: c.priority || i + 1,
+        schoolName: c.schoolName,
+        schoolType: c.schoolType || 'SMA',
+        majorName: c.majorName || null,
+        registrationTrack: c.registrationTrack || null,
+        notes: c.notes || null,
+      })),
+      interests: (dto.interests || []).map((it, i) => ({
+        id: `interest_${dto.studentId}_${i + 1}`,
+        interestField: it.interestField,
+        careerGoal: it.careerGoal || null,
+        reason: it.reason || null,
+      })),
+      achievements: [],
+      documents: [],
       verificationLogs: [
         {
-          id: 'log_mock_001',
-          action: 'VERIFIED',
+          id: `log_${Date.now()}`,
+          action: dto.status === 'verified' ? 'VERIFIED' : 'DRAFT_UPDATED',
           performedByType: 'TEACHER',
-          performedByUserId: 'usr_guru_001',
-          actorName: 'Ahmad Fauzi, S.Pd.',
-          note: 'Rencana disetujui sesuai minat dan restu orang tua.',
-          createdAt: '2026-09-05T10:00:00Z',
+          performedByUserId: useAuthStore.getState().user?.id || 'usr_guru_001',
+          actorName: useAuthStore.getState().user?.full_name || 'Wali Kelas',
+          note: dto.notes || 'Data rencana studi diperbarui.',
+          createdAt: new Date().toISOString(),
         },
       ],
+    };
+
+    safeSetStorage(plansKey, JSON.stringify(savedPlans));
+    return {
+      success: true,
+      message: 'Rencana studi siswa Tahun Ajaran 2026/2027 berhasil disimpan.',
+      planId,
     };
   }
 
   public async verifyStudentPlan(dto: VerifyPlanDTO, _token: string): Promise<VerifyPlanResult> {
+    const academicYear = '2026/2027';
+    const plansKey = `smart_absensi_homeroom_plans_${academicYear.replace('/', '_')}`;
+    try {
+      const raw = safeGetStorage(plansKey);
+      if (raw) {
+        const savedPlans = JSON.parse(raw);
+        for (const stdId of Object.keys(savedPlans)) {
+          if (savedPlans[stdId]?.plan?.id === dto.plan_id) {
+            savedPlans[stdId].plan.status = dto.decision;
+            if (dto.decision === 'verified') {
+              savedPlans[stdId].plan.verifiedAt = new Date().toISOString();
+              savedPlans[stdId].plan.verifiedByName = 'Wali Kelas 9';
+              savedPlans[stdId].plan.revisionNote = null;
+            } else {
+              savedPlans[stdId].plan.revisionNote = dto.notes || 'Perlu perbaikan';
+            }
+            safeSetStorage(plansKey, JSON.stringify(savedPlans));
+            break;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     return {
       success: true,
       message: dto.decision === 'verified'
@@ -3440,7 +3541,7 @@ export class MockProvider implements IDataProvider {
   }
 
   public async getHomeroomDocumentUrl(_documentId: string, _token: string): Promise<string> {
-    return 'https://example.com/mock-student-documents/sample-verification-doc.pdf';
+    return 'https://example.com/mock-student-documents/sample-verification-doc.pdf?signed=mock_token_signature&expires=900';
   }
 
   // Exam Committee & Cross-Device Synchronization API (Mock Provider)

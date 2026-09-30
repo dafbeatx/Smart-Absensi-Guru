@@ -6,7 +6,9 @@ import type {
   PlanStatus,
 } from '../../../types/homeroom.types';
 import { HomeroomRepository } from '../../../repositories/HomeroomRepository';
+import { StudentRepository } from '../../../repositories/StudentRepository';
 import { StudentPlanDetailDrawer } from './StudentPlanDetailDrawer';
+import { EditStudentPlanModal } from './EditStudentPlanModal';
 import { Button } from '../../../components/ui/Button';
 
 interface HomeroomModalProps {
@@ -28,6 +30,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
 }) => {
   const isPrivileged = user?.role === 'ADMIN' || user?.role === 'OPERATOR' || user?.role === 'KEPSEK';
   const [selectedClass, setSelectedClass] = useState<string>(defaultClassName);
+  const [availableClasses, setAvailableClasses] = useState<string[]>(['9A', '9B']);
   const [loading, setLoading] = useState(false);
   const [overview, setOverview] = useState<HomeroomOverview | null>(null);
   const [students, setStudents] = useState<HomeroomStudentItem[]>([]);
@@ -37,6 +40,13 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<{
+    id: string;
+    fullName: string;
+    nisn?: string | null;
+    className?: string;
+  } | null>(null);
 
   const loadData = useCallback(async (cls?: string) => {
     const effectiveToken =
@@ -48,8 +58,8 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
     setError(null);
     try {
       const [overviewData, studentsData] = await Promise.all([
-        HomeroomRepository.getOverview(effectiveToken, targetClass),
-        HomeroomRepository.getStudents(effectiveToken, targetClass),
+        HomeroomRepository.getOverview(effectiveToken, targetClass, '2026/2027'),
+        HomeroomRepository.getStudents(effectiveToken, targetClass, '2026/2027'),
       ]);
       setOverview(overviewData);
       setStudents(studentsData);
@@ -63,12 +73,26 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadData();
+      StudentRepository.getStudents().then((all) => {
+        const grade9Classes = Array.from(
+          new Set(
+            all
+              .filter((s) => s.className && (s.className.startsWith('9') || s.className.startsWith('IX')))
+              .map((s) => s.className.toUpperCase())
+          )
+        ).sort();
+        if (grade9Classes.length > 0) {
+          setAvailableClasses(grade9Classes);
+        }
+      }).catch(() => {});
     } else {
       setOverview(null);
       setStudents([]);
       setError(null);
       setSearchQuery('');
       setStatusFilter('ALL');
+      setIsEditModalOpen(false);
+      setEditingStudent(null);
     }
   }, [isOpen, loadData]);
 
@@ -90,6 +114,19 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
   const handleOpenStudentDetail = (id: string) => {
     setSelectedStudentId(id);
     setIsDrawerOpen(true);
+  };
+
+  const handleOpenEditModal = (id: string) => {
+    const st = students.find((s) => s.id === id);
+    if (st) {
+      setEditingStudent({
+        id: st.id,
+        fullName: st.fullName,
+        nisn: st.nisn,
+        className: st.className,
+      });
+      setIsEditModalOpen(true);
+    }
   };
 
   const handlePlanUpdated = () => {
@@ -117,6 +154,9 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
                 <h1 id="homeroom-modal-title" className="text-base font-bold text-slate-800 tracking-tight truncate">
                   Ruang Wali Kelas: Rencana Studi Siswa
                 </h1>
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200 shrink-0">
+                  TA 2026/2027
+                </span>
                 {isPrivileged && (
                   <span className="px-2 py-0.5 text-[10px] font-extrabold bg-purple-100 text-purple-700 rounded-md border border-purple-200 shrink-0">
                     Mode Admin
@@ -125,8 +165,8 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
               </div>
               <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
                 {overview
-                  ? `Rombel ${overview.assignedClass} • Angkatan ${overview.targetGraduationYear} • ${overview.teacherName}`
-                  : `Wali Kelas: ${user?.full_name || 'Administrator'}`}
+                  ? `Rombel ${overview.assignedClass} • Angkatan ${overview.targetGraduationYear} • TA ${overview.academicYear} • ${overview.teacherName}`
+                  : `Wali Kelas: ${user?.full_name || 'Administrator'} • TA 2026/2027`}
               </p>
             </div>
           </div>
@@ -134,7 +174,7 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             {isPrivileged && (
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                {['9A', '9B'].map((c) => (
+                {availableClasses.map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -204,6 +244,17 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
               }`}
             >
               Semua ({students.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('draft')}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors shrink-0 ${
+                statusFilter === 'draft'
+                  ? 'bg-slate-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+              }`}
+            >
+              Belum Ada Data ({overview?.stats.draft || 0})
             </button>
             <button
               type="button"
@@ -301,17 +352,21 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
                     <p className="text-[11px] text-slate-500 mt-0.5">
                       NISN: {s.nisn || '-'} • Rombel: {s.className}
                     </p>
-                    {s.plan.firstChoice && (
+                    {s.plan.firstChoice ? (
                       <p className="text-[11px] text-emerald-700 font-medium truncate mt-0.5">
                         🏫 {s.plan.firstChoice.schoolName}{' '}
                         {s.plan.firstChoice.majorName ? `(${s.plan.firstChoice.majorName})` : ''}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic mt-0.5">
+                        Belum ada data rencana studi (Data Kosong)
                       </p>
                     )}
                   </div>
                 </div>
 
                 {/* Status Badges & Action */}
-                <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                   <div className="text-right hidden sm:block">
                     {s.plan.status === 'verified' && (
                       <span className="px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-emerald-100 rounded-lg">
@@ -329,8 +384,10 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
                       </span>
                     )}
                     {s.plan.status === 'draft' && (
-                      <span className="px-2.5 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100 rounded-lg">
-                        Draft
+                      <span className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg ${
+                        s.plan.id ? 'text-slate-600 bg-slate-100' : 'text-slate-500 bg-slate-100 border border-slate-200/80'
+                      }`}>
+                        {s.plan.id ? 'Draft' : 'Belum Ada Data'}
                       </span>
                     )}
                   </div>
@@ -338,10 +395,19 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={() => handleOpenStudentDetail(s.id)}
-                    className="text-xs h-10 px-3.5 rounded-xl font-semibold border-slate-200 hover:bg-slate-100"
+                    onClick={() => handleOpenEditModal(s.id)}
+                    className="text-xs h-9 px-2.5 rounded-xl font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 cursor-pointer"
                   >
-                    Tinjau Rencana ➔
+                    ✏️ Edit
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => handleOpenStudentDetail(s.id)}
+                    className="text-xs h-9 px-3 rounded-xl font-semibold border-slate-200 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Tinjau ➔
                   </Button>
                 </div>
               </div>
@@ -369,6 +435,18 @@ export const HomeroomModal: React.FC<HomeroomModalProps> = ({
         studentId={selectedStudentId}
         token={token}
         onPlanUpdated={handlePlanUpdated}
+      />
+
+      {/* Edit Student Plan Modal */}
+      <EditStudentPlanModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingStudent(null);
+        }}
+        student={editingStudent}
+        token={token}
+        onPlanSaved={handlePlanUpdated}
       />
     </div>
   );

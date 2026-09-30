@@ -50,6 +50,8 @@ import type {
   StudentPlanDetail,
   VerifyPlanDTO,
   VerifyPlanResult,
+  SaveStudentPlanDTO,
+  SaveStudentPlanResult,
 } from '../types/homeroom.types';
 import type {
   ExamCommitteeMember,
@@ -202,10 +204,11 @@ export interface IDataProvider {
   deleteGradedStudent(studentId: string, token?: string): Promise<boolean>;
 
   // Homeroom & Student Continuation Plans API (Ruang Wali Kelas 9)
-  getHomeroomOverview(token: string, className?: string): Promise<HomeroomOverview>;
-  getHomeroomStudents(token: string, className?: string): Promise<HomeroomStudentItem[]>;
-  getStudentPlanDetail(studentId: string, token: string): Promise<StudentPlanDetail>;
+  getHomeroomOverview(token: string, className?: string, academicYear?: string): Promise<HomeroomOverview>;
+  getHomeroomStudents(token: string, className?: string, academicYear?: string): Promise<HomeroomStudentItem[]>;
+  getStudentPlanDetail(studentId: string, token: string, academicYear?: string): Promise<StudentPlanDetail>;
   verifyStudentPlan(dto: VerifyPlanDTO, token: string): Promise<VerifyPlanResult>;
+  saveStudentPlan?(dto: SaveStudentPlanDTO, token: string): Promise<SaveStudentPlanResult>;
   getHomeroomDocumentUrl(documentId: string, token: string): Promise<string>;
 
   // Exam Committee & Cross-Device Synchronization API (SK Panitia Ujian)
