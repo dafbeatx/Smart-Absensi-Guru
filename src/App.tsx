@@ -91,6 +91,14 @@ const MonthlySurveyAnalyticsModal = lazyRetry(
   'MonthlySurveyAnalyticsModal'
 );
 
+const OfficialDocumentVerificationModal = lazyRetry(
+  () =>
+    import('./components/ui/OfficialDocumentVerificationModal').then((m) => ({
+      default: m.OfficialDocumentVerificationModal,
+    })),
+  'OfficialDocumentVerificationModal'
+);
+
 import { shouldTriggerFridaySurvey } from './services/research-survey.service';
 
 export const App: React.FC = () => {
@@ -101,6 +109,16 @@ export const App: React.FC = () => {
   const [isPreviewScannerBlocked, setIsPreviewScannerBlocked] = useState(false);
   const [isFridaySurveyOpen, setIsFridaySurveyOpen] = useState(false);
   const [isSurveyAnalyticsOpen, setIsSurveyAnalyticsOpen] = useState(false);
+  const [verificationDocInfo, setVerificationDocInfo] = useState<{
+    isOpen: boolean;
+    docNo: string;
+    type?: string;
+    month?: string;
+    year?: string;
+    teacher?: string;
+    school?: string;
+    signatory?: string;
+  } | null>(null);
 
   const userId = user?.id;
   const userPhone = user?.phone_number;
@@ -123,6 +141,39 @@ export const App: React.FC = () => {
       document.title = appName;
     }
   }, [appName]);
+
+  // Global listener: Deteksi verifikasi dokumen dari URL scan QR
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const isVerifyRoute =
+        window.location.pathname.includes('verify-document') ||
+        window.location.hash.includes('verify-document') ||
+        params.has('verify-document') ||
+        params.has('verify_doc') ||
+        params.has('docId');
+
+      const docNo =
+        params.get('no') ||
+        params.get('code') ||
+        params.get('docId') ||
+        params.get('verify_doc') ||
+        params.get('verify-document');
+
+      if (isVerifyRoute || docNo) {
+        setVerificationDocInfo({
+          isOpen: true,
+          docNo: docNo || '421.3/SAG-BOGOR/9/2026',
+          type: params.get('type') || 'REKAP_PRESENSI',
+          month: params.get('month') || 'September',
+          year: params.get('year') || '2026',
+          teacher: params.get('teacher') || undefined,
+          school: params.get('school') || undefined,
+          signatory: params.get('signatory') || undefined,
+        });
+      }
+    }
+  }, []);
 
   // Global listener: Setiap kali memperoleh poin (Guru, Admin, Kepsek), selalu munculkan pop-up apresiasi cardless
   useEffect(() => {
@@ -275,6 +326,21 @@ export const App: React.FC = () => {
     return (
       <>
         <LoginPage />
+        {verificationDocInfo?.isOpen && (
+          <Suspense fallback={null}>
+            <OfficialDocumentVerificationModal
+              isOpen={verificationDocInfo.isOpen}
+              onClose={() => setVerificationDocInfo(null)}
+              docNo={verificationDocInfo.docNo}
+              docType={verificationDocInfo.type}
+              month={verificationDocInfo.month}
+              year={verificationDocInfo.year}
+              teacherName={verificationDocInfo.teacher}
+              schoolName={verificationDocInfo.school}
+              signatoryName={verificationDocInfo.signatory}
+            />
+          </Suspense>
+        )}
         <ToastContainer />
       </>
     );
@@ -461,6 +527,23 @@ export const App: React.FC = () => {
           <MonthlySurveyAnalyticsModal
             isOpen={isSurveyAnalyticsOpen}
             onClose={() => setIsSurveyAnalyticsOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      {/* 🛡️ Modal Publik Verifikasi Dokumen Resmi Saat Scan QR */}
+      {verificationDocInfo?.isOpen && (
+        <Suspense fallback={null}>
+          <OfficialDocumentVerificationModal
+            isOpen={verificationDocInfo.isOpen}
+            onClose={() => setVerificationDocInfo(null)}
+            docNo={verificationDocInfo.docNo}
+            docType={verificationDocInfo.type}
+            month={verificationDocInfo.month}
+            year={verificationDocInfo.year}
+            teacherName={verificationDocInfo.teacher}
+            schoolName={verificationDocInfo.school}
+            signatoryName={verificationDocInfo.signatory}
           />
         </Suspense>
       )}

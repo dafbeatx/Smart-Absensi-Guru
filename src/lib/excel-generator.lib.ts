@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import QRCode from 'qrcode';
 import type { AttendanceRecord, LeaveRequest, UserProfile, AuditLog, HolidayRecord } from '../types/database.types';
 import type { DailyAttendanceSummary } from '../services/analytics.service';
 import { APP_CONFIG } from '../config/app.config';
@@ -28,6 +29,65 @@ export const SIGNATORY_OFFICIALS = {
   TU_NAME: 'Mira Nurdianti, S.Pd',
   TU_TITLE: 'TU (Tata Usaha)',
 };
+
+/**
+ * Menghasilkan kode QR SVG asli, berstandar ISO/IEC 18004, tajam, dan 100% bisa discan oleh kamera smartphone.
+ */
+export function generateScannableQRCodeSVG(content: string, size = 64): string {
+  let svgResult = '';
+  try {
+    QRCode.toString(
+      content,
+      {
+        type: 'svg',
+        margin: 1,
+        width: size,
+        errorCorrectionLevel: 'M',
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff',
+        },
+      },
+      (err, svg) => {
+        if (!err && svg) {
+          svgResult = svg;
+        }
+      }
+    );
+  } catch (e) {
+    console.error('Failed to generate scannable QR SVG with QRCode.toString:', e);
+  }
+
+  // Fallback sinkron berbasis modul bit-matrix jika callback tidak mengembalikan langsung
+  if (!svgResult) {
+    try {
+      const qrData = QRCode.create(content, { errorCorrectionLevel: 'M' });
+      const modSize = qrData.modules.size;
+      const margin = 1;
+      const totalGrid = modSize + margin * 2;
+      const scale = size / totalGrid;
+      let pathD = '';
+      for (let r = 0; r < modSize; r++) {
+        for (let c = 0; c < modSize; c++) {
+          if (qrData.modules.get(r, c)) {
+            const x = (c + margin) * scale;
+            const y = (r + margin) * scale;
+            pathD += `M${x.toFixed(2)},${y.toFixed(2)}h${scale.toFixed(2)}v${scale.toFixed(2)}h-${scale.toFixed(2)}z `;
+          }
+        }
+      }
+      svgResult = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges" style="margin: 0 auto; display: block;"><rect width="${size}" height="${size}" fill="#ffffff"/><path d="${pathD}" fill="#0f172a"/></svg>`;
+    } catch (err2) {
+      console.error('Fallback QR code generator failed:', err2);
+    }
+  }
+
+  if (svgResult && !svgResult.includes('style=')) {
+    svgResult = svgResult.replace('<svg ', `<svg style="margin: 0 auto; display: block; border-radius: 4px; background: #ffffff;" `);
+  }
+
+  return svgResult;
+}
 
 export interface MultiSheetReportPayload {
   month: string;
@@ -283,6 +343,13 @@ export class ExcelReportGenerator {
     const monthPrefix = `${payload.year}-${String(monthNumber).padStart(2, '0')}`;
     const yearNum = parseInt(payload.year, 10) || new Date().getFullYear();
     const todayDateStr = getTodayDateInJakarta();
+
+    const docNo = `421.3/SAG-BOGOR/${parseIndonesianMonth(payload.month)}/${payload.year}`;
+    const baseUrl = typeof window !== 'undefined' && window.location?.origin && !window.location.origin.includes('localhost')
+      ? window.location.origin
+      : 'https://smart-absensi.sch.id';
+    const qrVerifyUrl = `${baseUrl}/verify-document?no=${encodeURIComponent(docNo)}&type=REKAP_PRESENSI&month=${encodeURIComponent(payload.month)}&year=${payload.year}&school=${encodeURIComponent(getDynamicBranding().institutionName)}&signatory=${encodeURIComponent(SIGNATORY_OFFICIALS.KEPSEK_NAME)}`;
+    const qrSvg = generateScannableQRCodeSVG(qrVerifyUrl, 64);
 
     const totalTeachers = payload.summary.totalTeachers || 1;
     const totalExpectedCapacity = totalTeachers * effectiveDays;
@@ -756,13 +823,10 @@ export class ExcelReportGenerator {
             <!-- QR Validasi Dokumen Resmi -->
             <div style="text-align: center; padding: 8px 14px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 8px; max-width: 190px;">
               <div style="font-weight: 800; color: #1e40af; font-size: 9px; margin-bottom: 4px;">🛡️ VALIDASI DOKUMEN RESMI</div>
-              <div style="margin-bottom: 4px;">
-                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto; display: block;">
-                  <rect width="18" height="18" x="3" y="3" rx="2"/>
-                  <path d="M7 7h.01"/><path d="M17 7h.01"/><path d="M7 17h.01"/><path d="M17 17h.01"/><path d="M7 12h10"/><path d="M12 7v10"/>
-                </svg>
+              <div style="margin: 4px auto; display: flex; justify-content: center; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e1; width: 70px; height: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" title="Pindai QR untuk Verifikasi: ${qrVerifyUrl}" data-qr-payload="${qrVerifyUrl}">
+                ${qrSvg}
               </div>
-              <div style="color: #475569; font-weight: 600;">No: 421.3/SAG-BOGOR/${parseIndonesianMonth(payload.month)}/${payload.year}</div>
+              <div style="color: #475569; font-weight: 600; margin-top: 4px;">No: ${docNo}</div>
               <div style="color: #15803d; font-weight: 700; margin-top: 2px;">TERVERIFIKASI RESMI &amp; Kriptografis</div>
             </div>
 
@@ -824,6 +888,13 @@ export class ExcelReportGenerator {
     const monthPrefix = `${year}-${String(monthNumber).padStart(2, '0')}`;
     const yearNum = parseInt(year, 10) || new Date().getFullYear();
     const todayDateStr = getTodayDateInJakarta();
+
+    const docNo = `421.3/IND-${teacher.nip || teacher.id.slice(0, 8)}/${monthPrefix}`;
+    const baseUrl = typeof window !== 'undefined' && window.location?.origin && !window.location.origin.includes('localhost')
+      ? window.location.origin
+      : 'https://smart-absensi.sch.id';
+    const qrVerifyUrl = `${baseUrl}/verify-document?no=${encodeURIComponent(docNo)}&type=PRESENSI_INDIVIDU&teacher=${encodeURIComponent(teacher.full_name)}&month=${encodeURIComponent(month)}&year=${year}&school=${encodeURIComponent(getDynamicBranding().institutionName)}&signatory=${encodeURIComponent(SIGNATORY_OFFICIALS.KEPSEK_NAME)}`;
+    const qrSvg = generateScannableQRCodeSVG(qrVerifyUrl, 64);
 
     const teacherRecords = records.filter((r) => isTeacherRecordMatch(teacher, r) && (!r.date || r.date.startsWith(monthPrefix)));
     const teacherLeaves = leaveRequests.filter((l) => isTeacherLeaveMatch(teacher, l));
@@ -1173,13 +1244,10 @@ export class ExcelReportGenerator {
           <!-- QR Validasi Dokumen Resmi Individu -->
           <div style="text-align: center; padding: 8px 14px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 8px; max-width: 190px;">
             <div style="font-weight: 800; color: #1e40af; font-size: 9px; margin-bottom: 4px;">🛡️ VALIDASI DOKUMEN RESMI</div>
-            <div style="margin-bottom: 4px;">
-              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto; display: block;">
-                <rect width="18" height="18" x="3" y="3" rx="2"/>
-                <path d="M7 7h.01"/><path d="M17 7h.01"/><path d="M7 17h.01"/><path d="M17 17h.01"/><path d="M7 12h10"/><path d="M12 7v10"/>
-              </svg>
+            <div style="margin: 4px auto; display: flex; justify-content: center; align-items: center; background: #ffffff; padding: 3px; border-radius: 6px; border: 1px solid #cbd5e1; width: 70px; height: 70px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" title="Pindai QR untuk Verifikasi: ${qrVerifyUrl}" data-qr-payload="${qrVerifyUrl}">
+              ${qrSvg}
             </div>
-            <div style="color: #475569; font-weight: 600;">No: 421.3/IND-${teacher.nip || teacher.id.slice(0, 8)}/${monthPrefix}</div>
+            <div style="color: #475569; font-weight: 600; margin-top: 4px;">No: ${docNo}</div>
             <div style="color: #15803d; font-weight: 700; margin-top: 2px;">TERVERIFIKASI RESMI &amp; Kriptografis</div>
           </div>
 

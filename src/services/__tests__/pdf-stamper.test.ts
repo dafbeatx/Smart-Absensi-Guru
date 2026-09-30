@@ -190,6 +190,18 @@ export const runPdfStamperTestSuite = async (): Promise<{
       ),
       'Official wet stamps & validation QR elements verified in both reports'
     );
+
+    // Test 7: Scannable QR Code Integrity (Eliminates dummy icon placeholder)
+    const hasDummyMaster = masterHtml.includes('M7 7h.01') || masterHtml.includes('M7 12h10');
+    const hasDummyIndividual = individualHtml.includes('M7 7h.01') || individualHtml.includes('M7 12h10');
+    const hasRealQrMaster = masterHtml.includes('xmlns="http://www.w3.org/2000/svg"') && masterHtml.includes('verify-document?no=');
+    const hasRealQrIndividual = individualHtml.includes('xmlns="http://www.w3.org/2000/svg"') && individualHtml.includes('verify-document?no=');
+
+    assert(
+      'PDF-Lib - Scannable Real QR SVG Replaces Dummy Icon in Official Reports',
+      !hasDummyMaster && !hasDummyIndividual && hasRealQrMaster && hasRealQrIndividual,
+      `Master: Real=${hasRealQrMaster}, Dummy=${hasDummyMaster} | Individual: Real=${hasRealQrIndividual}, Dummy=${hasDummyIndividual}`
+    );
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
     assert('PDF-Lib - Test Execution Error', false, errMsg);
