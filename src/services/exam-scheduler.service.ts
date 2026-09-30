@@ -283,7 +283,7 @@ export class ExamSchedulerService {
 
     const subjects = config.selectedSubjects && config.selectedSubjects.length > 0
       ? config.selectedSubjects
-      : ['PAI', 'PKn', 'Bahasa Indonesia', 'Matematika', 'IPA', 'IPS', 'Bahasa Inggris', 'Informatika', 'Seni Budaya', 'PJOK'];
+      : ['PAI', 'PKn', 'Bahasa Indonesia', 'Matematika', 'IPA', 'IPS', 'Bahasa Arab', 'Bahasa Inggris', 'Informatika', 'Seni Budaya', 'PJOK'];
 
     const classRoomMap = new Map<string, string>();
     classes.forEach((cls, clsIdx) => {

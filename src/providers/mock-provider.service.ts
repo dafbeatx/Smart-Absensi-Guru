@@ -96,6 +96,7 @@ import {
 } from '../utils/teaching-schedule.utils';
 import { resolveSchoolLevel } from '../utils/class.utils';
 import { getInitialSeedTeacherPointLogs } from '../utils/teacher-point-seed.utils';
+import { OFFICIAL_STUDENTS_2026_2027 } from '../data/official-students-2026-2027';
 
 const memoryStore = new Map<string, string>();
 
@@ -2272,48 +2273,11 @@ export class MockProvider implements IDataProvider {
     academicYear = '2026/2027',
     token?: string
   ): Promise<{ syncedCount: number; classesCount: number }> {
-    // Initial 2026/2027 roster of promoted & new students for offline / fallback
-    const defaultRoster = [
-      // Kelas 7 (Siswa Baru)
-      { name: 'ADIBA KHANSA AZ-ZAHRA', class: '7' },
-      { name: 'AKBAR AZHI MUGHNI', class: '7' },
-      { name: 'CALISA CANIA MARYAM', class: '7' },
-      { name: 'HANIFAH AL-QUSYARI', class: '7' },
-      { name: 'IFHAM FATHAR MUBAROK', class: '7' },
-      { name: 'MUHAMAD IBNU ZIKRA', class: '7' },
-      // Kelas 8A (Naik dari 7A)
-      { name: 'BILQIS AINUN NISSA', class: '8A' },
-      { name: 'KIRANA AURA ANWARUDIN', class: '8A' },
-      { name: 'NAJWA NUR FADILLAH', class: '8A' },
-      { name: 'RADISTI PUTRI RIANTI', class: '8A' },
-      { name: 'SUCI RAHMAWATI', class: '8A' },
-      { name: 'TASYIRA AFIFA', class: '8A' },
-      { name: 'YOLA AULIA SANTOSO', class: '8A' },
-      // Kelas 8B (Naik dari 7B)
-      { name: 'ABILA YAZID RIZAQI', class: '8B' },
-      { name: 'FARDHAN HANIF', class: '8B' },
-      { name: 'MARVHEL PUTRA IHSANUL ALIM', class: '8B' },
-      { name: 'MUHAMAD RAKA ADITYA', class: '8B' },
-      { name: 'ROMADONI', class: '8B' },
-      // Kelas 9A (Naik dari 8A)
-      { name: 'AJENG ALIFATUL KHOIR', class: '9A' },
-      { name: 'AZZAHRA ASHILA ROHMAH', class: '9A' },
-      { name: 'FUJI HIKMAH', class: '9A' },
-      { name: 'SEPTI MUJIANTI', class: '9A' },
-      { name: 'SIFA NURKHALIFAH', class: '9A' },
-      // Kelas 9B (Naik dari 8B)
-      { name: 'ANDIKA PRATAMA', class: '9B' },
-      { name: 'FAIRUZ PRASETIA', class: '9B' },
-      { name: 'FARIZ ABQORI MAULANA', class: '9B' },
-      { name: 'FITRA RAMADHAN', class: '9B' },
-      { name: 'WILDAN KHOER BASUKI', class: '9B' },
-      // Kelas SMA
-      { name: 'ARNESTA HADIWINATA', class: 'SMA' },
-      { name: 'EVIANA', class: 'SMA' },
-      { name: 'HAYATUSSIFA', class: 'SMA' },
-      { name: 'NAZWATUNNISA', class: 'SMA' },
-      { name: 'NYIMAS RANI RAHMAWATI', class: 'SMA' },
-    ];
+    // Master 2026/2027 roster of 144 official students from official Excel template
+    const defaultRoster = OFFICIAL_STUDENTS_2026_2027.map((s) => ({
+      name: s.fullName,
+      class: s.className,
+    }));
 
     const deletedKeys = getDeletedStudentKeys();
     const currentList = await this.getStudents(token);

@@ -59,7 +59,7 @@ export const OFFICIAL_SCHOOL_SUBJECTS: OfficialSchoolSubject[] = [
     name: 'Bahasa Arab',
     label: 'B. Arab – Bahasa Arab',
     category: 'Muatan Lokal',
-    aliases: ['B. Arab', 'Bahasa Arab', 'BARB', 'Arab'],
+    aliases: ['B. Arab', 'Bahasa Arab', 'BARB', 'Arab', 'B Arab', 'B.Arab', 'Bahasa Arab (Muatan Lokal)', 'B. Arab – Bahasa Arab'],
   },
   {
     code: 'B. Inggris',

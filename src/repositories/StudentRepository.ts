@@ -108,7 +108,16 @@ export class StudentRepository {
   public static async getStudentsByClass(className: string, token?: string): Promise<StudentItem[]> {
     const all = await this.getStudents(token);
     if (!className || className === 'ALL') return all;
-    return all.filter((s) => areClassCodesEqual(s.className, className));
+    return all.filter((s) => {
+      if (areClassCodesEqual(s.className, className)) return true;
+      const normS = normalizeClassCode(s.className);
+      const normTarget = normalizeClassCode(className);
+      if ((normS === '7' && (normTarget === '7A' || normTarget === '7B')) ||
+          (normTarget === '7' && (normS === '7A' || normS === '7B'))) {
+        return true;
+      }
+      return false;
+    });
   }
 
   /**
@@ -217,7 +226,7 @@ export class StudentRepository {
     }
 
     // 4. Default Fallback Rombel Umum Sekolah (Zero Network)
-    const fallbackClasses = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
+    const fallbackClasses = ['7', '7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
     return {
       classes: fallbackClasses,
       classStudentCounts: {},

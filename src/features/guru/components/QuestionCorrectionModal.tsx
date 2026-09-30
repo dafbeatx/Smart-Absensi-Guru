@@ -67,9 +67,10 @@ interface QuestionCorrectionModalProps {
   currentUser: UserProfile;
 }
 
-const PREDEFINED_CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
+const PREDEFINED_CLASSES = ['7', '7A', '7B', '8A', '8B', '9A', '9B', 'SMA'];
 const PREDEFINED_SUBJECTS = [
   ...OFFICIAL_SCHOOL_SUBJECTS.map((s) => s.label),
+  'Bahasa Arab',
   'PJOK',
 ];
 const PREDEFINED_EXAM_TYPES = ['Harian', 'PTS / UTS', 'PAS / UAS', 'ASTS', 'ASAJ', 'Simulasi'];
@@ -197,10 +198,15 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
       // Populate classes dynamically from student directory
       StudentRepository.getStudents()
-        .then((stus) => {
-          if (Array.isArray(stus) && stus.length > 0) {
+        .then(async (stus) => {
+          let list = stus;
+          if (!list || list.length === 0) {
+            await StudentRepository.syncFromGradeMaster('2026/2027');
+            list = await StudentRepository.getStudents();
+          }
+          if (Array.isArray(list) && list.length > 0) {
             const set = new Set<string>(PREDEFINED_CLASSES);
-            stus.forEach((s) => {
+            list.forEach((s) => {
               const norm = normalizeClassCode(s.className);
               if (norm) set.add(norm);
             });
@@ -294,10 +300,14 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const loadSessionData = useCallback(async (session: ExamSessionRecord) => {
     try {
       const classIdentifier = session.class_code || session.class_name;
-      const [students, grades] = await Promise.all([
+      let [students, grades] = await Promise.all([
         StudentRepository.getStudentsByClass(classIdentifier),
         ExamCorrectionRepository.getGradedStudents(session.id),
       ]);
+      if (!students || students.length === 0) {
+        await StudentRepository.syncFromGradeMaster(session.academic_year || '2026/2027');
+        students = await StudentRepository.getStudentsByClass(classIdentifier);
+      }
       setClassStudents(students);
       setGradedStudents(grades);
     } catch (err) {

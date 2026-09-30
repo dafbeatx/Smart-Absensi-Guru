@@ -24,7 +24,11 @@ export const StudentDirectoryModal: React.FC<StudentDirectoryModalProps> = ({
   const loadStudents = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await StudentRepository.getStudents();
+      let data = await StudentRepository.getStudents();
+      if (!data || data.length === 0) {
+        await StudentRepository.syncFromGradeMaster('2026/2027');
+        data = await StudentRepository.getStudents();
+      }
       setStudents(data || []);
     } catch (err) {
       console.warn('Gagal memuat direktori siswa:', err);

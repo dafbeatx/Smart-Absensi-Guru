@@ -47,6 +47,7 @@ import { runStudentSyncDedupTestSuite } from './__tests__/student-sync-dedup.tes
 import { runMeetingMinutesTestSuite } from './__tests__/meeting-minutes.test';
 import { runAttendanceTimeWindowTestSuite } from './__tests__/attendance-time-window.test';
 import { runResearchSurveyTestSuite } from './__tests__/research-survey.test';
+import { runOfficialStudentsAndArabicTestSuite } from './__tests__/official-students-and-arabic.test';
 
 export interface TestResultItem {
   testName: string;
@@ -131,6 +132,7 @@ export class MasterTestRunner {
       { name: 'Meeting Minutes & Notulen Rapat AI Restructuring Engine (Phase 4.9)', fn: runMeetingMinutesTestSuite },
       { name: 'Attendance Jakarta Time Window & Double Attendance Prevention (Phase 5.0)', fn: runAttendanceTimeWindowTestSuite },
       { name: 'Weekly Research Survey & Quantitative TAM Evaluation Engine (Phase 5.1)', fn: runResearchSurveyTestSuite },
+      { name: 'Master Data Siswa 2026/2027 & Mapel Bahasa Arab', fn: runOfficialStudentsAndArabicTestSuite },
     ];
 
     let totalPassed = 0;
