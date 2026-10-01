@@ -31,6 +31,7 @@ import {
   Globe,
   ExternalLink,
   Calendar,
+  Edit3,
 } from 'lucide-react';
 import type {
   ExamSessionRecord,
@@ -142,6 +143,13 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [isKeyEditorModalOpen, setIsKeyEditorModalOpen] = useState(false);
   const [editingSessionTarget, setEditingSessionTarget] = useState<ExamSessionRecord | null>(null);
   const [quickKeyInput, setQuickKeyInput] = useState('');
+  const [editingSessionFormat, setEditingSessionFormat] = useState<'PG_ONLY' | 'PG_AND_ESSAY'>('PG_AND_ESSAY');
+
+  // Quick Essay Batch & Inline Edit State
+  const [isEditingFromRecap, setIsEditingFromRecap] = useState(false);
+  const [isBatchEssayModalOpen, setIsBatchEssayModalOpen] = useState(false);
+  const [batchScores, setBatchScores] = useState<Record<string, number>>({});
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
 
   const undoStack = useRef<{ qNum: number; prev: string | undefined }[]>([]);
   const questionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -368,6 +376,9 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const handleOpenKeyEditor = async (session: ExamSessionRecord, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setEditingSessionTarget(session);
+    const isPgOnly = (session.scoring_config?.essayCount ?? 0) === 0 || (session.scoring_config?.essayWeight ?? 0) === 0;
+    setEditingSessionFormat(isPgOnly ? 'PG_ONLY' : 'PG_AND_ESSAY');
+
     let keys = Array.isArray(session.answer_key) ? session.answer_key : [];
     if (keys.length === 0 && session.id) {
       try {
@@ -403,6 +414,20 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       return;
     }
 
+    const parsedScoringConfig = editingSessionFormat === 'PG_ONLY'
+      ? {
+          pgWeight: 1.0,
+          essayWeight: 0,
+          essayMaxScore: 0,
+          essayCount: 0,
+        }
+      : {
+          pgWeight: 0.7,
+          essayWeight: 0.3,
+          essayMaxScore: 20,
+          essayCount: 5,
+        };
+
     try {
       const updated = await ExamCorrectionRepository.saveSession({
         id: sessionToUpdate.id,
@@ -419,7 +444,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         academic_year: sessionToUpdate.academic_year,
         semester: sessionToUpdate.semester,
         exam_type: sessionToUpdate.exam_type,
-        scoring_config: sessionToUpdate.scoring_config,
+        scoring_config: parsedScoringConfig,
       });
 
       // Update in sessions list
@@ -595,17 +620,25 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     setStudentSearchQuery(name);
     setIsStudentDropdownOpen(false);
 
+    const count = activeSession?.scoring_config?.essayCount || 5;
+
     // If student already has recorded grade in this session, prefill
     const existing = gradedStudents.find((g) => g.name.toLowerCase().trim() === name.toLowerCase().trim());
     if (existing) {
       setUserAnswers(existing.mcq_answers || {});
-      setEssayScores(existing.essay_scores || [0, 0, 0, 0, 0]);
+      const initialScores =
+        Array.isArray(existing.essay_scores) && existing.essay_scores.length > 0
+          ? (existing.essay_scores.length === count
+              ? existing.essay_scores
+              : [...existing.essay_scores, ...Array(Math.max(0, count - existing.essay_scores.length)).fill(0)].slice(0, count))
+          : Array(count).fill(0);
+      setEssayScores(initialScores);
       
       // If student previously had a manual override, restore it
       const calcForExisting = calculateStudentResult(
         activeSession?.answer_key || [],
         existing.mcq_answers || {},
-        existing.essay_scores || [0, 0, 0, 0, 0],
+        initialScores,
         activeSession?.scoring_config
       );
       if (Number(existing.final_score) !== calcForExisting.finalScore) {
@@ -632,11 +665,16 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       (cs) => cs.fullName?.toLowerCase().trim() === selectedStudentName.toLowerCase().trim()
     );
 
+    const existingGraded = gradedStudents.find(
+      (g) => g.name.toLowerCase().trim() === selectedStudentName.toLowerCase().trim()
+    );
+
     try {
       const saved = await ExamCorrectionRepository.saveGradedStudent({
+        id: existingGraded?.id,
         session_id: activeSession.id,
         name: selectedStudentName.trim(),
-        student_user_id: matchedStudent?.id,
+        student_user_id: matchedStudent?.id || existingGraded?.student_user_id,
         mcq_answers: userAnswers,
         essay_scores: essayScores,
         mcq_score: Math.round(calculation.score),
@@ -659,6 +697,17 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         }
         return [...prev, saved];
       });
+
+      // If editing from recap table, cleanly navigate back to recap
+      if (isEditingFromRecap) {
+        setIsEditingFromRecap(false);
+        setActiveTab('recap');
+        setToastMessage({
+          text: `Nilai ${saved.name} (Skor Akhir: ${effectiveFinalScore}) berhasil diperbarui!`,
+          type: 'success',
+        });
+        return;
+      }
 
       // Reliable auto-advance to next ungraded student from full class list
       const savedNameNorm = saved.name.toLowerCase().trim();
@@ -691,6 +740,161 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       logger.error('QuestionCorrectionModal', 'Failed to save student score:', err);
       const errMsg = err?.message ? `Gagal menyimpan nilai: ${err.message}` : 'Gagal menyimpan nilai siswa. Periksa koneksi!';
       setToastMessage({ text: errMsg, type: 'error' });
+    }
+  };
+
+  // Quick Inline Essay Edit handler from Recap Table
+  const handleTableEssayBlur = async (student: GradedStudentScoreRecord, rawVal: string) => {
+    if (!activeSession) return;
+    const newScore = Math.max(0, Math.min(100, parseInt(rawVal, 10) || 0));
+    if (newScore === Number(student.essay_score)) return;
+
+    const count = activeSession.scoring_config?.essayCount || 5;
+    const maxScore = activeSession.scoring_config?.essayMaxScore || 20;
+    const maxPerItem = Math.max(1, Math.round(maxScore / count));
+    const rawTotal = Math.round((newScore / 100) * maxScore);
+
+    let remaining = rawTotal;
+    const newEssayScores: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const itm = Math.min(maxPerItem, remaining);
+      newEssayScores.push(itm);
+      remaining -= itm;
+    }
+
+    const pgWeight = activeSession.scoring_config?.pgWeight ?? 0.7;
+    const essayWeight = activeSession.scoring_config?.essayWeight ?? 0.3;
+    const newFinalScore = Math.round(Number(student.mcq_score) * pgWeight + newScore * essayWeight);
+    const newLps = Math.round(Number(student.mcq_score) * 0.6 + newScore * 0.4);
+
+    // Optimistic UI update
+    setGradedStudents((prev) =>
+      prev.map((item) =>
+        item.id === student.id
+          ? {
+              ...item,
+              essay_score: newScore,
+              essay_scores: newEssayScores,
+              final_score: newFinalScore,
+              lps: newLps,
+            }
+          : item
+      )
+    );
+
+    try {
+      await ExamCorrectionRepository.saveGradedStudent({
+        id: student.id,
+        session_id: activeSession.id,
+        name: student.name,
+        student_user_id: student.student_user_id,
+        mcq_answers: student.mcq_answers,
+        essay_scores: newEssayScores,
+        mcq_score: student.mcq_score,
+        essay_score: newScore,
+        final_score: newFinalScore,
+        csi: student.csi,
+        lps: newLps,
+        correct: student.correct,
+        wrong: student.wrong,
+        answer_key: activeSession.answer_key,
+      });
+      setToastMessage({
+        text: `Nilai essay ${student.name} berhasil disimpan: ${newScore} (Skor Akhir: ${newFinalScore})`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      logger.error('QuestionCorrectionModal', 'Failed to update inline essay:', err);
+      setToastMessage({ text: 'Gagal menyimpan nilai essay ke server.', type: 'error' });
+      const reloaded = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
+      setGradedStudents(reloaded);
+    }
+  };
+
+  // Open Batch Essay Modal
+  const handleOpenBatchEssayModal = () => {
+    const initialScores: Record<string, number> = {};
+    gradedStudents.forEach((s) => {
+      initialScores[s.id] = Number(s.essay_score) || 0;
+    });
+    setBatchScores(initialScores);
+    setIsBatchEssayModalOpen(true);
+  };
+
+  // Apply mass score to all students who still have 0 essay score
+  const handleApplyMassEssayScore = (val: number) => {
+    setBatchScores((prev) => {
+      const updated = { ...prev };
+      gradedStudents.forEach((s) => {
+        if (!updated[s.id] || updated[s.id] === 0) {
+          updated[s.id] = val;
+        }
+      });
+      return updated;
+    });
+    setToastMessage({ text: `Nilai ${val} disiapkan untuk siswa yang essay-nya masih 0`, type: 'success' });
+  };
+
+  // Save all modified essay scores in batch
+  const handleSaveAllBatchEssay = async () => {
+    if (!activeSession) return;
+    setIsSavingBatch(true);
+    try {
+      const count = activeSession.scoring_config?.essayCount || 5;
+      const maxScore = activeSession.scoring_config?.essayMaxScore || 20;
+      const maxPerItem = Math.max(1, Math.round(maxScore / count));
+      const pgWeight = activeSession.scoring_config?.pgWeight ?? 0.7;
+      const essayWeight = activeSession.scoring_config?.essayWeight ?? 0.3;
+
+      let savedCount = 0;
+      for (const st of gradedStudents) {
+        const newScore = batchScores[st.id] !== undefined ? batchScores[st.id] : Number(st.essay_score) || 0;
+        if (newScore === Number(st.essay_score)) continue;
+
+        const rawTotal = Math.round((newScore / 100) * maxScore);
+        let remaining = rawTotal;
+        const newEssayScores: number[] = [];
+        for (let i = 0; i < count; i++) {
+          const itm = Math.min(maxPerItem, remaining);
+          newEssayScores.push(itm);
+          remaining -= itm;
+        }
+
+        const newFinalScore = Math.round(Number(st.mcq_score) * pgWeight + newScore * essayWeight);
+        const newLps = Math.round(Number(st.mcq_score) * 0.6 + newScore * 0.4);
+
+        await ExamCorrectionRepository.saveGradedStudent({
+          id: st.id,
+          session_id: activeSession.id,
+          name: st.name,
+          student_user_id: st.student_user_id,
+          mcq_answers: st.mcq_answers,
+          essay_scores: newEssayScores,
+          mcq_score: st.mcq_score,
+          essay_score: newScore,
+          final_score: newFinalScore,
+          csi: st.csi,
+          lps: newLps,
+          correct: st.correct,
+          wrong: st.wrong,
+          answer_key: activeSession.answer_key,
+        });
+        savedCount++;
+      }
+
+      // Reload fresh data from repository
+      const refreshed = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
+      setGradedStudents(refreshed);
+      setIsBatchEssayModalOpen(false);
+      setToastMessage({
+        text: `Berhasil memperbarui nilai essay untuk ${savedCount} siswa!`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      logger.error('QuestionCorrectionModal', 'Failed batch saving essay scores:', err);
+      setToastMessage({ text: 'Gagal menyimpan nilai essay batch: ' + (err?.message || 'Error'), type: 'error' });
+    } finally {
+      setIsSavingBatch(false);
     }
   };
 
@@ -1704,6 +1908,27 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start max-w-7xl mx-auto w-full">
             {/* Left Column: Student Selector & Answer Sheet */}
             <div className="lg:col-span-8 space-y-4">
+              {/* Return to Recap Banner if Editing Student */}
+              {isEditingFromRecap && (
+                <div className="p-3.5 bg-teal-50 border border-teal-200 rounded-2xl flex items-center justify-between text-xs text-teal-900 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-teal-700 shrink-0" />
+                    <span>
+                      Mode Edit Nilai Siswa: <strong className="text-teal-950 font-bold">{selectedStudentName}</strong>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingFromRecap(false);
+                      setActiveTab('recap');
+                    }}
+                    className="px-3 py-1 bg-white hover:bg-teal-100 border border-teal-300 rounded-xl text-xs font-bold text-teal-800 transition-colors shadow-2xs"
+                  >
+                    Kembali ke Rekap
+                  </button>
+                </div>
+              )}
               {/* Class Mapping Warning if no students found in master */}
               {classStudents.length === 0 && (
                 <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900 shadow-xs">
@@ -2008,31 +2233,78 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 {/* Essay Inputs (Only if Session has essay questions configured) */}
                 {((activeSession.scoring_config?.essayCount ?? 0) > 0 &&
                   (activeSession.scoring_config?.essayMaxScore ?? 0) > 0) ? (
-                  <div className="pt-2 border-t border-slate-200">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-2">
-                      Nilai Essay ({activeSession.scoring_config?.essayCount || 5} Soal, maks 4/soal)
-                    </span>
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {essayScores.map((score, idx) => (
-                        <div key={idx} className="text-center">
-                          <span className="text-[9px] text-slate-500 block mb-0.5">#{idx + 1}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            max="4"
-                            value={score}
-                            onChange={(e) => {
-                              const val = Math.max(0, Math.min(4, parseInt(e.target.value, 10) || 0));
-                              setEssayScores((prev) => {
-                                const next = [...prev];
-                                next[idx] = val;
-                                return next;
-                              });
-                            }}
-                            className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-center text-xs font-black text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                          />
-                        </div>
-                      ))}
+                  <div className="pt-2 border-t border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Nilai Essay ({activeSession.scoring_config?.essayCount || 5} Soal)
+                      </span>
+                      <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                        Skor: {calculation ? Math.round(calculation.essayScore) : 0} / 100
+                      </span>
+                    </div>
+
+                    {/* Mode A: Total Nilai Essay Langsung (0-100) */}
+                    <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 block">
+                        Input Total Nilai Essay Langsung (0–100):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={calculation && calculation.essayScore > 0 ? Math.round(calculation.essayScore) : ''}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
+                          const count = activeSession.scoring_config?.essayCount || 5;
+                          const maxScore = activeSession.scoring_config?.essayMaxScore || 20;
+                          const rawTotal = Math.round((val / 100) * maxScore);
+                          const maxPerItem = Math.max(1, Math.round(maxScore / count));
+                          let remaining = rawTotal;
+                          const newScores: number[] = [];
+                          for (let i = 0; i < count; i++) {
+                            const itm = Math.min(maxPerItem, remaining);
+                            newScores.push(itm);
+                            remaining -= itm;
+                          }
+                          setEssayScores(newScores);
+                        }}
+                        placeholder="Ketik total essay (misal: 80)..."
+                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                      />
+                    </div>
+
+                    {/* Mode B: Rincian Nilai per Soal */}
+                    <div>
+                      <span className="text-[9px] text-slate-500 block mb-1">
+                        Atau Rincian Nilai per Butir (maks {Math.max(1, Math.round((activeSession.scoring_config?.essayMaxScore || 20) / (activeSession.scoring_config?.essayCount || 5)))}/soal):
+                      </span>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {essayScores.map((score, idx) => {
+                          const maxPerItem = Math.max(1, Math.round((activeSession.scoring_config?.essayMaxScore || 20) / (activeSession.scoring_config?.essayCount || 5)));
+                          return (
+                            <div key={idx} className="text-center">
+                              <span className="text-[9px] text-slate-500 block mb-0.5">#{idx + 1}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxPerItem}
+                                value={score === 0 ? '' : score}
+                                placeholder="0"
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const val = e.target.value === '' ? 0 : Math.max(0, Math.min(maxPerItem, parseInt(e.target.value, 10) || 0));
+                                  setEssayScores((prev) => {
+                                    const next = [...prev];
+                                    next[idx] = val;
+                                    return next;
+                                  });
+                                }}
+                                className="w-full bg-white border border-slate-300 rounded-lg p-1.5 text-center text-xs font-black text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -2058,7 +2330,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       className="w-full py-3 bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-700 hover:to-[#023246] disabled:opacity-40 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-xs flex items-center justify-center gap-2 transition-all min-h-12 active:scale-[0.98]"
                     >
                       <Save className="w-4 h-4" />
-                      <span>Simpan & Siswa Berikutnya</span>
+                      <span>{isEditingFromRecap ? 'Simpan Perubahan & Kembali ke Rekap' : 'Simpan & Siswa Berikutnya'}</span>
                     </button>
                   )}
                 </div>
@@ -2103,6 +2375,20 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* 0. Input Cepat Essay Batch Button */}
+                {((activeSession.scoring_config?.essayCount ?? 0) > 0 &&
+                  (activeSession.scoring_config?.essayMaxScore ?? 0) > 0) && (
+                  <button
+                    type="button"
+                    onClick={handleOpenBatchEssayModal}
+                    className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1.5 border border-indigo-200 shadow-2xs transition-all min-h-10"
+                    title="Buka form input nilai essay cepat untuk seluruh siswa sekaligus"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Input Cepat Essay (Semua Siswa)</span>
+                  </button>
+                )}
+
                 {/* 1. Official ASTS & ASAS Multi-Sheet Excel */}
                 <button
                   type="button"
@@ -2219,7 +2505,30 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                             <td className="py-2.5 px-3 text-center text-emerald-700 font-bold">{s.correct}</td>
                             <td className="py-2.5 px-3 text-center text-rose-600 font-bold">{s.wrong}</td>
                             <td className="py-2.5 px-3 text-center font-mono text-slate-700">{s.mcq_score}</td>
-                            <td className="py-2.5 px-3 text-center font-mono text-slate-700">{s.essay_score}</td>
+                            <td className="py-2 px-2 text-center">
+                              {((activeSession.scoring_config?.essayCount ?? 0) > 0 &&
+                                (activeSession.scoring_config?.essayMaxScore ?? 0) > 0) ? (
+                                <div className="inline-flex items-center justify-center gap-1">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    defaultValue={s.essay_score || 0}
+                                    key={`${s.id}_${s.essay_score}`}
+                                    onBlur={(e) => handleTableEssayBlur(s, e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    className="w-16 h-8 text-center font-mono font-bold text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 hover:border-teal-500 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 rounded-lg text-slate-900 transition-all"
+                                    title="Ketik nilai essay (0-100), tekan Enter atau klik di luar untuk menyimpan"
+                                  />
+                                </div>
+                              ) : (
+                                <span className="font-mono text-slate-400">-</span>
+                              )}
+                            </td>
                             <td className="py-2.5 px-3.5 text-center">
                               <span className="text-sm font-black text-slate-900">{score}</span>
                             </td>
@@ -2333,11 +2642,26 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               </button>
             </div>
 
-            <div className="space-y-2 flex-1 sm:flex-initial">
-              <label className="text-xs font-semibold text-slate-700">
-                Kunci Jawaban PG (Bisa paste format 1.A 2.B atau ABCD...)
-              </label>
-              <textarea
+            <div className="space-y-3 flex-1 sm:flex-initial">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Format Penilaian Sesi
+                </label>
+                <select
+                  value={editingSessionFormat}
+                  onChange={(e) => setEditingSessionFormat(e.target.value as 'PG_ONLY' | 'PG_AND_ESSAY')}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                >
+                  <option value="PG_ONLY">Pilihan Ganda Saja (100% PG)</option>
+                  <option value="PG_AND_ESSAY">Kombinasi PG (70%) + Essay (30%)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Kunci Jawaban PG (Bisa paste format 1.A 2.B atau ABCD...)
+                </label>
+                <textarea
                 rows={5}
                 value={quickKeyInput}
                 onChange={(e) => setQuickKeyInput(e.target.value)}
@@ -2348,6 +2672,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 <span>Terdeteksi: <strong className="text-teal-700">{parseAnswerKey(quickKeyInput).length}</strong> butir soal PG</span>
                 <span className="text-[10px] text-slate-400">Mendukung A, B, C, D, E</span>
               </div>
+            </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 shrink-0">
@@ -2366,6 +2691,145 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Simpan Kunci</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* BATCH ESSAY GRADING MODAL */}
+      {/* ========================================================================= */}
+      {isBatchEssayModalOpen && activeSession && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs animate-fadeIn p-3 sm:p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[92vh] rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xl flex flex-col space-y-3.5 overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-200">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Input Cepat Nilai Essay — {activeSession.session_name}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-1">
+                    Ketik nilai essay (skala 0–100) per siswa atau terapkan nilai massal sekaligus.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBatchEssayModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mass Fill Bar */}
+            <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-bold text-indigo-900">
+                Isi Massal ke Siswa yang Masih 0:
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="Contoh: 75"
+                  id="mass-essay-input"
+                  className="w-24 bg-white border border-indigo-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('mass-essay-input') as HTMLInputElement;
+                    const val = Math.max(0, Math.min(100, parseInt(el?.value || '0', 10) || 0));
+                    if (val > 0) {
+                      handleApplyMassEssayScore(val);
+                    }
+                  }}
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs"
+                >
+                  Terapkan
+                </button>
+              </div>
+            </div>
+
+            {/* Student List with Inputs */}
+            <div className="flex-1 overflow-y-auto max-h-[52vh] divide-y divide-slate-100 pr-1">
+              {gradedStudents.map((s, idx) => {
+                const currentEssay = batchScores[s.id] !== undefined ? batchScores[s.id] : Number(s.essay_score) || 0;
+                const pgWeight = activeSession.scoring_config?.pgWeight ?? 0.7;
+                const essayWeight = activeSession.scoring_config?.essayWeight ?? 0.3;
+                const liveFinal = Math.round(Number(s.mcq_score) * pgWeight + currentEssay * essayWeight);
+                const isPass = liveFinal >= (Number(activeSession.kkm) || 75);
+
+                return (
+                  <div key={s.id} className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50 px-2 rounded-lg transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-6 text-center text-xs font-mono text-slate-400">{idx + 1}</span>
+                      <div className="truncate">
+                        <span className="text-xs font-bold text-slate-900 block truncate">{s.name}</span>
+                        <span className="text-[10px] text-slate-500">Nilai PG: <strong className="text-slate-700">{s.mcq_score}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] text-slate-500 font-semibold">Essay:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={currentEssay === 0 ? '' : currentEssay}
+                          placeholder="0"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
+                            setBatchScores((prev) => ({ ...prev, [s.id]: val }));
+                          }}
+                          className="w-16 h-8 text-center font-mono font-bold text-xs bg-white border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-lg text-slate-900"
+                        />
+                        <span className="text-[10px] text-slate-400">/100</span>
+                      </div>
+
+                      <div className="w-18 text-right">
+                        <span className="text-xs font-black text-slate-900 block leading-tight">
+                          Skor: {liveFinal}
+                        </span>
+                        <span className={`text-[9px] font-bold ${isPass ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {isPass ? 'Tuntas' : 'Remedial'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+              <span className="text-xs text-slate-500">
+                {Object.keys(batchScores).length} nilai disiapkan
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBatchEssayModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingBatch}
+                  onClick={handleSaveAllBatchEssay}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isSavingBatch ? 'Menyimpan...' : 'Simpan Semua Nilai Essay'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
