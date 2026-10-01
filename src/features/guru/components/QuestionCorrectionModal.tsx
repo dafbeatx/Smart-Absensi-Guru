@@ -2521,7 +2521,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                                         (e.target as HTMLInputElement).blur();
                                       }
                                     }}
-                                    className="w-16 h-8 text-center font-mono font-bold text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 hover:border-teal-500 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 rounded-lg text-slate-900 transition-all"
+                                    className="w-16 h-8 text-center font-mono font-bold text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all"
                                     title="Ketik nilai essay (0-100), tekan Enter atau klik di luar untuk menyimpan"
                                   />
                                 </div>
@@ -2788,7 +2788,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                             const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
                             setBatchScores((prev) => ({ ...prev, [s.id]: val }));
                           }}
-                          className="w-16 h-8 text-center font-mono font-bold text-xs bg-white border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-lg text-slate-900"
+                          className="w-16 h-8 text-center font-mono font-bold text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                         />
                         <span className="text-[10px] text-slate-400">/100</span>
                       </div>
