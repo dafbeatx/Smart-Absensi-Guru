@@ -10,6 +10,7 @@ import {
   getCsiLabel,
   getLpsLabel,
   generateAutoPgAnswers,
+  generateAutoEssayScores,
 } from '../../utils/scoring.utils';
 import { ExamCorrectionRepository } from '../../repositories/ExamCorrectionRepository';
 import type { CreateExamSessionDTO, SaveGradedStudentDTO } from '../../types/database.types';
@@ -481,6 +482,48 @@ export const runQuestionCorrectionTestSuite = async (): Promise<{
       'Auto PG 04: Nilai manual 70 pada soal SMA (opsi A-E) menghasilkan 7 Benar, 3 Salah dengan opsi A-E valid',
       calcSMA.correct === 7 && calcSMA.wrong === 3 && calcSMA.score === 70 && allValidSMA,
       `calcSMA: Benar ${calcSMA.correct}, Salah ${calcSMA.wrong}, Skor ${calcSMA.score}, Valid Opsi: ${allValidSMA}`
+    );
+
+    // ── Test 28: generateAutoEssayScores - Nilai Sempurna 100%
+    const autoEssay100 = generateAutoEssayScores(100, 5, 20);
+    const sumEssay100 = autoEssay100.reduce((a, b) => a + b, 0);
+    const calcEssay100 = calculateStudentResult([], {}, autoEssay100, { pgWeight: 0, essayWeight: 1, essayMaxScore: 20, essayCount: 5 });
+    assert(
+      'Auto Essay 01: Nilai manual 100 mengisi seluruh butir essay dengan poin maksimal (5 butir x 4 poin = 20, skor 100)',
+      autoEssay100.length === 5 && sumEssay100 === 20 && calcEssay100.essayScore === 100 && autoEssay100.every((s) => s === 4),
+      `autoEssay100: [${autoEssay100.join(', ')}], sum: ${sumEssay100}, score: ${calcEssay100.essayScore}`
+    );
+
+    // ── Test 29: generateAutoEssayScores - Nilai Parsial 80% (16/20 poin)
+    const autoEssay80 = generateAutoEssayScores(80, 5, 20);
+    const sumEssay80 = autoEssay80.reduce((a, b) => a + b, 0);
+    const calcEssay80 = calculateStudentResult([], {}, autoEssay80, { pgWeight: 0, essayWeight: 1, essayMaxScore: 20, essayCount: 5 });
+    assert(
+      'Auto Essay 02: Nilai manual 80 terdistribusi merata (16 poin: [4, 3, 3, 3, 3]), skor 80',
+      autoEssay80.length === 5 && sumEssay80 === 16 && calcEssay80.essayScore === 80,
+      `autoEssay80: [${autoEssay80.join(', ')}], sum: ${sumEssay80}, score: ${calcEssay80.essayScore}`
+    );
+
+    // ── Test 30: Koreksi Nilai Manual Sinkron - PG + Essay Terpadu
+    // Saat guru mengetik nilai manual 80, PG 80% dan Essay 80% menghasilkan Final Score persis 80
+    const autoPgFor80 = generateAutoPgAnswers(sampleKey20, 80, ['A', 'B', 'C', 'D']);
+    const autoEssayFor80 = generateAutoEssayScores(80, 5, 20);
+    const combinedCalc = calculateStudentResult(
+      sampleKey20,
+      autoPgFor80,
+      autoEssayFor80,
+      { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 }
+    );
+    const autoEssayEdge0 = generateAutoEssayScores(0, 5, 20);
+    const autoEssayEdgeOver = generateAutoEssayScores(150, 5, 20);
+    assert(
+      'Auto Grading 03: Nilai manual 80 mengisi PG (80%) dan Essay (80%) secara sinkron menghasilkan Final Score 80',
+      combinedCalc.score === 80 &&
+        combinedCalc.essayScore === 80 &&
+        combinedCalc.finalScore === 80 &&
+        autoEssayEdge0.every((s) => s === 0) &&
+        autoEssayEdgeOver.reduce((a, b) => a + b, 0) === 20,
+      `combined: PG ${combinedCalc.score}, Essay ${combinedCalc.essayScore}, Final ${combinedCalc.finalScore}`
     );
   } catch (err: any) {
     assert('Fatal Execution: Question Correction Test Suite threw an uncaught error', false, err?.message);

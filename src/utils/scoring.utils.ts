@@ -360,3 +360,55 @@ export function generateAutoPgAnswers(
   return result;
 }
 
+/**
+ * Generates automated student essay scores per item to match a desired target score (0 - 100).
+ * - Distributes scores evenly across essay questions so the total raw essay score produces the target percentage.
+ * - Guarantees that each item score does not exceed maxPerItem and is >= 0.
+ * - Distributes remainder points smoothly starting from the first questions.
+ *
+ * @param targetScore Score percentage between 0 and 100
+ * @param essayCount Number of essay questions (default 5)
+ * @param essayMaxScore Total maximum raw points for all essay questions (default 20)
+ * @returns Array of numbers representing raw points per essay item, length equal to essayCount
+ */
+export function generateAutoEssayScores(
+  targetScore: number,
+  essayCount: number = 5,
+  essayMaxScore: number = 20
+): number[] {
+  const count = Math.max(0, essayCount);
+  if (count === 0) return [];
+
+  const maxScore = Math.max(1, essayMaxScore);
+  const clampedScore = Math.max(0, Math.min(100, Math.round(targetScore)));
+
+  const targetRaw = Math.min(maxScore, Math.max(0, Math.round((clampedScore / 100) * maxScore)));
+  if (targetRaw <= 0) {
+    return Array(count).fill(0);
+  }
+
+  const maxPerItem = Math.max(1, Math.ceil(maxScore / count));
+  const baseScore = Math.min(maxPerItem, Math.floor(targetRaw / count));
+  let remainder = targetRaw - baseScore * count;
+
+  const result: number[] = Array(count).fill(baseScore);
+
+  for (let i = 0; i < count && remainder > 0; i++) {
+    if (result[i] < maxPerItem) {
+      result[i] += 1;
+      remainder -= 1;
+    }
+  }
+
+  let idx = 0;
+  while (remainder > 0 && idx < count) {
+    if (result[idx] < maxPerItem) {
+      result[idx] += 1;
+      remainder -= 1;
+    }
+    idx++;
+  }
+
+  return result;
+}
+

@@ -43,7 +43,7 @@ import type {
 import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
-import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel, generateAutoPgAnswers } from '../../../utils/scoring.utils';
+import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel, generateAutoPgAnswers, generateAutoEssayScores } from '../../../utils/scoring.utils';
 import { normalizeClassCode, areClassCodesEqual, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
 import {
@@ -157,6 +157,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const questionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const dropdownRef = useRef<HTMLDivElement>(null);
   const originalStudentAnswersRef = useRef<Record<number, string>>({});
+  const originalStudentEssayScoresRef = useRef<number[]>([]);
 
   // Auto toast timer
   useEffect(() => {
@@ -658,6 +659,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const resetGradingForm = () => {
     setUserAnswers({});
     originalStudentAnswersRef.current = {};
+    originalStudentEssayScoresRef.current = [];
     setEssayScores([0, 0, 0, 0, 0]);
     setManualScore(null);
     undoStack.current = [];
@@ -685,6 +687,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               ? existing.essay_scores
               : [...existing.essay_scores, ...Array(Math.max(0, count - existing.essay_scores.length)).fill(0)].slice(0, count))
           : Array(count).fill(0);
+      originalStudentEssayScoresRef.current = initialScores;
       setEssayScores(initialScores);
       
       // If student previously had a manual override, restore it
@@ -706,9 +709,17 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   };
 
   const handleManualScoreChange = (rawVal: string) => {
+    const count = activeSession?.scoring_config?.essayCount ?? 5;
+    const maxScore = activeSession?.scoring_config?.essayMaxScore ?? 20;
+
     if (rawVal === '') {
       setManualScore(null);
       setUserAnswers(originalStudentAnswersRef.current || {});
+      setEssayScores(
+        originalStudentEssayScoresRef.current.length > 0
+          ? originalStudentEssayScoresRef.current
+          : Array(count).fill(0)
+      );
       return;
     }
     const val = Math.min(100, Math.max(0, parseInt(rawVal, 10) || 0));
@@ -723,11 +734,22 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       setUserAnswers(autoAnswers);
       undoStack.current = [];
     }
+
+    if (count > 0 && maxScore > 0) {
+      const autoEssay = generateAutoEssayScores(val, count, maxScore);
+      setEssayScores(autoEssay);
+    }
   };
 
   const handleCancelManualScore = () => {
+    const count = activeSession?.scoring_config?.essayCount ?? 5;
     setManualScore(null);
     setUserAnswers(originalStudentAnswersRef.current || {});
+    setEssayScores(
+      originalStudentEssayScoresRef.current.length > 0
+        ? originalStudentEssayScoresRef.current
+        : Array(count).fill(0)
+    );
     undoStack.current = [];
     setToastMessage({ text: 'Koreksi nilai manual dibatalkan.', type: 'success' });
   };
@@ -2426,7 +2448,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     </label>
                     {manualScore !== null && (
                       <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
-                        PG Otomatis Terisi
+                        PG &amp; Essay Otomatis Terisi
                       </span>
                     )}
                   </div>
@@ -2437,26 +2459,37 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                       max="100"
                       value={manualScore === null ? '' : manualScore}
                       onChange={(e) => handleManualScoreChange(e.target.value)}
-                      placeholder="Ketik nilai langsung..."
+                      placeholder="Ketik nilai langsung (0-100)..."
                       className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                      title="Ketik nilai manual (0-100), butir soal PG dan nilai essay otomatis terisi"
                     />
                     {manualScore !== null && (
                       <button
                         type="button"
                         onClick={handleCancelManualScore}
-                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700 border border-slate-200 shrink-0"
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700 border border-slate-200 shrink-0 cursor-pointer"
                       >
                         Batal
                       </button>
                     )}
                   </div>
                   {manualScore !== null && calculation && (
-                    <p className="text-[10px] text-teal-700 font-medium mt-1.5 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                      <span>
-                        Jawaban PG terisi: <strong>{calculation.correct} Benar</strong>, <strong>{calculation.wrong} Salah</strong>
-                      </span>
-                    </p>
+                    <div className="text-[10px] text-teal-700 font-medium mt-1.5 space-y-0.5">
+                      <p className="flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                        <span>
+                          Jawaban PG terisi: <strong>{calculation.correct} Benar</strong>, <strong>{calculation.wrong} Salah</strong> (Skor PG: {Math.round(calculation.score)})
+                        </span>
+                      </p>
+                      {((activeSession.scoring_config?.essayCount ?? 5) > 0 &&
+                        (activeSession.scoring_config?.essayMaxScore ?? 20) > 0) && (
+                        <p className="flex items-center gap-1 pl-4.5 text-slate-600">
+                          <span>
+                            Nilai Essay terisi: <strong>{Math.round(calculation.essayScore)} / 100</strong> (Rincian butir: {essayScores.join(', ')})
+                          </span>
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -2513,18 +2546,13 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         max="100"
                         value={calculation && calculation.essayScore > 0 ? Math.round(calculation.essayScore) : ''}
                         onChange={(e) => {
+                          if (manualScore !== null) {
+                            setManualScore(null);
+                          }
                           const val = e.target.value === '' ? 0 : Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0));
                           const count = activeSession.scoring_config?.essayCount || 5;
                           const maxScore = activeSession.scoring_config?.essayMaxScore || 20;
-                          const rawTotal = Math.round((val / 100) * maxScore);
-                          const maxPerItem = Math.max(1, Math.round(maxScore / count));
-                          let remaining = rawTotal;
-                          const newScores: number[] = [];
-                          for (let i = 0; i < count; i++) {
-                            const itm = Math.min(maxPerItem, remaining);
-                            newScores.push(itm);
-                            remaining -= itm;
-                          }
+                          const newScores = generateAutoEssayScores(val, count, maxScore);
                           setEssayScores(newScores);
                         }}
                         placeholder="Ketik total essay (misal: 80)..."
@@ -2551,6 +2579,9 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                                 placeholder="0"
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
+                                  if (manualScore !== null) {
+                                    setManualScore(null);
+                                  }
                                   const val = e.target.value === '' ? 0 : Math.max(0, Math.min(maxPerItem, parseInt(e.target.value, 10) || 0));
                                   setEssayScores((prev) => {
                                     const next = [...prev];
