@@ -136,7 +136,7 @@ export class MasterTestRunner {
       { name: 'Weekly Research Survey & Quantitative TAM Evaluation Engine (Phase 5.1)', fn: runResearchSurveyTestSuite },
       { name: 'Master Data Siswa 2026/2027 & Mapel Bahasa Arab', fn: runOfficialStudentsAndArabicTestSuite },
       { name: 'Teacher Points Audit & Verified Leaderboard Suite (15 Regresi Kasus Wajib)', fn: runTeacherPointsAuditTestSuite },
-      { name: 'Exam Correction & Grade Audit Overhaul Suite (12 Regresi Kasus Wajib)', fn: runExamCorrectionAuditTestSuite },
+      { name: 'Exam Correction & Grade Audit Overhaul Suite (14 Regresi Kasus Wajib)', fn: runExamCorrectionAuditTestSuite },
     ];
 
     let totalPassed = 0;

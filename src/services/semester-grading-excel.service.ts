@@ -11,6 +11,7 @@
 import * as XLSX from 'xlsx';
 import { logger } from '../utils/logger.utils';
 import type { ExamSessionRecord, GradedStudentScoreRecord } from '../types/database.types';
+import { ExamCorrectionRepository } from '../repositories/ExamCorrectionRepository';
 
 export interface StudentScoreEntry {
   name: string;
@@ -259,14 +260,77 @@ export class SemesterGradingExcelService {
       }
     });
 
-    // 4. Buat Nama File yang Rapi dan Unduh
+    // 4. Prepend dedicated "REKAP NILAI" worksheet as Sheet 1 so teachers immediately see the student table
+    let recapWs: XLSX.WorkSheet | null = null;
+    if (session && Array.isArray(gradedStudents) && gradedStudents.length > 0) {
+      recapWs = ExamCorrectionRepository.buildRecapWorksheet(session, gradedStudents);
+    } else if (scoresByClass) {
+      const targetClass = className ? this.normalizeSheetClassName(className) : '8A';
+      const studentEntries = scoresByClass[targetClass] || Object.values(scoresByClass)[0] || [];
+      if (studentEntries.length > 0) {
+        const synthSession: ExamSessionRecord = {
+          id: 'synth_session',
+          session_name: `Penilaian Semester ${subject || 'Mapel'} Kelas ${targetClass}`,
+          teacher: teacher || '',
+          subject: subject || 'Mata Pelajaran',
+          class_name: targetClass,
+          school_level: targetClass === 'SMA' ? 'SMA' : 'SMP',
+          kkm: kkm || 75,
+          academic_year: academicYear,
+          semester,
+          answer_key: [],
+          student_list: [],
+          created_at: new Date().toISOString(),
+        };
+        const synthStudents: GradedStudentScoreRecord[] = studentEntries.map((st, i) => {
+          const finalScore = st.asas !== null && st.asas !== undefined && st.asts !== null && st.asts !== undefined
+            ? Math.round((st.asts * 0.5 + st.asas * 0.5) * 10) / 10
+            : (st.asas ?? st.asts ?? 0);
+          return {
+            id: `st_${i + 1}`,
+            session_id: 'synth_session',
+            name: st.name,
+            mcq_answers: {},
+            essay_scores: [],
+            mcq_score: st.asts ?? 0,
+            essay_score: st.asas ?? 0,
+            final_score: finalScore,
+            csi: 80,
+            lps: 80,
+            correct: 0,
+            wrong: 0,
+          };
+        });
+        recapWs = ExamCorrectionRepository.buildRecapWorksheet(synthSession, synthStudents);
+      }
+    }
+
+    if (recapWs) {
+      wb.SheetNames = ['REKAP NILAI', ...wb.SheetNames.filter((n) => n !== 'REKAP NILAI')];
+      wb.Sheets['REKAP NILAI'] = recapWs;
+    }
+
+    // Ensure all sheets have visible gridlines
+    Object.keys(wb.Sheets).forEach((sheetName) => {
+      const s = wb.Sheets[sheetName];
+      if (s) {
+        s['!views'] = [{ showGridLines: true }];
+      }
+    });
+
+    const wbAny = wb as any;
+    wbAny.Workbook = wbAny.Workbook || {};
+    wbAny.Workbook.WBView = [{ activeTab: 0, showSheetTabs: true }];
+    wbAny.Workbook.Views = [{ activeTab: 0 }];
+
+    // 5. Buat Nama File yang Rapi dan Unduh
     const cleanSubject = (subject || session?.subject || 'MAPEL').replace(/[\\/:*?"<>|]/g, '_');
     const cleanClass = className ? this.normalizeSheetClassName(className) : (session?.class_name ? this.normalizeSheetClassName(session.class_name) : 'SEMUA_KELAS');
     const cleanAcademicYear = (academicYear || '2026-2027').replace('/', '-');
     const filename = `FORMAT_PENILAIAN_ASTS_ASAS_${cleanSubject}_${cleanClass}_${cleanAcademicYear}.xlsx`;
 
     XLSX.writeFile(wb, filename);
-    logger.info('SemesterGradingExcelService', `Exported official format file: ${filename}`);
+    logger.info('SemesterGradingExcelService', `Exported official format file with REKAP NILAI table: ${filename}`);
   }
 
   /**

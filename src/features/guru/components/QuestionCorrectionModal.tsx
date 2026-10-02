@@ -2679,7 +2679,23 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   </button>
                 )}
 
-                {/* 1. Official ASTS & ASAS Multi-Sheet Excel */}
+                {/* 1. Primary Button: Download Excel Rekap Nilai (Full Table) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!activeSession) return;
+                    ExamCorrectionRepository.exportToExcel(activeSession, gradedStudents);
+                    setToastMessage({ text: 'Tabel Rekap Nilai (.xlsx) berhasil diunduh!', type: 'success' });
+                  }}
+                  disabled={gradedStudents.length === 0}
+                  className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all min-h-10 cursor-pointer"
+                  title="Unduh file Excel Rekap Nilai lengkap dengan tabel nilai peserta didik, nilai akhir, predikat, dan statistik kelas"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+                  <span>Unduh Excel Rekap Nilai</span>
+                </button>
+
+                {/* 2. Secondary Button: Official ASTS & ASAS Multi-Sheet Excel */}
                 <button
                   type="button"
                   disabled={isExportingOfficial}
@@ -2697,32 +2713,32 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         semester,
                         className: activeSession.class_name,
                       });
-                      setToastMessage({ text: 'Format resmi ASTS & ASAS (.xlsx) berhasil diunduh!', type: 'success' });
+                      setToastMessage({ text: 'Format resmi multi-sheet ASTS & ASAS (.xlsx) berhasil diunduh!', type: 'success' });
                     } catch (err: any) {
                       setToastMessage({ text: 'Gagal mengunduh format resmi: ' + (err?.message || 'Error'), type: 'error' });
                     } finally {
                       setIsExportingOfficial(false);
                     }
                   }}
-                  className="px-3.5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all min-h-10"
-                  title="Unduh file Excel multi-sheet resmi dengan format dan rumus identik FORMAT PENILAIAN ASTS & ASAS.xlsx"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-800 text-xs font-bold flex items-center gap-1.5 border border-slate-300 shadow-2xs transition-all min-h-10 cursor-pointer"
+                  title="Unduh file Excel multi-sheet resmi dengan lembar Rekap Nilai di halaman pertama serta rumus nilai akhir ASTS & ASAS"
                 >
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
-                  <span>{isExportingOfficial ? 'Memproses...' : 'Format Resmi ASTS & ASAS (.xlsx)'}</span>
+                  <FileSpreadsheet className="w-4 h-4 text-teal-700" />
+                  <span>{isExportingOfficial ? 'Memproses...' : 'Format Multi-Sheet Resmi'}</span>
                 </button>
 
-                {/* 2. Download Blank Template */}
+                {/* 3. Download Blank Template */}
                 <button
                   type="button"
                   onClick={() => SemesterGradingExcelService.downloadCleanTemplate()}
-                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all min-h-10 border border-slate-200 shadow-2xs"
+                  className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all min-h-10 border border-slate-200 shadow-2xs cursor-pointer"
                   title="Unduh blanko format penilaian sekolah"
                 >
                   <Download className="w-3.5 h-3.5 text-slate-500" />
                   <span>Blanko (.xlsx)</span>
                 </button>
 
-                {/* 3. Import from Excel ASTS/ASAS */}
+                {/* 4. Import from Excel ASTS/ASAS */}
                 <label className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all min-h-10 shadow-2xs">
                   <RefreshCw className={`w-3.5 h-3.5 text-amber-600 ${isImportingExcel ? 'animate-spin' : ''}`} />
                   <span>{isImportingExcel ? 'Mengimpor...' : 'Import Excel'}</span>
@@ -2735,23 +2751,12 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   />
                 </label>
 
-                {/* 4. Single-sheet quick recap */}
-                <button
-                  type="button"
-                  onClick={() => ExamCorrectionRepository.exportToExcel(activeSession, gradedStudents)}
-                  disabled={gradedStudents.length === 0}
-                  className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 text-slate-700 text-xs font-medium flex items-center gap-1.5 border border-slate-200 shadow-2xs transition-all min-h-10"
-                  title="Ekspor rekapitulasi cepat tabel saat ini"
-                >
-                  <span>Rekap Sesi</span>
-                </button>
-
                 {/* 5. CSV download */}
                 <button
                   type="button"
                   onClick={() => ExamCorrectionRepository.exportToCSV(activeSession, gradedStudents)}
                   disabled={gradedStudents.length === 0}
-                  className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 text-slate-700 text-xs font-medium flex items-center gap-1.5 border border-slate-200 shadow-2xs transition-all min-h-10"
+                  className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 text-slate-700 text-xs font-medium flex items-center gap-1.5 border border-slate-200 shadow-2xs transition-all min-h-10 cursor-pointer"
                   title="Unduh format CSV"
                 >
                   <Download className="w-3.5 h-3.5 text-slate-400" />

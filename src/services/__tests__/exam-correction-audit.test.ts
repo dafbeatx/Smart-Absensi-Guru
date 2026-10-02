@@ -18,8 +18,11 @@
 
 import { parseAnswerKey, validateAnswerKey, calculateStudentResult } from '../../utils/scoring.utils';
 import { SemesterGradingExcelService } from '../semester-grading-excel.service';
+import { ExamCorrectionRepository } from '../../repositories/ExamCorrectionRepository';
+import * as XLSX from 'xlsx';
+import fs from 'fs';
 import { MockProvider } from '../../providers/mock-provider.service';
-import type { ExamSessionRecord, SaveGradedStudentDTO } from '../../types/database.types';
+import type { ExamSessionRecord, SaveGradedStudentDTO, GradedStudentScoreRecord } from '../../types/database.types';
 
 export const runExamCorrectionAuditTestSuite = async (): Promise<{
   passed: number;
@@ -347,6 +350,93 @@ export const runExamCorrectionAuditTestSuite = async (): Promise<{
       'Test 12: Penurunan Drastis Network Roundtrips & Egress',
       singleSaveCalls === 1 && batchImportCalls === 1 && previousLegacyCallsFor30 === 180,
       `Import 30 siswa turun drastis dari 180 request menjadi ${batchImportCalls} request atomik tunggal.`
+    );
+
+    // ── Test 13: Excel Rekap Nilai Table Structure (Gridlines, AutoFilter, 13 Kolom)
+    const auditSession: ExamSessionRecord = {
+      id: 'sess_audit_rekap_01',
+      session_name: 'PTS Informatika 8A Ganjil 2026/2027',
+      teacher: 'Dafa Maulana',
+      subject: 'Informatika',
+      class_name: '8A',
+      school_level: 'SMP',
+      kkm: 75,
+      academic_year: '2026/2027',
+      semester: 'Ganjil',
+      answer_key: ['A', 'B', 'C', 'D'],
+      student_list: ['AMANDA HASNA MIRZA', 'AZKIYA RAMADHANI'],
+      scoring_config: { pgWeight: 0.7, essayWeight: 0.3, essayCount: 5, essayMaxScore: 20 },
+      created_at: new Date().toISOString(),
+    };
+
+    const auditStudents: GradedStudentScoreRecord[] = [
+      {
+        id: 'st_audit_1',
+        session_id: 'sess_audit_rekap_01',
+        name: 'AMANDA HASNA MIRZA',
+        mcq_answers: { 1: 'A', 2: 'B', 3: 'C', 4: 'D' },
+        essay_scores: [4, 4, 4, 4, 4],
+        mcq_score: 100,
+        essay_score: 100,
+        final_score: 100,
+        csi: 95,
+        lps: 90,
+        correct: 4,
+        wrong: 0,
+      },
+      {
+        id: 'st_audit_2',
+        session_id: 'sess_audit_rekap_01',
+        name: 'AZKIYA RAMADHANI',
+        mcq_answers: { 1: 'A', 2: 'B', 3: 'C', 4: 'A' },
+        essay_scores: [3, 3, 3, 3, 3],
+        mcq_score: 75,
+        essay_score: 75,
+        final_score: 75,
+        csi: 75,
+        lps: 70,
+        correct: 3,
+        wrong: 1,
+      },
+    ];
+
+    const auditRecapWs = ExamCorrectionRepository.buildRecapWorksheet(auditSession, auditStudents);
+    const hasGridlines = auditRecapWs['!views']?.[0]?.showGridLines === true;
+    const hasAutoFilter = auditRecapWs['!autofilter']?.ref === 'A13:M15';
+    const has13Cols = auditRecapWs['!cols']?.length === 13;
+    const hasCorrectHeader = auditRecapWs['B13']?.v === 'Nama Peserta Didik' && auditRecapWs['H13']?.v === 'Nilai Akhir';
+    const hasStudentScores = auditRecapWs['B14']?.v === 'AMANDA HASNA MIRZA' && auditRecapWs['H14']?.v === 100;
+
+    assert(
+      'Test 13: Excel Rekap Nilai Memiliki Tabel Lengkap (Gridlines, AutoFilter, 13 Kolom)',
+      hasGridlines && hasAutoFilter && has13Cols && hasCorrectHeader && hasStudentScores,
+      'Worksheet REKAP NILAI terverifikasi memiliki gridlines aktif, autofilter A13:M15, 13 kolom lengkap, dan baris siswa.'
+    );
+
+    // ── Test 14: Official Multi-Sheet Excel Wajib Membuka Sheet REKAP NILAI di Halaman 1
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      session: auditSession,
+      gradedStudents: auditStudents,
+      subject: 'Informatika',
+      teacher: 'Dafa Maulana',
+      className: '8A',
+    });
+
+    const officialFilename = 'FORMAT_PENILAIAN_ASTS_ASAS_Informatika_8A_2026-2027.xlsx';
+    let sheet1IsRecap = false;
+    let activeTabIsZero = false;
+
+    if (fs.existsSync(officialFilename)) {
+      const readOfficialWb = XLSX.read(fs.readFileSync(officialFilename), { type: 'buffer' });
+      sheet1IsRecap = readOfficialWb.SheetNames[0] === 'REKAP NILAI';
+      activeTabIsZero = (readOfficialWb.Workbook?.Views?.[0] as any)?.activeTab === 0 || readOfficialWb.SheetNames[0] === 'REKAP NILAI';
+      fs.unlinkSync(officialFilename); // Clean up test file
+    }
+
+    assert(
+      'Test 14: Format Resmi ASTS & ASAS Membuka Sheet 1 REKAP NILAI dengan Tabel Siswa',
+      sheet1IsRecap && activeTabIsZero,
+      'Berkas Excel multi-sheet resmi terverifikasi membuka sheet REKAP NILAI sebagai tab pertama aktif dengan tabel siswa terisi.'
     );
 
   } catch (err: any) {

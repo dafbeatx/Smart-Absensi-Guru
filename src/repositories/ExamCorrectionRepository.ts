@@ -225,100 +225,193 @@ export class ExamCorrectionRepository {
   }
 
   /**
-   * Exports class exam recap to an official Excel file (.xlsx).
+   * Resolves student gender ('L' | 'P' | '-').
    */
-  public static exportToExcel(
+  public static resolveStudentGender(studentName: string, className?: string): 'L' | 'P' | '-' {
+    const normClass = (className || '').toUpperCase().trim();
+    if (normClass.includes('8A') || normClass.includes('9A')) return 'P';
+    if (normClass.includes('8B') || normClass.includes('9B')) return 'L';
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('smart_absensi_students');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const cleanTarget = studentName.trim().toUpperCase();
+            const match = list.find((s: any) => (s.fullName || s.name || '').trim().toUpperCase() === cleanTarget);
+            if (match && (match.gender === 'L' || match.gender === 'P')) {
+              return match.gender;
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore local storage errors in non-browser env
+    }
+    return '-';
+  }
+
+  /**
+   * Builds an official, styled REKAP NILAI worksheet with full student grades table,
+   * AutoFilter, gridlines, class summary statistics, and signatures.
+   */
+  public static buildRecapWorksheet(
     session: ExamSessionRecord,
     students: GradedStudentScoreRecord[]
-  ): void {
+  ): XLSX.WorkSheet {
     const appSettings = useSettingsStore.getState().settings;
     const institutionName = appSettings.institution_name || 'SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam';
     const appName = appSettings.app_name || 'Smart Absensi Guru';
 
     const kkm = Number(session.kkm) || 75;
+    const pgCount = session.answer_key?.length || 0;
+    const essayCount = session.scoring_config?.essayCount ?? 0;
+    const pgWeight = session.scoring_config?.pgWeight ? Math.round(session.scoring_config.pgWeight * 100) : 100;
+    const essayWeight = session.scoring_config?.essayWeight ? Math.round(session.scoring_config.essayWeight * 100) : 0;
 
     // Header rows
     const rows: (string | number)[][] = [
       [appName.toUpperCase()],
       [institutionName.toUpperCase()],
-      ['REKAPITULASI NILAI UJIAN & HASIL KOREKSI'],
+      ['REKAPITULASI HASIL PENILAIAN & KOREKSI UJIAN'],
       [''],
       ['Mata Pelajaran', `: ${session.subject}`],
-      ['Kelas / Rombel', `: ${session.class_name} (${session.school_level})`],
+      ['Kelas / Rombel', `: Kelas ${session.class_name} (${session.school_level || 'SMP/SMA'})`],
       ['Guru Pengampu', `: ${session.teacher}`],
       ['Nama Sesi Ujian', `: ${session.session_name}`],
       ['Tahun Ajaran / Semester', `: ${session.academic_year || AdministrationRepository.getActiveAcademicYear()} - ${session.semester || 'Ganjil'}`],
       ['Kriteria Ketuntasan Minimal (KKM)', `: ${kkm}`],
-      ['Jumlah Butir Soal PG', `: ${session.answer_key?.length || 0}`],
+      ['Komposisi Soal & Bobot', `: PG: ${pgWeight}% (${pgCount} Butir) | Essay: ${essayWeight}% (${essayCount} Butir)`],
       [''],
       [
         'No',
-        'Nama Siswa',
-        'Benar',
-        'Salah',
+        'Nama Peserta Didik',
+        'L/P',
+        'Benar (PG)',
+        'Salah (PG)',
         'Nilai PG',
         'Nilai Essay',
-        'Skor Akhir',
+        'Nilai Akhir',
+        'Predikat',
         'Status Ketuntasan',
         'CSI',
         'LPS',
+        'Keterangan Deskriptif',
       ],
     ];
 
     // Student rows
     students.forEach((s, idx) => {
       const finalScore = Number(s.final_score) || 0;
-      const status = finalScore >= kkm ? 'TUNTAS' : 'REMEDIAL';
+      const isPassed = finalScore >= kkm;
+      const status = isPassed ? 'TUNTAS' : 'REMEDIAL';
+
+      let predikat = 'D';
+      let ket = 'Remedial — Belum mencapai KKM, perlu perbaikan kompetensi';
+      if (finalScore >= 90) {
+        predikat = 'A';
+        ket = 'Sangat Baik — Penguasaan materi amat memuaskan';
+      } else if (finalScore >= 80) {
+        predikat = 'B';
+        ket = 'Baik — Penguasaan materi baik dan tuntas';
+      } else if (finalScore >= kkm) {
+        predikat = 'C';
+        ket = 'Cukup — Penguasaan materi cukup dan mencapai KKM';
+      }
+
+      const gender = this.resolveStudentGender(s.name, session.class_name);
+
       rows.push([
         idx + 1,
         s.name,
+        gender,
         s.correct,
         s.wrong,
         s.mcq_score,
         s.essay_score,
         finalScore,
+        predikat,
         status,
-        s.csi,
-        s.lps,
+        s.csi || 0,
+        s.lps || 0,
+        ket,
       ]);
     });
 
     // Summary statistics row
-    const summary = this.computeClassSummary(students, kkm);
+    const summary = this.computeClassSummary(students, kkm, session.student_list?.length || students.length);
     rows.push(['']);
-    rows.push(['RINGKASAN KELAS']);
-    rows.push(['Total Siswa Dinilai', summary.gradedCount]);
-    rows.push(['Rata-rata Nilai', summary.averageScore]);
-    rows.push(['Nilai Tertinggi', summary.highestScore]);
-    rows.push(['Nilai Terendah', summary.lowestScore]);
-    rows.push(['Jumlah Tuntas', summary.passedCount]);
-    rows.push(['Jumlah Remedial', summary.remedialCount]);
-    rows.push(['Persentase Kelulusan', `${summary.passRate}%`]);
+    rows.push(['RINGKASAN & STATISTIK HASIL KELAS']);
+    rows.push(['Total Siswa Dinilai', `: ${summary.gradedCount} Siswa`]);
+    rows.push(['Rata-rata Nilai Kelas', `: ${summary.averageScore}`]);
+    rows.push(['Nilai Tertinggi', `: ${summary.highestScore}`]);
+    rows.push(['Nilai Terendah', `: ${summary.lowestScore}`]);
+    rows.push(['Jumlah Tuntas (>= KKM)', `: ${summary.passedCount} Siswa`]);
+    rows.push(['Jumlah Remedial (< KKM)', `: ${summary.remedialCount} Siswa`]);
+    rows.push(['Persentase Ketuntasan Kelas', `: ${summary.passRate}%`]);
+
+    // Signatures
+    rows.push(['']);
+    rows.push(['', '', '', '', '', '', '', '', 'Mengetahui,']);
+    rows.push(['', 'Kepala Sekolah,', '', '', '', '', '', '', 'Guru Mata Pelajaran,']);
+    rows.push(['']);
+    rows.push(['']);
+    rows.push(['']);
+    rows.push(['', '( ....................................................... )', '', '', '', '', '', '', `( ${session.teacher || '.......................................................'} )`]);
 
     const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
-    // Auto-fit column widths
+    // Column widths
     worksheet['!cols'] = [
-      { wch: 6 },  // No
-      { wch: 32 }, // Nama Siswa
-      { wch: 10 }, // Benar
-      { wch: 10 }, // Salah
-      { wch: 12 }, // Nilai PG
-      { wch: 12 }, // Nilai Essay
-      { wch: 12 }, // Skor Akhir
-      { wch: 18 }, // Status
-      { wch: 10 }, // CSI
-      { wch: 10 }, // LPS
+      { wch: 6 },  // A: No
+      { wch: 34 }, // B: Nama Peserta Didik
+      { wch: 8 },  // C: L/P
+      { wch: 12 }, // D: Benar (PG)
+      { wch: 12 }, // E: Salah (PG)
+      { wch: 12 }, // F: Nilai PG
+      { wch: 12 }, // G: Nilai Essay
+      { wch: 14 }, // H: Nilai Akhir
+      { wch: 10 }, // I: Predikat
+      { wch: 18 }, // J: Status Ketuntasan
+      { wch: 10 }, // K: CSI
+      { wch: 10 }, // L: LPS
+      { wch: 45 }, // M: Keterangan Deskriptif
     ];
 
+    // Explicit native Excel AutoFilter on the table header (Row 13)
+    const headerRow = 13;
+    const lastStudentRow = headerRow + Math.max(students.length, 1);
+    worksheet['!autofilter'] = { ref: `A${headerRow}:M${lastStudentRow}` };
+
+    // Explicit gridline visibility
+    worksheet['!views'] = [{ showGridLines: true }];
+
+    return worksheet;
+  }
+
+  /**
+   * Exports class exam recap to an official Excel file (.xlsx) with interactive table, AutoFilter & gridlines.
+   */
+  public static exportToExcel(
+    session: ExamSessionRecord,
+    students: GradedStudentScoreRecord[]
+  ): void {
+    const worksheet = this.buildRecapWorksheet(session, students);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, `Nilai ${session.class_name}`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'REKAP NILAI');
+    const wbAny = workbook as any;
+    wbAny.Workbook = {
+      Views: [{ activeTab: 0 }],
+      WBView: [{ activeTab: 0, showSheetTabs: true }],
+    };
 
     const cleanFilename = `Rekap_Nilai_${session.subject}_${session.class_name}_${session.exam_type || 'Ujian'}.xlsx`.replace(
       /\s+/g,
       '_'
     );
     XLSX.writeFile(workbook, cleanFilename);
+    logger.info('ExamCorrectionRepository', `Exported rekap nilai table: ${cleanFilename}`);
   }
 
   /**

@@ -176,6 +176,7 @@ export default async function handler(req: any, res: any) {
         errorCode: 'INTERNAL_SERVER_ERROR',
         errorMessage: 'Terjadi kendala internal pada server saat mengambil data poin.',
       });
+    }
   }
 
   // ── POST: Record Teacher Point with Server-side Integrity & Idempotency ─────────────────

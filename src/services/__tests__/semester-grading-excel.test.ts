@@ -85,4 +85,169 @@ describe('SemesterGradingExcelService — ASTS & ASAS Official Sync', () => {
 
     assert.strictEqual(total, 144, 'Total students in template must be 144');
   });
+
+  it('4. ExamCorrectionRepository.buildRecapWorksheet builds rich table with gridlines, autofilter, and predikat', () => {
+    const { ExamCorrectionRepository } = require('../../repositories/ExamCorrectionRepository');
+    const mockSession = {
+      id: 'sess_test_1',
+      session_name: 'PTS Informatika 8A Ganjil 2026/2027',
+      teacher: 'Dafa Maulana',
+      subject: 'Informatika',
+      class_name: '8A',
+      school_level: 'SMP' as const,
+      kkm: 75,
+      academic_year: '2026/2027',
+      semester: 'Ganjil',
+      answer_key: ['A', 'B', 'C', 'D'],
+      student_list: ['AMANDA HASNA MIRZA', 'AZKIYA RAMADHANI', 'ZAHRA AULIA'],
+      scoring_config: { pgWeight: 0.7, essayWeight: 0.3, essayCount: 5, essayMaxScore: 20 },
+      created_at: new Date().toISOString(),
+    };
+
+    const mockStudents = [
+      {
+        id: 'st_1',
+        session_id: 'sess_test_1',
+        name: 'AMANDA HASNA MIRZA',
+        mcq_answers: { 1: 'A', 2: 'B', 3: 'C', 4: 'D' },
+        essay_scores: [4, 4, 4, 4, 4],
+        mcq_score: 100,
+        essay_score: 100,
+        final_score: 100,
+        csi: 95,
+        lps: 92,
+        correct: 4,
+        wrong: 0,
+      },
+      {
+        id: 'st_2',
+        session_id: 'sess_test_1',
+        name: 'AZKIYA RAMADHANI',
+        mcq_answers: { 1: 'A', 2: 'B', 3: 'C', 4: 'A' },
+        essay_scores: [3, 3, 3, 3, 3],
+        mcq_score: 75,
+        essay_score: 75,
+        final_score: 75,
+        csi: 75,
+        lps: 70,
+        correct: 3,
+        wrong: 1,
+      },
+      {
+        id: 'st_3',
+        session_id: 'sess_test_1',
+        name: 'ZAHRA AULIA',
+        mcq_answers: { 1: 'A', 2: 'A', 3: 'A', 4: 'A' },
+        essay_scores: [2, 2, 2, 2, 2],
+        mcq_score: 50,
+        essay_score: 50,
+        final_score: 50,
+        csi: 50,
+        lps: 50,
+        correct: 1,
+        wrong: 3,
+      },
+    ];
+
+    const ws = ExamCorrectionRepository.buildRecapWorksheet(mockSession, mockStudents);
+
+    // Verify gridlines and autofilter
+    assert.ok(ws['!views'], 'Worksheet must contain !views');
+    assert.strictEqual(ws['!views'][0].showGridLines, true, 'Gridlines must be explicitly enabled');
+    assert.ok(ws['!autofilter'], 'Worksheet must contain !autofilter');
+    assert.strictEqual(ws['!autofilter'].ref, 'A13:M16', 'AutoFilter range must cover headers and all 3 student rows');
+    assert.strictEqual(ws['!cols'].length, 13, 'Must have 13 column widths defined');
+
+    // Verify header columns (Row 13)
+    assert.strictEqual(ws['A13'].v, 'No');
+    assert.strictEqual(ws['B13'].v, 'Nama Peserta Didik');
+    assert.strictEqual(ws['C13'].v, 'L/P');
+    assert.strictEqual(ws['D13'].v, 'Benar (PG)');
+    assert.strictEqual(ws['E13'].v, 'Salah (PG)');
+    assert.strictEqual(ws['F13'].v, 'Nilai PG');
+    assert.strictEqual(ws['G13'].v, 'Nilai Essay');
+    assert.strictEqual(ws['H13'].v, 'Nilai Akhir');
+    assert.strictEqual(ws['I13'].v, 'Predikat');
+    assert.strictEqual(ws['J13'].v, 'Status Ketuntasan');
+    assert.strictEqual(ws['K13'].v, 'CSI');
+    assert.strictEqual(ws['L13'].v, 'LPS');
+    assert.strictEqual(ws['M13'].v, 'Keterangan Deskriptif');
+
+    // Verify student 1 (Row 14)
+    assert.strictEqual(ws['A14'].v, 1);
+    assert.strictEqual(ws['B14'].v, 'AMANDA HASNA MIRZA');
+    assert.strictEqual(ws['C14'].v, 'P'); // 8A all female
+    assert.strictEqual(ws['H14'].v, 100);
+    assert.strictEqual(ws['I14'].v, 'A');
+    assert.strictEqual(ws['J14'].v, 'TUNTAS');
+
+    // Verify student 3 (Row 16, remedial)
+    assert.strictEqual(ws['A16'].v, 3);
+    assert.strictEqual(ws['H16'].v, 50);
+    assert.strictEqual(ws['I16'].v, 'D');
+    assert.strictEqual(ws['J16'].v, 'REMEDIAL');
+  });
+
+  it('5. SemesterGradingExcelService.exportOfficialFormatExcel prepends REKAP NILAI as Sheet 1 and sets activeTab 0', async () => {
+    const mockSession = {
+      id: 'sess_test_2',
+      session_name: 'PTS Informatika 8A Ganjil 2026/2027',
+      teacher: 'Dafa Maulana',
+      subject: 'Informatika',
+      class_name: '8A',
+      school_level: 'SMP' as const,
+      kkm: 75,
+      academic_year: '2026/2027',
+      semester: 'Ganjil',
+      answer_key: ['A', 'B'],
+      student_list: ['AMANDA HASNA MIRZA'],
+      created_at: new Date().toISOString(),
+    };
+
+    const mockStudents = [
+      {
+        id: 'st_1',
+        session_id: 'sess_test_2',
+        name: 'AMANDA HASNA MIRZA',
+        mcq_answers: { 1: 'A', 2: 'B' },
+        essay_scores: [],
+        mcq_score: 95,
+        essay_score: 0,
+        final_score: 95,
+        csi: 90,
+        lps: 85,
+        correct: 2,
+        wrong: 0,
+      },
+    ];
+
+    // In Node test environment, exportOfficialFormatExcel writes file to disk
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      session: mockSession,
+      gradedStudents: mockStudents,
+      subject: 'Informatika',
+      teacher: 'Dafa Maulana',
+      className: '8A',
+    });
+
+    const expectedExportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Informatika_8A_2026-2027.xlsx';
+    assert.ok(fs.existsSync(expectedExportPath), 'Exported file must exist on disk');
+
+    const exportedWb = XLSX.read(fs.readFileSync(expectedExportPath), { type: 'buffer' });
+
+    // REKAP NILAI MUST BE SHEET 1!
+    assert.strictEqual(exportedWb.SheetNames[0], 'REKAP NILAI', 'Sheet 1 must be REKAP NILAI table');
+    assert.strictEqual(exportedWb.SheetNames[1], 'IDENTITAS SEKOLAH');
+    assert.strictEqual(exportedWb.SheetNames[2], 'FORMAT PENILAIAN');
+
+    // Verify student data exists on REKAP NILAI
+    const rekapSheet = exportedWb.Sheets['REKAP NILAI'];
+    assert.ok(rekapSheet, 'REKAP NILAI sheet must exist');
+    assert.strictEqual(rekapSheet['B14'].v, 'AMANDA HASNA MIRZA');
+    assert.strictEqual(rekapSheet['H14'].v, 95);
+    assert.strictEqual(rekapSheet['J14'].v, 'TUNTAS');
+
+    // Clean up exported test file
+    fs.unlinkSync(expectedExportPath);
+  });
 });
