@@ -37,6 +37,7 @@ import type {
   NotificationPreferences,
   TeacherPointLog,
   TeacherPointActivityType,
+  TeacherRewardDecision,
   InventorySarprasItem,
   CreateInventorySarprasDTO,
   UpdateInventorySarprasDTO,
@@ -2896,9 +2897,11 @@ export class MockProvider implements IDataProvider {
     const KEY = 'smart_absensi_teacher_point_history';
     const allLogs = await this.getTeacherPointHistory('ALL');
 
+    const cleanIdempotencyKey = log.idempotency_key || `${log.user_id}:${log.date}:${log.activity_type}`;
     // Idempotency check: prevent duplicate point for the exact same user, date, and activity_type
     const existing = allLogs.find(
-      (l) => l.user_id === log.user_id && l.date === log.date && l.activity_type === log.activity_type
+      (l) => (l.idempotency_key && l.idempotency_key === cleanIdempotencyKey) ||
+             (l.user_id === log.user_id && l.date === log.date && l.activity_type === log.activity_type)
     );
     if (existing) {
       return existing;
@@ -2907,6 +2910,10 @@ export class MockProvider implements IDataProvider {
     const newLog: TeacherPointLog = {
       ...log,
       id: 'pt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      status: log.status || 'VALID',
+      source: log.source || 'SYSTEM',
+      occurred_at: log.occurred_at || log.date || new Date().toISOString(),
+      idempotency_key: cleanIdempotencyKey,
       created_at: new Date().toISOString(),
     };
 
@@ -2929,6 +2936,72 @@ export class MockProvider implements IDataProvider {
     }
 
     return newLog;
+  }
+
+  public async getRegisteredTeachers(token?: string): Promise<UserProfile[]> {
+    return this.getAllUsers(token || '');
+  }
+
+  public async voidTeacherPointLog(
+    pointId: string,
+    voidReason: string,
+    _actorId?: string,
+    _token?: string
+  ): Promise<boolean> {
+    const KEY = 'smart_absensi_teacher_point_history';
+    const allLogs = await this.getTeacherPointHistory('ALL');
+    const target = allLogs.find((l) => l.id === pointId);
+    if (!target) return false;
+
+    target.status = 'VOIDED';
+    target.voided_at = new Date().toISOString();
+    target.void_reason = voidReason || 'Dibatalkan oleh pengelola';
+
+    safeSetStorage(KEY, JSON.stringify(allLogs));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_points_updated', {
+          detail: { pointId, voided: true },
+        })
+      );
+    }
+    return true;
+  }
+
+  public async getTeacherRewardDecision(
+    period: string,
+    _token?: string
+  ): Promise<TeacherRewardDecision | null> {
+    const key = `smart_absensi_reward_decision_${period.replace(/\s+/g, '_')}`;
+    const raw = safeGetStorage(key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  public async saveTeacherRewardDecision(
+    decision: TeacherRewardDecision,
+    _token?: string
+  ): Promise<TeacherRewardDecision> {
+    const key = `smart_absensi_reward_decision_${decision.period.replace(/\s+/g, '_')}`;
+    const saved: TeacherRewardDecision = {
+      ...decision,
+      id: decision.id || 'rew_' + Date.now(),
+      approved_at: decision.approved_at || new Date().toISOString(),
+      created_at: decision.created_at || new Date().toISOString(),
+    };
+    safeSetStorage(key, JSON.stringify(saved));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_reward_decision_updated', {
+          detail: saved,
+        })
+      );
+    }
+    return saved;
   }
 
   public invalidateTeacherPointCache(_userId?: string): void {

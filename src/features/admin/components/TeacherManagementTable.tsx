@@ -11,7 +11,6 @@ import type { UserProfile, RoleCode, TeacherPointLog } from '../../../types/data
 import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHistoryModal';
 import { convertToWebP, formatFileSize } from '../../../utils/image.utils';
 import { handleAppError } from '../../../utils/error.utils';
-import { getTeacherDisciplineLeaderboard } from '../../../utils/teacher-appreciation.utils';
 import { TeacherPointReconciliationService } from '../../../services/teacher-point-reconciliation.service';
 import {
   ExamCommitteeRepository,
@@ -181,11 +180,6 @@ export const TeacherManagementTable: React.FC<TeacherManagementTableProps> = ({
         ) {
           map[log.user_id] = (map[log.user_id] || 0) + log.points;
         }
-      });
-    } else {
-      const fallbackBoard = getTeacherDisciplineLeaderboard(null, null, 'CURRENT_MONTH');
-      (fallbackBoard.leaderboard || []).forEach((item) => {
-        map[item.id] = item.totalPoints;
       });
     }
     return map;

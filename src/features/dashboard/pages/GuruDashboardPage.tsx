@@ -130,7 +130,6 @@ import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
   formatShortTeacherName,
-  normalizeTeacherName,
   type DisciplinePeriodType,
 } from '../../../utils/teacher-appreciation.utils';
 import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-seed.utils';
@@ -1730,41 +1729,38 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const disciplineLeaderboard = useMemo(() => {
     return getTeacherDisciplineLeaderboard(
       effectiveUser,
-      !isCurrentCalendarMonth ? null : appreciationScore,
+      null, // DILARANG mengirim currentUserScore untuk mengoverride ledger global!
       disciplinePeriod,
       allTeacherPointLogs,
       allRegisteredTeachers,
       { targetYearMonth: selectedYearMonthStr }
     );
-  }, [effectiveUser, appreciationScore, disciplinePeriod, isCurrentCalendarMonth, selectedYearMonthStr, allTeacherPointLogs, allRegisteredTeachers]);
+  }, [effectiveUser, disciplinePeriod, selectedYearMonthStr, allTeacherPointLogs, allRegisteredTeachers]);
 
   const currentUserLeaderboardItem = useMemo(() => {
     if (!disciplineLeaderboard?.leaderboard) return null;
-    const normUser = effectiveUser?.full_name ? normalizeTeacherName(effectiveUser.full_name) : '';
     return disciplineLeaderboard.leaderboard.find(
-      (item) =>
-        item.isCurrentUser ||
-        item.id === effectiveUser?.id ||
-        (effectiveUser?.nip && item.nip && item.nip.replace(/\s+/g, '') === effectiveUser.nip.replace(/\s+/g, '')) ||
-        (effectiveUser?.full_name && item.name && effectiveUser.full_name.trim().toLowerCase() === item.name.trim().toLowerCase()) ||
-        (normUser && normUser === normalizeTeacherName(item.name))
+      (item) => item.isCurrentUser || item.id === effectiveUser?.id
     );
-  }, [disciplineLeaderboard?.leaderboard, effectiveUser?.id, effectiveUser?.nip, effectiveUser?.full_name]);
+  }, [disciplineLeaderboard?.leaderboard, effectiveUser?.id]);
 
-  const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? (isCurrentCalendarMonth ? (appreciationScore?.totalPoints ?? 0) : 0);
+  const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? 0;
 
   // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
-  // Piagam resmi dan selebrasi penghargaan hanya aktif jika telah memasuki akhir bulan
+  // Piagam resmi dan selebrasi penghargaan hanya aktif jika telah memasuki akhir bulan dan status data SYNCED
   useEffect(() => {
     if (!effectiveUser?.id) return;
     const rank = disciplineLeaderboard.currentUserRank;
-    if (rank < 1 || rank > 3) {
+    if (!rank || rank < 1 || rank > 3) {
       setIsCelebrationModalOpen(false);
       return;
     }
 
-    // Hindari race-condition saat log poin seluruh guru sekolah belum selesai dimuat
-    if (!allTeacherPointLogs || allTeacherPointLogs.length === 0) return;
+    // Hindari race-condition saat log poin seluruh guru sekolah belum selesai dimuat atau belum SYNCED
+    if (!allTeacherPointLogs || allTeacherPointLogs.length === 0 || disciplineLeaderboard.dataStatus !== 'SYNCED') {
+      setIsCelebrationModalOpen(false);
+      return;
+    }
 
     const timing = evaluateDisciplinePeriodTiming(new Date(), selectedYear, selectedMonth);
     if (!timing.isEndOfMonth) return;
@@ -1776,7 +1772,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       const timer = setTimeout(() => {
         // Re-verifikasi rank mutakhir sesaat sebelum membuka modal
         const currentFreshRank = disciplineLeaderboard.currentUserRank;
-        if (currentFreshRank >= 1 && currentFreshRank <= 3) {
+        if (currentFreshRank && currentFreshRank >= 1 && currentFreshRank <= 3 && disciplineLeaderboard.dataStatus === 'SYNCED') {
           setIsCelebrationModalOpen(true);
           SoundService.play('SUCCESS');
           sessionStorage.setItem(storageKey, 'true');
@@ -1784,7 +1780,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank, selectedYear, selectedMonth, allTeacherPointLogs]);
+  }, [effectiveUser?.id, disciplineLeaderboard.currentUserRank, disciplineLeaderboard.dataStatus, selectedYear, selectedMonth, allTeacherPointLogs]);
 
   // ── Teacher Challenge & Streak Engine (Duolingo Style) ─────────────────
   const streakInfo = useMemo(() => {
@@ -1870,7 +1866,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       effectiveUser,
       streakInfo,
       appreciationScore,
-      disciplineLeaderboard.currentUserRank,
+      disciplineLeaderboard.currentUserRank ?? undefined,
       rival?.name
     );
   }, [isTomorrowOff, effectiveUser, streakInfo, appreciationScore, disciplineLeaderboard]);
@@ -1883,7 +1879,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       effectiveUser,
       streakInfo,
       appreciationScore,
-      disciplineLeaderboard.currentUserRank,
+      disciplineLeaderboard.currentUserRank ?? undefined,
       rival?.name,
       { isTomorrowOff, settings, holidays: allHolidays }
     );
@@ -6370,7 +6366,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         quests={dailyQuests}
         appreciationScore={{ ...appreciationScore, totalPoints: effectiveTotalPoints }}
         onOpenQuestAction={handleOpenQuestAction}
-        userRank={disciplineLeaderboard.currentUserRank}
+        userRank={disciplineLeaderboard.currentUserRank ?? undefined}
         totalTeachers={disciplineLeaderboard.totalTeachers}
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}

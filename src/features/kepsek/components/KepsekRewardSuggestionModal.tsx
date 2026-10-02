@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import type { TeacherLeaderboardItem } from '../../../utils/teacher-appreciation.utils';
 import { GroqAIService } from '../../../services/groq-ai.service';
 import { useToastStore } from '../../../store/useToastStore';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { TeacherPointRepository } from '../../../repositories/TeacherPointRepository';
+import type { TeacherRewardDecision } from '../../../types/database.types';
 import {
   Sparkles,
   Trophy,
@@ -17,6 +20,7 @@ interface KepsekRewardSuggestionModalProps {
   onClose: () => void;
   championTeacher: TeacherLeaderboardItem | null;
   periodMonthYear?: string;
+  snapshotId?: string;
   onRewardSaved?: (rewardText: string) => void;
 }
 
@@ -25,6 +29,7 @@ export const KepsekRewardSuggestionModal: React.FC<KepsekRewardSuggestionModalPr
   onClose,
   championTeacher,
   periodMonthYear = 'September 2026',
+  snapshotId,
   onRewardSaved,
 }) => {
   const { showToast } = useToastStore();
@@ -97,12 +102,15 @@ export const KepsekRewardSuggestionModal: React.FC<KepsekRewardSuggestionModalPr
     }
   };
 
-  const handleSaveReward = () => {
+  const handleSaveReward = async () => {
     const trimmed = rewardInput.trim();
     if (!trimmed) {
       showToast('warning', 'Harap Isi Hadiah', 'Tentukan hadiah untuk guru Juara 1 bulan ini.');
       return;
     }
+
+    const user = useAuthStore.getState().user;
+    const token = useAuthStore.getState().token || undefined;
 
     const payload = {
       teacherId: championTeacher.id,
@@ -113,15 +121,33 @@ export const KepsekRewardSuggestionModal: React.FC<KepsekRewardSuggestionModalPr
       decidedAt: new Date().toISOString(),
     };
 
+    // 1. Simpan ke localStorage untuk reaktivitas lokal
     localStorage.setItem(storageKey, JSON.stringify(payload));
     window.dispatchEvent(new CustomEvent('smart_absensi_kepsek_reward_updated', { detail: payload }));
+
+    // 2. Simpan ke database cloud resmi via TeacherPointRepository
+    try {
+      const decision: TeacherRewardDecision = {
+        period: periodMonthYear,
+        teacher_user_id: championTeacher.id,
+        teacher_name: championTeacher.name,
+        approved_by: user?.full_name || user?.id || 'Kepala Sekolah',
+        approved_at: new Date().toISOString(),
+        leaderboard_snapshot_id: snapshotId || `snap_${periodMonthYear.replace(/\s+/g, '_')}_${Date.now()}`,
+        reason: `Juara 1 Peringkat Poin Disiplin Guru periode ${periodMonthYear} (${championTeacher.totalPoints} PTS)`,
+        reward_detail: trimmed,
+      };
+      await TeacherPointRepository.saveRewardDecision(decision, token);
+    } catch (err: any) {
+      console.warn('TeacherPointRepository.saveRewardDecision error:', err);
+    }
 
     setSavedReward(trimmed);
     if (onRewardSaved) {
       onRewardSaved(trimmed);
     }
 
-    showToast('success', 'Hadiah Resmi Ditetapkan! 🎁', `Apresiasi untuk ${championTeacher.name} telah disimpan dan diumumkan.`);
+    showToast('success', 'Hadiah Resmi Ditetapkan! 🎁', `Apresiasi untuk ${championTeacher.name} telah disimpan dan disahkan.`);
     onClose();
   };
 

@@ -360,15 +360,19 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     topTeacher,
     currentUserRank,
     totalTeachers,
+    dataStatus,
+    isTieForFirst,
+    snapshotId,
+    lastCalculated,
   } = useMemo(() => {
     return getTeacherDisciplineLeaderboard(
       currentUser,
-      currentUserScore || null,
+      null, // DILARANG mengirim currentUserScore untuk mengoverride ledger global!
       selectedPeriod,
       allPointLogs,
       registeredTeachers.length > 0 ? registeredTeachers : allRegisteredTeachersProp
     );
-  }, [currentUser, currentUserScore, selectedPeriod, allPointLogs, registeredTeachers, allRegisteredTeachersProp]);
+  }, [currentUser, selectedPeriod, allPointLogs, registeredTeachers, allRegisteredTeachersProp]);
 
   // Keep selectedTeacher synchronized with fresh avatar
   useEffect(() => {
@@ -809,7 +813,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
                   <div className="pt-3 border-t border-white/15 flex flex-wrap items-center justify-between gap-2 text-xs text-cyan-100">
                     <span className="flex items-center gap-1.5 font-semibold">
-                      <span>{selectedTeacher.topBadge.icon}</span>
+                      <span>{selectedTeacher.topBadge?.icon || '🥉'}</span>
                       <strong className="text-white">{selectedTeacher.level}</strong>
                     </span>
                     <span className="text-slate-300">
@@ -1198,181 +1202,220 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       </div>
                     ) : (
                       <>
-                        {/* 👑 TOP 3 PODIUM HERO CARDS ───────────────────────────── */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
-                      {/* Juara 2 (Perak) */}
-                      {leaderboard[1] && (
-                        <div
-                          onClick={() => setSelectedTeacher(leaderboard[1])}
-                          className="order-2 md:order-1 rounded-3xl p-5 border border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-50/50 shadow-xs hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between gap-2 mb-3">
-                              <span className="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                                <span>🥈</span>
-                                <span>Juara 2 • Perak</span>
-                              </span>
-                              <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-900 transition-colors flex items-center gap-0.5">
-                                Rapor Detail <ChevronRight className="w-3 h-3" />
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <div className="relative w-12 h-12 rounded-2xl bg-slate-200 text-slate-800 flex items-center justify-center font-black text-lg border border-slate-300 shrink-0 overflow-hidden shadow-2xs">
-                                <span>{leaderboard[1].name ? leaderboard[1].name.charAt(0) : '2'}</span>
-                                {leaderboard[1].avatar_url && (
-                                  <img
-                                    src={leaderboard[1].avatar_url}
-                                    alt={leaderboard[1].name}
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                    onError={(e) => {
-                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
-                                  {formatShortTeacherName(leaderboard[1].name)}
-                                </h4>
-                                <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                                  {leaderboard[1].position}
+                        {/* Status Peringkat Belum Tervalidasi Banner (PARTIAL / OFFLINE_CACHE / ERROR) */}
+                        {(dataStatus === 'PARTIAL' || dataStatus === 'OFFLINE_CACHE' || dataStatus === 'ERROR') ? (
+                          <div className="p-4 sm:p-5 rounded-3xl bg-amber-50 border-2 border-amber-300 text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                            <div className="flex items-start gap-3.5">
+                              <span className="text-2xl sm:text-3xl shrink-0">⚠️</span>
+                              <div>
+                                <h4 className="text-sm font-black text-amber-950">Data peringkat belum tervalidasi</h4>
+                                <p className="text-xs text-amber-800 mt-0.5 leading-relaxed font-medium">
+                                  {dataStatus === 'ERROR'
+                                    ? 'Terjadi kendala saat menyinkronkan data buku besar poin dengan server cloud.'
+                                    : 'Sumber data poin masih bersifat parsial / cache offline lokal.'} Podium juara dan rekomendasi penghargaan sekolah dinonaktifkan sementara hingga seluruh log tersinkronisasi 100%.
                                 </p>
                               </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSyncPoints(true)}
+                              className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shrink-0 transition-colors cursor-pointer flex items-center gap-1.5"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Segarkan Data</span>
+                            </button>
                           </div>
-
-                          <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
-                            <span className="text-xs text-slate-600 font-bold">
-                              {leaderboard[1].hadirTepatWaktuCount} Hari On-Time
-                            </span>
-                            <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 text-xs font-black">
-                              ⭐ {leaderboard[1].totalPoints} Poin
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Juara 1 (Emas) - Highlighted Podium Champion */}
-                      {topTeacher && (
-                        <div
-                          onClick={() => setSelectedTeacher(topTeacher)}
-                          className="order-1 md:order-2 rounded-3xl p-5 sm:p-6 border-2 border-amber-300 bg-linear-to-b from-amber-50 via-white to-amber-50/50 shadow-md hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
-                        >
-                          <div className="absolute -top-12 -right-12 w-28 h-28 rounded-full bg-amber-200/30 blur-xl pointer-events-none" />
-
-                          <div>
-                            <div className="flex items-center justify-between gap-2 mb-3">
-                              <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1 shadow-2xs">
-                                <span>👑</span>
-                                <span>Juara 1 • Poin Tertinggi</span>
-                              </span>
-                              <span className="text-xs font-black text-amber-800 group-hover:text-amber-950 transition-colors flex items-center gap-1">
-                                Rapor Detail <ChevronRight className="w-3.5 h-3.5" />
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-3.5">
-                              <div className="relative w-14 h-14 rounded-2xl bg-[#023246] text-white flex items-center justify-center font-black text-xl border-2 border-amber-300 shadow-sm shrink-0 overflow-hidden">
-                                <span>{topTeacher.name ? topTeacher.name.charAt(0) : '1'}</span>
-                                {topTeacher.avatar_url && (
-                                  <img
-                                    src={topTeacher.avatar_url}
-                                    alt={topTeacher.name}
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                    onError={(e) => {
-                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-sm sm:text-base font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
-                                  {formatShortTeacherName(topTeacher.name)}
-                                </h4>
-                                <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                                  {topTeacher.position}
-                                </p>
-                                {topTeacher.nip && (
-                                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                                    NPP: {topTeacher.nip}
+                        ) : (
+                          <>
+                            {isTieForFirst && (
+                              <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-950 flex items-center gap-3">
+                                <span className="text-xl shrink-0">🤝</span>
+                                <div>
+                                  <h4 className="text-xs font-bold">Peringkat 1 Berimbang (Shared Rank)</h4>
+                                  <p className="text-[11px] text-blue-800 mt-0.5 leading-tight">
+                                    Terdapat guru dengan total poin dan indikator tie-breaker yang identik. Penetapan Juara 1 tunggal menunggu arahan Kepala Sekolah.
                                   </p>
-                                )}
+                                </div>
                               </div>
-                            </div>
-                          </div>
+                            )}
 
-                          <div className="pt-4 mt-4 border-t border-amber-100 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
-                                {topTeacher.hadirTepatWaktuCount} Hari On-Time
-                              </span>
-                              {topTeacher.earlyBirdCount && topTeacher.earlyBirdCount > 0 ? (
-                                <span className="text-[11px] text-amber-800 font-bold">
-                                  🌅 {topTeacher.earlyBirdCount} Fajar
-                                </span>
-                              ) : null}
-                            </div>
-                            <span className="px-3.5 py-1 rounded-2xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-xs">
-                              ⭐ {topTeacher.totalPoints} Poin
-                            </span>
-                          </div>
-                        </div>
-                      )}
+                            {/* 👑 TOP 3 PODIUM HERO CARDS ───────────────────────────── */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+                              {/* Juara 2 (Perak) */}
+                              {leaderboard[1] && (
+                                <div
+                                  onClick={() => setSelectedTeacher(leaderboard[1])}
+                                  className="order-2 md:order-1 rounded-3xl p-5 border border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-50/50 shadow-xs hover:border-slate-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                      <span className="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                        <span>🥈</span>
+                                        <span>Juara 2 • Perak</span>
+                                      </span>
+                                      <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-900 transition-colors flex items-center gap-0.5">
+                                        Rapor Detail <ChevronRight className="w-3 h-3" />
+                                      </span>
+                                    </div>
 
-                      {/* Juara 3 (Perunggu) */}
-                      {leaderboard[2] && (
-                        <div
-                          onClick={() => setSelectedTeacher(leaderboard[2])}
-                          className="order-3 rounded-3xl p-5 border border-amber-200/80 bg-linear-to-b from-amber-50/40 via-white to-amber-50/20 shadow-xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between gap-2 mb-3">
-                              <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                                <span>🥉</span>
-                                <span>Juara 3 • Perunggu</span>
-                              </span>
-                              <span className="text-[10px] font-bold text-amber-800 group-hover:text-amber-950 transition-colors flex items-center gap-0.5">
-                                Rapor Detail <ChevronRight className="w-3 h-3" />
-                              </span>
-                            </div>
+                                    <div className="flex items-center gap-3">
+                                      <div className="relative w-12 h-12 rounded-2xl bg-slate-200 text-slate-800 flex items-center justify-center font-black text-lg border border-slate-300 shrink-0 overflow-hidden shadow-2xs">
+                                        <span>{leaderboard[1].name ? leaderboard[1].name.charAt(0) : '2'}</span>
+                                        {leaderboard[1].avatar_url && (
+                                          <img
+                                            src={leaderboard[1].avatar_url}
+                                            alt={leaderboard[1].name}
+                                            className="absolute inset-0 w-full h-full object-cover"
+                                            onError={(e) => {
+                                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                                          {formatShortTeacherName(leaderboard[1].name)}
+                                        </h4>
+                                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                          {leaderboard[1].position}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
 
-                            <div className="flex items-center gap-3">
-                              <div className="relative w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-black text-lg border border-amber-200 shrink-0 overflow-hidden shadow-2xs">
-                                <span>{leaderboard[2].name ? leaderboard[2].name.charAt(0) : '3'}</span>
-                                {leaderboard[2].avatar_url && (
-                                  <img
-                                    src={leaderboard[2].avatar_url}
-                                    alt={leaderboard[2].name}
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                    onError={(e) => {
-                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
-                                  {formatShortTeacherName(leaderboard[2].name)}
-                                </h4>
-                                <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                                  {leaderboard[2].position}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
+                                  <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
+                                    <span className="text-xs text-slate-600 font-bold">
+                                      {leaderboard[1].hadirTepatWaktuCount} Hari On-Time
+                                    </span>
+                                    <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-900 text-xs font-black">
+                                      ⭐ {leaderboard[1].totalPoints} Poin
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
 
-                          <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
-                            <span className="text-xs text-slate-600 font-bold">
-                              {leaderboard[2].hadirTepatWaktuCount} Hari On-Time
-                            </span>
-                            <span className="px-3 py-1 rounded-xl bg-amber-100 text-amber-900 text-xs font-black">
-                              ⭐ {leaderboard[2].totalPoints} Poin
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                              {/* Juara 1 (Emas) - Highlighted Podium Champion */}
+                              {topTeacher && (
+                                <div
+                                  onClick={() => setSelectedTeacher(topTeacher)}
+                                  className="order-1 md:order-2 rounded-3xl p-5 sm:p-6 border-2 border-amber-300 bg-linear-to-b from-amber-50 via-white to-amber-50/50 shadow-md hover:border-amber-400 hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
+                                >
+                                  <div className="absolute -top-12 -right-12 w-28 h-28 rounded-full bg-amber-200/30 blur-xl pointer-events-none" />
+
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                      <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1 shadow-2xs">
+                                        <span>👑</span>
+                                        <span>Juara 1 • Poin Tertinggi</span>
+                                      </span>
+                                      <span className="text-xs font-black text-amber-800 group-hover:text-amber-950 transition-colors flex items-center gap-1">
+                                        Rapor Detail <ChevronRight className="w-3.5 h-3.5" />
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-3.5">
+                                      <div className="relative w-14 h-14 rounded-2xl bg-[#023246] text-white flex items-center justify-center font-black text-xl border-2 border-amber-300 shadow-sm shrink-0 overflow-hidden">
+                                        <span>{topTeacher.name ? topTeacher.name.charAt(0) : '1'}</span>
+                                        {topTeacher.avatar_url && (
+                                          <img
+                                            src={topTeacher.avatar_url}
+                                            alt={topTeacher.name}
+                                            className="absolute inset-0 w-full h-full object-cover"
+                                            onError={(e) => {
+                                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm sm:text-base font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                                          {formatShortTeacherName(topTeacher.name)}
+                                        </h4>
+                                        <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                                          {topTeacher.position}
+                                        </p>
+                                        {topTeacher.nip && (
+                                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                            NPP: {topTeacher.nip}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="pt-4 mt-4 border-t border-amber-100 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                                        {topTeacher.hadirTepatWaktuCount} Hari On-Time
+                                      </span>
+                                      {topTeacher.earlyBirdCount && topTeacher.earlyBirdCount > 0 ? (
+                                        <span className="text-[11px] text-amber-800 font-bold">
+                                          🌅 {topTeacher.earlyBirdCount} Fajar
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <span className="px-3.5 py-1 rounded-2xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-xs">
+                                      ⭐ {topTeacher.totalPoints} Poin
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Juara 3 (Perunggu) */}
+                              {leaderboard[2] && (
+                                <div
+                                  onClick={() => setSelectedTeacher(leaderboard[2])}
+                                  className="order-3 rounded-3xl p-5 border border-amber-200/80 bg-linear-to-b from-amber-50/40 via-white to-amber-50/20 shadow-xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                        <span>🥉</span>
+                                        <span>Juara 3 • Perunggu</span>
+                                      </span>
+                                      <span className="text-[10px] font-bold text-amber-800 group-hover:text-amber-950 transition-colors flex items-center gap-0.5">
+                                        Rapor Detail <ChevronRight className="w-3 h-3" />
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                      <div className="relative w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-black text-lg border border-amber-200 shrink-0 overflow-hidden shadow-2xs">
+                                        <span>{leaderboard[2].name ? leaderboard[2].name.charAt(0) : '3'}</span>
+                                        {leaderboard[2].avatar_url && (
+                                          <img
+                                            src={leaderboard[2].avatar_url}
+                                            alt={leaderboard[2].name}
+                                            className="absolute inset-0 w-full h-full object-cover"
+                                            onError={(e) => {
+                                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                                          {formatShortTeacherName(leaderboard[2].name)}
+                                        </h4>
+                                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                          {leaderboard[2].position}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between">
+                                    <span className="text-xs text-slate-600 font-bold">
+                                      {leaderboard[2].hadirTepatWaktuCount} Hari On-Time
+                                    </span>
+                                    <span className="px-3 py-1 rounded-xl bg-amber-100 text-amber-900 text-xs font-black">
+                                      ⭐ {leaderboard[2].totalPoints} Poin
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
 
                     {/* Tie-Breaker Info Strip */}
                     <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/70 text-xs text-amber-900">
@@ -1606,7 +1649,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                   {/* Level & Lencana */}
                                   <td className="py-3.5 px-4">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-base">{teacher.topBadge.icon}</span>
+                                      <span className="text-base">{teacher.topBadge?.icon || '🥉'}</span>
                                       <span className="font-bold text-slate-700 text-xs">
                                         {teacher.level}
                                       </span>
@@ -2220,7 +2263,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
 
                 <div className="pt-2 border-t border-white/15 flex items-center justify-between text-[10px] text-cyan-100">
                   <span className="flex items-center gap-1">
-                    <span>{selectedTeacher.topBadge.icon}</span>
+                    <span>{selectedTeacher.topBadge?.icon || '🥉'}</span>
                     <strong className="text-white">{selectedTeacher.level}</strong>
                   </span>
                   <span className="text-slate-300">
@@ -2766,9 +2809,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                   {teacher.totalPoints} Poin
                                 </span>
                                 <span className="text-[9px] text-slate-500 flex items-center justify-end gap-1 font-medium mt-0.5">
-                                  <span>{teacher.topBadge.icon}</span>
+                                  <span>{teacher.topBadge?.icon || '🥉'}</span>
                                   <span className="truncate max-w-16">
-                                    {teacher.topBadge.title.split(' ')[0]}
+                                    {teacher.topBadge?.title ? teacher.topBadge.title.split(' ')[0] : ''}
                                   </span>
                                 </span>
                               </div>
@@ -3090,7 +3133,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               <div className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate flex-1 min-w-0">
                 {activeTab === 'LEADERBOARD' && (
                   <span className="truncate block">
-                    Juara 1: <strong>{formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}</strong> ({topTeacher?.totalPoints ?? 0} Poin)
+                    Juara 1: <strong>{formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}</strong> ({topTeacher?.totalPoints ?? 0} Poin) • <span className="text-[10px] text-slate-400">Snapshot: {snapshotId.slice(0, 16)} • {new Date(lastCalculated).toLocaleTimeString('id-ID')} WIB</span>
                   </span>
                 )}
                 {activeTab === 'HISTORY' && <span className="truncate block">Buku Catatan Riwayat Transaksi Poin Guru</span>}

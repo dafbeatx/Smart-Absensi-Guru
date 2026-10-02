@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import type { TeacherPointLog, UserProfile, TeacherPointActivityType } from '../../../types/database.types';
-import { getTeacherDisciplineLeaderboard, normalizeTeacherName } from '../../../utils/teacher-appreciation.utils';
 import {
   X,
   Clock,
@@ -145,18 +144,16 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
       ? (teacher as any).totalPoints
       : 0;
 
-  // Skor akumulasi resmi bulan Agustus 2026 yang terverifikasi deterministik
+  // Skor akumulasi resmi bulan Agustus 2026 yang terverifikasi deterministik dari ledger
   const augustVerifiedPoints = useMemo(() => {
-    const prevBoard = getTeacherDisciplineLeaderboard(null, null, 'PREVIOUS_MONTH');
-    const norm = normalizeTeacherName(teacherName);
-    const item = prevBoard.leaderboard.find(
-      (t) =>
-        (teacher?.id && t.id === teacher.id) ||
-        (teacher?.nip && t.nip && teacher.nip.replace(/\s+/g, '') === t.nip.replace(/\s+/g, '')) ||
-        (norm && norm === normalizeTeacherName(t.name))
-    );
-    return item ? item.totalPoints : 0;
-  }, [teacher?.id, teacher?.nip, teacherName]);
+    if (!teacher?.id) return 0;
+    const prevLogs = (pointHistory || []).filter((l) => {
+      if (l.user_id !== teacher.id || l.status === 'VOIDED') return false;
+      const d = l.date || l.created_at;
+      return d && d.startsWith('2026-08');
+    });
+    return prevLogs.reduce((sum, l) => sum + (Number(l.points) || 0), 0);
+  }, [teacher?.id, pointHistory]);
 
   // 1. Filter log berdasarkan periode bulan yang dipilih (reset awal bulan per tanggal 1)
   const periodFilteredLogs = useMemo(() => {

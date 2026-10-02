@@ -35,6 +35,7 @@ import {
 } from '../../../utils/teacher-appreciation.utils';
 import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-seed.utils';
 import type { TeacherPointLog } from '../../../types/database.types';
+import { TeacherPointRepository } from '../../../repositories/TeacherPointRepository';
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
 
 export interface KepsekDashboardPageProps {
@@ -204,7 +205,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     window.dispatchEvent(new Event('smart_absensi_teachers_updated'));
   };
 
-  // Evaluasi Juara 1 & Popup Otomatis ke Kepala Sekolah
+  // Evaluasi Juara 1 & Popup Otomatis ke Kepala Sekolah (Hanya jika data SYNCED dan tervalidasi)
   const disciplineLeaderboard = useMemo(() => {
     return getTeacherDisciplineLeaderboard(
       null,
@@ -218,30 +219,51 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const activePeriodMonthYear = `${disciplineLeaderboard.monthName} ${disciplineLeaderboard.year}`;
 
   useEffect(() => {
-    const top1 = disciplineLeaderboard.leaderboard?.[0] || null;
+    // Larang penentuan juara atau popup rekomendasi jika data belum SYNCED atau terdapat tie pada peringkat 1
+    if (disciplineLeaderboard.dataStatus !== 'SYNCED' || !disciplineLeaderboard.isChampionEligible) {
+      setChampionTeacher(null);
+      return;
+    }
+
+    const top1 = disciplineLeaderboard.topTeacher;
     setChampionTeacher(top1);
 
-    // Cek Hadiah Tersimpan secara dinamis
-    const periodKey = `${disciplineLeaderboard.monthName}_${disciplineLeaderboard.year}`;
-    const storageKey = `smart_absensi_kepsek_reward_champion_${periodKey}`;
-    try {
-      const stored = localStorage.getItem(storageKey) || localStorage.getItem('smart_absensi_kepsek_reward_champion_September_2026');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed?.rewardText) setSavedChampionReward(parsed.rewardText);
-      } else if (top1) {
-        // Otomatis munculkan popup saran hadiah ke Kepala Sekolah saat login jika belum ditentukan
-        const popupSessionKey = `smart_absensi_kepsek_popup_shown_${periodKey}`;
-        const hasShown = sessionStorage.getItem(popupSessionKey);
-        if (!hasShown) {
-          setIsRewardModalOpen(true);
-          sessionStorage.setItem(popupSessionKey, 'true');
+    // Cek Keputusan Hadiah Tersimpan melalui Cloud Ledger Repository
+    const periodKey = activePeriodMonthYear;
+    const legacyKey = `${disciplineLeaderboard.monthName}_${disciplineLeaderboard.year}`;
+
+    TeacherPointRepository.getRewardDecision(periodKey)
+      .then((decision) => {
+        if (decision?.reward_detail) {
+          setSavedChampionReward(decision.reward_detail);
+        } else {
+          // Fallback membaca cache lokal
+          try {
+            const stored = localStorage.getItem(`smart_absensi_kepsek_reward_champion_${legacyKey}`);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (parsed?.rewardText) {
+                setSavedChampionReward(parsed.rewardText);
+                return;
+              }
+            }
+          } catch {}
+
+          if (top1) {
+            // Otomatis munculkan popup saran hadiah ke Kepala Sekolah saat login jika belum ditentukan
+            const popupSessionKey = `smart_absensi_kepsek_popup_shown_${legacyKey}`;
+            const hasShown = sessionStorage.getItem(popupSessionKey);
+            if (!hasShown) {
+              setIsRewardModalOpen(true);
+              sessionStorage.setItem(popupSessionKey, 'true');
+            }
+          }
         }
-      }
-    } catch {
-      // Ignored
-    }
-  }, [disciplineLeaderboard]);
+      })
+      .catch((e) => {
+        console.warn('TeacherPointRepository.getRewardDecision error:', e);
+      });
+  }, [disciplineLeaderboard, activePeriodMonthYear]);
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
 
@@ -1080,6 +1102,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         onClose={() => setIsRewardModalOpen(false)}
         championTeacher={championTeacher}
         periodMonthYear={activePeriodMonthYear}
+        snapshotId={disciplineLeaderboard.snapshotId}
         onRewardSaved={(rewardText) => setSavedChampionReward(rewardText)}
       />
 

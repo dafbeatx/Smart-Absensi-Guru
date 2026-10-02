@@ -93,17 +93,47 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  // ── GET: Read Point History (Admin, Guru, Kepsek can view all school teacher points) ────
+  // ── GET: Read Point History & Reward Decisions ───────────────────────────
   if (req.method === 'GET') {
     try {
-      const { user_id, month, limit: rawLimit, offset: rawOffset } = req.query || {};
+      const { user_id, month, type, period, limit: rawLimit, offset: rawOffset } = req.query || {};
+
+      // Jika meminta data keputusan reward Kepala Sekolah
+      if (type === 'reward_decision') {
+        const cleanPeriod = String(period || month || '').trim();
+        if (!cleanPeriod) {
+          return res.status(400).json({
+            success: false,
+            errorCode: 'VALIDATION_ERROR',
+            errorMessage: 'Parameter period wajib disertakan untuk query reward_decision.',
+          });
+        }
+        const { data: decision, error: dErr } = await serverSupabase
+          .from('teacher_point_reward_decisions')
+          .select('id, period, teacher_user_id, teacher_name, approved_by, approved_at, leaderboard_snapshot_id, reason, reward_detail, created_at')
+          .eq('period', cleanPeriod)
+          .maybeSingle();
+
+        if (dErr) {
+          console.error('[API /api/teacher-points GET reward_decision error]:', dErr);
+          return res.status(500).json({
+            success: false,
+            errorCode: 'DATABASE_ERROR',
+            errorMessage: 'Gagal memuat data keputusan apresiasi kepala sekolah.',
+          });
+        }
+        return res.status(200).json({
+          success: true,
+          data: decision || null,
+        });
+      }
 
       const limit = Math.min(1000, Math.max(1, parseInt(rawLimit as string, 10) || 500));
       const offset = Math.max(0, parseInt(rawOffset as string, 10) || 0);
 
       let query = serverSupabase
         .from('teacher_point_history')
-        .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at, idempotency_key')
+        .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at, idempotency_key, status, voided_at, void_reason, source, occurred_at')
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
@@ -146,13 +176,118 @@ export default async function handler(req: any, res: any) {
         errorCode: 'INTERNAL_SERVER_ERROR',
         errorMessage: 'Terjadi kendala internal pada server saat mengambil data poin.',
       });
-    }
   }
 
   // ── POST: Record Teacher Point with Server-side Integrity & Idempotency ─────────────────
   if (req.method === 'POST') {
     try {
       const body = req.body || {};
+
+      // ── Sub-Aksi A: Void / Pembatalan Poin Resmi (Audit Trail) ───────────
+      if (body.action === 'VOID') {
+        const leaderRoles = ['ADMIN', 'KEPSEK', 'KEPALA SEKOLAH', 'OPERATOR'];
+        if (!leaderRoles.includes(callerRole)) {
+          return res.status(403).json({
+            success: false,
+            errorCode: 'AUTH_FORBIDDEN',
+            errorMessage: 'Hanya Admin, Operator, atau Kepala Sekolah yang berhak membatalkan (void) poin.',
+          });
+        }
+        const pointId = String(body.point_id || '').trim();
+        const voidReason = String(body.void_reason || 'Dibatalkan oleh pengelola').trim();
+        if (!pointId) {
+          return res.status(400).json({
+            success: false,
+            errorCode: 'VALIDATION_ERROR',
+            errorMessage: 'Field point_id wajib disertakan untuk pembatalan poin.',
+          });
+        }
+        const { error: vErr } = await serverSupabase
+          .from('teacher_point_history')
+          .update({
+            status: 'VOIDED',
+            voided_at: new Date().toISOString(),
+            void_reason: voidReason,
+          })
+          .eq('id', pointId);
+
+        if (vErr) {
+          console.error('[API /api/teacher-points VOID error]:', vErr);
+          return res.status(500).json({
+            success: false,
+            errorCode: 'DATABASE_ERROR',
+            errorMessage: 'Gagal membatalkan poin di database.',
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          voided: true,
+          point_id: pointId,
+        });
+      }
+
+      // ── Sub-Aksi B: Simpan Keputusan Hadiah Juara Kepala Sekolah ─────────
+      if (body.action === 'REWARD_DECISION') {
+        const rewardRoles = ['KEPSEK', 'KEPALA SEKOLAH', 'ADMIN'];
+        if (!rewardRoles.includes(callerRole)) {
+          return res.status(403).json({
+            success: false,
+            errorCode: 'AUTH_FORBIDDEN',
+            errorMessage: 'Hanya Kepala Sekolah atau Admin yang berhak menyetujui keputusan apresiasi juara.',
+          });
+        }
+        const {
+          period: decPeriod,
+          teacher_user_id: decTeacherId,
+          teacher_name: decTeacherName,
+          leaderboard_snapshot_id: decSnapshotId,
+          reason: decReason,
+          reward_detail: decRewardDetail,
+        } = body;
+
+        if (!decPeriod || !decTeacherId || !decRewardDetail) {
+          return res.status(400).json({
+            success: false,
+            errorCode: 'VALIDATION_ERROR',
+            errorMessage: 'Field period, teacher_user_id, dan reward_detail wajib disertakan.',
+          });
+        }
+
+        const decisionRecord = {
+          id: body.id || `rew_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          period: String(decPeriod).trim(),
+          teacher_user_id: String(decTeacherId).trim(),
+          teacher_name: decTeacherName ? String(decTeacherName).trim() : null,
+          approved_by: callerUser?.id || callerUser?.full_name || 'KEPSEK',
+          approved_at: new Date().toISOString(),
+          leaderboard_snapshot_id: decSnapshotId ? String(decSnapshotId).trim() : null,
+          reason: decReason ? String(decReason).trim() : null,
+          reward_detail: String(decRewardDetail).trim(),
+          created_at: new Date().toISOString(),
+        };
+
+        const { data: savedDec, error: decErr } = await serverSupabase
+          .from('teacher_point_reward_decisions')
+          .upsert(decisionRecord, { onConflict: 'period' })
+          .select()
+          .single();
+
+        if (decErr) {
+          console.error('[API /api/teacher-points REWARD_DECISION error]:', decErr);
+          return res.status(500).json({
+            success: false,
+            errorCode: 'DATABASE_ERROR',
+            errorMessage: 'Gagal menyimpan keputusan apresiasi ke database.',
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          data: savedDec || decisionRecord,
+        });
+      }
+
       const {
         recipient_user_id,
         activity_type,
@@ -298,13 +433,16 @@ export default async function handler(req: any, res: any) {
         title: verifiedTitle,
         description: description && typeof description === 'string' ? description.trim().slice(0, 500) : null,
         idempotency_key: cleanIdempotencyKey || null,
+        status: 'VALID',
+        source: body.source ? String(body.source).trim() : 'SYSTEM',
+        occurred_at: body.occurred_at ? String(body.occurred_at).trim() : targetDate,
         created_at: new Date().toISOString(),
       };
 
       const { data: inserted, error: insertErr } = await serverSupabase
         .from('teacher_point_history')
         .insert(payload)
-        .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at, idempotency_key')
+        .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at, idempotency_key, status, voided_at, void_reason, source, occurred_at')
         .maybeSingle();
 
       if (insertErr) {
@@ -317,7 +455,7 @@ export default async function handler(req: any, res: any) {
         if (isConflict) {
           const { data: conflictRow } = await serverSupabase
             .from('teacher_point_history')
-            .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at, idempotency_key')
+            .select('id, user_id, teacher_name, date, points, activity_type, title, description, created_at, idempotency_key, status, voided_at, void_reason, source, occurred_at')
             .eq('idempotency_key', cleanIdempotencyKey)
             .maybeSingle();
 

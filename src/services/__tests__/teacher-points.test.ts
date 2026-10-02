@@ -821,7 +821,7 @@ export const runTeacherPointsTestSuite = async (): Promise<{
 
     assert(
       'Leaderboard Synchronization: Kepsek view has accurate Champion points',
-      topTeacherInKepsek !== undefined && topTeacherInKepsek.totalPoints === 385,
+      topTeacherInKepsek !== undefined && topTeacherInKepsek !== null && topTeacherInKepsek.totalPoints === 385,
       `Kepsek top teacher: ${topTeacherInKepsek?.name} (${topTeacherInKepsek?.totalPoints} pts)`
     );
 
@@ -1056,7 +1056,7 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       result.leaderboard[0].totalPoints === 250 &&
         result.leaderboard[1].totalPoints === 200 &&
         result.leaderboard[2].totalPoints === 180 &&
-        result.topTeacher.totalPoints === 250,
+        result.topTeacher?.totalPoints === 250,
       `Juara 1: ${result.leaderboard[0].totalPoints}, Juara 2: ${result.leaderboard[1].totalPoints}, Juara 3: ${result.leaderboard[2].totalPoints}`
     );
   } catch (err: unknown) {
@@ -1324,13 +1324,13 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     // 1. Verifikasi Juara 1 adalah Fitri Ani Rahayu dengan 415 Poin & 14 Hari On-Time di kedua tampilan
     assert(
       'August Parity: Juara 1 Agustus (Fitri Ani Rahayu, 415 Poin, 14 Hari On-Time) 100% identik di Admin dan Guru',
-      adminAugView.topTeacher.id === 'usr_guru_005' &&
-      adminAugView.topTeacher.totalPoints === 415 &&
-      adminAugView.topTeacher.hadirTepatWaktuCount === 14 &&
-      guruAugView.topTeacher.id === 'usr_guru_005' &&
-      guruAugView.topTeacher.totalPoints === 415 &&
-      guruAugView.topTeacher.hadirTepatWaktuCount === 14,
-      `Admin Top: ${adminAugView.topTeacher.name} (${adminAugView.topTeacher.totalPoints} pts, ${adminAugView.topTeacher.hadirTepatWaktuCount} on-time), Guru Top: ${guruAugView.topTeacher.name} (${guruAugView.topTeacher.totalPoints} pts, ${guruAugView.topTeacher.hadirTepatWaktuCount} on-time)`
+      adminAugView.topTeacher?.id === 'usr_guru_005' &&
+      adminAugView.topTeacher?.totalPoints === 415 &&
+      adminAugView.topTeacher?.hadirTepatWaktuCount === 14 &&
+      guruAugView.topTeacher?.id === 'usr_guru_005' &&
+      guruAugView.topTeacher?.totalPoints === 415 &&
+      guruAugView.topTeacher?.hadirTepatWaktuCount === 14,
+      `Admin Top: ${adminAugView.topTeacher?.name} (${adminAugView.topTeacher?.totalPoints} pts, ${adminAugView.topTeacher?.hadirTepatWaktuCount} on-time), Guru Top: ${guruAugView.topTeacher?.name} (${guruAugView.topTeacher?.totalPoints} pts, ${guruAugView.topTeacher?.hadirTepatWaktuCount} on-time)`
     );
 
     // 2. Verifikasi urutan peringkat dan poin seluruh guru 100% persis sama
@@ -1426,11 +1426,11 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       octLeaderboard.monthName === 'Oktober' &&
       octLeaderboard.year === 2026 &&
       widia?.totalPoints === 50 &&
-      octLeaderboard.topTeacher.id === 'usr_guru_009' &&
-      octLeaderboard.topTeacher.level === '🏆 Pendidik Teladan Utama' &&
+      octLeaderboard.topTeacher?.id === 'usr_guru_009' &&
+      octLeaderboard.topTeacher?.level === '🏆 Pendidik Teladan Utama' &&
       septi?.totalPoints === 40 &&
       septi?.rank === 2,
-      `Top: ${octLeaderboard.topTeacher.name} (${octLeaderboard.topTeacher.totalPoints} pts), Septi: ${septi?.totalPoints} pts (#${septi?.rank})`
+      `Top: ${octLeaderboard.topTeacher?.name} (${octLeaderboard.topTeacher?.totalPoints} pts), Septi: ${septi?.totalPoints} pts (#${septi?.rank})`
     );
   } catch (err: unknown) {
     assert('October 2026 Points: Guard', false, String(err));

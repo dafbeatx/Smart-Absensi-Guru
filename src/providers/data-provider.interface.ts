@@ -31,6 +31,7 @@ import type {
   SavePushSubscriptionResult,
   NotificationPreferences,
   TeacherPointLog,
+  TeacherRewardDecision,
   InventorySarprasItem,
   CreateInventorySarprasDTO,
   UpdateInventorySarprasDTO,
@@ -229,6 +230,18 @@ export interface IDataProvider {
   // Weekly Research Survey & TAM Evaluation API (100% Anonymous Quantitative Research)
   submitWeeklySurvey(dto: SubmitWeeklySurveyDTO): Promise<boolean>;
   getMonthlySurveySummary(month: number, year: number): Promise<WeeklySurveySummary>;
+
+  // Teacher Discipline Point History & Recognition API (Single Official Ledger)
+  getTeacherPointHistory(userId: string, token?: string): Promise<TeacherPointLog[]>;
+  getRegisteredTeachers?(token?: string): Promise<UserProfile[]>;
+  recordTeacherPoint(
+    log: Omit<TeacherPointLog, 'id' | 'created_at'>,
+    token?: string
+  ): Promise<TeacherPointLog>;
+  voidTeacherPointLog?(pointId: string, voidReason: string, actorId?: string, token?: string): Promise<boolean>;
+  getTeacherRewardDecision?(period: string, token?: string): Promise<TeacherRewardDecision | null>;
+  saveTeacherRewardDecision?(decision: TeacherRewardDecision, token?: string): Promise<TeacherRewardDecision>;
+  invalidateTeacherPointCache?(userId?: string): void;
 }
 
 

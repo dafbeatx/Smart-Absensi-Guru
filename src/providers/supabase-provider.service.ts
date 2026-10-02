@@ -41,6 +41,7 @@ import type {
   NotificationPreferences,
   TeacherPointLog,
   TeacherPointActivityType,
+  TeacherRewardDecision,
   InventorySarprasItem,
   CreateInventorySarprasDTO,
   UpdateInventorySarprasDTO,
@@ -105,7 +106,7 @@ import {
   removeDeletedStudentKey,
   deduplicateStudents,
 } from '../utils/student-dedup.utils';
-import { getInitialSeedTeacherPointLogs, getSafeInitialTeacherPointLogs } from '../utils/teacher-point-seed.utils';
+import { getSafeInitialTeacherPointLogs } from '../utils/teacher-point-seed.utils';
 import { resolveBehaviorLogType } from '../utils/student-behavior.utils';
 
 export class SupabaseProvider implements IDataProvider {
@@ -5594,8 +5595,7 @@ export class SupabaseProvider implements IDataProvider {
           if (localData.length > 0) {
             return localData;
           }
-          const seeds = getInitialSeedTeacherPointLogs();
-          return (!userId || userId === 'ALL') ? seeds : seeds.filter((l) => l.user_id === userId);
+          return [];
         }
 
         const json = await response.json();
@@ -5610,18 +5610,14 @@ export class SupabaseProvider implements IDataProvider {
           activity_type: row.activity_type as TeacherPointActivityType,
           title: row.title,
           description: row.description || undefined,
+          status: row.status || 'VALID',
+          voided_at: row.voided_at || null,
+          void_reason: row.void_reason || null,
+          source: row.source || 'SYSTEM',
+          occurred_at: row.occurred_at || row.date,
+          idempotency_key: row.idempotency_key || null,
           created_at: row.created_at,
         }));
-
-        // Pastikan rekap resmi Agustus tetap disertakan jika backend PostgreSQL hanya memuat log September
-        const hasAugust = result.some((l) => l.date && l.date.startsWith('2026-08'));
-        if (!hasAugust) {
-          const seeds = getInitialSeedTeacherPointLogs();
-          const augustSeeds = (!userId || userId === 'ALL')
-            ? seeds.filter((s) => s.date && s.date.startsWith('2026-08'))
-            : seeds.filter((s) => s.user_id === userId && s.date && s.date.startsWith('2026-08'));
-          result.push(...augustSeeds);
-        }
 
         this.cachedTeacherPointHistory.set(userId, { data: result, timestamp: Date.now() });
 
@@ -5660,7 +5656,7 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error('AUTH_REQUIRED: Sesi login aktif diperlukan untuk mencatat poin guru.');
     }
 
-    const idempotencyKey = `att:${log.user_id}:${log.date}:${log.activity_type}`;
+    const idempotencyKey = log.idempotency_key || `att:${log.user_id}:${log.date}:${log.activity_type}`;
     const payload = {
       recipient_user_id: log.user_id,
       activity_type: log.activity_type,
@@ -5669,6 +5665,8 @@ export class SupabaseProvider implements IDataProvider {
       title: log.title,
       description: log.description || null,
       idempotency_key: idempotencyKey,
+      source: log.source || 'SYSTEM',
+      occurred_at: log.occurred_at || log.date,
     };
 
     try {
@@ -5718,10 +5716,151 @@ export class SupabaseProvider implements IDataProvider {
         activity_type: savedRecord.activity_type as TeacherPointActivityType,
         title: savedRecord.title,
         description: savedRecord.description || undefined,
+        status: savedRecord.status || 'VALID',
+        voided_at: savedRecord.voided_at || null,
+        void_reason: savedRecord.void_reason || null,
+        source: savedRecord.source || 'SYSTEM',
+        occurred_at: savedRecord.occurred_at || savedRecord.date,
+        idempotency_key: savedRecord.idempotency_key || null,
         created_at: savedRecord.created_at,
       };
     } catch (err: any) {
       logger.error('SupabaseProvider', 'recordTeacherPoint exception:', err);
+      throw err;
+    }
+  }
+
+  public async getRegisteredTeachers(token?: string): Promise<UserProfile[]> {
+    return this.getAllUsers(token || '');
+  }
+
+  public async voidTeacherPointLog(
+    pointId: string,
+    voidReason: string,
+    _actorId?: string,
+    _token?: string
+  ): Promise<boolean> {
+    const activeToken =
+      _token ||
+      useAuthStore.getState().token ||
+      (typeof window !== 'undefined'
+        ? (() => {
+            try {
+              return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
+            } catch {
+              return null;
+            }
+          })()
+        : null);
+
+    if (!activeToken) {
+      throw new Error('AUTH_REQUIRED: Sesi login aktif diperlukan untuk membatalkan poin.');
+    }
+
+    try {
+      const response = await fetch('/api/teacher-points', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${activeToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'VOID',
+          point_id: pointId,
+          void_reason: voidReason,
+        }),
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.errorMessage || `Gagal membatalkan poin (HTTP ${response.status})`);
+      }
+
+      this.cachedTeacherPointHistory.clear();
+      return true;
+    } catch (err: any) {
+      logger.error('SupabaseProvider', 'voidTeacherPointLog error:', err);
+      throw err;
+    }
+  }
+
+  public async getTeacherRewardDecision(
+    period: string,
+    _token?: string
+  ): Promise<TeacherRewardDecision | null> {
+    const activeToken =
+      _token ||
+      useAuthStore.getState().token ||
+      (typeof window !== 'undefined'
+        ? (() => {
+            try {
+              return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
+            } catch {
+              return null;
+            }
+          })()
+        : null);
+
+    try {
+      const response = await fetch(
+        `/api/teacher-points?type=reward_decision&period=${encodeURIComponent(period)}`,
+        {
+          method: 'GET',
+          headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : {},
+        }
+      );
+      if (!response.ok) return null;
+      const json = await response.json();
+      return json.data || null;
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getTeacherRewardDecision error:', err);
+      return null;
+    }
+  }
+
+  public async saveTeacherRewardDecision(
+    decision: TeacherRewardDecision,
+    _token?: string
+  ): Promise<TeacherRewardDecision> {
+    const activeToken =
+      _token ||
+      useAuthStore.getState().token ||
+      (typeof window !== 'undefined'
+        ? (() => {
+            try {
+              return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
+            } catch {
+              return null;
+            }
+          })()
+        : null);
+
+    if (!activeToken) {
+      throw new Error('AUTH_REQUIRED: Sesi login aktif diperlukan untuk menyetujui reward.');
+    }
+
+    try {
+      const response = await fetch('/api/teacher-points', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${activeToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'REWARD_DECISION',
+          ...decision,
+        }),
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.errorMessage || `Gagal menyimpan reward decision (HTTP ${response.status})`);
+      }
+
+      const json = await response.json();
+      return json.data;
+    } catch (err: any) {
+      logger.error('SupabaseProvider', 'saveTeacherRewardDecision error:', err);
       throw err;
     }
   }

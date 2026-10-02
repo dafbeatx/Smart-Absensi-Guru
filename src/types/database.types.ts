@@ -340,16 +340,76 @@ export type TeacherPointActivityType =
   | 'STUDENT_DEMERIT'
   | 'SURVEY_PARTICIPATION';
 
+export type TeacherPointStatus = 'VALID' | 'VOIDED';
+
 export interface TeacherPointLog {
   id: string;
   user_id: string;
   teacher_name?: string;
   date: string; // YYYY-MM-DD
-  points: number; // e.g. +15, +5, +10, -10
+  points: number; // Signed integer (e.g. +15, +5, +10, -10)
   activity_type: TeacherPointActivityType;
   title?: string;
   description?: string;
   created_at: string;
+  status?: TeacherPointStatus;
+  voided_at?: string | null;
+  void_reason?: string | null;
+  idempotency_key?: string | null;
+  source?: string;
+  occurred_at?: string;
+}
+
+export type TeacherLeaderboardDataStatus =
+  | 'LOADING'
+  | 'SYNCED'
+  | 'EMPTY'
+  | 'PARTIAL'
+  | 'OFFLINE_CACHE'
+  | 'ERROR';
+
+export type TeacherDisciplineStatus =
+  | 'ACTIVE'
+  | 'NO_ACTIVITY'
+  | 'ON_LEAVE'
+  | 'INACTIVE'
+  | 'DATA_PENDING'
+  | 'DATA_ERROR';
+
+export interface TeacherRewardDecision {
+  id?: string;
+  period: string; // YYYY-MM or 'September 2026'
+  teacher_user_id: string;
+  teacher_name?: string;
+  approved_by: string;
+  approved_by_name?: string;
+  approved_at?: string;
+  leaderboard_snapshot_id: string;
+  reason?: string;
+  reward_detail: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TeacherPointAuditReport {
+  period: string;
+  scannedLogsCount: number;
+  duplicateLogsCount: number;
+  unrecognizedUserIdsCount: number;
+  inactiveUsersWithLogsCount: number;
+  wrongMonthLogsCount: number;
+  negativeTotalUsersCount: number;
+  mismatchedScoreUsersCount: number;
+  ambiguousIdentitiesCount: number;
+  details: {
+    duplicates: string[];
+    unrecognizedUsers: string[];
+    inactiveUsers: string[];
+    wrongMonthLogs: string[];
+    negativeTotals: { userId: string; netPoints: number }[];
+    ambiguousIdentities: string[];
+  };
+  generatedAt: string;
 }
 
 export interface TeacherAppreciationScore {
