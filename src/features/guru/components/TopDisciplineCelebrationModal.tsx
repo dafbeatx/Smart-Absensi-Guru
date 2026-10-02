@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import type { UserProfile } from '../../../types/database.types';
 import type { TeacherLeaderboardItem } from '../../../utils/teacher-appreciation.utils';
-import { getDisciplinePeriodMetadata } from '../../../utils/teacher-appreciation.utils';
 import {
   Trophy,
   Award,
@@ -23,7 +22,6 @@ interface TopDisciplineCelebrationModalProps {
   teacherData?: TeacherLeaderboardItem | null;
   topTeachers?: TeacherLeaderboardItem[] | null;
   onOpenCertificate?: () => void;
-  periodMonthYear?: string;
 }
 
 export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationModalProps> = ({
@@ -36,11 +34,8 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
   teacherData,
   topTeachers,
   onOpenCertificate,
-  periodMonthYear,
 }) => {
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
-  const defaultPeriod = React.useMemo(() => getDisciplinePeriodMetadata('CURRENT_MONTH').label, []);
-  const effectivePeriod = periodMonthYear || defaultPeriod;
   if (!isOpen || rank < 1 || rank > 3) return null;
 
   const isRank1 = rank === 1;
@@ -292,7 +287,7 @@ export const TopDisciplineCelebrationModal: React.FC<TopDisciplineCelebrationMod
         isOpen={isCertificateOpen}
         onClose={() => setIsCertificateOpen(false)}
         user={user}
-        periodMonthYear={effectivePeriod}
+        periodMonthYear="September 2026"
         totalPoints={totalPoints}
         rank={rank}
       />
