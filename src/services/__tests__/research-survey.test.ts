@@ -5,7 +5,14 @@ import {
   markFridaySurveyCompleted,
   shouldTriggerFridaySurvey,
   calculateSurveySummary,
+  getSurveyActivePeriodKey,
+  hasCompletedActiveSurvey,
+  markActiveSurveyCompleted,
+  shouldSendDailySurveyReminder,
+  markDailySurveyReminderSent,
+  shouldShowDailySurveyBanner,
 } from '../research-survey.service';
+import { NotificationService } from '../notification-permission.service';
 import { MockProvider } from '../../providers/mock-provider.service';
 import type { WeeklySurveyResponse } from '../../types/database.types';
 
@@ -201,6 +208,67 @@ export async function runResearchSurveyTestSuite(): Promise<TestSuiteResult> {
       monthlyReport.evaluations.some((e) =>
         e.evaluationText.includes('Integrasi kuesioner mingguan')
       )
+    );
+
+    // ── 9. UNIT TESTS: Daily Survey Reminder & Cross-Device Notification ──
+    const dailyDate = '2026-10-02';
+    const testUser = 'user_daily_survey_test_99';
+    const periodKey = getSurveyActivePeriodKey(dailyDate);
+    assert('Daily Survey - Deterministic active period key', periodKey === '2026_M10_W1');
+
+    assert(
+      'Daily Survey - Initially not completed for active period',
+      hasCompletedActiveSurvey(testUser, dailyDate) === false
+    );
+    assert(
+      'Daily Survey - Initially banner is visible',
+      shouldShowDailySurveyBanner(testUser, dailyDate) === true
+    );
+    assert(
+      'Daily Survey - Should send reminder when not completed & not reminded today',
+      shouldSendDailySurveyReminder(testUser, dailyDate) === true
+    );
+
+    // Mark reminded today
+    markDailySurveyReminderSent(testUser, dailyDate);
+    assert(
+      'Daily Survey - Should NOT send reminder again on the same day (Anti-Spam / Zero-Egress)',
+      shouldSendDailySurveyReminder(testUser, dailyDate) === false
+    );
+
+    // Mark survey completed
+    markActiveSurveyCompleted(testUser, dailyDate);
+    assert(
+      'Daily Survey - Successfully marked as completed for active cycle',
+      hasCompletedActiveSurvey(testUser, dailyDate) === true
+    );
+    assert(
+      'Daily Survey - Banner is hidden after completion',
+      shouldShowDailySurveyBanner(testUser, dailyDate) === false
+    );
+    assert(
+      'Daily Survey - Should NOT remind after completion',
+      shouldSendDailySurveyReminder(testUser, dailyDate) === false
+    );
+
+    // Notification Service Payload Verification
+    const notifPayload = NotificationService.notifyPendingSurveyReminder(
+      'user_test_notif_guru',
+      'Ibu Siti Rahma S.Pd',
+      'GURU'
+    );
+    assert('Notification - Survey reminder payload created', Boolean(notifPayload.id));
+    assert(
+      'Notification - Title advertises +10 Poin reward',
+      notifPayload.title.includes('+10 Poin')
+    );
+    assert(
+      'Notification - Deep-link actionUrl points to ?openSurvey=true',
+      notifPayload.actionUrl === '/?openSurvey=true'
+    );
+    assert(
+      'Notification - Targeted for Guru role',
+      notifPayload.roleTarget === 'GURU'
     );
   } catch (err: any) {
     assert('Research Survey Suite - Exception free execution', false, err?.message || String(err));

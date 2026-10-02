@@ -4,6 +4,7 @@ import { PendingApprovalWidget } from '../../features/leave/components/PendingAp
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 import { EarlyWarningSystemWidget } from './EarlyWarningSystemWidget';
 import { ExecutiveSurveySummaryWidget } from './ExecutiveSurveySummaryWidget';
+import { DailySurveyReminderBanner } from '../survey/DailySurveyReminderBanner';
 import { BurnoutEarlyWarningWidget } from '../../features/kepsek/components/BurnoutEarlyWarningWidget';
 import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay } from '../../utils/time.utils';
 import {
@@ -561,6 +562,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         </div>
       </div>
 
+      {/* ── 1.5. DAILY SURVEY REMINDER BANNER (Cross-Device Reminder +10 Poin) ── */}
+      <DailySurveyReminderBanner />
+
       {/* ── 2. EXECUTIVE HIGH-IMPACT KPI HERO BANNER (Decision in 5 seconds) ── */}
       <button
         type="button"
@@ -937,6 +941,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           </button>
         </div>
       </div>
+
+      {/* ── 3.4. SUARA PENDIDIK & HASIL SURVEY GURU (100% ANONIM DENGAN GRAFIK & SOLUSI) ── */}
+      <ExecutiveSurveySummaryWidget />
 
       {/* ── 3.5. TEACHER WELL-BEING & BURNOUT EARLY WARNING WIDGET ────────── */}
       <BurnoutEarlyWarningWidget />

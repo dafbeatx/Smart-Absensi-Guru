@@ -7,6 +7,7 @@ import { SoundService } from './audio.service';
 import { pwaService } from './pwa.service';
 import { ProviderFactory } from '../providers/provider-factory';
 import { useAuthStore } from '../store/useAuthStore';
+import { getTodayDateInJakarta } from '../utils/time.utils';
 import type { SavePushSubscriptionResult } from '../types/database.types';
 
 /**
@@ -968,6 +969,41 @@ export class NotificationPermissionService {
       tag: `leave_broadcast_${Date.now()}`,
       url: '/?tab=BERANDA',
     }).catch(() => {});
+
+    return payload;
+  }
+
+  /**
+   * Helper: Trigger Notifikasi Harian Pengingat Survey Evaluasi (+10 Poin)
+   * Mengirim notifikasi native (Windows, macOS, Android, Apple iOS PWA) dan in-app bell
+   */
+  public notifyPendingSurveyReminder(userId: string, userName: string, role: string = 'GURU') {
+    const todayStr = getTodayDateInJakarta();
+    const payload: AttendanceNotificationPayload = {
+      id: `notif_survey_reminder_${userId}_${todayStr}`,
+      title: '📋 Survey Evaluasi Belum Diisi (+10 Poin)',
+      body: `Bapak/Ibu ${userName}, partisipasi Anda sangat penting untuk evaluasi sistem sekolah. Luangkan 1 menit untuk mengisi kuesioner anonim & dapatkan +10 Poin!`,
+      type: 'EVENT',
+      userId,
+      roleTarget: (role.toUpperCase() as any) || 'ALL',
+      actionType: 'NAVIGATE_TAB',
+      actionDate: todayStr,
+      actionTargetId: userId,
+      actionUrl: '/?openSurvey=true',
+      severity: 'INFO',
+    };
+
+    this.sendNativeNotification(payload);
+
+    if (userId) {
+      this.triggerServerWebPush({
+        targetUserId: userId,
+        title: '📋 Survey Evaluasi Belum Diisi (+10 Poin)',
+        body: `Bapak/Ibu ${userName}, isi kuesioner evaluasi anonim 1 menit & dapatkan +10 Poin!`,
+        tag: `survey_reminder_${userId}_${todayStr}`,
+        url: '/?openSurvey=true',
+      }).catch(() => {});
+    }
 
     return payload;
   }

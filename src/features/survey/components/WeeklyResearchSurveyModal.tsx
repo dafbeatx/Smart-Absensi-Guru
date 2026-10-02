@@ -2,9 +2,13 @@ import React, { useState } from 'react';
 import type { RoleCode } from '../../../types/database.types';
 import {
   ResearchSurveyService,
-  markFridaySurveyCompleted,
+  markActiveSurveyCompleted,
 } from '../../../services/research-survey.service';
+import { ProviderFactory } from '../../../providers/provider-factory';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { useToastStore } from '../../../store/useToastStore';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
+import { X, Sparkles, ShieldCheck } from 'lucide-react';
 
 export interface WeeklyResearchSurveyModalProps {
   isOpen: boolean;
@@ -156,8 +160,53 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
         year: y,
       });
 
-      // Mark locally so user is not prompted again this Friday
-      markFridaySurveyCompleted(userId, todayStr);
+      // Mark locally so user is not prompted again for this active cycle & day
+      markActiveSurveyCompleted(userId, todayStr);
+
+      // 🌟 Berikan apresiasi +10 Poin Kedisiplinan & Partisipasi ke akun pengguna
+      if (userId) {
+        try {
+          const token = useAuthStore.getState().token || '';
+          const currentAuth = useAuthStore.getState().user;
+          const teacherName = currentAuth?.full_name || 'Bapak/Ibu Pendidik';
+
+          await ProviderFactory.getProvider().recordTeacherPoint(
+            {
+              user_id: userId,
+              teacher_name: teacherName,
+              date: todayStr,
+              points: 10,
+              activity_type: 'SURVEY_PARTICIPATION',
+              title: 'Apresiasi Partisipasi Survey TAM',
+              description: 'Menyelesaikan pengisian kuesioner evaluasi riset & sistem sekolah (+10 Poin)',
+            },
+            token || undefined
+          );
+
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('smart_absensi_points_updated', {
+                detail: {
+                  userId: userId,
+                  teacherName: teacherName,
+                  points: 10,
+                  title: 'Apresiasi Partisipasi Survey TAM',
+                  description: 'Menyelesaikan pengisian kuesioner evaluasi riset (+10 Poin)',
+                  activity_type: 'SURVEY_PARTICIPATION',
+                },
+              })
+            );
+          }
+        } catch (ptErr) {
+          console.warn('Failed to award survey points:', ptErr);
+        }
+      }
+
+      useToastStore.getState().showToast(
+        'success',
+        'Survey Terkirim & +10 Poin Didapatkan! 🌟',
+        'Terima kasih atas partisipasi Anda dalam evaluasi mutu aplikasi sekolah.'
+      );
 
       setIsSubmitted(true);
       setTimeout(() => {
@@ -166,7 +215,7 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
     } catch (err) {
       console.warn('Failed to submit weekly survey:', err);
       // Even if network fails, ensure user experience isn't blocked indefinitely
-      markFridaySurveyCompleted(userId);
+      markActiveSurveyCompleted(userId);
       setIsSubmitted(true);
       setTimeout(() => {
         onCompleted();
@@ -181,32 +230,47 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
       className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
       role="dialog"
       aria-modal="true"
-      aria-label="Kuesioner Evaluasi Mingguan Hari Jumat"
+      aria-label="Kuesioner Evaluasi Sistem Sekolah"
     >
       <div className="relative w-full max-w-xl max-h-[92dvh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
         {/* Header Section */}
-        <div className="bg-linear-to-r from-emerald-700 via-teal-700 to-slate-900 text-white p-5 shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/25 border border-emerald-400/40 text-emerald-200">
-              <span>📋</span> Kuesioner Evaluasi Mingguan (Jumat)
+        <div className="bg-linear-to-r from-emerald-700 via-teal-700 to-slate-900 text-white p-4 sm:p-5 shrink-0">
+          <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1.5">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold bg-emerald-500/25 border border-emerald-400/40 text-emerald-200">
+              <span>📋</span> Kuesioner Evaluasi Sistem
             </span>
-            <span className="text-xs font-bold text-emerald-200/90">
-              Progres: {answeredCount}/{totalQuestions}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-amber-400 text-slate-950 shadow-2xs">
+                <Sparkles className="w-2.5 h-2.5 text-slate-950" />
+                +10 Poin
+              </span>
+              <span className="text-xs font-bold text-emerald-200/90">
+                {answeredCount}/{totalQuestions}
+              </span>
+              <button
+                type="button"
+                onClick={onCompleted}
+                aria-label="Tutup kuesioner"
+                className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer ml-1"
+                title="Tutup / Nanti Saja"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          <h2 className="text-lg sm:text-xl font-extrabold text-white leading-tight">
+          <h2 className="text-base sm:text-lg font-extrabold text-white leading-tight">
             Evaluasi Efektivitas Aplikasi Sekolah
           </h2>
-          <p className="text-xs text-emerald-100/90 mt-1">
-            Penelitian kuantitatif model TAM & evaluasi mingguan demi penjaminan mutu sistem sekolah.
+          <p className="text-[11px] sm:text-xs text-emerald-100/90 mt-0.5 leading-relaxed">
+            Penelitian kuantitatif model TAM &amp; evaluasi berkala demi penjaminan mutu sistem sekolah.
           </p>
 
           {/* Anonymity Banner */}
-          <div className="mt-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2.5 flex items-start gap-2.5">
-            <span className="text-base shrink-0 mt-0.5">🔒</span>
+          <div className="mt-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2.5 flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
             <div className="text-[11px] text-emerald-50 leading-relaxed">
-              <strong className="text-white font-extrabold">100% Anonim & Rahasia Akademik:</strong> Identitas pribadi (Nama, NPP, Telepon) sama sekali tidak dicatat dalam respons kuesioner. Pengisian bersifat <strong>wajib</strong> setelah absensi masuk hari Jumat.
+              <strong className="text-white font-extrabold">100% Anonim &amp; Rahasia:</strong> Identitas pribadi (Nama, NPP, Telepon) tidak dicatat. Pengisian hanya membutuhkan waktu ~1 menit.
             </div>
           </div>
         </div>
@@ -217,9 +281,9 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl animate-bounce shadow-md">
               ✓
             </div>
-            <h3 className="text-xl font-black text-slate-900">Terima Kasih Banyak!</h3>
+            <h3 className="text-lg sm:text-xl font-black text-slate-900">Terima Kasih Banyak!</h3>
             <p className="text-xs sm:text-sm text-slate-600 max-w-md leading-relaxed">
-              Tanggapan dan masukan Anda telah tersimpan secara <strong>100% anonim</strong> ke dalam rekapitulasi riset bulanan sekolah.
+              Tanggapan Anda telah tersimpan secara <strong>100% anonim</strong> dan Anda memperoleh <strong>+10 Poin</strong> apresiasi.
             </p>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -269,7 +333,7 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
                           type="button"
                           id={`btn-survey-${q.id}-${val}`}
                           onClick={() => handleScoreSelect(q.id, val)}
-                          className={`py-2 px-1 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 cursor-pointer ${
+                          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 cursor-pointer ${
                             isSelected
                               ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-102 ring-2 ring-emerald-500'
                               : 'bg-slate-100 hover:bg-slate-200 text-slate-700'

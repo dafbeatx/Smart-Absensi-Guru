@@ -337,7 +337,8 @@ export type TeacherPointActivityType =
   | 'MOOD_CHECKIN'
   | 'COMPLAINT_SUBMIT'
   | 'STUDENT_MERIT'
-  | 'STUDENT_DEMERIT';
+  | 'STUDENT_DEMERIT'
+  | 'SURVEY_PARTICIPATION';
 
 export interface TeacherPointLog {
   id: string;

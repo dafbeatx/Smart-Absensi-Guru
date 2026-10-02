@@ -40,6 +40,19 @@ function safeSetStorage(key: string, value: string): void {
 }
 
 /**
+ * Returns the current active survey period key (e.g. "2026_M10_W1")
+ */
+export function getSurveyActivePeriodKey(dateStr?: string): string {
+  const today = dateStr || getTodayDateInJakarta();
+  const d = new Date(today);
+  const y = isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+  const m = isNaN(d.getTime()) ? new Date().getMonth() + 1 : d.getMonth() + 1;
+  const day = isNaN(d.getTime()) ? new Date().getDate() : d.getDate();
+  const weekNum = Math.ceil(day / 7);
+  return `${y}_M${m}_W${weekNum}`;
+}
+
+/**
  * Checks whether the current or specified date is Friday in Asia/Jakarta timezone.
  */
 export function isFridayToday(dateOrStr?: Date | string): boolean {
@@ -58,6 +71,23 @@ export function hasCompletedFridaySurvey(userId: string, dateStr?: string): bool
 }
 
 /**
+ * Checks whether the user has completed the survey for the active period cycle.
+ * Evaluated locally with zero egress/network overhead and isolated per user.
+ */
+export function hasCompletedActiveSurvey(userId: string, dateStr?: string): boolean {
+  if (!userId) return false;
+  const periodKey = getSurveyActivePeriodKey(dateStr);
+  const userPeriodKey = `smart_absensi_survey_done_${periodKey}_${userId}`;
+  if (safeGetStorage(userPeriodKey) === '1') {
+    return true;
+  }
+  // Also check if completed today specifically for this user
+  const today = dateStr || getTodayDateInJakarta();
+  const todayUserKey = `smart_absensi_friday_survey_${today}_${userId}`;
+  return safeGetStorage(todayUserKey) === '1';
+}
+
+/**
  * Marks the Friday survey as completed locally for the user and device.
  */
 export function markFridaySurveyCompleted(userId: string, dateStr?: string): void {
@@ -66,6 +96,61 @@ export function markFridaySurveyCompleted(userId: string, dateStr?: string): voi
   const deviceKey = `smart_absensi_friday_survey_${today}`;
   safeSetStorage(perUserKey, '1');
   safeSetStorage(deviceKey, '1');
+}
+
+/**
+ * Marks the active period survey as completed for the user and device.
+ * Also dispatches event so dashboard banners and badges instantly disappear without page reload.
+ */
+export function markActiveSurveyCompleted(userId: string, dateStr?: string): void {
+  const today = dateStr || getTodayDateInJakarta();
+  const periodKey = getSurveyActivePeriodKey(today);
+  const userPeriodKey = `smart_absensi_survey_done_${periodKey}_${userId || 'anon'}`;
+  safeSetStorage(userPeriodKey, '1');
+  markFridaySurveyCompleted(userId, today);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('smart_absensi_survey_completed', {
+        detail: { userId, periodKey, date: today },
+      })
+    );
+  }
+}
+
+/**
+ * Decides whether a daily reminder (notification / prompt) should be sent today.
+ * Returns true if:
+ * 1. User has NOT completed the active survey period.
+ * 2. Daily reminder has NOT yet been fired today for this user (prevents spam).
+ */
+export function shouldSendDailySurveyReminder(userId: string, dateStr?: string): boolean {
+  if (!userId) return false;
+  if (hasCompletedActiveSurvey(userId, dateStr)) {
+    return false;
+  }
+  const today = dateStr || getTodayDateInJakarta();
+  const reminderKey = `smart_absensi_survey_daily_reminded_${today}_${userId}`;
+  return safeGetStorage(reminderKey) !== '1';
+}
+
+/**
+ * Marks the daily survey reminder as sent for today.
+ */
+export function markDailySurveyReminderSent(userId: string, dateStr?: string): void {
+  if (!userId) return;
+  const today = dateStr || getTodayDateInJakarta();
+  const reminderKey = `smart_absensi_survey_daily_reminded_${today}_${userId}`;
+  safeSetStorage(reminderKey, '1');
+}
+
+/**
+ * Checks whether the daily sticky reminder banner should be visible.
+ * Visible if user has NOT completed the active survey for this period.
+ */
+export function shouldShowDailySurveyBanner(userId: string, dateStr?: string): boolean {
+  if (!userId) return false;
+  return !hasCompletedActiveSurvey(userId, dateStr);
 }
 
 export interface ShouldTriggerSurveyParams {

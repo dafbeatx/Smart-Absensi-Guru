@@ -44,6 +44,7 @@ import {
 } from '../../guru/components/CustomizeQuickIconsModal';
 import { SarprasInventoryModal } from '../../sarpras/components/SarprasInventoryModal';
 import { GuruSurveyVoiceCard } from '../../guru/components/GuruSurveyVoiceCard';
+import { DailySurveyReminderBanner } from '../../../components/survey/DailySurveyReminderBanner';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
@@ -2030,6 +2031,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           if (match) targetDate = match[1];
         }
         handleOpenCorrectionModal(targetDate);
+      } else if (
+        notifObj.action_type === 'NAVIGATE_TAB' &&
+        (notifObj.title.toLowerCase().includes('survey') || notifObj.message.toLowerCase().includes('survey'))
+      ) {
+        window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_modal'));
       }
     }
   };
@@ -2406,6 +2412,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         {/* ── TAB 1: BERANDA ──────────────────────────────────────────────── */}
         {activeTab === 'BERANDA' && berandaLayer === 'HOME' && (
           <>
+            {/* 📋 PENGINGAT HARIAN SURVEY EVALUASI SISTEM (+10 POIN) */}
+            <DailySurveyReminderBanner />
+
             {/* 🏛️ KARTU TUGAS KEPANITIAAN UJIAN (SK KEPALA SEKOLAH) */}
             {committeeInfo?.isCommittee && (
               <div

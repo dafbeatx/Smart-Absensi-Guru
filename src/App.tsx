@@ -99,7 +99,12 @@ const OfficialDocumentVerificationModal = lazyRetry(
   'OfficialDocumentVerificationModal'
 );
 
-import { shouldTriggerFridaySurvey } from './services/research-survey.service';
+import {
+  shouldTriggerFridaySurvey,
+  shouldSendDailySurveyReminder,
+  markDailySurveyReminderSent,
+} from './services/research-survey.service';
+import { NotificationService } from './services/notification-permission.service';
 
 export const App: React.FC = () => {
   const { isAuthenticated, user, token } = useAuthStore();
@@ -241,8 +246,35 @@ export const App: React.FC = () => {
       setIsSurveyAnalyticsOpen(true);
     };
 
+    const handleOpenSurveyModal = () => {
+      setIsFridaySurveyOpen(true);
+    };
+
     window.addEventListener('smart_absensi_checkin_completed', handleCheckInCompleted);
     window.addEventListener('smart_absensi_open_survey_analytics', handleOpenSurveyAnalytics);
+    window.addEventListener('smart_absensi_open_survey_modal', handleOpenSurveyModal);
+
+    // Deep-link check: URL query ?openSurvey=true atau hash
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('openSurvey') === 'true' || window.location.hash.includes('openSurvey')) {
+          setIsFridaySurveyOpen(true);
+        }
+      } catch {}
+    }
+
+    // Evaluasi pengingat harian survey lintas perangkat (Zero Egress - dievaluasi lokal)
+    if (userId) {
+      if (shouldSendDailySurveyReminder(userId)) {
+        NotificationService.notifyPendingSurveyReminder(
+          userId,
+          user?.full_name || 'Bapak/Ibu Pendidik',
+          user?.role || 'GURU'
+        );
+        markDailySurveyReminderSent(userId);
+      }
+    }
 
     // Initial check for Friday: if user already checked in today and hasn't filled the survey
     if (userId) {
@@ -265,6 +297,7 @@ export const App: React.FC = () => {
     return () => {
       window.removeEventListener('smart_absensi_checkin_completed', handleCheckInCompleted);
       window.removeEventListener('smart_absensi_open_survey_analytics', handleOpenSurveyAnalytics);
+      window.removeEventListener('smart_absensi_open_survey_modal', handleOpenSurveyModal);
     };
   }, [userId]);
 
