@@ -552,7 +552,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     },
     {
       id: 'SURVEY_RESEARCH',
-      label: 'Riset & Kuesioner TAM',
+      label: 'Hasil Survey & Solusi Guru',
       icon: '📊',
     },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),

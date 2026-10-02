@@ -154,6 +154,16 @@ export async function runResearchSurveyTestSuite(): Promise<TestSuiteResult> {
       !('user_id' in (summary.evaluations[0] as any))
     );
 
+    // Distribution & Weekly Trends & Action Solutions:
+    assert('Distribution - Calculates star distributions', Boolean(summary.distribution?.overall));
+    assert('Weekly Trends - Contains weekly trend entries', (summary.weeklyTrends?.length || 0) >= 4);
+    assert('Solutions - Generates structured action solutions', (summary.solutions?.length || 0) >= 4);
+    assert(
+      'Solutions - Has solutions for Kepsek and Admin',
+      summary.solutions?.some((s) => s.forRole === 'KEPSEK') === true &&
+        summary.solutions?.some((s) => s.forRole === 'ADMIN') === true
+    );
+
     // Empty dataset handling (zero respondents)
     const emptySummary = calculateSurveySummary([], 11, 2026);
     assert('Summary - Empty dataset handles zero respondents gracefully', emptySummary.totalRespondents === 0);

@@ -43,6 +43,7 @@ import {
   DEFAULT_8_QUICK_ICONS,
 } from '../../guru/components/CustomizeQuickIconsModal';
 import { SarprasInventoryModal } from '../../sarpras/components/SarprasInventoryModal';
+import { GuruSurveyVoiceCard } from '../../guru/components/GuruSurveyVoiceCard';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
@@ -780,6 +781,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         break;
       case 'mood':
         setIsMoodModalOpen(true);
+        break;
+      case 'survey_hasil':
+        window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_analytics'));
         break;
       default:
         setIsMoreFeaturesModalOpen(true);
@@ -3623,6 +3627,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
             </section>
 
+            {/* 🌟 2.6 SUARA PENDIDIK & HASIL SURVEY GURU (100% ANONIM) ── */}
+            <GuruSurveyVoiceCard />
+
             {/* 🌟 3. FITUR UTAMA GURU (8 IKON KUSTOM: 2 BARIS X 4 KOLOM) ─────────── */}
             <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-sm space-y-3.5">
               <div className="flex items-center justify-between px-1">
@@ -5757,14 +5764,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-base">📊</span>
-                    <span className="font-extrabold text-xs text-emerald-950">Riset TAM &amp; Evaluasi Sekolah</span>
+                    <span className="font-extrabold text-xs text-emerald-950">Hasil Survey &amp; Solusi Seluruh Guru</span>
                   </div>
                   <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
                     100% Anonim
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Evaluasi efektivitas, kemudahan, dan pembuktian hipotesis kuantitatif pemanfaatan aplikasi sekolah setiap hari Jumat.
+                  Evaluasi kuesioner bersama, grafik dimensi kemanfaatan &amp; kemudahan (TAM), serta langkah nyata rekomendasi solusi sekolah.
                 </p>
                 <button
                   type="button"
@@ -5774,7 +5781,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                   }}
                   className="w-full mt-1 py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
                 >
-                  <span>📈</span> Lihat Rekapitulasi &amp; Hasil Riset Bulanan
+                  <span>📈</span> Lihat Rekapitulasi, Grafik &amp; Solusi Lengkap
                 </button>
               </div>
 

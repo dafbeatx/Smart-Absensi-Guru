@@ -3,6 +3,7 @@ import type { UserProfile, LeaveRequest, AttendanceRecord, AttendanceStatus } fr
 import { PendingApprovalWidget } from '../../features/leave/components/PendingApprovalWidget';
 import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 import { EarlyWarningSystemWidget } from './EarlyWarningSystemWidget';
+import { ExecutiveSurveySummaryWidget } from './ExecutiveSurveySummaryWidget';
 import { BurnoutEarlyWarningWidget } from '../../features/kepsek/components/BurnoutEarlyWarningWidget';
 import { evaluateAttendanceStatus, getTodayDateInJakarta, isDateOffDay } from '../../utils/time.utils';
 import {
@@ -601,6 +602,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
         attendanceRecords={attendanceRecords}
         onOpenCorrectionModal={onOpenCorrectionModal}
       />
+
+      {/* ── 2.2 SUARA PENDIDIK & HASIL SURVEY GURU (100% ANONIM) ── */}
+      <ExecutiveSurveySummaryWidget />
 
       {/* ── 2. SUMMARY STAT CARDS GRID (5 CARDS IN A ROW - FULLY CLICKABLE) ──────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">

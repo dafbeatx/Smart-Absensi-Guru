@@ -558,7 +558,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'EXPORT', label: 'Laporan', icon: '📊', hasDropdown: true },
     { id: 'SETTINGS', label: 'Pengaturan', icon: '⚙️', hasDropdown: true },
     { id: 'SARPRAS', label: 'Inventaris Sarpras', icon: '📦' },
-    { id: 'SURVEY_RESEARCH', label: 'Riset & Kuesioner TAM', icon: '📊' },
+    { id: 'SURVEY_RESEARCH', label: 'Hasil Survey & Solusi Guru', icon: '📊' },
     { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
     { id: 'SYSTEM_HEALTH', label: 'Kesehatan Cloud & AI', icon: '🩺' },
     { id: 'ABOUT', label: 'Tentang Aplikasi', icon: 'ℹ️' },

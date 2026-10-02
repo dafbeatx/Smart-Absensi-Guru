@@ -3649,6 +3649,159 @@ export class MockProvider implements IDataProvider {
   }
 
   // ── Weekly Research Survey & TAM Evaluation Mock Implementation ──
+  private static INITIAL_ANONYMOUS_SURVEY_SEEDS: WeeklySurveyResponse[] = [
+    {
+      id: 'seed-surv-10-01',
+      date: '2026-10-02',
+      role: 'GURU',
+      q1_usefulness: 5,
+      q2_motivation: 5,
+      q3_ease_of_use: 5,
+      q4_fairness: 5,
+      q5_impact: 5,
+      next_week_evaluation: 'Presensi dengan QR poster gerbang sangat praktis dan cepat, tidak terjadi antrean sama sekali saat jam sibuk pagi.',
+      week_number: 1,
+      month: 10,
+      year: 2026,
+      created_at: '2026-10-02T06:40:00Z',
+    },
+    {
+      id: 'seed-surv-10-02',
+      date: '2026-10-02',
+      role: 'GURU',
+      q1_usefulness: 5,
+      q2_motivation: 4,
+      q3_ease_of_use: 4,
+      q4_fairness: 5,
+      q5_impact: 5,
+      next_week_evaluation: 'Sistem lencana poin membuat kami termotivasi hadir lebih awal. Saat cuaca mendung GPS kadang butuh beberapa detik mengunci koordinat.',
+      week_number: 1,
+      month: 10,
+      year: 2026,
+      created_at: '2026-10-02T06:45:00Z',
+    },
+    {
+      id: 'seed-surv-10-03',
+      date: '2026-10-02',
+      role: 'GURU',
+      q1_usefulness: 4,
+      q2_motivation: 5,
+      q3_ease_of_use: 5,
+      q4_fairness: 4,
+      q5_impact: 5,
+      next_week_evaluation: 'Pengajuan izin sakit dan dinas luar sangat transparan karena langsung ternotifikasi dan disetujui pimpinan tanpa dokumen fisik berbelit.',
+      week_number: 1,
+      month: 10,
+      year: 2026,
+      created_at: '2026-10-02T06:48:00Z',
+    },
+    {
+      id: 'seed-surv-10-04',
+      date: '2026-10-02',
+      role: 'ADMIN',
+      q1_usefulness: 5,
+      q2_motivation: 4,
+      q3_ease_of_use: 5,
+      q4_fairness: 5,
+      q5_impact: 5,
+      next_week_evaluation: 'Fitur ekspor dokumen presensi format resmi berstandar Dinas Pendidikan sangat meringankan beban rekapitulasi bulanan tata usaha.',
+      week_number: 1,
+      month: 10,
+      year: 2026,
+      created_at: '2026-10-02T06:50:00Z',
+    },
+    {
+      id: 'seed-surv-10-05',
+      date: '2026-10-02',
+      role: 'KEPSEK',
+      q1_usefulness: 5,
+      q2_motivation: 5,
+      q3_ease_of_use: 5,
+      q4_fairness: 5,
+      q5_impact: 5,
+      next_week_evaluation: 'Dashboard eksekutif memudahkan monitoring ketepatan waktu guru secara adil dan objektif untuk bahan evaluasi rapat dewan guru.',
+      week_number: 1,
+      month: 10,
+      year: 2026,
+      created_at: '2026-10-02T06:55:00Z',
+    },
+    {
+      id: 'seed-surv-10-06',
+      date: '2026-10-02',
+      role: 'GURU',
+      q1_usefulness: 5,
+      q2_motivation: 4,
+      q3_ease_of_use: 4,
+      q4_fairness: 4,
+      q5_impact: 4,
+      next_week_evaluation: 'Aplikasi ringan dan cepat diakses. Perlu pendampingan berkala antarguru untuk rekan yang baru berganti perangkat smartphone.',
+      week_number: 1,
+      month: 10,
+      year: 2026,
+      created_at: '2026-10-02T07:01:00Z',
+    },
+    {
+      id: 'seed-surv-09-01',
+      date: '2026-09-25',
+      role: 'GURU',
+      q1_usefulness: 5,
+      q2_motivation: 5,
+      q3_ease_of_use: 5,
+      q4_fairness: 5,
+      q5_impact: 5,
+      next_week_evaluation: 'Kedisiplinan dewan guru terasa makin solid sejak diterapkannya sistem poin dan challenge kehadiran harian.',
+      week_number: 4,
+      month: 9,
+      year: 2026,
+      created_at: '2026-09-25T06:35:00Z',
+    },
+    {
+      id: 'seed-surv-09-02',
+      date: '2026-09-18',
+      role: 'GURU',
+      q1_usefulness: 4,
+      q2_motivation: 4,
+      q3_ease_of_use: 5,
+      q4_fairness: 5,
+      q5_impact: 4,
+      next_week_evaluation: 'Aturan jam masuk sangat jelas dan transparan. Semua riwayat kehadiran terekam dengan akurat tanpa keraguan.',
+      week_number: 3,
+      month: 9,
+      year: 2026,
+      created_at: '2026-09-18T06:40:00Z',
+    },
+    {
+      id: 'seed-surv-09-03',
+      date: '2026-09-11',
+      role: 'GURU',
+      q1_usefulness: 5,
+      q2_motivation: 4,
+      q3_ease_of_use: 4,
+      q4_fairness: 4,
+      q5_impact: 5,
+      next_week_evaluation: 'Sangat terbantu dengan jadwal mengajar dan kalender agenda sekolah yang langsung tersinkron di beranda aplikasi.',
+      week_number: 2,
+      month: 9,
+      year: 2026,
+      created_at: '2026-09-11T06:45:00Z',
+    },
+    {
+      id: 'seed-surv-09-04',
+      date: '2026-09-04',
+      role: 'GURU',
+      q1_usefulness: 4,
+      q2_motivation: 4,
+      q3_ease_of_use: 4,
+      q4_fairness: 4,
+      q5_impact: 4,
+      next_week_evaluation: 'Awal implementasi berjalan lancar. Sosialisasi penggunaan aplikasi kepada dewan guru sangat membantu.',
+      week_number: 1,
+      month: 9,
+      year: 2026,
+      created_at: '2026-09-04T06:50:00Z',
+    },
+  ];
+
   private mockWeeklySurveys: WeeklySurveyResponse[] = [];
 
   private getStoredSurveys(): WeeklySurveyResponse[] {
@@ -3656,9 +3809,13 @@ export class MockProvider implements IDataProvider {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {}
     }
+    if (this.mockWeeklySurveys.length > 0) {
+      return this.mockWeeklySurveys;
+    }
+    this.mockWeeklySurveys = [...MockProvider.INITIAL_ANONYMOUS_SURVEY_SEEDS];
     return this.mockWeeklySurveys;
   }
 

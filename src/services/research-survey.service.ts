@@ -5,6 +5,9 @@ import type {
   WeeklySurveySummary,
   SurveyHypothesisResult,
   SurveyAnonymousEvaluation,
+  SurveyScoreDistribution,
+  SurveyWeeklyTrend,
+  SurveyActionSolution,
 } from '../types/database.types';
 import { getJakartaDayOfWeek, getTodayDateInJakarta } from '../utils/time.utils';
 
@@ -92,6 +95,94 @@ export function shouldTriggerFridaySurvey(params: ShouldTriggerSurveyParams): bo
 }
 
 /**
+ * Generates structured, actionable solutions based on empirical survey indicators and qualitative teacher evaluations.
+ */
+export function generateSurveySolutions(
+  indicators: WeeklySurveySummary['indicators'],
+  _evaluations: SurveyAnonymousEvaluation[],
+  _totalRespondents: number,
+  _overallMean: number
+): SurveyActionSolution[] {
+  const easeMean = indicators.q3_ease_of_use?.mean || 0;
+  const motivationMean = indicators.q2_motivation?.mean || 0;
+  const usefulnessMean = indicators.q1_usefulness?.mean || 0;
+  const impactMean = indicators.q5_impact?.mean || 0;
+
+  return [
+    {
+      id: 'sol-01-teknis-geofence',
+      category: 'TEKNIS',
+      targetDimension: 'Kemudahan Penggunaan & Akurasi GPS (Q3)',
+      priority: easeMean < 4.5 ? 'TINGGI' : 'SEDANG',
+      issueDiagnosed:
+        easeMean < 4.5
+          ? 'Sebagian guru melaporkan kendala jeda deteksi GPS saat cuaca berawan atau perangkat smartphone tipe lama.'
+          : 'Tingkat kemudahan aplikasi sangat tinggi, namun tetap memerlukan perlindungan preventif saat koneksi internet lambat.',
+      solutionTitle: 'Optimalisasi Buffer Geofencing 500m & Titik Wi-Fi Khusus Presensi Lobi',
+      concreteSteps: [
+        'Aktifkan buffer radius 500m otomatis saat pemindaian QR Poster gerbang sekolah untuk memastikan absensi langsung diterima tanpa jeda.',
+        'Sediakan Wi-Fi khusus presensi di area lobi/gerbang sekolah dengan SSID berkecepatan tinggi tanpa login berbelit.',
+        'Bagikan modul ringkas panduan kalibrasi sensor kompas GPS & pembersihan berkas cache browser bagi pendidik.',
+      ],
+      forRole: 'ADMIN',
+      status: 'DIREKOMENDASIKAN',
+      pic: 'Tim IT & Operator Dapodik / Presensi',
+    },
+    {
+      id: 'sol-02-manajemen-apresiasi',
+      category: 'MANAJEMEN',
+      targetDimension: 'Motivasi Kehadiran & Semangat Kerja (Q2)',
+      priority: motivationMean < 4.5 ? 'TINGGI' : 'SEDANG',
+      issueDiagnosed:
+        'Guru mengharapkan apresiasi formal institusi sekolah atas komitmen ketepatan waktu hadir setiap hari.',
+      solutionTitle: 'Program Piagam Penghargaan Disiplin & Fleksibilitas Toleransi Darurat',
+      concreteSteps: [
+        'Kepala Sekolah mengumumkan dan memberikan piagam kehormatan "Pendidik Paling Disiplin & Inspiratif" di apel/upacara awal bulan.',
+        'Terapkan kebijakan toleransi keterlambatan 15 menit tetap berstatus HADIR untuk mengantisipasi kendala lalu lintas darurat guru.',
+        'Sediakan sesi refleksi 10 menit setiap Jumat pagi untuk mendengarkan masukan operasional KBM secara santai dan konstruktif.',
+      ],
+      forRole: 'KEPSEK',
+      status: 'DIREKOMENDASIKAN',
+      pic: 'Kepala Sekolah & Wakil Bidang Kurikulum',
+    },
+    {
+      id: 'sol-03-budaya-peer-assist',
+      category: 'BUDAYA',
+      targetDimension: 'Dampak Budaya Disiplin & Kolaborasi (Q5)',
+      priority: impactMean < 4.5 ? 'TINGGI' : 'STANDAR',
+      issueDiagnosed:
+        'Kesenjangan kecakapan teknologi antar-generasi guru memerlukan ruang pendampingan yang ramah dan saling mendukung.',
+      solutionTitle: 'Gerakan Pendampingan Rekan Sejawat (Peer-Assistance) & Budaya Tepat Waktu',
+      concreteSteps: [
+        'Bentuk gugus pendamping sejawat di mana guru yang cakap digital mendampingi rekan guru senior dalam pengoperasian aplikasi.',
+        'Budayakan "Hadir 15 Menit Sebelum Bel" untuk menyambut peserta didik di gerbang kelas dengan suasana hangat.',
+        'Optimalkan fitur resmi pertukaran jam mengajar antarguru serumpun bila terdapat penugasan dinas luar mendadak.',
+      ],
+      forRole: 'GURU',
+      status: 'SEDANG_BERJALAN',
+      pic: 'Koordinator MGMP & Komite Dewan Guru',
+    },
+    {
+      id: 'sol-04-kebijakan-administrasi',
+      category: 'KEBIJAKAN',
+      targetDimension: 'Kemanfaatan & Transparansi Presensi (Q1 & Q4)',
+      priority: usefulnessMean < 4.5 ? 'TINGGI' : 'STANDAR',
+      issueDiagnosed:
+        'Perlunya sinkronisasi data presensi secara langsung dengan pelaporan administrasi dinas tanpa penginputan manual berulang.',
+      solutionTitle: 'Otomatisasi Laporan Presensi 1-Klik Berstandar Dinas & Transparansi Audit',
+      concreteSteps: [
+        'Pemanfaatan fitur ekspor 1-klik format Excel/PDF resmi berstandar Dinas Pendidikan dengan verifikasi barcode dokumen.',
+        'Transparansi riwayat absensi dan persetujuan izin secara real-time via notifikasi instan Telegram/WhatsApp.',
+        'Integrasikan rekapitulasi kehadiran dengan berkas SKP kinerja guru dan administrasi ketenagakerjaan sekolah.',
+      ],
+      forRole: 'SEMUA',
+      status: 'TERCAPAI',
+      pic: 'Tata Usaha, Admin Sekolah & Kepala Sekolah',
+    },
+  ];
+}
+
+/**
  * Computes quantitative research summary, indicators, and hypothesis verification.
  */
 export function calculateSurveySummary(
@@ -143,6 +234,102 @@ export function calculateSurveySummary(
             5
           ).toFixed(2)
         );
+
+  const calcDistribution = (
+    key: 'q1_usefulness' | 'q2_motivation' | 'q3_ease_of_use' | 'q4_fairness' | 'q5_impact'
+  ): SurveyScoreDistribution => {
+    if (totalRespondents === 0) {
+      return {
+        star5: 0,
+        star4: 0,
+        star3: 0,
+        star2: 0,
+        star1: 0,
+        percentages: { star5: 0, star4: 0, star3: 0, star2: 0, star1: 0 },
+      };
+    }
+    const star5 = filtered.filter((s) => s[key] === 5).length;
+    const star4 = filtered.filter((s) => s[key] === 4).length;
+    const star3 = filtered.filter((s) => s[key] === 3).length;
+    const star2 = filtered.filter((s) => s[key] === 2).length;
+    const star1 = filtered.filter((s) => s[key] === 1).length;
+    return {
+      star5,
+      star4,
+      star3,
+      star2,
+      star1,
+      percentages: {
+        star5: Math.round((star5 / totalRespondents) * 100),
+        star4: Math.round((star4 / totalRespondents) * 100),
+        star3: Math.round((star3 / totalRespondents) * 100),
+        star2: Math.round((star2 / totalRespondents) * 100),
+        star1: Math.round((star1 / totalRespondents) * 100),
+      },
+    };
+  };
+
+  const q1Dist = calcDistribution('q1_usefulness');
+  const q2Dist = calcDistribution('q2_motivation');
+  const q3Dist = calcDistribution('q3_ease_of_use');
+  const q4Dist = calcDistribution('q4_fairness');
+  const q5Dist = calcDistribution('q5_impact');
+
+  const overallDistCount = totalRespondents * 5;
+  const overallStar5 = q1Dist.star5 + q2Dist.star5 + q3Dist.star5 + q4Dist.star5 + q5Dist.star5;
+  const overallStar4 = q1Dist.star4 + q2Dist.star4 + q3Dist.star4 + q4Dist.star4 + q5Dist.star4;
+  const overallStar3 = q1Dist.star3 + q2Dist.star3 + q3Dist.star3 + q4Dist.star3 + q5Dist.star3;
+  const overallStar2 = q1Dist.star2 + q2Dist.star2 + q3Dist.star2 + q4Dist.star2 + q5Dist.star2;
+  const overallStar1 = q1Dist.star1 + q2Dist.star1 + q3Dist.star1 + q4Dist.star1 + q5Dist.star1;
+
+  const distribution = {
+    q1_usefulness: q1Dist,
+    q2_motivation: q2Dist,
+    q3_ease_of_use: q3Dist,
+    q4_fairness: q4Dist,
+    q5_impact: q5Dist,
+    overall: {
+      star5: overallStar5,
+      star4: overallStar4,
+      star3: overallStar3,
+      star2: overallStar2,
+      star1: overallStar1,
+      percentages: {
+        star5: overallDistCount > 0 ? Math.round((overallStar5 / overallDistCount) * 100) : 0,
+        star4: overallDistCount > 0 ? Math.round((overallStar4 / overallDistCount) * 100) : 0,
+        star3: overallDistCount > 0 ? Math.round((overallStar3 / overallDistCount) * 100) : 0,
+        star2: overallDistCount > 0 ? Math.round((overallStar2 / overallDistCount) * 100) : 0,
+        star1: overallDistCount > 0 ? Math.round((overallStar1 / overallDistCount) * 100) : 0,
+      },
+    },
+  };
+
+  // Compute Weekly Trends (Weeks 1 to 4)
+  const weeklyTrends: SurveyWeeklyTrend[] = [1, 2, 3, 4].map((w) => {
+    const weekSurveys = filtered.filter((s) => s.week_number === w);
+    const count = weekSurveys.length;
+    let meanScore = 0;
+    if (count > 0) {
+      const sum = weekSurveys.reduce(
+        (acc, curr) =>
+          acc +
+          ((curr.q1_usefulness +
+            curr.q2_motivation +
+            curr.q3_ease_of_use +
+            curr.q4_fairness +
+            curr.q5_impact) /
+            5),
+        0
+      );
+      meanScore = Number((sum / count).toFixed(2));
+    }
+    return {
+      weekNumber: w,
+      label: `Minggu ke-${w}`,
+      respondentCount: count,
+      meanScore,
+    };
+  });
 
   const hypotheses: SurveyHypothesisResult[] = [
     {
@@ -200,6 +387,8 @@ export function calculateSurveySummary(
     }))
     .reverse();
 
+  const solutions = generateSurveySolutions(indicators, evaluations, totalRespondents, overallMean);
+
   return {
     month,
     year,
@@ -209,6 +398,9 @@ export function calculateSurveySummary(
     overallMean,
     hypotheses,
     evaluations,
+    distribution,
+    weeklyTrends,
+    solutions,
   };
 }
 

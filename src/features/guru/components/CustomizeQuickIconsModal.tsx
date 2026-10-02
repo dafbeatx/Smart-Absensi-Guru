@@ -93,6 +93,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     colorClass: 'from-slate-700 to-slate-900',
   },
   {
+    id: 'survey_hasil',
+    title: 'Hasil Survey',
+    category: 'Presensi & Waktu',
+    description: 'Hasil survey anonim seluruh guru, grafik TAM, & rekomendasi solusi',
+    icon: BarChart3,
+    colorClass: 'from-[#023246] to-[#287094]',
+  },
+  {
     id: 'kalender',
     title: 'Kalender Agenda',
     category: 'Akademik & Nilai',

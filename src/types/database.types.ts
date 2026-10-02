@@ -820,6 +820,41 @@ export interface SurveyAnonymousEvaluation {
   createdAt: string;
 }
 
+export interface SurveyScoreDistribution {
+  star5: number;
+  star4: number;
+  star3: number;
+  star2: number;
+  star1: number;
+  percentages: {
+    star5: number;
+    star4: number;
+    star3: number;
+    star2: number;
+    star1: number;
+  };
+}
+
+export interface SurveyWeeklyTrend {
+  weekNumber: number;
+  label: string;
+  respondentCount: number;
+  meanScore: number;
+}
+
+export interface SurveyActionSolution {
+  id: string;
+  category: 'TEKNIS' | 'MANAJEMEN' | 'BUDAYA' | 'KEBIJAKAN';
+  targetDimension: string;
+  priority: 'TINGGI' | 'SEDANG' | 'STANDAR';
+  issueDiagnosed: string;
+  solutionTitle: string;
+  concreteSteps: string[];
+  forRole: 'SEMUA' | 'KEPSEK' | 'ADMIN' | 'GURU';
+  status: 'DIREKOMENDASIKAN' | 'SEDANG_BERJALAN' | 'TERCAPAI';
+  pic: string;
+}
+
 export interface WeeklySurveySummary {
   month: number;
   year: number;
@@ -839,6 +874,16 @@ export interface WeeklySurveySummary {
   overallMean: number;
   hypotheses: SurveyHypothesisResult[];
   evaluations: SurveyAnonymousEvaluation[];
+  distribution?: {
+    q1_usefulness: SurveyScoreDistribution;
+    q2_motivation: SurveyScoreDistribution;
+    q3_ease_of_use: SurveyScoreDistribution;
+    q4_fairness: SurveyScoreDistribution;
+    q5_impact: SurveyScoreDistribution;
+    overall: SurveyScoreDistribution;
+  };
+  weeklyTrends?: SurveyWeeklyTrend[];
+  solutions?: SurveyActionSolution[];
 }
 
 
