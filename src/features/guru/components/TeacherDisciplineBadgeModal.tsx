@@ -6,6 +6,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { TeacherPointHistoryModal } from './TeacherPointHistoryModal';
 import {
   getTeacherDisciplineLeaderboard,
+  getDisciplinePeriodMetadata,
   formatShortTeacherName,
   type DisciplinePeriodType,
   type TeacherLeaderboardItem,
@@ -36,6 +37,8 @@ export interface TeacherDisciplineBadgeModalProps {
   allRegisteredTeachers?: UserProfile[];
   allPointLogs?: TeacherPointLog[];
   initialPeriod?: DisciplinePeriodType;
+  selectedMonth?: number;
+  selectedYear?: number;
 }
 
 type TabKey = 'LEADERBOARD' | 'HISTORY' | 'RULES' | 'BADGES' | 'MESSAGE';
@@ -84,6 +87,10 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   const [activeTab, setActiveTab] = useState<TabKey>('LEADERBOARD');
   const [selectedPeriod, setSelectedPeriod] = useState<DisciplinePeriodType>(initialPeriod);
   const [historyFilterScope, setHistoryFilterScope] = useState<'CURRENT_MONTH' | 'ALL'>('CURRENT_MONTH');
+
+  const currentMeta = useMemo(() => getDisciplinePeriodMetadata('CURRENT_MONTH'), []);
+  const prevMeta = useMemo(() => getDisciplinePeriodMetadata('PREVIOUS_MONTH'), []);
+  const activeMeta = selectedPeriod === 'CURRENT_MONTH' ? currentMeta : prevMeta;
 
   // Sinkronkan selectedPeriod saat modal dibuka dengan initialPeriod baru
   useEffect(() => {
@@ -425,31 +432,31 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   }, [allPointLogs, currentUser]);
 
   // Log milik currentUser yang difilter sesuai periode / scope
-  const targetMonthPrefix = selectedPeriod === 'CURRENT_MONTH' ? '2026-09' : '2026-08';
+  const targetMonthPrefix = activeMeta.yearMonth;
   const myFilteredLogs = useMemo(() => {
     if (historyFilterScope === 'ALL') {
       return myAllLogs;
     }
     const filtered = myAllLogs.filter((l) => l.date && l.date.startsWith(targetMonthPrefix));
-    // Jika melihat periode bulan Agustus 2026 dan belum ada baris transaksi harian tersendiri,
-    // sediakan item rekap akumulasi resmi agar poin Agustus tidak hilang menjadi 0
+    // Jika melihat periode bulan lampau dan belum ada baris transaksi harian tersendiri,
+    // sediakan item rekap akumulasi resmi agar poin bulan lalu tidak hilang menjadi 0
     if (filtered.length === 0 && selectedPeriod === 'PREVIOUS_MONTH' && resolvedUserTotalPoints > 0) {
       return [
         {
-          id: `aug_recap_${currentUser?.id || 'me'}`,
+          id: `prev_recap_${currentUser?.id || 'me'}`,
           user_id: currentUser?.id || '',
           teacher_name: currentUser?.full_name || 'Guru Pendidik',
-          date: '2026-08-31',
+          date: `${prevMeta.yearMonth}-28`,
           points: resolvedUserTotalPoints,
           activity_type: 'CHECK_IN_ON_TIME' as TeacherPointActivityType,
-          title: 'Rekap Akumulasi Poin Disiplin Final (Agustus 2026)',
-          description: `Rekapitulasi resmi performa kehadiran dan kedisiplinan sebulan penuh bulan Agustus 2026 (${resolvedUserTotalPoints} Poin Terverifikasi)`,
-          created_at: '2026-08-31T17:00:00.000Z',
+          title: `Rekap Akumulasi Poin Disiplin Final (${prevMeta.label})`,
+          description: `Rekapitulasi resmi performa kehadiran dan kedisiplinan sebulan penuh bulan ${prevMeta.label} (${resolvedUserTotalPoints} Poin Terverifikasi)`,
+          created_at: `${prevMeta.yearMonth}-28T17:00:00.000Z`,
         },
       ];
     }
     return filtered;
-  }, [myAllLogs, historyFilterScope, targetMonthPrefix, selectedPeriod, resolvedUserTotalPoints, currentUser]);
+  }, [myAllLogs, historyFilterScope, targetMonthPrefix, selectedPeriod, resolvedUserTotalPoints, currentUser, prevMeta.yearMonth, prevMeta.label]);
 
   const historyDisplayPoints = useMemo(() => {
     if (historyFilterScope === 'ALL') {
@@ -581,7 +588,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   Disiplin &amp; Apresiasi
                 </span>
                 <span className="hidden md:inline-flex px-2 py-0.5 text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 rounded-full shrink-0">
-                  {selectedPeriod === 'CURRENT_MONTH' ? 'Bulan Berjalan (September 2026)' : 'Rekap Final (Agustus 2026)'}
+                  {selectedPeriod === 'CURRENT_MONTH' ? currentMeta.badgeSubLabel : prevMeta.badgeSubLabel}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 truncate">
@@ -606,7 +613,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 }`}
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>September 2026</span>
+                <span>{currentMeta.label}</span>
               </button>
               <button
                 type="button"
@@ -618,7 +625,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 }`}
               >
                 <span>🏅</span>
-                <span>Agustus 2026</span>
+                <span>{prevMeta.label}</span>
               </button>
             </div>
 
@@ -735,7 +742,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 onClick={() => setSelectedPeriod(selectedPeriod === 'CURRENT_MONTH' ? 'PREVIOUS_MONTH' : 'CURRENT_MONTH')}
                 className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 text-[#023246] border border-slate-200"
               >
-                {selectedPeriod === 'CURRENT_MONTH' ? 'Sep 2026' : 'Agt 2026'} ▾
+                {selectedPeriod === 'CURRENT_MONTH' ? currentMeta.shortLabel : prevMeta.shortLabel} ▾
               </button>
             </div>
           </div>
@@ -806,7 +813,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       <strong className="text-white">{selectedTeacher.level}</strong>
                     </span>
                     <span className="text-slate-300">
-                      Periode: {selectedPeriod === 'CURRENT_MONTH' ? 'September 2026' : 'Agustus 2026'}
+                      Periode: {activeMeta.label}
                     </span>
                   </div>
                 </div>
@@ -2005,8 +2012,8 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
           teacher={pointHistoryTeacher}
           pointHistory={teacherLogs}
           isLoading={isPointHistoryLoading}
-          selectedMonth={selectedPeriod === 'CURRENT_MONTH' ? 9 : 8}
-          selectedYear={2026}
+          selectedMonth={activeMeta.month}
+          selectedYear={activeMeta.year}
         />
       </div>,
       document.body
@@ -2217,7 +2224,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     <strong className="text-white">{selectedTeacher.level}</strong>
                   </span>
                   <span className="text-slate-300">
-                    Periode: {selectedPeriod === 'CURRENT_MONTH' ? 'September 2026' : 'Agustus 2026'}
+                    Periode: {activeMeta.label}
                   </span>
                 </div>
               </div>
@@ -2409,7 +2416,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       }`}
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="truncate">September 2026 (Berjalan)</span>
+                      <span className="truncate">{currentMeta.label} (Berjalan)</span>
                     </button>
 
                     <button
@@ -2422,7 +2429,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       }`}
                     >
                       <span>🏅</span>
-                      <span className="truncate">Agustus 2026 (Final)</span>
+                      <span className="truncate">{prevMeta.label} (Final)</span>
                     </button>
                   </div>
 
@@ -2530,7 +2537,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     <div className="flex items-center justify-between gap-1.5 mb-2">
                       <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-900 text-[9px] sm:text-[10px] font-extrabold tracking-wide uppercase truncate">
                         <span>👑</span>
-                        <span>{selectedPeriod === 'CURRENT_MONTH' ? 'Poin Terbanyak Bulan Ini' : 'Poin Tertinggi Agustus'}</span>
+                        <span>{selectedPeriod === 'CURRENT_MONTH' ? 'Poin Terbanyak Bulan Ini' : `Poin Tertinggi Rekap ${prevMeta.monthName}`}</span>
                       </div>
                       <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200 transition-colors shrink-0">
                         <span>Lihat Grafik</span>
@@ -2783,7 +2790,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   <div className="p-3.5 rounded-2xl bg-linear-to-br from-[#023246] to-[#0A455E] text-white border border-[#023246]/40 shadow-sm flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <span className="text-[10px] text-cyan-200 uppercase tracking-wider font-extrabold block">
-                        Buku Catatan Poin Disiplin • {historyFilterScope === 'CURRENT_MONTH' ? (selectedPeriod === 'CURRENT_MONTH' ? 'September 2026' : 'Agustus 2026') : 'Semua Riwayat'}
+                        Buku Catatan Poin Disiplin • {historyFilterScope === 'CURRENT_MONTH' ? activeMeta.label : 'Semua Riwayat'}
                       </span>
                       <h4 className="text-xs sm:text-sm font-black text-white truncate mt-0.5">
                         {currentUser?.full_name || 'Profil Anda'}
@@ -2816,7 +2823,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       }`}
                     >
                       <span>📅</span>
-                      <span className="truncate">{selectedPeriod === 'CURRENT_MONTH' ? 'September 2026' : 'Agustus 2026'} ({myFilteredLogs.length})</span>
+                      <span className="truncate">{activeMeta.label} ({myFilteredLogs.length})</span>
                     </button>
                     <button
                       type="button"
@@ -3111,8 +3118,8 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
         teacher={pointHistoryTeacher}
         pointHistory={teacherLogs}
         isLoading={isPointHistoryLoading}
-        selectedMonth={selectedPeriod === 'CURRENT_MONTH' ? 9 : 8}
-        selectedYear={2026}
+        selectedMonth={activeMeta.month}
+        selectedYear={activeMeta.year}
       />
     </div>
   );
