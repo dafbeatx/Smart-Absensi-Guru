@@ -9,6 +9,7 @@ import {
   getScoreLabel,
   getCsiLabel,
   getLpsLabel,
+  generateAutoPgAnswers,
 } from '../../utils/scoring.utils';
 import { ExamCorrectionRepository } from '../../repositories/ExamCorrectionRepository';
 import type { CreateExamSessionDTO, SaveGradedStudentDTO } from '../../types/database.types';
@@ -439,6 +440,47 @@ export const runQuestionCorrectionTestSuite = async (): Promise<{
         SemesterGradingExcelService.CANONICAL_CLASSES.includes('8A') &&
         SemesterGradingExcelService.TEMPLATE_PATH.includes('FORMAT_PENILAIAN_ASTS_ASAS'),
       `Canonical: ${SemesterGradingExcelService.CANONICAL_CLASSES.join(', ')}`
+    );
+
+    // ── Test 24: generateAutoPgAnswers - 100% Score Sempurna
+    const sampleKey20 = ['A', 'B', 'C', 'D', 'A', 'B', 'C', 'D', 'A', 'B', 'C', 'D', 'A', 'B', 'C', 'D', 'A', 'B', 'C', 'D'];
+    const auto100 = generateAutoPgAnswers(sampleKey20, 100, ['A', 'B', 'C', 'D']);
+    const calc100 = calculateStudentResult(sampleKey20, auto100, [], { pgWeight: 1, essayWeight: 0, essayMaxScore: 0, essayCount: 0 });
+    assert(
+      'Auto PG 01: Nilai manual 100 mengisi seluruh butir soal dengan kunci jawaban benar (20 Benar, 0 Salah, Skor 100)',
+      calc100.correct === 20 && calc100.wrong === 0 && calc100.score === 100,
+      `Hasil kalkulasi: Benar ${calc100.correct}, Salah ${calc100.wrong}, Skor ${calc100.score}`
+    );
+
+    // ── Test 25: generateAutoPgAnswers - Skor Parsial 80% (16 Benar, 4 Salah)
+    const auto80 = generateAutoPgAnswers(sampleKey20, 80, ['A', 'B', 'C', 'D']);
+    const calc80 = calculateStudentResult(sampleKey20, auto80, [], { pgWeight: 1, essayWeight: 0, essayMaxScore: 0, essayCount: 0 });
+    assert(
+      'Auto PG 02: Nilai manual 80 mengisi 16 butir benar dan 4 butir salah terdistribusi dengan opsi valid',
+      calc80.correct === 16 && calc80.wrong === 4 && calc80.score === 80,
+      `Hasil kalkulasi: Benar ${calc80.correct}, Salah ${calc80.wrong}, Skor ${calc80.score}`
+    );
+
+    // ── Test 26: generateAutoPgAnswers - Skor 0% & Edge Case Input Negatif / Over 100
+    const auto0 = generateAutoPgAnswers(sampleKey20, 0, ['A', 'B', 'C', 'D']);
+    const calc0 = calculateStudentResult(sampleKey20, auto0, [], { pgWeight: 1, essayWeight: 0, essayMaxScore: 0, essayCount: 0 });
+    const autoOver = generateAutoPgAnswers(sampleKey20, 120, ['A', 'B', 'C', 'D']);
+    const calcOver = calculateStudentResult(sampleKey20, autoOver, [], { pgWeight: 1, essayWeight: 0, essayMaxScore: 0, essayCount: 0 });
+    assert(
+      'Auto PG 03: Skor 0 menghasilkan 0 benar 20 salah; Skor > 100 dibatasi aman ke 100',
+      calc0.correct === 0 && calc0.wrong === 20 && calc0.score === 0 && calcOver.correct === 20 && calcOver.score === 100,
+      `calc0: Benar ${calc0.correct}, calcOver: Benar ${calcOver.correct}`
+    );
+
+    // ── Test 27: generateAutoPgAnswers - SMA 5 Pilihan (A-E)
+    const sampleKeySMA = ['A', 'E', 'C', 'D', 'B', 'E', 'A', 'C', 'B', 'D'];
+    const autoSMA = generateAutoPgAnswers(sampleKeySMA, 70, ['A', 'B', 'C', 'D', 'E']);
+    const calcSMA = calculateStudentResult(sampleKeySMA, autoSMA, [], { pgWeight: 1, essayWeight: 0, essayMaxScore: 0, essayCount: 0 });
+    const allValidSMA = Object.values(autoSMA).every((opt) => ['A', 'B', 'C', 'D', 'E'].includes(opt));
+    assert(
+      'Auto PG 04: Nilai manual 70 pada soal SMA (opsi A-E) menghasilkan 7 Benar, 3 Salah dengan opsi A-E valid',
+      calcSMA.correct === 7 && calcSMA.wrong === 3 && calcSMA.score === 70 && allValidSMA,
+      `calcSMA: Benar ${calcSMA.correct}, Salah ${calcSMA.wrong}, Skor ${calcSMA.score}, Valid Opsi: ${allValidSMA}`
     );
   } catch (err: any) {
     assert('Fatal Execution: Question Correction Test Suite threw an uncaught error', false, err?.message);

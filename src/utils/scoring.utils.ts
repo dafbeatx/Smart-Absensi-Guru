@@ -165,3 +165,74 @@ export function getLpsLabel(lps: number): string {
   if (lps >= 55) return 'Di Bawah Rata-rata';
   return 'Perlu Perhatian';
 }
+
+/**
+ * Generates automated student answers (Pilihan Ganda) to match a desired target score (0 - 100).
+ * - Distributes correct and incorrect answers realistically across the answer key.
+ * - Guarantees that incorrect answers pick an alternate option (e.g. B instead of A) from availableOptions.
+ * - Guarantees that calculating scores from these answers produces the expected correct count and target score.
+ *
+ * @param answerKey List of correct answers per question, e.g. ['A', 'B', 'C', 'D', ...]
+ * @param targetScore Score between 0 and 100
+ * @param availableOptions List of available choices, e.g. ['A', 'B', 'C', 'D'] or ['A', 'B', 'C', 'D', 'E']
+ * @returns Record<number, string> mapping question number (1-based) to selected option
+ */
+export function generateAutoPgAnswers(
+  answerKey: string[],
+  targetScore: number,
+  availableOptions: string[] = ['A', 'B', 'C', 'D']
+): Record<number, string> {
+  const total = answerKey.length;
+  if (total === 0) return {};
+
+  const clampedScore = Math.max(0, Math.min(100, Math.round(targetScore)));
+  const targetCorrect = Math.max(0, Math.min(total, Math.round((clampedScore / 100) * total)));
+  const targetWrong = total - targetCorrect;
+
+  // Determine which question indices (0-based) should be wrong
+  const wrongIndices = new Set<number>();
+  if (targetWrong > 0) {
+    if (targetWrong >= total) {
+      for (let i = 0; i < total; i++) {
+        wrongIndices.add(i);
+      }
+    } else {
+      // Distribute wrong answers evenly across the test with a slight offset
+      const step = total / targetWrong;
+      for (let w = 0; w < targetWrong; w++) {
+        const idx = Math.min(total - 1, Math.floor((w + 0.5) * step));
+        wrongIndices.add(idx);
+      }
+      // If rounding caused fewer than targetWrong indices, fill from the end backwards
+      let fallbackIdx = total - 1;
+      while (wrongIndices.size < targetWrong && fallbackIdx >= 0) {
+        wrongIndices.add(fallbackIdx);
+        fallbackIdx--;
+      }
+    }
+  }
+
+  const result: Record<number, string> = {};
+  for (let i = 0; i < total; i++) {
+    const qNum = i + 1;
+    const correctKey = (answerKey[i] || 'A').toUpperCase().trim();
+    if (wrongIndices.has(i)) {
+      // Pick an alternate option that is definitely not the correct key
+      const wrongChoices = availableOptions.filter(
+        (opt) => opt.toUpperCase().trim() !== correctKey
+      );
+      const chosenWrong =
+        wrongChoices.length > 0
+          ? wrongChoices[i % wrongChoices.length]
+          : correctKey === 'A'
+          ? 'B'
+          : 'A';
+      result[qNum] = chosenWrong;
+    } else {
+      result[qNum] = correctKey;
+    }
+  }
+
+  return result;
+}
+

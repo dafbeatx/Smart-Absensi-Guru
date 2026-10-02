@@ -42,7 +42,7 @@ import type {
 import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
-import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel } from '../../../utils/scoring.utils';
+import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel, generateAutoPgAnswers } from '../../../utils/scoring.utils';
 import { normalizeClassCode, areClassCodesEqual, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
 import {
@@ -154,6 +154,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const undoStack = useRef<{ qNum: number; prev: string | undefined }[]>([]);
   const questionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const originalStudentAnswersRef = useRef<Record<number, string>>({});
 
   // Auto toast timer
   useEffect(() => {
@@ -579,6 +580,10 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       return;
     }
 
+    if (manualScore !== null) {
+      setManualScore(null);
+    }
+
     setUserAnswers((prev) => ({ ...prev, [questionNum]: opt }));
 
     // Smooth auto-scroll to next question
@@ -610,6 +615,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
   const resetGradingForm = () => {
     setUserAnswers({});
+    originalStudentAnswersRef.current = {};
     setEssayScores([0, 0, 0, 0, 0]);
     setManualScore(null);
     undoStack.current = [];
@@ -625,6 +631,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     // If student already has recorded grade in this session, prefill
     const existing = gradedStudents.find((g) => g.name.toLowerCase().trim() === name.toLowerCase().trim());
     if (existing) {
+      originalStudentAnswersRef.current = existing.mcq_answers || {};
       setUserAnswers(existing.mcq_answers || {});
       const initialScores =
         Array.isArray(existing.essay_scores) && existing.essay_scores.length > 0
@@ -652,6 +659,33 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     }
   };
 
+  const handleManualScoreChange = (rawVal: string) => {
+    if (rawVal === '') {
+      setManualScore(null);
+      setUserAnswers(originalStudentAnswersRef.current || {});
+      return;
+    }
+    const val = Math.min(100, Math.max(0, parseInt(rawVal, 10) || 0));
+    setManualScore(val);
+
+    if (activeSession?.answer_key && activeSession.answer_key.length > 0) {
+      const autoAnswers = generateAutoPgAnswers(
+        activeSession.answer_key,
+        val,
+        availableOptions
+      );
+      setUserAnswers(autoAnswers);
+      undoStack.current = [];
+    }
+  };
+
+  const handleCancelManualScore = () => {
+    setManualScore(null);
+    setUserAnswers(originalStudentAnswersRef.current || {});
+    undoStack.current = [];
+    setToastMessage({ text: 'Koreksi nilai manual dibatalkan.', type: 'success' });
+  };
+
   const handleSaveStudent = async () => {
     if (!activeSession) return;
     if (!selectedStudentName.trim()) {
@@ -669,6 +703,10 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       (g) => g.name.toLowerCase().trim() === selectedStudentName.toLowerCase().trim()
     );
 
+    const hasEssay =
+      (activeSession.scoring_config?.essayCount ?? 0) > 0 &&
+      (activeSession.scoring_config?.essayMaxScore ?? 0) > 0;
+
     try {
       const saved = await ExamCorrectionRepository.saveGradedStudent({
         id: existingGraded?.id,
@@ -677,7 +715,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         student_user_id: matchedStudent?.id || existingGraded?.student_user_id,
         mcq_answers: userAnswers,
         essay_scores: essayScores,
-        mcq_score: Math.round(calculation.score),
+        mcq_score: hasEssay ? Math.round(calculation.score) : effectiveFinalScore,
         essay_score: Math.round(calculation.essayScore),
         final_score: effectiveFinalScore,
         csi: calculation.csi,
@@ -806,6 +844,81 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     } catch (err: any) {
       logger.error('QuestionCorrectionModal', 'Failed to update inline essay:', err);
       setToastMessage({ text: 'Gagal menyimpan nilai essay ke server.', type: 'error' });
+      const reloaded = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
+      setGradedStudents(reloaded);
+    }
+  };
+
+  // Quick Inline PG / Score Edit handler from Recap Table
+  const handleTableMcqBlur = async (student: GradedStudentScoreRecord, rawVal: string) => {
+    if (!activeSession) return;
+    const newScore = Math.max(0, Math.min(100, parseInt(rawVal, 10) || 0));
+    if (newScore === Number(student.mcq_score)) return;
+
+    // Automatically generate new PG answers matching the given score
+    const newAnswers = generateAutoPgAnswers(
+      activeSession.answer_key || [],
+      newScore,
+      availableOptions
+    );
+
+    const calc = calculateStudentResult(
+      activeSession.answer_key || [],
+      newAnswers,
+      student.essay_scores || [],
+      activeSession.scoring_config
+    );
+
+    const hasEssay =
+      (activeSession.scoring_config?.essayCount ?? 0) > 0 &&
+      (activeSession.scoring_config?.essayMaxScore ?? 0) > 0;
+    const pgWeight = hasEssay ? (activeSession.scoring_config?.pgWeight ?? 0.7) : 1.0;
+    const essayWeight = hasEssay ? (activeSession.scoring_config?.essayWeight ?? 0.3) : 0;
+    const newFinalScore = Math.round(newScore * pgWeight + (Number(student.essay_score) || 0) * essayWeight);
+    const newLps = hasEssay ? Math.round(newScore * 0.6 + (Number(student.essay_score) || 0) * 0.4) : newScore;
+
+    // Optimistic UI update
+    setGradedStudents((prev) =>
+      prev.map((item) =>
+        item.id === student.id
+          ? {
+              ...item,
+              mcq_score: newScore,
+              mcq_answers: newAnswers,
+              correct: calc.correct,
+              wrong: calc.wrong,
+              final_score: newFinalScore,
+              csi: calc.csi,
+              lps: newLps,
+            }
+          : item
+      )
+    );
+
+    try {
+      await ExamCorrectionRepository.saveGradedStudent({
+        id: student.id,
+        session_id: activeSession.id,
+        name: student.name,
+        student_user_id: student.student_user_id,
+        mcq_answers: newAnswers,
+        essay_scores: student.essay_scores || [],
+        mcq_score: newScore,
+        essay_score: student.essay_score || 0,
+        final_score: newFinalScore,
+        csi: calc.csi,
+        lps: newLps,
+        correct: calc.correct,
+        wrong: calc.wrong,
+        answer_key: activeSession.answer_key,
+      });
+      setToastMessage({
+        text: `Nilai PG ${student.name} disimpan: ${newScore} (PG otomatis terisi: ${calc.correct} Benar, ${calc.wrong} Salah)`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      logger.error('QuestionCorrectionModal', 'Failed to update inline PG score:', err);
+      setToastMessage({ text: 'Gagal menyimpan nilai PG ke server.', type: 'error' });
       const reloaded = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
       setGradedStudents(reloaded);
     }
@@ -2173,32 +2286,44 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
                 {/* Manual Score Override */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Koreksi Nilai Manual (Opsional)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-700">
+                      Koreksi Nilai Manual (Opsional)
+                    </label>
+                    {manualScore !== null && (
+                      <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                        PG Otomatis Terisi
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
                       min="0"
                       max="100"
                       value={manualScore === null ? '' : manualScore}
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? null : Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
-                        setManualScore(val);
-                      }}
+                      onChange={(e) => handleManualScoreChange(e.target.value)}
                       placeholder="Ketik nilai langsung..."
                       className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                     />
                     {manualScore !== null && (
                       <button
                         type="button"
-                        onClick={() => setManualScore(null)}
-                        className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700 border border-slate-200"
+                        onClick={handleCancelManualScore}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-bold text-slate-700 border border-slate-200 shrink-0"
                       >
                         Batal
                       </button>
                     )}
                   </div>
+                  {manualScore !== null && calculation && (
+                    <p className="text-[10px] text-teal-700 font-medium mt-1.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                      <span>
+                        Jawaban PG terisi: <strong>{calculation.correct} Benar</strong>, <strong>{calculation.wrong} Salah</strong>
+                      </span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Correct vs Wrong Stats */}
@@ -2504,7 +2629,29 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                             <td className="py-2.5 px-3.5 font-bold text-slate-900">{s.name}</td>
                             <td className="py-2.5 px-3 text-center text-emerald-700 font-bold">{s.correct}</td>
                             <td className="py-2.5 px-3 text-center text-rose-600 font-bold">{s.wrong}</td>
-                            <td className="py-2.5 px-3 text-center font-mono text-slate-700">{s.mcq_score}</td>
+                            <td className="py-2 px-2 text-center">
+                              {activeSession.answer_key && activeSession.answer_key.length > 0 ? (
+                                <div className="inline-flex items-center justify-center gap-1">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    defaultValue={s.mcq_score || 0}
+                                    key={`${s.id}_${s.mcq_score}`}
+                                    onBlur={(e) => handleTableMcqBlur(s, e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    className="w-16 h-8 text-center font-mono font-bold text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 transition-all hover:border-teal-400"
+                                    title="Ketik nilai PG (0-100), butir soal PG otomatis terisi sesuai nilai"
+                                  />
+                                </div>
+                              ) : (
+                                <span className="font-mono text-slate-700">{s.mcq_score}</span>
+                              )}
+                            </td>
                             <td className="py-2 px-2 text-center">
                               {((activeSession.scoring_config?.essayCount ?? 0) > 0 &&
                                 (activeSession.scoring_config?.essayMaxScore ?? 0) > 0) ? (
