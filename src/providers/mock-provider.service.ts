@@ -45,6 +45,8 @@ import type {
   CreateExamSessionDTO,
   GradedStudentScoreRecord,
   SaveGradedStudentDTO,
+  BatchSaveGradesDTO,
+  BatchSaveGradesResult,
   SubmitWeeklySurveyDTO,
   WeeklySurveySummary,
   WeeklySurveyResponse,
@@ -3212,24 +3214,48 @@ export class MockProvider implements IDataProvider {
       }
     }
 
-    const existingIndex = all.findIndex(
-      (s) => s.session_id === dto.session_id && (s.id === dto.id || s.name.trim().toLowerCase() === dto.name.trim().toLowerCase())
-    );
+    // Match student primarily by student_user_id or id to prevent colliding identical names
+    const existingIndex = all.findIndex((s) => {
+      if (s.session_id !== dto.session_id) return false;
+      if (dto.student_user_id && s.student_user_id && s.student_user_id === dto.student_user_id) return true;
+      if (dto.id && s.id === dto.id) return true;
+      if (!dto.student_user_id && !dto.id) {
+        return s.name.trim().toLowerCase() === dto.name.trim().toLowerCase();
+      }
+      return false;
+    });
+
+    const existing = existingIndex >= 0 ? all[existingIndex] : null;
+
+    // Optimistic Concurrency Control (OCC)
+    if (existing && dto.expected_revision !== undefined && existing.revision !== undefined && existing.revision !== dto.expected_revision) {
+      throw new Error(
+        `CONCURRENCY_CONFLICT: Data siswa ${existing.name} telah diperbarui oleh pengguna lain (revisi saat ini ${existing.revision}, dikirim ${dto.expected_revision}). Silakan muat ulang.`
+      );
+    }
+
+    const currentRev = (existing?.revision || 0) + 1;
+    const finalScore = Math.max(0, Math.min(100, dto.final_score));
 
     const record: GradedStudentScoreRecord = {
-      id: dto.id || (existingIndex >= 0 ? all[existingIndex].id : `stu_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
+      id: dto.id || existing?.id || `stu_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       session_id: dto.session_id,
+      student_user_id: dto.student_user_id || existing?.student_user_id || dto.id || `std_${Date.now()}`,
       name: dto.name.trim(),
-      mcq_answers: dto.mcq_answers,
-      essay_scores: dto.essay_scores,
-      mcq_score: dto.mcq_score,
-      essay_score: dto.essay_score,
-      final_score: dto.final_score,
-      csi: dto.csi,
-      lps: dto.lps,
-      correct: dto.correct,
-      wrong: dto.wrong,
-      created_at: existingIndex >= 0 ? all[existingIndex].created_at : new Date().toISOString(),
+      mcq_answers: (dto.mcq_answers || {}) as Record<number, string>,
+      essay_scores: dto.essay_scores || [],
+      mcq_score: Math.max(0, Math.min(100, dto.mcq_score ?? 0)),
+      essay_score: Math.max(0, Math.min(100, dto.essay_score ?? 0)),
+      final_score: finalScore,
+      csi: Math.max(0, Math.min(100, dto.csi ?? 0)),
+      lps: Math.max(0, Math.min(100, dto.lps ?? 0)),
+      correct: dto.correct ?? 0,
+      wrong: dto.wrong ?? 0,
+      remedial_status: finalScore >= 75 ? 'PASSED' : 'REMEDIAL',
+      source: dto.source || 'MANUAL_ENTRY',
+      revision: currentRev,
+      created_at: existing ? existing.created_at : new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     if (existingIndex >= 0) {
@@ -3240,6 +3266,42 @@ export class MockProvider implements IDataProvider {
 
     safeSetStorage('smart_absensi_graded_students', JSON.stringify(all));
     return record;
+  }
+
+  public async batchSaveGradedStudents(dto: BatchSaveGradesDTO, _token?: string): Promise<BatchSaveGradesResult> {
+    if (!dto.items || !Array.isArray(dto.items)) {
+      throw new Error('INVALID_PAYLOAD: items wajib berupa array.');
+    }
+    if (dto.items.length > 100) {
+      throw new Error(`BATCH_LIMIT_EXCEEDED: Maksimal 100 siswa per transaksi batch (diterima: ${dto.items.length}).`);
+    }
+
+    // Pre-validate all items before any mutation
+    for (let i = 0; i < dto.items.length; i++) {
+      const item = dto.items[i];
+      if (!item.name || !item.name.trim()) {
+        throw new Error(`INVALID_ROW: Baris ke-${i + 1} tidak memiliki nama siswa.`);
+      }
+      if (item.final_score < 0 || item.final_score > 100) {
+        throw new Error(`INVALID_SCORE: Nilai siswa "${item.name}" harus berada di antara 0 dan 100 (diterima: ${item.final_score}).`);
+      }
+    }
+
+    const results: GradedStudentScoreRecord[] = [];
+    for (const item of dto.items) {
+      const saved = await this.saveGradedStudent({
+        ...item,
+        session_id: dto.session_id,
+        source: item.source || dto.source || 'IMPORT_EXCEL',
+      });
+      results.push(saved);
+    }
+
+    return {
+      success: true,
+      total_processed: results.length,
+      results,
+    };
   }
 
   public async deleteGradedStudent(studentId: string, _token?: string): Promise<boolean> {

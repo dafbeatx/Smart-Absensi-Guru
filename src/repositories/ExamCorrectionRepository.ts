@@ -5,6 +5,8 @@ import type {
   CreateExamSessionDTO,
   GradedStudentScoreRecord,
   SaveGradedStudentDTO,
+  BatchSaveGradesDTO,
+  BatchSaveGradesResult,
 } from '../types/database.types';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { AdministrationRepository } from './AdministrationRepository';
@@ -146,6 +148,29 @@ export class ExamCorrectionRepository {
   ): Promise<GradedStudentScoreRecord> {
     const provider = ProviderFactory.getProvider();
     return await provider.saveGradedStudent(data, token);
+  }
+
+  /**
+   * Saves multiple graded student results atomically in a single batch request.
+   */
+  public static async batchSaveGradedStudents(
+    data: BatchSaveGradesDTO,
+    token?: string
+  ): Promise<BatchSaveGradesResult> {
+    const provider = ProviderFactory.getProvider();
+    if (typeof provider.batchSaveGradedStudents === 'function') {
+      return await provider.batchSaveGradedStudents(data, token);
+    }
+    const results: GradedStudentScoreRecord[] = [];
+    for (const item of data.items) {
+      const saved = await provider.saveGradedStudent(item, token);
+      results.push(saved);
+    }
+    return {
+      success: true,
+      total_processed: results.length,
+      results,
+    };
   }
 
   /**

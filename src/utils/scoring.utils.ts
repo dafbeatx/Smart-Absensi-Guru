@@ -1,18 +1,35 @@
 import { DEFAULT_SCORING_CONFIG, type ScoringConfig, type StudentCalculationResult } from '../types/database.types';
 
-const VALID_OPTIONS = new Set(['A', 'B', 'C', 'D', 'E']);
+export const VALID_OPTIONS = new Set(['A', 'B', 'C', 'D', 'E']);
+
+export interface AnswerKeyValidationResult {
+  isValid: boolean;
+  keys: string[];
+  totalQuestions: number;
+  errors: string[];
+  gaps: number[];
+  duplicates: number[];
+  invalidOptions: Array<{ num?: number; value: string }>;
+}
 
 /**
- * Deterministic answer key parser.
- * Supports multiple formats:
- * - "1.A 2.B 3.C 4.D"
- * - "1) A 2) B 3) C"
- * - "A B C D"
- * - "A, B, C, D"
- * - "ABCDABCD"
+ * Validates and inspects answer key input strictly.
+ * - Enforces contiguous question numbers without gaps (e.g. 1, 2, 4 is rejected).
+ * - Enforces uniqueness of question numbers (no duplicate definitions like 1.A and 1.B).
+ * - Validates options strictly against A, B, C, D, E.
  */
-export function parseAnswerKey(input: string): string[] {
-  if (!input || !input.trim()) return [];
+export function validateAnswerKey(input: string): AnswerKeyValidationResult {
+  if (!input || !input.trim()) {
+    return {
+      isValid: false,
+      keys: [],
+      totalQuestions: 0,
+      errors: ['Kunci jawaban tidak boleh kosong.'],
+      gaps: [],
+      duplicates: [],
+      invalidOptions: [],
+    };
+  }
 
   const normalized = input
     .replace(/\r\n/g, ' ')
@@ -20,56 +37,152 @@ export function parseAnswerKey(input: string): string[] {
     .replace(/\t/g, ' ')
     .trim();
 
+  const errors: string[] = [];
+  const gaps: number[] = [];
+  const duplicates: number[] = [];
+  const invalidOptions: Array<{ num?: number; value: string }> = [];
+
   // Strategy 1: Numbered format — "1.A 2.B" or "1)A 2)B" or "1:A" or "1-A"
-  const numberedPattern = /(\d+)\s*[.:\-)\s]\s*([A-Ea-e])/g;
-  const numberedMatches: { num: number; ans: string }[] = [];
+  const numberedPattern = /(\d+)\s*[.:\-)\s]\s*([A-Za-z0-9]+)/g;
+  const numberedMap = new Map<number, string>();
   let match: RegExpExecArray | null;
+  let hasNumbered = false;
 
   while ((match = numberedPattern.exec(normalized)) !== null) {
+    hasNumbered = true;
     const num = parseInt(match[1], 10);
-    const ans = match[2].toUpperCase();
-    if (VALID_OPTIONS.has(ans)) {
-      numberedMatches.push({ num, ans });
+    const rawVal = match[2].toUpperCase().trim();
+
+    if (numberedMap.has(num)) {
+      duplicates.push(num);
+    } else {
+      numberedMap.set(num, rawVal);
+    }
+
+    if (!VALID_OPTIONS.has(rawVal)) {
+      invalidOptions.push({ num, value: rawVal });
     }
   }
 
-  if (numberedMatches.length > 0) {
-    numberedMatches.sort((a, b) => a.num - b.num);
-    const result: string[] = [];
-    for (const m of numberedMatches) {
-      result[m.num - 1] = m.ans;
+  if (hasNumbered) {
+    if (duplicates.length > 0) {
+      const dupList = Array.from(new Set(duplicates)).sort((a, b) => a - b).join(', ');
+      errors.push(`Ditemukan nomor soal duplikat: [${dupList}]. Setiap nomor soal harus unik.`);
     }
-    return result.filter(Boolean);
+
+    if (invalidOptions.length > 0) {
+      const invList = invalidOptions.map((o) => `Soal #${o.num}: '${o.value}'`).join(', ');
+      errors.push(`Pilihan jawaban tidak valid (hanya A-E yang diperbolehkan): ${invList}.`);
+    }
+
+    const nums = Array.from(numberedMap.keys()).sort((a, b) => a - b);
+    if (nums.length > 0) {
+      if (nums[0] !== 1) {
+        errors.push(`Nomor soal harus dimulai dari 1 (ditemukan nomor awal: ${nums[0]}).`);
+      }
+
+      const maxNum = nums[nums.length - 1];
+      for (let expected = 1; expected <= maxNum; expected++) {
+        if (!numberedMap.has(expected)) {
+          gaps.push(expected);
+        }
+      }
+
+      if (gaps.length > 0) {
+        errors.push(`Nomor soal tidak berurutan / berlubang pada nomor: [${gaps.join(', ')}]. Dilarang melewati nomor soal.`);
+      }
+    }
+
+    const isValid = errors.length === 0;
+    const keys: string[] = [];
+    if (isValid) {
+      for (let i = 1; i <= numberedMap.size; i++) {
+        keys.push(numberedMap.get(i)!);
+      }
+    }
+
+    return {
+      isValid,
+      keys,
+      totalQuestions: keys.length,
+      errors,
+      gaps,
+      duplicates,
+      invalidOptions,
+    };
   }
 
   // Strategy 2: Separated letters — "A B C D" or "A, B, C, D" or "A;B;C;D"
-  const separatedPattern = /^[A-Ea-e](\s*[,;\s]\s*[A-Ea-e])+$/;
-  const cleanedForSep = normalized.replace(/[^A-Ea-e,;\s]/g, '').trim();
+  const tokens = normalized.split(/[,;\s]+/).map((t) => t.trim().toUpperCase()).filter(Boolean);
+  let allTokensAreLetters = tokens.length > 0;
 
-  if (separatedPattern.test(cleanedForSep)) {
-    const letters = cleanedForSep
-      .split(/[,;\s]+/)
-      .map((l) => l.trim().toUpperCase())
-      .filter((l) => VALID_OPTIONS.has(l));
-    if (letters.length > 0) return letters;
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (!VALID_OPTIONS.has(tok)) {
+      allTokensAreLetters = false;
+      invalidOptions.push({ num: i + 1, value: tok });
+    }
+  }
+
+  if (allTokensAreLetters) {
+    return {
+      isValid: true,
+      keys: tokens,
+      totalQuestions: tokens.length,
+      errors: [],
+      gaps: [],
+      duplicates: [],
+      invalidOptions: [],
+    };
   }
 
   // Strategy 3: Continuous string — "ABCDABCD"
-  const onlyLetters = normalized.toUpperCase().replace(/[^A-E]/g, '');
-  if (onlyLetters.length > 0 && onlyLetters.length === normalized.replace(/\s/g, '').length) {
-    return onlyLetters.split('');
+  const onlyAlpha = normalized.toUpperCase().replace(/[^A-Z]/g, '');
+  if (onlyAlpha.length > 0 && onlyAlpha.length === normalized.replace(/\s/g, '').length) {
+    const chars = onlyAlpha.split('');
+    const invalidChars = chars.filter((c) => !VALID_OPTIONS.has(c));
+    if (invalidChars.length === 0) {
+      return {
+        isValid: true,
+        keys: chars,
+        totalQuestions: chars.length,
+        errors: [],
+        gaps: [],
+        duplicates: [],
+        invalidOptions: [],
+      };
+    }
   }
 
-  // Strategy 4: Fallback — extract all valid A-E letters in order
-  if (onlyLetters.length > 0) {
-    return onlyLetters.split('');
-  }
+  return {
+    isValid: false,
+    keys: [],
+    totalQuestions: 0,
+    errors: ['Format kunci jawaban tidak dapat dikenali. Gunakan format "1.A 2.B 3.C" atau "A B C D".'],
+    gaps,
+    duplicates,
+    invalidOptions,
+  };
+}
 
-  return [];
+/**
+ * Deterministic answer key parser.
+ * Strict mode prevents question shifting or silent data corruption from gaps/duplicates.
+ */
+export function parseAnswerKey(input: string, options?: { throwOnError?: boolean }): string[] {
+  const validation = validateAnswerKey(input);
+  if (!validation.isValid) {
+    if (options?.throwOnError) {
+      throw new Error(`Kunci jawaban tidak valid: ${validation.errors.join(' ')}`);
+    }
+    return [];
+  }
+  return validation.keys;
 }
 
 /**
  * Calculates student exam scores including PG, Essay, CSI, and LPS.
+ * Strictly clamps all scores to 0..100 and validates per-item essay bounds.
  */
 export function calculateStudentResult(
   answerKey: string[],
@@ -99,37 +212,48 @@ export function calculateStudentResult(
     }
   }
 
-  // PG Score (0 - 100)
-  const pgScore = totalQuestions > 0 ? (correct / totalQuestions) * 100 : 0;
+  // PG Score (0 - 100) strictly clamped
+  const rawPgScore = totalQuestions > 0 ? (correct / totalQuestions) * 100 : 0;
+  const pgScore = Math.max(0, Math.min(100, rawPgScore));
 
   // Essay Score (0 - 100 normalized)
-  const totalEssayRaw = essayScores.reduce((a, b) => a + (Number(b) || 0), 0);
-  const essayScore =
-    config.essayMaxScore > 0
-      ? (totalEssayRaw / config.essayMaxScore) * 100
+  const essayCount = config.essayCount ?? 5;
+  const essayMaxScore = config.essayMaxScore ?? 20;
+  const maxPerItem = essayCount > 0 ? essayMaxScore / essayCount : essayMaxScore;
+  const itemMax = maxPerItem > 0 ? maxPerItem : essayMaxScore;
+
+  // Validate and clamp each individual essay score to non-negative and max per item
+  const clampedEssayScores = (essayScores || []).map((score) => {
+    const num = Number(score) || 0;
+    return Math.max(0, Math.min(itemMax, num));
+  });
+
+  const totalEssayRaw = clampedEssayScores.reduce((a, b) => a + b, 0);
+  const rawEssayScore =
+    essayMaxScore > 0
+      ? (totalEssayRaw / essayMaxScore) * 100
       : 0;
+  const essayScore = Math.max(0, Math.min(100, Math.round(rawEssayScore * 10) / 10));
 
   // Final Score = weighted combination
-  // If exam has no essay (essayCount === 0 or essayMaxScore === 0), PG weight is 100% (1.0)
   const hasEssay = (config.essayCount ?? 0) > 0 && (config.essayMaxScore ?? 0) > 0;
   const pgWeight = hasEssay ? (config.pgWeight ?? 0.7) : 1.0;
   const essayWeight = hasEssay ? (config.essayWeight ?? 0.3) : 0;
 
-  const finalScore = Math.round(
-    pgScore * pgWeight + essayScore * essayWeight
-  );
-
+  const rawFinalScore = Math.round(pgScore * pgWeight + essayScore * essayWeight);
+  const finalScore = Math.max(0, Math.min(100, rawFinalScore));
   const percentage = finalScore;
 
   // CSI — Cognitive Skill Index (Accuracy & Answer Completeness)
   const completeness = totalQuestions > 0 ? ((correct + wrong) / totalQuestions) * 100 : 0;
   const accuracy = totalQuestions > 0 ? (correct / totalQuestions) * 100 : 0;
-  const csi = Math.round(accuracy * 0.7 + completeness * 0.3);
+  const csi = Math.max(0, Math.min(100, Math.round(accuracy * 0.7 + completeness * 0.3)));
 
   // LPS — Learning Performance Score (PG + Essay composite)
-  const lps = hasEssay
+  const rawLps = hasEssay
     ? Math.round(pgScore * 0.6 + essayScore * 0.4)
     : Math.round(pgScore);
+  const lps = Math.max(0, Math.min(100, rawLps));
 
   return {
     correct,

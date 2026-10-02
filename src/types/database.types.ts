@@ -791,6 +791,8 @@ export interface GradedStudentScoreRecord {
   correct: number;
   wrong: number;
   remedial_status?: string;
+  source?: string;
+  revision?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -800,16 +802,50 @@ export interface SaveGradedStudentDTO {
   session_id: string;
   name: string;
   student_user_id?: string;
-  mcq_answers: Record<number, string>;
-  essay_scores: number[];
-  mcq_score: number;
-  essay_score: number;
+  mcq_answers?: Record<string | number, string>;
+  essay_scores?: number[];
+  mcq_score?: number;
+  essay_score?: number;
   final_score: number;
-  csi: number;
-  lps: number;
-  correct: number;
-  wrong: number;
+  csi?: number;
+  lps?: number;
+  correct?: number;
+  wrong?: number;
   answer_key?: string[];
+  expected_revision?: number;
+  change_reason?: string;
+  source?: string;
+  actor_user_id?: string;
+  actor_name?: string;
+  actor_role?: string;
+}
+
+export interface GradeAuditLog {
+  id: string;
+  session_id: string;
+  student_user_id: string;
+  student_name: string;
+  actor_user_id?: string | null;
+  actor_name: string;
+  actor_role: string;
+  revision: number;
+  old_values?: Record<string, unknown> | null;
+  new_values: Record<string, unknown>;
+  change_reason?: string | null;
+  source: string;
+  created_at: string;
+}
+
+export interface BatchSaveGradesDTO {
+  session_id: string;
+  items: Array<SaveGradedStudentDTO>;
+  source?: string;
+}
+
+export interface BatchSaveGradesResult {
+  success: boolean;
+  total_processed: number;
+  results: GradedStudentScoreRecord[];
 }
 
 export interface StudentCalculationResult {

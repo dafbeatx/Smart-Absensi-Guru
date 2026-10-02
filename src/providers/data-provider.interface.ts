@@ -39,6 +39,8 @@ import type {
   CreateExamSessionDTO,
   GradedStudentScoreRecord,
   SaveGradedStudentDTO,
+  BatchSaveGradesDTO,
+  BatchSaveGradesResult,
   SubmitWeeklySurveyDTO,
   WeeklySurveySummary,
 } from '../types/database.types';
@@ -202,6 +204,7 @@ export interface IDataProvider {
   deleteExamSession(sessionId: string, token?: string): Promise<boolean>;
   getGradedStudents(sessionId: string, token?: string): Promise<GradedStudentScoreRecord[]>;
   saveGradedStudent(data: SaveGradedStudentDTO, token?: string): Promise<GradedStudentScoreRecord>;
+  batchSaveGradedStudents?(data: BatchSaveGradesDTO, token?: string): Promise<BatchSaveGradesResult>;
   deleteGradedStudent(studentId: string, token?: string): Promise<boolean>;
 
   // Homeroom & Student Continuation Plans API (Ruang Wali Kelas 9)

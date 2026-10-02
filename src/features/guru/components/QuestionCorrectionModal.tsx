@@ -36,6 +36,7 @@ import {
 import type {
   ExamSessionRecord,
   GradedStudentScoreRecord,
+  SaveGradedStudentDTO,
   UserProfile,
   StudentItem,
 } from '../../../types/database.types';
@@ -126,6 +127,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
   // Active Grading Sheet State
   const [selectedStudentName, setSelectedStudentName] = useState('');
+  const [selectedStudentUserId, setSelectedStudentUserId] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
@@ -331,13 +333,22 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       if (detailed) {
         fullSession = detailed;
       }
-    } catch (err) {
+    } catch (err: any) {
       logger.warn('QuestionCorrectionModal', 'Failed to fetch detailed session, using preview', err);
     }
-    setActiveSession(fullSession);
-    await loadSessionData(fullSession);
-    setActiveTab('grading');
-    resetGradingForm();
+
+    try {
+      await loadSessionData(fullSession);
+      setActiveSession(fullSession);
+      setActiveTab('grading');
+      resetGradingForm();
+    } catch (loadErr: any) {
+      logger.error('QuestionCorrectionModal', 'Failed to load session details/students:', loadErr);
+      setToastMessage({
+        text: `Gagal memuat detail sesi "${session.session_name}": ${loadErr?.message || 'Koneksi error'}. Silakan coba lagi.`,
+        type: 'error',
+      });
+    }
   };
 
   // Close dropdown on outside click
@@ -517,26 +528,43 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
   // Filtered students for dropdown
   const filteredStudents = useMemo(() => {
-    // Collect all candidate student names
-    const names = new Set<string>();
+    const studentMap = new Map<string, { id: string; name: string }>();
+
     classStudents.forEach((s) => {
-      if (s.fullName) names.add(s.fullName.trim());
+      if (s.fullName?.trim() && s.id) {
+        studentMap.set(s.id, { id: s.id, name: s.fullName.trim() });
+      }
     });
+
     if (activeSession?.student_list) {
-      activeSession.student_list.forEach((n) => {
-        if (n) names.add(n.trim());
+      activeSession.student_list.forEach((n, idx) => {
+        if (n?.trim()) {
+          const trimmed = n.trim();
+          const existingKey = Array.from(studentMap.keys()).find((k) => studentMap.get(k)?.name.toLowerCase() === trimmed.toLowerCase());
+          if (!existingKey) {
+            const tempId = `std_list_${idx}_${trimmed.replace(/\s+/g, '_').toLowerCase()}`;
+            studentMap.set(tempId, { id: tempId, name: trimmed });
+          }
+        }
       });
     }
-    // Also ALWAYS include any student who already has grades in this session!
+
     gradedStudents.forEach((g) => {
-      if (g.name) names.add(g.name.trim());
+      if (g.name?.trim()) {
+        const id = g.student_user_id || g.id;
+        if (!studentMap.has(id)) {
+          studentMap.set(id, { id, name: g.name.trim() });
+        }
+      }
     });
 
-    const gradedSet = new Set(gradedStudents.map((g) => g.name.toLowerCase().trim()));
+    const gradedIdSet = new Set(gradedStudents.map((g) => g.student_user_id || g.id));
+    const gradedNameSet = new Set(gradedStudents.map((g) => g.name.toLowerCase().trim()));
 
-    const list = Array.from(names).map((name) => ({
-      name,
-      isGraded: gradedSet.has(name.toLowerCase().trim()),
+    const list = Array.from(studentMap.values()).map((st) => ({
+      id: st.id,
+      name: st.name,
+      isGraded: gradedIdSet.has(st.id) || gradedNameSet.has(st.name.toLowerCase().trim()),
     }));
 
     // Sort: un-graded first, then graded
@@ -549,21 +577,35 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     return list.filter((s) => s.name.toLowerCase().includes(studentSearchQuery.toLowerCase()));
   }, [classStudents, activeSession, gradedStudents, studentSearchQuery]);
 
-  // Full, complete roster of students in the class (unfiltered by search query for reliable auto-advancement)
-  const allClassStudentNames = useMemo(() => {
-    const names = new Set<string>();
+  // Full, complete roster of students in the class with unique IDs for auto-advancement
+  const allClassStudents = useMemo(() => {
+    const studentMap = new Map<string, { id: string; name: string }>();
     classStudents.forEach((s) => {
-      if (s.fullName?.trim()) names.add(s.fullName.trim());
+      if (s.fullName?.trim() && s.id) {
+        studentMap.set(s.id, { id: s.id, name: s.fullName.trim() });
+      }
     });
     if (activeSession?.student_list) {
-      activeSession.student_list.forEach((n) => {
-        if (n?.trim()) names.add(n.trim());
+      activeSession.student_list.forEach((n, idx) => {
+        if (n?.trim()) {
+          const trimmed = n.trim();
+          const existingKey = Array.from(studentMap.keys()).find((k) => studentMap.get(k)?.name.toLowerCase() === trimmed.toLowerCase());
+          if (!existingKey) {
+            const tempId = `std_list_${idx}_${trimmed.replace(/\s+/g, '_').toLowerCase()}`;
+            studentMap.set(tempId, { id: tempId, name: trimmed });
+          }
+        }
       });
     }
     gradedStudents.forEach((g) => {
-      if (g.name?.trim()) names.add(g.name.trim());
+      if (g.name?.trim()) {
+        const id = g.student_user_id || g.id;
+        if (!studentMap.has(id)) {
+          studentMap.set(id, { id, name: g.name.trim() });
+        }
+      }
     });
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
+    return Array.from(studentMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [classStudents, activeSession, gradedStudents]);
 
   const handleAnswerSelect = (questionNum: number, opt: string) => {
@@ -621,15 +663,19 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     undoStack.current = [];
   };
 
-  const handleSelectStudent = (name: string) => {
+  const handleSelectStudent = (name: string, studentUserId?: string) => {
     setSelectedStudentName(name);
+    setSelectedStudentUserId(studentUserId || '');
     setStudentSearchQuery(name);
     setIsStudentDropdownOpen(false);
 
     const count = activeSession?.scoring_config?.essayCount || 5;
 
     // If student already has recorded grade in this session, prefill
-    const existing = gradedStudents.find((g) => g.name.toLowerCase().trim() === name.toLowerCase().trim());
+    const existing = gradedStudents.find((g) =>
+      (studentUserId && (g.student_user_id === studentUserId || g.id === studentUserId)) ||
+      g.name.toLowerCase().trim() === name.toLowerCase().trim()
+    );
     if (existing) {
       originalStudentAnswersRef.current = existing.mcq_answers || {};
       setUserAnswers(existing.mcq_answers || {});
@@ -696,23 +742,25 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     if (!calculation) return;
 
     const matchedStudent = classStudents.find(
-      (cs) => cs.fullName?.toLowerCase().trim() === selectedStudentName.toLowerCase().trim()
+      (cs) => (selectedStudentUserId && cs.id === selectedStudentUserId) || cs.fullName?.toLowerCase().trim() === selectedStudentName.toLowerCase().trim()
     );
 
     const existingGraded = gradedStudents.find(
-      (g) => g.name.toLowerCase().trim() === selectedStudentName.toLowerCase().trim()
+      (g) => (selectedStudentUserId && (g.student_user_id === selectedStudentUserId || g.id === selectedStudentUserId)) || g.name.toLowerCase().trim() === selectedStudentName.toLowerCase().trim()
     );
 
     const hasEssay =
       (activeSession.scoring_config?.essayCount ?? 0) > 0 &&
       (activeSession.scoring_config?.essayMaxScore ?? 0) > 0;
 
+    const studentUserId = selectedStudentUserId || matchedStudent?.id || existingGraded?.student_user_id || `std_${Date.now()}`;
+
     try {
       const saved = await ExamCorrectionRepository.saveGradedStudent({
         id: existingGraded?.id,
         session_id: activeSession.id,
         name: selectedStudentName.trim(),
-        student_user_id: matchedStudent?.id || existingGraded?.student_user_id,
+        student_user_id: studentUserId,
         mcq_answers: userAnswers,
         essay_scores: essayScores,
         mcq_score: hasEssay ? Math.round(calculation.score) : effectiveFinalScore,
@@ -723,17 +771,24 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         correct: calculation.correct,
         wrong: calculation.wrong,
         answer_key: activeSession.answer_key,
+        expected_revision: existingGraded?.revision,
+        actor_user_id: currentUser?.id,
+        actor_name: currentUser?.full_name,
+        actor_role: userRole,
+        source: 'MANUAL_ENTRY',
       });
 
       // Update local state list
       setGradedStudents((prev) => {
-        const index = prev.findIndex((s) => s.name.toLowerCase().trim() === saved.name.toLowerCase().trim());
+        const index = prev.findIndex(
+          (s) => (saved.student_user_id && s.student_user_id === saved.student_user_id) || s.id === saved.id
+        );
         if (index >= 0) {
           const clone = [...prev];
           clone[index] = saved;
           return clone;
         }
-        return [...prev, saved];
+        return [saved, ...prev];
       });
 
       // If editing from recap table, cleanly navigate back to recap
@@ -747,30 +802,34 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         return;
       }
 
-      // Reliable auto-advance to next ungraded student from full class list
-      const savedNameNorm = saved.name.toLowerCase().trim();
-      const updatedGradedSet = new Set([
+      // Reliable auto-advance to next ungraded student from full class list by ID & Name
+      const updatedGradedIds = new Set([
+        ...gradedStudents.map((g) => g.student_user_id || g.id),
+        saved.student_user_id || saved.id,
+      ]);
+      const updatedGradedNames = new Set([
         ...gradedStudents.map((g) => g.name.toLowerCase().trim()),
-        savedNameNorm,
+        saved.name.toLowerCase().trim(),
       ]);
 
-      const remainingUngraded = allClassStudentNames.filter(
-        (name) => !updatedGradedSet.has(name.toLowerCase().trim())
+      const remainingUngraded = allClassStudents.filter(
+        (st) => !updatedGradedIds.has(st.id) && !updatedGradedNames.has(st.name.toLowerCase().trim())
       );
 
       if (remainingUngraded.length > 0) {
         const nextStudent = remainingUngraded[0];
-        handleSelectStudent(nextStudent);
+        handleSelectStudent(nextStudent.name, nextStudent.id);
         setToastMessage({
-          text: `Nilai ${saved.name} (${effectiveFinalScore}) disimpan! Lanjut ke: ${nextStudent}`,
+          text: `Nilai ${saved.name} (${effectiveFinalScore}) disimpan! Lanjut ke: ${nextStudent.name}`,
           type: 'success',
         });
       } else {
         resetGradingForm();
         setSelectedStudentName('');
+        setSelectedStudentUserId('');
         setStudentSearchQuery('');
         setToastMessage({
-          text: `Nilai ${saved.name} (${effectiveFinalScore}) disimpan! Seluruh siswa (${allClassStudentNames.length || gradedStudents.length + 1}) telah dinilai! 🎉`,
+          text: `Nilai ${saved.name} (${effectiveFinalScore}) disimpan! Seluruh siswa (${allClassStudents.length || gradedStudents.length + 1}) telah dinilai! 🎉`,
           type: 'success',
         });
       }
@@ -836,6 +895,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         correct: student.correct,
         wrong: student.wrong,
         answer_key: activeSession.answer_key,
+        expected_revision: student.revision,
+        actor_user_id: currentUser?.id,
+        actor_name: currentUser?.full_name,
+        actor_role: userRole,
+        source: 'MANUAL_ENTRY',
       });
       setToastMessage({
         text: `Nilai essay ${student.name} berhasil disimpan: ${newScore} (Skor Akhir: ${newFinalScore})`,
@@ -911,6 +975,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         correct: calc.correct,
         wrong: calc.wrong,
         answer_key: activeSession.answer_key,
+        expected_revision: student.revision,
+        actor_user_id: currentUser?.id,
+        actor_name: currentUser?.full_name,
+        actor_role: userRole,
+        source: 'MANUAL_ENTRY',
       });
       setToastMessage({
         text: `Nilai PG ${student.name} disimpan: ${newScore} (PG otomatis terisi: ${calc.correct} Benar, ${calc.wrong} Salah)`,
@@ -959,7 +1028,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       const pgWeight = activeSession.scoring_config?.pgWeight ?? 0.7;
       const essayWeight = activeSession.scoring_config?.essayWeight ?? 0.3;
 
-      let savedCount = 0;
+      const batchItems: SaveGradedStudentDTO[] = [];
       for (const st of gradedStudents) {
         const newScore = batchScores[st.id] !== undefined ? batchScores[st.id] : Number(st.essay_score) || 0;
         if (newScore === Number(st.essay_score)) continue;
@@ -976,12 +1045,12 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         const newFinalScore = Math.round(Number(st.mcq_score) * pgWeight + newScore * essayWeight);
         const newLps = Math.round(Number(st.mcq_score) * 0.6 + newScore * 0.4);
 
-        await ExamCorrectionRepository.saveGradedStudent({
+        batchItems.push({
           id: st.id,
           session_id: activeSession.id,
           name: st.name,
-          student_user_id: st.student_user_id,
-          mcq_answers: st.mcq_answers,
+          student_user_id: st.student_user_id || st.id,
+          mcq_answers: st.mcq_answers || {},
           essay_scores: newEssayScores,
           mcq_score: st.mcq_score,
           essay_score: newScore,
@@ -991,16 +1060,32 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           correct: st.correct,
           wrong: st.wrong,
           answer_key: activeSession.answer_key,
+          expected_revision: st.revision,
+          actor_user_id: currentUser?.id,
+          actor_name: currentUser?.full_name,
+          actor_role: userRole,
+          source: 'BATCH_ESSAY',
         });
-        savedCount++;
       }
 
-      // Reload fresh data from repository
-      const refreshed = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
-      setGradedStudents(refreshed);
+      if (batchItems.length > 0) {
+        const batchRes = await ExamCorrectionRepository.batchSaveGradedStudents({
+          session_id: activeSession.id,
+          items: batchItems,
+          source: 'BATCH_ESSAY',
+        });
+
+        if (batchRes && batchRes.results) {
+          setGradedStudents(batchRes.results);
+        } else {
+          const refreshed = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
+          setGradedStudents(refreshed);
+        }
+      }
+
       setIsBatchEssayModalOpen(false);
       setToastMessage({
-        text: `Berhasil memperbarui nilai essay untuk ${savedCount} siswa!`,
+        text: `Berhasil memperbarui nilai essay untuk ${batchItems.length} siswa secara atomik!`,
         type: 'success',
       });
     } catch (err: any) {
@@ -1131,34 +1216,44 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         return;
       }
 
-      const isAsas = /ASAS|PAS|UAS|AKHIR/i.test(activeSession.exam_type || '');
-      let importedCount = 0;
+      // Pre-validate all rows before any write: prevents partial writes
+      const prepared = SemesterGradingExcelService.prepareBatchImport(
+        matchingSheet,
+        activeSession,
+        classStudents.map((s) => ({ id: s.id, fullName: s.fullName }))
+      );
 
-      for (const st of matchingSheet.students) {
-        const score = isAsas ? st.asas : st.asts;
-        const effectiveScore = typeof score === 'number' ? score : (typeof st.finalScore === 'number' ? st.finalScore : null);
-        if (effectiveScore === null) continue;
-
-        await ExamCorrectionRepository.saveGradedStudent({
-          session_id: activeSession.id,
-          name: st.name,
-          mcq_answers: {},
-          essay_scores: [],
-          mcq_score: effectiveScore,
-          essay_score: 0,
-          final_score: effectiveScore,
-          csi: 0,
-          lps: 0,
-          correct: 0,
-          wrong: 0,
+      if (!prepared.isValid) {
+        const errorDetails = prepared.errors.slice(0, 3).map((err) => `Baris ${err.row} (${err.studentName || 'Anon'}): ${err.reason}`).join('; ');
+        const extra = prepared.errors.length > 3 ? ` ...dan ${prepared.errors.length - 3} kesalahan lainnya.` : '';
+        setToastMessage({
+          text: `Validasi Excel gagal: ${errorDetails}${extra} Tidak ada nilai yang disimpan ke database.`,
+          type: 'error',
         });
-        importedCount++;
+        return;
       }
 
-      const updated = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
-      setGradedStudents(updated);
+      // Single atomic batch save request
+      const batchRes = await ExamCorrectionRepository.batchSaveGradedStudents({
+        session_id: activeSession.id,
+        items: prepared.items.map((it) => ({
+          ...it,
+          actor_user_id: currentUser?.id,
+          actor_name: currentUser?.full_name,
+          actor_role: userRole,
+        })),
+        source: 'IMPORT_EXCEL',
+      });
+
+      if (batchRes && batchRes.results) {
+        setGradedStudents(batchRes.results);
+      } else {
+        const updated = await ExamCorrectionRepository.getGradedStudents(activeSession.id);
+        setGradedStudents(updated);
+      }
+
       setToastMessage({
-        text: `Berhasil mengimpor ${importedCount} nilai siswa dari file Excel kelas ${matchingSheet.className}!`,
+        text: `Berhasil mengimpor ${prepared.items.length} nilai siswa secara atomik dari file Excel kelas ${matchingSheet.className}!`,
         type: 'success',
       });
     } catch (err: any) {
@@ -1213,12 +1308,13 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   }
 
   return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="question-correction-title"
-      className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="question-correction-title"
+        className="w-full h-full sm:h-[92vh] sm:max-w-6xl flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans sm:rounded-3xl sm:border sm:border-slate-200/80 sm:shadow-2xl"
+      >
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -1849,7 +1945,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     <Database className="w-10 h-10 text-indigo-600 mx-auto" />
                     <h4 className="text-sm font-bold text-slate-900">Perlu Sinkronisasi Skema Database</h4>
                     <p className="text-xs text-slate-600 max-w-md mx-auto">
-                      Kolom baru (owner_user_id / class_code) belum terpasang di PostgreSQL. Silakan jalankan berkas migration <code className="bg-indigo-100 text-indigo-800 px-1 py-0.5 rounded font-mono">sql/26_exam_correction_rls_overhaul.sql</code> pada Supabase SQL Editor.
+                      Skema PostgreSQL atau tabel koreksi ujian belum lengkap. Silakan jalankan berkas migration <code className="bg-indigo-100 text-indigo-800 px-1 py-0.5 rounded font-mono">sql/58_exam_correction_and_grade_audit_overhaul.sql</code> pada Supabase SQL Editor.
                     </p>
                     <button
                       type="button"
@@ -2087,9 +2183,9 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     {filteredStudents.length > 0 ? (
                       filteredStudents.map((stu) => (
                         <button
-                          key={stu.name}
+                          key={stu.id}
                           type="button"
-                          onClick={() => handleSelectStudent(stu.name)}
+                          onClick={() => handleSelectStudent(stu.name, stu.id)}
                           className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-between transition-colors min-h-10"
                         >
                           <span>{stu.name}</span>
@@ -2695,7 +2791,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    handleSelectStudent(s.name);
+                                    handleSelectStudent(s.name, s.student_user_id || s.id);
                                     setActiveTab('grading');
                                   }}
                                   className="p-1 rounded text-teal-700 hover:text-teal-800 hover:bg-teal-50"
@@ -2981,6 +3077,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           </div>
         </div>
       )}
+      </div>
     </div>,
     document.body
   );

@@ -49,6 +49,8 @@ import type {
   CreateExamSessionDTO,
   GradedStudentScoreRecord,
   SaveGradedStudentDTO,
+  BatchSaveGradesDTO,
+  BatchSaveGradesResult,
   SubmitWeeklySurveyDTO,
   WeeklySurveySummary,
   WeeklySurveyResponse,
@@ -6013,19 +6015,7 @@ export class SupabaseProvider implements IDataProvider {
 
   // ─── EXAM CORRECTION & GRADING API (Koreksi Soal & Nilai Siswa) ───────────────
 
-  private gmClientInstance: SupabaseClient | null = null;
-  private getGradeMasterClient(): SupabaseClient | null {
-    if (this.gmClientInstance) return this.gmClientInstance;
-    try {
-      const gmUrl = 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
-      const gmKey =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
-      this.gmClientInstance = createClient(gmUrl, gmKey);
-      return this.gmClientInstance;
-    } catch {
-      return null;
-    }
-  }
+
 
   public async getExamSessions(_token?: string): Promise<ExamSessionRecord[]> {
     return this.dedupeRequest('getExamSessions', async () => {
@@ -6218,25 +6208,7 @@ export class SupabaseProvider implements IDataProvider {
       created_at: new Date().toISOString(),
     };
 
-    // Dual-write sync to GradeMaster OS Supabase Database (Project fwhdjqvtjzesbdcqorsn)
-    try {
-      const gmClient = this.getGradeMasterClient();
-      if (gmClient) {
-        const gmPayload = {
-          ...recordPayload,
-          id: savedId,
-          password_hash: (dto as unknown as Record<string, unknown>).password_hash as string | undefined || '$2b$10$nkZlyRiUBVxVYIlH1nDNHO21rtZmAZhjths2uPTj4D9n.4qSgUfqa',
-          remedial_essay_count: 5,
-          remedial_timer: 15,
-          is_public: true,
-          is_demo: false,
-          school_level: recordPayload.school_level || (recordPayload.class_name === 'SMA' ? 'SMA' : 'SMP'),
-        };
-        await gmClient.from('gm_sessions').upsert(gmPayload);
-      }
-    } catch (gmSyncErr) {
-      logger.warn('SupabaseProvider', 'GradeMaster dual-write session note:', gmSyncErr);
-    }
+
 
     // Update local cache
     try {
@@ -6263,15 +6235,7 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error(`Gagal menghapus sesi ujian di cloud: ${error.message}`);
     }
 
-    // Dual-write delete from GradeMaster OS
-    try {
-      const gmClient = this.getGradeMasterClient();
-      if (gmClient) {
-        await gmClient.from('gm_sessions').delete().eq('id', sessionId);
-      }
-    } catch (gmErr) {
-      logger.warn('SupabaseProvider', 'GradeMaster delete session note:', gmErr);
-    }
+
 
     // Update local cache
     try {
@@ -6339,70 +6303,116 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async saveGradedStudent(dto: SaveGradedStudentDTO, _token?: string): Promise<GradedStudentScoreRecord> {
-    const studentPayload: any = {
-      session_id: dto.session_id,
-      name: dto.name.trim(),
-      student_user_id: dto.student_user_id,
-      mcq_answers: dto.mcq_answers || {},
-      essay_scores: dto.essay_scores || [],
-      mcq_score: dto.mcq_score || 0,
-      essay_score: dto.essay_score || 0,
-      final_score: dto.final_score || 0,
-      csi: dto.csi || 0,
-      lps: dto.lps || 0,
-      correct: dto.correct || 0,
-      wrong: dto.wrong || 0,
-      updated_at: new Date().toISOString(),
-    };
+    const studentUserId = dto.student_user_id || dto.id || `std_${Date.now()}`;
+    const cleanName = dto.name.trim();
 
-    let savedId = dto.id;
+    // 1. Try atomic PostgreSQL RPC save_exam_grade_v2
+    try {
+      const { data, error } = await this.client.rpc('save_exam_grade_v2', {
+        p_session_id: dto.session_id,
+        p_student_user_id: studentUserId,
+        p_student_name: cleanName,
+        p_mcq_answers: dto.mcq_answers || {},
+        p_essay_scores: dto.essay_scores || [],
+        p_actor_user_id: dto.actor_user_id || null,
+        p_actor_name: dto.actor_name || 'Guru',
+        p_actor_role: dto.actor_role || 'GURU',
+        p_expected_revision: dto.expected_revision ?? null,
+        p_change_reason: dto.change_reason ?? null,
+        p_source: dto.source || 'MANUAL_ENTRY',
+      });
 
-    // 1. Check existing student in gm_students
-    let existingRecord: any = null;
-    if (dto.id) {
-      const { data } = await this.client.from('gm_students').select('id').eq('id', dto.id).maybeSingle();
-      existingRecord = data;
+      if (!error && data) {
+        const record = data as GradedStudentScoreRecord;
+        this.updateGradedStudentCache(dto.session_id, record);
+        return record;
+      }
+
+      if (error) {
+        if (error.message?.includes('CONCURRENCY_CONFLICT')) {
+          throw new Error(error.message);
+        }
+        logger.warn('SupabaseProvider', 'RPC save_exam_grade_v2 not available or errored, using fallback:', error.message);
+      }
+    } catch (rpcErr: any) {
+      if (rpcErr?.message?.includes('CONCURRENCY_CONFLICT')) {
+        throw rpcErr;
+      }
+      logger.warn('SupabaseProvider', 'RPC exception, using resilient fallback:', rpcErr?.message || rpcErr);
     }
-    if (!existingRecord) {
+
+    // 2. Resilient Direct Fallback (Safe & Atomic per student, zero dual write, zero answer deletion)
+    let existingRecord: any = null;
+    if (studentUserId) {
       const { data } = await this.client
         .from('gm_students')
-        .select('id')
+        .select('id, revision')
         .eq('session_id', dto.session_id)
-        .ilike('name', dto.name.trim())
+        .eq('student_user_id', studentUserId)
+        .maybeSingle();
+      existingRecord = data;
+    }
+    if (!existingRecord && dto.id) {
+      const { data } = await this.client
+        .from('gm_students')
+        .select('id, revision')
+        .eq('id', dto.id)
         .maybeSingle();
       existingRecord = data;
     }
 
+    if (existingRecord && dto.expected_revision !== undefined && existingRecord.revision !== undefined && existingRecord.revision !== dto.expected_revision) {
+      throw new Error(
+        `CONCURRENCY_CONFLICT: Data siswa ${cleanName} telah diperbarui oleh pengguna lain (revisi saat ini ${existingRecord.revision}, dikirim ${dto.expected_revision}). Silakan muat ulang.`
+      );
+    }
+
+    const currentRev = (existingRecord?.revision || 0) + 1;
+    const finalScore = Math.max(0, Math.min(100, dto.final_score));
+
+    const studentPayload: any = {
+      session_id: dto.session_id,
+      student_user_id: studentUserId,
+      name: cleanName,
+      mcq_answers: dto.mcq_answers || {},
+      essay_scores: dto.essay_scores || [],
+      mcq_score: Math.max(0, Math.min(100, dto.mcq_score || 0)),
+      essay_score: Math.max(0, Math.min(100, dto.essay_score || 0)),
+      final_score: finalScore,
+      csi: Math.max(0, Math.min(100, dto.csi || 0)),
+      lps: Math.max(0, Math.min(100, dto.lps || 0)),
+      correct: dto.correct || 0,
+      wrong: dto.wrong || 0,
+      remedial_status: finalScore >= 75 ? 'PASSED' : 'REMEDIAL',
+      source: dto.source || 'MANUAL_ENTRY',
+      revision: currentRev,
+      updated_at: new Date().toISOString(),
+    };
+
+    let savedId = existingRecord?.id || dto.id;
     if (existingRecord) {
-      savedId = existingRecord.id;
       const { error: updErr } = await this.client.from('gm_students').update(studentPayload).eq('id', savedId);
       if (updErr) {
-        logger.error('SupabaseProvider', 'saveGradedStudent update error:', updErr.message);
+        logger.error('SupabaseProvider', 'saveGradedStudent fallback update error:', updErr.message);
         throw new Error(`Gagal menyimpan nilai ke cloud: ${updErr.message}`);
       }
     } else {
-      const generatedStudentId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : undefined;
-      if (generatedStudentId) {
-        studentPayload.id = generatedStudentId;
-      }
-      const { data: inserted, error: insErr } = await this.client
+      studentPayload.id = savedId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined);
+      const { data: insData, error: insErr } = await this.client
         .from('gm_students')
         .insert(studentPayload)
         .select('id')
         .single();
       if (insErr) {
-        logger.error('SupabaseProvider', 'saveGradedStudent insert error:', insErr.message);
+        logger.error('SupabaseProvider', 'saveGradedStudent fallback insert error:', insErr.message);
         throw new Error(`Gagal menyimpan nilai siswa ke cloud: ${insErr.message}`);
       }
-      savedId = inserted?.id || generatedStudentId;
+      savedId = insData?.id || studentPayload.id;
     }
 
-    // 2. Insert or update per-question answers if answer_key provided
-    if (savedId && dto.answer_key && Array.isArray(dto.answer_key)) {
+    // Atomic upsert gm_answers on conflict (student_id, question_number) - NEVER delete!
+    if (savedId && dto.answer_key && Array.isArray(dto.answer_key) && dto.mcq_answers) {
       try {
-        await this.client.from('gm_answers').delete().eq('student_id', savedId);
         const normalize = (v?: string) => (v ? v.trim().toUpperCase() : '');
         const answerRows = Object.entries(dto.mcq_answers).map(([qNum, selected]) => ({
           student_id: savedId,
@@ -6412,88 +6422,35 @@ export class SupabaseProvider implements IDataProvider {
           updated_at: new Date().toISOString(),
         }));
         if (answerRows.length > 0) {
-          const { error: ansErr } = await this.client.from('gm_answers').insert(answerRows);
-          if (ansErr) {
-            logger.warn('SupabaseProvider', 'gm_answers insert note:', ansErr.message);
-          }
+          await this.client.from('gm_answers').upsert(answerRows, { onConflict: 'student_id,question_number' });
         }
       } catch (ansErr) {
-        logger.warn('SupabaseProvider', 'gm_answers exception:', ansErr);
+        logger.warn('SupabaseProvider', 'gm_answers upsert note:', ansErr);
       }
     }
 
-    // 3. Mirror record to public.student_scores for relational student grade history
+    // Upsert student_scores on conflict (student_id, session_id) - NEVER duplicate!
     try {
-      const { data: acc } = await this.client
-        .from('gm_student_accounts')
-        .select('id')
-        .ilike('student_name', dto.name.trim())
-        .limit(1)
-        .maybeSingle();
-
-      const studentUuid = acc?.id || dto.student_user_id || (savedId && savedId.length === 36 ? savedId : undefined);
-      if (studentUuid) {
-        await this.client.from('student_scores').insert({
-          student_id: studentUuid,
-          score: dto.final_score,
-          answers: {
-            session_id: dto.session_id,
-            name: dto.name,
-            mcq_answers: dto.mcq_answers,
-            essay_scores: dto.essay_scores,
-            csi: dto.csi,
-            lps: dto.lps,
-            correct: dto.correct,
-            wrong: dto.wrong,
-          },
-          is_completed: true,
-          completed_at: new Date().toISOString(),
-        });
-      }
+      await this.client.from('student_scores').upsert({
+        student_id: studentUserId,
+        session_id: dto.session_id,
+        score: finalScore,
+        answers: {
+          session_id: dto.session_id,
+          name: cleanName,
+          mcq_answers: dto.mcq_answers,
+          essay_scores: dto.essay_scores,
+          csi: dto.csi,
+          lps: dto.lps,
+          correct: dto.correct,
+          wrong: dto.wrong,
+        },
+        is_completed: true,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'student_id,session_id' });
     } catch (scoreSyncErr) {
-      logger.debug('SupabaseProvider', 'student_scores sync note:', scoreSyncErr);
-    }
-
-    // 4. Dual-write sync to GradeMaster OS Supabase Database (Project fwhdjqvtjzesbdcqorsn)
-    try {
-      const gmClient = this.getGradeMasterClient();
-      if (gmClient) {
-        const { data: gmAcc } = await gmClient
-          .from('gm_student_accounts')
-          .select('id')
-          .ilike('student_name', dto.name.trim())
-          .limit(1)
-          .maybeSingle();
-
-        const gmStudentPayload = {
-          ...studentPayload,
-          id: savedId,
-          student_user_id: gmAcc?.id || null,
-        };
-
-        await gmClient.from('gm_students').upsert(gmStudentPayload, { onConflict: 'session_id,name' });
-
-        if (gmAcc?.id) {
-          await gmClient.from('student_scores').insert({
-            student_id: gmAcc.id,
-            score: dto.final_score,
-            answers: {
-              session_id: dto.session_id,
-              name: dto.name,
-              mcq_answers: dto.mcq_answers,
-              essay_scores: dto.essay_scores,
-              csi: dto.csi,
-              lps: dto.lps,
-              correct: dto.correct,
-              wrong: dto.wrong,
-            },
-            is_completed: true,
-            completed_at: new Date().toISOString(),
-          });
-        }
-      }
-    } catch (gmScoreErr) {
-      logger.warn('SupabaseProvider', 'GradeMaster dual-write student score note:', gmScoreErr);
+      logger.debug('SupabaseProvider', 'student_scores upsert note:', scoreSyncErr);
     }
 
     const result: GradedStudentScoreRecord = {
@@ -6502,23 +6459,86 @@ export class SupabaseProvider implements IDataProvider {
       created_at: new Date().toISOString(),
     };
 
-    // Update local cache
+    this.updateGradedStudentCache(dto.session_id, result);
+    return result;
+  }
+
+  public async batchSaveGradedStudents(dto: BatchSaveGradesDTO, token?: string): Promise<BatchSaveGradesResult> {
+    if (!dto.items || !Array.isArray(dto.items)) {
+      throw new Error('INVALID_PAYLOAD: items wajib berupa array.');
+    }
+    if (dto.items.length > 100) {
+      throw new Error(`BATCH_LIMIT_EXCEEDED: Maksimal 100 siswa per transaksi batch (diterima: ${dto.items.length}).`);
+    }
+
+    // 1. Try batch atomic RPC batch_save_exam_grades_v2
+    try {
+      const { data, error } = await this.client.rpc('batch_save_exam_grades_v2', {
+        p_session_id: dto.session_id,
+        p_items: dto.items.map((it) => ({
+          student_user_id: it.student_user_id || it.id || `std_${Date.now()}`,
+          name: it.name.trim(),
+          mcq_answers: it.mcq_answers || {},
+          essay_scores: it.essay_scores || [],
+          source: it.source || dto.source || 'IMPORT_EXCEL',
+        })),
+        p_actor_user_id: dto.items[0]?.actor_user_id || null,
+        p_actor_name: dto.items[0]?.actor_name || 'Guru',
+        p_actor_role: dto.items[0]?.actor_role || 'GURU',
+        p_source: dto.source || 'IMPORT_EXCEL',
+      });
+
+      if (!error && data && data.success) {
+        const results = (data.results || []) as GradedStudentScoreRecord[];
+        results.forEach((rec) => this.updateGradedStudentCache(dto.session_id, rec));
+        return {
+          success: true,
+          total_processed: data.total_processed || results.length,
+          results,
+        };
+      }
+      if (error) {
+        logger.warn('SupabaseProvider', 'RPC batch_save_exam_grades_v2 error, fallback to individual saves:', error.message);
+      }
+    } catch (batchErr) {
+      logger.warn('SupabaseProvider', 'RPC batch exception, fallback:', batchErr);
+    }
+
+    // Fallback if RPC is not present
+    const results: GradedStudentScoreRecord[] = [];
+    for (const item of dto.items) {
+      const saved = await this.saveGradedStudent({
+        ...item,
+        session_id: dto.session_id,
+        source: item.source || dto.source || 'IMPORT_EXCEL',
+      }, token);
+      results.push(saved);
+    }
+
+    return {
+      success: true,
+      total_processed: results.length,
+      results,
+    };
+  }
+
+  private updateGradedStudentCache(sessionId: string, record: GradedStudentScoreRecord): void {
     try {
       if (typeof window !== 'undefined') {
-        const cacheKey = `smart_absensi_graded_${dto.session_id}`;
+        const cacheKey = `smart_absensi_graded_${sessionId}`;
         const raw = window.localStorage.getItem(cacheKey);
         const existing: GradedStudentScoreRecord[] = raw ? JSON.parse(raw) : [];
-        const idx = existing.findIndex((s) => s.id === savedId || s.name.toLowerCase() === dto.name.trim().toLowerCase());
+        const idx = existing.findIndex(
+          (s) => (record.student_user_id && s.student_user_id === record.student_user_id) || s.id === record.id
+        );
         if (idx >= 0) {
-          existing[idx] = result;
+          existing[idx] = record;
         } else {
-          existing.push(result);
+          existing.push(record);
         }
         window.localStorage.setItem(cacheKey, JSON.stringify(existing));
       }
     } catch {}
-
-    return result;
   }
 
   public async deleteGradedStudent(studentId: string, _token?: string): Promise<boolean> {

@@ -49,6 +49,7 @@ import { runAttendanceTimeWindowTestSuite } from './__tests__/attendance-time-wi
 import { runResearchSurveyTestSuite } from './__tests__/research-survey.test';
 import { runOfficialStudentsAndArabicTestSuite } from './__tests__/official-students-and-arabic.test';
 import { runTeacherPointsAuditTestSuite } from './__tests__/teacher-points-audit.test';
+import { runExamCorrectionAuditTestSuite } from './__tests__/exam-correction-audit.test';
 
 export interface TestResultItem {
   testName: string;
@@ -135,6 +136,7 @@ export class MasterTestRunner {
       { name: 'Weekly Research Survey & Quantitative TAM Evaluation Engine (Phase 5.1)', fn: runResearchSurveyTestSuite },
       { name: 'Master Data Siswa 2026/2027 & Mapel Bahasa Arab', fn: runOfficialStudentsAndArabicTestSuite },
       { name: 'Teacher Points Audit & Verified Leaderboard Suite (15 Regresi Kasus Wajib)', fn: runTeacherPointsAuditTestSuite },
+      { name: 'Exam Correction & Grade Audit Overhaul Suite (12 Regresi Kasus Wajib)', fn: runExamCorrectionAuditTestSuite },
     ];
 
     let totalPassed = 0;

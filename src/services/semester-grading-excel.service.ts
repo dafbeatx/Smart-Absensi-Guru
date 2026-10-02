@@ -53,6 +53,39 @@ export interface ParsedClassSheetResult {
   students: ParsedStudentRow[];
 }
 
+export interface ExcelValidationError {
+  row: number;
+  studentName: string;
+  field: string;
+  value: any;
+  reason: string;
+}
+
+export interface PreparedBatchImport {
+  isValid: boolean;
+  errors: ExcelValidationError[];
+  items: Array<{
+    session_id: string;
+    student_user_id: string;
+    name: string;
+    final_score: number;
+    mcq_score: number;
+    essay_score: number;
+    mcq_answers: Record<string, string>;
+    essay_scores: number[];
+    correct: number;
+    wrong: number;
+    csi: number;
+    lps: number;
+    source: string;
+  }>;
+  summary: {
+    totalRows: number;
+    validCount: number;
+    invalidCount: number;
+  };
+}
+
 export class SemesterGradingExcelService {
   public static TEMPLATE_PATH = '/templates/FORMAT_PENILAIAN_ASTS_ASAS.xlsx';
   public static CANONICAL_CLASSES = ['7', '8A', '8B', '9A', '9B', 'SMA'] as const;
@@ -353,5 +386,119 @@ export class SemesterGradingExcelService {
       reader.onerror = (err) => reject(err);
       reader.readAsArrayBuffer(file);
     });
+  }
+
+  /**
+   * Pre-validates all rows from an imported sheet before any write to database.
+   * Prevents partial writes: if any row is invalid, isValid is false and no records should be saved.
+   */
+  public static prepareBatchImport(
+    sheet: ParsedClassSheetResult,
+    session: ExamSessionRecord,
+    roster: Array<{ id: string; fullName: string }> = []
+  ): PreparedBatchImport {
+    const errors: ExcelValidationError[] = [];
+    const items: PreparedBatchImport['items'] = [];
+    const seenNames = new Set<string>();
+
+    const isAsas = /ASAS|PAS|UAS|AKHIR/i.test(session.exam_type || '');
+
+    // Build lookup for student IDs by normalized name
+    const rosterMap = new Map<string, string>();
+    roster.forEach((r) => {
+      if (r.fullName && r.id) {
+        rosterMap.set(r.fullName.trim().toLowerCase(), r.id);
+      }
+    });
+
+    sheet.students.forEach((st, idx) => {
+      const rowNum = idx + 9; // Rows in template start at row 9
+      const trimmedName = (st.name || '').trim();
+
+      if (!trimmedName) {
+        errors.push({
+          row: rowNum,
+          studentName: '',
+          field: 'name',
+          value: st.name,
+          reason: 'Nama siswa kosong pada baris ini.',
+        });
+        return;
+      }
+
+      // Check duplicates within the file
+      const lowerName = trimmedName.toLowerCase();
+      if (seenNames.has(lowerName)) {
+        errors.push({
+          row: rowNum,
+          studentName: trimmedName,
+          field: 'name',
+          value: trimmedName,
+          reason: `Nama siswa duplikat di file Excel pada baris ${rowNum}. Setiap siswa hanya boleh muncul sekali.`,
+        });
+        return;
+      }
+      seenNames.add(lowerName);
+
+      // Determine raw score
+      const rawScore = isAsas ? st.asas : st.asts;
+      const effectiveScore = typeof rawScore === 'number' && !isNaN(rawScore)
+        ? rawScore
+        : (typeof st.finalScore === 'number' && !isNaN(st.finalScore) ? st.finalScore : null);
+
+      if (effectiveScore === null) {
+        errors.push({
+          row: rowNum,
+          studentName: trimmedName,
+          field: isAsas ? 'ASAS' : 'ASTS',
+          value: rawScore,
+          reason: 'Nilai siswa belum diisi atau tidak valid (bukan angka).',
+        });
+        return;
+      }
+
+      if (effectiveScore < 0 || effectiveScore > 100) {
+        errors.push({
+          row: rowNum,
+          studentName: trimmedName,
+          field: isAsas ? 'ASAS' : 'ASTS',
+          value: effectiveScore,
+          reason: `Nilai (${effectiveScore}) di luar batas wajar 0..100.`,
+        });
+        return;
+      }
+
+      // Resolve student unique ID
+      const matchedUserId = rosterMap.get(lowerName) || `std_${trimmedName.replace(/\s+/g, '_').toLowerCase()}`;
+
+      items.push({
+        session_id: session.id,
+        student_user_id: matchedUserId,
+        name: trimmedName,
+        final_score: Math.round(effectiveScore),
+        mcq_score: Math.round(effectiveScore),
+        essay_score: 0,
+        mcq_answers: {},
+        essay_scores: [],
+        correct: 0,
+        wrong: 0,
+        csi: 0,
+        lps: 0,
+        source: 'IMPORT_EXCEL',
+      });
+    });
+
+    const isValid = errors.length === 0 && items.length > 0;
+
+    return {
+      isValid,
+      errors,
+      items: isValid ? items : [],
+      summary: {
+        totalRows: sheet.students.length,
+        validCount: items.length,
+        invalidCount: errors.length,
+      },
+    };
   }
 }
