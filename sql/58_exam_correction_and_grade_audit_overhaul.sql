@@ -16,7 +16,7 @@
 -- 1. TABEL gm_sessions: Hardening & Indexes
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.gm_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   session_name TEXT NOT NULL,
   teacher TEXT NOT NULL,
   subject TEXT NOT NULL,
@@ -80,8 +80,8 @@ CREATE INDEX IF NOT EXISTS idx_gm_sessions_created ON public.gm_sessions(created
 -- 2. TABEL gm_students: Hardening, Unique (session_id, student_user_id), & Concurrency
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.gm_students (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES public.gm_sessions(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  session_id TEXT NOT NULL REFERENCES public.gm_sessions(id) ON DELETE CASCADE,
   student_user_id VARCHAR(64) NOT NULL,
   name TEXT NOT NULL,
   mcq_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -149,8 +149,8 @@ CREATE INDEX IF NOT EXISTS idx_gm_students_session_final_score ON public.gm_stud
 -- 3. TABEL gm_answers: Hardening & Unique (student_id, question_number)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.gm_answers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id UUID NOT NULL REFERENCES public.gm_students(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  student_id TEXT NOT NULL REFERENCES public.gm_students(id) ON DELETE CASCADE,
   question_number INTEGER NOT NULL,
   selected_answer TEXT NOT NULL,
   is_correct BOOLEAN NOT NULL DEFAULT false,
@@ -186,9 +186,9 @@ CREATE INDEX IF NOT EXISTS idx_gm_answers_student_qnum ON public.gm_answers(stud
 -- 4. TABEL student_scores: Mirroring & Anti-Duplikasi
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.student_scores (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   student_id TEXT NOT NULL,
-  session_id UUID REFERENCES public.gm_sessions(id) ON DELETE CASCADE,
+  session_id TEXT REFERENCES public.gm_sessions(id) ON DELETE CASCADE,
   score NUMERIC NOT NULL DEFAULT 0,
   answers JSONB NOT NULL DEFAULT '{}'::jsonb,
   is_completed BOOLEAN NOT NULL DEFAULT true,
@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS public.student_scores (
 );
 
 ALTER TABLE public.student_scores
-  ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES public.gm_sessions(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS session_id TEXT REFERENCES public.gm_sessions(id) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- Bersihkan duplikat student_scores per student_id dan session_id
@@ -227,8 +227,8 @@ END $$;
 -- 5. TABEL AUDIT NILAI: gm_grade_audit_logs
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.gm_grade_audit_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES public.gm_sessions(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  session_id TEXT NOT NULL REFERENCES public.gm_sessions(id) ON DELETE CASCADE,
   student_user_id VARCHAR(64) NOT NULL,
   student_name TEXT NOT NULL,
   actor_user_id TEXT REFERENCES public.users(id) ON DELETE SET NULL,
@@ -251,8 +251,8 @@ CREATE INDEX IF NOT EXISTS idx_gm_grade_audit_created ON public.gm_grade_audit_l
 -- 6. TABEL OUTBOX GRADE MASTER: gm_external_sync_outbox
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.gm_external_sync_outbox (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+  session_id TEXT NOT NULL,
   action_type TEXT NOT NULL,
   payload JSONB NOT NULL,
   status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SYNCED', 'FAILED')),
@@ -270,7 +270,7 @@ CREATE INDEX IF NOT EXISTS idx_gm_outbox_status ON public.gm_external_sync_outbo
 -- 7. ATOMIC STORED PROCEDURE: save_exam_grade_v2
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.save_exam_grade_v2(
-  p_session_id UUID,
+  p_session_id TEXT,
   p_student_user_id VARCHAR(64),
   p_student_name TEXT,
   p_mcq_answers JSONB,
@@ -308,7 +308,7 @@ DECLARE
   v_essay_count INTEGER := 5;
   v_has_essay BOOLEAN := false;
   v_new_revision INTEGER := 1;
-  v_saved_student_id UUID;
+  v_saved_student_id TEXT;
   v_ans_key_elem JSONB;
   v_ans_idx INTEGER;
   v_old_values JSONB := NULL;
@@ -437,7 +437,7 @@ BEGIN
         updated_at = NOW()
     WHERE id = v_saved_student_id;
   ELSE
-    v_saved_student_id := gen_random_uuid();
+    v_saved_student_id := gen_random_uuid()::TEXT;
     v_new_revision := 1;
 
     INSERT INTO public.gm_students (
@@ -549,7 +549,7 @@ $$;
 -- 8. BATCH ATOMIC STORED PROCEDURE: batch_save_exam_grades_v2
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.batch_save_exam_grades_v2(
-  p_session_id UUID,
+  p_session_id TEXT,
   p_items JSONB,
   p_actor_user_id TEXT,
   p_actor_name TEXT,
