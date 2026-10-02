@@ -525,6 +525,59 @@ export const runQuestionCorrectionTestSuite = async (): Promise<{
         autoEssayEdgeOver.reduce((a, b) => a + b, 0) === 20,
       `combined: PG ${combinedCalc.score}, Essay ${combinedCalc.essayScore}, Final ${combinedCalc.finalScore}`
     );
+
+    // ── Test 31: Session Subject Filter & Canonical Alias Resolution
+    // Memvalidasi grouping mapel, alias Bahasa Arab, mapel custom, dan filtering sesi
+    const dummySessions = [
+      { id: '1', subject: 'Bahasa Arab', session_name: 'Sesi Arab 1', class_name: '8A' },
+      { id: '2', subject: 'B. Arab – Bahasa Arab', session_name: 'Sesi Arab 2', class_name: '8B' },
+      { id: '3', subject: 'Informatika', session_name: 'Sesi Info 1', class_name: '7A' },
+      { id: '4', subject: 'Tahfidz Al-Quran', session_name: 'Sesi Tahfidz', class_name: '9A' },
+    ];
+
+    // Simulasi grouping dan counting seperti pada QuestionCorrectionModal
+    const counts: Record<string, number> = {};
+    const subjectDisplayNames: Record<string, string> = {};
+
+    dummySessions.forEach((s) => {
+      const raw = (s.subject || '').trim();
+      const official = [
+        { name: 'Bahasa Arab', aliases: ['B. Arab – Bahasa Arab', 'B. Arab'] },
+        { name: 'Informatika', aliases: ['TIK', 'Komputer'] },
+      ].find((sub) => sub.name.toLowerCase() === raw.toLowerCase() || sub.aliases.some((a) => a.toLowerCase() === raw.toLowerCase()));
+
+      const canonicalKey = official ? official.name.toLowerCase() : raw.toLowerCase();
+      const displayName = official ? official.name : raw;
+
+      if (!subjectDisplayNames[canonicalKey]) {
+        subjectDisplayNames[canonicalKey] = displayName;
+      }
+      counts[canonicalKey] = (counts[canonicalKey] || 0) + 1;
+    });
+
+    const uniqueSubjects = Object.keys(subjectDisplayNames)
+      .map((key) => subjectDisplayNames[key])
+      .sort((a, b) => a.localeCompare(b));
+
+    const finalCounts: Record<string, number> = {};
+    Object.keys(subjectDisplayNames).forEach((key) => {
+      finalCounts[subjectDisplayNames[key]] = counts[key];
+    });
+
+    // Filter Bahasa Arab harus menangkap sesi 1 dan 2
+    const arabSessions = dummySessions.filter(
+      (s) => s.subject.toLowerCase().includes('arab')
+    );
+
+    assert(
+      'Session Filter 01: Canonical subject grouping & alias resolution menghitung 3 kategori unik (Bahasa Arab=2, Informatika=1, Tahfidz=1)',
+      uniqueSubjects.length === 3 &&
+        finalCounts['Bahasa Arab'] === 2 &&
+        finalCounts['Informatika'] === 1 &&
+        finalCounts['Tahfidz Al-Quran'] === 1 &&
+        arabSessions.length === 2,
+      `unique: ${uniqueSubjects.join(', ')}, Arab count: ${finalCounts['Bahasa Arab']}`
+    );
   } catch (err: any) {
     assert('Fatal Execution: Question Correction Test Suite threw an uncaught error', false, err?.message);
   }

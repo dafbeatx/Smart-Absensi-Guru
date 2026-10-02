@@ -49,6 +49,7 @@ import { logger } from '../../../utils/logger.utils';
 import {
   OFFICIAL_SCHOOL_SUBJECTS,
   normalizeSubjectName,
+  isSameSubject,
 } from '../../../config/school-subjects.config';
 import { SemesterGradingExcelService } from '../../../services/semester-grading-excel.service';
 
@@ -140,6 +141,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [sessionClassFilter, setSessionClassFilter] = useState<string>('ALL');
   const [sessionStatusFilter, setSessionStatusFilter] = useState<'ALL' | 'WITH_KEY' | 'WITHOUT_KEY'>('ALL');
   const [sessionYearFilter, setSessionYearFilter] = useState<string>('ALL');
+  const [sessionSubjectFilter, setSessionSubjectFilter] = useState<string>('ALL');
 
   // Key Editor Modal State
   const [isKeyEditorModalOpen, setIsKeyEditorModalOpen] = useState(false);
@@ -490,6 +492,38 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     return counts;
   }, [sessions]);
 
+  // Unique subjects extracted from loaded sessions for subject filtering
+  const { availableSessionSubjects, sessionSubjectCounts } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const subjectDisplayNames: Record<string, string> = {};
+
+    sessions.forEach((s) => {
+      const raw = (s.subject || '').trim();
+      if (!raw) return;
+
+      const official = OFFICIAL_SCHOOL_SUBJECTS.find((sub) => isSameSubject(sub.name, raw));
+      const canonicalKey = official ? official.name.toLowerCase() : raw.toLowerCase();
+      const displayName = official ? official.name : raw;
+
+      if (!subjectDisplayNames[canonicalKey]) {
+        subjectDisplayNames[canonicalKey] = displayName;
+      }
+
+      counts[canonicalKey] = (counts[canonicalKey] || 0) + 1;
+    });
+
+    const uniqueSubjects = Object.keys(subjectDisplayNames)
+      .map((key) => subjectDisplayNames[key])
+      .sort((a, b) => a.localeCompare(b));
+
+    const finalCounts: Record<string, number> = {};
+    Object.keys(subjectDisplayNames).forEach((key) => {
+      finalCounts[subjectDisplayNames[key]] = counts[key];
+    });
+
+    return { availableSessionSubjects: uniqueSubjects, sessionSubjectCounts: finalCounts };
+  }, [sessions]);
+
   // Filtered sessions for Tab 1
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
@@ -517,9 +551,14 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         sessionYearFilter === 'ALL' ||
         sessYear === sessionYearFilter;
 
-      return matchesSearch && matchesClass && matchesStatus && matchesYear;
+      const matchesSubject =
+        sessionSubjectFilter === 'ALL' ||
+        isSameSubject(s.subject, sessionSubjectFilter) ||
+        s.subject.toLowerCase().trim() === sessionSubjectFilter.toLowerCase().trim();
+
+      return matchesSearch && matchesClass && matchesStatus && matchesYear && matchesSubject;
     });
-  }, [sessions, sessionSearchQuery, sessionClassFilter, sessionStatusFilter, sessionYearFilter]);
+  }, [sessions, sessionSearchQuery, sessionClassFilter, sessionStatusFilter, sessionYearFilter, sessionSubjectFilter]);
 
   const sessionsWithKeyCount = useMemo(
     () => sessions.filter((s) => Array.isArray(s.answer_key) && s.answer_key.length > 0).length,
@@ -1884,8 +1923,80 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   )}
                 </div>
 
-                {/* Search Bar & Class Filter */}
-                <div className="flex flex-col sm:flex-row gap-2">
+                {/* Filter Mata Pelajaran Tab Bar */}
+                <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        Mata Pelajaran:
+                      </span>
+                      {sessionSubjectFilter !== 'ALL' && (
+                        <span className="px-2 py-0.5 rounded-md bg-teal-50 border border-teal-200 text-teal-800 text-[10px] font-bold">
+                          Aktif: {sessionSubjectFilter}
+                        </span>
+                      )}
+                    </div>
+                    {sessionSubjectFilter !== 'ALL' && (
+                      <button
+                        type="button"
+                        onClick={() => setSessionSubjectFilter('ALL')}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-teal-700 flex items-center gap-1 self-start sm:self-auto transition-colors"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Reset Mapel
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Horizontal Scrollable Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setSessionSubjectFilter('ALL')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 ${
+                        sessionSubjectFilter === 'ALL'
+                          ? 'bg-[#023246] text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>Semua Mapel</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                        sessionSubjectFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {sessions.length}
+                      </span>
+                    </button>
+
+                    {availableSessionSubjects.map((subj) => {
+                      const count = sessionSubjectCounts[subj] || 0;
+                      const isSelected = sessionSubjectFilter === subj || isSameSubject(sessionSubjectFilter, subj);
+                      return (
+                        <button
+                          key={subj}
+                          type="button"
+                          onClick={() => setSessionSubjectFilter(isSelected ? 'ALL' : subj)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-teal-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-teal-50 hover:text-teal-900 border border-transparent hover:border-teal-200'
+                          }`}
+                        >
+                          <span>{subj}</span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                              isSelected ? 'bg-teal-800 text-white' : 'bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Search Bar, Quick Mapel Select & Class Filter */}
+                <div className="flex flex-col lg:flex-row gap-2">
                   <div className="relative grow">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
@@ -1906,32 +2017,51 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
-                    <button
-                      type="button"
-                      onClick={() => setSessionClassFilter('ALL')}
-                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
-                        sessionClassFilter === 'ALL'
-                          ? 'bg-teal-600 text-white shadow-2xs'
-                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
-                    >
-                      Semua Kelas
-                    </button>
-                    {availableClasses.map((cls) => (
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                    {/* Quick Subject Select Dropdown */}
+                    <div className="relative shrink-0 w-full sm:w-auto">
+                      <select
+                        value={sessionSubjectFilter}
+                        onChange={(e) => setSessionSubjectFilter(e.target.value)}
+                        aria-label="Filter Mata Pelajaran"
+                        className="w-full sm:w-auto bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/30 cursor-pointer"
+                      >
+                        <option value="ALL">Semua Mapel ({sessions.length})</option>
+                        {availableSessionSubjects.map((subj) => (
+                          <option key={subj} value={subj}>
+                            {subj} ({sessionSubjectCounts[subj] || 0})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 shrink-0">
                       <button
-                        key={cls}
                         type="button"
-                        onClick={() => setSessionClassFilter(cls)}
+                        onClick={() => setSessionClassFilter('ALL')}
                         className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
-                          sessionClassFilter === cls
+                          sessionClassFilter === 'ALL'
                             ? 'bg-teal-600 text-white shadow-2xs'
                             : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                       >
-                        {cls}
+                        Semua Kelas
                       </button>
-                    ))}
+                      {availableClasses.map((cls) => (
+                        <button
+                          key={cls}
+                          type="button"
+                          onClick={() => setSessionClassFilter(cls)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
+                            sessionClassFilter === cls
+                              ? 'bg-teal-600 text-white shadow-2xs'
+                              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                          }`}
+                        >
+                          {cls}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -2041,7 +2171,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     <p className="text-[11px] text-slate-500 mb-3 max-w-md mx-auto">
                       {sessionYearFilter === '2026/2027'
                         ? 'Belum ada sesi ujian untuk Tahun Ajaran 2026/2027. Sesi riwayat dari GradeMaster tersimpan di Tahun Ajaran 2025/2026.'
-                        : 'Coba ubah kata kunci pencarian atau reset filter tahun ajaran / kelas.'}
+                        : 'Coba ubah kata kunci pencarian atau reset filter tahun ajaran, mata pelajaran, atau kelas.'}
                     </p>
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       {sessionYearFilter === '2026/2027' && !isReadOnly && (
@@ -2069,6 +2199,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                           setSessionClassFilter('ALL');
                           setSessionStatusFilter('ALL');
                           setSessionYearFilter('ALL');
+                          setSessionSubjectFilter('ALL');
                         }}
                         className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
                       >
