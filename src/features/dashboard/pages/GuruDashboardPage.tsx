@@ -6411,7 +6411,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={() => setIsExamCardModalOpen(false)}
       />
 
-      {/* 18. Modal Koreksi Soal & Input Nilai Siswa (GradeMaster In-App) */}
+      {/* 18. Layer Koreksi Soal & Input Nilai Siswa (GradeMaster In-App) */}
       <QuestionCorrectionModal
         isOpen={isQuestionCorrectionModalOpen}
         onClose={handleCloseQuestionCorrectionModal}

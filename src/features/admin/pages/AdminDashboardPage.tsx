@@ -1010,7 +1010,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         onClose={() => setIsPreferencesModalOpen(false)}
       />
 
-      {/* Modal Koreksi Soal & Input Nilai (GradeMaster In-App) */}
+      {/* Layer Koreksi Soal & Input Nilai (GradeMaster In-App) */}
       {user && (
         <QuestionCorrectionModal
           isOpen={isQuestionCorrectionModalOpen}

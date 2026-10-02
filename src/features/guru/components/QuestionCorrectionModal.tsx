@@ -1282,25 +1282,64 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   // Role Guard Check
   if (!isAuthorizedRole) {
     return createPortal(
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md w-full text-center space-y-4 shadow-xl">
-          <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 mx-auto flex items-center justify-center border border-rose-100">
-            <ShieldAlert className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-900">Akses Fitur Terbatas</h3>
-            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-              Fitur Koreksi Soal & Nilai tersedia untuk Guru Pengampu dan petugas Akademik.
-              Peran akun Anda saat ini ({userRole}) tidak memiliki otorisasi untuk membuka modul ini.
-            </p>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="question-correction-restricted-title"
+        className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] text-slate-800 font-sans animate-fadeIn"
+      >
+        <header className="px-4 py-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-semibold shrink-0 cursor-pointer min-h-11"
+              title="Kembali ke Dashboard"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+              <span className="hidden sm:inline">Kembali</span>
+            </button>
+            <div className="h-6 w-px bg-slate-200 hidden sm:block shrink-0" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 id="question-correction-restricted-title" className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                Koreksi Soal & Input Nilai
+              </h2>
+              <p className="text-[11px] text-slate-500">Otorisasi Hak Akses</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer min-h-11 min-w-11 flex items-center justify-center"
+            title="Tutup (Esc)"
           >
-            Tutup
+            <X className="w-5 h-5" />
           </button>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-md w-full text-center space-y-4 shadow-xs">
+            <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 mx-auto flex items-center justify-center border border-rose-100">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Akses Fitur Terbatas</h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Fitur Koreksi Soal & Nilai tersedia untuk Guru Pengampu dan petugas Akademik.
+                Peran akun Anda saat ini ({userRole}) tidak memiliki otorisasi untuk membuka modul ini.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer min-h-11 flex items-center justify-center"
+            >
+              Kembali ke Dashboard
+            </button>
+          </div>
         </div>
       </div>,
       document.body
@@ -1308,13 +1347,12 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="question-correction-title"
-        className="w-full h-full sm:h-[92vh] sm:max-w-6xl flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans sm:rounded-3xl sm:border sm:border-slate-200/80 sm:shadow-2xl"
-      >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="question-correction-title"
+      className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
+    >
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -1335,7 +1373,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           <button
             type="button"
             onClick={onClose}
-            className="p-2 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-semibold shrink-0"
+            className="p-2 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-semibold shrink-0 cursor-pointer min-h-11"
             title="Kembali ke Dashboard"
           >
             <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -1372,7 +1410,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
             href={gradeMasterUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-medium transition-colors shadow-2xs"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-medium transition-colors shadow-2xs min-h-11"
             title="Buka Web Input Nilai (GradeMaster Cloud) di Tab Baru"
           >
             <Globe className="w-3.5 h-3.5 text-teal-600" />
@@ -1384,7 +1422,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer min-h-11 min-w-11 flex items-center justify-center"
             title="Tutup (Esc)"
           >
             <X className="w-5 h-5" />
@@ -3077,8 +3115,9 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           </div>
         </div>
       )}
-      </div>
     </div>,
     document.body
   );
 };
+
+export const QuestionCorrectionLayer = QuestionCorrectionModal;
