@@ -170,7 +170,9 @@ export class AttendancePolicyService {
     holidays?: HolidayRecord[],
     existingPointLogs?: TeacherPointLog[],
     token?: string,
-    userCreatedAt?: string
+    userCreatedAt?: string,
+    customStartDate?: string,
+    customEndDate?: string
   ): Promise<void> {
     if (!userId) return;
 
@@ -181,8 +183,8 @@ export class AttendancePolicyService {
 
     // Batasi awal evaluasi: 1 bulan berjalan atau tanggal pembuatan user
     const firstDayOfMonthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
-    let startDateStr = firstDayOfMonthStr;
-    if (userCreatedAt) {
+    let startDateStr = customStartDate || firstDayOfMonthStr;
+    if (!customStartDate && userCreatedAt) {
       const userCreatedDateStr = userCreatedAt.slice(0, 10);
       if (userCreatedDateStr > startDateStr) {
         startDateStr = userCreatedDateStr;
@@ -219,9 +221,9 @@ export class AttendancePolicyService {
         }
       }
 
-      // Loop dari startDateStr hingga kemarin (< todayStr)
+      // Loop dari startDateStr hingga kemarin (< todayStr / customEndDate)
       const startDate = new Date(startDateStr);
-      const endDate = new Date(todayStr);
+      const endDate = new Date(customEndDate || todayStr);
 
       const curDate = new Date(startDate);
       while (curDate < endDate) {

@@ -81,7 +81,7 @@ export const DailySurveyReminderBanner: React.FC<DailySurveyReminderBannerProps>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Konten Kiri */}
         <div className="flex items-start gap-2.5 min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:w-9 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0 mt-0.5">
             <ClipboardCheck className="w-4 h-4 text-amber-800" />
           </div>
 
@@ -108,7 +108,7 @@ export const DailySurveyReminderBanner: React.FC<DailySurveyReminderBannerProps>
             type="button"
             id="btn-survey-reminder-fill-now"
             onClick={handleOpen}
-            className="flex-1 sm:flex-initial min-h-[44px] px-3.5 py-2 bg-[#023246] hover:bg-[#18536B] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 cursor-pointer"
+            className="flex-1 sm:flex-initial min-h-11 px-3.5 py-2 bg-[#023246] hover:bg-[#18536B] text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 cursor-pointer"
           >
             <span>Isi Sekarang</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -119,7 +119,7 @@ export const DailySurveyReminderBanner: React.FC<DailySurveyReminderBannerProps>
             id="btn-survey-reminder-dismiss"
             onClick={handleDismiss}
             aria-label="Tutup pengingat sementara"
-            className="min-h-[44px] min-w-[44px] px-2.5 py-2 text-slate-600 hover:text-slate-900 hover:bg-amber-200/50 text-xs font-bold rounded-xl transition-all flex items-center justify-center cursor-pointer"
+            className="min-h-11 min-w-11 px-2.5 py-2 text-slate-600 hover:text-slate-900 hover:bg-amber-200/50 text-xs font-bold rounded-xl transition-all flex items-center justify-center cursor-pointer"
             title="Nanti Saja"
           >
             <span className="hidden sm:inline mr-1 text-[11px]">Nanti</span>

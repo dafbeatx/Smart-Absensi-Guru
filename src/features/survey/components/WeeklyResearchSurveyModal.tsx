@@ -333,7 +333,7 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
                           type="button"
                           id={`btn-survey-${q.id}-${val}`}
                           onClick={() => handleScoreSelect(q.id, val)}
-                          className={`min-h-[44px] py-2 px-1 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 cursor-pointer ${
+                          className={`min-h-11 py-2 px-1 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 cursor-pointer ${
                             isSelected
                               ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-102 ring-2 ring-emerald-500'
                               : 'bg-slate-100 hover:bg-slate-200 text-slate-700'

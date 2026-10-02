@@ -101,7 +101,9 @@ export const runAttendancePenaltiesTestSuite = async (): Promise<{
     holidayList,
     pointLogsAfterRerun,
     undefined,
-    '2026-09-01T00:00:00Z'
+    '2026-09-01T00:00:00Z',
+    '2026-09-01',
+    '2026-09-08'
   );
 
   const pointLogsAfterAlpa = await mockProvider.getTeacherPointHistory(testUserId);
@@ -156,7 +158,9 @@ export const runAttendancePenaltiesTestSuite = async (): Promise<{
     holidayList,
     [],
     undefined,
-    '2026-09-07T00:00:00Z'
+    '2026-09-07T00:00:00Z',
+    '2026-09-07',
+    '2026-09-09'
   );
 
   const pointLogsAfterLeave = await mockProvider.getTeacherPointHistory(leaveUserId);

@@ -148,6 +148,7 @@ export const runAttendanceEngineTestSuite = async (): Promise<{
       attempt_action: 'CHECK_OUT',
       verification_method: 'QR_GPS',
       attendance_source: 'QR',
+      bypass_time_window: true,
     });
 
     // 3. Verifikasi sistem merekonsiliasi transaksi ini sebagai CHECK_OUT, bukan CHECK_IN terlambat
