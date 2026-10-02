@@ -3526,7 +3526,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </div>
 
                 <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-bold rounded-lg bg-amber-50 text-amber-800 border border-amber-200/70 shrink-0">
-                  September 2026
+                  {activeMonthName} {selectedYear}
                 </span>
               </div>
 
