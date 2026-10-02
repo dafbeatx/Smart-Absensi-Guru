@@ -644,7 +644,7 @@ export const MonthlySurveyAnalyticsModal: React.FC<MonthlySurveyAnalyticsModalPr
               {activeTab === 'SOLUTIONS' && (
                 <div className="space-y-5 animate-fade-in">
                   {/* Strategic Solutions Action Plan Header */}
-                  <div className="bg-gradient-to-r from-[#023246] to-[#18536B] text-white p-4 sm:p-5 rounded-2xl shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="bg-linear-to-r from-[#023246] to-[#18536B] text-white p-4 sm:p-5 rounded-2xl shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 uppercase tracking-wider">

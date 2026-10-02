@@ -89,7 +89,7 @@ export const GuruSurveyVoiceCard: React.FC = () => {
         </div>
 
         <div className="p-2.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/70">
-          <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase block flex items-center justify-center gap-0.5">
+          <span className="text-[9.5px] font-extrabold text-emerald-800 uppercase flex items-center justify-center gap-0.5">
             <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
             Indeks Rerata
           </span>
@@ -101,7 +101,7 @@ export const GuruSurveyVoiceCard: React.FC = () => {
         </div>
 
         <div className="p-2.5 rounded-2xl bg-amber-50/70 border border-amber-200/70">
-          <span className="text-[9.5px] font-extrabold text-amber-800 uppercase block flex items-center justify-center gap-0.5">
+          <span className="text-[9.5px] font-extrabold text-amber-800 uppercase flex items-center justify-center gap-0.5">
             <Lightbulb className="w-2.5 h-2.5 text-amber-600" />
             Solusi Nyata
           </span>
@@ -117,7 +117,7 @@ export const GuruSurveyVoiceCard: React.FC = () => {
         type="button"
         id="btn-guru-open-survey-voice"
         onClick={handleOpen}
-        className="w-full py-2.5 px-3.5 bg-gradient-to-r from-[#023246] to-[#18536B] hover:brightness-110 text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 cursor-pointer"
+        className="w-full py-2.5 px-3.5 bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 cursor-pointer"
       >
         <span>📈</span>
         <span>Buka Hasil Survey, Grafik &amp; Solusi Lengkap</span>
