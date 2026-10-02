@@ -1720,16 +1720,23 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   );
 
   // Teacher Discipline Leaderboard & Top Teacher Recognition (Sinkron dengan selectedMonth)
-  const disciplinePeriod: DisciplinePeriodType = selectedMonth === 8 ? 'PREVIOUS_MONTH' : 'CURRENT_MONTH';
+  const currentJakartaToday = getTodayDateInJakarta();
+  const currentJakartaYear = parseInt(currentJakartaToday.substring(0, 4), 10);
+  const currentJakartaMonth = parseInt(currentJakartaToday.substring(5, 7), 10);
+  const isCurrentCalendarMonth = selectedYear === currentJakartaYear && selectedMonth === currentJakartaMonth;
+  const disciplinePeriod: DisciplinePeriodType = isCurrentCalendarMonth ? 'CURRENT_MONTH' : 'PREVIOUS_MONTH';
+  const selectedYearMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+
   const disciplineLeaderboard = useMemo(() => {
     return getTeacherDisciplineLeaderboard(
       effectiveUser,
-      selectedMonth === 8 ? null : appreciationScore,
+      !isCurrentCalendarMonth ? null : appreciationScore,
       disciplinePeriod,
       allTeacherPointLogs,
-      allRegisteredTeachers
+      allRegisteredTeachers,
+      { targetYearMonth: selectedYearMonthStr }
     );
-  }, [effectiveUser, appreciationScore, disciplinePeriod, selectedMonth, allTeacherPointLogs, allRegisteredTeachers]);
+  }, [effectiveUser, appreciationScore, disciplinePeriod, isCurrentCalendarMonth, selectedYearMonthStr, allTeacherPointLogs, allRegisteredTeachers]);
 
   const currentUserLeaderboardItem = useMemo(() => {
     if (!disciplineLeaderboard?.leaderboard) return null;
@@ -1744,7 +1751,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     );
   }, [disciplineLeaderboard?.leaderboard, effectiveUser?.id, effectiveUser?.nip, effectiveUser?.full_name]);
 
-  const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? (selectedMonth === 8 ? 0 : (appreciationScore?.totalPoints ?? 0));
+  const effectiveTotalPoints = currentUserLeaderboardItem?.totalPoints ?? (isCurrentCalendarMonth ? (appreciationScore?.totalPoints ?? 0) : 0);
 
   // Automated Pop-up Apresiasi Kehormatan untuk Juara 1, 2, dan 3 Disiplin Sekolah
   // Piagam resmi dan selebrasi penghargaan hanya aktif jika telah memasuki akhir bulan
@@ -3531,7 +3538,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-amber-900 text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase">
                     <span className="text-sm">👑</span>
-                    <span>{selectedMonth === 8 ? 'Poin Tertinggi Rekap Agustus' : 'Poin Terbanyak Bulan Berjalan'}</span>
+                    <span>{isCurrentCalendarMonth ? 'Poin Terbanyak Bulan Berjalan' : `Poin Tertinggi Rekap ${activeMonthName}`}</span>
                   </div>
                   <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors shrink-0">
                     <span>Rincian</span>
@@ -6336,7 +6343,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         currentUserScore={appreciationScore ? { ...appreciationScore, totalPoints: effectiveTotalPoints } : undefined}
         allRegisteredTeachers={allRegisteredTeachers}
         allPointLogs={allTeacherPointLogs}
-        initialPeriod={selectedMonth === 8 ? 'PREVIOUS_MONTH' : 'CURRENT_MONTH'}
+        initialPeriod={isCurrentCalendarMonth ? 'CURRENT_MONTH' : 'PREVIOUS_MONTH'}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
       />
 
       {/* 14b. Modal Riwayat Pendapatan Poin Transparan Disiplin Guru */}
@@ -6380,6 +6389,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         user={effectiveUser}
         teacherData={disciplineLeaderboard?.leaderboard?.find((t) => t.isCurrentUser)}
         topTeachers={disciplineLeaderboard?.leaderboard?.slice(0, 3)}
+        periodMonthYear={`${disciplineLeaderboard.monthName} ${disciplineLeaderboard.year}`}
       />
 
       {/* 15b. Modal Syarat & Ketentuan Kebijakan Presensi Wajib Datang & Pulang */}

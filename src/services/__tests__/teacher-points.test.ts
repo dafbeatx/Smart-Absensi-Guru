@@ -10,6 +10,7 @@ import { TeacherChallengeService } from '../teacher-challenge.service';
 import {
   calculateTeacherAppreciationScore,
   getTeacherDisciplineLeaderboard,
+  getDisciplinePeriodMetadata,
 } from '../../utils/teacher-appreciation.utils';
 import { evaluateDisciplinePeriodTiming, getTomorrowDateInJakarta } from '../../utils/time.utils';
 import { generateExcellenceCertificateHTML } from '../../lib/certificate-generator.lib';
@@ -1243,7 +1244,9 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       },
     ];
 
-    const prevBoard = getTeacherDisciplineLeaderboard(null, null, 'PREVIOUS_MONTH', septemberOnlyLogs);
+    const prevBoard = getTeacherDisciplineLeaderboard(null, null, 'PREVIOUS_MONTH', septemberOnlyLogs, null, {
+      targetYearMonth: '2026-08',
+    });
     const fitriInPrev = prevBoard.leaderboard.find((t) => t.id === 'usr_guru_005');
     const dafaInPrev = prevBoard.leaderboard.find((t) => t.id === 'usr_admin_001');
 
@@ -1305,7 +1308,8 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       null,
       'PREVIOUS_MONTH',
       allLogs,
-      allUsers
+      allUsers,
+      { targetYearMonth: '2026-08' }
     );
 
     const guruAugView = getTeacherDisciplineLeaderboard(
@@ -1313,7 +1317,8 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       guruSeptScore as any,
       'PREVIOUS_MONTH',
       allLogs,
-      allUsers
+      allUsers,
+      { targetYearMonth: '2026-08' }
     );
 
     // 1. Verifikasi Juara 1 adalah Fitri Ani Rahayu dengan 415 Poin & 14 Hari On-Time di kedua tampilan
@@ -1346,6 +1351,119 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     );
   } catch (err: unknown) {
     assert('August Leaderboard Parity: Guard', false, String(err));
+  }
+
+  // 43. Dynamic Calendar Month Engine: Automatically resolves CURRENT_MONTH to October 2026 and PREVIOUS_MONTH to September 2026
+  try {
+    const currentMeta = getDisciplinePeriodMetadata('CURRENT_MONTH');
+    const prevMeta = getDisciplinePeriodMetadata('PREVIOUS_MONTH');
+
+    assert(
+      'Dynamic Calendar Engine: CURRENT_MONTH dynamically resolves to October 2026',
+      currentMeta.yearMonth === '2026-10' &&
+      currentMeta.monthName === 'Oktober' &&
+      currentMeta.year === 2026 &&
+      currentMeta.periodLabel.includes('Oktober 2026 (Bulan Berjalan'),
+      `Resolved: ${currentMeta.yearMonth}, Label: ${currentMeta.periodLabel}`
+    );
+
+    assert(
+      'Dynamic Calendar Engine: PREVIOUS_MONTH dynamically resolves to September 2026',
+      prevMeta.yearMonth === '2026-09' &&
+      prevMeta.monthName === 'September' &&
+      prevMeta.year === 2026 &&
+      prevMeta.periodLabel.includes('September 2026 (Rekap Final Penuh'),
+      `Resolved: ${prevMeta.yearMonth}, Label: ${prevMeta.periodLabel}`
+    );
+  } catch (err: unknown) {
+    assert('Dynamic Calendar Engine: Guard', false, String(err));
+  }
+
+  // 44. October 2026 Point Aggregation: Aggregates October transactions dynamically and ranks top teacher
+  try {
+    const octLogs: TeacherPointLog[] = [
+      {
+        id: 'oct-widia-1',
+        user_id: 'usr_guru_009',
+        points: 25,
+        activity_type: 'CHECK_IN_ON_TIME',
+        date: '2026-10-01',
+        title: 'Presensi Masuk Tepat Waktu',
+        created_at: '2026-10-01T06:55:00Z',
+      },
+      {
+        id: 'oct-widia-2',
+        user_id: 'usr_guru_009',
+        points: 25,
+        activity_type: 'CHECK_IN_ON_TIME',
+        date: '2026-10-02',
+        title: 'Presensi Masuk Tepat Waktu',
+        created_at: '2026-10-02T06:50:00Z',
+      },
+      {
+        id: 'oct-septi-1',
+        user_id: 'usr_guru_007',
+        points: 40,
+        activity_type: 'CHECK_IN_ON_TIME',
+        date: '2026-10-01',
+        title: 'Presensi Masuk Tepat Waktu',
+        created_at: '2026-10-01T07:00:00Z',
+      },
+    ];
+
+    const octLeaderboard = getTeacherDisciplineLeaderboard(
+      null,
+      null,
+      'CURRENT_MONTH',
+      octLogs
+    );
+
+    const widia = octLeaderboard.leaderboard.find((t) => t.id === 'usr_guru_009');
+    const septi = octLeaderboard.leaderboard.find((t) => t.id === 'usr_guru_007');
+
+    assert(
+      'October 2026 Points: Widianingsih earns 50 pts and ranks Juara 1 Teladan Utama in October',
+      octLeaderboard.monthName === 'Oktober' &&
+      octLeaderboard.year === 2026 &&
+      widia?.totalPoints === 50 &&
+      octLeaderboard.topTeacher.id === 'usr_guru_009' &&
+      octLeaderboard.topTeacher.level === '🏆 Pendidik Teladan Utama' &&
+      septi?.totalPoints === 40 &&
+      septi?.rank === 2,
+      `Top: ${octLeaderboard.topTeacher.name} (${octLeaderboard.topTeacher.totalPoints} pts), Septi: ${septi?.totalPoints} pts (#${septi?.rank})`
+    );
+  } catch (err: unknown) {
+    assert('October 2026 Points: Guard', false, String(err));
+  }
+
+  // 45. Zero-Touch Future Month Transition Engine: Automatically rolls over to future months without manual edits
+  try {
+    const novMeta = getDisciplinePeriodMetadata('CURRENT_MONTH', '2026-11-05');
+    const novPrev = getDisciplinePeriodMetadata('PREVIOUS_MONTH', '2026-11-05');
+    const janMeta = getDisciplinePeriodMetadata('CURRENT_MONTH', '2027-01-10');
+    const janPrev = getDisciplinePeriodMetadata('PREVIOUS_MONTH', '2027-01-10');
+
+    assert(
+      'Future Transition: November 2026 rolls over automatically without manual intervention',
+      novMeta.yearMonth === '2026-11' &&
+      novMeta.monthName === 'November' &&
+      novPrev.yearMonth === '2026-10' &&
+      novPrev.monthName === 'Oktober',
+      `Nov Current: ${novMeta.label}, Nov Prev: ${novPrev.label}`
+    );
+
+    assert(
+      'Future Transition: Year rollover to January 2027 automatically sets previous month to December 2026',
+      janMeta.yearMonth === '2027-01' &&
+      janMeta.year === 2027 &&
+      janMeta.monthName === 'Januari' &&
+      janPrev.yearMonth === '2026-12' &&
+      janPrev.year === 2026 &&
+      janPrev.monthName === 'Desember',
+      `Jan 2027 Current: ${janMeta.label}, Prev: ${janPrev.label}`
+    );
+  } catch (err: unknown) {
+    assert('Future Transition: Guard', false, String(err));
   }
 
   return { passed, failed, results };

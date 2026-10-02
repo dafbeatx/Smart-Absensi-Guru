@@ -51,7 +51,8 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
   const { showToast } = useToastStore();
 
   const timing = useMemo(() => {
-    return evaluateDisciplinePeriodTiming(new Date(), selectedYear || 2026, selectedMonth || 9);
+    const today = new Date();
+    return evaluateDisciplinePeriodTiming(today, selectedYear || today.getFullYear(), selectedMonth || (today.getMonth() + 1));
   }, [selectedYear, selectedMonth]);
 
   const [simulateEndOfMonth, setSimulateEndOfMonth] = useState<boolean>(() => {
@@ -68,7 +69,8 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
   React.useEffect(() => {
     if (!isOpen) return;
     try {
-      const stored = localStorage.getItem('smart_absensi_kepsek_reward_champion_September_2026');
+      const dynamicKey = `smart_absensi_kepsek_reward_champion_${timing.monthName}_${timing.year}`;
+      const stored = localStorage.getItem(dynamicKey) || localStorage.getItem('smart_absensi_kepsek_reward_champion_September_2026');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed?.rewardText) setKepsekReward(parsed.rewardText);
@@ -76,7 +78,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
     } catch {
       // Ignored
     }
-  }, [isOpen]);
+  }, [isOpen, timing.monthName, timing.year]);
 
   if (!isOpen) return null;
 
@@ -826,7 +828,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
         isOpen={isCertificateModalOpen}
         onClose={() => setIsCertificateModalOpen(false)}
         user={user}
-        periodMonthYear="September 2026"
+        periodMonthYear={`${timing.monthName} ${timing.year}`}
         totalPoints={totalPoints}
         rank={selectedCertificateRank}
       />

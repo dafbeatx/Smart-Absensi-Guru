@@ -205,23 +205,27 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   };
 
   // Evaluasi Juara 1 & Popup Otomatis ke Kepala Sekolah
-  useEffect(() => {
-    const res = getTeacherDisciplineLeaderboard(
+  const disciplineLeaderboard = useMemo(() => {
+    return getTeacherDisciplineLeaderboard(
       null,
       null,
       'CURRENT_MONTH',
       allTeacherPointLogs,
       teachers
     );
+  }, [allTeacherPointLogs, teachers]);
 
-    const top1 = res.leaderboard?.[0] || null;
+  const activePeriodMonthYear = `${disciplineLeaderboard.monthName} ${disciplineLeaderboard.year}`;
+
+  useEffect(() => {
+    const top1 = disciplineLeaderboard.leaderboard?.[0] || null;
     setChampionTeacher(top1);
 
-    // Cek Hadiah Tersimpan
-    const periodKey = 'September_2026';
+    // Cek Hadiah Tersimpan secara dinamis
+    const periodKey = `${disciplineLeaderboard.monthName}_${disciplineLeaderboard.year}`;
     const storageKey = `smart_absensi_kepsek_reward_champion_${periodKey}`;
     try {
-      const stored = localStorage.getItem(storageKey);
+      const stored = localStorage.getItem(storageKey) || localStorage.getItem('smart_absensi_kepsek_reward_champion_September_2026');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed?.rewardText) setSavedChampionReward(parsed.rewardText);
@@ -237,7 +241,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
     } catch {
       // Ignored
     }
-  }, [allTeacherPointLogs, teachers]);
+  }, [disciplineLeaderboard]);
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
 
@@ -1075,7 +1079,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         isOpen={isRewardModalOpen}
         onClose={() => setIsRewardModalOpen(false)}
         championTeacher={championTeacher}
-        periodMonthYear="September 2026"
+        periodMonthYear={activePeriodMonthYear}
         onRewardSaved={(rewardText) => setSavedChampionReward(rewardText)}
       />
 
@@ -1095,7 +1099,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             is_active: true,
             created_at: '',
           }}
-          periodMonthYear="September 2026"
+          periodMonthYear={activePeriodMonthYear}
           totalPoints={championTeacher.totalPoints}
           rank={1}
         />
