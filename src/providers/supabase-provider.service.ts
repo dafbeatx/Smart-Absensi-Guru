@@ -5874,6 +5874,20 @@ export class SupabaseProvider implements IDataProvider {
 
   // ─── EXAM CORRECTION & GRADING API (Koreksi Soal & Nilai Siswa) ───────────────
 
+  private gmClientInstance: SupabaseClient | null = null;
+  private getGradeMasterClient(): SupabaseClient | null {
+    if (this.gmClientInstance) return this.gmClientInstance;
+    try {
+      const gmUrl = 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
+      const gmKey =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY';
+      this.gmClientInstance = createClient(gmUrl, gmKey);
+      return this.gmClientInstance;
+    } catch {
+      return null;
+    }
+  }
+
   public async getExamSessions(_token?: string): Promise<ExamSessionRecord[]> {
     return this.dedupeRequest('getExamSessions', async () => {
       try {
@@ -6065,6 +6079,26 @@ export class SupabaseProvider implements IDataProvider {
       created_at: new Date().toISOString(),
     };
 
+    // Dual-write sync to GradeMaster OS Supabase Database (Project fwhdjqvtjzesbdcqorsn)
+    try {
+      const gmClient = this.getGradeMasterClient();
+      if (gmClient) {
+        const gmPayload = {
+          ...recordPayload,
+          id: savedId,
+          password_hash: (dto as unknown as Record<string, unknown>).password_hash as string | undefined || '$2b$10$nkZlyRiUBVxVYIlH1nDNHO21rtZmAZhjths2uPTj4D9n.4qSgUfqa',
+          remedial_essay_count: 5,
+          remedial_timer: 15,
+          is_public: true,
+          is_demo: false,
+          school_level: recordPayload.school_level || (recordPayload.class_name === 'SMA' ? 'SMA' : 'SMP'),
+        };
+        await gmClient.from('gm_sessions').upsert(gmPayload);
+      }
+    } catch (gmSyncErr) {
+      logger.warn('SupabaseProvider', 'GradeMaster dual-write session note:', gmSyncErr);
+    }
+
     // Update local cache
     try {
       if (typeof window !== 'undefined') {
@@ -6088,6 +6122,16 @@ export class SupabaseProvider implements IDataProvider {
     if (error) {
       logger.error('SupabaseProvider', 'deleteExamSession error:', error.message);
       throw new Error(`Gagal menghapus sesi ujian di cloud: ${error.message}`);
+    }
+
+    // Dual-write delete from GradeMaster OS
+    try {
+      const gmClient = this.getGradeMasterClient();
+      if (gmClient) {
+        await gmClient.from('gm_sessions').delete().eq('id', sessionId);
+      }
+    } catch (gmErr) {
+      logger.warn('SupabaseProvider', 'GradeMaster delete session note:', gmErr);
     }
 
     // Update local cache
@@ -6269,6 +6313,48 @@ export class SupabaseProvider implements IDataProvider {
       }
     } catch (scoreSyncErr) {
       logger.debug('SupabaseProvider', 'student_scores sync note:', scoreSyncErr);
+    }
+
+    // 4. Dual-write sync to GradeMaster OS Supabase Database (Project fwhdjqvtjzesbdcqorsn)
+    try {
+      const gmClient = this.getGradeMasterClient();
+      if (gmClient) {
+        const { data: gmAcc } = await gmClient
+          .from('gm_student_accounts')
+          .select('id')
+          .ilike('student_name', dto.name.trim())
+          .limit(1)
+          .maybeSingle();
+
+        const gmStudentPayload = {
+          ...studentPayload,
+          id: savedId,
+          student_user_id: gmAcc?.id || null,
+        };
+
+        await gmClient.from('gm_students').upsert(gmStudentPayload, { onConflict: 'session_id,name' });
+
+        if (gmAcc?.id) {
+          await gmClient.from('student_scores').insert({
+            student_id: gmAcc.id,
+            score: dto.final_score,
+            answers: {
+              session_id: dto.session_id,
+              name: dto.name,
+              mcq_answers: dto.mcq_answers,
+              essay_scores: dto.essay_scores,
+              csi: dto.csi,
+              lps: dto.lps,
+              correct: dto.correct,
+              wrong: dto.wrong,
+            },
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (gmScoreErr) {
+      logger.warn('SupabaseProvider', 'GradeMaster dual-write student score note:', gmScoreErr);
     }
 
     const result: GradedStudentScoreRecord = {
