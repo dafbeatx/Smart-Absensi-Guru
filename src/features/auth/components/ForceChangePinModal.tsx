@@ -98,7 +98,7 @@ export const ForceChangePinModal: React.FC = () => {
               placeholder="Masukkan 6 angka PIN baru"
               value={newPin}
               onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono tracking-widest text-center text-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono tracking-widest text-center text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
               required
               disabled={isSubmitting}
             />
@@ -115,7 +115,7 @@ export const ForceChangePinModal: React.FC = () => {
               placeholder="Ulangi 6 angka PIN baru"
               value={confirmPin}
               onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono tracking-widest text-center text-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono tracking-widest text-center text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
               required
               disabled={isSubmitting}
             />
