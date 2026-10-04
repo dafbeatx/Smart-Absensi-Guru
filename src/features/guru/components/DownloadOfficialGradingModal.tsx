@@ -369,7 +369,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
             {/* 2 & 3. Tahun Ajaran & Semester (Ditanyakan) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1 flex items-center gap-1.5">
+                <label className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-slate-500" />
                   <span>Tahun Ajaran</span>
                   <span className="text-rose-500">*</span>
@@ -424,7 +424,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
             {/* 4. Guru Pengampu & KKM */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1 flex items-center gap-1.5">
+                <label className="text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                   <UserCheck className="w-3.5 h-3.5 text-slate-500" />
                   <span>Guru Pengampu</span>
                 </label>
@@ -438,7 +438,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1 flex items-center gap-1.5">
+                <label className="text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                   <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
                   <span>KKM / KKTP</span>
                 </label>
