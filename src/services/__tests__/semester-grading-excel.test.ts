@@ -461,4 +461,86 @@ describe('SemesterGradingExcelService — ASTS & ASAS Official Sync', () => {
 
     fs.unlinkSync(exportPath);
   });
+  it('10. exportOfficialFormatExcel with className: SEMUA_KELAS includes all 6 class sheets with identical blank template table structure, user-selected subject, academic year, semester, and teacher', async () => {
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      subject: 'Informatika',
+      teacher: 'M. Iqbal Gustiawan, S.Pd., G.r',
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      kkm: 75,
+      className: 'SEMUA_KELAS',
+      targetColumn: 'NONE',
+      includeRecapSheet: false,
+    });
+
+    const exportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Informatika_SEMUA_KELAS_2026-2027.xlsx';
+    assert.ok(fs.existsSync(exportPath), 'Exported all classes file must exist on disk');
+
+    const wb = XLSX.read(fs.readFileSync(exportPath), { type: 'buffer' });
+
+    // Must be EXACTLY the 8 official sheets matching the master blank template
+    const expectedSheets = ['IDENTITAS SEKOLAH', 'FORMAT PENILAIAN', '7', '8A', '8B', '9A', '9B', 'SMA'];
+    assert.deepStrictEqual(wb.SheetNames, expectedSheets, 'Sheet structure must be 100% identical to master blank template');
+
+    // Verify IDENTITAS SEKOLAH metadata
+    const idSheet = wb.Sheets['IDENTITAS SEKOLAH'];
+    assert.strictEqual(idSheet['B8'].v, '2026/2027', 'Tahun Pelajaran must be 2026/2027');
+    assert.strictEqual(idSheet['B9'].v, 'Ganjil', 'Semester must be Ganjil');
+    assert.strictEqual(idSheet['B10'].v, 'M. Iqbal Gustiawan, S.Pd., G.r', 'Guru must match');
+    assert.strictEqual(idSheet['B11'].v, 'Informatika', 'Mata Pelajaran must match');
+
+    // Verify FORMAT PENILAIAN
+    const fpSheet = wb.Sheets['FORMAT PENILAIAN'];
+    assert.strictEqual(fpSheet['B5'].v, 75, 'KKM must be 75');
+
+    // Verify each class sheet has table headers, metadata, and students
+    const classRosters: Record<string, { expectedCount: number; firstStudent: string }> = {
+      '7': { expectedCount: 31, firstStudent: 'AFHTAR SHAKIL' },
+      '8A': { expectedCount: 15, firstStudent: 'AMANDA HASNA MIRZA' },
+      '8B': { expectedCount: 29, firstStudent: 'ABILA YAZID RIZAQI' },
+      '9A': { expectedCount: 20, firstStudent: 'ADELIA ZAFIRAH BILQIZ' },
+      '9B': { expectedCount: 26, firstStudent: 'ANDIKA PRATAMA' },
+      'SMA': { expectedCount: 23, firstStudent: 'M. FAZRIL FATURRAHMAN' },
+    };
+
+    let totalVerifiedStudents = 0;
+    Object.entries(classRosters).forEach(([cls, info]) => {
+      const ws = wb.Sheets[cls];
+      assert.ok(ws, `Class sheet ${cls} must exist`);
+
+      // Header row 8
+      assert.strictEqual(ws['A8'].v, 'No', 'Column A8 must be No');
+      assert.strictEqual(ws['B8'].v, 'Nama Peserta Didik', 'Column B8 must be Nama Peserta Didik');
+      assert.strictEqual(ws['C8'].v, 'L/P', 'Column C8 must be L/P');
+      assert.strictEqual(ws['D8'].v, 'ASTS', 'Column D8 must be ASTS');
+      assert.strictEqual(ws['E8'].v, 'ASAS', 'Column E8 must be ASAS');
+      assert.strictEqual(ws['F8'].v, 'Nilai Akhir', 'Column F8 must be Nilai Akhir');
+      assert.strictEqual(ws['G8'].v, 'Predikat', 'Column G8 must be Predikat');
+      assert.strictEqual(ws['H8'].v, 'Status', 'Column H8 must be Status');
+
+      // First student
+      assert.strictEqual(ws['B9'].v, info.firstStudent, `First student in ${cls} must be ${info.firstStudent}`);
+
+      // Check formulas for Nilai Akhir and Predikat
+      assert.ok(ws['F9'].f, 'F9 formula must exist');
+      assert.ok(ws['G9'].f, 'G9 formula must exist');
+      assert.ok(ws['H9'].f, 'H9 formula must exist');
+
+      // Metadata in class sheet
+      assert.strictEqual(ws['B5'].v, 'Informatika', 'Mata Pelajaran must be Informatika');
+      assert.strictEqual(ws['E4'].v, '2026/2027', 'Tahun Pelajaran must be 2026/2027');
+      assert.strictEqual(ws['H4'].v, 'Ganjil', 'Semester must be Ganjil');
+      assert.strictEqual(ws['E5'].v, 75, 'KKM must be 75');
+
+      // Count students in class table
+      const rows = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '' });
+      const studentsInTable = rows.slice(8).filter((r) => r[0] && typeof r[0] === 'number');
+      assert.strictEqual(studentsInTable.length, info.expectedCount, `Class ${cls} must contain ${info.expectedCount} students`);
+      totalVerifiedStudents += studentsInTable.length;
+    });
+
+    assert.strictEqual(totalVerifiedStudents, 144, 'Total students across all 6 classes must be exactly 144');
+
+    fs.unlinkSync(exportPath);
+  });
 });

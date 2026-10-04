@@ -5,25 +5,31 @@ import {
   Download,
   AlertTriangle,
   CheckCircle2,
-  Info,
-  ChevronDown,
-  ChevronUp,
-  Users,
+  Calendar,
+  BookOpen,
+  UserCheck,
+  Layers,
+  GraduationCap,
 } from 'lucide-react';
 import type {
   ExamSessionRecord,
   GradedStudentScoreRecord,
-  StudentItem,
   UserProfile,
 } from '../../../types/database.types';
 import {
   SemesterGradingExcelService,
   type GradingTargetColumn,
+  type StudentScoreEntry,
 } from '../../../services/semester-grading-excel.service';
 import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRepository';
-import { StudentRepository } from '../../../repositories/StudentRepository';
 import { resolveSessionAcademicYear } from '../../../utils/academic-year.utils';
-import { OFFICIAL_STUDENTS_2026_2027 } from '../../../data/official-students-2026-2027';
+import {
+  OFFICIAL_SCHOOL_SUBJECTS,
+  isSameSubject,
+  normalizeSubjectName,
+} from '../../../config/school-subjects.config';
+import { AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
+import { logger } from '../../../utils/logger.utils';
 
 export interface DownloadOfficialGradingModalProps {
   isOpen: boolean;
@@ -48,113 +54,92 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
   defaultSemester = 'Ganjil',
   onSuccess,
 }) => {
-  // Mode: 'SESSION' (isi nilai dari sesi) | 'BLANK' (blanko murni sekolah)
-  const [mode, setMode] = useState<'SESSION' | 'BLANK'>(() => (activeSession || availableSessions.length > 0 ? 'SESSION' : 'BLANK'));
-  
-  // Sesi yang dipilih
-  const [selectedSessionId, setSelectedSessionId] = useState<string>(activeSession?.id || (availableSessions[0]?.id ?? ''));
+  // 1. Mata Pelajaran (Ditanyakan kepada Guru)
+  const [selectedSubject, setSelectedSubject] = useState<string>('Informatika');
+  const [customSubject, setCustomSubject] = useState<string>('');
+  const isCustomSubjectMode = selectedSubject === '__CUSTOM__';
 
-  // Target kolom nilai di Excel
-  const [targetColumn, setTargetColumn] = useState<GradingTargetColumn>('ASTS');
+  // 2. Tahun Ajaran (Ditanyakan kepada Guru)
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>(() => {
+    if (activeSession?.academic_year) {
+      return resolveSessionAcademicYear(activeSession.academic_year, activeSession.session_name, activeSession.created_at, defaultAcademicYear);
+    }
+    return defaultAcademicYear || '2026/2027';
+  });
 
-  // Sertakan Sheet 1 REKAP NILAI
-  const [includeRecapSheet, setIncludeRecapSheet] = useState(true);
+  // 3. Semester (Ditanyakan kepada Guru)
+  const [selectedSemester, setSelectedSemester] = useState<'Ganjil' | 'Genap'>(() => {
+    const sem = activeSession?.semester || defaultSemester || 'Ganjil';
+    return /genap/i.test(sem) ? 'Genap' : 'Ganjil';
+  });
 
-  // Parameter umum
-  const [kkm, setKkm] = useState<number>(75);
-  const [showMissingStudents, setShowMissingStudents] = useState(false);
+  // 4. Guru Pengampu & KKM
+  const [teacherName, setTeacherName] = useState<string>(() => activeSession?.teacher || currentUser?.full_name || '');
+  const [kkm, setKkm] = useState<number>(() => Number(activeSession?.kkm) || 75);
+
+  // 5. Target Kolom Nilai (Ditanyakan & Divalidasi)
+  const [targetColumn, setTargetColumn] = useState<GradingTargetColumn>('NONE');
+
+  // Loading & Error State
   const [isDownloading, setIsDownloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Data siswa & nilai yang dimuat dinamis
-  const [sessionGradedStudents, setSessionGradedStudents] = useState<GradedStudentScoreRecord[]>(gradedStudents);
-  const [classRoster, setClassRoster] = useState<StudentItem[]>([]);
-  const [isLoadingSessionData, setIsLoadingSessionData] = useState(false);
+  // Rombel statis yang selalu disertakan dalam format resmi
+  const canonicalClassesInfo = useMemo(() => [
+    { name: '7', count: 31, level: 'SMP' },
+    { name: '8A', count: 15, level: 'SMP' },
+    { name: '8B', count: 29, level: 'SMP' },
+    { name: '9A', count: 20, level: 'SMP' },
+    { name: '9B', count: 26, level: 'SMP' },
+    { name: 'SMA', count: 23, level: 'SMA' },
+  ], []);
 
-  // Tentukan sesi yang sedang aktif di dialog
-  const currentSession = useMemo(() => {
-    if (activeSession && activeSession.id === selectedSessionId) {
-      return activeSession;
-    }
-    return availableSessions.find((s) => s.id === selectedSessionId) || activeSession || null;
-  }, [activeSession, availableSessions, selectedSessionId]);
+  const totalRegisteredStudents = useMemo(() => {
+    return canonicalClassesInfo.reduce((acc, c) => acc + c.count, 0); // 144 siswa
+  }, [canonicalClassesInfo]);
 
-  // Inisialisasi awal saat modal dibuka atau activeSession berubah
+  // Inisialisasi awal saat modal dibuka
   useEffect(() => {
     if (isOpen) {
       setErrorMessage(null);
-      if (activeSession) {
-        setSelectedSessionId(activeSession.id);
-        setMode('SESSION');
-        setKkm(Number(activeSession.kkm) || 75);
-        // Tebak target kolom dari tipe ujian secara cerdas
+
+      // Inisialisasi Mata Pelajaran
+      const initialSub = activeSession?.subject || 'Informatika';
+      const isKnown = OFFICIAL_SCHOOL_SUBJECTS.some((s) => isSameSubject(s.name, initialSub) || isSameSubject(s.code, initialSub));
+      if (isKnown) {
+        const found = OFFICIAL_SCHOOL_SUBJECTS.find((s) => isSameSubject(s.name, initialSub) || isSameSubject(s.code, initialSub));
+        setSelectedSubject(found?.name || initialSub);
+        setCustomSubject('');
+      } else {
+        setSelectedSubject('__CUSTOM__');
+        setCustomSubject(initialSub);
+      }
+
+      // Inisialisasi Tahun Ajaran
+      const resolvedYear = activeSession
+        ? resolveSessionAcademicYear(activeSession.academic_year, activeSession.session_name, activeSession.created_at, defaultAcademicYear)
+        : defaultAcademicYear;
+      setSelectedAcademicYear(resolvedYear);
+
+      // Inisialisasi Semester
+      const sem = activeSession?.semester || defaultSemester || 'Ganjil';
+      setSelectedSemester(/genap/i.test(sem) ? 'Genap' : 'Ganjil');
+
+      // Inisialisasi Guru & KKM
+      setTeacherName(activeSession?.teacher || currentUser?.full_name || 'Guru Pengampu');
+      setKkm(Number(activeSession?.kkm) || 75);
+
+      // Inisialisasi Target Kolom Nilai
+      if (activeSession && gradedStudents.length > 0) {
         const isAsas = /ASAS|PAS|UAS|AKHIR/i.test(activeSession.exam_type || '');
         setTargetColumn(isAsas ? 'ASAS' : 'ASTS');
-      } else if (availableSessions.length > 0) {
-        setSelectedSessionId(availableSessions[0].id);
-        setMode('SESSION');
-        setKkm(Number(availableSessions[0].kkm) || 75);
-        const isAsas = /ASAS|PAS|UAS|AKHIR/i.test(availableSessions[0].exam_type || '');
-        setTargetColumn(isAsas ? 'ASAS' : 'ASTS');
       } else {
-        setMode('BLANK');
+        setTargetColumn('NONE');
       }
     }
-  }, [isOpen, activeSession, availableSessions]);
+  }, [isOpen, activeSession, gradedStudents, currentUser, defaultAcademicYear, defaultSemester]);
 
-  // Sinkronisasi data nilai & roster saat currentSession berubah
-  useEffect(() => {
-    if (!isOpen || mode !== 'SESSION' || !currentSession) return;
-
-    let isMounted = true;
-
-    const loadData = async () => {
-      setIsLoadingSessionData(true);
-      try {
-        // 1. Dapatkan graded students
-        let grades: GradedStudentScoreRecord[] = [];
-        if (activeSession && activeSession.id === currentSession.id && gradedStudents.length > 0) {
-          grades = gradedStudents;
-        } else {
-          grades = await ExamCorrectionRepository.getGradedStudents(currentSession.id);
-        }
-
-        // 2. Dapatkan roster siswa untuk kelas sesi
-        let roster: StudentItem[] = [];
-        try {
-          roster = await StudentRepository.getStudentsByClass(currentSession.class_name);
-        } catch {
-          // Fallback ke master data 2026/2027
-          const normCls = SemesterGradingExcelService.normalizeSheetClassName(currentSession.class_name);
-          roster = OFFICIAL_STUDENTS_2026_2027.filter((st) => {
-            const stCls = SemesterGradingExcelService.normalizeSheetClassName(st.className);
-            return stCls === normCls;
-          });
-        }
-
-        if (isMounted) {
-          setSessionGradedStudents(grades);
-          setClassRoster(roster);
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setErrorMessage('Gagal memuat detail nilai sesi: ' + (err?.message || 'Error'));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingSessionData(false);
-        }
-      }
-    };
-
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, mode, currentSession, activeSession, gradedStudents]);
-
-  // Keyboard escape listener
+  // Keyboard Escape listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen && !isDownloading) {
@@ -165,100 +150,136 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isDownloading, onClose]);
 
-  // Perhitungan statistik & validasi
-  const validationSummary = useMemo(() => {
-    const totalRoster = classRoster.length > 0 
-      ? classRoster.length 
-      : (currentSession?.student_list?.length || sessionGradedStudents.length || 0);
+  // Nama mata pelajaran efektif
+  const effectiveSubjectName = useMemo(() => {
+    if (isCustomSubjectMode) {
+      return customSubject.trim() || 'Mata Pelajaran';
+    }
+    return selectedSubject;
+  }, [isCustomSubjectMode, customSubject, selectedSubject]);
 
-    const gradedCount = sessionGradedStudents.length;
-    const ungradedCount = Math.max(0, totalRoster - gradedCount);
+  // Sesi-sesi yang cocok dengan mata pelajaran & tahun ajaran yang dipilih
+  const matchingSessions = useMemo(() => {
+    return availableSessions.filter((s) => {
+      const matchSub = isSameSubject(s.subject, effectiveSubjectName) || normalizeSubjectName(s.subject) === normalizeSubjectName(effectiveSubjectName);
+      const sessYear = resolveSessionAcademicYear(s.academic_year, s.session_name, s.created_at, defaultAcademicYear);
+      const matchYear = sessYear === selectedAcademicYear;
+      return matchSub && matchYear;
+    });
+  }, [availableSessions, effectiveSubjectName, selectedAcademicYear, defaultAcademicYear]);
 
-    const gradedNames = new Set(sessionGradedStudents.map((s) => s.name.trim().toUpperCase()));
-    const missingStudents = classRoster.filter((st) => !gradedNames.has(st.fullName.trim().toUpperCase()));
+  // Hitung jumlah rombel yang memiliki sesi ujian
+  const classesWithSessions = useMemo(() => {
+    const map = new Set<string>();
+    matchingSessions.forEach((s) => {
+      map.add(SemesterGradingExcelService.normalizeSheetClassName(s.class_name));
+    });
+    if (activeSession && isSameSubject(activeSession.subject, effectiveSubjectName)) {
+      map.add(SemesterGradingExcelService.normalizeSheetClassName(activeSession.class_name));
+    }
+    return map;
+  }, [matchingSessions, activeSession, effectiveSubjectName]);
 
-    const scores = sessionGradedStudents.map((s) => Number(s.final_score) || 0);
-    const avgScore = scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : 0;
-    const maxScore = scores.length > 0 ? Math.max(...scores) : 0;
-    const minScore = scores.length > 0 ? Math.min(...scores) : 0;
-    const passedCount = scores.filter((s) => s >= kkm).length;
-
-    return {
-      totalRoster,
-      gradedCount,
-      ungradedCount,
-      missingStudents,
-      avgScore,
-      maxScore,
-      minScore,
-      passedCount,
-    };
-  }, [classRoster, currentSession?.student_list, sessionGradedStudents, kkm]);
-
-  // Tangani unduh Excel
+  // Eksekusi Unduh Berkas Excel
   const handleDownload = useCallback(async () => {
     setIsDownloading(true);
     setErrorMessage(null);
 
     try {
-      if (mode === 'BLANK' || targetColumn === 'NONE') {
-        // Mode unduh template resmi blanko
-        await SemesterGradingExcelService.exportOfficialFormatExcel({
-          subject: currentSession?.subject || (currentUser?.full_name ? `${currentUser?.full_name} (Mapel)` : 'Mata Pelajaran'),
-          teacher: currentSession?.teacher || currentUser?.full_name || 'Guru Pengampu',
-          academicYear: currentSession ? resolveSessionAcademicYear(currentSession.academic_year, currentSession.session_name, currentSession.created_at, defaultAcademicYear) : defaultAcademicYear,
-          semester: currentSession?.semester || defaultSemester,
-          kkm,
-          className: currentSession?.class_name || '8A',
-          session: currentSession || undefined,
-          gradedStudents: [],
-          targetColumn: 'NONE',
-          includeRecapSheet: false,
-        });
+      const finalSubject = effectiveSubjectName.trim();
+      if (!finalSubject) {
+        throw new Error('Silakan pilih atau masukkan mata pelajaran.');
+      }
 
-        onSuccess?.('Format Penilaian blanko resmi (.xlsx) berhasil diunduh!');
-        onClose();
-      } else {
-        // Mode dengan nilai sesi
-        if (!currentSession) {
-          throw new Error('Pilih sesi ujian terlebih dahulu.');
+      // Kumpulkan data nilai per kelas jika guru memilih untuk mengisi nilai (targetColumn !== 'NONE')
+      const scoresByClass: Record<string, StudentScoreEntry[]> = {};
+
+      if (targetColumn !== 'NONE') {
+        // 1. Masukkan nilai dari activeSession jika cocok
+        if (
+          activeSession &&
+          (isSameSubject(activeSession.subject, finalSubject) || normalizeSubjectName(activeSession.subject) === normalizeSubjectName(finalSubject))
+        ) {
+          const normCls = SemesterGradingExcelService.normalizeSheetClassName(activeSession.class_name);
+          const studentList = gradedStudents.length > 0 ? gradedStudents : [];
+          if (studentList.length > 0) {
+            scoresByClass[normCls] = studentList.map((st) => {
+              const score = Number(st.final_score) || 0;
+              return {
+                name: st.name,
+                asts: targetColumn === 'ASTS' || targetColumn === 'BOTH' ? score : null,
+                asas: targetColumn === 'ASAS' || targetColumn === 'BOTH' ? score : null,
+              };
+            });
+          }
         }
 
-        const resolvedYear = resolveSessionAcademicYear(
-          currentSession.academic_year,
-          currentSession.session_name,
-          currentSession.created_at,
-          defaultAcademicYear
-        );
+        // 2. Cari dan kumpulkan nilai dari sesi-sesi lain yang cocok di availableSessions
+        for (const sess of matchingSessions) {
+          const normCls = SemesterGradingExcelService.normalizeSheetClassName(sess.class_name);
+          // Jika kelas ini belum terisi dari activeSession
+          if (!scoresByClass[normCls]) {
+            try {
+              const grades = await ExamCorrectionRepository.getGradedStudents(sess.id);
+              if (grades && grades.length > 0) {
+                scoresByClass[normCls] = grades.map((st) => {
+                  const score = Number(st.final_score) || 0;
+                  return {
+                    name: st.name,
+                    asts: targetColumn === 'ASTS' || targetColumn === 'BOTH' ? score : null,
+                    asas: targetColumn === 'ASAS' || targetColumn === 'BOTH' ? score : null,
+                  };
+                });
+              }
+            } catch (fetchErr) {
+              logger.warn('DownloadOfficialGradingModal', `Gagal memuat nilai sesi ${sess.id}:`, fetchErr);
+            }
+          }
+        }
+      }
 
-        await SemesterGradingExcelService.exportOfficialFormatExcel({
-          session: currentSession,
-          gradedStudents: sessionGradedStudents,
-          subject: currentSession.subject,
-          teacher: currentSession.teacher,
-          kkm,
-          academicYear: resolvedYear,
-          semester: currentSession.semester || defaultSemester,
-          className: currentSession.class_name,
-          targetColumn,
-          includeRecapSheet,
-        });
+      // Export template resmi multi-sheet mencakup seluruh kelas
+      // includeRecapSheet: false menjamin hasil 100% persis master template 8 sheet (tanpa sheet rekap tambahan di awal)
+      await SemesterGradingExcelService.exportOfficialFormatExcel({
+        subject: finalSubject,
+        teacher: teacherName.trim() || 'Guru Pengampu',
+        academicYear: selectedAcademicYear,
+        semester: selectedSemester,
+        kkm: kkm || 75,
+        className: 'SEMUA_KELAS',
+        scoresByClass: Object.keys(scoresByClass).length > 0 ? scoresByClass : undefined,
+        targetColumn,
+        includeRecapSheet: false,
+      });
 
-        const targetLabel = targetColumn === 'ASTS' 
-          ? 'Kolom ASTS (Tengah Semester)' 
+      const targetColText = targetColumn === 'NONE' 
+        ? 'Format Blanko Bersih' 
+        : targetColumn === 'ASTS' 
+          ? 'Kolom ASTS' 
           : targetColumn === 'ASAS' 
-            ? 'Kolom ASAS (Akhir Semester)' 
+            ? 'Kolom ASAS' 
             : 'Kedua Kolom (ASTS & ASAS)';
 
-        onSuccess?.(`Format Penilaian ASTS & ASAS berhasil diunduh dengan alokasi nilai ke ${targetLabel}!`);
-        onClose();
-      }
+      onSuccess?.(`Format Penilaian (${finalSubject}) berhasil diunduh untuk semua kelas dengan alokasi ${targetColText}!`);
+      onClose();
     } catch (err: any) {
       setErrorMessage(err?.message || 'Gagal memproses dan mengunduh berkas Format Penilaian.');
     } finally {
       setIsDownloading(false);
     }
-  }, [mode, targetColumn, currentSession, currentUser, defaultAcademicYear, defaultSemester, kkm, sessionGradedStudents, includeRecapSheet, onSuccess, onClose]);
+  }, [
+    effectiveSubjectName,
+    targetColumn,
+    activeSession,
+    gradedStudents,
+    matchingSessions,
+    teacherName,
+    selectedAcademicYear,
+    selectedSemester,
+    kkm,
+    onSuccess,
+    onClose,
+  ]);
 
   if (!isOpen) return null;
 
@@ -269,7 +290,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
       aria-labelledby="download-format-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto"
     >
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl my-auto overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl my-auto overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-3">
@@ -278,10 +299,10 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
             </div>
             <div>
               <h3 id="download-format-title" className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-                Unduh Format Penilaian
+                Unduh Format Penilaian Resmi
               </h3>
               <p className="text-xs text-slate-600 mt-0.5">
-                Pilih dan validasi alokasi nilai ke berkas resmi Excel ASTS & ASAS
+                Mencakup semua kelas (7, 8A, 8B, 9A, 9B, SMA) dengan tabel dan rumus lengkap
               </p>
             </div>
           </div>
@@ -306,353 +327,120 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
             </div>
           )}
 
-          {/* Mode Selector (Jika dibuka di luar sesi aktif dan ada sesi yang tersedia) */}
-          {!activeSession && availableSessions.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setMode('SESSION')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 min-h-11 cursor-pointer ${
-                  mode === 'SESSION'
-                    ? 'bg-white text-emerald-800 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                <span>Dari Sesi Ujian</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('BLANK');
-                  setTargetColumn('NONE');
-                }}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 min-h-11 cursor-pointer ${
-                  mode === 'BLANK'
-                    ? 'bg-white text-emerald-800 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Blanko Kosong Sekolah</span>
-              </button>
+          {/* Form Pertanyaan Utama: Mata Pelajaran, Tahun Ajaran, Semester */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800 border-b border-slate-200/80 pb-2">
+              <BookOpen className="w-4 h-4 text-teal-700" />
+              <span>Identitas Penilaian Sekolah (Ditulis ke Semua Sheet Kelas)</span>
             </div>
-          )}
 
-          {/* Section 1: Pemilihan Sesi Ujian */}
-          {mode === 'SESSION' && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">
-                Sesi Ujian Target
+            {/* 1. Mata Pelajaran (Ditanyakan) */}
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">
+                Mata Pelajaran <span className="text-rose-500">*</span>
               </label>
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+              >
+                {OFFICIAL_SCHOOL_SUBJECTS.map((subj) => (
+                  <option key={subj.code} value={subj.name}>
+                    {subj.name} ({subj.category})
+                  </option>
+                ))}
+                <option value="__CUSTOM__">[+] Mata Pelajaran Lainnya (Tulis Manual)</option>
+              </select>
 
-              {activeSession ? (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2 py-0.5 bg-teal-100 text-teal-800 font-bold text-[11px] rounded-md">
-                        Kelas {activeSession.class_name}
-                      </span>
-                      <span className="px-2 py-0.5 bg-slate-200 text-slate-700 font-medium text-[11px] rounded-md">
-                        {activeSession.subject}
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        TA {resolveSessionAcademicYear(activeSession.academic_year, activeSession.session_name, activeSession.created_at, defaultAcademicYear)}
-                      </span>
-                    </div>
-                    <p className="text-xs font-bold text-slate-800 mt-1.5">
-                      {activeSession.session_name}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Pengampu: {activeSession.teacher || 'Guru'} • KKM: {kkm}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="relative">
-                  <select
-                    value={selectedSessionId}
-                    onChange={(e) => setSelectedSessionId(e.target.value)}
-                    disabled={availableSessions.length === 0}
-                    className="w-full appearance-none bg-white border border-slate-300 rounded-xl px-3 py-2.5 pr-8 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
-                  >
-                    {availableSessions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        Kelas {s.class_name} — {s.session_name} ({s.subject})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
+              {isCustomSubjectMode && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    placeholder="Ketik nama mata pelajaran..."
+                    value={customSubject}
+                    onChange={(e) => setCustomSubject(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+                    autoFocus
+                  />
                 </div>
               )}
             </div>
-          )}
 
-          {/* Section 2: Pertanyaan Inti — Alokasi Kolom Nilai */}
-          {mode === 'SESSION' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-800 block">
-                  Nilai Mana yang Akan Dimasukkan ke Excel?
-                </label>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  Template Resmi ASTS & ASAS
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* Opsi 1: ASTS */}
-                <button
-                  type="button"
-                  onClick={() => setTargetColumn('ASTS')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-24 ${
-                    targetColumn === 'ASTS'
-                      ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        targetColumn === 'ASTS' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'
-                      }`}>
-                        {targetColumn === 'ASTS' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <span className="text-xs font-bold text-slate-900">Kolom ASTS</span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      Tengah Semester
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                    Nilai dialokasikan ke <strong>Kolom ASTS</strong> (UTS/PTS). Kolom ASAS dibiarkan kosong.
-                  </p>
-                </button>
-
-                {/* Opsi 2: ASAS */}
-                <button
-                  type="button"
-                  onClick={() => setTargetColumn('ASAS')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-24 ${
-                    targetColumn === 'ASAS'
-                      ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        targetColumn === 'ASAS' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'
-                      }`}>
-                        {targetColumn === 'ASAS' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <span className="text-xs font-bold text-slate-900">Kolom ASAS</span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800">
-                      Akhir Semester
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                    Nilai dialokasikan ke <strong>Kolom ASAS</strong> (UAS/PAS). Kolom ASTS dibiarkan kosong.
-                  </p>
-                </button>
-
-                {/* Opsi 3: Kedua Kolom (ASTS & ASAS) */}
-                <button
-                  type="button"
-                  onClick={() => setTargetColumn('BOTH')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-24 ${
-                    targetColumn === 'BOTH'
-                      ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        targetColumn === 'BOTH' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'
-                      }`}>
-                        {targetColumn === 'BOTH' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <span className="text-xs font-bold text-slate-900">Kedua Kolom</span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">
-                      ASTS & ASAS
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                    Salin nilai sesi ini ke <strong>ASTS & ASAS</strong> untuk kalkulasi nilai akhir penuh (100%).
-                  </p>
-                </button>
-
-                {/* Opsi 4: Blanko Kosong */}
-                <button
-                  type="button"
-                  onClick={() => setTargetColumn('NONE')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-24 ${
-                    targetColumn === 'NONE'
-                      ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20'
-                      : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        targetColumn === 'NONE' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'
-                      }`}>
-                        {targetColumn === 'NONE' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
-                      <span className="text-xs font-bold text-slate-900">Blanko Kosong</span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
-                      Tanpa Nilai
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
-                    Sertakan nama peserta didik resmi, namun <strong>kosongkan nilai</strong> untuk input manual.
-                  </p>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Section 3: Validasi Interaktif Nilai */}
-          {mode === 'SESSION' && targetColumn !== 'NONE' && (
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800">
-                  Validasi Data Nilai Peserta Didik
-                </span>
-                {isLoadingSessionData && (
-                  <span className="text-[11px] text-slate-500 animate-pulse">
-                    Memeriksa data...
-                  </span>
-                )}
-              </div>
-
-              {/* Stat Tiles */}
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold">Total Siswa</p>
-                  <p className="text-base font-extrabold text-slate-900 mt-0.5">
-                    {validationSummary.totalRoster}
-                  </p>
-                </div>
-                <div className="p-2.5 bg-emerald-50/60 border border-emerald-200 rounded-xl">
-                  <p className="text-[10px] text-emerald-700 uppercase font-semibold">Sudah Dinilai</p>
-                  <p className="text-base font-extrabold text-emerald-800 mt-0.5">
-                    {validationSummary.gradedCount}
-                  </p>
-                </div>
-                <div className={`p-2.5 rounded-xl border ${
-                  validationSummary.ungradedCount > 0
-                    ? 'bg-amber-50/70 border-amber-200 text-amber-900'
-                    : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}>
-                  <p className="text-[10px] uppercase font-semibold">Belum Dinilai</p>
-                  <p className={`text-base font-extrabold mt-0.5 ${
-                    validationSummary.ungradedCount > 0 ? 'text-amber-800' : 'text-slate-600'
-                  }`}>
-                    {validationSummary.ungradedCount}
-                  </p>
-                </div>
-              </div>
-
-              {/* Validation Status Box */}
-              {validationSummary.ungradedCount > 0 ? (
-                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-xs font-bold text-amber-900">
-                        Perhatian: {validationSummary.ungradedCount} peserta didik belum memiliki nilai
-                      </p>
-                      <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                        Siswa yang belum dinilai akan tercatat kosong pada kolom {targetColumn} di berkas Excel.
-                      </p>
-                    </div>
-                  </div>
-
-                  {validationSummary.missingStudents.length > 0 && (
-                    <div className="pt-1 border-t border-amber-200/60">
-                      <button
-                        type="button"
-                        onClick={() => setShowMissingStudents(!showMissingStudents)}
-                        className="text-[11px] font-bold text-amber-900 hover:text-amber-950 flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>{showMissingStudents ? 'Sembunyikan nama siswa' : `Lihat daftar ${validationSummary.missingStudents.length} siswa belum dinilai`}</span>
-                        {showMissingStudents ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                      </button>
-
-                      {showMissingStudents && (
-                        <div className="mt-2 max-h-28 overflow-y-auto bg-white/80 p-2 rounded-lg border border-amber-200 text-[11px] space-y-1">
-                          {validationSummary.missingStudents.map((st, i) => (
-                            <div key={st.id || i} className="flex justify-between items-center text-slate-700">
-                              <span>{i + 1}. {st.fullName}</span>
-                              <span className="text-[10px] text-amber-700 font-medium">Belum dinilai</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : validationSummary.gradedCount > 0 ? (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <p className="text-xs font-bold text-emerald-900">
-                    Validasi Sempurna: Seluruh {validationSummary.gradedCount} peserta didik telah memiliki nilai yang tervalidasi.
-                  </p>
-                </div>
-              ) : (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2">
-                  <Info className="w-4 h-4 text-slate-500 shrink-0" />
-                  <p className="text-xs text-slate-700">
-                    Belum ada nilai yang tersimpan pada sesi ini. Berkas akan diekspor sebagai blanko nama siswa.
-                  </p>
-                </div>
-              )}
-
-              {/* Sample Live Preview */}
-              {sessionGradedStudents.length > 0 && (
-                <div className="border border-slate-200 rounded-xl p-2.5 bg-slate-50/50 space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-700 block">
-                    Pratinjau Alokasi Nilai ke Excel (Contoh 3 Siswa Teratas)
-                  </span>
-                  <div className="space-y-1">
-                    {sessionGradedStudents.slice(0, 3).map((st, i) => {
-                      const score = Number(st.final_score) || 0;
-                      return (
-                        <div
-                          key={st.id || i}
-                          className="flex items-center justify-between text-xs bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/70"
-                        >
-                          <span className="font-medium text-slate-800 truncate max-w-50">
-                            {i + 1}. {st.name}
-                          </span>
-                          <div className="flex items-center gap-2 font-mono text-[11px]">
-                            <span className="text-slate-500">Nilai: <strong>{score}</strong></span>
-                            <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
-                              {targetColumn === 'ASTS' && `ASTS: ${score} | ASAS: —`}
-                              {targetColumn === 'ASAS' && `ASTS: — | ASAS: ${score}`}
-                              {targetColumn === 'BOTH' && `ASTS: ${score} | ASAS: ${score}`}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Section 4: Konfigurasi Tambahan */}
-          <div className="pt-2 border-t border-slate-200 space-y-3">
+            {/* 2 & 3. Tahun Ajaran & Semester (Ditanyakan) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Kriteria Ketuntasan Minimal (KKM)
+                <label className="text-xs font-bold text-slate-700 block mb-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Tahun Ajaran</span>
+                  <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedAcademicYear}
+                  onChange={(e) => setSelectedAcademicYear(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+                >
+                  {AVAILABLE_ACADEMIC_YEARS.map((ay) => (
+                    <option key={ay.year} value={ay.year}>
+                      {ay.year} {ay.year === '2026/2027' ? '(Aktif)' : ''}
+                    </option>
+                  ))}
+                  {!AVAILABLE_ACADEMIC_YEARS.some((ay) => ay.year === selectedAcademicYear) && (
+                    <option value={selectedAcademicYear}>{selectedAcademicYear}</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Semester <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-white border border-slate-300 rounded-xl min-h-11">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSemester('Ganjil')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      selectedSemester === 'Ganjil'
+                        ? 'bg-teal-700 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Ganjil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSemester('Genap')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      selectedSemester === 'Genap'
+                        ? 'bg-teal-700 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Genap
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Guru Pengampu & KKM */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Guru Pengampu</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Nama Guru Pengampu..."
+                  value={teacherName}
+                  onChange={(e) => setTeacherName(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1 flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
+                  <span>KKM / KKTP</span>
                 </label>
                 <input
                   type="number"
@@ -663,20 +451,176 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
                   className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all min-h-11"
                 />
               </div>
+            </div>
+          </div>
 
-              {mode === 'SESSION' && (
-                <div className="flex items-center sm:items-end pb-1">
-                  <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer min-h-11 select-none">
-                    <input
-                      type="checkbox"
-                      checked={includeRecapSheet}
-                      onChange={(e) => setIncludeRecapSheet(e.target.checked)}
-                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                    />
-                    <span>Sertakan Lembar REKAP NILAI (Sheet 1)</span>
-                  </label>
+          {/* Cakupan Semua Kelas (Include Semua Kelas 7, 8A, 8B, 9A, 9B, SMA) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-emerald-700" />
+                <span>Cakupan Sheet Excel (Semua 6 Kelas Disertakan)</span>
+              </label>
+              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                {totalRegisteredStudents} Siswa • 6 Kelas Lengkap
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {canonicalClassesInfo.map((cls) => {
+                const hasSession = classesWithSessions.has(cls.name);
+                return (
+                  <div
+                    key={cls.name}
+                    className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-center flex flex-col justify-between"
+                  >
+                    <span className="text-xs font-extrabold text-slate-900">Kelas {cls.name}</span>
+                    <span className="text-[10px] text-slate-500 mt-0.5">{cls.count} Siswa</span>
+                    {hasSession && (
+                      <span className="text-[9px] font-bold text-teal-700 bg-teal-50 rounded px-1 mt-1">
+                        Ada Sesi
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Pertanyaan Alokasi Nilai: Blanko Kosong vs Kolom ASTS/ASAS */}
+          <div className="space-y-2.5 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 block">
+                Validasi Pengisian Nilai ke Tabel Excel
+              </label>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Sama Persis Format Blanko Resmi
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Opsi 1: Format Blanko Kosong Resmi */}
+              <button
+                type="button"
+                onClick={() => setTargetColumn('NONE')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-24 ${
+                  targetColumn === 'NONE'
+                    ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      targetColumn === 'NONE' ? 'border-emerald-700 bg-emerald-700' : 'border-slate-300'
+                    }`}>
+                      {targetColumn === 'NONE' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">Blanko Kosong (Semua Kelas)</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
+                    Tanpa Nilai
+                  </span>
                 </div>
-              )}
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                  Tabel 144 siswa di semua 6 kelas disertakan lengkap dengan rumus, namun <strong>kolom nilai dikosongkan</strong>.
+                </p>
+              </button>
+
+              {/* Opsi 2: Kolom ASTS */}
+              <button
+                type="button"
+                onClick={() => setTargetColumn('ASTS')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-24 ${
+                  targetColumn === 'ASTS'
+                    ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      targetColumn === 'ASTS' ? 'border-emerald-700 bg-emerald-700' : 'border-slate-300'
+                    }`}>
+                      {targetColumn === 'ASTS' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">Isi Kolom ASTS</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    Tengah Semester
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                  Nilai dari sesi ujian mapel ini dialokasikan ke <strong>Kolom ASTS</strong> (UTS/PTS). Kolom ASAS kosong.
+                </p>
+              </button>
+
+              {/* Opsi 3: Kolom ASAS */}
+              <button
+                type="button"
+                onClick={() => setTargetColumn('ASAS')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-24 ${
+                  targetColumn === 'ASAS'
+                    ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      targetColumn === 'ASAS' ? 'border-emerald-700 bg-emerald-700' : 'border-slate-300'
+                    }`}>
+                      {targetColumn === 'ASAS' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">Isi Kolom ASAS</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800">
+                    Akhir Semester
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                  Nilai dari sesi ujian mapel ini dialokasikan ke <strong>Kolom ASAS</strong> (UAS/PAS). Kolom ASTS kosong.
+                </p>
+              </button>
+
+              {/* Opsi 4: Kedua Kolom (ASTS & ASAS) */}
+              <button
+                type="button"
+                onClick={() => setTargetColumn('BOTH')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-24 ${
+                  targetColumn === 'BOTH'
+                    ? 'border-emerald-600 bg-emerald-50/80 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      targetColumn === 'BOTH' ? 'border-emerald-700 bg-emerald-700' : 'border-slate-300'
+                    }`}>
+                      {targetColumn === 'BOTH' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">Kedua Kolom</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">
+                    ASTS & ASAS
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+                  Salin nilai sesi ke <strong>ASTS & ASAS</strong> untuk menguji kalkulasi nilai akhir semester 100%.
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Konfirmasi Kesesuaian Template */}
+          <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-950">
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Format Berkas 100% Persis Template Master Blanko Sekolah</p>
+              <p className="text-[11px] text-emerald-900 mt-0.5 leading-relaxed">
+                Tersusun atas 8 sheet resmi: <code>IDENTITAS SEKOLAH</code>, <code>FORMAT PENILAIAN</code>, serta 6 sheet kelas (<code>7</code>, <code>8A</code>, <code>8B</code>, <code>9A</code>, <code>9B</code>, <code>SMA</code>) dengan tabel siswa, rumus nilai akhir <code>ROUND((ASTS*50%)+(ASAS*50%), 0)</code>, predikat, dan status ketuntasan.
+              </p>
             </div>
           </div>
         </div>
@@ -699,7 +643,7 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
             className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all min-h-11 cursor-pointer"
           >
             <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
-            <span>{isDownloading ? 'Memproses Berkas...' : 'Unduh Format Penilaian (.xlsx)'}</span>
+            <span>{isDownloading ? 'Menyiapkan Berkas...' : 'Unduh Format Penilaian (.xlsx)'}</span>
           </button>
         </div>
       </div>

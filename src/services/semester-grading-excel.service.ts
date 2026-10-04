@@ -260,6 +260,12 @@ export class SemesterGradingExcelService {
       const ws = wb.Sheets[clsSheetName];
       if (!ws) return;
 
+      // Update header metadata in all class sheets to reflect user's chosen subject, academic year, semester, and KKM
+      ws['B5'] = { t: 's', v: subject || session?.subject || '', f: "'IDENTITAS SEKOLAH'!B11" };
+      ws['E4'] = { t: 's', v: academicYear, f: "'IDENTITAS SEKOLAH'!B8" };
+      ws['H4'] = { t: 's', v: semester, f: "'IDENTITAS SEKOLAH'!B9" };
+      ws['E5'] = { t: 'n', v: kkm || Number(session?.kkm) || 75, f: "'FORMAT PENILAIAN'!B5" };
+
       const studentGrades = classScoreMap[clsSheetName];
       if (!studentGrades) return;
 
