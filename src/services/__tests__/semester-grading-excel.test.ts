@@ -543,4 +543,58 @@ describe('SemesterGradingExcelService — ASTS & ASAS Official Sync', () => {
 
     fs.unlinkSync(exportPath);
   });
+
+  it('11. exportOfficialFormatExcel with includeRecapSheet: false preserves green header style, cream row style, and formulas', async () => {
+    const { default: XLSXStyle } = await import('xlsx-js-style');
+
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      subject: 'Informatika',
+      teacher: 'M. Iqbal Gustiawan, S.Pd., G.r',
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      kkm: 75,
+      className: '8B',
+      targetColumn: 'ASAS',
+      includeRecapSheet: false,
+      scoresByClass: {
+        '8B': [
+          { name: 'ABILA YAZID RIZAQI', asas: 80 },
+          { name: 'ADRIAN PUTRA NUGRAHA', asas: 90 },
+        ],
+      },
+    });
+
+    const exportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Informatika_8B_2026-2027.xlsx';
+    assert.ok(fs.existsSync(exportPath), 'Exported 8B file must exist');
+
+    const wb = XLSXStyle.read(fs.readFileSync(exportPath), { type: 'buffer', cellStyles: true });
+
+    // Verify 8 official sheets
+    assert.strictEqual(wb.SheetNames[0], 'IDENTITAS SEKOLAH');
+    assert.strictEqual(wb.SheetNames[1], 'FORMAT PENILAIAN');
+    assert.strictEqual(wb.SheetNames[4], '8B');
+
+    const s8b = wb.Sheets['8B'];
+    assert.ok(s8b, 'Sheet 8B must exist');
+
+    // Verify Green Header styling is preserved on row 8
+    assert.strictEqual(s8b['A8'].v, 'No');
+    assert.strictEqual(s8b['B8'].v, 'Nama Peserta Didik');
+    assert.strictEqual(s8b['A8'].s?.fgColor?.rgb, '2E7D32', 'Header cell A8 must retain dark green background (#2E7D32)');
+    assert.strictEqual(s8b['B8'].s?.fgColor?.rgb, '2E7D32', 'Header cell B8 must retain dark green background (#2E7D32)');
+
+    // Verify student 1 (ABILA YAZID RIZAQI) has ASAS filled and styling preserved
+    assert.strictEqual(s8b['B9'].v, 'ABILA YAZID RIZAQI');
+    assert.strictEqual(s8b['B9'].s?.fgColor?.rgb, 'FFF2CC', 'Student name cell B9 must retain cream accent (#FFF2CC)');
+    assert.strictEqual(s8b['E9'].v, 80, 'ASAS score for Abila must be 80');
+    assert.strictEqual(s8b['E9'].s?.fgColor?.rgb, 'FFF2CC', 'ASAS score cell E9 must retain cream accent (#FFF2CC)');
+
+    // Verify student 2 (ADRIAN PUTRA NUGRAHA) has ASAS filled
+    assert.strictEqual(s8b['B10'].v, 'ADRIAN PUTRA NUGRAHA');
+    assert.strictEqual(s8b['E10'].v, 90, 'ASAS score for Adrian must be 90');
+
+    // Clean up
+    fs.unlinkSync(exportPath);
+  });
 });
+

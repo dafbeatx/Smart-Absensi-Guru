@@ -9,6 +9,7 @@
  */
 
 import * as XLSX from 'xlsx';
+import * as fflate from 'fflate';
 import { logger } from '../utils/logger.utils';
 import type { ExamSessionRecord, GradedStudentScoreRecord } from '../types/database.types';
 import { ExamCorrectionRepository } from '../repositories/ExamCorrectionRepository';
@@ -121,6 +122,288 @@ export class SemesterGradingExcelService {
   }
 
   /**
+   * Mengambil master binary buffer template dari path publik.
+   */
+  private static async loadTemplateBuffer(): Promise<Uint8Array> {
+    try {
+      const resp = await fetch(this.TEMPLATE_PATH);
+      if (!resp.ok) {
+        throw new Error(`Status ${resp.status} saat fetch ${this.TEMPLATE_PATH}`);
+      }
+      const arrayBuffer = await resp.arrayBuffer();
+      return new Uint8Array(arrayBuffer);
+    } catch (fetchErr) {
+      logger.warn('SemesterGradingExcelService', 'Browser fetch failed, trying local node buffer if available', fetchErr);
+      if (typeof window === 'undefined') {
+        try {
+          const dynamicImport = new Function('m', 'return import(m)');
+          const fs = await dynamicImport('fs');
+          const buf = fs.readFileSync('public/templates/FORMAT_PENILAIAN_ASTS_ASAS.xlsx');
+          return new Uint8Array(buf);
+        } catch (nodeErr) {
+          logger.error('SemesterGradingExcelService', 'Node fallback buffer failed:', nodeErr);
+        }
+      }
+      throw fetchErr;
+    }
+  }
+
+  /**
+   * Helper sanitasi string XML untuk keamanan injeksi tag OpenXML.
+   */
+  private static escapeXml(str: any): string {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  /**
+   * Ekspor berkas Excel format resmi sekolah yang 100% mempertahankan seluruh border,
+   * warna header tabel, formula native Excel, grafik/chart, dan formatting sel dari template master.
+   */
+  public static async exportStyledOfficialFormatExcel(options: ExportOfficialAssessmentOptions): Promise<void> {
+    const {
+      subject,
+      teacher,
+      academicYear = '2026/2027',
+      semester = 'Ganjil',
+      kkm = 75,
+      className,
+      scoresByClass,
+      session,
+      gradedStudents,
+      targetColumn = 'NONE',
+    } = options;
+
+    const templateBytes = await this.loadTemplateBuffer();
+    const files = fflate.unzipSync(templateBytes);
+
+    const effectiveSubject = subject || session?.subject || 'Mata Pelajaran';
+    const effectiveTeacher = teacher || session?.teacher || 'Guru Pengampu';
+    const effectiveKkm = Number(kkm) || Number(session?.kkm) || 75;
+
+    // 1. Update sheet1.xml (IDENTITAS SEKOLAH)
+    if (files['xl/worksheets/sheet1.xml']) {
+      let s1 = new TextDecoder().decode(files['xl/worksheets/sheet1.xml']);
+      s1 = s1.replace(
+        /(<c\s+[^>]*r="B8"[^>]*>).*?(<\/c>)|(<c\s+[^>]*r="B8"[^>]*\/>)/,
+        `<c r="B8" s="50" t="inlineStr"><is><t>${this.escapeXml(academicYear)}</t></is></c>`
+      );
+      s1 = s1.replace(
+        /(<c\s+[^>]*r="B9"[^>]*>).*?(<\/c>)|(<c\s+[^>]*r="B9"[^>]*\/>)/,
+        `<c r="B9" s="50" t="inlineStr"><is><t>${this.escapeXml(semester)}</t></is></c>`
+      );
+      s1 = s1.replace(
+        /(<c\s+[^>]*r="B10"[^>]*>).*?(<\/c>)|(<c\s+[^>]*r="B10"[^>]*\/>)/,
+        `<c r="B10" s="50" t="inlineStr"><is><t>${this.escapeXml(effectiveTeacher)}</t></is></c>`
+      );
+      s1 = s1.replace(
+        /(<c\s+[^>]*r="B11"[^>]*>).*?(<\/c>)|(<c\s+[^>]*r="B11"[^>]*\/>)/,
+        `<c r="B11" s="50" t="inlineStr"><is><t>${this.escapeXml(effectiveSubject)}</t></is></c>`
+      );
+      files['xl/worksheets/sheet1.xml'] = new TextEncoder().encode(s1);
+    }
+
+    // 2. Update sheet2.xml (FORMAT PENILAIAN)
+    if (files['xl/worksheets/sheet2.xml']) {
+      let s2 = new TextDecoder().decode(files['xl/worksheets/sheet2.xml']);
+      s2 = s2.replace(
+        /(<c\s+[^>]*r="B5"[^>]*>).*?(<\/c>)|(<c\s+[^>]*r="B5"[^>]*\/>)/,
+        `<c r="B5" s="53"><v>${effectiveKkm}</v></c>`
+      );
+      files['xl/worksheets/sheet2.xml'] = new TextEncoder().encode(s2);
+    }
+
+    // 3. Kumpulkan data nilai siswa per kelas
+    const classScoreMap: Record<string, Record<string, { asts?: number | null; asas?: number | null }>> = {};
+
+    if (scoresByClass) {
+      Object.entries(scoresByClass).forEach(([cls, list]) => {
+        const normCls = this.normalizeSheetClassName(cls);
+        if (!classScoreMap[normCls]) classScoreMap[normCls] = {};
+        if (targetColumn === 'NONE') return;
+        list.forEach((st) => {
+          const normName = st.name.trim().toUpperCase();
+          if (targetColumn === 'ASTS') {
+            classScoreMap[normCls][normName] = { asts: st.asts ?? st.asas, asas: null };
+          } else if (targetColumn === 'ASAS') {
+            classScoreMap[normCls][normName] = { asts: null, asas: st.asas ?? st.asts };
+          } else if (targetColumn === 'BOTH') {
+            const sc = st.asts ?? st.asas;
+            classScoreMap[normCls][normName] = { asts: sc, asas: sc };
+          } else {
+            classScoreMap[normCls][normName] = {
+              asts: st.asts,
+              asas: st.asas,
+            };
+          }
+        });
+      });
+    }
+
+    if (session && Array.isArray(gradedStudents) && gradedStudents.length > 0) {
+      const normCls = this.normalizeSheetClassName(session.class_name);
+      if (!classScoreMap[normCls]) classScoreMap[normCls] = {};
+
+      const isNone = targetColumn === 'NONE';
+      const isBoth = targetColumn === 'BOTH';
+      const isAsas = targetColumn === 'ASAS'
+        ? true
+        : (targetColumn === 'ASTS' ? false : /ASAS|PAS|UAS|AKHIR/i.test(session.exam_type || ''));
+
+      if (!isNone) {
+        gradedStudents.forEach((st) => {
+          const normName = st.name.trim().toUpperCase();
+          const score = Number(st.final_score) || 0;
+          if (!classScoreMap[normCls][normName]) {
+            classScoreMap[normCls][normName] = {};
+          }
+          if (isBoth) {
+            classScoreMap[normCls][normName].asts = score;
+            classScoreMap[normCls][normName].asas = score;
+          } else if (isAsas) {
+            classScoreMap[normCls][normName].asas = score;
+          } else {
+            classScoreMap[normCls][normName].asts = score;
+          }
+        });
+      }
+    }
+
+    // Extract shared strings untuk membaca nama siswa di tabel tiap kelas
+    const ssXml = new TextDecoder().decode(files['xl/sharedStrings.xml'] || new Uint8Array());
+    const sharedStrings = [...ssXml.matchAll(/<si>(.*?)<\/si>/gs)].map((si) => {
+      const tMatches = [...si[1].matchAll(/<t[^>]*>(.*?)<\/t>/gs)].map((m) => m[1]);
+      return tMatches.join('');
+    });
+
+    const classSheets = [
+      { name: '7', path: 'xl/worksheets/sheet3.xml', tabIndex: 2 },
+      { name: '8A', path: 'xl/worksheets/sheet4.xml', tabIndex: 3 },
+      { name: '8B', path: 'xl/worksheets/sheet5.xml', tabIndex: 4 },
+      { name: '9A', path: 'xl/worksheets/sheet6.xml', tabIndex: 5 },
+      { name: '9B', path: 'xl/worksheets/sheet7.xml', tabIndex: 6 },
+      { name: 'SMA', path: 'xl/worksheets/sheet8.xml', tabIndex: 7 },
+    ];
+
+    classSheets.forEach(({ name: clsName, path: sheetPath }) => {
+      if (!files[sheetPath]) return;
+      let xml = new TextDecoder().decode(files[sheetPath]);
+
+      // Update header info di kelas
+      xml = xml.replace(/(<c\s+[^>]*r="B5"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${this.escapeXml(effectiveSubject)}</v>$3`);
+      xml = xml.replace(/(<c\s+[^>]*r="E4"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${this.escapeXml(academicYear)}</v>$3`);
+      xml = xml.replace(/(<c\s+[^>]*r="H4"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${this.escapeXml(semester)}</v>$3`);
+      xml = xml.replace(/(<c\s+[^>]*r="E5"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${effectiveKkm}</v>$3`);
+
+      const studentGrades = classScoreMap[clsName];
+
+      if (studentGrades && Object.keys(studentGrades).length > 0) {
+        xml = xml.replace(/<row\s+[^>]*r="(\d+)"[^>]*>(.*?)<\/row>/gs, (rowMatch, rowStr, rowContent) => {
+          const r = parseInt(rowStr, 10);
+          if (r < 9) return rowMatch;
+
+          const bMatch = rowContent.match(/<c\s+[^>]*r="B\d+"[^>]*t="s"[^>]*><v>(\d+)<\/v><\/c>/);
+          if (!bMatch) return rowMatch;
+          const strIdx = parseInt(bMatch[1], 10);
+          const studentName = (sharedStrings[strIdx] || '').trim().toUpperCase();
+          if (!studentName || studentName.includes('REKAP')) return rowMatch;
+
+          const grade = studentGrades[studentName] || this.fuzzyFindStudentScore(studentName, studentGrades);
+          if (!grade) return rowMatch;
+
+          let updatedRow = rowMatch;
+
+          if (grade.asts !== null && grade.asts !== undefined && !isNaN(grade.asts)) {
+            const astsVal = Number(grade.asts);
+            updatedRow = updatedRow.replace(
+              new RegExp(`(<c\\s+[^>]*r="D${r}"[^>]*>).*?(<\\/c>)|(<c\\s+[^>]*r="D${r}"[^>]*\\/>)`),
+              `<c r="D${r}" s="17"><v>${astsVal}</v></c>`
+            );
+          }
+          if (grade.asas !== null && grade.asas !== undefined && !isNaN(grade.asas)) {
+            const asasVal = Number(grade.asas);
+            updatedRow = updatedRow.replace(
+              new RegExp(`(<c\\s+[^>]*r="E${r}"[^>]*>).*?(<\\/c>)|(<c\\s+[^>]*r="E${r}"[^>]*\\/>)`),
+              `<c r="E${r}" s="17"><v>${asasVal}</v></c>`
+            );
+          }
+
+          // Perbarui cached values pada F, G, H, I dengan formula tetap utuh
+          const aVal = grade.asts ?? 0;
+          const sVal = grade.asas ?? 0;
+          const finalScore = Math.round((aVal * 0.5 + sVal * 0.5) * 10) / 10;
+          const pred = finalScore >= 90 ? 'A' : (finalScore >= 80 ? 'B' : (finalScore >= effectiveKkm ? 'C' : 'D'));
+          const status = finalScore >= effectiveKkm ? 'Tuntas' : 'Belum Tuntas';
+          const desc = pred === 'A'
+            ? 'Penguasaan kompetensi sangat baik.'
+            : (pred === 'B'
+              ? 'Penguasaan kompetensi baik.'
+              : (pred === 'C'
+                ? 'Penguasaan kompetensi cukup dan masih perlu penguatan.'
+                : 'Belum mencapai KKM.'));
+
+          updatedRow = updatedRow.replace(new RegExp(`(<c\\s+[^>]*r="F${r}"[^>]*><f>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`), `$1<v>${finalScore}</v>$3`);
+          updatedRow = updatedRow.replace(new RegExp(`(<c\\s+[^>]*r="G${r}"[^>]*><f>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`), `$1<v>${pred}</v>$3`);
+          updatedRow = updatedRow.replace(new RegExp(`(<c\\s+[^>]*r="H${r}"[^>]*><f>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`), `$1<v>${status}</v>$3`);
+          updatedRow = updatedRow.replace(new RegExp(`(<c\\s+[^>]*r="I${r}"[^>]*><f[^>]*>.*?<\\/f>)(<v>[^<]*<\\/v>)?(<\\/c>)`), `$1<v>${this.escapeXml(desc)}</v>$3`);
+
+          return updatedRow;
+        });
+      }
+
+      files[sheetPath] = new TextEncoder().encode(xml);
+    });
+
+    // 4. Update activeTab di xl/workbook.xml
+    if (files['xl/workbook.xml']) {
+      let wbXml = new TextDecoder().decode(files['xl/workbook.xml']);
+      const normClass = className ? this.normalizeSheetClassName(className) : '';
+      const matchedSheet = classSheets.find((cs) => cs.name === normClass);
+      // Default ke sheet '7' (tabIndex 2) jika semua kelas, atau spesifik tabIndex kelas terkait
+      const targetTabIndex = matchedSheet ? matchedSheet.tabIndex : 2;
+
+      wbXml = wbXml.replace(
+        /<workbookView\s+([^>]*?)activeTab="\d+"([^>]*?)\/>/,
+        `<workbookView $1activeTab="${targetTabIndex}"$2/>`
+      );
+      files['xl/workbook.xml'] = new TextEncoder().encode(wbXml);
+    }
+
+    // 5. Pack dan simpan / download
+    const zipped = fflate.zipSync(files);
+
+    const cleanSubject = effectiveSubject.replace(/[\\/:*?"<>|]/g, '_');
+    const cleanClass = className ? this.normalizeSheetClassName(className) : (session?.class_name ? this.normalizeSheetClassName(session.class_name) : 'SEMUA_KELAS');
+    const cleanAcademicYear = (academicYear || '2026-2027').replace('/', '-');
+    const filename = `FORMAT_PENILAIAN_ASTS_ASAS_${cleanSubject}_${cleanClass}_${cleanAcademicYear}.xlsx`;
+
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const blob = new Blob([zipped as any], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } else {
+      // Lingkungan Node (test runner)
+      const dynamicImport = new Function('m', 'return import(m)');
+      const fs = await dynamicImport('fs');
+      fs.writeFileSync(filename, Buffer.from(zipped));
+    }
+
+    logger.info('SemesterGradingExcelService', `Exported 100% styled official template Excel: ${filename}`);
+  }
+
+  /**
    * Mengambil master workbook dari path template publik.
    */
   private static async loadTemplateWorkbook(): Promise<XLSX.WorkBook> {
@@ -179,6 +462,13 @@ export class SemesterGradingExcelService {
       includeRecapSheet = true,
     } = options;
 
+    // Jika includeRecapSheet === false atau targetColumn === 'NONE',
+    // WAJIB gunakan exportStyledOfficialFormatExcel agar 100% mempertahankan tabel, border,
+    // warna header, grafik/chart, dan formula native dari master template tanpa kehilangan styling.
+    if (includeRecapSheet === false || targetColumn === 'NONE') {
+      return this.exportStyledOfficialFormatExcel(options);
+    }
+
     const wb = await this.loadTemplateWorkbook();
 
     // 1. Perbarui Metadata di Sheet "IDENTITAS SEKOLAH"
@@ -205,7 +495,7 @@ export class SemesterGradingExcelService {
       Object.entries(scoresByClass).forEach(([cls, list]) => {
         const normCls = this.normalizeSheetClassName(cls);
         if (!classScoreMap[normCls]) classScoreMap[normCls] = {};
-        if (targetColumn === 'NONE') return;
+        if ((targetColumn as any) === 'NONE') return;
         list.forEach((st) => {
           const normName = st.name.trim().toUpperCase();
           if (targetColumn === 'ASTS') {
@@ -230,7 +520,7 @@ export class SemesterGradingExcelService {
       const normCls = this.normalizeSheetClassName(session.class_name);
       if (!classScoreMap[normCls]) classScoreMap[normCls] = {};
 
-      const isNone = targetColumn === 'NONE';
+      const isNone = (targetColumn as any) === 'NONE';
       const isBoth = targetColumn === 'BOTH';
       const isAsas = targetColumn === 'ASAS'
         ? true
@@ -292,10 +582,10 @@ export class SemesterGradingExcelService {
 
     // 4. Prepend dedicated "REKAP NILAI" worksheet as Sheet 1 so teachers immediately see the student table
     let recapWs: XLSX.WorkSheet | null = null;
-    const shouldIncludeRecap = includeRecapSheet !== false && targetColumn !== 'NONE';
+    const shouldIncludeRecap = Boolean(includeRecapSheet);
     if (shouldIncludeRecap && session && Array.isArray(gradedStudents) && gradedStudents.length > 0) {
       recapWs = ExamCorrectionRepository.buildRecapWorksheet(session, gradedStudents);
-    } else if (scoresByClass) {
+    } else if (shouldIncludeRecap && scoresByClass) {
       const targetClass = className ? this.normalizeSheetClassName(className) : '8A';
       const studentEntries = scoresByClass[targetClass] || Object.values(scoresByClass)[0] || [];
       if (studentEntries.length > 0) {
