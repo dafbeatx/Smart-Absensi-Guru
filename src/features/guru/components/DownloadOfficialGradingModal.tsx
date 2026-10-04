@@ -195,6 +195,50 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
       const scoresByClass: Record<string, StudentScoreEntry[]> = {};
 
       if (targetColumn !== 'NONE') {
+        // Gunakan Map per kelas agar nilai siswa digabungkan (merged) dari activeSession dan seluruh sesi yang cocok
+        const classStudentMaps: Record<string, Map<string, StudentScoreEntry>> = {};
+
+        const addStudentGrade = (normCls: string, stName: string, rawScore: number, examType?: string) => {
+          if (!stName || !stName.trim()) return;
+          const cleanName = stName.trim();
+          const canonKey = SemesterGradingExcelService.canonicalizeStudentName(cleanName);
+          if (!canonKey) return;
+
+          if (!classStudentMaps[normCls]) {
+            classStudentMaps[normCls] = new Map();
+          }
+          const m = classStudentMaps[normCls];
+
+          const isAsas = targetColumn === 'ASAS'
+            ? true
+            : (targetColumn === 'ASTS' ? false : /ASAS|PAS|UAS|AKHIR/i.test(examType || ''));
+
+          let entry = m.get(canonKey);
+          if (!entry) {
+            entry = {
+              name: cleanName,
+              asts: null,
+              asas: null,
+            };
+            m.set(canonKey, entry);
+          }
+
+          if (targetColumn === 'ASTS') {
+            entry.asts = rawScore;
+          } else if (targetColumn === 'ASAS') {
+            entry.asas = rawScore;
+          } else if (targetColumn === 'BOTH') {
+            entry.asts = rawScore;
+            entry.asas = rawScore;
+          } else {
+            if (isAsas) {
+              if (entry.asas === null || entry.asas === 0 || rawScore > 0) entry.asas = rawScore;
+            } else {
+              if (entry.asts === null || entry.asts === 0 || rawScore > 0) entry.asts = rawScore;
+            }
+          }
+        };
+
         // 1. Masukkan nilai dari activeSession jika cocok
         if (
           activeSession &&
@@ -202,40 +246,36 @@ export const DownloadOfficialGradingModal: React.FC<DownloadOfficialGradingModal
         ) {
           const normCls = SemesterGradingExcelService.normalizeSheetClassName(activeSession.class_name);
           const studentList = gradedStudents.length > 0 ? gradedStudents : [];
-          if (studentList.length > 0) {
-            scoresByClass[normCls] = studentList.map((st) => {
-              const score = Number(st.final_score) || 0;
-              return {
-                name: st.name,
-                asts: targetColumn === 'ASTS' || targetColumn === 'BOTH' ? score : null,
-                asas: targetColumn === 'ASAS' || targetColumn === 'BOTH' ? score : null,
-              };
-            });
+          studentList.forEach((st) => {
+            const score = (st.final_score !== null && st.final_score !== undefined && !isNaN(Number(st.final_score)) && Number(st.final_score) > 0)
+              ? Number(st.final_score)
+              : (Number(st.mcq_score) || Number(st.essay_score) || (st.final_score !== null && st.final_score !== undefined ? Number(st.final_score) : 0));
+            addStudentGrade(normCls, st.name, score, activeSession.exam_type);
+          });
+        }
+
+        // 2. Cari dan gabungkan nilai dari seluruh sesi yang cocok di availableSessions
+        for (const sess of matchingSessions) {
+          const normCls = SemesterGradingExcelService.normalizeSheetClassName(sess.class_name);
+          try {
+            const grades = await ExamCorrectionRepository.getGradedStudents(sess.id);
+            if (grades && grades.length > 0) {
+              grades.forEach((st) => {
+                const score = (st.final_score !== null && st.final_score !== undefined && !isNaN(Number(st.final_score)) && Number(st.final_score) > 0)
+                  ? Number(st.final_score)
+                  : (Number(st.mcq_score) || Number(st.essay_score) || (st.final_score !== null && st.final_score !== undefined ? Number(st.final_score) : 0));
+                addStudentGrade(normCls, st.name, score, sess.exam_type);
+              });
+            }
+          } catch (fetchErr) {
+            logger.warn('DownloadOfficialGradingModal', `Gagal memuat nilai sesi ${sess.id}:`, fetchErr);
           }
         }
 
-        // 2. Cari dan kumpulkan nilai dari sesi-sesi lain yang cocok di availableSessions
-        for (const sess of matchingSessions) {
-          const normCls = SemesterGradingExcelService.normalizeSheetClassName(sess.class_name);
-          // Jika kelas ini belum terisi dari activeSession
-          if (!scoresByClass[normCls]) {
-            try {
-              const grades = await ExamCorrectionRepository.getGradedStudents(sess.id);
-              if (grades && grades.length > 0) {
-                scoresByClass[normCls] = grades.map((st) => {
-                  const score = Number(st.final_score) || 0;
-                  return {
-                    name: st.name,
-                    asts: targetColumn === 'ASTS' || targetColumn === 'BOTH' ? score : null,
-                    asas: targetColumn === 'ASAS' || targetColumn === 'BOTH' ? score : null,
-                  };
-                });
-              }
-            } catch (fetchErr) {
-              logger.warn('DownloadOfficialGradingModal', `Gagal memuat nilai sesi ${sess.id}:`, fetchErr);
-            }
-          }
-        }
+        // Susun scoresByClass dari classStudentMaps
+        Object.entries(classStudentMaps).forEach(([cls, map]) => {
+          scoresByClass[cls] = Array.from(map.values());
+        });
       }
 
       // Export template resmi multi-sheet mencakup seluruh kelas

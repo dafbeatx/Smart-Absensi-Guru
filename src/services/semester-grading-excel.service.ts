@@ -293,10 +293,28 @@ export class SemesterGradingExcelService {
       if (!files[sheetPath]) return;
       let xml = new TextDecoder().decode(files[sheetPath]);
 
-      // Update header info di kelas
-      xml = xml.replace(/(<c\s+[^>]*r="B5"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${this.escapeXml(effectiveSubject)}</v>$3`);
-      xml = xml.replace(/(<c\s+[^>]*r="E4"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${this.escapeXml(academicYear)}</v>$3`);
-      xml = xml.replace(/(<c\s+[^>]*r="H4"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${this.escapeXml(semester)}</v>$3`);
+      // Update header info di kelas dengan tipe string eksplisit (t="str") untuk formula berbasis teks
+      xml = xml.replace(
+        /(<c\s+[^>]*r="B5"[^>]*)(><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g,
+        (_m, cOpen, fTag, _v, cClose) => {
+          const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
+          return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(effectiveSubject)}</v>${cClose}`;
+        }
+      );
+      xml = xml.replace(
+        /(<c\s+[^>]*r="E4"[^>]*)(><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g,
+        (_m, cOpen, fTag, _v, cClose) => {
+          const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
+          return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(academicYear)}</v>${cClose}`;
+        }
+      );
+      xml = xml.replace(
+        /(<c\s+[^>]*r="H4"[^>]*)(><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g,
+        (_m, cOpen, fTag, _v, cClose) => {
+          const cleanOpen = cOpen.replace(/\s*t="[^"]*"/g, '');
+          return `${cleanOpen} t="str"${fTag}<v>${this.escapeXml(semester)}</v>${cClose}`;
+        }
+      );
       xml = xml.replace(/(<c\s+[^>]*r="E5"[^>]*><f>[^<]*<\/f>)(<v>[^<]*<\/v>)?(<\/c>)/g, `$1<v>${effectiveKkm}</v>$3`);
 
       const studentGrades = classScoreMap[clsName];
@@ -306,10 +324,17 @@ export class SemesterGradingExcelService {
           const r = parseInt(rowStr, 10);
           if (r < 9) return rowMatch;
 
+          let studentName = '';
           const bMatch = rowContent.match(/<c\s+[^>]*r="B\d+"[^>]*t="s"[^>]*><v>(\d+)<\/v><\/c>/);
-          if (!bMatch) return rowMatch;
-          const strIdx = parseInt(bMatch[1], 10);
-          const studentName = (sharedStrings[strIdx] || '').trim().toUpperCase();
+          if (bMatch) {
+            const strIdx = parseInt(bMatch[1], 10);
+            studentName = (sharedStrings[strIdx] || '').trim().toUpperCase();
+          } else {
+            const inlineMatch = rowContent.match(/<c\s+[^>]*r="B\d+"[^>]*t="inlineStr"[^>]*><is><t>([^<]+)<\/t><\/is><\/c>/);
+            if (inlineMatch) {
+              studentName = inlineMatch[1].trim().toUpperCase();
+            }
+          }
           if (!studentName || studentName.includes('REKAP')) return rowMatch;
 
           const grade = studentGrades[studentName] || this.fuzzyFindStudentScore(studentName, studentGrades);
@@ -358,7 +383,7 @@ export class SemesterGradingExcelService {
       files[sheetPath] = new TextEncoder().encode(xml);
     });
 
-    // 4. Update activeTab di xl/workbook.xml
+    // 4. Update activeTab & kalkulasi di xl/workbook.xml
     if (files['xl/workbook.xml']) {
       let wbXml = new TextDecoder().decode(files['xl/workbook.xml']);
       const normClass = className ? this.normalizeSheetClassName(className) : '';
@@ -370,7 +395,36 @@ export class SemesterGradingExcelService {
         /<workbookView\s+([^>]*?)activeTab="\d+"([^>]*?)\/>/,
         `<workbookView $1activeTab="${targetTabIndex}"$2/>`
       );
+
+      // Force full calculation on load across all versions of Excel (MS Excel, WPS, LibreOffice, Google Sheets)
+      if (wbXml.includes('<calcPr')) {
+        wbXml = wbXml.replace(/<calcPr([^>]*?)\/>/g, (_m, attrs) => {
+          const cleanAttrs = attrs
+            .replace(/\s*forceFullCalc="[^"]*"/g, '')
+            .replace(/\s*fullCalcOnLoad="[^"]*"/g, '');
+          return `<calcPr${cleanAttrs} forceFullCalc="1" fullCalcOnLoad="1"/>`;
+        });
+      } else {
+        wbXml = wbXml.replace('</workbook>', '<calcPr forceFullCalc="1" fullCalcOnLoad="1"/></workbook>');
+      }
+
       files['xl/workbook.xml'] = new TextEncoder().encode(wbXml);
+    }
+
+    // 5. Universal Excel Compatibility (Hilangkan calcChain.xml agar bebas dari pesan repair/corrupt di seluruh versi Excel)
+    // Excel akan secara otomatis dan bersih meregenerasi calculation chain baru saat dibuka tanpa dialog error.
+    delete files['xl/calcChain.xml'];
+
+    if (files['[Content_Types].xml']) {
+      let ctXml = new TextDecoder().decode(files['[Content_Types].xml']);
+      ctXml = ctXml.replace(/<Override[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/g, '');
+      files['[Content_Types].xml'] = new TextEncoder().encode(ctXml);
+    }
+
+    if (files['xl/_rels/workbook.xml.rels']) {
+      let relsXml = new TextDecoder().decode(files['xl/_rels/workbook.xml.rels']);
+      relsXml = relsXml.replace(/<Relationship[^>]*Target="calcChain\.xml"[^>]*\/>/g, '');
+      files['xl/_rels/workbook.xml.rels'] = new TextEncoder().encode(relsXml);
     }
 
     // 5. Pack dan simpan / download
@@ -655,19 +709,102 @@ export class SemesterGradingExcelService {
   }
 
   /**
-   * Helper pencarian nama siswa fleksibel (mengabaikan titik, spasi ganda, gelar singkat).
+   * Menormalkan nama siswa Indonesia untuk pencocokan toleran (fuzzy).
+   * Menghilangkan tanda baca, merapikan spasi ganda, dan menstandarisasi variasi ejaan umum
+   * seperti Muhammad/Muhamad/M./MHD, Achmad/Akhmad/Ahmad.
    */
-  private static fuzzyFindStudentScore(
+  public static canonicalizeStudentName(name: string): string {
+    if (!name) return '';
+    return name
+      .toUpperCase()
+      .trim()
+      .replace(/[^A-Z0-9\s]/g, ' ')
+      .replace(/\b(MUHAMMAD|MUHAMAD|MUCHAMMAD|MOCHAMMAD|MOCHAMAD|MHD|MUH|M)\b/g, 'MUH')
+      .replace(/\b(ACHMAD|AKHMAD|AHMAD)\b/g, 'AHMAD')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Mengompresi huruf berulang berturutan (misal: TT -> T, RR -> R, SS -> S, II -> I)
+   * sehingga nama dengan perbedaan huruf rangkap (FATTURAHMAN vs FATURRAHMAN) menjadi identik.
+   */
+  public static compressRepeatedChars(str: string): string {
+    if (!str) return '';
+    let res = '';
+    for (let i = 0; i < str.length; i++) {
+      if (i === 0 || str[i] !== str[i - 1]) {
+        res += str[i];
+      }
+    }
+    return res;
+  }
+
+  /**
+   * Helper pencarian nama siswa fleksibel cerdas yang menangani seluruh variasi penamaan siswa Indonesia:
+   * 1. Exact match (case insensitive, trimmed).
+   * 2. Canonical ejaan umum (Muhammad vs Muhamad vs M., Ahmad vs Achmad).
+   * 3. Toleransi typo huruf rangkap (Faturrahman vs Fatturahman, Zakii vs Zaki, Bilqis Nissa vs Nisa).
+   * 4. Substring inclusion antar-nama bersih (misal gelar/nama tengah hilang).
+   * 5. Token overlap matching: jika minimal 2 kata utama cocok, atau 1 kata unik pada nama tunggal (misal FERDIANSYAH).
+   */
+  public static fuzzyFindStudentScore(
     excelName: string,
     gradesMap: Record<string, { asts?: number | null; asas?: number | null }>
   ): { asts?: number | null; asas?: number | null } | null {
-    const cleanExcel = excelName.replace(/[^A-Z0-9]/g, '');
+    if (!excelName || !gradesMap) return null;
+
+    // 1. Exact match
+    const normExcel = excelName.trim().toUpperCase();
+    if (gradesMap[normExcel]) return gradesMap[normExcel];
+
+    // 2. Canonical & stemmed comparison
+    const ce = this.canonicalizeStudentName(normExcel);
+    const se = this.compressRepeatedChars(ce);
+    const cle = se.replace(/\s+/g, '');
+    const tokensE = se.split(' ').filter(Boolean);
+    const sigE = tokensE.filter((t) => t !== 'MUH');
+
     for (const [key, val] of Object.entries(gradesMap)) {
-      const cleanKey = key.replace(/[^A-Z0-9]/g, '');
+      const normKey = key.trim().toUpperCase();
+      if (normKey === normExcel) return val;
+
+      const ci = this.canonicalizeStudentName(normKey);
+      if (ci === ce) return val;
+
+      const si = this.compressRepeatedChars(ci);
+      if (si === se) return val;
+
+      const cli = si.replace(/\s+/g, '');
+      if (cli === cle) return val;
+      if (cle.length >= 6 && cli.length >= 6 && (cle.includes(cli) || cli.includes(cle))) {
+        return val;
+      }
+
+      // Token overlap matching
+      const tokensI = si.split(' ').filter(Boolean);
+      const sigI = tokensI.filter((t) => t !== 'MUH');
+      const overlap = sigE.filter((t) => sigI.includes(t));
+
+      // Jika 2 atau lebih kata utama cocok
+      if (overlap.length >= 2) {
+        return val;
+      }
+      // Jika salah satu nama hanya terdiri dari 1 kata utama (misal 'FERDIANSYAH') dan kata itu cocok
+      if ((sigE.length === 1 || sigI.length === 1) && overlap.length >= 1) {
+        return val;
+      }
+    }
+
+    // 3. Fallback alphanumeric basic inclusion
+    const cleanExcel = normExcel.replace(/[^A-Z0-9]/g, '');
+    for (const [key, val] of Object.entries(gradesMap)) {
+      const cleanKey = key.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (cleanKey === cleanExcel || cleanKey.includes(cleanExcel) || cleanExcel.includes(cleanKey)) {
         return val;
       }
     }
+
     return null;
   }
 

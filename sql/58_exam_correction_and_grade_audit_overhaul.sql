@@ -280,7 +280,8 @@ CREATE OR REPLACE FUNCTION public.save_exam_grade_v2(
   p_actor_role TEXT,
   p_expected_revision INTEGER DEFAULT NULL,
   p_change_reason TEXT DEFAULT NULL,
-  p_source TEXT DEFAULT 'MANUAL_ENTRY'
+  p_source TEXT DEFAULT 'MANUAL_ENTRY',
+  p_final_score NUMERIC DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -381,7 +382,14 @@ BEGIN
   IF v_essay_score < 0 THEN v_essay_score := 0; END IF;
 
   -- 5. Hitung Skor Akhir, CSI, dan LPS
-  v_final_score := ROUND((v_mcq_score * v_pg_weight) + (v_essay_score * v_essay_weight));
+  IF p_final_score IS NOT NULL AND p_final_score >= 0 THEN
+    v_final_score := LEAST(100, GREATEST(0, ROUND(p_final_score)));
+    IF v_total_questions = 0 AND v_mcq_score = 0 THEN
+      v_mcq_score := v_final_score;
+    END IF;
+  ELSE
+    v_final_score := ROUND((v_mcq_score * v_pg_weight) + (v_essay_score * v_essay_weight));
+  END IF;
   IF v_final_score > 100 THEN v_final_score := 100; END IF;
   IF v_final_score < 0 THEN v_final_score := 0; END IF;
 

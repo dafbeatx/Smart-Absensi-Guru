@@ -820,7 +820,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         student_user_id: studentUserId,
         mcq_answers: userAnswers,
         essay_scores: essayScores,
-        mcq_score: hasEssay ? Math.round(calculation.score) : effectiveFinalScore,
+        mcq_score: (hasEssay && calculation.score > 0) ? Math.round(calculation.score) : effectiveFinalScore,
         essay_score: Math.round(calculation.essayScore),
         final_score: effectiveFinalScore,
         csi: calculation.csi,
@@ -838,7 +838,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       // Update local state list
       setGradedStudents((prev) => {
         const index = prev.findIndex(
-          (s) => (saved.student_user_id && s.student_user_id === saved.student_user_id) || s.id === saved.id
+          (s) => (saved.student_user_id && s.student_user_id === saved.student_user_id) || s.id === saved.id || s.name.toLowerCase().trim() === saved.name.toLowerCase().trim()
         );
         if (index >= 0) {
           const clone = [...prev];

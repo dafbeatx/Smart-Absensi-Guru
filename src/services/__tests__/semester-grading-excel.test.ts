@@ -596,5 +596,158 @@ describe('SemesterGradingExcelService — ASTS & ASAS Official Sync', () => {
     // Clean up
     fs.unlinkSync(exportPath);
   });
+
+  it('12. Universal Excel Compatibility — purges stale calcChain.xml and enforces fullCalcOnLoad', async () => {
+    const fflate = await import('fflate');
+
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      subject: 'Informatika',
+      teacher: 'M. Iqbal Gustiawan, S.Pd., G.r',
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      kkm: 75,
+      className: '8B',
+      targetColumn: 'ASTS',
+      includeRecapSheet: false,
+      scoresByClass: {
+        '8B': [
+          { name: 'MUHAMAD AL FAZRI', asts: 88 },
+        ],
+      },
+    });
+
+    const exportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Informatika_8B_2026-2027.xlsx';
+    assert.ok(fs.existsSync(exportPath), 'Exported file must exist');
+
+    const fileBuf = fs.readFileSync(exportPath);
+    const files = fflate.unzipSync(new Uint8Array(fileBuf));
+
+    // 1. Verify xl/calcChain.xml is completely removed to prevent Excel repair warning
+    assert.strictEqual(files['xl/calcChain.xml'], undefined, 'xl/calcChain.xml must NOT exist in universal Excel export');
+
+    // 2. Verify [Content_Types].xml does NOT reference calcChain.xml
+    const ctXml = new TextDecoder().decode(files['[Content_Types].xml']);
+    assert.ok(!ctXml.includes('calcChain.xml'), '[Content_Types].xml must not contain calcChain.xml');
+
+    // 3. Verify xl/_rels/workbook.xml.rels does NOT reference calcChain.xml
+    const relsXml = new TextDecoder().decode(files['xl/_rels/workbook.xml.rels']);
+    assert.ok(!relsXml.includes('calcChain.xml'), 'workbook.xml.rels must not contain calcChain.xml');
+
+    // 4. Verify xl/workbook.xml contains forceFullCalc="1" and fullCalcOnLoad="1"
+    const wbXml = new TextDecoder().decode(files['xl/workbook.xml']);
+    assert.ok(wbXml.includes('forceFullCalc="1"'), 'workbook.xml must contain forceFullCalc="1"');
+    assert.ok(wbXml.includes('fullCalcOnLoad="1"'), 'workbook.xml must contain fullCalcOnLoad="1"');
+
+    // Clean up
+    fs.unlinkSync(exportPath);
+  });
+
+  it('13. Indonesian Student Name Normalization & Fuzzy Matching handles spelling variations without false positives', () => {
+    const gradesMap: Record<string, { asts?: number | null; asas?: number | null }> = {
+      'MUHAMMAD AL FAZRI': { asts: 85 },
+      'MUHAMMAD FAZRIL FATURRAHMAN': { asts: 90 },
+      'FATURRAHMAN RANGGA': { asts: 78 },
+      'FERDIANSYAH': { asts: 92 },
+      'ZAKI AHMAD AL FARIDZI': { asts: 88 },
+      'BILQIS AINUN NISA': { asts: 95 },
+      'SAYYID AGIL': { asts: 82 },
+      'AL DAFI PUTRA ASYABANI': { asts: 87 },
+      'AFNAN SYAKIR AZZAKWAN': { asts: 91 },
+      'MUHAMMAD HAFIDZ TRI HENDRIAWAN': { asts: 89 },
+    };
+
+    // 1. Muhamad (single M) in Excel vs Muhammad (double M) in database/manual input
+    const match1 = SemesterGradingExcelService.fuzzyFindStudentScore('MUHAMAD AL FAZRI', gradesMap);
+    assert.ok(match1, 'MUHAMAD AL FAZRI must match MUHAMMAD AL FAZRI');
+    assert.strictEqual(match1?.asts, 85);
+
+    // 2. M. Fazril in Excel vs Muhammad Fazril in database/manual input
+    const match2 = SemesterGradingExcelService.fuzzyFindStudentScore('M. FAZRIL FATURRAHMAN', gradesMap);
+    assert.ok(match2, 'M. FAZRIL FATURRAHMAN must match MUHAMMAD FAZRIL FATURRAHMAN');
+    assert.strictEqual(match2?.asts, 90);
+
+    // 3. Faturrahman (double R) vs Fatturahman (double T) typo compression
+    const match3 = SemesterGradingExcelService.fuzzyFindStudentScore('FATTURAHMAN RANGGA', gradesMap);
+    assert.ok(match3, 'FATTURAHMAN RANGGA must match FATURRAHMAN RANGGA');
+    assert.strictEqual(match3?.asts, 78);
+
+    // 4. Single-name Ferdiansyah
+    const match4 = SemesterGradingExcelService.fuzzyFindStudentScore('FERDIANSYAH', gradesMap);
+    assert.ok(match4, 'FERDIANSYAH must match FERDIANSYAH');
+    assert.strictEqual(match4?.asts, 92);
+
+    // 5. Zakii (double I) vs Zaki (single I) & Alfaridzi vs Al Faridzi
+    const match5 = SemesterGradingExcelService.fuzzyFindStudentScore('ZAKII AHMAD ALFARIDZI', gradesMap);
+    assert.ok(match5, 'ZAKII AHMAD ALFARIDZI must match ZAKI AHMAD AL FARIDZI');
+    assert.strictEqual(match5?.asts, 88);
+
+    // 6. Nissa (double S) vs Nisa (single S)
+    const match6 = SemesterGradingExcelService.fuzzyFindStudentScore('BILQIS AINUN NISSA', gradesMap);
+    assert.ok(match6, 'BILQIS AINUN NISSA must match BILQIS AINUN NISA');
+    assert.strictEqual(match6?.asts, 95);
+
+    // 7. Middle name / token overlap
+    const match7 = SemesterGradingExcelService.fuzzyFindStudentScore('M. SAYYID AGIL M', gradesMap);
+    assert.ok(match7, 'M. SAYYID AGIL M must match SAYYID AGIL');
+    assert.strictEqual(match7?.asts, 82);
+
+    // 8. Negative tests: ensure different students are NOT cross-matched (Zero False Positives)
+    const neg1 = SemesterGradingExcelService.fuzzyFindStudentScore('AMANDA HASNA MIRZA', gradesMap);
+    assert.strictEqual(neg1, null, 'AMANDA HASNA MIRZA must not match unrelated students');
+
+    const neg2 = SemesterGradingExcelService.fuzzyFindStudentScore('MUHAMAD ILHAM AZZIKRA', gradesMap);
+    assert.strictEqual(neg2, null, 'MUHAMAD ILHAM AZZIKRA must not match MUHAMMAD AL FAZRI');
+  });
+
+  it('14. Manual Score from "Koreksi Nilai Manual (Opsional)" with Indonesian names is written to Excel table', async () => {
+    const { default: XLSXStyle } = await import('xlsx-js-style');
+
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      subject: 'Informatika',
+      teacher: 'Guru Pengampu',
+      academicYear: '2026/2027',
+      semester: 'Ganjil',
+      kkm: 75,
+      className: '8B',
+      targetColumn: 'ASTS',
+      includeRecapSheet: false,
+      scoresByClass: {
+        '8B': [
+          // Input names as entered by teacher in manual correction (with Muhammad double M)
+          { name: 'Muhammad Al Fazri', asts: 94 },
+          { name: 'Muhammad Hafidz Tri Hendriawan', asts: 86 },
+        ],
+      },
+    });
+
+    const exportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Informatika_8B_2026-2027.xlsx';
+    assert.ok(fs.existsSync(exportPath), 'Exported file must exist');
+
+    const wb = XLSXStyle.read(fs.readFileSync(exportPath), { type: 'buffer' });
+    const s8b = wb.Sheets['8B'];
+
+    // In 8B sheet:
+    // Row 20 in Excel template is "MUHAMAD AL FAZRI"
+    // Row 21 in Excel template is "MUHAMAD HAFIDZ TRI HENDRIAWAN"
+    let foundAlFazri = false;
+    let foundHafidz = false;
+
+    for (let r = 9; r <= 45; r++) {
+      const name = s8b['B' + r]?.v;
+      if (name === 'MUHAMAD AL FAZRI') {
+        assert.strictEqual(s8b['D' + r]?.v, 94, 'ASTS score for MUHAMAD AL FAZRI must be 94');
+        foundAlFazri = true;
+      }
+      if (name === 'MUHAMAD HAFIDZ TRI HENDRIAWAN') {
+        assert.strictEqual(s8b['D' + r]?.v, 86, 'ASTS score for MUHAMAD HAFIDZ TRI HENDRIAWAN must be 86');
+        foundHafidz = true;
+      }
+    }
+
+    assert.ok(foundAlFazri, 'MUHAMAD AL FAZRI must be matched and graded in Excel');
+    assert.ok(foundHafidz, 'MUHAMAD HAFIDZ TRI HENDRIAWAN must be matched and graded in Excel');
+
+    fs.unlinkSync(exportPath);
+  });
 });
 

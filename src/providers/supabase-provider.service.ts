@@ -6325,6 +6325,27 @@ export class SupabaseProvider implements IDataProvider {
 
       if (!error && data) {
         const record = data as GradedStudentScoreRecord;
+        // Jika teacher menginput nilai manual dan nilai akhir di RPC berbeda dari dto.final_score
+        // (misal karena sesi tanpa kunci jawaban atau manual score override),
+        // lakukan update eksplisit ke gm_students & student_scores agar nilai manual tersimpan 100% akurat.
+        if (dto.final_score !== undefined && dto.final_score !== null && Number(record.final_score) !== Number(dto.final_score)) {
+          const finalVal = Math.max(0, Math.min(100, Number(dto.final_score)));
+          try {
+            await this.client.from('gm_students').update({
+              final_score: finalVal,
+              mcq_score: dto.mcq_score ?? finalVal,
+              essay_score: dto.essay_score ?? 0,
+            }).eq('id', record.id);
+            await this.client.from('student_scores').update({
+              score: finalVal,
+            }).eq('student_id', studentUserId).eq('session_id', dto.session_id);
+            record.final_score = finalVal;
+            record.mcq_score = dto.mcq_score ?? finalVal;
+            record.essay_score = dto.essay_score ?? 0;
+          } catch (patchErr) {
+            logger.warn('SupabaseProvider', 'Failed to patch manual final_score:', patchErr);
+          }
+        }
         this.updateGradedStudentCache(dto.session_id, record);
         return record;
       }
