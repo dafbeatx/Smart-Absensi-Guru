@@ -20,6 +20,8 @@ export interface StudentScoreEntry {
   gender?: 'L' | 'P';
 }
 
+export type GradingTargetColumn = 'ASTS' | 'ASAS' | 'BOTH' | 'NONE';
+
 export interface ExportOfficialAssessmentOptions {
   subject: string;
   teacher: string;
@@ -30,6 +32,8 @@ export interface ExportOfficialAssessmentOptions {
   scoresByClass?: Record<string, StudentScoreEntry[]>;
   session?: ExamSessionRecord;
   gradedStudents?: GradedStudentScoreRecord[];
+  targetColumn?: GradingTargetColumn;
+  includeRecapSheet?: boolean;
 }
 
 export interface ParsedStudentRow {
@@ -171,6 +175,8 @@ export class SemesterGradingExcelService {
       scoresByClass,
       session,
       gradedStudents,
+      targetColumn,
+      includeRecapSheet = true,
     } = options;
 
     const wb = await this.loadTemplateWorkbook();
@@ -199,12 +205,22 @@ export class SemesterGradingExcelService {
       Object.entries(scoresByClass).forEach(([cls, list]) => {
         const normCls = this.normalizeSheetClassName(cls);
         if (!classScoreMap[normCls]) classScoreMap[normCls] = {};
+        if (targetColumn === 'NONE') return;
         list.forEach((st) => {
           const normName = st.name.trim().toUpperCase();
-          classScoreMap[normCls][normName] = {
-            asts: st.asts,
-            asas: st.asas,
-          };
+          if (targetColumn === 'ASTS') {
+            classScoreMap[normCls][normName] = { asts: st.asts ?? st.asas, asas: null };
+          } else if (targetColumn === 'ASAS') {
+            classScoreMap[normCls][normName] = { asts: null, asas: st.asas ?? st.asts };
+          } else if (targetColumn === 'BOTH') {
+            const sc = st.asts ?? st.asas;
+            classScoreMap[normCls][normName] = { asts: sc, asas: sc };
+          } else {
+            classScoreMap[normCls][normName] = {
+              asts: st.asts,
+              asas: st.asas,
+            };
+          }
         });
       });
     }
@@ -214,21 +230,29 @@ export class SemesterGradingExcelService {
       const normCls = this.normalizeSheetClassName(session.class_name);
       if (!classScoreMap[normCls]) classScoreMap[normCls] = {};
 
-      const isAsas = /ASAS|PAS|UAS|AKHIR/i.test(session.exam_type || '');
-      // Jika bukan ASAS, maka dialokasikan ke ASTS (Asesmen Tengah Semester)
+      const isNone = targetColumn === 'NONE';
+      const isBoth = targetColumn === 'BOTH';
+      const isAsas = targetColumn === 'ASAS'
+        ? true
+        : (targetColumn === 'ASTS' ? false : /ASAS|PAS|UAS|AKHIR/i.test(session.exam_type || ''));
 
-      gradedStudents.forEach((st) => {
-        const normName = st.name.trim().toUpperCase();
-        const score = Number(st.final_score) || 0;
-        if (!classScoreMap[normCls][normName]) {
-          classScoreMap[normCls][normName] = {};
-        }
-        if (isAsas) {
-          classScoreMap[normCls][normName].asas = score;
-        } else {
-          classScoreMap[normCls][normName].asts = score;
-        }
-      });
+      if (!isNone) {
+        gradedStudents.forEach((st) => {
+          const normName = st.name.trim().toUpperCase();
+          const score = Number(st.final_score) || 0;
+          if (!classScoreMap[normCls][normName]) {
+            classScoreMap[normCls][normName] = {};
+          }
+          if (isBoth) {
+            classScoreMap[normCls][normName].asts = score;
+            classScoreMap[normCls][normName].asas = score;
+          } else if (isAsas) {
+            classScoreMap[normCls][normName].asas = score;
+          } else {
+            classScoreMap[normCls][normName].asts = score;
+          }
+        });
+      }
     }
 
     // Tulis nilai ke dalam tiap sheet kelas yang ada pada template
@@ -262,7 +286,8 @@ export class SemesterGradingExcelService {
 
     // 4. Prepend dedicated "REKAP NILAI" worksheet as Sheet 1 so teachers immediately see the student table
     let recapWs: XLSX.WorkSheet | null = null;
-    if (session && Array.isArray(gradedStudents) && gradedStudents.length > 0) {
+    const shouldIncludeRecap = includeRecapSheet !== false && targetColumn !== 'NONE';
+    if (shouldIncludeRecap && session && Array.isArray(gradedStudents) && gradedStudents.length > 0) {
       recapWs = ExamCorrectionRepository.buildRecapWorksheet(session, gradedStudents);
     } else if (scoresByClass) {
       const targetClass = className ? this.normalizeSheetClassName(className) : '8A';

@@ -58,6 +58,7 @@ import {
   isSessionSearchMatch,
 } from '../../../utils/academic-year.utils';
 import { SemesterGradingExcelService } from '../../../services/semester-grading-excel.service';
+import { DownloadOfficialGradingModal } from './DownloadOfficialGradingModal';
 
 export type ModalLoadState =
   | 'IDLE'
@@ -1249,7 +1250,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     }
   };
 
-  const [isExportingOfficial, setIsExportingOfficial] = useState(false);
+    const [isDownloadFormatModalOpen, setIsDownloadFormatModalOpen] = useState(false);
   const [isImportingExcel, setIsImportingExcel] = useState(false);
 
   const handleImportExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1557,7 +1558,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => SemesterGradingExcelService.downloadCleanTemplate()}
+              onClick={() => setIsDownloadFormatModalOpen(true)}
               className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all border border-slate-200 shadow-2xs shrink-0 min-h-9"
               title="Unduh Berkas Blanko Format Penilaian ASTS & ASAS Resmi (.xlsx)"
             >
@@ -2847,39 +2848,18 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 {/* 2. Secondary Button: Official ASTS & ASAS Multi-Sheet Excel */}
                 <button
                   type="button"
-                  disabled={isExportingOfficial}
-                  onClick={async () => {
-                    if (!activeSession) return;
-                    setIsExportingOfficial(true);
-                    try {
-                      await SemesterGradingExcelService.exportOfficialFormatExcel({
-                        session: activeSession,
-                        gradedStudents,
-                        subject: activeSession.subject,
-                        teacher: activeSession.teacher,
-                        kkm: Number(activeSession.kkm) || 75,
-                        academicYear: resolveSessionAcademicYear(activeSession.academic_year, activeSession.session_name, activeSession.created_at, academicYear),
-                        semester: activeSession.semester || semester,
-                        className: activeSession.class_name,
-                      });
-                      setToastMessage({ text: 'Format resmi multi-sheet ASTS & ASAS (.xlsx) berhasil diunduh!', type: 'success' });
-                    } catch (err: any) {
-                      setToastMessage({ text: 'Gagal mengunduh format resmi: ' + (err?.message || 'Error'), type: 'error' });
-                    } finally {
-                      setIsExportingOfficial(false);
-                    }
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-800 text-xs font-bold flex items-center gap-1.5 border border-slate-300 shadow-2xs transition-all min-h-10 cursor-pointer"
-                  title="Unduh file Excel multi-sheet resmi dengan lembar Rekap Nilai di halaman pertama serta rumus nilai akhir ASTS & ASAS"
+                  onClick={() => setIsDownloadFormatModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold flex items-center gap-1.5 transition-all min-h-10 shadow-2xs cursor-pointer"
+                  title="Unduh berkas Excel multi-sheet resmi ASTS & ASAS dengan validasi dan alokasi nilai"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-teal-700" />
-                  <span>{isExportingOfficial ? 'Memproses...' : 'Format Multi-Sheet Resmi'}</span>
+                  <span>Format Penilaian Resmi (.xlsx)</span>
                 </button>
 
                 {/* 3. Download Blank Template */}
                 <button
                   type="button"
-                  onClick={() => SemesterGradingExcelService.downloadCleanTemplate()}
+                  onClick={() => setIsDownloadFormatModalOpen(true)}
                   className="px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all min-h-10 border border-slate-200 shadow-2xs cursor-pointer"
                   title="Unduh blanko format penilaian sekolah"
                 >
@@ -3300,6 +3280,19 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           </div>
         </div>
       )}
+
+      {/* Modal Unduh & Validasi Format Penilaian Resmi */}
+      <DownloadOfficialGradingModal
+        isOpen={isDownloadFormatModalOpen}
+        onClose={() => setIsDownloadFormatModalOpen(false)}
+        activeSession={activeSession}
+        gradedStudents={gradedStudents}
+        availableSessions={sessions}
+        currentUser={currentUser}
+        defaultAcademicYear={academicYear}
+        defaultSemester={semester}
+        onSuccess={(msg) => setToastMessage({ text: msg, type: 'success' })}
+      />
     </div>,
     document.body
   );

@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import fs from 'fs';
 import * as XLSX from 'xlsx';
 import { SemesterGradingExcelService } from '../semester-grading-excel.service';
+import { ExamCorrectionRepository } from '../../repositories/ExamCorrectionRepository';
 
 describe('SemesterGradingExcelService — ASTS & ASAS Official Sync', () => {
   it('1. Normalizes class names correctly for sheet matching', () => {
@@ -87,7 +88,6 @@ describe('SemesterGradingExcelService — ASTS & ASAS Official Sync', () => {
   });
 
   it('4. ExamCorrectionRepository.buildRecapWorksheet builds rich table with gridlines, autofilter, and predikat', () => {
-    const { ExamCorrectionRepository } = require('../../repositories/ExamCorrectionRepository');
     const mockSession = {
       id: 'sess_test_1',
       session_name: 'PTS Informatika 8A Ganjil 2026/2027',
@@ -156,7 +156,7 @@ describe('SemesterGradingExcelService — ASTS & ASAS Official Sync', () => {
     assert.strictEqual(ws['!views'][0].showGridLines, true, 'Gridlines must be explicitly enabled');
     assert.ok(ws['!autofilter'], 'Worksheet must contain !autofilter');
     assert.strictEqual(ws['!autofilter'].ref, 'A13:M16', 'AutoFilter range must cover headers and all 3 student rows');
-    assert.strictEqual(ws['!cols'].length, 13, 'Must have 13 column widths defined');
+    assert.strictEqual(ws['!cols']?.length, 13, 'Must have 13 column widths defined');
 
     // Verify header columns (Row 13)
     assert.strictEqual(ws['A13'].v, 'No');
@@ -249,5 +249,216 @@ describe('SemesterGradingExcelService — ASTS & ASAS Official Sync', () => {
 
     // Clean up exported test file
     fs.unlinkSync(expectedExportPath);
+  });
+  it('6. exportOfficialFormatExcel with targetColumn: ASTS populates column D and leaves column E blank', async () => {
+    const mockSession = {
+      id: 'sess_test_asts',
+      session_name: 'Ujian Harian Matematika 8A',
+      teacher: 'Ahmad Guru',
+      subject: 'Matematika',
+      class_name: '8A',
+      school_level: 'SMP' as const,
+      kkm: 75,
+      academic_year: '2026/2027',
+      semester: 'Ganjil',
+      answer_key: ['A'],
+      student_list: ['AMANDA HASNA MIRZA'],
+      created_at: new Date().toISOString(),
+    };
+
+    const mockStudents = [
+      {
+        id: 'st_asts_1',
+        session_id: 'sess_test_asts',
+        name: 'AMANDA HASNA MIRZA',
+        mcq_answers: { 1: 'A' },
+        essay_scores: [],
+        mcq_score: 88,
+        essay_score: 0,
+        final_score: 88,
+        csi: 90,
+        lps: 85,
+        correct: 1,
+        wrong: 0,
+      },
+    ];
+
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      session: mockSession,
+      gradedStudents: mockStudents,
+      subject: 'Matematika',
+      teacher: 'Ahmad Guru',
+      className: '8A',
+      targetColumn: 'ASTS',
+    });
+
+    const exportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Matematika_8A_2026-2027.xlsx';
+    assert.ok(fs.existsSync(exportPath), 'Exported file must exist');
+
+    const wb = XLSX.read(fs.readFileSync(exportPath), { type: 'buffer' });
+    const sheet8A = wb.Sheets['8A'];
+    assert.ok(sheet8A, 'Sheet 8A must exist');
+
+    // Amanda Hasna Mirza is row 9
+    assert.strictEqual(sheet8A['B9'].v, 'AMANDA HASNA MIRZA');
+    assert.strictEqual(sheet8A['D9'].v, 88, 'ASTS (Col D) must be populated with 88');
+    assert.strictEqual(sheet8A['E9'], undefined, 'ASAS (Col E) must remain blank');
+
+    fs.unlinkSync(exportPath);
+  });
+
+  it('7. exportOfficialFormatExcel with targetColumn: ASAS populates column E and leaves column D blank', async () => {
+    const mockSession = {
+      id: 'sess_test_asas',
+      session_name: 'Ujian Akhir Semester Matematika 8A',
+      teacher: 'Ahmad Guru',
+      subject: 'Matematika',
+      class_name: '8A',
+      school_level: 'SMP' as const,
+      kkm: 75,
+      academic_year: '2026/2027',
+      semester: 'Ganjil',
+      answer_key: ['A'],
+      student_list: ['AMANDA HASNA MIRZA'],
+      created_at: new Date().toISOString(),
+    };
+
+    const mockStudents = [
+      {
+        id: 'st_asas_1',
+        session_id: 'sess_test_asas',
+        name: 'AMANDA HASNA MIRZA',
+        mcq_answers: { 1: 'A' },
+        essay_scores: [],
+        mcq_score: 92,
+        essay_score: 0,
+        final_score: 92,
+        csi: 90,
+        lps: 85,
+        correct: 1,
+        wrong: 0,
+      },
+    ];
+
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      session: mockSession,
+      gradedStudents: mockStudents,
+      subject: 'Matematika',
+      teacher: 'Ahmad Guru',
+      className: '8A',
+      targetColumn: 'ASAS',
+    });
+
+    const exportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Matematika_8A_2026-2027.xlsx';
+    assert.ok(fs.existsSync(exportPath), 'Exported file must exist');
+
+    const wb = XLSX.read(fs.readFileSync(exportPath), { type: 'buffer' });
+    const sheet8A = wb.Sheets['8A'];
+    assert.ok(sheet8A, 'Sheet 8A must exist');
+
+    // Amanda Hasna Mirza is row 9
+    assert.strictEqual(sheet8A['B9'].v, 'AMANDA HASNA MIRZA');
+    assert.strictEqual(sheet8A['D9'], undefined, 'ASTS (Col D) must remain blank');
+    assert.strictEqual(sheet8A['E9'].v, 92, 'ASAS (Col E) must be populated with 92');
+
+    fs.unlinkSync(exportPath);
+  });
+
+  it('8. exportOfficialFormatExcel with targetColumn: BOTH populates both columns D and E', async () => {
+    const mockSession = {
+      id: 'sess_test_both',
+      session_name: 'Simulasi Lengkap Nilai Matematika 8A',
+      teacher: 'Ahmad Guru',
+      subject: 'Matematika',
+      class_name: '8A',
+      school_level: 'SMP' as const,
+      kkm: 75,
+      academic_year: '2026/2027',
+      semester: 'Ganjil',
+      answer_key: ['A'],
+      student_list: ['AMANDA HASNA MIRZA'],
+      created_at: new Date().toISOString(),
+    };
+
+    const mockStudents = [
+      {
+        id: 'st_both_1',
+        session_id: 'sess_test_both',
+        name: 'AMANDA HASNA MIRZA',
+        mcq_answers: { 1: 'A' },
+        essay_scores: [],
+        mcq_score: 85,
+        essay_score: 0,
+        final_score: 85,
+        csi: 90,
+        lps: 85,
+        correct: 1,
+        wrong: 0,
+      },
+    ];
+
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      session: mockSession,
+      gradedStudents: mockStudents,
+      subject: 'Matematika',
+      teacher: 'Ahmad Guru',
+      className: '8A',
+      targetColumn: 'BOTH',
+    });
+
+    const exportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Matematika_8A_2026-2027.xlsx';
+    assert.ok(fs.existsSync(exportPath), 'Exported file must exist');
+
+    const wb = XLSX.read(fs.readFileSync(exportPath), { type: 'buffer' });
+    const sheet8A = wb.Sheets['8A'];
+    assert.ok(sheet8A, 'Sheet 8A must exist');
+
+    assert.strictEqual(sheet8A['D9'].v, 85, 'ASTS (Col D) must be 85');
+    assert.strictEqual(sheet8A['E9'].v, 85, 'ASAS (Col E) must be 85');
+
+    fs.unlinkSync(exportPath);
+  });
+
+  it('9. exportOfficialFormatExcel with targetColumn: NONE leaves grades blank and omits REKAP NILAI', async () => {
+    const mockSession = {
+      id: 'sess_test_none',
+      session_name: 'Blanko Matematika 8A',
+      teacher: 'Ahmad Guru',
+      subject: 'Matematika',
+      class_name: '8A',
+      school_level: 'SMP' as const,
+      kkm: 75,
+      academic_year: '2026/2027',
+      semester: 'Ganjil',
+      answer_key: [],
+      student_list: [],
+      created_at: new Date().toISOString(),
+    };
+
+    await SemesterGradingExcelService.exportOfficialFormatExcel({
+      session: mockSession,
+      gradedStudents: [],
+      subject: 'Matematika',
+      teacher: 'Ahmad Guru',
+      className: '8A',
+      targetColumn: 'NONE',
+    });
+
+    const exportPath = 'FORMAT_PENILAIAN_ASTS_ASAS_Matematika_8A_2026-2027.xlsx';
+    assert.ok(fs.existsSync(exportPath), 'Exported file must exist');
+
+    const wb = XLSX.read(fs.readFileSync(exportPath), { type: 'buffer' });
+    
+    // REKAP NILAI should NOT be prepended on blank template
+    assert.strictEqual(wb.SheetNames[0], 'IDENTITAS SEKOLAH');
+    assert.strictEqual(wb.SheetNames[1], 'FORMAT PENILAIAN');
+
+    const sheet8A = wb.Sheets['8A'];
+    assert.ok(sheet8A, 'Sheet 8A must exist');
+    assert.strictEqual(sheet8A['B9'].v, 'AMANDA HASNA MIRZA', 'Official student roster is preserved');
+    assert.strictEqual(sheet8A['D9'], undefined, 'ASTS must be blank');
+    assert.strictEqual(sheet8A['E9'], undefined, 'ASAS must be blank');
+
+    fs.unlinkSync(exportPath);
   });
 });
