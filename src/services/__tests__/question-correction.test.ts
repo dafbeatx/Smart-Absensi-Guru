@@ -21,6 +21,15 @@ import {
   resolveSchoolLevel,
 } from '../../utils/class.utils';
 import { SemesterGradingExcelService } from '../semester-grading-excel.service';
+import {
+  normalizeAcademicYearString,
+  detectAcademicYearFromText,
+  detectAcademicYearFromDate,
+  resolveSessionAcademicYear,
+  isAcademicYearMatch,
+  isClassMatch,
+  isSessionSearchMatch,
+} from '../../utils/academic-year.utils';
 
 export const runQuestionCorrectionTestSuite = async (): Promise<{
   passed: number;
@@ -577,6 +586,129 @@ export const runQuestionCorrectionTestSuite = async (): Promise<{
         finalCounts['Tahfidz Al-Quran'] === 1 &&
         arabSessions.length === 2,
       `unique: ${uniqueSubjects.join(', ')}, Arab count: ${finalCounts['Bahasa Arab']}`
+    );
+
+    // ── Test 32: Normalisasi Format Tahun Ajaran (normalizeAcademicYearString)
+    const y1 = normalizeAcademicYearString('2026/2027');
+    const y2 = normalizeAcademicYearString('2026-2027');
+    const y3 = normalizeAcademicYearString('2026 - 2027');
+    const y4 = normalizeAcademicYearString('2026 / 2027');
+    const y5 = normalizeAcademicYearString('26/27');
+    const y6 = normalizeAcademicYearString('26-27');
+    const y7 = normalizeAcademicYearString('2026');
+    const y8 = normalizeAcademicYearString('TA 2026/2027');
+    assert(
+      'Smart Year 01: Normalisasi berbagai format penulisan tahun ajaran menjadi kanonikal 2026/2027',
+      y1 === '2026/2027' &&
+        y2 === '2026/2027' &&
+        y3 === '2026/2027' &&
+        y4 === '2026/2027' &&
+        y5 === '2026/2027' &&
+        y6 === '2026/2027' &&
+        y7 === '2026/2027' &&
+        y8 === '2026/2027',
+      `Hasil: y1=${y1}, y2=${y2}, y5=${y5}, y7=${y7}`
+    );
+
+    // ── Test 33: Deteksi Tahun Ajaran dari Nama Sesi / Teks (detectAcademicYearFromText)
+    const dt1 = detectAcademicYearFromText('ASTS Ganjil 2026/2027');
+    const dt2 = detectAcademicYearFromText('PTS Informatika 8A 2026-2027');
+    const dt3 = detectAcademicYearFromText('Ujian Harian Matematika 2026');
+    const dt4 = detectAcademicYearFromText('Simulasi Penilaian 25/26');
+    const dtNull = detectAcademicYearFromText('Penilaian Harian Bab 1');
+    assert(
+      'Smart Year 02: Ekstraksi tahun ajaran otomatis dari nama/judul sesi ujian',
+      dt1 === '2026/2027' &&
+        dt2 === '2026/2027' &&
+        dt3 === '2026/2027' &&
+        dt4 === '2025/2026' &&
+        dtNull === null,
+      `Hasil: dt1=${dt1}, dt2=${dt2}, dt3=${dt3}, dt4=${dt4}`
+    );
+
+    // ── Test 34: Inferensi Tahun Ajaran dari Timestamp created_at (detectAcademicYearFromDate)
+    // Kalender pendidikan Indonesia dimulai 1 Juli hingga 30 Juni
+    const dd1 = detectAcademicYearFromDate('2026-10-04T10:00:00Z'); // Semester Ganjil 2026/2027
+    const dd2 = detectAcademicYearFromDate('2027-03-15T08:00:00Z'); // Semester Genap 2026/2027
+    const dd3 = detectAcademicYearFromDate('2025-09-01T07:00:00Z'); // Semester Ganjil 2025/2026
+    const dd4 = detectAcademicYearFromDate('2026-05-20T07:00:00Z'); // Semester Genap 2025/2026
+    assert(
+      'Smart Year 03: Inferensi tahun ajaran tepat dari tanggal pembuatan (Juli-Des: Ganjil, Jan-Jun: Genap)',
+      dd1 === '2026/2027' && dd2 === '2026/2027' && dd3 === '2025/2026' && dd4 === '2025/2026',
+      `Hasil: dd1=${dd1}, dd2=${dd2}, dd3=${dd3}, dd4=${dd4}`
+    );
+
+    // ── Test 35: Resolusi Cerdas Tahun Sesi Tanpa Data Hilang (resolveSessionAcademicYear)
+    // Kasus krusial: Sesi tanpa field academic_year tetapi dibuat pada 2026 harus otomatis 2026/2027
+    const resA = resolveSessionAcademicYear(undefined, 'Ujian IPA', '2026-10-04T12:00:00Z');
+    const resB = resolveSessionAcademicYear('', 'ASTS Informatika 2026/2027', undefined);
+    const resC = resolveSessionAcademicYear('2026-2027', 'Sesi Biasa', undefined);
+    const resD = resolveSessionAcademicYear(undefined, 'Sesi Tanpa Info', undefined); // Fallback ke tahun aktif
+    assert(
+      'Smart Year 04: resolveSessionAcademicYear menyelesaikan sesi tanpa explicit year ke 2026/2027 (Zero Data Loss)',
+      resA === '2026/2027' && resB === '2026/2027' && resC === '2026/2027' && resD === '2026/2027',
+      `Hasil: resA=${resA}, resB=${resB}, resC=${resC}, resD=${resD}`
+    );
+
+    // ── Test 36: Filter Cerdas Tahun Ajaran (isAcademicYearMatch)
+    // Memastikan sesi yang difilter 2026/2027 tidak hilang meski format tahun variatif
+    const sess2026_1 = { academic_year: '2026/2027', session_name: 'ASTS 1' };
+    const sess2026_2 = { academic_year: '2026-2027', session_name: 'ASTS 2' };
+    const sess2026_3 = { academic_year: undefined, session_name: 'PTS Informatika 2026/2027' };
+    const sess2026_4 = { academic_year: undefined, session_name: 'Ujian Harian', created_at: '2026-10-04T12:00:00Z' };
+    const sess2025 = { academic_year: '2025/2026', session_name: 'PAS 2025/2026' };
+
+    const match1 = isAcademicYearMatch(sess2026_1, '2026/2027');
+    const match2 = isAcademicYearMatch(sess2026_2, '2026/2027');
+    const match3 = isAcademicYearMatch(sess2026_3, '2026/2027');
+    const match4 = isAcademicYearMatch(sess2026_4, '2026/2027');
+    const matchOld = isAcademicYearMatch(sess2025, '2026/2027');
+    const matchAll = isAcademicYearMatch(sess2025, 'ALL');
+
+    assert(
+      'Smart Year 05: isAcademicYearMatch menangkap seluruh variasi data 2026/2027 dan memisahkan arsip 2025/2026',
+      match1 && match2 && match3 && match4 && !matchOld && matchAll,
+      `match1=${match1}, match2=${match2}, match3=${match3}, match4=${match4}, matchOld=${matchOld}, matchAll=${matchAll}`
+    );
+
+    // ── Test 37: Filter Cerdas Kesetaraan Kelas (isClassMatch)
+    // Kelas 7 dan 7A/7B saling ekuivalen dalam penyaringan agar sesi tidak hilang
+    const matchCls1 = isClassMatch('7', '7A');
+    const matchCls2 = isClassMatch('7A', '7');
+    const matchCls3 = isClassMatch('Kelas VIII-A', '8A');
+    const matchCls4 = isClassMatch('8A', '8B');
+    const matchClsAll = isClassMatch('8A', 'ALL');
+
+    assert(
+      'Smart Filter 06: isClassMatch mendukung ekuivalensi kelas 7 <-> 7A/7B dan normalisasi romawi',
+      matchCls1 && matchCls2 && matchCls3 && !matchCls4 && matchClsAll,
+      `7->7A: ${matchCls1}, 7A->7: ${matchCls2}, VIII-A->8A: ${matchCls3}`
+    );
+
+    // ── Test 38: Pencarian Multi-Field Cerdas (isSessionSearchMatch)
+    const testSessionSearch: any = {
+      session_name: 'ASTS Informatika Ganjil',
+      subject: 'Informatika',
+      teacher: 'Dafa Maulana',
+      class_name: '8A',
+      class_code: '8A',
+      academic_year: '2026/2027',
+      semester: 'Ganjil',
+      exam_type: 'ASTS',
+      school_level: 'SMP',
+    };
+
+    const sMatchYear = isSessionSearchMatch(testSessionSearch, '2026/2027');
+    const sMatchSubj = isSessionSearchMatch(testSessionSearch, 'info');
+    const sMatchSem = isSessionSearchMatch(testSessionSearch, 'ganjil');
+    const sMatchExam = isSessionSearchMatch(testSessionSearch, 'asts');
+    const sMatchTeacher = isSessionSearchMatch(testSessionSearch, 'dafa');
+    const sMatchNone = isSessionSearchMatch(testSessionSearch, 'Biologi');
+
+    assert(
+      'Smart Search 07: isSessionSearchMatch menelusuri nama, mapel, guru, kelas, tahun ajaran, semester, dan jenis ujian',
+      sMatchYear && sMatchSubj && sMatchSem && sMatchExam && sMatchTeacher && !sMatchNone,
+      `Year: ${sMatchYear}, Subj: ${sMatchSubj}, Sem: ${sMatchSem}, Exam: ${sMatchExam}`
     );
   } catch (err: any) {
     assert('Fatal Execution: Question Correction Test Suite threw an uncaught error', false, err?.message);

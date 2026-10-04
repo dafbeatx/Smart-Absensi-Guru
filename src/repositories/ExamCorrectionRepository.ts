@@ -9,7 +9,7 @@ import type {
   BatchSaveGradesResult,
 } from '../types/database.types';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { AdministrationRepository } from './AdministrationRepository';
+import { resolveSessionAcademicYear } from '../utils/academic-year.utils';
 import { logger } from '../utils/logger.utils';
 
 export interface ClassRecapSummary {
@@ -280,7 +280,7 @@ export class ExamCorrectionRepository {
       ['Kelas / Rombel', `: Kelas ${session.class_name} (${session.school_level || 'SMP/SMA'})`],
       ['Guru Pengampu', `: ${session.teacher}`],
       ['Nama Sesi Ujian', `: ${session.session_name}`],
-      ['Tahun Ajaran / Semester', `: ${session.academic_year || AdministrationRepository.getActiveAcademicYear()} - ${session.semester || 'Ganjil'}`],
+      ['Tahun Ajaran / Semester', `: ${resolveSessionAcademicYear(session.academic_year, session.session_name, session.created_at)} - ${session.semester || 'Ganjil'}`],
       ['Kriteria Ketuntasan Minimal (KKM)', `: ${kkm}`],
       ['Komposisi Soal & Bobot', `: PG: ${pgWeight}% (${pgCount} Butir) | Essay: ${essayWeight}% (${essayCount} Butir)`],
       [''],

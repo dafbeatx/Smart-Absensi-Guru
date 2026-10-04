@@ -65,6 +65,7 @@ import type {
   SaveStudentPlanResult,
 } from '../types/homeroom.types';
 import { areClassCodesEqual } from '../utils/class.utils';
+import { resolveSessionAcademicYear } from '../utils/academic-year.utils';
 import type {
   ExamCommitteeMember,
   ExamScheduleData,
@@ -3117,6 +3118,7 @@ export class MockProvider implements IDataProvider {
           return parsed.map((s: ExamSessionRecord) => ({
             ...s,
             school_level: resolveSchoolLevel(s.class_name, s.school_level),
+            academic_year: resolveSessionAcademicYear(s.academic_year, s.session_name, s.created_at),
           }));
         }
       } catch {
@@ -3151,7 +3153,7 @@ export class MockProvider implements IDataProvider {
         essayCount: 5,
       },
       exam_type: dto.exam_type || 'Harian',
-      academic_year: dto.academic_year || '2025/2026',
+      academic_year: resolveSessionAcademicYear(dto.academic_year, dto.session_name),
       semester: dto.semester || 'Ganjil',
       kkm: dto.kkm || 75,
       created_at: existingIndex >= 0 ? sessions[existingIndex].created_at : new Date().toISOString(),

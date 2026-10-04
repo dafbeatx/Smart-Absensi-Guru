@@ -44,13 +44,19 @@ import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRe
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { AdministrationRepository, AVAILABLE_ACADEMIC_YEARS } from '../../../repositories/AdministrationRepository';
 import { parseAnswerKey, calculateStudentResult, getScoreLabel, getCsiLabel, generateAutoPgAnswers, generateAutoEssayScores } from '../../../utils/scoring.utils';
-import { normalizeClassCode, areClassCodesEqual, resolveSchoolLevel } from '../../../utils/class.utils';
+import { normalizeClassCode, resolveSchoolLevel } from '../../../utils/class.utils';
 import { logger } from '../../../utils/logger.utils';
 import {
   OFFICIAL_SCHOOL_SUBJECTS,
   normalizeSubjectName,
   isSameSubject,
 } from '../../../config/school-subjects.config';
+import {
+  resolveSessionAcademicYear,
+  isAcademicYearMatch,
+  isClassMatch,
+  isSessionSearchMatch,
+} from '../../../utils/academic-year.utils';
 import { SemesterGradingExcelService } from '../../../services/semester-grading-excel.service';
 
 export type ModalLoadState =
@@ -319,7 +325,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         ExamCorrectionRepository.getGradedStudents(session.id),
       ]);
       if (!students || students.length === 0) {
-        await StudentRepository.syncFromGradeMaster(session.academic_year || '2026/2027');
+        const targetYear = resolveSessionAcademicYear(session.academic_year, session.session_name, session.created_at);
+        await StudentRepository.syncFromGradeMaster(targetYear);
         students = await StudentRepository.getStudentsByClass(classIdentifier);
       }
       setClassStudents(students);
@@ -482,11 +489,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     }
   };
 
-  // Academic year distribution for quick filtering
+  // Academic year distribution for quick filtering with smart detection
   const sessionYearCounts = useMemo(() => {
     const counts: Record<string, number> = { '2026/2027': 0, '2025/2026': 0 };
     sessions.forEach((s) => {
-      const yr = s.academic_year || '2025/2026';
+      const yr = resolveSessionAcademicYear(s.academic_year, s.session_name, s.created_at);
       counts[yr] = (counts[yr] || 0) + 1;
     });
     return counts;
@@ -524,21 +531,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     return { availableSessionSubjects: uniqueSubjects, sessionSubjectCounts: finalCounts };
   }, [sessions]);
 
-  // Filtered sessions for Tab 1
+  // Filtered sessions for Tab 1 with smart search, year detection, and class aliasing
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
-      const q = sessionSearchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        s.session_name.toLowerCase().includes(q) ||
-        s.subject.toLowerCase().includes(q) ||
-        s.teacher.toLowerCase().includes(q) ||
-        s.class_name.toLowerCase().includes(q) ||
-        (s.class_code && s.class_code.toLowerCase().includes(q));
-
-      const matchesClass =
-        sessionClassFilter === 'ALL' ||
-        areClassCodesEqual(s.class_code || s.class_name, sessionClassFilter);
+      const matchesSearch = isSessionSearchMatch(s, sessionSearchQuery);
+      const matchesClass = isClassMatch(s.class_code || s.class_name, sessionClassFilter);
 
       const hasKey = Array.isArray(s.answer_key) && s.answer_key.length > 0;
       const matchesStatus =
@@ -546,14 +543,12 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         (sessionStatusFilter === 'WITH_KEY' && hasKey) ||
         (sessionStatusFilter === 'WITHOUT_KEY' && !hasKey);
 
-      const sessYear = s.academic_year || '2025/2026';
-      const matchesYear =
-        sessionYearFilter === 'ALL' ||
-        sessYear === sessionYearFilter;
+      const matchesYear = isAcademicYearMatch(s, sessionYearFilter);
 
       const matchesSubject =
         sessionSubjectFilter === 'ALL' ||
         isSameSubject(s.subject, sessionSubjectFilter) ||
+        normalizeSubjectName(s.subject).toLowerCase() === normalizeSubjectName(sessionSubjectFilter).toLowerCase() ||
         s.subject.toLowerCase().trim() === sessionSubjectFilter.toLowerCase().trim();
 
       return matchesSearch && matchesClass && matchesStatus && matchesYear && matchesSubject;
@@ -1864,7 +1859,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   </div>
                 </div>
 
-                {/* Filter Tahun Ajaran Tab Bar (2026/2027 vs 2025/2026) */}
+                {/* Filter Tahun Ajaran Tab Bar (2026/2027 vs 2025/2026 & Tahun Dinamis) */}
                 <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto">
                     <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 mr-1 shrink-0">
@@ -1914,6 +1909,29 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         {sessionYearCounts['2025/2026'] || 0}
                       </span>
                     </button>
+                    {/* Render any additional academic years detected dynamically */}
+                    {Object.keys(sessionYearCounts)
+                      .filter((yr) => yr !== '2026/2027' && yr !== '2025/2026' && sessionYearCounts[yr] > 0)
+                      .sort((a, b) => b.localeCompare(a))
+                      .map((yr) => (
+                        <button
+                          key={yr}
+                          type="button"
+                          onClick={() => setSessionYearFilter(yr)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 ${
+                            sessionYearFilter === yr
+                              ? 'bg-slate-700 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          <span>{yr}</span>
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                            sessionYearFilter === yr ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-800'
+                          }`}>
+                            {sessionYearCounts[yr]}
+                          </span>
+                        </button>
+                      ))}
                   </div>
 
                   {sessionYearFilter !== 'ALL' && (
@@ -2170,7 +2188,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     <h4 className="text-xs font-bold text-slate-800 mb-1">Tidak Ada Sesi yang Sesuai Filter</h4>
                     <p className="text-[11px] text-slate-500 mb-3 max-w-md mx-auto">
                       {sessionYearFilter === '2026/2027'
-                        ? 'Belum ada sesi ujian untuk Tahun Ajaran 2026/2027. Sesi riwayat dari GradeMaster tersimpan di Tahun Ajaran 2025/2026.'
+                        ? 'Tidak ada sesi ujian yang cocok dengan kriteria filter pada Tahun Ajaran 2026/2027. Buat sesi baru atau tampilkan semua tahun.'
                         : 'Coba ubah kata kunci pencarian atau reset filter tahun ajaran, mata pelajaran, atau kelas.'}
                     </p>
                     <div className="flex flex-wrap items-center justify-center gap-2">
@@ -2183,13 +2201,13 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                           <Plus className="w-3.5 h-3.5" /> Buat Sesi 2026/2027
                         </button>
                       )}
-                      {sessionYearFilter === '2026/2027' && (sessionYearCounts['2025/2026'] || 0) > 0 && (
+                      {sessionYearFilter !== 'ALL' && (
                         <button
                           type="button"
-                          onClick={() => setSessionYearFilter('2025/2026')}
-                          className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 inline-flex items-center gap-1 transition-colors"
+                          onClick={() => setSessionYearFilter('ALL')}
+                          className="px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold border border-teal-200 inline-flex items-center gap-1 transition-colors"
                         >
-                          <Calendar className="w-3.5 h-3.5" /> Buka Sesi 2025/2026 ({sessionYearCounts['2025/2026']})
+                          <Calendar className="w-3.5 h-3.5" /> Tampilkan Semua Tahun ({sessions.length})
                         </button>
                       )}
                       <button
@@ -2212,7 +2230,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     {filteredSessions.map((sess) => {
                       const keyCount = Array.isArray(sess.answer_key) ? sess.answer_key.length : 0;
                       const hasKey = keyCount > 0;
-                      const sessYear = sess.academic_year || '2025/2026';
+                      const sessYear = resolveSessionAcademicYear(sess.academic_year, sess.session_name, sess.created_at);
                       const isYearActive = sessYear === '2026/2027';
 
                       return (
@@ -2840,8 +2858,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                         subject: activeSession.subject,
                         teacher: activeSession.teacher,
                         kkm: Number(activeSession.kkm) || 75,
-                        academicYear,
-                        semester,
+                        academicYear: resolveSessionAcademicYear(activeSession.academic_year, activeSession.session_name, activeSession.created_at, academicYear),
+                        semester: activeSession.semester || semester,
                         className: activeSession.class_name,
                       });
                       setToastMessage({ text: 'Format resmi multi-sheet ASTS & ASAS (.xlsx) berhasil diunduh!', type: 'success' });

@@ -101,6 +101,7 @@ import {
 } from '../utils/teaching-schedule.utils';
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
+import { resolveSessionAcademicYear } from '../utils/academic-year.utils';
 import {
   getStudentNaturalKey,
   getDeletedStudentKeys,
@@ -6024,7 +6025,7 @@ export class SupabaseProvider implements IDataProvider {
           .from('gm_sessions')
           .select('id, session_name, teacher, subject, class_name, class_code, owner_user_id, school_level, answer_key, scoring_config, exam_type, academic_year, semester, kkm, created_at, updated_at')
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(500);
 
         if (error) {
           logger.error('SupabaseProvider', 'getExamSessions error:', error.message);
@@ -6061,7 +6062,7 @@ export class SupabaseProvider implements IDataProvider {
             student_list: [], // student_list remains loaded on-demand via getExamSessionById
             scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
             exam_type: d.exam_type || 'Harian',
-            academic_year: d.academic_year || '2025/2026',
+            academic_year: resolveSessionAcademicYear(d.academic_year, d.session_name, d.created_at),
             semester: d.semester || 'Ganjil',
             kkm: Number(d.kkm) || 75,
             created_at: d.created_at,
@@ -6135,7 +6136,7 @@ export class SupabaseProvider implements IDataProvider {
           student_list: studentList,
           scoring_config: d.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
           exam_type: d.exam_type || 'Harian',
-          academic_year: d.academic_year || '2025/2026',
+          academic_year: resolveSessionAcademicYear(d.academic_year, d.session_name, d.created_at),
           semester: d.semester || 'Ganjil',
           kkm: Number(d.kkm) || 75,
           created_at: d.created_at,
@@ -6160,7 +6161,7 @@ export class SupabaseProvider implements IDataProvider {
       student_list: dto.student_list || [],
       scoring_config: dto.scoring_config || { pgWeight: 0.7, essayWeight: 0.3, essayMaxScore: 20, essayCount: 5 },
       exam_type: dto.exam_type || 'Harian',
-      academic_year: dto.academic_year || '2025/2026',
+      academic_year: resolveSessionAcademicYear(dto.academic_year, dto.session_name),
       semester: dto.semester || 'Ganjil',
       kkm: dto.kkm || 75,
       is_public: true,
