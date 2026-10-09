@@ -174,17 +174,24 @@ export class UniversalExcelGradingService {
 
         const rawNameVal = String(rowData[headerInfo.nameColIndex] || '').trim();
 
-        // 1. Abaikan baris kosong atau baris non-siswa (KUNCI, REKAP, TOTAL, RATA-RATA, KETERANGAN, TTD, dll)
-        if (
-          !rawNameVal ||
-          /^(kunci|kunci\s*jawaban|kunci_jawaban|rekap|rata-rata|jumlah|total|nilai\s*tertinggi|nilai\s*terendah|standar\s*deviasi|keterangan|ttd|pengawas|deskripsi)/i.test(
-            rawNameVal
-          )
-        ) {
+        // 1. Validasi nama siswa yang sah (abaikan baris jika hanya angka 31, 23.4032..., 40.5, atau kata kunci footer/kunci)
+        if (!this.isLegitimateStudentName(rawNameVal)) {
           continue;
         }
 
-        // 2. Abaikan baris jika hanya memuat huruf kunci jawaban pilihan ganda (misal baris kunci tanpa nama 'KUNCI')
+        // 2. Deteksi baris footer / rangkuman statistik di tingkat baris keseluruhan
+        // (Misal: kolom A bertuliskan "Rata-rata", "Jumlah", sementara kolom lain berisi nilai/formula)
+        const rowSummaryPattern =
+          /(rata[\s\-_]*rata|rerata|average|mean|median|modus|jumlah\s*siswa|nilai\s*tertinggi|nilai\s*terendah|standar\s*deviasi|stdev|daya\s*serap|mengetahui|kepala\s*sekolah|guru\s*(mata\s*pelajaran|mapel|pengampu)?|tanda\s*tangan|^nip\b|^nuptk\b)/i;
+
+        const hasSummaryKeywordInRow = rowData.some((cell: any) =>
+          rowSummaryPattern.test(String(cell || '').trim())
+        );
+        if (hasSummaryKeywordInRow) {
+          continue;
+        }
+
+        // 3. Abaikan baris jika hanya memuat huruf kunci jawaban pilihan ganda (misal baris kunci tanpa nama 'KUNCI')
         const nonBlank = rowData.filter((x: any) => x !== '' && x !== undefined);
         if (nonBlank.length > 5 && nonBlank.every((x: any) => typeof x === 'string' && /^[A-E]$/i.test(x.trim()))) {
           continue;
@@ -361,6 +368,39 @@ export class UniversalExcelGradingService {
     }
 
     return { student: null, matchedStudent: null, confidence: 'UNMATCHED', matchType: 'UNMATCHED' };
+  }
+
+  /**
+   * Validasi apakah sebuah string merupakan nama siswa yang sah:
+   * - Bukan berupa angka murni atau formula kalkulasi Excel (misal: "31", "23.403225806451612", "40.5")
+   * - Mengandung minimal 2 karakter alfabet latin (a-z / A-Z)
+   * - Bukan kata kunci indikator statistik, rekap, tanda tangan, atau catatan footer
+   */
+  public static isLegitimateStudentName(rawName: string): boolean {
+    const trimmed = String(rawName || '').trim();
+    if (!trimmed) return false;
+
+    // 1. Abaikan jika murni angka, desimal, atau kalkulasi Excel (misal "31", "23.403225806451612", "40.5", "100")
+    if (/^[\d.,\s\-_/\\#%:=+]+$/.test(trimmed)) {
+      return false;
+    }
+
+    // 2. Wajib mengandung minimal 2 karakter huruf alfabet (a-z / A-Z)
+    // Nama siswa manusia selalu memiliki minimal 2 huruf (cth: "Al", "Ibnu", "Siti", "Ahmad")
+    const letters = trimmed.match(/[a-zA-Z]/g);
+    if (!letters || letters.length < 2) {
+      return false;
+    }
+
+    // 3. Filter kata kunci non-siswa di kolom nama
+    const nonStudentRegex =
+      /^(kunci|kunci\s*jawaban|kunci_jawaban|rekap|rata[\s\-_]*rata|rerata|average|mean|median|modus|jumlah(\s*siswa)?|^total(\s*siswa)?|nilai\s*(tertinggi|terendah)|tertinggi|terendah|^max$|^min$|standar\s*deviasi|stdev|daya\s*serap|persentase|ketuntasan|mengetahui|kepala\s*sekolah|guru(\s*(mata\s*pelajaran|mapel|pengampu))?|pengawas|^nip\b|^nuptk\b|^ttd\b|tanda\s*tangan|catatan|keterangan|deskripsi)\b/i;
+
+    if (nonStudentRegex.test(trimmed)) {
+      return false;
+    }
+
+    return true;
   }
 
   /**

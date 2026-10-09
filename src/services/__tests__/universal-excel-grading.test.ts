@@ -453,6 +453,66 @@ export async function runUniversalExcelGradingTestSuite(): Promise<TestSuiteResu
         details: err?.message || String(err),
       });
     }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 8: Auto-Sanitizer Footer & Angka: Mengabaikan baris 31, 23.403225806451612, dan footer statistik
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      // 1. Verifikasi unit validator isLegitimateStudentName
+      if (UniversalExcelGradingService.isLegitimateStudentName('31') !== false) {
+        throw new Error('isLegitimateStudentName should reject pure integer "31"');
+      }
+      if (UniversalExcelGradingService.isLegitimateStudentName('23.403225806451612') !== false) {
+        throw new Error('isLegitimateStudentName should reject decimal formula "23.403225806451612"');
+      }
+      if (UniversalExcelGradingService.isLegitimateStudentName('40.5') !== false) {
+        throw new Error('isLegitimateStudentName should reject float "40.5"');
+      }
+      if (UniversalExcelGradingService.isLegitimateStudentName('Rata-rata') !== false) {
+        throw new Error('isLegitimateStudentName should reject "Rata-rata"');
+      }
+      if (UniversalExcelGradingService.isLegitimateStudentName('Ahmad Fauzi') !== true) {
+        throw new Error('isLegitimateStudentName should accept valid name "Ahmad Fauzi"');
+      }
+
+      // 2. Verifikasi parser mengabaikan baris-baris tersebut di lembar kerja
+      const wb = XLSX.utils.book_new();
+      const wsData = [
+        ['No', 'Nama Siswa', 'Skor PG', 'Skor Esai', 'Total'],
+        [1, 'Ahmad Fauzi', 40, 35, 75],
+        [2, 'Siti Nurhaliza', 45, 40, 85],
+        ['', '31', '', '', 0],
+        ['', '23.403225806451612', 31, '', 31],
+        ['', '40.5', '', '', 0],
+        ['Rata-rata Kelas', '', 42.5, 37.5, 80],
+        ['Mengetahui, Kepala Sekolah', '', '', '', ''],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, '8B');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const parsed = await UniversalExcelGradingService.parseExcelBuffer(buf, 'koreksian_footer.xlsx');
+      const sheet = parsed.sheets[0];
+
+      if (sheet.rows.length !== 2) {
+        throw new Error(`Expected exactly 2 valid students (numeric & summary footer skipped), got ${sheet.rows.length}`);
+      }
+
+      if (sheet.rows[0].rawStudentName !== 'Ahmad Fauzi' || sheet.rows[1].rawStudentName !== 'Siti Nurhaliza') {
+        throw new Error(`Unexpected students: ${sheet.rows.map((r) => r.rawStudentName).join(', ')}`);
+      }
+
+      results.push({
+        testName: '8. Auto-Sanitizer Footer & Angka: Mengabaikan baris 31, 23.403..., 40.5, dan footer rekap',
+        status: 'PASS',
+      });
+    } catch (err: any) {
+      results.push({
+        testName: '8. Auto-Sanitizer Footer & Angka: Mengabaikan baris 31, 23.403..., 40.5, dan footer rekap',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
   } finally {
     ProviderFactory.setProvider(originalProvider);
   }

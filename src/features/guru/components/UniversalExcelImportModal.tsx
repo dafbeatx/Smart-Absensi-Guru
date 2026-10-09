@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   X,
   FileSpreadsheet,
@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import type {
   ExamSessionRecord,
@@ -76,6 +78,9 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
     return allDirectoryStudents.filter((s) => areClassCodesEqual(s.className || '', className));
   }, [allDirectoryStudents, className]);
 
+  // Cached original sheets for resetting rows
+  const initialSheetsRef = useRef<UniversalExcelParsedSheet[]>([]);
+
   // Handle file select
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,8 +96,10 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
         setErrorMessage('Tidak dapat menemukan tabel data nilai atau nama siswa pada file Excel ini.');
         setParsedSheets([]);
         setActiveRows([]);
+        initialSheetsRef.current = [];
       } else {
         setParsedSheets(sheets);
+        initialSheetsRef.current = JSON.parse(JSON.stringify(sheets));
         setActiveSheetIndex(0);
         applySheetToForm(sheets[0]);
       }
@@ -100,6 +107,7 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
       setErrorMessage(`Gagal membaca file Excel: ${err?.message || 'Format tidak valid'}`);
       setParsedSheets([]);
       setActiveRows([]);
+      initialSheetsRef.current = [];
     } finally {
       setIsParsing(false);
     }
@@ -123,6 +131,24 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
     if (index >= 0 && index < parsedSheets.length) {
       setActiveSheetIndex(index);
       applySheetToForm(parsedSheets[index]);
+    }
+  };
+
+  // Hapus satu baris dari daftar pratinjau import
+  const handleDeleteRow = (rowIndex: number) => {
+    setActiveRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+  };
+
+  // Bersihkan semua baris yang belum cocok dengan database siswa
+  const handleClearUnmatchedRows = () => {
+    setActiveRows((prev) => prev.filter((r) => r.matchConfidence !== 'UNMATCHED'));
+  };
+
+  // Kembalikan semua baris sheet aktif ke kondisi awal dari berkas Excel
+  const handleResetCurrentSheet = () => {
+    const origSheet = initialSheetsRef.current[activeSheetIndex];
+    if (origSheet && origSheet.rows) {
+      setActiveRows(JSON.parse(JSON.stringify(origSheet.rows)));
     }
   };
 
@@ -488,7 +514,7 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-[11px]">
+                  <div className="flex items-center gap-2 text-[11px] flex-wrap">
                     <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
                       {matchStats.exact} Cocok
                     </span>
@@ -498,9 +524,27 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                       </span>
                     )}
                     {matchStats.unmatched > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
-                        {matchStats.unmatched} Perlu Cek
-                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearUnmatchedRows}
+                        title="Hapus semua baris yang belum cocok dengan database siswa"
+                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold border border-rose-200 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3 text-rose-600" />
+                        <span>Hapus {matchStats.unmatched} Tak Cocok</span>
+                      </button>
+                    )}
+                    {initialSheetsRef.current[activeSheetIndex] &&
+                      activeRows.length !== initialSheetsRef.current[activeSheetIndex]?.rows.length && (
+                      <button
+                        type="button"
+                        onClick={handleResetCurrentSheet}
+                        title="Kembalikan semua baris semula dari sheet ini"
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold border border-slate-300 transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3 text-slate-500" />
+                        <span>Reset Baris</span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -509,61 +553,80 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200 sticky top-0 z-10">
                       <tr>
-                        <th className="py-2.5 px-3 text-center w-10">No</th>
+                        <th className="py-2.5 px-3 text-center w-12">No</th>
                         <th className="py-2.5 px-3">Nama di Excel</th>
                         <th className="py-2.5 px-3">Siswa di Database Sekolah</th>
                         <th className="py-2.5 px-3 text-center w-20">Nilai PG</th>
                         <th className="py-2.5 px-3 text-center w-20">Essay / Esai</th>
                         <th className="py-2.5 px-3 text-center w-24">Skor Ujian</th>
+                        <th className="py-2.5 px-2 text-center w-12">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {activeRows.map((r, idx) => {
-                        const isPass = r.finalScore >= kkm;
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50/80">
-                            <td className="py-2 px-3 text-center font-mono text-slate-500">
-                              {r.rowNumber}
-                            </td>
-                            <td className="py-2 px-3 font-semibold text-slate-900">
-                              {r.rawName}
-                            </td>
-                            <td className="py-2 px-3">
-                              <select
-                                value={r.matchedStudentId || ''}
-                                onChange={(e) => handleUpdateStudentMatch(idx, e.target.value)}
-                                className={`w-full text-xs font-medium rounded-lg px-2 py-1 border transition-colors ${
-                                  r.matchConfidence === 'EXACT'
-                                    ? 'border-emerald-300 bg-emerald-50/40 text-emerald-950 font-semibold'
-                                    : r.matchConfidence === 'FUZZY'
-                                    ? 'border-amber-300 bg-amber-50/40 text-amber-950'
-                                    : 'border-slate-300 bg-white text-slate-700'
-                                }`}
-                              >
-                                <option value="">-- Belum Cocok (Buat Akun Siswa Baru) --</option>
-                                {classCandidates.map((c) => (
-                                  <option key={c.id} value={c.id}>
-                                    {c.fullName}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="py-2 px-3 text-center font-mono font-bold text-slate-800">
-                              {r.pgScore !== null ? r.pgScore : '-'}
-                            </td>
-                            <td className="py-2 px-3 text-center font-mono font-bold text-slate-800">
-                              {r.essayScore !== null ? r.essayScore : '-'}
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
-                                isPass ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'
-                              }`}>
-                                {r.finalScore}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {activeRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-center py-8 text-slate-400 text-xs">
+                            Semua baris telah dihapus. Klik &quot;Reset Baris&quot; untuk memulihkan.
+                          </td>
+                        </tr>
+                      ) : (
+                        activeRows.map((r, idx) => {
+                          const isPass = r.finalScore >= kkm;
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/80 group">
+                              <td className="py-2 px-3 text-center font-mono text-slate-500">
+                                {idx + 1}
+                              </td>
+                              <td className="py-2 px-3 font-semibold text-slate-900">
+                                {r.rawName}
+                              </td>
+                              <td className="py-2 px-3">
+                                <select
+                                  value={r.matchedStudentId || ''}
+                                  onChange={(e) => handleUpdateStudentMatch(idx, e.target.value)}
+                                  className={`w-full text-xs font-medium rounded-lg px-2 py-1 border transition-colors ${
+                                    r.matchConfidence === 'EXACT'
+                                      ? 'border-emerald-300 bg-emerald-50/40 text-emerald-950 font-semibold'
+                                      : r.matchConfidence === 'FUZZY'
+                                      ? 'border-amber-300 bg-amber-50/40 text-amber-950'
+                                      : 'border-slate-300 bg-white text-slate-700'
+                                  }`}
+                                >
+                                  <option value="">-- Belum Cocok (Buat Akun Siswa Baru) --</option>
+                                  {classCandidates.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.fullName}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="py-2 px-3 text-center font-mono font-bold text-slate-800">
+                                {r.pgScore !== null ? r.pgScore : '-'}
+                              </td>
+                              <td className="py-2 px-3 text-center font-mono font-bold text-slate-800">
+                                {r.essayScore !== null ? r.essayScore : '-'}
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
+                                  isPass ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'
+                                }`}>
+                                  {r.finalScore}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRow(idx)}
+                                  title={`Hapus baris "${r.rawName}" dari import`}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
