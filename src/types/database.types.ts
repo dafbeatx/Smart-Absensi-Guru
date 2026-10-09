@@ -855,6 +855,7 @@ export interface BatchSaveGradesResult {
 export interface GradeMasterScoreItem {
   studentName: string;
   score: number;
+  originalScore?: number;
 }
 
 export interface SyncScoresToGradeMasterDTO {
@@ -869,7 +870,7 @@ export interface SyncScoresToGradeMasterDTO {
 
 export interface SyncScoresToGradeMasterResult {
   success: boolean;
-  count: number;
+  count?: number;
   sessionId?: string;
   message?: string;
 }

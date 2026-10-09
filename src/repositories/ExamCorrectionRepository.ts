@@ -184,14 +184,14 @@ export class ExamCorrectionRepository {
   }
 
   /**
-   * Synchronizes score list directly to GradeMaster database schema.
+   * Synchronizes score list directly to GradeMaster HTTP API bridge.
    */
   public static async syncScoresToGradeMaster(
     data: SyncScoresToGradeMasterDTO,
-    token?: string
+    _token?: string
   ): Promise<SyncScoresToGradeMasterResult> {
-    const provider = ProviderFactory.getProvider();
-    return await provider.syncScoresToGradeMaster(data, token);
+    const { syncScoresToGradeMaster } = await import('../services/grademaster-sync.service');
+    return await syncScoresToGradeMaster(data);
   }
 
   /**

@@ -1,10 +1,10 @@
 /**
- * SMART ABSENSI GURU — GRADEMASTER SCORE SYNCHRONIZATION SERVICE
- * Menyinkronkan nilai ujian / penilaian harian guru langsung ke skema GradeMaster OS (Supabase)
- * Memastikan keterbacaan 100% pada Portal Siswa:
- * - gm_sessions: academic_year dengan format slash 'YYYY/YYYY', is_public = true, student_list array
- * - gm_students: is_deleted = false, original_score = final_score, remedial_status = 'NONE' | 'PASSED'
- * - Provider Pattern Abstraction: Seluruh mutasi lewat ProviderFactory.getProvider()
+ * SMART ABSENSI GURU — GRADEMASTER SCORE SYNCHRONIZATION SERVICE (HTTP API BRIDGE)
+ * Menyinkronkan nilai ujian / penilaian harian guru langsung ke Portal Siswa (GradeMaster OS / Web Input Nilai)
+ * Menggunakan endpoint HTTP API Bridge:
+ * - URL: https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi
+ * - Header: x-sync-key: gm_sync_smart_absensi_2026
+ * - Method: POST (JSON Body)
  */
 
 import { ProviderFactory } from '../providers/provider-factory';
@@ -19,44 +19,88 @@ import { logger } from '../utils/logger.utils';
 export type SyncScoresParams = SyncScoresToGradeMasterDTO;
 
 /**
- * Sinkronisasi data nilai siswa ke database GradeMaster (Supabase)
- * Memenuhi kriteria join Portal Siswa GradeMaster:
- * - gm_students.name = targetStudentName
- * - gm_students.is_deleted = false
- * - gm_sessions.academic_year = targetAcademicYear ('YYYY/YYYY')
- * - gm_sessions.class_name = targetClassName
+ * Sinkronisasi data nilai siswa ke Portal Siswa GradeMaster via HTTP API Bridge
  */
-export async function syncScoresToGradeMaster({
-  className,
-  subject,
-  academicYear = '2026/2027',
-  examType = 'HARIAN',
-  teacherName = 'Guru Pengampu',
-  kkm = 75,
-  scores = [],
-}: SyncScoresParams): Promise<SyncScoresToGradeMasterResult> {
-  const cleanClass = className.trim();
-  const cleanSubject = subject.trim();
-  const cleanYear = normalizeAcademicYearString(academicYear) || '2026/2027';
-  const cleanExamType = examType.trim().toUpperCase() || 'HARIAN';
+export async function syncScoresToGradeMaster(payload: {
+  className: string;
+  subject: string;
+  academicYear?: string;
+  examType?: string;
+  teacherName?: string;
+  kkm?: number;
+  scores: Array<{ studentName: string; score: number; originalScore?: number }>;
+}): Promise<SyncScoresToGradeMasterResult> {
+  const apiUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GRADEMASTER_API_URL) ||
+    'https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi';
 
-  logger.info(
-    'GradeMasterSyncService',
-    `Memulai sinkronisasi ${scores.length} nilai untuk kelas ${cleanClass}, mapel ${cleanSubject} (${cleanYear})`
-  );
+  const syncKey =
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GRADEMASTER_SYNC_KEY) ||
+    'gm_sync_smart_absensi_2026';
 
-  const provider = ProviderFactory.getProvider();
-  const result = await provider.syncScoresToGradeMaster({
+  if (!payload.className || !payload.className.trim()) {
+    throw new Error('INVALID_PAYLOAD: className wajib diisi.');
+  }
+  if (!payload.subject || !payload.subject.trim()) {
+    throw new Error('INVALID_PAYLOAD: subject wajib diisi.');
+  }
+
+  const cleanClass = payload.className.trim();
+  const cleanSubject = payload.subject.trim();
+  const cleanYear = normalizeAcademicYearString(payload.academicYear || '2026/2027') || '2026/2027';
+  const cleanExamType = payload.examType ? payload.examType.trim().toUpperCase() : 'HARIAN';
+  const cleanTeacher = payload.teacherName?.trim() || 'Guru Pengampu';
+  const cleanKkm = Number(payload.kkm) || 75;
+
+  const formattedScores = (payload.scores || []).map((s) => ({
+    studentName: s.studentName.trim(),
+    score: Number(s.score),
+    originalScore: s.originalScore !== undefined ? Number(s.originalScore) : Number(s.score),
+  }));
+
+  const bodyData = {
     className: cleanClass,
     subject: cleanSubject,
     academicYear: cleanYear,
     examType: cleanExamType,
-    teacherName,
-    kkm,
-    scores,
+    teacherName: cleanTeacher,
+    kkm: cleanKkm,
+    scores: formattedScores,
+  };
+
+  logger.info(
+    'GradeMasterSyncService',
+    `Mengirim ${formattedScores.length} nilai via HTTP API Bridge ke: ${apiUrl} (Kelas: ${cleanClass}, Mapel: ${cleanSubject}, TA: ${cleanYear})`
+  );
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-sync-key': syncKey,
+    },
+    body: JSON.stringify(bodyData),
   });
 
-  return result;
+  const resJson = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorMsg = resJson.error || resJson.message || `HTTP ${response.status}: Gagal melakukan sinkronisasi ke Web Input Nilai`;
+    logger.error('GradeMasterSyncService', 'Gagal memanggil HTTP API Bridge:', errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  logger.info(
+    'GradeMasterSyncService',
+    `Sinkronisasi berhasil: ${resJson.message || 'OK'} (Diproses: ${resJson.processedCount ?? formattedScores.length})`
+  );
+
+  return {
+    success: true,
+    message: resJson.message || 'Berhasil sinkronisasi nilai ke Portal Siswa',
+    count: resJson.processedCount !== undefined ? Number(resJson.processedCount) : formattedScores.length,
+    sessionId: resJson.sessionId,
+  };
 }
 
 /**
@@ -84,7 +128,7 @@ export async function syncExistingSessionToGradeMaster(
       success: true,
       count: 0,
       sessionId,
-      message: 'Belum ada nilai siswa yang tersimpan pada sesi ini.',
+      message: 'Belum ada nilai siswa yang tersimpan pada sesi ini untuk disinkronkan.',
     };
   }
 
@@ -92,9 +136,10 @@ export async function syncExistingSessionToGradeMaster(
   const scores: GradeMasterScoreItem[] = graded.map((s) => ({
     studentName: s.name.trim(),
     score: Number(s.final_score) || 0,
+    originalScore: Number(s.original_score !== undefined ? s.original_score : s.final_score) || 0,
   }));
 
-  // 4. Jalankan sinkronisasi
+  // 4. Jalankan sinkronisasi ke HTTP API Bridge
   return await syncScoresToGradeMaster({
     className: session.class_name,
     subject: session.subject,
