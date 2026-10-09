@@ -51,6 +51,8 @@ import type {
   SaveGradedStudentDTO,
   BatchSaveGradesDTO,
   BatchSaveGradesResult,
+  SyncScoresToGradeMasterDTO,
+  SyncScoresToGradeMasterResult,
   SubmitWeeklySurveyDTO,
   WeeklySurveySummary,
   WeeklySurveyResponse,
@@ -102,7 +104,7 @@ import {
 } from '../utils/teaching-schedule.utils';
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
-import { resolveSessionAcademicYear } from '../utils/academic-year.utils';
+import { resolveSessionAcademicYear, normalizeAcademicYearString } from '../utils/academic-year.utils';
 import {
   getStudentNaturalKey,
   getDeletedStudentKeys,
@@ -6338,26 +6340,30 @@ export class SupabaseProvider implements IDataProvider {
 
       if (!error && data) {
         const record = data as GradedStudentScoreRecord;
-        // Jika teacher menginput nilai manual dan nilai akhir di RPC berbeda dari dto.final_score
-        // (misal karena sesi tanpa kunci jawaban atau manual score override),
-        // lakukan update eksplisit ke gm_students & student_scores agar nilai manual tersimpan 100% akurat.
-        if (dto.final_score !== undefined && dto.final_score !== null && Number(record.final_score) !== Number(dto.final_score)) {
-          const finalVal = Math.max(0, Math.min(100, Number(dto.final_score)));
-          try {
-            await this.client.from('gm_students').update({
-              final_score: finalVal,
-              mcq_score: dto.mcq_score ?? finalVal,
-              essay_score: dto.essay_score ?? 0,
-            }).eq('id', record.id);
-            await this.client.from('student_scores').update({
-              score: finalVal,
-            }).eq('student_id', studentUserId).eq('session_id', dto.session_id);
-            record.final_score = finalVal;
-            record.mcq_score = dto.mcq_score ?? finalVal;
-            record.essay_score = dto.essay_score ?? 0;
-          } catch (patchErr) {
-            logger.warn('SupabaseProvider', 'Failed to patch manual final_score:', patchErr);
-          }
+        // GradeMaster OS portal visibility guarantees: is_deleted = false, original_score & remedial_status
+        const finalVal = dto.final_score !== undefined && dto.final_score !== null
+          ? Math.max(0, Math.min(100, Number(dto.final_score)))
+          : Number(record.final_score);
+        try {
+          await this.client.from('gm_students').update({
+            is_deleted: false,
+            original_score: finalVal,
+            final_score: finalVal,
+            mcq_score: dto.mcq_score ?? finalVal,
+            essay_score: dto.essay_score ?? 0,
+            remedial_status: finalVal >= 75 ? 'PASSED' : 'NONE',
+          }).eq('id', record.id);
+          await this.client.from('student_scores').update({
+            score: finalVal,
+          }).eq('student_id', studentUserId).eq('session_id', dto.session_id);
+          record.final_score = finalVal;
+          record.original_score = finalVal;
+          record.is_deleted = false;
+          record.mcq_score = dto.mcq_score ?? finalVal;
+          record.essay_score = dto.essay_score ?? 0;
+          record.remedial_status = finalVal >= 75 ? 'PASSED' : 'NONE';
+        } catch (patchErr) {
+          logger.warn('SupabaseProvider', 'Failed to patch GradeMaster student fields:', patchErr);
         }
         this.updateGradedStudentCache(dto.session_id, record);
         return record;
@@ -6414,11 +6420,13 @@ export class SupabaseProvider implements IDataProvider {
       mcq_score: Math.max(0, Math.min(100, dto.mcq_score || 0)),
       essay_score: Math.max(0, Math.min(100, dto.essay_score || 0)),
       final_score: finalScore,
+      original_score: finalScore,
       csi: Math.max(0, Math.min(100, dto.csi || 0)),
       lps: Math.max(0, Math.min(100, dto.lps || 0)),
       correct: dto.correct || 0,
       wrong: dto.wrong || 0,
-      remedial_status: finalScore >= 75 ? 'PASSED' : 'REMEDIAL',
+      remedial_status: finalScore >= 75 ? 'PASSED' : 'NONE',
+      is_deleted: false,
       source: dto.source || 'MANUAL_ENTRY',
       revision: currentRev,
       updated_at: new Date().toISOString(),
@@ -6583,6 +6591,249 @@ export class SupabaseProvider implements IDataProvider {
       throw new Error(`Gagal menghapus nilai siswa di cloud: ${error.message}`);
     }
     return true;
+  }
+
+  public async syncScoresToGradeMaster(
+    dto: SyncScoresToGradeMasterDTO,
+    _token?: string
+  ): Promise<SyncScoresToGradeMasterResult> {
+    const cleanClass = dto.className?.trim() || '';
+    const cleanSubject = dto.subject?.trim() || '';
+    const cleanYear = normalizeAcademicYearString(dto.academicYear || '2026/2027') || '2026/2027';
+    const examType = (dto.examType || 'HARIAN').trim().toUpperCase();
+    const teacherName = dto.teacherName?.trim() || 'Guru Pengampu';
+    const kkm = Number(dto.kkm) || 75;
+    const scores = dto.scores || [];
+
+    if (!cleanClass || !cleanSubject) {
+      throw new Error('PARAMETER_INVALID: className dan subject wajib diisi untuk sinkronisasi GradeMaster.');
+    }
+
+    if (scores.length === 0) {
+      return { success: true, count: 0, message: 'Tidak ada data nilai yang dikirim.' };
+    }
+
+    // 1. Fetch student accounts for exact casing/name synchronization with GradeMaster portal
+    const accountNamesMap = new Map<string, string>();
+    try {
+      const { data: accounts } = await this.client
+        .from('gm_student_accounts')
+        .select('student_name, class_name')
+        .eq('class_name', cleanClass);
+
+      (accounts || []).forEach((acc: any) => {
+        if (acc.student_name) {
+          accountNamesMap.set(acc.student_name.trim().toLowerCase(), acc.student_name.trim());
+        }
+      });
+    } catch (accErr) {
+      logger.debug('SupabaseProvider', 'Account name prefetch note:', accErr);
+    }
+
+    // 2. Cari atau Buat Sesi di gm_sessions
+    let sessionId: string | null = null;
+    let existingStudentList: string[] = [];
+    const sessionName = `${examType} - ${cleanSubject} - ${cleanClass} (${cleanYear})`;
+
+    const { data: existingSession } = await this.client
+      .from('gm_sessions')
+      .select('id, student_list')
+      .eq('class_name', cleanClass)
+      .eq('subject', cleanSubject)
+      .eq('academic_year', cleanYear)
+      .eq('exam_type', examType)
+      .maybeSingle();
+
+    if (existingSession) {
+      sessionId = existingSession.id;
+      existingStudentList = Array.isArray(existingSession.student_list) ? existingSession.student_list : [];
+      // Guarantee is_public is true
+      await this.client
+        .from('gm_sessions')
+        .update({
+          is_public: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId);
+    } else {
+      // Check if session_name exists to prevent UNIQUE violation
+      const { data: sessionByName } = await this.client
+        .from('gm_sessions')
+        .select('id, student_list')
+        .eq('session_name', sessionName)
+        .maybeSingle();
+
+      if (sessionByName) {
+        sessionId = sessionByName.id;
+        existingStudentList = Array.isArray(sessionByName.student_list) ? sessionByName.student_list : [];
+        await this.client
+          .from('gm_sessions')
+          .update({
+            is_public: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', sessionId);
+      } else {
+        const studentNames = scores.map((s) => {
+          const raw = s.studentName.trim();
+          return accountNamesMap.get(raw.toLowerCase()) || raw;
+        });
+
+        const generatedId =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : undefined;
+
+        const newSessionPayload: any = {
+          session_name: sessionName,
+          teacher: teacherName,
+          subject: cleanSubject,
+          class_name: cleanClass,
+          class_code: normalizeClassCode(cleanClass),
+          academic_year: cleanYear,
+          exam_type: examType,
+          kkm: kkm,
+          is_public: true,
+          student_list: studentNames,
+          password_hash: 'system_synced',
+          scoring_config: { pgWeight: 1, essayWeight: 0, essayMaxScore: 0, essayCount: 0 },
+          updated_at: new Date().toISOString(),
+        };
+        if (generatedId) newSessionPayload.id = generatedId;
+
+        const { data: newSession, error: sessErr } = await this.client
+          .from('gm_sessions')
+          .insert(newSessionPayload)
+          .select('id')
+          .single();
+
+        if (sessErr) {
+          logger.error('SupabaseProvider', 'syncScoresToGradeMaster session insert error:', sessErr);
+          throw sessErr;
+        }
+
+        sessionId = newSession?.id || generatedId;
+        existingStudentList = studentNames;
+      }
+    }
+
+    if (!sessionId) {
+      throw new Error('Gagal mendapatkan atau membuat ID sesi ujian GradeMaster.');
+    }
+
+    // 3. Upsert Nilai ke gm_students
+    const updatedStudentNames: string[] = [...existingStudentList];
+
+    for (let i = 0; i < scores.length; i++) {
+      const item = scores[i];
+      const rawName = item.studentName.trim();
+      const canonicalName = accountNamesMap.get(rawName.toLowerCase()) || rawName;
+      const finalScore = Number(item.score);
+      const remedialStatus = finalScore >= kkm ? 'PASSED' : 'NONE';
+
+      if (!updatedStudentNames.includes(canonicalName)) {
+        updatedStudentNames.push(canonicalName);
+      }
+
+      // Check if student already exists in this session
+      const { data: existingStudent } = await this.client
+        .from('gm_students')
+        .select('id')
+        .eq('session_id', sessionId)
+        .ilike('name', canonicalName)
+        .maybeSingle();
+
+      if (existingStudent) {
+        await this.client
+          .from('gm_students')
+          .update({
+            name: canonicalName,
+            final_score: finalScore,
+            original_score: finalScore,
+            mcq_score: finalScore,
+            essay_score: 0,
+            remedial_status: remedialStatus,
+            is_deleted: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingStudent.id);
+      } else {
+        const generatedStudentId =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : undefined;
+
+        const studentUserId = `std_${normalizeClassCode(cleanClass).toLowerCase()}_${Date.now()}_${i}`;
+
+        const insertStudentPayload: any = {
+          session_id: sessionId,
+          student_user_id: studentUserId,
+          name: canonicalName,
+          final_score: finalScore,
+          original_score: finalScore,
+          mcq_score: finalScore,
+          essay_score: 0,
+          remedial_status: remedialStatus,
+          is_deleted: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        if (generatedStudentId) insertStudentPayload.id = generatedStudentId;
+
+        const { error: insErr } = await this.client
+          .from('gm_students')
+          .insert(insertStudentPayload);
+
+        if (insErr) {
+          logger.warn('SupabaseProvider', 'syncScoresToGradeMaster insert student warning:', insErr.message);
+        }
+      }
+
+      // Mirror to student_scores
+      try {
+        await this.client.from('student_scores').upsert(
+          {
+            student_id: `std_${cleanClass}_${canonicalName.replace(/\s+/g, '_')}`,
+            session_id: sessionId,
+            score: finalScore,
+            answers: {
+              session_id: sessionId,
+              name: canonicalName,
+              score: finalScore,
+              synced_at: new Date().toISOString(),
+            },
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'student_id,session_id' }
+        );
+      } catch (mirrorErr) {
+        logger.debug('SupabaseProvider', 'Mirror student_scores note:', mirrorErr);
+      }
+    }
+
+    // 4. Update student_list in gm_sessions if needed
+    if (updatedStudentNames.length > existingStudentList.length) {
+      try {
+        await this.client
+          .from('gm_sessions')
+          .update({
+            student_list: updatedStudentNames,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', sessionId);
+      } catch (sessListErr) {
+        logger.debug('SupabaseProvider', 'Update student_list note:', sessListErr);
+      }
+    }
+
+    return {
+      success: true,
+      count: scores.length,
+      sessionId: sessionId || undefined,
+      message: `Berhasil menyinkronkan ${scores.length} nilai siswa ke GradeMaster (${cleanClass}).`,
+    };
   }
 
   // ─── HOMEROOM & STUDENT CONTINUATION PLANS API ───────────────────────────

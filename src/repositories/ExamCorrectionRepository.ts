@@ -7,6 +7,8 @@ import type {
   SaveGradedStudentDTO,
   BatchSaveGradesDTO,
   BatchSaveGradesResult,
+  SyncScoresToGradeMasterDTO,
+  SyncScoresToGradeMasterResult,
 } from '../types/database.types';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { resolveSessionAcademicYear } from '../utils/academic-year.utils';
@@ -179,6 +181,28 @@ export class ExamCorrectionRepository {
   public static async deleteGradedStudent(studentId: string, token?: string): Promise<boolean> {
     const provider = ProviderFactory.getProvider();
     return await provider.deleteGradedStudent(studentId, token);
+  }
+
+  /**
+   * Synchronizes score list directly to GradeMaster database schema.
+   */
+  public static async syncScoresToGradeMaster(
+    data: SyncScoresToGradeMasterDTO,
+    token?: string
+  ): Promise<SyncScoresToGradeMasterResult> {
+    const provider = ProviderFactory.getProvider();
+    return await provider.syncScoresToGradeMaster(data, token);
+  }
+
+  /**
+   * Synchronizes an existing exam session and all its graded students to GradeMaster.
+   */
+  public static async syncSessionToGradeMaster(
+    sessionId: string,
+    token?: string
+  ): Promise<SyncScoresToGradeMasterResult> {
+    const { syncExistingSessionToGradeMaster } = await import('../services/grademaster-sync.service');
+    return await syncExistingSessionToGradeMaster(sessionId, token);
   }
 
   /**

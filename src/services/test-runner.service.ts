@@ -52,6 +52,7 @@ import { runTeacherPointsAuditTestSuite } from './__tests__/teacher-points-audit
 import { runExamCorrectionAuditTestSuite } from './__tests__/exam-correction-audit.test';
 import { runPaydayNotificationAntiSpamTestSuite } from './__tests__/payday-notification-antispam.test';
 import { runExamPeriodToggleTestSuite } from './__tests__/exam-period-toggle.test';
+import { runGradeMasterScoreSyncTestSuite } from './__tests__/grademaster-score-sync.test';
 
 export interface TestResultItem {
   testName: string;
@@ -141,6 +142,7 @@ export class MasterTestRunner {
       { name: 'Exam Correction & Grade Audit Overhaul Suite (14 Regresi Kasus Wajib)', fn: runExamCorrectionAuditTestSuite },
       { name: 'Payday Notification Anti-Spam & Deduplication Engine', fn: runPaydayNotificationAntiSpamTestSuite },
       { name: 'Exam Period Settings & Auto-Expiry Engine (Phase 5.2)', fn: runExamPeriodToggleTestSuite },
+      { name: 'GradeMaster Score Sync Suite (TA 2026/2027)', fn: runGradeMasterScoreSyncTestSuite },
     ];
 
     let totalPassed = 0;

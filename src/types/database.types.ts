@@ -786,6 +786,8 @@ export interface GradedStudentScoreRecord {
   mcq_score: number;
   essay_score: number;
   final_score: number;
+  original_score?: number;
+  is_deleted?: boolean;
   csi: number;
   lps: number;
   correct: number;
@@ -807,6 +809,8 @@ export interface SaveGradedStudentDTO {
   mcq_score?: number;
   essay_score?: number;
   final_score: number;
+  original_score?: number;
+  is_deleted?: boolean;
   csi?: number;
   lps?: number;
   correct?: number;
@@ -846,6 +850,28 @@ export interface BatchSaveGradesResult {
   success: boolean;
   total_processed: number;
   results: GradedStudentScoreRecord[];
+}
+
+export interface GradeMasterScoreItem {
+  studentName: string;
+  score: number;
+}
+
+export interface SyncScoresToGradeMasterDTO {
+  className: string;
+  subject: string;
+  academicYear?: string;
+  examType?: string;
+  teacherName?: string;
+  kkm?: number;
+  scores: GradeMasterScoreItem[];
+}
+
+export interface SyncScoresToGradeMasterResult {
+  success: boolean;
+  count: number;
+  sessionId?: string;
+  message?: string;
 }
 
 export interface StudentCalculationResult {

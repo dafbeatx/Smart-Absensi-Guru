@@ -53,6 +53,7 @@ import {
 } from '../../../config/school-subjects.config';
 import {
   resolveSessionAcademicYear,
+  normalizeAcademicYearString,
   isAcademicYearMatch,
   isClassMatch,
   isSessionSearchMatch,
@@ -161,6 +162,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [isBatchEssayModalOpen, setIsBatchEssayModalOpen] = useState(false);
   const [batchScores, setBatchScores] = useState<Record<string, number>>({});
   const [isSavingBatch, setIsSavingBatch] = useState(false);
+  const [isSyncingGradeMaster, setIsSyncingGradeMaster] = useState(false);
 
   const undoStack = useRef<{ qNum: number; prev: string | undefined }[]>([]);
   const questionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -823,6 +825,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         mcq_score: (hasEssay && calculation.score > 0) ? Math.round(calculation.score) : effectiveFinalScore,
         essay_score: Math.round(calculation.essayScore),
         final_score: effectiveFinalScore,
+        original_score: effectiveFinalScore,
+        is_deleted: false,
         csi: calculation.csi,
         lps: calculation.lps,
         correct: calculation.correct,
@@ -947,6 +951,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         mcq_score: student.mcq_score,
         essay_score: newScore,
         final_score: newFinalScore,
+        original_score: newFinalScore,
+        is_deleted: false,
         csi: student.csi,
         lps: newLps,
         correct: student.correct,
@@ -1027,6 +1033,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         mcq_score: newScore,
         essay_score: student.essay_score || 0,
         final_score: newFinalScore,
+        original_score: newFinalScore,
+        is_deleted: false,
         csi: calc.csi,
         lps: newLps,
         correct: calc.correct,
@@ -1112,6 +1120,8 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
           mcq_score: st.mcq_score,
           essay_score: newScore,
           final_score: newFinalScore,
+          original_score: newFinalScore,
+          is_deleted: false,
           csi: st.csi,
           lps: newLps,
           correct: st.correct,
@@ -1153,6 +1163,34 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     }
   };
 
+  // Sync current active session scores directly to GradeMaster OS Portal
+  const handleSyncToGradeMaster = async () => {
+    if (!activeSession) return;
+    if (gradedStudents.length === 0) {
+      setToastMessage({
+        text: 'Belum ada nilai siswa yang tersimpan pada sesi ini untuk disinkronkan.',
+        type: 'error',
+      });
+      return;
+    }
+    setIsSyncingGradeMaster(true);
+    try {
+      const res = await ExamCorrectionRepository.syncSessionToGradeMaster(activeSession.id);
+      setToastMessage({
+        text: `Berhasil menyinkronkan ${res.count} nilai siswa ke Portal Siswa GradeMaster!`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      logger.error('QuestionCorrectionModal', 'Failed syncing to GradeMaster:', err);
+      setToastMessage({
+        text: `Gagal sinkronisasi ke GradeMaster: ${err?.message || 'Error'}`,
+        type: 'error',
+      });
+    } finally {
+      setIsSyncingGradeMaster(false);
+    }
+  };
+
   const handleCreateSessionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalSubject = selectedSubject === 'CUSTOM' ? customSubject.trim() : selectedSubject;
@@ -1175,7 +1213,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
     const defaultSessionName = sessionName.trim()
       ? sessionName.trim()
-      : `${examType} - ${finalSubject} - ${finalClass} (${academicYear})`;
+      : `${examType} - ${finalSubject} - ${finalClass} (${normalizeAcademicYearString(academicYear) || academicYear || '2025/2026'})`;
 
     const isPgOnly = examFormat === 'PG_ONLY';
 
@@ -1189,9 +1227,9 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         owner_user_id: currentUser?.id,
         school_level: resolveSchoolLevel(finalClass),
         answer_key: previewNewKeys,
-        student_list: [],
+        student_list: allClassStudents.map((s) => s.name.trim()),
         kkm: Number(kkm) || 75,
-        academic_year: academicYear,
+        academic_year: normalizeAcademicYearString(academicYear) || academicYear || '2025/2026',
         semester: semester,
         exam_type: examType,
         scoring_config: isPgOnly
@@ -2828,6 +2866,18 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     <span>Input Cepat Essay (Semua Siswa)</span>
                   </button>
                 )}
+
+                {/* 0.5. Sinkronkan ke Portal Siswa GradeMaster OS Cloud */}
+                <button
+                  type="button"
+                  onClick={handleSyncToGradeMaster}
+                  disabled={gradedStudents.length === 0 || isSyncingGradeMaster}
+                  className="px-3.5 py-2 rounded-xl bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-700 hover:to-[#023246] disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all min-h-10 cursor-pointer"
+                  title="Sinkronkan seluruh nilai siswa di sesi ini langsung ke Portal Siswa (GradeMaster OS Cloud)"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-teal-200 ${isSyncingGradeMaster ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingGradeMaster ? 'Menyinkronkan...' : 'Sinkron ke Portal Siswa'}</span>
+                </button>
 
                 {/* 1. Primary Button: Download Excel Rekap Nilai (Full Table) */}
                 <button

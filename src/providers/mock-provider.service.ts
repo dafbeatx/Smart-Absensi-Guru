@@ -47,6 +47,8 @@ import type {
   SaveGradedStudentDTO,
   BatchSaveGradesDTO,
   BatchSaveGradesResult,
+  SyncScoresToGradeMasterDTO,
+  SyncScoresToGradeMasterResult,
   SubmitWeeklySurveyDTO,
   WeeklySurveySummary,
   WeeklySurveyResponse,
@@ -100,6 +102,7 @@ import {
   sortTeachingSlots,
 } from '../utils/teaching-schedule.utils';
 import { resolveSchoolLevel } from '../utils/class.utils';
+import { normalizeAcademicYearString } from '../utils/academic-year.utils';
 import { getInitialSeedTeacherPointLogs } from '../utils/teacher-point-seed.utils';
 import { OFFICIAL_STUDENTS_2026_2027 } from '../data/official-students-2026-2027';
 
@@ -3251,11 +3254,13 @@ export class MockProvider implements IDataProvider {
       mcq_score: Math.max(0, Math.min(100, dto.mcq_score ?? 0)),
       essay_score: Math.max(0, Math.min(100, dto.essay_score ?? 0)),
       final_score: finalScore,
+      original_score: finalScore,
       csi: Math.max(0, Math.min(100, dto.csi ?? 0)),
       lps: Math.max(0, Math.min(100, dto.lps ?? 0)),
       correct: dto.correct ?? 0,
       wrong: dto.wrong ?? 0,
-      remedial_status: finalScore >= 75 ? 'PASSED' : 'REMEDIAL',
+      remedial_status: finalScore >= 75 ? 'PASSED' : 'NONE',
+      is_deleted: false,
       source: dto.source || 'MANUAL_ENTRY',
       revision: currentRev,
       created_at: existing ? existing.created_at : new Date().toISOString(),
@@ -3321,6 +3326,156 @@ export class MockProvider implements IDataProvider {
       // ignore
     }
     return true;
+  }
+
+  public async syncScoresToGradeMaster(
+    dto: SyncScoresToGradeMasterDTO,
+    _token?: string
+  ): Promise<SyncScoresToGradeMasterResult> {
+    const cleanClass = dto.className?.trim() || '';
+    const cleanSubject = dto.subject?.trim() || '';
+    const cleanYear = normalizeAcademicYearString(dto.academicYear || '2026/2027') || '2026/2027';
+    const examType = (dto.examType || 'HARIAN').trim().toUpperCase();
+    const teacherName = dto.teacherName?.trim() || 'Guru Pengampu';
+    const kkm = Number(dto.kkm) || 75;
+    const scores = dto.scores || [];
+
+    if (!cleanClass || !cleanSubject) {
+      throw new Error('PARAMETER_INVALID: className dan subject wajib diisi untuk sinkronisasi GradeMaster.');
+    }
+
+    if (scores.length === 0) {
+      return { success: true, count: 0, message: 'Tidak ada data nilai yang dikirim.' };
+    }
+
+    // 1. Sessions handling in mock storage
+    const rawSessions = safeGetStorage('smart_absensi_exam_sessions');
+    let allSessions: ExamSessionRecord[] = [];
+    if (rawSessions) {
+      try {
+        allSessions = JSON.parse(rawSessions);
+        if (!Array.isArray(allSessions)) allSessions = [];
+      } catch {
+        allSessions = [];
+      }
+    }
+
+    const sessionName = `${examType} - ${cleanSubject} - ${cleanClass} (${cleanYear})`;
+    let session = allSessions.find(
+      (s) =>
+        (s.class_name.trim().toUpperCase() === cleanClass.toUpperCase() &&
+          s.subject.trim().toUpperCase() === cleanSubject.toUpperCase() &&
+          s.academic_year === cleanYear &&
+          (s.exam_type || '').toUpperCase() === examType) ||
+        s.session_name === sessionName
+    );
+
+    const studentNames = scores.map((s) => s.studentName.trim());
+
+    if (session) {
+      session.is_public = true;
+      const existingList = Array.isArray(session.student_list) ? session.student_list : [];
+      studentNames.forEach((n) => {
+        if (!existingList.includes(n)) existingList.push(n);
+      });
+      session.student_list = existingList;
+      session.updated_at = new Date().toISOString();
+    } else {
+      session = {
+        id: `sess_gm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        session_name: sessionName,
+        teacher: teacherName,
+        subject: cleanSubject,
+        class_name: cleanClass,
+        class_code: normalizeClassCode(cleanClass),
+        school_level: resolveSchoolLevel(cleanClass),
+        academic_year: cleanYear,
+        exam_type: examType,
+        semester: 'Ganjil',
+        kkm: kkm,
+        is_public: true,
+        answer_key: [],
+        student_list: studentNames,
+        scoring_config: { pgWeight: 1, essayWeight: 0, essayMaxScore: 0, essayCount: 0 },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      allSessions.unshift(session);
+    }
+
+    safeSetStorage('smart_absensi_exam_sessions', JSON.stringify(allSessions));
+
+    // 2. Graded students handling
+    const rawGraded = safeGetStorage('smart_absensi_graded_students');
+    let allGraded: GradedStudentScoreRecord[] = [];
+    if (rawGraded) {
+      try {
+        allGraded = JSON.parse(rawGraded);
+        if (!Array.isArray(allGraded)) allGraded = [];
+      } catch {
+        allGraded = [];
+      }
+    }
+
+    const sessionId = session.id;
+
+    for (let i = 0; i < scores.length; i++) {
+      const item = scores[i];
+      const cleanStudentName = item.studentName.trim();
+      const finalScore = Number(item.score);
+      const remedialStatus = finalScore >= kkm ? 'PASSED' : 'NONE';
+
+      const existingIdx = allGraded.findIndex(
+        (g) => g.session_id === sessionId && g.name.trim().toLowerCase() === cleanStudentName.toLowerCase()
+      );
+
+      if (existingIdx >= 0) {
+        allGraded[existingIdx] = {
+          ...allGraded[existingIdx],
+          name: cleanStudentName,
+          final_score: finalScore,
+          original_score: finalScore,
+          mcq_score: finalScore,
+          essay_score: 0,
+          remedial_status: remedialStatus,
+          is_deleted: false,
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        const studentRecord: GradedStudentScoreRecord = {
+          id: `stu_gm_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+          session_id: sessionId,
+          student_user_id: `std_${normalizeClassCode(cleanClass).toLowerCase()}_${Date.now()}_${i}`,
+          name: cleanStudentName,
+          mcq_answers: {},
+          essay_scores: [],
+          mcq_score: finalScore,
+          essay_score: 0,
+          final_score: finalScore,
+          original_score: finalScore,
+          csi: 100,
+          lps: finalScore,
+          correct: 0,
+          wrong: 0,
+          remedial_status: remedialStatus,
+          is_deleted: false,
+          source: 'GRADEMASTER_SYNC',
+          revision: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        allGraded.push(studentRecord);
+      }
+    }
+
+    safeSetStorage('smart_absensi_graded_students', JSON.stringify(allGraded));
+
+    return {
+      success: true,
+      count: scores.length,
+      sessionId: sessionId,
+      message: `Berhasil menyinkronkan ${scores.length} nilai siswa ke GradeMaster (${cleanClass}).`,
+    };
   }
 
   // ─── HOMEROOM & STUDENT CONTINUATION PLANS API ───────────────────────────

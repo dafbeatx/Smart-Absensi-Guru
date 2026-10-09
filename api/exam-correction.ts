@@ -181,6 +181,17 @@ export default async function handler(req: any, res: any) {
           });
         }
 
+        if (rpcRes) {
+          try {
+            const finalScoreVal = Number(rpcRes.final_score) || 0;
+            await serverSupabase.from('gm_students').update({
+              is_deleted: false,
+              original_score: finalScoreVal,
+              remedial_status: finalScoreVal >= 75 ? 'PASSED' : 'NONE',
+            }).eq('id', rpcRes.id);
+          } catch {}
+        }
+
         return res.status(200).json({
           success: true,
           result: rpcRes,
@@ -231,6 +242,18 @@ export default async function handler(req: any, res: any) {
             code: 'BATCH_SAVE_ERROR',
             message: rpcErr.message,
           });
+        }
+
+        // Guarantee is_deleted = false for all saved batch students
+        if (rpcRes?.results && Array.isArray(rpcRes.results)) {
+          try {
+            const savedIds = rpcRes.results.map((r: any) => r.id).filter(Boolean);
+            if (savedIds.length > 0) {
+              await serverSupabase.from('gm_students').update({
+                is_deleted: false,
+              }).in('id', savedIds);
+            }
+          } catch {}
         }
 
         return res.status(200).json({
