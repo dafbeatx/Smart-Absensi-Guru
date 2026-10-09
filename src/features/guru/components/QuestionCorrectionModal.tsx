@@ -197,6 +197,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
   // Bulk Sync to GradeMaster OS Cloud Modal State
   const [isBulkSyncModalOpen, setIsBulkSyncModalOpen] = useState(false);
+  const [bulkSyncScope, setBulkSyncScope] = useState<'ALL_CLASSES' | 'SPECIFIC_CLASS' | 'ACTIVE_SESSION'>('ALL_CLASSES');
   const [bulkSyncYear, setBulkSyncYear] = useState(() => AdministrationRepository.getActiveAcademicYear() || '2026/2027');
   const [bulkSyncSemester, setBulkSyncSemester] = useState(() => {
     const s = AdministrationRepository.getActiveSemester();
@@ -1445,23 +1446,27 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   // Filter sesi yang cocok untuk pratinjau Sinkronisasi Massal
   const previewEligibleSessions = useMemo(() => {
     return sessions.filter((s) => {
+      if (bulkSyncScope === 'ACTIVE_SESSION') {
+        return s.id === activeSession?.id;
+      }
       if (bulkSyncYear !== 'ALL') {
         if (!isAcademicYearMatch(s, bulkSyncYear)) return false;
       }
       if (bulkSyncSemester !== 'ALL') {
         if (!isSemesterMatch(s, bulkSyncSemester)) return false;
       }
-      if (bulkSyncClass !== 'ALL') {
-        if (!isClassMatch(s.class_name, bulkSyncClass)) return false;
+      if (bulkSyncScope === 'SPECIFIC_CLASS') {
+        if (bulkSyncClass !== 'ALL' && !isClassMatch(s.class_name, bulkSyncClass)) return false;
       }
       return true;
     });
-  }, [sessions, bulkSyncYear, bulkSyncSemester, bulkSyncClass]);
+  }, [sessions, bulkSyncScope, activeSession?.id, bulkSyncYear, bulkSyncSemester, bulkSyncClass]);
 
   const handleOpenBulkSyncModal = () => {
+    setBulkSyncScope('ALL_CLASSES');
     setBulkSyncYear(AdministrationRepository.getActiveAcademicYear() || '2026/2027');
     setBulkSyncSemester(AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil');
-    setBulkSyncClass('ALL');
+    setBulkSyncClass(availableClasses[0] || 'ALL');
     setBulkSyncProgress(null);
     setBulkSyncResult(null);
     setIsBulkSyncModalOpen(true);
@@ -1473,32 +1478,70 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     setBulkSyncResult(null);
 
     try {
-      const res = await ExamCorrectionRepository.syncAllSessionsToGradeMaster({
-        academicYear: bulkSyncYear,
-        semester: bulkSyncSemester,
-        className: bulkSyncClass,
-        teacherName: currentUser?.full_name || 'Guru Pengampu',
-        onProgress: (info) => {
-          setBulkSyncProgress(info);
-        },
-      });
-
-      setBulkSyncResult(res);
-      if (res.totalProcessed > 0) {
-        setToastMessage({
-          text: `Berhasil menyinkronkan ${res.totalProcessed} sesi (${res.totalScoresSynced} nilai siswa) ke GradeMaster!`,
-          type: 'success',
-        });
-      } else if (res.totalSkipped > 0 && res.totalProcessed === 0) {
-        setToastMessage({
-          text: 'Semua sesi yang cocok belum memiliki nilai siswa (dilewati otomatis).',
-          type: 'error',
-        });
+      if (bulkSyncScope === 'ACTIVE_SESSION' && activeSession) {
+        const res = await ExamCorrectionRepository.syncSessionToGradeMaster(activeSession.id);
+        const bulkRes: BulkSyncSessionsResult = {
+          success: res.success,
+          totalFound: 1,
+          totalProcessed: res.success ? 1 : 0,
+          totalSkipped: 0,
+          totalScoresSynced: res.count || 0,
+          academicYear: bulkSyncYear,
+          semester: bulkSyncSemester,
+          details: [{
+            sessionId: activeSession.id,
+            sessionName: activeSession.session_name,
+            subject: activeSession.subject,
+            className: activeSession.class_name,
+            academicYear: activeSession.academic_year || bulkSyncYear,
+            semester: activeSession.semester || bulkSyncSemester,
+            studentCount: res.count || 0,
+            status: res.success ? 'SUCCESS' : 'FAILED',
+            message: res.message,
+          }],
+          message: res.message || (res.success ? 'Berhasil disinkronkan ke GradeMaster' : 'Gagal sinkronisasi'),
+        };
+        setBulkSyncResult(bulkRes);
+        if (res.success) {
+          setToastMessage({
+            text: `Berhasil menyinkronkan sesi ${activeSession.subject} (${res.count || 0} nilai siswa) ke GradeMaster!`,
+            type: 'success',
+          });
+        } else {
+          setToastMessage({
+            text: `Gagal sinkronisasi: ${res.message || 'Error'}`,
+            type: 'error',
+          });
+        }
       } else {
-        setToastMessage({
-          text: res.message || 'Sinkronisasi selesai.',
-          type: 'success',
+        const targetClass = bulkSyncScope === 'SPECIFIC_CLASS' ? bulkSyncClass : 'ALL';
+        const res = await ExamCorrectionRepository.syncAllSessionsToGradeMaster({
+          academicYear: bulkSyncYear,
+          semester: bulkSyncSemester,
+          className: targetClass,
+          teacherName: currentUser?.full_name || 'Guru Pengampu',
+          onProgress: (info) => {
+            setBulkSyncProgress(info);
+          },
         });
+
+        setBulkSyncResult(res);
+        if (res.totalProcessed > 0) {
+          setToastMessage({
+            text: `Berhasil menyinkronkan ${res.totalProcessed} sesi (${res.totalScoresSynced} nilai siswa) ke GradeMaster!`,
+            type: 'success',
+          });
+        } else if (res.totalSkipped > 0 && res.totalProcessed === 0) {
+          setToastMessage({
+            text: 'Semua sesi yang cocok belum memiliki nilai siswa (dilewati otomatis).',
+            type: 'error',
+          });
+        } else {
+          setToastMessage({
+            text: res.message || 'Sinkronisasi selesai.',
+            type: 'success',
+          });
+        }
       }
     } catch (err: any) {
       logger.error('QuestionCorrectionModal', 'Bulk sync failed:', err);
@@ -4166,68 +4209,177 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 </div>
               </div>
 
-              {/* Target Filters Selection */}
+              {/* Target Filters & Scope Selection with Radio Buttons */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
                 <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                  <span>Target Sinkronisasi Akademik</span>
-                  <span className="text-[11px] font-normal text-slate-500">Sesuaikan sasaran pengiriman</span>
+                  <span>Pilihan Cakupan Sinkronisasi Massal</span>
+                  <span className="text-[11px] font-normal text-slate-500">Pilih jangkauan data</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Tahun Ajaran */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-600">Tahun Ajaran</label>
-                    <select
-                      value={bulkSyncYear}
+                {/* Radio Buttons for Scope */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  {/* Option 1: Semua Kelas Sekaligus */}
+                  <label
+                    className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                      bulkSyncScope === 'ALL_CLASSES'
+                        ? 'bg-white border-teal-500 ring-2 ring-teal-500/20 text-teal-950 font-bold shadow-2xs'
+                        : 'bg-white/60 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bulkSyncScope"
+                      value="ALL_CLASSES"
                       disabled={isBulkSyncing}
-                      onChange={(e) => {
-                        setBulkSyncYear(e.target.value);
+                      checked={bulkSyncScope === 'ALL_CLASSES'}
+                      onChange={() => {
+                        setBulkSyncScope('ALL_CLASSES');
                         setBulkSyncResult(null);
                       }}
-                      className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    >
-                      <option value="2026/2027">2026/2027 (Aktif)</option>
-                      <option value="2025/2026">2025/2026</option>
-                      <option value="2024/2025">2024/2025</option>
-                      <option value="ALL">Semua Tahun Ajaran</option>
-                    </select>
-                  </div>
+                      className="text-teal-600 focus:ring-teal-500 shrink-0 mt-0.5"
+                    />
+                    <div className="min-w-0">
+                      <span className="block font-bold">⚡ Semua Kelas Sekaligus</span>
+                      <span className="text-[11px] text-slate-500 font-normal block">
+                        Kirim seluruh rombel & mata pelajaran
+                      </span>
+                    </div>
+                  </label>
 
-                  {/* Semester */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-600">Semester</label>
-                    <select
-                      value={bulkSyncSemester}
+                  {/* Option 2: Satu Kelas Spesifik */}
+                  <label
+                    className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                      bulkSyncScope === 'SPECIFIC_CLASS'
+                        ? 'bg-white border-teal-500 ring-2 ring-teal-500/20 text-teal-950 font-bold shadow-2xs'
+                        : 'bg-white/60 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bulkSyncScope"
+                      value="SPECIFIC_CLASS"
                       disabled={isBulkSyncing}
-                      onChange={(e) => {
-                        setBulkSyncSemester(e.target.value);
+                      checked={bulkSyncScope === 'SPECIFIC_CLASS'}
+                      onChange={() => {
+                        setBulkSyncScope('SPECIFIC_CLASS');
+                        if (bulkSyncClass === 'ALL' && availableClasses.length > 0) {
+                          setBulkSyncClass(availableClasses[0]);
+                        }
                         setBulkSyncResult(null);
                       }}
-                      className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    >
-                      <option value="Ganjil">Semester Ganjil (1)</option>
-                      <option value="Genap">Semester Genap (2)</option>
-                      <option value="ALL">Semua Semester</option>
-                    </select>
-                  </div>
+                      className="text-teal-600 focus:ring-teal-500 shrink-0 mt-0.5"
+                    />
+                    <div className="min-w-0">
+                      <span className="block font-bold">🎯 Satu Kelas Tertentu</span>
+                      <span className="text-[11px] text-slate-500 font-normal block">
+                        Hanya rombel/kelas yang dipilih
+                      </span>
+                    </div>
+                  </label>
 
-                  {/* Filter Kelas */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-600">Rombel / Kelas</label>
-                    <select
-                      value={bulkSyncClass}
-                      disabled={isBulkSyncing}
-                      onChange={(e) => {
-                        setBulkSyncClass(e.target.value);
+                  {/* Option 3: Hanya Sesi Aktif */}
+                  <label
+                    className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                      !activeSession ? 'opacity-50 cursor-not-allowed' : ''
+                    } ${
+                      bulkSyncScope === 'ACTIVE_SESSION'
+                        ? 'bg-white border-teal-500 ring-2 ring-teal-500/20 text-teal-950 font-bold shadow-2xs'
+                        : 'bg-white/60 border-slate-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bulkSyncScope"
+                      value="ACTIVE_SESSION"
+                      disabled={isBulkSyncing || !activeSession}
+                      checked={bulkSyncScope === 'ACTIVE_SESSION'}
+                      onChange={() => {
+                        if (!activeSession) return;
+                        setBulkSyncScope('ACTIVE_SESSION');
                         setBulkSyncResult(null);
                       }}
-                      className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    >
-                      <option value="ALL">Semua Kelas</option>
-                      {availableClasses.map((cls) => (
-                        <option key={cls} value={cls}>Kelas {cls}</option>
-                      ))}
-                    </select>
+                      className="text-teal-600 focus:ring-teal-500 shrink-0 mt-0.5"
+                    />
+                    <div className="min-w-0">
+                      <span className="block font-bold truncate">
+                        📄 Sesi Aktif Saat Ini
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-normal block truncate">
+                        {activeSession ? `${activeSession.subject} (${activeSession.class_name})` : 'Tidak ada sesi'}
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Sub-filters: Tahun Ajaran, Semester, and Kelas */}
+                <div className="pt-2 border-t border-slate-200/80">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Tahun Ajaran */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">Tahun Ajaran</label>
+                      <select
+                        value={bulkSyncYear}
+                        disabled={isBulkSyncing || bulkSyncScope === 'ACTIVE_SESSION'}
+                        onChange={(e) => {
+                          setBulkSyncYear(e.target.value);
+                          setBulkSyncResult(null);
+                        }}
+                        className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <option value="2026/2027">2026/2027 (Aktif)</option>
+                        <option value="2025/2026">2025/2026</option>
+                        <option value="2024/2025">2024/2025</option>
+                        <option value="ALL">Semua Tahun Ajaran</option>
+                      </select>
+                    </div>
+
+                    {/* Semester */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">Semester</label>
+                      <select
+                        value={bulkSyncSemester}
+                        disabled={isBulkSyncing || bulkSyncScope === 'ACTIVE_SESSION'}
+                        onChange={(e) => {
+                          setBulkSyncSemester(e.target.value);
+                          setBulkSyncResult(null);
+                        }}
+                        className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <option value="Ganjil">Semester Ganjil (1)</option>
+                        <option value="Genap">Semester Genap (2)</option>
+                        <option value="ALL">Semua Semester</option>
+                      </select>
+                    </div>
+
+                    {/* Filter Kelas */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">
+                        Rombel / Kelas {bulkSyncScope === 'SPECIFIC_CLASS' ? '(Pilih Target)' : ''}
+                      </label>
+                      {bulkSyncScope === 'ALL_CLASSES' ? (
+                        <div className="w-full text-xs font-semibold bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-2 text-slate-500 italic">
+                          Semua Kelas Terpilih Otomatis
+                        </div>
+                      ) : bulkSyncScope === 'ACTIVE_SESSION' ? (
+                        <div className="w-full text-xs font-semibold bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-2 text-slate-500 italic truncate">
+                          {activeSession ? `Kelas ${activeSession.class_name}` : 'Sesi Aktif'}
+                        </div>
+                      ) : (
+                        <select
+                          value={bulkSyncClass}
+                          disabled={isBulkSyncing}
+                          onChange={(e) => {
+                            setBulkSyncClass(e.target.value);
+                            setBulkSyncResult(null);
+                          }}
+                          className="w-full text-xs font-bold bg-white border border-teal-500 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          {availableClasses.map((cls) => (
+                            <option key={cls} value={cls}>Kelas {cls}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4418,7 +4570,15 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     className="px-4 py-2 bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-700 hover:to-[#023246] disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
                   >
                     <CloudLightning className={`w-4 h-4 ${isBulkSyncing ? 'animate-pulse' : ''}`} />
-                    <span>{isBulkSyncing ? 'Menyinkronkan Nilai...' : 'Sinkronkan Sekarang'}</span>
+                    <span>
+                      {isBulkSyncing
+                        ? 'Menyinkronkan Nilai...'
+                        : bulkSyncScope === 'ALL_CLASSES'
+                        ? `⚡ Sinkron Masal Semua Kelas (${previewEligibleSessions.length} Sesi)`
+                        : bulkSyncScope === 'SPECIFIC_CLASS'
+                        ? `Sinkron Kelas ${bulkSyncClass} (${previewEligibleSessions.length} Sesi)`
+                        : 'Sinkron Sesi Aktif Ini'}
+                    </span>
                   </button>
                 )}
               </div>

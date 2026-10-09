@@ -99,10 +99,12 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
       setActiveSheetIndex(0);
       setErrorMessage(null);
       setSavingProgress(null);
+      setImportScope('ALL_CLASSES');
       initialSheetsRef.current = [];
     }
   }, [isOpen]);
 
+  const [importScope, setImportScope] = useState<'ALL_CLASSES' | 'SINGLE_SHEET'>('ALL_CLASSES');
   const [isSaving, setIsSaving] = useState(false);
   const [savingProgress, setSavingProgress] = useState<{
     current: number;
@@ -213,11 +215,13 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
         initialSheetsRef.current = JSON.parse(JSON.stringify(sheets));
         setSheetConfigs(initialConfigs);
         setActiveSheetIndex(0);
+        setImportScope(sheets.length > 1 ? 'ALL_CLASSES' : 'SINGLE_SHEET');
       }
     } catch (err: any) {
       setErrorMessage(`Gagal membaca file Excel: ${err?.message || 'Format tidak valid'}`);
       setParsedSheets([]);
       setSheetConfigs({});
+      setImportScope('ALL_CLASSES');
       initialSheetsRef.current = [];
     } finally {
       setIsParsing(false);
@@ -593,6 +597,72 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
 
               {/* STEP 2: Configuration Target */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
+                {/* Pilihan Radio Button: Sinkron Masal Semua Kelas vs Sheet Ini Saja */}
+                {parsedSheets.length > 1 && (
+                  <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                        <span>Pilihan Cakupan Sinkron Masal / Import Nilai:</span>
+                      </span>
+                      <span className="text-[11px] text-emerald-700 font-semibold">
+                        {allSheetsSummary.validSheetsCount} Kelas Terdeteksi
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <label
+                        className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                          importScope === 'ALL_CLASSES'
+                            ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 font-bold shadow-2xs'
+                            : 'bg-white/60 border-slate-200 text-slate-700 hover:bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="importScope"
+                          value="ALL_CLASSES"
+                          checked={importScope === 'ALL_CLASSES'}
+                          onChange={() => setImportScope('ALL_CLASSES')}
+                          className="text-emerald-600 focus:ring-emerald-500 shrink-0 mt-0.5"
+                        />
+                        <div className="min-w-0">
+                          <span className="block font-bold">
+                            ⚡ Sinkron Masal (Semua {allSheetsSummary.validSheetsCount} Kelas Sekaligus)
+                          </span>
+                          <span className="text-[11px] text-slate-500 font-normal block">
+                            Langsung membuat sesi & simpan total {allSheetsSummary.totalStudents} nilai siswa
+                          </span>
+                        </div>
+                      </label>
+
+                      <label
+                        className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                          importScope === 'SINGLE_SHEET'
+                            ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 font-bold shadow-2xs'
+                            : 'bg-white/60 border-slate-200 text-slate-700 hover:bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="importScope"
+                          value="SINGLE_SHEET"
+                          checked={importScope === 'SINGLE_SHEET'}
+                          onChange={() => setImportScope('SINGLE_SHEET')}
+                          className="text-emerald-600 focus:ring-emerald-500 shrink-0 mt-0.5"
+                        />
+                        <div className="min-w-0">
+                          <span className="block font-bold">
+                            Hanya Kelas Ini ({currentConfig.className})
+                          </span>
+                          <span className="text-[11px] text-slate-500 font-normal block">
+                            Hanya simpan {currentConfig.rows.length} siswa pada sheet kelas aktif
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800">
                     Konfigurasi Sesi Ujian Hasil Import
@@ -980,31 +1050,25 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
             </button>
 
             {parsedSheets.length > 1 ? (
-              <>
-                <button
-                  type="button"
-                  disabled={currentConfig.rows.length === 0 || isSaving}
-                  onClick={handleExecuteImportSingle}
-                  title={`Hanya impor kelas ${currentConfig.className} pada sheet ini`}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-colors disabled:opacity-40 cursor-pointer min-h-10"
-                >
-                  <span>Import Sheet Ini Saja ({currentConfig.className})</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={allSheetsSummary.totalStudents === 0 || isSaving}
-                  onClick={handleExecuteImportAll}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
-                >
-                  <CheckCircle2 className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
-                  <span>
-                    {isSaving
-                      ? `Menyimpan ${savingProgress ? `${savingProgress.current}/${savingProgress.total}` : 'Kelas'}...`
-                      : `Import Semua Kelas (${allSheetsSummary.validSheetsCount} Kelas • ${allSheetsSummary.totalStudents} Siswa)`}
-                  </span>
-                </button>
-              </>
+              <button
+                type="button"
+                disabled={
+                  (importScope === 'ALL_CLASSES'
+                    ? allSheetsSummary.totalStudents === 0
+                    : currentConfig.rows.length === 0) || isSaving
+                }
+                onClick={importScope === 'ALL_CLASSES' ? handleExecuteImportAll : handleExecuteImportSingle}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
+              >
+                <CheckCircle2 className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
+                <span>
+                  {isSaving
+                    ? `Menyimpan ${savingProgress ? `${savingProgress.current}/${savingProgress.total}` : 'Kelas'}...`
+                    : importScope === 'ALL_CLASSES'
+                    ? `⚡ Sinkron Masal Semua Kelas (${allSheetsSummary.validSheetsCount} Kelas • ${allSheetsSummary.totalStudents} Siswa)`
+                    : `Simpan Sesi Kelas ${currentConfig.className} (${currentConfig.rows.length} Siswa)`}
+                </span>
+              </button>
             ) : (
               <button
                 type="button"
