@@ -16,6 +16,7 @@ import { MockProvider } from '../../providers/mock-provider.service';
 import {
   syncScoresToGradeMaster,
   syncExistingSessionToGradeMaster,
+  syncAllSessionsToGradeMaster,
   syncBehaviorsToGradeMaster,
   syncClassBehaviorsToGradeMaster,
 } from '../grademaster-sync.service';
@@ -573,6 +574,246 @@ export async function runGradeMasterScoreSyncTestSuite(): Promise<TestSuiteResul
     } catch (err: any) {
       results.push({
         testName: 'GradeMaster Sync 11: StudentBehaviorRepository.syncClassToGradeMaster bekerja end-to-end via bridge',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 12: syncAllSessionsToGradeMaster menyaring Tahun Ajaran & Semester tepat sasaran
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      const sessTarget = await mockProvider.saveExamSession({
+        session_name: 'Penilaian Harian Matematika 9A (2026/2027) Ganjil',
+        teacher: 'Guru Matematika',
+        subject: 'Matematika',
+        class_name: '9A',
+        school_level: 'SMP',
+        student_list: ['Siti Rahma'],
+        exam_type: 'HARIAN',
+        kkm: 75,
+        answer_key: ['A', 'B'],
+        academic_year: '2026/2027',
+        semester: 'Ganjil',
+      });
+
+      await mockProvider.saveGradedStudent({
+        session_id: sessTarget.id,
+        student_user_id: 'stu_9a_01',
+        name: 'Siti Rahma',
+        final_score: 100,
+        original_score: 100,
+      });
+
+      const sessOtherYear = await mockProvider.saveExamSession({
+        session_name: 'Ujian IPA 9A (2025/2026) Genap',
+        teacher: 'Guru IPA',
+        subject: 'IPA',
+        class_name: '9A',
+        school_level: 'SMP',
+        student_list: ['Budi Santoso'],
+        exam_type: 'PTS',
+        kkm: 75,
+        answer_key: ['A'],
+        academic_year: '2025/2026',
+        semester: 'Genap',
+      });
+
+      await mockProvider.saveGradedStudent({
+        session_id: sessOtherYear.id,
+        student_user_id: 'stu_9a_02',
+        name: 'Budi Santoso',
+        final_score: 100,
+        original_score: 100,
+      });
+
+      const bulkRes = await syncAllSessionsToGradeMaster({
+        academicYear: '2026/2027',
+        semester: 'Ganjil',
+        className: '9A',
+      });
+
+      const isTargetValid =
+        bulkRes.success &&
+        bulkRes.academicYear === '2026/2027' &&
+        bulkRes.semester === 'Ganjil' &&
+        bulkRes.details.some((d) => d.subject === 'Matematika' && d.status === 'SUCCESS') &&
+        !bulkRes.details.some((d) => d.subject === 'IPA');
+
+      results.push({
+        testName: 'GradeMaster Sync 12: syncAllSessionsToGradeMaster menyaring Tahun Ajaran & Semester tepat sasaran',
+        status: isTargetValid ? 'PASS' : 'FAIL',
+        details: isTargetValid
+          ? `Berhasil menyaring target 2026/2027 Ganjil, total diproses: ${bulkRes.totalProcessed}`
+          : `Gagal: ${JSON.stringify(bulkRes)}`,
+      });
+    } catch (err: any) {
+      results.push({
+        testName: 'GradeMaster Sync 12: syncAllSessionsToGradeMaster menyaring Tahun Ajaran & Semester tepat sasaran',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 13: syncAllSessionsToGradeMaster melewati sesi kosong (tanpa nilai) secara otomatis
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      const sessEmpty = await mockProvider.saveExamSession({
+        session_name: 'Draft Bahasa Indonesia 9A (2026/2027)',
+        teacher: 'Guru Bahasa',
+        subject: 'Bahasa Indonesia',
+        class_name: '9A',
+        school_level: 'SMP',
+        student_list: ['Siswa Belum Dinilai'],
+        exam_type: 'HARIAN',
+        kkm: 75,
+        answer_key: ['A'],
+        academic_year: '2026/2027',
+        semester: 'Ganjil',
+      });
+
+      const bulkRes = await syncAllSessionsToGradeMaster({
+        academicYear: '2026/2027',
+        semester: 'Ganjil',
+        className: '9A',
+      });
+
+      const emptyDetail = bulkRes.details.find((d) => d.sessionId === sessEmpty.id);
+      const isSkipValid = emptyDetail?.status === 'SKIPPED' && bulkRes.totalSkipped >= 1;
+
+      results.push({
+        testName: 'GradeMaster Sync 13: syncAllSessionsToGradeMaster melewati sesi kosong (tanpa nilai) otomatis',
+        status: isSkipValid ? 'PASS' : 'FAIL',
+        details: isSkipValid
+          ? `Sesi kosong dilewati dengan status SKIPPED, total dilewati: ${bulkRes.totalSkipped}`
+          : `Gagal: ${JSON.stringify(emptyDetail)}`,
+      });
+    } catch (err: any) {
+      results.push({
+        testName: 'GradeMaster Sync 13: syncAllSessionsToGradeMaster melewati sesi kosong (tanpa nilai) otomatis',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 14: Anti-Duplikasi Cerdas (menggabungkan sesi duplikat & deduplikasi skor siswa)
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      const sessDupl1 = await mockProvider.saveExamSession({
+        session_name: 'Penilaian Harian Bahasa Inggris 8A (Sesi 1)',
+        teacher: 'Guru Inggris',
+        subject: 'Bahasa Inggris',
+        class_name: '8A',
+        school_level: 'SMP',
+        student_list: ['Rani Permata'],
+        exam_type: 'HARIAN',
+        kkm: 75,
+        answer_key: ['A'],
+        academic_year: '2026/2027',
+        semester: 'Ganjil',
+      });
+
+      await mockProvider.saveGradedStudent({
+        session_id: sessDupl1.id,
+        student_user_id: 'stu_8a_01',
+        name: 'Rani Permata',
+        final_score: 80,
+      });
+
+      const sessDupl2 = await mockProvider.saveExamSession({
+        session_name: 'Penilaian Harian Bahasa Inggris 8A (Sesi 2 Duplikat)',
+        teacher: 'Guru Inggris',
+        subject: 'Bahasa Inggris',
+        class_name: '8A',
+        school_level: 'SMP',
+        student_list: ['Rani Permata', 'Budi Santoso'],
+        exam_type: 'HARIAN',
+        kkm: 75,
+        answer_key: ['A'],
+        academic_year: '2026/2027',
+        semester: 'Ganjil',
+      });
+
+      // Update nilai Rani Permata menjadi 95 dan tambahkan Budi Santoso
+      await mockProvider.saveGradedStudent({
+        session_id: sessDupl2.id,
+        student_user_id: 'stu_8a_01',
+        name: 'Rani Permata',
+        final_score: 95,
+      });
+      await mockProvider.saveGradedStudent({
+        session_id: sessDupl2.id,
+        student_user_id: 'stu_8a_02',
+        name: 'Budi Santoso',
+        final_score: 88,
+      });
+
+      const bulkRes = await syncAllSessionsToGradeMaster({
+        academicYear: '2026/2027',
+        semester: 'Ganjil',
+        className: '8A',
+      });
+
+      const call = fetchState.lastCall;
+      const body = call ? JSON.parse(call.options.body) : null;
+
+      // Rani Permata hanya boleh muncul 1 kali di payload, dengan nilai terbaru 95
+      const raniEntries = (body?.scores || []).filter(
+        (s: any) => s.studentName.toLowerCase() === 'rani permata'
+      );
+
+      const isDedupValid =
+        bulkRes.success &&
+        raniEntries.length === 1 &&
+        raniEntries[0].score === 95 &&
+        (body?.scores || []).length === 2; // Rani & Budi
+
+      results.push({
+        testName: 'GradeMaster Sync 14: Anti-Duplikasi Cerdas berhasil menggabung sesi duplikat & deduplikasi siswa',
+        status: isDedupValid ? 'PASS' : 'FAIL',
+        details: isDedupValid
+          ? `Anti-duplikasi sukses: Skor Rani = ${raniEntries[0]?.score}, total siswa unik = ${body?.scores?.length}`
+          : `Gagal: ${JSON.stringify({ raniEntries, scores: body?.scores })}`,
+      });
+    } catch (err: any) {
+      results.push({
+        testName: 'GradeMaster Sync 14: Anti-Duplikasi Cerdas berhasil menggabung sesi duplikat & deduplikasi siswa',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 15: ExamCorrectionRepository.syncAllSessionsToGradeMaster dengan progress callback
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      const progressLogs: any[] = [];
+      const repoBulkRes = await ExamCorrectionRepository.syncAllSessionsToGradeMaster({
+        academicYear: '2026/2027',
+        semester: 'Ganjil',
+        className: '8A',
+        onProgress: (info) => {
+          progressLogs.push(info);
+        },
+      });
+
+      const isRepoValid =
+        repoBulkRes.success &&
+        progressLogs.length > 0 &&
+        progressLogs.some((p) => p.status === 'DONE');
+
+      results.push({
+        testName: 'GradeMaster Sync 15: ExamCorrectionRepository.syncAllSessionsToGradeMaster dengan onProgress bekerja',
+        status: isRepoValid ? 'PASS' : 'FAIL',
+        details: isRepoValid
+          ? `Berhasil eksekusi bulk sync via repository dengan ${progressLogs.length} event progress`
+          : `Gagal: ${JSON.stringify({ repoBulkRes, progressLogs })}`,
+      });
+    } catch (err: any) {
+      results.push({
+        testName: 'GradeMaster Sync 15: ExamCorrectionRepository.syncAllSessionsToGradeMaster dengan onProgress bekerja',
         status: 'FAIL',
         details: err?.message || String(err),
       });

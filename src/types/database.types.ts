@@ -862,6 +862,7 @@ export interface SyncScoresToGradeMasterDTO {
   className: string;
   subject: string;
   academicYear?: string;
+  semester?: string;
   examType?: string;
   teacherName?: string;
   kkm?: number;
@@ -873,6 +874,44 @@ export interface SyncScoresToGradeMasterResult {
   count?: number;
   sessionId?: string;
   message?: string;
+}
+
+export interface BulkSyncSessionsOptions {
+  academicYear?: string;
+  semester?: string;
+  className?: string;
+  teacherName?: string;
+  onProgress?: (info: {
+    current: number;
+    total: number;
+    currentSubject: string;
+    currentClass: string;
+    status: 'IN_PROGRESS' | 'DONE';
+  }) => void;
+}
+
+export interface BulkSyncSessionDetail {
+  sessionId: string;
+  sessionName: string;
+  subject: string;
+  className: string;
+  academicYear: string;
+  semester: string;
+  studentCount: number;
+  status: 'SUCCESS' | 'SKIPPED' | 'FAILED';
+  message?: string;
+}
+
+export interface BulkSyncSessionsResult {
+  success: boolean;
+  totalFound: number;
+  totalProcessed: number;
+  totalSkipped: number;
+  totalScoresSynced: number;
+  academicYear: string;
+  semester: string;
+  details: BulkSyncSessionDetail[];
+  message: string;
 }
 
 export interface GradeMasterBehaviorItem {

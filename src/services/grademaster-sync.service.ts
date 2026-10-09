@@ -15,12 +15,54 @@ import type {
   SyncBehaviorsToGradeMasterDTO,
   SyncBehaviorsToGradeMasterResult,
   GradeMasterBehaviorItem,
+  BulkSyncSessionsOptions,
+  BulkSyncSessionDetail,
+  BulkSyncSessionsResult,
 } from '../types/database.types';
-import { normalizeAcademicYearString } from '../utils/academic-year.utils';
+import {
+  normalizeAcademicYearString,
+  isAcademicYearMatch,
+  resolveSessionAcademicYear,
+} from '../utils/academic-year.utils';
+import { normalizeClassCode, areClassCodesEqual } from '../utils/class.utils';
+import { normalizeSubjectName } from '../config/school-subjects.config';
+import { AdministrationRepository } from '../repositories/AdministrationRepository';
 import { logger } from '../utils/logger.utils';
 
 export type SyncScoresParams = SyncScoresToGradeMasterDTO;
 export type SyncBehaviorsParams = SyncBehaviorsToGradeMasterDTO;
+
+/**
+ * Memeriksa apakah semester pada sesi cocok dengan filter semester target
+ */
+export function isSemesterMatch(
+  session: { semester?: string | null; session_name?: string | null },
+  targetSemester?: string | null
+): boolean {
+  if (!targetSemester || targetSemester === 'ALL' || targetSemester === 'SEMUA') return true;
+  const targetClean = targetSemester.trim().toLowerCase();
+  const sessionSemester = (session.semester || '').trim().toLowerCase();
+  const sessionName = (session.session_name || '').toLowerCase();
+
+  const isTargetGenap = targetClean.includes('genap') || targetClean === '2';
+  const isTargetGanjil = targetClean.includes('ganjil') || targetClean === '1';
+
+  if (isTargetGenap) {
+    if (sessionSemester.includes('genap') || sessionSemester === '2') return true;
+    if (sessionName.includes('genap') || sessionName.includes('asas') || sessionName.includes('pat')) return true;
+    return false;
+  }
+
+  if (isTargetGanjil) {
+    if (sessionSemester.includes('ganjil') || sessionSemester === '1') return true;
+    if (sessionName.includes('ganjil') || sessionName.includes('asts') || sessionName.includes('pts') || sessionName.includes('pas')) return true;
+    // Default fallback to Ganjil if semester is not marked as Genap
+    if (!sessionSemester && !sessionName.includes('genap')) return true;
+    return false;
+  }
+
+  return true;
+}
 
 /**
  * Sinkronisasi data nilai siswa ke Portal Siswa GradeMaster via HTTP API Bridge
@@ -29,6 +71,7 @@ export async function syncScoresToGradeMaster(payload: {
   className: string;
   subject: string;
   academicYear?: string;
+  semester?: string;
   examType?: string;
   teacherName?: string;
   kkm?: number;
@@ -52,6 +95,7 @@ export async function syncScoresToGradeMaster(payload: {
   const cleanClass = payload.className.trim();
   const cleanSubject = payload.subject.trim();
   const cleanYear = normalizeAcademicYearString(payload.academicYear || '2026/2027') || '2026/2027';
+  const cleanSemester = payload.semester?.trim();
   const cleanExamType = payload.examType ? payload.examType.trim().toUpperCase() : 'HARIAN';
   const cleanTeacher = payload.teacherName?.trim() || 'Guru Pengampu';
   const cleanKkm = Number(payload.kkm) || 75;
@@ -62,7 +106,7 @@ export async function syncScoresToGradeMaster(payload: {
     originalScore: s.originalScore !== undefined ? Number(s.originalScore) : Number(s.score),
   }));
 
-  const bodyData = {
+  const bodyData: Record<string, any> = {
     className: cleanClass,
     subject: cleanSubject,
     academicYear: cleanYear,
@@ -72,9 +116,13 @@ export async function syncScoresToGradeMaster(payload: {
     scores: formattedScores,
   };
 
+  if (cleanSemester) {
+    bodyData.semester = cleanSemester;
+  }
+
   logger.info(
     'GradeMasterSyncService',
-    `Mengirim ${formattedScores.length} nilai via HTTP API Bridge ke: ${apiUrl} (Kelas: ${cleanClass}, Mapel: ${cleanSubject}, TA: ${cleanYear})`
+    `Mengirim ${formattedScores.length} nilai via HTTP API Bridge ke: ${apiUrl} (Kelas: ${cleanClass}, Mapel: ${cleanSubject}, TA: ${cleanYear}${cleanSemester ? `, Semester: ${cleanSemester}` : ''})`
   );
 
   const response = await fetch(apiUrl, {
@@ -148,11 +196,255 @@ export async function syncExistingSessionToGradeMaster(
     className: session.class_name,
     subject: session.subject,
     academicYear: session.academic_year || '2026/2027',
+    semester: session.semester,
     examType: session.exam_type || 'HARIAN',
     teacherName: session.teacher,
     kkm: Number(session.kkm) || 75,
     scores,
   });
+}
+
+/**
+ * Sinkronisasi seluruh sesi penilaian / seluruh mata pelajaran langsung ke Portal Siswa GradeMaster
+ * secara cerdas, otomatis mencegah duplikasi sesi dan duplikasi nilai siswa,
+ * serta menyaring tahun ajaran & semester yang tepat sasaran.
+ */
+export async function syncAllSessionsToGradeMaster(
+  options: BulkSyncSessionsOptions = {},
+  token?: string
+): Promise<BulkSyncSessionsResult> {
+  const provider = ProviderFactory.getProvider();
+
+  // 1. Target Academic Year & Semester
+  const targetYear = options.academicYear && options.academicYear !== 'ALL'
+    ? normalizeAcademicYearString(options.academicYear) || '2026/2027'
+    : (AdministrationRepository.getActiveAcademicYear() || '2026/2027');
+
+  const activeSem = AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil';
+  const targetSemester = options.semester && options.semester !== 'ALL'
+    ? (options.semester.trim().toLowerCase().includes('genap') ? 'Genap' : 'Ganjil')
+    : activeSem;
+
+  const targetClass = options.className && options.className !== 'ALL'
+    ? normalizeClassCode(options.className)
+    : 'ALL';
+
+  // 2. Ambil seluruh sesi ujian
+  const allSessions = await provider.getExamSessions(token);
+
+  // 3. Saring sesi berdasarkan tahun ajaran, semester, dan kelas
+  const matchedSessions = (allSessions || []).filter((s) => {
+    // Check Academic Year
+    if (options.academicYear !== 'ALL') {
+      const matchYear = isAcademicYearMatch(s, targetYear);
+      if (!matchYear) return false;
+    }
+
+    // Check Semester
+    if (options.semester !== 'ALL') {
+      const matchSem = isSemesterMatch(s, targetSemester);
+      if (!matchSem) return false;
+    }
+
+    // Check Class
+    if (targetClass !== 'ALL') {
+      if (!areClassCodesEqual(s.class_name, targetClass)) return false;
+    }
+
+    return true;
+  })
+    .sort((a, b) => {
+      const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
+
+  const details: BulkSyncSessionDetail[] = [];
+  let totalProcessed = 0;
+  let totalSkipped = 0;
+  let totalScoresSynced = 0;
+
+  if (matchedSessions.length === 0) {
+    return {
+      success: true,
+      totalFound: 0,
+      totalProcessed: 0,
+      totalSkipped: 0,
+      totalScoresSynced: 0,
+      academicYear: targetYear,
+      semester: targetSemester,
+      details: [],
+      message: `Tidak ditemukan sesi ujian untuk Tahun Ajaran ${targetYear} dan Semester ${targetSemester}.`,
+    };
+  }
+
+  // 4. Kumpulkan nilai siswa dan lakukan Anti-Duplikasi Cerdas
+  // Kunci deduplikasi unik: [KELAS]:::[MAPEL]:::[JENIS_UJIAN]:::[TAHUN]:::[SEMESTER]
+  interface DeduplicatedSessionGroup {
+    primarySession: (typeof matchedSessions)[0];
+    allSessionIds: string[];
+    uniqueStudentsMap: Map<string, { studentName: string; score: number; originalScore: number; timestamp: number }>;
+  }
+
+  const dedupGroups = new Map<string, DeduplicatedSessionGroup>();
+
+  for (const session of matchedSessions) {
+    const graded = await provider.getGradedStudents(session.id, token);
+
+    if (!graded || graded.length === 0) {
+      details.push({
+        sessionId: session.id,
+        sessionName: session.session_name,
+        subject: session.subject,
+        className: session.class_name,
+        academicYear: session.academic_year || targetYear,
+        semester: session.semester || targetSemester,
+        studentCount: 0,
+        status: 'SKIPPED',
+        message: 'Diabaikan: Belum ada nilai siswa yang diinput.',
+      });
+      totalSkipped++;
+      continue;
+    }
+
+    const normClass = normalizeClassCode(session.class_name);
+    const normSubj = normalizeSubjectName(session.subject).toUpperCase();
+    const normExamType = (session.exam_type || 'HARIAN').trim().toUpperCase();
+    const sessionYear = resolveSessionAcademicYear(session.academic_year, session.session_name, session.created_at, targetYear);
+    const sessionSem = session.semester?.trim() || targetSemester;
+
+    const groupKey = `${normClass}:::${normSubj}:::${normExamType}:::${sessionYear}:::${sessionSem.toUpperCase()}`;
+
+    if (!dedupGroups.has(groupKey)) {
+      dedupGroups.set(groupKey, {
+        primarySession: session,
+        allSessionIds: [session.id],
+        uniqueStudentsMap: new Map(),
+      });
+    } else {
+      const grp = dedupGroups.get(groupKey)!;
+      grp.allSessionIds.push(session.id);
+      grp.primarySession = session;
+    }
+
+    const group = dedupGroups.get(groupKey)!;
+    const sessionTime = new Date(session.updated_at || session.created_at || 0).getTime();
+
+    // Masukkan siswa dengan deduplikasi (mengambil nilai terbaru)
+    for (const st of graded) {
+      const cleanName = (st?.name || '').trim();
+      if (!cleanName) continue;
+      const studentKey = cleanName.toUpperCase();
+      const finalScore = Number(st.final_score) || 0;
+      const origScore = Number(st.original_score !== undefined ? st.original_score : st.final_score) || 0;
+      const stTime = new Date(st.updated_at || st.created_at || 0).getTime() || sessionTime || Date.now();
+
+      // Karena sesi diproses dari yang paling baru ke yang paling lama,
+      // entri pertama yang ditemukan merupakan rekaman paling mutakhir
+      if (!group.uniqueStudentsMap.has(studentKey)) {
+        group.uniqueStudentsMap.set(studentKey, {
+          studentName: cleanName,
+          score: finalScore,
+          originalScore: origScore,
+          timestamp: stTime,
+        });
+      }
+    }
+  }
+
+  // 5. Jalankan sinkronisasi untuk setiap sesi unik ke GradeMaster HTTP API Bridge
+  const uniqueGroupsArray = Array.from(dedupGroups.values());
+  const totalToSync = uniqueGroupsArray.length;
+
+  for (let i = 0; i < totalToSync; i++) {
+    const grp = uniqueGroupsArray[i];
+    const session = grp.primarySession;
+    const scores = Array.from(grp.uniqueStudentsMap.values()).map((s) => ({
+      studentName: s.studentName,
+      score: s.score,
+      originalScore: s.originalScore,
+    }));
+
+    if (options.onProgress) {
+      options.onProgress({
+        current: i + 1,
+        total: totalToSync,
+        currentSubject: session.subject,
+        currentClass: session.class_name,
+        status: 'IN_PROGRESS',
+      });
+    }
+
+    try {
+      const res = await syncScoresToGradeMaster({
+        className: session.class_name,
+        subject: session.subject,
+        academicYear: session.academic_year || targetYear,
+        semester: session.semester || targetSemester,
+        examType: session.exam_type || 'HARIAN',
+        teacherName: session.teacher || options.teacherName || 'Guru Pengampu',
+        kkm: Number(session.kkm) || 75,
+        scores,
+      });
+
+      totalProcessed++;
+      totalScoresSynced += (res.count ?? scores.length);
+
+      const isMerged = grp.allSessionIds.length > 1;
+      details.push({
+        sessionId: session.id,
+        sessionName: session.session_name,
+        subject: session.subject,
+        className: session.class_name,
+        academicYear: session.academic_year || targetYear,
+        semester: session.semester || targetSemester,
+        studentCount: scores.length,
+        status: 'SUCCESS',
+        message: isMerged
+          ? `Berhasil tersinkron (${scores.length} siswa, digabung dari ${grp.allSessionIds.length} sesi duplikat)`
+          : `Berhasil tersinkron (${scores.length} siswa)`,
+      });
+    } catch (syncErr: any) {
+      logger.error('GradeMasterBulkSync', `Gagal menyinkronkan ${session.session_name}:`, syncErr);
+      details.push({
+        sessionId: session.id,
+        sessionName: session.session_name,
+        subject: session.subject,
+        className: session.class_name,
+        academicYear: session.academic_year || targetYear,
+        semester: session.semester || targetSemester,
+        studentCount: scores.length,
+        status: 'FAILED',
+        message: `Gagal: ${syncErr?.message || 'Kesalahan jaringan API'}`,
+      });
+    }
+  }
+
+  if (options.onProgress) {
+    options.onProgress({
+      current: totalToSync,
+      total: totalToSync,
+      currentSubject: 'Selesai',
+      currentClass: '',
+      status: 'DONE',
+    });
+  }
+
+  const success = totalProcessed > 0 || (matchedSessions.length > 0 && totalSkipped === matchedSessions.length);
+
+  return {
+    success,
+    totalFound: matchedSessions.length,
+    totalProcessed,
+    totalSkipped,
+    totalScoresSynced,
+    academicYear: targetYear,
+    semester: targetSemester,
+    details,
+    message: totalProcessed > 0
+      ? `Berhasil menyinkronkan ${totalProcessed} sesi mata pelajaran (${totalScoresSynced} nilai siswa) untuk TA ${targetYear} Semester ${targetSemester} ke GradeMaster OS!`
+      : `Tidak ada sesi yang berhasil disinkronkan (${totalSkipped} sesi diabaikan karena kosong).`,
+  };
 }
 
 /**

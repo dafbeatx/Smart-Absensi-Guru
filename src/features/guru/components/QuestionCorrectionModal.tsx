@@ -34,6 +34,10 @@ import {
   Edit3,
   Sliders,
   Check,
+  Sparkles,
+  CheckCheck,
+  CloudLightning,
+  Info,
 } from 'lucide-react';
 import type {
   ExamSessionRecord,
@@ -41,6 +45,7 @@ import type {
   SaveGradedStudentDTO,
   UserProfile,
   StudentItem,
+  BulkSyncSessionsResult,
 } from '../../../types/database.types';
 import { ExamCorrectionRepository } from '../../../repositories/ExamCorrectionRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
@@ -60,6 +65,7 @@ import {
   isClassMatch,
   isSessionSearchMatch,
 } from '../../../utils/academic-year.utils';
+import { isSemesterMatch } from '../../../services/grademaster-sync.service';
 import { SemesterGradingExcelService } from '../../../services/semester-grading-excel.service';
 import { DownloadOfficialGradingModal } from './DownloadOfficialGradingModal';
 
@@ -186,6 +192,24 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [batchScores, setBatchScores] = useState<Record<string, number>>({});
   const [isSavingBatch, setIsSavingBatch] = useState(false);
   const [isSyncingGradeMaster, setIsSyncingGradeMaster] = useState(false);
+
+  // Bulk Sync to GradeMaster OS Cloud Modal State
+  const [isBulkSyncModalOpen, setIsBulkSyncModalOpen] = useState(false);
+  const [bulkSyncYear, setBulkSyncYear] = useState(() => AdministrationRepository.getActiveAcademicYear() || '2026/2027');
+  const [bulkSyncSemester, setBulkSyncSemester] = useState(() => {
+    const s = AdministrationRepository.getActiveSemester();
+    return s === 'GENAP' ? 'Genap' : 'Ganjil';
+  });
+  const [bulkSyncClass, setBulkSyncClass] = useState<string>('ALL');
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
+  const [bulkSyncProgress, setBulkSyncProgress] = useState<{
+    current: number;
+    total: number;
+    currentSubject: string;
+    currentClass: string;
+    status: 'IN_PROGRESS' | 'DONE';
+  } | null>(null);
+  const [bulkSyncResult, setBulkSyncResult] = useState<BulkSyncSessionsResult | null>(null);
 
   const undoStack = useRef<{ qNum: number; prev: string | undefined }[]>([]);
   const questionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -1415,6 +1439,75 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     }
   };
 
+  // Filter sesi yang cocok untuk pratinjau Sinkronisasi Massal
+  const previewEligibleSessions = useMemo(() => {
+    return sessions.filter((s) => {
+      if (bulkSyncYear !== 'ALL') {
+        if (!isAcademicYearMatch(s, bulkSyncYear)) return false;
+      }
+      if (bulkSyncSemester !== 'ALL') {
+        if (!isSemesterMatch(s, bulkSyncSemester)) return false;
+      }
+      if (bulkSyncClass !== 'ALL') {
+        if (!isClassMatch(s.class_name, bulkSyncClass)) return false;
+      }
+      return true;
+    });
+  }, [sessions, bulkSyncYear, bulkSyncSemester, bulkSyncClass]);
+
+  const handleOpenBulkSyncModal = () => {
+    setBulkSyncYear(AdministrationRepository.getActiveAcademicYear() || '2026/2027');
+    setBulkSyncSemester(AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil');
+    setBulkSyncClass('ALL');
+    setBulkSyncProgress(null);
+    setBulkSyncResult(null);
+    setIsBulkSyncModalOpen(true);
+  };
+
+  const handleExecuteBulkSync = async () => {
+    setIsBulkSyncing(true);
+    setBulkSyncProgress(null);
+    setBulkSyncResult(null);
+
+    try {
+      const res = await ExamCorrectionRepository.syncAllSessionsToGradeMaster({
+        academicYear: bulkSyncYear,
+        semester: bulkSyncSemester,
+        className: bulkSyncClass,
+        teacherName: currentUser?.full_name || 'Guru Pengampu',
+        onProgress: (info) => {
+          setBulkSyncProgress(info);
+        },
+      });
+
+      setBulkSyncResult(res);
+      if (res.totalProcessed > 0) {
+        setToastMessage({
+          text: `Berhasil menyinkronkan ${res.totalProcessed} sesi (${res.totalScoresSynced} nilai siswa) ke GradeMaster!`,
+          type: 'success',
+        });
+      } else if (res.totalSkipped > 0 && res.totalProcessed === 0) {
+        setToastMessage({
+          text: 'Semua sesi yang cocok belum memiliki nilai siswa (dilewati otomatis).',
+          type: 'error',
+        });
+      } else {
+        setToastMessage({
+          text: res.message || 'Sinkronisasi selesai.',
+          type: 'success',
+        });
+      }
+    } catch (err: any) {
+      logger.error('QuestionCorrectionModal', 'Bulk sync failed:', err);
+      setToastMessage({
+        text: `Gagal sinkronisasi massal: ${err?.message || 'Error jaringan'}`,
+        type: 'error',
+      });
+    } finally {
+      setIsBulkSyncing(false);
+    }
+  };
+
   const handleCreateSessionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalSubject = selectedSubject === 'CUSTOM' ? customSubject.trim() : selectedSubject;
@@ -1818,6 +1911,19 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
         {activeTab === 'sessions' && !isCreatingSession && !isReadOnly && (
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleOpenBulkSyncModal}
+              className="px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold flex items-center gap-1.5 transition-all border border-teal-300 shadow-2xs shrink-0 min-h-9 cursor-pointer"
+              title="Sinkronkan seluruh nilai siswa di semua mata pelajaran & kelas ke GradeMaster OS Cloud sekaligus (Anti-Duplikasi)"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
+              <span>Sinkron Semua Nilai</span>
+              <span className="hidden sm:inline px-1 py-0.5 rounded text-[9px] bg-teal-200/70 text-teal-900 font-extrabold uppercase tracking-wider">
+                Cloud
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => setIsDownloadFormatModalOpen(true)}
@@ -3188,6 +3294,17 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   <span>{isSyncingGradeMaster ? 'Menyinkronkan...' : 'Sinkron ke Portal Siswa'}</span>
                 </button>
 
+                {/* 0.6. Sinkronkan SEMUA Sesi Sekaligus (Bulk) */}
+                <button
+                  type="button"
+                  onClick={handleOpenBulkSyncModal}
+                  className="px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold flex items-center gap-1.5 border border-teal-300 shadow-2xs transition-all min-h-10 cursor-pointer"
+                  title="Sinkronkan seluruh mata pelajaran dan rombel sekaligus ke GradeMaster Cloud (Anti-Duplikasi)"
+                >
+                  <Layers className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Sinkron Semua Mapel (Massal)</span>
+                </button>
+
                 {/* 1. Primary Button: Download Excel Rekap Nilai (Full Table) */}
                 <button
                   type="button"
@@ -3396,15 +3513,26 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   Web Input Nilai (GradeMaster Cloud) tersambung via frame resmi.
                 </span>
               </div>
-              <a
-                href={gradeMasterUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shrink-0"
-              >
-                <span>Buka Layar Penuh</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleOpenBulkSyncModal}
+                  className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs shrink-0 cursor-pointer"
+                  title="Sinkronkan seluruh nilai siswa lokal ke database GradeMaster OS Cloud"
+                >
+                  <RefreshCw className="w-3 h-3 text-teal-200" />
+                  <span>Sinkron Semua Nilai Lokal</span>
+                </button>
+                <a
+                  href={gradeMasterUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shrink-0"
+                >
+                  <span>Buka Layar Penuh</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
             <div className="flex-1 w-full min-h-145 sm:min-h-160 rounded-xl overflow-hidden border border-slate-200 bg-white shadow-xs">
               <iframe
@@ -3947,6 +4075,331 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                   <Save className="w-4 h-4" />
                   <span>{isSavingBatch ? 'Menyimpan...' : 'Simpan Semua Nilai Essay'}</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL SINKRONISASI MASSAL NILAI KE GRADEMASTER OS CLOUD */}
+      {/* ========================================================================= */}
+      {isBulkSyncModalOpen && (
+        <div className="fixed inset-0 z-60 flex sm:items-center sm:justify-center bg-slate-900/50 sm:backdrop-blur-xs animate-fadeIn p-0 sm:p-4">
+          <div className="bg-white w-full h-dvh sm:h-auto sm:max-h-[92vh] sm:max-w-2xl sm:rounded-2xl sm:border sm:border-slate-200 p-4 sm:p-6 shadow-2xl flex flex-col justify-between overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-200 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-linear-to-br from-teal-50 to-emerald-50 text-teal-700 rounded-xl border border-teal-200 shadow-2xs">
+                  <CloudLightning className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    Sinkronisasi Massal ke GradeMaster OS
+                    <span className="text-[10px] bg-teal-100 text-teal-800 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      Cloud Bridge
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Kirim nilai seluruh mata pelajaran langsung ke Portal Siswa secara tepat sasaran tanpa duplikasi.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isBulkSyncing}
+                onClick={() => {
+                  if (!isBulkSyncing) {
+                    setIsBulkSyncModalOpen(false);
+                    setBulkSyncResult(null);
+                  }
+                }}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-40"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              {/* Smart Engine Guarantee Banner */}
+              <div className="bg-linear-to-r from-teal-50/80 via-emerald-50/50 to-teal-50/60 border border-teal-200/90 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-start gap-2.5">
+                  <Sparkles className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-xs">
+                    <p className="font-bold text-teal-950">
+                      Sistem Anti-Duplikasi & Deteksi Cerdas Aktif
+                    </p>
+                    <ul className="text-slate-700 space-y-1 list-disc list-inside">
+                      <li>
+                        <strong className="text-slate-900">Anti-Duplikasi:</strong> Jika ada sesi mapel yang sama atau siswa ganda, sistem menggabungkannya otomatis dan hanya mengirim skor siswa terbaru.
+                      </li>
+                      <li>
+                        <strong className="text-slate-900">Tepat Sasaran:</strong> Filter Tahun Ajaran dan Semester memastikan data tersimpan pada folder akademik yang tepat di akun siswa.
+                      </li>
+                      <li>
+                        <strong className="text-slate-900">Auto-Skip Kosong:</strong> Sesi ujian tanpa data nilai siswa dilewati otomatis agar database portal siswa tetap bersih.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Target Filters Selection */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
+                <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                  <span>Target Sinkronisasi Akademik</span>
+                  <span className="text-[11px] font-normal text-slate-500">Sesuaikan sasaran pengiriman</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Tahun Ajaran */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-600">Tahun Ajaran</label>
+                    <select
+                      value={bulkSyncYear}
+                      disabled={isBulkSyncing}
+                      onChange={(e) => {
+                        setBulkSyncYear(e.target.value);
+                        setBulkSyncResult(null);
+                      }}
+                      className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="2026/2027">2026/2027 (Aktif)</option>
+                      <option value="2025/2026">2025/2026</option>
+                      <option value="2024/2025">2024/2025</option>
+                      <option value="ALL">Semua Tahun Ajaran</option>
+                    </select>
+                  </div>
+
+                  {/* Semester */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-600">Semester</label>
+                    <select
+                      value={bulkSyncSemester}
+                      disabled={isBulkSyncing}
+                      onChange={(e) => {
+                        setBulkSyncSemester(e.target.value);
+                        setBulkSyncResult(null);
+                      }}
+                      className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="Ganjil">Semester Ganjil (1)</option>
+                      <option value="Genap">Semester Genap (2)</option>
+                      <option value="ALL">Semua Semester</option>
+                    </select>
+                  </div>
+
+                  {/* Filter Kelas */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-600">Rombel / Kelas</label>
+                    <select
+                      value={bulkSyncClass}
+                      disabled={isBulkSyncing}
+                      onChange={(e) => {
+                        setBulkSyncClass(e.target.value);
+                        setBulkSyncResult(null);
+                      }}
+                      className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="ALL">Semua Kelas</option>
+                      {availableClasses.map((cls) => (
+                        <option key={cls} value={cls}>Kelas {cls}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Realtime Progress Bar when Syncing */}
+              {isBulkSyncing && (
+                <div className="bg-teal-50/70 border border-teal-300 rounded-xl p-3.5 space-y-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between text-xs font-bold text-teal-900">
+                    <span className="flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 text-teal-600 animate-spin" />
+                      Proses Sinkronisasi Massal Sedang Berjalan...
+                    </span>
+                    <span>
+                      {bulkSyncProgress ? `${bulkSyncProgress.current} / ${bulkSyncProgress.total} Sesi` : 'Menyiapkan...'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-teal-200/50 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="bg-linear-to-r from-teal-600 to-emerald-500 h-2.5 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${
+                          bulkSyncProgress && bulkSyncProgress.total > 0
+                            ? Math.round((bulkSyncProgress.current / bulkSyncProgress.total) * 100)
+                            : 8
+                        }%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-teal-800 font-medium">
+                    {bulkSyncProgress
+                      ? `Sedang mengirim nilai: ${bulkSyncProgress.currentSubject} (Kelas ${bulkSyncProgress.currentClass})`
+                      : 'Memvalidasi data sesi dan nilai siswa lokal...'}
+                  </p>
+                </div>
+              )}
+
+              {/* Sync Result Summary */}
+              {bulkSyncResult && !isBulkSyncing && (
+                <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-4 space-y-3 animate-fadeIn">
+                  <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
+                    <CheckCheck className="w-5 h-5 text-emerald-600" />
+                    <span>Laporan Hasil Sinkronisasi Massal</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-white/80 border border-emerald-200 rounded-lg p-2">
+                      <span className="text-[10px] text-slate-500 block">Sesi Berhasil</span>
+                      <span className="text-base font-black text-emerald-700">{bulkSyncResult.totalProcessed}</span>
+                    </div>
+                    <div className="bg-white/80 border border-emerald-200 rounded-lg p-2">
+                      <span className="text-[10px] text-slate-500 block">Nilai Siswa Terkirim</span>
+                      <span className="text-base font-black text-teal-700">{bulkSyncResult.totalScoresSynced}</span>
+                    </div>
+                    <div className="bg-white/80 border border-emerald-200 rounded-lg p-2">
+                      <span className="text-[10px] text-slate-500 block">Sesi Kosong Dilewati</span>
+                      <span className="text-base font-black text-slate-600">{bulkSyncResult.totalSkipped}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-emerald-800">
+                    {bulkSyncResult.message || 'Nilai siswa telah berhasil diperbarui di Portal Siswa GradeMaster OS.'}
+                  </p>
+
+                  {/* Mini Detail Logs */}
+                  {bulkSyncResult.details.length > 0 && (
+                    <div className="max-h-36 overflow-y-auto space-y-1 pr-1 border-t border-emerald-200/60 pt-2 text-xs">
+                      {bulkSyncResult.details.map((dtl, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between py-1 px-2 rounded bg-white/60 text-[11px]"
+                        >
+                          <span className="font-semibold text-slate-800 truncate mr-2">
+                            {dtl.subject} - Kelas {dtl.className} ({dtl.studentCount} siswa)
+                          </span>
+                          <span
+                            className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                              dtl.status === 'SUCCESS'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : dtl.status === 'SKIPPED'
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-rose-100 text-rose-700'
+                            }`}
+                          >
+                            {dtl.status === 'SUCCESS' ? 'Terkirim' : dtl.status === 'SKIPPED' ? 'Dilewati' : 'Gagal'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Preview Matching Sessions */}
+              {!bulkSyncResult && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">
+                      Pratinjau Sesi Penilaian ({previewEligibleSessions.length} sesi cocok)
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Target: {bulkSyncYear} • {bulkSyncSemester}
+                    </span>
+                  </div>
+
+                  {previewEligibleSessions.length === 0 ? (
+                    <div className="border border-dashed border-slate-300 rounded-xl p-6 text-center text-slate-500 text-xs bg-slate-50/50">
+                      <Info className="w-5 h-5 mx-auto text-slate-400 mb-1" />
+                      Tidak ditemukan sesi penilaian yang cocok dengan kriteria filter di atas.
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Coba ubah filter Tahun Ajaran atau Semester untuk melihat sesi lainnya.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+                      {previewEligibleSessions.map((s) => (
+                        <div
+                          key={s.id}
+                          className="bg-white border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between gap-2 shadow-2xs hover:border-teal-300 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-bold text-slate-900 truncate">
+                                {s.subject}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                Kelas {s.class_name}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                                {s.exam_type || 'HARIAN'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                              {s.session_name} • {s.academic_year || '2026/2027'} ({s.semester || 'Ganjil'})
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <span className="text-[10px] font-semibold text-slate-600 block">
+                              KKM: {s.kkm || 75}
+                            </span>
+                            <span className="text-[10px] font-bold text-teal-700">
+                              Siap Sinkron
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex items-center justify-between pt-3.5 border-t border-slate-200 shrink-0">
+              <span className="text-xs text-slate-500">
+                {bulkSyncResult
+                  ? 'Sinkronisasi selesai'
+                  : `${previewEligibleSessions.length} sesi siap diproses`}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isBulkSyncing}
+                  onClick={() => {
+                    setIsBulkSyncModalOpen(false);
+                    setBulkSyncResult(null);
+                  }}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer min-h-10"
+                >
+                  {bulkSyncResult ? 'Tutup' : 'Batal'}
+                </button>
+
+                {bulkSyncResult ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBulkSyncModalOpen(false);
+                      setBulkSyncResult(null);
+                      setActiveTab('grademaster_web');
+                    }}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>Lihat di Portal GradeMaster</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={previewEligibleSessions.length === 0 || isBulkSyncing}
+                    onClick={handleExecuteBulkSync}
+                    className="px-4 py-2 bg-linear-to-r from-teal-600 to-[#18536B] hover:from-teal-700 hover:to-[#023246] disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
+                  >
+                    <CloudLightning className={`w-4 h-4 ${isBulkSyncing ? 'animate-pulse' : ''}`} />
+                    <span>{isBulkSyncing ? 'Menyinkronkan Nilai...' : 'Sinkronkan Sekarang'}</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -9,6 +9,8 @@ import type {
   BatchSaveGradesResult,
   SyncScoresToGradeMasterDTO,
   SyncScoresToGradeMasterResult,
+  BulkSyncSessionsOptions,
+  BulkSyncSessionsResult,
 } from '../types/database.types';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { resolveSessionAcademicYear } from '../utils/academic-year.utils';
@@ -203,6 +205,18 @@ export class ExamCorrectionRepository {
   ): Promise<SyncScoresToGradeMasterResult> {
     const { syncExistingSessionToGradeMaster } = await import('../services/grademaster-sync.service');
     return await syncExistingSessionToGradeMaster(sessionId, token);
+  }
+
+  /**
+   * Synchronizes all eligible exam sessions to GradeMaster in bulk.
+   * Smartly deduplicates duplicate sessions and student scores, and respects target academic year & semester.
+   */
+  public static async syncAllSessionsToGradeMaster(
+    options?: BulkSyncSessionsOptions,
+    token?: string
+  ): Promise<BulkSyncSessionsResult> {
+    const { syncAllSessionsToGradeMaster } = await import('../services/grademaster-sync.service');
+    return await syncAllSessionsToGradeMaster(options, token);
   }
 
   /**
