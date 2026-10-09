@@ -323,6 +323,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
   const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS'>('HOME');
+  const berandaLayerRef = React.useRef(berandaLayer);
+  berandaLayerRef.current = berandaLayer;
   const [surveyAnalyticsReturnTarget, setSurveyAnalyticsReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
   const [notulenReturnTarget, setNotulenReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [studentBehaviorReturnTarget, setStudentBehaviorReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
@@ -837,9 +839,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   };
 
   // Listener untuk membuka layer Suara Pendidik & Hasil Survei Guru (Layer dedicated, bukan popup)
+  // Gunakan ref agar handler selalu membaca nilai berandaLayer terkini tanpa re-register listener
   useEffect(() => {
     const handleOpenSurveyAnalytics = () => {
-      setSurveyAnalyticsReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+      setSurveyAnalyticsReturnTarget(berandaLayerRef.current === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
       setActiveTab('BERANDA');
       setBerandaLayer('SURVEY_ANALYTICS');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -848,7 +851,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     return () => {
       window.removeEventListener('smart_absensi_open_survey_analytics', handleOpenSurveyAnalytics);
     };
-  }, [berandaLayer]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
