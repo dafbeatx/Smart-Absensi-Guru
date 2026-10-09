@@ -49,6 +49,8 @@ import type {
   BatchSaveGradesResult,
   SyncScoresToGradeMasterDTO,
   SyncScoresToGradeMasterResult,
+  SyncBehaviorsToGradeMasterDTO,
+  SyncBehaviorsToGradeMasterResult,
   SubmitWeeklySurveyDTO,
   WeeklySurveySummary,
   WeeklySurveyResponse,
@@ -3475,6 +3477,42 @@ export class MockProvider implements IDataProvider {
       count: scores.length,
       sessionId: sessionId,
       message: `Berhasil menyinkronkan ${scores.length} nilai siswa ke GradeMaster (${cleanClass}).`,
+    };
+  }
+
+  public async syncBehaviorsToGradeMaster(
+    dto: SyncBehaviorsToGradeMasterDTO,
+    _token?: string
+  ): Promise<SyncBehaviorsToGradeMasterResult> {
+    const cleanClass = dto.className?.trim() || '';
+    const cleanYear = normalizeAcademicYearString(dto.academicYear || '2026/2027') || '2026/2027';
+    const behaviors = dto.behaviors || [];
+
+    if (!cleanClass) {
+      throw new Error('PARAMETER_INVALID: className wajib diisi untuk sinkronisasi sikap GradeMaster.');
+    }
+
+    if (behaviors.length === 0) {
+      return { success: true, count: 0, message: 'Tidak ada data catatan sikap yang dikirim.' };
+    }
+
+    for (const b of behaviors) {
+      await this.recordStudentBehavior({
+        studentName: b.studentName.trim(),
+        className: cleanClass,
+        academicYear: cleanYear,
+        type: b.type,
+        points: Math.abs(b.pointsDelta),
+        reason: b.reason,
+        violationDate: b.date,
+        teacherName: dto.teacherName || 'Guru Pengampu',
+      });
+    }
+
+    return {
+      success: true,
+      count: behaviors.length,
+      message: `Berhasil menyinkronkan ${behaviors.length} catatan sikap siswa ke GradeMaster (${cleanClass}).`,
     };
   }
 

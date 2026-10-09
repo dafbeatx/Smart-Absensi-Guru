@@ -875,6 +875,27 @@ export interface SyncScoresToGradeMasterResult {
   message?: string;
 }
 
+export interface GradeMasterBehaviorItem {
+  studentName: string;
+  type: 'GOOD' | 'BAD';
+  pointsDelta: number;
+  reason: string;
+  date: string;
+}
+
+export interface SyncBehaviorsToGradeMasterDTO {
+  className: string;
+  academicYear?: string;
+  teacherName?: string;
+  behaviors: GradeMasterBehaviorItem[];
+}
+
+export interface SyncBehaviorsToGradeMasterResult {
+  success: boolean;
+  count?: number;
+  message?: string;
+}
+
 export interface StudentCalculationResult {
   correct: number;
   wrong: number;

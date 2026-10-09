@@ -12,11 +12,15 @@ import type {
   SyncScoresToGradeMasterDTO,
   SyncScoresToGradeMasterResult,
   GradeMasterScoreItem,
+  SyncBehaviorsToGradeMasterDTO,
+  SyncBehaviorsToGradeMasterResult,
+  GradeMasterBehaviorItem,
 } from '../types/database.types';
 import { normalizeAcademicYearString } from '../utils/academic-year.utils';
 import { logger } from '../utils/logger.utils';
 
 export type SyncScoresParams = SyncScoresToGradeMasterDTO;
+export type SyncBehaviorsParams = SyncBehaviorsToGradeMasterDTO;
 
 /**
  * Sinkronisasi data nilai siswa ke Portal Siswa GradeMaster via HTTP API Bridge
@@ -193,4 +197,133 @@ export async function postManualScoreToGradeMasterHttp(params: {
     logger.warn('GradeMasterSyncService', 'Gagal memanggil endpoint manual-score HTTP:', err);
     return { success: false, error: err?.message || 'Network error' };
   }
+}
+
+/**
+ * Sinkronisasi data catatan sikap / perilaku (Behavior) siswa ke GradeMaster via HTTP API Bridge
+ */
+export async function syncBehaviorsToGradeMaster(payload: {
+  className: string;
+  academicYear?: string;
+  teacherName?: string;
+  behaviors: Array<{
+    studentName: string;
+    type: 'GOOD' | 'BAD';
+    pointsDelta: number;
+    reason: string;
+    date: string;
+  }>;
+}): Promise<SyncBehaviorsToGradeMasterResult> {
+  const apiUrl =
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GRADEMASTER_API_URL) ||
+    'https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi';
+
+  const syncKey =
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GRADEMASTER_SYNC_KEY) ||
+    'gm_sync_smart_absensi_2026';
+
+  if (!payload.className || !payload.className.trim()) {
+    throw new Error('INVALID_PAYLOAD: className wajib diisi.');
+  }
+
+  const cleanClass = payload.className.trim();
+  const cleanYear = normalizeAcademicYearString(payload.academicYear || '2026/2027') || '2026/2027';
+  const cleanTeacher = payload.teacherName?.trim() || 'Guru Pengampu';
+
+  const formattedBehaviors: GradeMasterBehaviorItem[] = (payload.behaviors || []).map((b) => ({
+    studentName: b.studentName.trim(),
+    type: (b.type === 'GOOD' ? 'GOOD' : 'BAD') as 'GOOD' | 'BAD',
+    pointsDelta: Math.abs(Number(b.pointsDelta) || 0),
+    reason: b.reason?.trim() || (b.type === 'GOOD' ? 'Catatan Kebaikan' : 'Catatan Kedisiplinan'),
+    date: b.date?.trim() || new Date().toISOString().split('T')[0],
+  }));
+
+  const bodyData = {
+    className: cleanClass,
+    academicYear: cleanYear,
+    teacherName: cleanTeacher,
+    behaviors: formattedBehaviors,
+  };
+
+  logger.info(
+    'GradeMasterSyncService',
+    `Mengirim ${formattedBehaviors.length} catatan perilaku via HTTP API Bridge ke: ${apiUrl} (Kelas: ${cleanClass}, TA: ${cleanYear})`
+  );
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-sync-key': syncKey,
+    },
+    body: JSON.stringify(bodyData),
+  });
+
+  const resJson = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorMsg =
+      resJson.error ||
+      resJson.message ||
+      `HTTP ${response.status}: Gagal melakukan sinkronisasi catatan sikap ke Web Input Nilai`;
+    logger.error('GradeMasterSyncService', 'Gagal memanggil HTTP API Bridge (Behavior):', errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  logger.info(
+    'GradeMasterSyncService',
+    `Sinkronisasi perilaku berhasil: ${resJson.message || 'OK'} (Diproses: ${resJson.processedCount ?? formattedBehaviors.length})`
+  );
+
+  return {
+    success: true,
+    message: resJson.message || 'Berhasil sinkronisasi catatan sikap siswa ke Portal Siswa',
+    count: resJson.processedCount !== undefined ? Number(resJson.processedCount) : formattedBehaviors.length,
+  };
+}
+
+/**
+ * Sinkronisasi seluruh catatan perilaku siswa suatu kelas ke GradeMaster via HTTP API Bridge
+ */
+export async function syncClassBehaviorsToGradeMaster(
+  className: string,
+  academicYear = '2026/2027',
+  teacherName = 'Guru Pengampu',
+  token?: string
+): Promise<SyncBehaviorsToGradeMasterResult> {
+  const { StudentBehaviorRepository } = await import('../repositories/StudentBehaviorRepository');
+  const records = await StudentBehaviorRepository.getBehaviors(className, academicYear, token);
+
+  const behaviors: GradeMasterBehaviorItem[] = [];
+
+  for (const rec of records) {
+    for (const log of rec.behavior_logs || []) {
+      if (log.voided_at) continue; // Jangan kirim log yang dibatalkan
+      const dateStr =
+        (log.occurred_at || log.violation_date || log.timestamp || '').split('T')[0] ||
+        new Date().toISOString().split('T')[0];
+      behaviors.push({
+        studentName: rec.student_name,
+        type: log.type === 'GOOD' ? 'GOOD' : 'BAD',
+        pointsDelta: Math.abs(log.points),
+        reason: log.reason,
+        date: dateStr,
+      });
+    }
+  }
+
+  if (behaviors.length === 0) {
+    return {
+      success: true,
+      count: 0,
+      message: `Tidak ada catatan sikap aktif untuk kelas ${className} pada TA ${academicYear}.`,
+    };
+  }
+
+  return await syncBehaviorsToGradeMaster({
+    className,
+    academicYear,
+    teacherName,
+    behaviors,
+  });
 }

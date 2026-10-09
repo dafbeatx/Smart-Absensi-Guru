@@ -6,6 +6,8 @@ import type {
   RecordStudentBehaviorResult,
   StudentCharacterSummary,
   GradeMasterBehaviorCategory,
+  SyncBehaviorsToGradeMasterDTO,
+  SyncBehaviorsToGradeMasterResult,
 } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
 
@@ -133,6 +135,30 @@ export class StudentBehaviorRepository {
           }
         } catch {
           // ignore background broadcast error
+        }
+
+        // Forward ke GradeMaster HTTP Bridge secara background
+        try {
+          const dateStr = (params.violationDate || params.occurredAt || new Date().toISOString()).split('T')[0];
+          const { syncBehaviorsToGradeMaster } = await import('../services/grademaster-sync.service');
+          syncBehaviorsToGradeMaster({
+            className: params.className,
+            academicYear: params.academicYear || '2026/2027',
+            teacherName: params.teacherName || 'Guru Pengampu',
+            behaviors: [
+              {
+                studentName: params.studentName,
+                type: params.type,
+                pointsDelta: Math.abs(params.points),
+                reason: params.reason,
+                date: dateStr,
+              },
+            ],
+          }).catch((syncErr) => {
+            logger.warn('StudentBehaviorRepository', 'Background GradeMaster HTTP sync warning:', syncErr?.message || syncErr);
+          });
+        } catch {
+          // ignore background sync load error
         }
       }
 
@@ -292,6 +318,37 @@ export class StudentBehaviorRepository {
       JSON.stringify({ ...official, _cachedAt: Date.now() })
     );
     return official;
+  }
+
+  /**
+   * Menyinkronkan seluruh catatan sikap suatu kelas ke GradeMaster OS via HTTP API Bridge
+   */
+  public static async syncClassToGradeMaster(
+    className: string,
+    academicYear = '2026/2027',
+    teacherName = 'Guru Pengampu',
+    token?: string
+  ): Promise<SyncBehaviorsToGradeMasterResult> {
+    try {
+      const { syncClassBehaviorsToGradeMaster } = await import('../services/grademaster-sync.service');
+      return await syncClassBehaviorsToGradeMaster(className, academicYear, teacherName, token);
+    } catch (err: any) {
+      logger.error('StudentBehaviorRepository', 'syncClassToGradeMaster failed:', err);
+      return {
+        success: false,
+        message: err?.message || 'Gagal menyinkronkan catatan perilaku ke GradeMaster.',
+      };
+    }
+  }
+
+  /**
+   * Mengirim kumpulan catatan sikap ke GradeMaster OS via HTTP API Bridge
+   */
+  public static async syncBehaviorsToGradeMaster(
+    payload: SyncBehaviorsToGradeMasterDTO
+  ): Promise<SyncBehaviorsToGradeMasterResult> {
+    const { syncBehaviorsToGradeMaster } = await import('../services/grademaster-sync.service');
+    return await syncBehaviorsToGradeMaster(payload);
   }
 }
 

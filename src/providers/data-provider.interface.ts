@@ -43,6 +43,8 @@ import type {
   BatchSaveGradesResult,
   SyncScoresToGradeMasterDTO,
   SyncScoresToGradeMasterResult,
+  SyncBehaviorsToGradeMasterDTO,
+  SyncBehaviorsToGradeMasterResult,
   SubmitWeeklySurveyDTO,
   WeeklySurveySummary,
 } from '../types/database.types';
@@ -210,6 +212,7 @@ export interface IDataProvider {
   batchSaveGradedStudents?(data: BatchSaveGradesDTO, token?: string): Promise<BatchSaveGradesResult>;
   deleteGradedStudent(studentId: string, token?: string): Promise<boolean>;
   syncScoresToGradeMaster(data: SyncScoresToGradeMasterDTO, token?: string): Promise<SyncScoresToGradeMasterResult>;
+  syncBehaviorsToGradeMaster?(data: SyncBehaviorsToGradeMasterDTO, token?: string): Promise<SyncBehaviorsToGradeMasterResult>;
 
   // Homeroom & Student Continuation Plans API (Ruang Wali Kelas 9)
   getHomeroomOverview(token: string, className?: string, academicYear?: string): Promise<HomeroomOverview>;

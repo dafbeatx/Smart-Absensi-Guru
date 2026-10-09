@@ -27,6 +27,8 @@ import {
   Award,
   Calendar,
   Undo2,
+  Globe,
+  RefreshCw,
 } from 'lucide-react';
 import {
   toJakartaIsoString,
@@ -92,6 +94,7 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
   const [voidTargetLog, setVoidTargetLog] = useState<{ id: string; studentName: string; reason: string; points: number } | null>(null);
   const [voidReasonText, setVoidReasonText] = useState<string>('');
   const [isVoiding, setIsVoiding] = useState<boolean>(false);
+  const [isSyncingGradeMaster, setIsSyncingGradeMaster] = useState<boolean>(false);
 
   const isCloud = useMemo(() => {
     try {
@@ -409,6 +412,31 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
     }
   };
 
+  const handleSyncToGradeMaster = async () => {
+    setIsSyncingGradeMaster(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const targetClass = selectedClass === 'ALL' ? (students[0]?.class_name || '9A') : selectedClass;
+      const res = await StudentBehaviorRepository.syncClassToGradeMaster(
+        targetClass,
+        academicYear,
+        currentTeacherName
+      );
+      if (res.success) {
+        setSuccessMessage(
+          `Berhasil! ${res.count ?? 0} catatan sikap kelas ${targetClass} telah disinkronkan ke GradeMaster OS via HTTP Bridge.`
+        );
+      } else {
+        setErrorMessage(res.message || 'Gagal menyinkronkan data sikap ke GradeMaster OS.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Terjadi kesalahan saat memanggil HTTP API Bridge.');
+    } finally {
+      setIsSyncingGradeMaster(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -454,14 +482,30 @@ export const StudentBehaviorModal: React.FC<StudentBehaviorModalProps> = ({
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer shrink-0"
-            aria-label="Tutup modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleSyncToGradeMaster}
+              disabled={isSyncingGradeMaster}
+              className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center gap-1.5 transition-all cursor-pointer text-[11px] font-bold border border-white/20"
+              title="Sinkronkan catatan sikap ke GradeMaster OS"
+            >
+              {isSyncingGradeMaster ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-300" />
+              ) : (
+                <Globe className="w-3.5 h-3.5 text-teal-300" />
+              )}
+              <span className="hidden sm:inline">{isSyncingGradeMaster ? 'Sync...' : 'Sync GM'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer shrink-0"
+              aria-label="Tutup modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Switcher (Segmented Control) */}

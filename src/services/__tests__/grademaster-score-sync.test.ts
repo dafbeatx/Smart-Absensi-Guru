@@ -16,8 +16,11 @@ import { MockProvider } from '../../providers/mock-provider.service';
 import {
   syncScoresToGradeMaster,
   syncExistingSessionToGradeMaster,
+  syncBehaviorsToGradeMaster,
+  syncClassBehaviorsToGradeMaster,
 } from '../grademaster-sync.service';
 import { ExamCorrectionRepository } from '../../repositories/ExamCorrectionRepository';
+import { StudentBehaviorRepository } from '../../repositories/StudentBehaviorRepository';
 import type { TestSuiteResult } from '../test-runner.service';
 
 export async function runGradeMasterScoreSyncTestSuite(): Promise<TestSuiteResult> {
@@ -362,6 +365,214 @@ export async function runGradeMasterScoreSyncTestSuite(): Promise<TestSuiteResul
     } catch (err: any) {
       results.push({
         testName: 'GradeMaster Sync 07: ExamCorrectionRepository.syncSessionToGradeMaster bekerja end-to-end via bridge',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 8: syncBehaviorsToGradeMaster mengirim payload behavior ke HTTP bridge
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      mockFetchResponse = {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          message: 'Berhasil sinkronisasi 2 catatan sikap ke Portal Siswa',
+          processedCount: 2,
+        }),
+      };
+
+      const syncRes = await syncBehaviorsToGradeMaster({
+        className: '9A',
+        academicYear: '2026/2027',
+        teacherName: 'Guru Pengampu',
+        behaviors: [
+          {
+            studentName: 'Ahmad Rizki',
+            type: 'BAD',
+            pointsDelta: 10,
+            reason: 'Terlambat masuk kelas 15 menit',
+            date: '2026-10-09',
+          },
+          {
+            studentName: 'Siti Nurhaliza',
+            type: 'GOOD',
+            pointsDelta: 5,
+            reason: 'Merapikan lab komputer dan membantu guru',
+            date: '2026-10-09',
+          },
+        ],
+      });
+
+      const call = fetchState.lastCall;
+      const body = call ? JSON.parse(call.options.body) : null;
+      const headers = call?.options?.headers || {};
+
+      const isValid =
+        syncRes.success &&
+        syncRes.count === 2 &&
+        call?.url === 'https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi' &&
+        headers['Content-Type'] === 'application/json' &&
+        headers['x-sync-key'] === 'gm_sync_smart_absensi_2026' &&
+        body?.className === '9A' &&
+        body?.academicYear === '2026/2027' &&
+        body?.teacherName === 'Guru Pengampu' &&
+        body?.behaviors?.length === 2 &&
+        body?.behaviors[0].studentName === 'Ahmad Rizki' &&
+        body?.behaviors[0].type === 'BAD' &&
+        body?.behaviors[0].pointsDelta === 10 &&
+        body?.behaviors[0].reason === 'Terlambat masuk kelas 15 menit' &&
+        body?.behaviors[0].date === '2026-10-09' &&
+        body?.behaviors[1].studentName === 'Siti Nurhaliza' &&
+        body?.behaviors[1].type === 'GOOD' &&
+        body?.behaviors[1].pointsDelta === 5;
+
+      results.push({
+        testName: 'GradeMaster Sync 08: syncBehaviorsToGradeMaster mengirim payload behavior via HTTP bridge',
+        status: isValid ? 'PASS' : 'FAIL',
+        details: isValid
+          ? `URL: ${call?.url}, Count: ${syncRes.count}, Behaviors: ${body?.behaviors?.length}`
+          : `Gagal verifikasi: ${JSON.stringify({ syncRes, body })}`,
+      });
+    } catch (err: any) {
+      results.push({
+        testName: 'GradeMaster Sync 08: syncBehaviorsToGradeMaster mengirim payload behavior via HTTP bridge',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 9: syncBehaviorsToGradeMaster menolak payload jika className kosong
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      let threwError = false;
+      try {
+        await syncBehaviorsToGradeMaster({
+          className: '',
+          behaviors: [
+            {
+              studentName: 'Ahmad Rizki',
+              type: 'BAD',
+              pointsDelta: 10,
+              reason: 'Bolos pelajaran',
+              date: '2026-10-09',
+            },
+          ],
+        });
+      } catch (err: any) {
+        if (err?.message?.includes('className')) {
+          threwError = true;
+        }
+      }
+
+      results.push({
+        testName: 'GradeMaster Sync 09: syncBehaviorsToGradeMaster menolak className kosong dengan error eksplisit',
+        status: threwError ? 'PASS' : 'FAIL',
+        details: threwError ? 'Error tertangkap dengan benar untuk className kosong' : 'Gagal mendeteksi className kosong',
+      });
+    } catch (err: any) {
+      results.push({
+        testName: 'GradeMaster Sync 09: syncBehaviorsToGradeMaster menolak className kosong dengan error eksplisit',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 10: syncClassBehaviorsToGradeMaster membaca catatan siswa lokal & kirim ke HTTP bridge
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      mockFetchResponse = {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          message: 'Berhasil sinkronisasi catatan sikap ke Portal Siswa',
+          processedCount: 1,
+        }),
+      };
+
+      mockProvider.setMockStudentBehaviors([
+        {
+          id: 'stu_9b_bima',
+          student_id: 'stu_9b_bima',
+          student_name: 'Bima Sakti',
+          class_name: '9B',
+          academic_year: '2026/2027',
+          total_points: 0,
+          merits_points: 0,
+          demerits_points: 0,
+          net_points: 0,
+          behavior_logs: [],
+          sync_status: 'LOCAL_DRAFT',
+        },
+      ]);
+
+      await mockProvider.recordStudentBehavior({
+        studentId: 'stu_9b_bima',
+        studentName: 'Bima Sakti',
+        className: '9B',
+        academicYear: '2026/2027',
+        type: 'GOOD',
+        points: 10,
+        reason: 'Juara Olimpiade Matematika',
+        violationDate: '2026-10-09',
+        teacherName: 'Guru Matematika',
+      });
+
+      const syncClassRes = await syncClassBehaviorsToGradeMaster('9B', '2026/2027', 'Guru Matematika');
+      const call = fetchState.lastCall;
+      const body = call ? JSON.parse(call.options.body) : null;
+
+      const isValid =
+        syncClassRes.success &&
+        (syncClassRes.count ?? 0) >= 1 &&
+        body?.className === '9B' &&
+        body?.behaviors?.some((b: any) => b.studentName === 'Bima Sakti' && b.type === 'GOOD');
+
+      results.push({
+        testName: 'GradeMaster Sync 10: syncClassBehaviorsToGradeMaster membaca catatan siswa lokal & kirim ke HTTP bridge',
+        status: isValid ? 'PASS' : 'FAIL',
+        details: isValid
+          ? `Tersinkron ${syncClassRes.count} catatan sikap siswa untuk kelas 9B`
+          : `Gagal: ${JSON.stringify({ syncClassRes, body })}`,
+      });
+    } catch (err: any) {
+      results.push({
+        testName: 'GradeMaster Sync 10: syncClassBehaviorsToGradeMaster membaca catatan siswa lokal & kirim ke HTTP bridge',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 11: StudentBehaviorRepository.syncClassToGradeMaster integrasi end-to-end
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      mockFetchResponse = {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          message: 'Berhasil sinkronisasi catatan sikap ke Portal Siswa',
+          processedCount: 1,
+        }),
+      };
+
+      const repoRes = await StudentBehaviorRepository.syncClassToGradeMaster('9B', '2026/2027', 'Guru Matematika');
+      const isRepoValid = repoRes.success && (repoRes.count ?? 0) >= 1;
+
+      results.push({
+        testName: 'GradeMaster Sync 11: StudentBehaviorRepository.syncClassToGradeMaster bekerja end-to-end via bridge',
+        status: isRepoValid ? 'PASS' : 'FAIL',
+        details: isRepoValid ? `Tersinkron count: ${repoRes.count}` : `Gagal: ${JSON.stringify(repoRes)}`,
+      });
+    } catch (err: any) {
+      results.push({
+        testName: 'GradeMaster Sync 11: StudentBehaviorRepository.syncClassToGradeMaster bekerja end-to-end via bridge',
         status: 'FAIL',
         details: err?.message || String(err),
       });
