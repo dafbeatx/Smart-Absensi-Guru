@@ -68,6 +68,7 @@ import {
 import { isSemesterMatch } from '../../../services/grademaster-sync.service';
 import { SemesterGradingExcelService } from '../../../services/semester-grading-excel.service';
 import { DownloadOfficialGradingModal } from './DownloadOfficialGradingModal';
+import { UniversalExcelImportModal } from './UniversalExcelImportModal';
 
 export type ModalLoadState =
   | 'IDLE'
@@ -128,6 +129,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [selectedClass, setSelectedClass] = useState('8A');
   const [customClass, setCustomClass] = useState('');
   const [availableClasses, setAvailableClasses] = useState<string[]>(PREDEFINED_CLASSES);
+  const [allDirectoryStudents, setAllDirectoryStudents] = useState<StudentItem[]>([]);
   const [examType, setExamType] = useState('PTS / UTS');
   const [examFormat, setExamFormat] = useState<'PG_ONLY' | 'PG_AND_ESSAY'>('PG_ONLY');
   const [academicYear, setAcademicYear] = useState(() => AdministrationRepository.getActiveAcademicYear());
@@ -275,6 +277,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
             list = await StudentRepository.getStudents();
           }
           if (Array.isArray(list) && list.length > 0) {
+            setAllDirectoryStudents(list);
             const set = new Set<string>(PREDEFINED_CLASSES);
             list.forEach((s) => {
               const norm = normalizeClassCode(s.className);
@@ -1606,7 +1609,15 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   };
 
     const [isDownloadFormatModalOpen, setIsDownloadFormatModalOpen] = useState(false);
+  const [isUniversalExcelModalOpen, setIsUniversalExcelModalOpen] = useState(false);
   const [isImportingExcel, setIsImportingExcel] = useState(false);
+
+  const handleUniversalExcelSuccess = async (newSession: ExamSessionRecord, msg: string) => {
+    await loadSessions();
+    await handleSelectSession(newSession);
+    setActiveTab('recap');
+    setToastMessage({ text: msg, type: 'success' });
+  };
 
   const handleImportExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1922,6 +1933,16 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               <span className="hidden sm:inline px-1 py-0.5 rounded text-[9px] bg-teal-200/70 text-teal-900 font-extrabold uppercase tracking-wider">
                 Cloud
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsUniversalExcelModalOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1.5 transition-all border border-emerald-300 shadow-2xs shrink-0 min-h-9 cursor-pointer"
+              title="Import berkas Excel untuk deteksi & pencocokan nama siswa, kelas, dan nilai PG & Essay secara otomatis"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Import Nilai Excel</span>
             </button>
 
             <button
@@ -4417,6 +4438,16 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         defaultAcademicYear={academicYear}
         defaultSemester={semester}
         onSuccess={(msg) => setToastMessage({ text: msg, type: 'success' })}
+      />
+
+      {/* Modal Import Nilai Universal Excel */}
+      <UniversalExcelImportModal
+        isOpen={isUniversalExcelModalOpen}
+        onClose={() => setIsUniversalExcelModalOpen(false)}
+        availableSessions={sessions}
+        allDirectoryStudents={allDirectoryStudents.length > 0 ? allDirectoryStudents : classStudents}
+        currentUser={currentUser}
+        onSuccess={handleUniversalExcelSuccess}
       />
     </div>,
     document.body

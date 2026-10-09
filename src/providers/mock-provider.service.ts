@@ -3146,10 +3146,10 @@ export class MockProvider implements IDataProvider {
 
     const record: ExamSessionRecord = {
       id: dto.id || `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      session_name: dto.session_name.trim(),
-      teacher: dto.teacher.trim(),
-      subject: dto.subject.trim(),
-      class_name: dto.class_name.trim(),
+      session_name: (dto.session_name || '').trim(),
+      teacher: (dto.teacher || 'Guru Pengampu').trim(),
+      subject: (dto.subject || '').trim(),
+      class_name: (dto.class_name || '').trim(),
       school_level: resolveSchoolLevel(dto.class_name, dto.school_level),
       answer_key: dto.answer_key || [],
       student_list: dto.student_list || [],

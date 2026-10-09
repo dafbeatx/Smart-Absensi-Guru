@@ -97,6 +97,16 @@ export class ExamCorrectionRepository {
   }
 
   /**
+   * Alias for saveSession to ensure consistent naming across service modules.
+   */
+  public static async saveExamSession(
+    session: CreateExamSessionDTO,
+    token?: string
+  ): Promise<ExamSessionRecord> {
+    return this.saveSession(session, token);
+  }
+
+  /**
    * Deletes an exam session and its associated student grades.
    */
   public static async deleteSession(sessionId: string, token?: string): Promise<boolean> {
@@ -141,6 +151,16 @@ export class ExamCorrectionRepository {
   ): Promise<GradedStudentScoreRecord[]> {
     const res = await this.getGradedStudentsWithStatus(sessionId, token);
     return res.data;
+  }
+
+  /**
+   * Alias for getGradedStudentsWithStatus.
+   */
+  public static async getGradedStudentsBySession(
+    sessionId: string,
+    token?: string
+  ): Promise<GradedStudentsFetchResult> {
+    return this.getGradedStudentsWithStatus(sessionId, token);
   }
 
   /**
