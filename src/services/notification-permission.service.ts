@@ -73,6 +73,7 @@ export type DetailedPermissionStatus =
 const memoryNotificationList: AttendanceNotificationPayload[] = [];
 const memoryReadStore: Map<string, Set<string>> = new Map();
 const memoryPendingReads: Map<string, string[]> = new Map();
+const memoryRecentNativeAlerts: Map<string, number> = new Map();
 
 export class NotificationPermissionService {
   private activeCheckoutTimer: ReturnType<typeof setTimeout> | null = null;
@@ -585,6 +586,15 @@ export class NotificationPermissionService {
     // 1. Save to local namespaced cache feed
     this.saveToCache(payload);
 
+    // Anti-Spam: Cek apakah notifikasi yang sama baru saja ditembakkan dalam kurun waktu 5 menit
+    const notifDedupeKey = payload.id || `${payload.title}_${payload.actionDate || ''}`;
+    const now = Date.now();
+    const lastFired = memoryRecentNativeAlerts.get(notifDedupeKey);
+    if (lastFired && now - lastFired < 5 * 60 * 1000) {
+      return;
+    }
+    memoryRecentNativeAlerts.set(notifDedupeKey, now);
+
     // 2. Play Audio Sound Effect (respecting quiet hours unless critical)
     const inQuietHours = this.isWithinQuietHours();
     if (!inQuietHours || payload.severity === 'CRITICAL') {
@@ -598,11 +608,12 @@ export class NotificationPermissionService {
     // 3. Kirim Native OS Browser Notification via Service Worker (Android & PWA Safe) dengan Fallback
     if (this.isPermissionGranted() && typeof window !== 'undefined') {
       const iconPath = '/pwa-192x192.png';
-      const notificationOptions: NotificationOptions = {
+      const notificationOptions: NotificationOptions & { renotify?: boolean } = {
         body: payload.body,
         icon: iconPath,
         badge: iconPath,
-        tag: payload.id || `sag-notif-${Date.now()}`,
+        tag: payload.id || `sag_notif_${payload.type || 'general'}`,
+        renotify: payload.severity === 'CRITICAL',
         requireInteraction: payload.severity === 'CRITICAL',
         data: {
           url: payload.actionUrl || '/?tab=BERANDA',
@@ -869,6 +880,7 @@ export class NotificationPermissionService {
 
   /**
    * Helper: Trigger Notifikasi Hari Gajian Bulanan untuk Guru & Staf (H-3, H-2, H-1, Hari H Tanggal 10)
+   * Anti-Spam Protocol: Dibatasi 1x per hari pada browser ini, tanpa broadcast server Web Push massal dari client.
    */
   public notifyPayday(
     teacherName?: string,
@@ -884,6 +896,15 @@ export class NotificationPermissionService {
       ? `notif_payday_${userId || 'all'}_${targetDate}_${reminderStatus}`
       : `notif_payday_${userId || 'all'}_${targetDate}`;
 
+    // Anti-Spam: Cek apakah hari ini notifikasi gajian sudah pernah ditembakkan di browser ini
+    const nativeKey = `smart_absensi_payday_native_fired_${targetDate}`;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(nativeKey) === '1') {
+      return;
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(nativeKey, '1');
+    }
+
     this.sendNativeNotification({
       id: notifId,
       title: customTitle || `💰 Hari Gajian Telah Tiba! (${targetDate})`,
@@ -895,15 +916,6 @@ export class NotificationPermissionService {
       actionDate: targetDate,
       actionUrl: '/?tab=BERANDA',
     });
-
-    // Otomatis kirimkan Web Push ke HP Guru, Admin & Kepsek di latar belakang
-    this.triggerServerWebPush({
-      targetRoles: ['GURU', 'ADMIN', 'KEPSEK'],
-      title: customTitle || `💰 Hari Gajian Telah Tiba! (${targetDate})`,
-      body: customBody || `Selamat ${greeting}! Hari ini tanggal 10 adalah Hari Gajian. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang!`,
-      tag: `payday_${targetDate}_${reminderStatus || 'H'}`,
-      url: '/?tab=BERANDA',
-    }).catch(() => {});
   }
 
   /**

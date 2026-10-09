@@ -28,9 +28,9 @@ self.addEventListener('push', (event) => {
     icon: payload.icon || '/pwa-192x192.png',
     badge: payload.badge || '/pwa-192x192.png',
     vibrate: [200, 100, 200, 100, 200],
-    tag: payload.tag || `push_${Date.now()}`,
-    renotify: true,
-    requireInteraction: false,
+    tag: payload.tag || `push_${payload.eventType || 'general'}`,
+    renotify: payload.severity === 'CRITICAL',
+    requireInteraction: payload.severity === 'CRITICAL',
     data: {
       url: payload.url || '/',
       dateOfArrival: Date.now(),

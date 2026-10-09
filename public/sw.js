@@ -120,7 +120,9 @@ self.addEventListener('push', (event) => {
     icon: payload.icon || '/pwa-192x192.png',
     badge: payload.badge || '/pwa-192x192.png',
     vibrate: [100, 50, 100],
-    tag: payload.tag || `sag_push_${Date.now()}`,
+    tag: payload.tag || `sag_push_${payload.eventType || 'general'}`,
+    renotify: payload.severity === 'CRITICAL',
+    requireInteraction: payload.severity === 'CRITICAL',
     data: {
       url: targetUrl,
       action_url: targetUrl,

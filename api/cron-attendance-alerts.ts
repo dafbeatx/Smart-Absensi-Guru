@@ -76,38 +76,41 @@ export default async function handler(req: any, res: any) {
   }> = [];
 
   // 1. 💰 PENGINGAT HARI GAJIAN BULANAN (H-3, H-2, H-1, HARI H TANGGAL 10)
-  if (dayOfMonth === 7) {
-    alertsToSend.push({
-      title: '💰 Pengingat: 3 Hari Lagi Hari Gajian! (Tanggal 10)',
-      body: 'Halo Bapak/Ibu Guru & Staf! 3 hari lagi (tanggal 10) adalah Hari Gajian bulanan. Tetap semangat mengajar dan selalu lakukan presensi.',
-      tag: `payday_h3_${todayDateStr}`,
-      url: '/?tab=BERANDA',
-    });
-  } else if (dayOfMonth === 8) {
-    alertsToSend.push({
-      title: '💰 Pengingat: 2 Hari Lagi Hari Gajian! (Tanggal 10)',
-      body: 'Halo Bapak/Ibu Guru & Staf! 2 hari lagi (tanggal 10) adalah Hari Gajian bulanan. Tetap semangat mengajar dan selalu lakukan presensi.',
-      tag: `payday_h2_${todayDateStr}`,
-      url: '/?tab=BERANDA',
-    });
-  } else if (dayOfMonth === 9) {
-    alertsToSend.push({
-      title: '💰 Pengingat: Besok Hari Gajian! (Tanggal 10)',
-      body: 'Halo Bapak/Ibu Guru & Staf! Besok (tanggal 10) adalah jadwal penggajian bulanan. Tetap semangat mengajar dan jangan lupa presensi.',
-      tag: `payday_h1_${todayDateStr}`,
-      url: '/?tab=BERANDA',
-    });
-  } else if (dayOfMonth === 10) {
-    alertsToSend.push({
-      title: '💰 Hari Gajian Telah Tiba! (Tanggal 10)',
-      body: 'Selamat Bapak/Ibu Guru & Staf! Hari ini tanggal 10 adalah Hari Gajian Guru & Staf. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang.',
-      tag: `payday_h0_${todayDateStr}`,
-      url: '/?tab=BERANDA',
-    });
+  // Hanya dikirimkan 1x per hari pada slot pagi (bukan slot checkout kepulangan siang)
+  const isMorningSlot = reqType === 'morning' || (curH >= 6 && curH <= 8);
+  if (isMorningSlot && reqType !== 'checkout') {
+    if (dayOfMonth === 7) {
+      alertsToSend.push({
+        title: '💰 Pengingat: 3 Hari Lagi Hari Gajian! (Tanggal 10)',
+        body: 'Halo Bapak/Ibu Guru & Staf! 3 hari lagi (tanggal 10) adalah Hari Gajian bulanan. Tetap semangat mengajar dan selalu lakukan presensi.',
+        tag: `payday_h3_${todayDateStr}`,
+        url: '/?tab=BERANDA',
+      });
+    } else if (dayOfMonth === 8) {
+      alertsToSend.push({
+        title: '💰 Pengingat: 2 Hari Lagi Hari Gajian! (Tanggal 10)',
+        body: 'Halo Bapak/Ibu Guru & Staf! 2 hari lagi (tanggal 10) adalah Hari Gajian bulanan. Tetap semangat mengajar dan selalu lakukan presensi.',
+        tag: `payday_h2_${todayDateStr}`,
+        url: '/?tab=BERANDA',
+      });
+    } else if (dayOfMonth === 9) {
+      alertsToSend.push({
+        title: '💰 Pengingat: Besok Hari Gajian! (Tanggal 10)',
+        body: 'Halo Bapak/Ibu Guru & Staf! Besok (tanggal 10) adalah jadwal penggajian bulanan. Tetap semangat mengajar dan jangan lupa presensi.',
+        tag: `payday_h1_${todayDateStr}`,
+        url: '/?tab=BERANDA',
+      });
+    } else if (dayOfMonth === 10) {
+      alertsToSend.push({
+        title: '💰 Hari Gajian Telah Tiba! (Tanggal 10)',
+        body: 'Selamat Bapak/Ibu Guru & Staf! Hari ini tanggal 10 adalah Hari Gajian Guru & Staf. Tetap semangat mengajar dan jangan lupa presensi masuk & pulang.',
+        tag: `payday_h0_${todayDateStr}`,
+        url: '/?tab=BERANDA',
+      });
+    }
   }
 
   // 2. ⏰ PENGINGAT PRESENSI MASUK PAGI (Hari Kerja, Pagi)
-  const isMorningSlot = reqType === 'morning' || (curH >= 6 && curH <= 8);
   if (!isWeekend && isMorningSlot && reqType !== 'checkout') {
     alertsToSend.push({
       title: '⏰ Pengingat Presensi Masuk Pagi',

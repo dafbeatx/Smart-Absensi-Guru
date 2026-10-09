@@ -1502,13 +1502,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             return [paydayNotif, ...prev];
           });
 
-          // Batasi penembakan native notification & push gajian maksimal 1x per hari
-          const paydayAlertKey = `smart_absensi_payday_fired_${effectiveUser.id}_${todayIsoStr}_${reminderInfo.status}`;
-          const alreadyFiredPayday = typeof window !== 'undefined' && localStorage.getItem(paydayAlertKey) === '1';
+          // Batasi penembakan native notification maksimal 1x per hari di browser/device ini
+          const isRealUser = !isPreviewMode && !!effectiveUser?.id && effectiveUser.id !== 'usr_guru_sample';
+          const paydayDeviceKey = `smart_absensi_payday_fired_${todayIsoStr}`;
+          const paydayUserKey = `smart_absensi_payday_fired_${effectiveUser.id}_${todayIsoStr}`;
+          const alreadyFiredToday =
+            typeof window !== 'undefined' &&
+            (localStorage.getItem(paydayDeviceKey) === '1' || localStorage.getItem(paydayUserKey) === '1');
 
-          if (!isPaydayRead && !alreadyFiredPayday) {
+          if (isRealUser && !alreadyFiredToday) {
             if (typeof window !== 'undefined') {
-              localStorage.setItem(paydayAlertKey, '1');
+              localStorage.setItem(paydayDeviceKey, '1');
+              localStorage.setItem(paydayUserKey, '1');
             }
             NotificationService.notifyPayday(
               effectiveUser.full_name,
