@@ -388,7 +388,7 @@ export const SurveyAnalyticsView: React.FC<SurveyAnalyticsViewProps> = ({
             </div>
 
             {/* Indeks Kepuasan Rerata */}
-            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 shadow-2xs space-y-1">
+            <div className="bg-emerald-50/60 p-3.5 sm:p-4 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
               <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                 Nilai Kepuasan Rerata
@@ -405,7 +405,7 @@ export const SurveyAnalyticsView: React.FC<SurveyAnalyticsViewProps> = ({
             </div>
 
             {/* Bukti Manfaat Nyata */}
-            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-2xs space-y-1">
+            <div className="bg-purple-50/60 p-3.5 sm:p-4 rounded-2xl border border-purple-200 shadow-2xs space-y-1">
               <span className="text-[10px] sm:text-[11px] font-extrabold text-purple-800 uppercase tracking-wider flex items-center gap-1">
                 <Award className="w-3.5 h-3.5 text-purple-600" />
                 Bukti Manfaat
@@ -421,7 +421,7 @@ export const SurveyAnalyticsView: React.FC<SurveyAnalyticsViewProps> = ({
             </div>
 
             {/* Rencana Solusi Sekolah */}
-            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-amber-200 bg-amber-50/40 shadow-2xs space-y-1">
+            <div className="bg-amber-50/60 p-3.5 sm:p-4 rounded-2xl border border-amber-200 shadow-2xs space-y-1">
               <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-800 uppercase tracking-wider flex items-center gap-1">
                 <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
                 Rencana Solusi
