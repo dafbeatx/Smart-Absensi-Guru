@@ -48,6 +48,7 @@ import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDiscip
 import { AboutAppView } from '../../guru/components/AboutAppView';
 import { WebTrafficService } from '../../../services/web-traffic.service';
 import { AdministrationHubView } from '../../administration/components/AdministrationHubView';
+import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
 import { StudentExamCardModal } from '../../guru/components/StudentExamCardModal';
 import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
 import { HomeroomModal } from '../../homeroom/components/HomeroomModal';
@@ -248,6 +249,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   // Ref to hold the latest backend sync function for cross-device sync hook
   const syncBackendRef = useRef<(() => void) | null>(null);
+
+  // Listener untuk membuka layer Suara Pendidik saat diakses via widget/deep-link
+  useEffect(() => {
+    const handleOpenSurvey = () => {
+      setActiveTab('SURVEY_RESEARCH');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('smart_absensi_open_survey_analytics', handleOpenSurvey);
+    return () => {
+      window.removeEventListener('smart_absensi_open_survey_analytics', handleOpenSurvey);
+    };
+  }, []);
 
   useEffect(() => {
     // 1. Instantly populate from local storage cache for instant UI rendering
@@ -568,7 +581,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   const handleSelectSidebarTab = (id: string) => {
     if (id === 'SURVEY_RESEARCH') {
-      window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_analytics'));
+      setActiveTab('SURVEY_RESEARCH');
       return;
     }
     if (id === 'APPLY_LEAVE') {
@@ -920,6 +933,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               backLabel="Kembali ke Dashboard Utama"
               role="ADMIN"
               className="max-w-4xl mx-auto"
+            />
+          )}
+
+          {/* TAB: SUARA PENDIDIK & HASIL SURVEI (LAYER RESMI) */}
+          {activeTab === 'SURVEY_RESEARCH' && (
+            <SurveyAnalyticsView
+              onBack={() => setActiveTab('DASHBOARD')}
+              backLabel="Kembali ke Dashboard Utama"
+              layoutMode="desktop"
             />
           )}
         </main>

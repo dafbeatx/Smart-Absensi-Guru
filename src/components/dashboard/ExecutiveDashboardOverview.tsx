@@ -608,7 +608,9 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
       />
 
       {/* ── 2.2 SUARA PENDIDIK & HASIL SURVEY GURU (100% ANONIM) ── */}
-      <ExecutiveSurveySummaryWidget />
+      <ExecutiveSurveySummaryWidget
+        onOpenSurveyModal={() => onNavigateTab && onNavigateTab('SURVEY_RESEARCH')}
+      />
 
       {/* ── 2. SUMMARY STAT CARDS GRID (5 CARDS IN A ROW - FULLY CLICKABLE) ──────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
@@ -941,9 +943,6 @@ export const ExecutiveDashboardOverview: React.FC<ExecutiveDashboardOverviewProp
           </button>
         </div>
       </div>
-
-      {/* ── 3.4. SUARA PENDIDIK & HASIL SURVEY GURU (100% ANONIM DENGAN GRAFIK & SOLUSI) ── */}
-      <ExecutiveSurveySummaryWidget />
 
       {/* ── 3.5. TEACHER WELL-BEING & BURNOUT EARLY WARNING WIDGET ────────── */}
       <BurnoutEarlyWarningWidget />

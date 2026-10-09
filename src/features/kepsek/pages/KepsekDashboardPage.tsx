@@ -37,6 +37,7 @@ import { getSafeInitialTeacherPointLogs } from '../../../utils/teacher-point-see
 import type { TeacherPointLog } from '../../../types/database.types';
 import { TeacherPointRepository } from '../../../repositories/TeacherPointRepository';
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
+import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -138,6 +139,18 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   useEffect(() => {
     fetchMyAttendance();
   }, [fetchMyAttendance]);
+
+  // Listener untuk membuka layer Suara Pendidik saat diakses via widget/deep-link
+  useEffect(() => {
+    const handleOpenSurvey = () => {
+      setActiveTab('SURVEY_RESEARCH');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('smart_absensi_open_survey_analytics', handleOpenSurvey);
+    return () => {
+      window.removeEventListener('smart_absensi_open_survey_analytics', handleOpenSurvey);
+    };
+  }, []);
 
   const fetchComplaintsCount = async () => {
     try {
@@ -601,7 +614,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             return;
           }
           if (id === 'SURVEY_RESEARCH') {
-            window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_analytics'));
+            setActiveTab('SURVEY_RESEARCH');
             return;
           }
           setActiveTab(id as typeof activeTab);
@@ -877,6 +890,15 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
               currentUser={user}
               layoutMode="desktop"
               onBack={() => setActiveTab('DASHBOARD')}
+            />
+          )}
+
+          {/* TAB: SUARA PENDIDIK & HASIL SURVEI (LAYER RESMI) */}
+          {activeTab === 'SURVEY_RESEARCH' && (
+            <SurveyAnalyticsView
+              onBack={() => setActiveTab('DASHBOARD')}
+              backLabel="Kembali ke Dashboard Utama"
+              layoutMode="desktop"
             />
           )}
 

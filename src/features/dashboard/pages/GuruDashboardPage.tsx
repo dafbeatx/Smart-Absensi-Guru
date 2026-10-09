@@ -44,6 +44,7 @@ import {
 } from '../../guru/components/CustomizeQuickIconsModal';
 import { SarprasInventoryModal } from '../../sarpras/components/SarprasInventoryModal';
 import { GuruSurveyVoiceCard } from '../../guru/components/GuruSurveyVoiceCard';
+import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
 import { DailySurveyReminderBanner } from '../../../components/survey/DailySurveyReminderBanner';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
@@ -321,7 +322,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS'>('HOME');
+  const [surveyAnalyticsReturnTarget, setSurveyAnalyticsReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
   const [notulenReturnTarget, setNotulenReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [studentBehaviorReturnTarget, setStudentBehaviorReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [aboutReturnTarget, setAboutReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
@@ -825,12 +827,28 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setIsMoodModalOpen(true);
         break;
       case 'survey_hasil':
-        window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_analytics'));
+        setSurveyAnalyticsReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+        setBerandaLayer('SURVEY_ANALYTICS');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       default:
         setIsMoreFeaturesModalOpen(true);
     }
   };
+
+  // Listener untuk membuka layer Suara Pendidik & Hasil Survei Guru (Layer dedicated, bukan popup)
+  useEffect(() => {
+    const handleOpenSurveyAnalytics = () => {
+      setSurveyAnalyticsReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+      setActiveTab('BERANDA');
+      setBerandaLayer('SURVEY_ANALYTICS');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('smart_absensi_open_survey_analytics', handleOpenSurveyAnalytics);
+    return () => {
+      window.removeEventListener('smart_absensi_open_survey_analytics', handleOpenSurveyAnalytics);
+    };
+  }, [berandaLayer]);
 
   // Notifications List State (Backend-Driven)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -5065,6 +5083,26 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           />
         )}
 
+        {/* ── LAYER: SUARA GURU & EVALUASI SEKOLAH (DEDICATED FULL VIEW - NON-POPUP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'SURVEY_ANALYTICS' && (
+          <SurveyAnalyticsView
+            onBack={() => {
+              setBerandaLayer(surveyAnalyticsReturnTarget === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+              if (surveyAnalyticsReturnTarget === 'PROFIL') {
+                setActiveTab('PROFIL');
+              }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            backLabel={
+              surveyAnalyticsReturnTarget === 'PROFIL'
+                ? 'Kembali ke Profil'
+                : surveyAnalyticsReturnTarget === 'ALL_FEATURES'
+                ? 'Kembali ke Semua Fitur'
+                : 'Kembali ke Beranda'
+            }
+          />
+        )}
+
         {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}
         {activeTab === 'RIWAYAT' && (
           <section className="space-y-3 sm:space-y-4">
@@ -5840,29 +5878,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </button>
               </div>
 
-              {/* Riset & Evaluasi Mingguan (TAM Kuesioner) Card */}
+              {/* Hasil Survei & Suara Guru Section */}
               <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-base">📊</span>
-                    <span className="font-extrabold text-xs text-emerald-950">Hasil Survey &amp; Solusi Seluruh Guru</span>
+                    <span className="font-extrabold text-xs text-emerald-950">Suara Guru &amp; Rencana Solusi Sekolah</span>
                   </div>
                   <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
                     100% Anonim
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 leading-relaxed">
-                  Evaluasi kuesioner bersama, grafik dimensi kemanfaatan &amp; kemudahan (TAM), serta langkah nyata rekomendasi solusi sekolah.
+                  Evaluasi bersama seluruh pendidik, grafik tingkat kepuasan guru, serta langkah perbaikan nyata yang disiapkan pihak sekolah.
                 </p>
                 <button
                   type="button"
                   id="btn-guru-open-survey-analytics"
                   onClick={() => {
-                    window.dispatchEvent(new CustomEvent('smart_absensi_open_survey_analytics'));
+                    setSurveyAnalyticsReturnTarget('PROFIL');
+                    setActiveTab('BERANDA');
+                    setBerandaLayer('SURVEY_ANALYTICS');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-full mt-1 py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer"
+                  className="w-full mt-1 py-2.5 px-3 bg-[#023246] hover:bg-[#18536B] text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-98 cursor-pointer min-h-11"
                 >
-                  <span>📈</span> Lihat Rekapitulasi, Grafik &amp; Solusi Lengkap
+                  <span>📊</span> Buka Layer Suara Guru &amp; Solusi Sekolah
                 </button>
               </div>
 

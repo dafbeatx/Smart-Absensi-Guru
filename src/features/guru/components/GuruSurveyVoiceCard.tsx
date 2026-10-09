@@ -119,8 +119,8 @@ export const GuruSurveyVoiceCard: React.FC = () => {
         onClick={handleOpen}
         className="w-full py-2.5 px-3.5 bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 text-white text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 cursor-pointer"
       >
-        <span>📈</span>
-        <span>Buka Hasil Survey, Grafik &amp; Solusi Lengkap</span>
+        <span>📊</span>
+        <span>Buka Layer Suara Guru &amp; Rencana Solusi Sekolah</span>
       </button>
     </section>
   );
