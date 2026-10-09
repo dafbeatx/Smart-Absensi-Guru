@@ -27,6 +27,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   },
 });
 
+import { authenticateUser as authenticateSharedSession } from './_shared/session-auth.js';
+
 interface SubscriptionRequestBody {
   subscription?: {
     endpoint: string;
@@ -41,21 +43,29 @@ interface SubscriptionRequestBody {
 /**
  * Validates session token and returns the authenticated user's ID
  */
-async function authenticateUser(authHeader: string | undefined): Promise<{ userId: string; role: string } | null> {
+async function authenticateUser(req: any): Promise<{ userId: string; role: string } | null> {
+  const authHeader = req?.headers?.authorization || req?.headers?.['x-session-token'];
   if (!authHeader) return null;
 
-  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  // 1. Validasi via Shared Stateful Session Authentication (saga_sess_)
+  try {
+    const sessionAuth = await authenticateSharedSession(req);
+    if (sessionAuth && sessionAuth.ok) {
+      return { userId: sessionAuth.userId, role: sessionAuth.role };
+    }
+  } catch {
+    // Abaikan jika tabel user_sessions belum siap atau terjadi fallback
+  }
+
+  const token = typeof authHeader === 'string' ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
   if (!token) return null;
 
-  // Format token internal: SB_JWT_<userId>_<timestamp> atau token khusus
+  // 2. Format token internal/legacy: SB_JWT_<userId>_<timestamp> atau token khusus
   // Contoh: SB_JWT_usr_guru_002_1789269893399
   let candidateUserId: string | null = null;
   if (token.startsWith('SB_JWT_')) {
     const parts = token.split('_');
-    // parts: ['SB', 'JWT', 'usr', 'guru', '002', 'timestamp']
-    // User ID di Smart Absensi berformat: usr_guru_002, usr_kepsek_002, usr_admin_001, atau UUID
     if (parts.length >= 4) {
-      // Ambil bagian tengah sebelum timestamp terakhir
       const withoutPrefix = token.substring('SB_JWT_'.length);
       const lastUnderscore = withoutPrefix.lastIndexOf('_');
       if (lastUnderscore > 0) {
@@ -66,7 +76,7 @@ async function authenticateUser(authHeader: string | undefined): Promise<{ userI
     candidateUserId = token;
   }
 
-  // Jika tidak terurai via convention, cek apakah token ada di header admin secret
+  // 3. Admin Secret Header
   const expectedSecret = process.env.INTERNAL_PUSH_SECRET || process.env.VAPID_PRIVATE_KEY;
   if (expectedSecret && token === expectedSecret) {
     return { userId: 'SYSTEM_INTERNAL', role: 'ADMIN' };
@@ -107,8 +117,7 @@ export default async function handler(req: any, res: any) {
   }
 
   // 1. Verifikasi Autentikasi Pengguna
-  const authHeader = req.headers.authorization || req.headers['x-session-token'];
-  const authenticated = await authenticateUser(authHeader);
+  const authenticated = await authenticateUser(req);
 
   if (!authenticated) {
     return res.status(401).json({
@@ -145,7 +154,7 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-      // 2A. Verifikasi Kepemilikan Endpoint (Mencegah Endpoint Hijacking antar-user)
+      // 2A. Verifikasi Kepemilikan Endpoint
       const { data: existingSub, error: checkError } = await supabase
         .from('push_subscriptions')
         .select('id, user_id')
@@ -161,15 +170,12 @@ export default async function handler(req: any, res: any) {
         });
       }
 
-      // Jika endpoint sudah ada dan dimiliki oleh user LAIN:
-      if (existingSub && existingSub.user_id !== currentUserId && currentUserId !== 'SYSTEM_INTERNAL') {
-        // Blokir jika ada usaha manipulasi kepemilikan tanpa izin
-        return res.status(409).json({
-          success: false,
-          persisted: false,
-          errorCode: 'ENDPOINT_CONFLICT',
-          errorMessage: 'Endpoint push ini telah terdaftar untuk profil pengguna lain pada perangkat ini.',
-        });
+      // Jika endpoint sudah ada dan dimiliki user lain pada perangkat fisik yang sama,
+      // lakukan auto-rebind ke user yang saat ini sedang login dengan sesi aktif.
+      if (existingSub && existingSub.user_id !== currentUserId) {
+        console.info(
+          `[API push-subscriptions] Rebinding endpoint ${existingSub.id} from ${existingSub.user_id} to active user ${currentUserId}`
+        );
       }
 
       // 2B. Simpan dengan Service-Role Key (Bypass RLS anonim secara aman dari server)

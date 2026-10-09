@@ -2506,15 +2506,13 @@ export class SupabaseProvider implements IDataProvider {
     return this.dedupeRequest(`getNotifications_${userId}`, async () => {
       try {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const nowIso = new Date().toISOString();
         const notifCols = 'id, user_id, recipient_user_id, audience_role, title, message, type, severity, action_url, action_type, action_date, action_target_id, payload, dedupe_key, revision, is_read, expires_at, resolved_at, created_by, created_at';
 
         // Query notifications targeted to user or broadcast
         let query = this.client
           .from('notifications')
           .select(notifCols)
-          .gte('created_at', thirtyDaysAgo)
-          .or(`expires_at.is.null,expires_at.gte.${nowIso}`);
+          .gte('created_at', thirtyDaysAgo);
 
         try {
           query = query.or(`recipient_user_id.eq.${userId},user_id.eq.${userId},recipient_user_id.is.null,user_id.is.null`);
@@ -2575,10 +2573,10 @@ export class SupabaseProvider implements IDataProvider {
         continue;
       }
 
-      // 2. Strict Role/Audience filter
-      if (n.audience_role && n.audience_role !== 'ALL' && userRole) {
+      // 2. Strict Role/Audience filter (mencegah kebocoran notifikasi role khusus ke role lain)
+      if (n.audience_role && n.audience_role !== 'ALL') {
         const targetRole = String(n.audience_role).toUpperCase().trim();
-        const currentRole = String(userRole).toUpperCase().trim();
+        const currentRole = userRole ? String(userRole).toUpperCase().trim() : '';
         if (targetRole !== currentRole) {
           continue;
         }
@@ -2776,6 +2774,20 @@ export class SupabaseProvider implements IDataProvider {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications' },
         (payload) => {
+          // Zero-Egress Guard: Jika notifikasi terarah secara privat ke user lain,
+          // abaikan agar tidak memicu cache clear dan refetch berulang (thundering herd) pada client ini
+          const record = (payload.new || payload.old) as any;
+          if (record) {
+            const isTargetedToOther =
+              (record.recipient_user_id && record.recipient_user_id !== userId) ||
+              (!record.recipient_user_id && record.user_id && record.user_id !== userId);
+            const isBroadcast = !record.recipient_user_id && !record.user_id;
+
+            if (isTargetedToOther && !isBroadcast) {
+              return;
+            }
+          }
+
           logger.info('SupabaseProvider', 'Realtime change in notifications table:', payload.eventType);
           this.cachedNotifications.clear();
           this.cachedNotificationReads.clear();

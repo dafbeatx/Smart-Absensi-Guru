@@ -1273,7 +1273,8 @@ export class MockProvider implements IDataProvider {
     return items
       .filter((n) => {
         if (n.expires_at && new Date(n.expires_at).getTime() < now) return false;
-        if (n.audience_role && n.audience_role !== 'ALL' && userRole) {
+        if (n.audience_role && n.audience_role !== 'ALL') {
+          if (!userRole) return false;
           return n.audience_role.toUpperCase().trim() === userRole.toUpperCase().trim();
         }
         return true;

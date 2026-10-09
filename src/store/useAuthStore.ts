@@ -52,6 +52,13 @@ export const useAuthStore = create<AuthState>()(
             // fire-and-forget: fail gracefully if offline
           });
         }
+        if (typeof window !== 'undefined') {
+          try {
+            window.dispatchEvent(new CustomEvent('smart_absensi_logout'));
+          } catch {
+            // ignore
+          }
+        }
         set({
           user: null,
           token: null,

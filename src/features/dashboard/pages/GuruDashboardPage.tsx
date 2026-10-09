@@ -1126,7 +1126,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
       // 5. Backend-Driven Notifications & Official School Announcements
       try {
-        const notifs = await provider.getNotifications(effectiveUser.id, authToken).catch(() => []);
+        const notifs = await provider.getNotifications(effectiveUser.id, authToken, effectiveUser.role).catch(() => []);
         const readIds = NotificationService.getReadNotificationIds(effectiveUser.id);
 
         let allItems: AppNotification[] = (notifs || []).map((n) => ({

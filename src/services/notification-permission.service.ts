@@ -88,7 +88,17 @@ export class NotificationPermissionService {
           this.syncPendingReads(userId).catch(() => {});
         }
       });
+      window.addEventListener('smart_absensi_logout', () => {
+        this.clearMemoryCache();
+      });
     }
+  }
+
+  /**
+   * Bersihkan in-memory notification cache saat pengguna logout / pergantian profil
+   */
+  public clearMemoryCache(): void {
+    memoryNotificationList.length = 0;
   }
 
   /**
