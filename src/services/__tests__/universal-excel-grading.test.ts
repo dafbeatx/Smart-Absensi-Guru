@@ -513,6 +513,78 @@ export async function runUniversalExcelGradingTestSuite(): Promise<TestSuiteResu
         details: err?.message || String(err),
       });
     }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 9: Analisis Cerdas Nama Guru & Mata Pelajaran dari Berkas Excel
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      // 1. Verifikasi deteksi dari Header (Mata Pelajaran & Guru Pengampu)
+      const wb1 = XLSX.utils.book_new();
+      const wsData1 = [
+        ['MATA PELAJARAN', 'Informatika'],
+        ['GURU PENGAMPU', 'Fitriani Rahayu, S.Mat'],
+        ['Kelas', '8A'],
+        ['No', 'Nama Siswa', 'Skor PG', 'Skor Esai', 'Total'],
+        [1, 'Caskia Aprilia', 45, 40, 85],
+      ];
+      const ws1 = XLSX.utils.aoa_to_sheet(wsData1);
+      XLSX.utils.book_append_sheet(wb1, ws1, '8A');
+      const buf1 = XLSX.write(wb1, { type: 'buffer', bookType: 'xlsx' });
+
+      const parsed1 = await UniversalExcelGradingService.parseExcelBuffer(buf1, 'koreksian_infor.xlsx');
+      const sheet1 = parsed1.sheets[0];
+
+      if (sheet1.detectedSubject !== 'Informatika') {
+        throw new Error(`Expected detectedSubject 'Informatika', got '${sheet1.detectedSubject}'`);
+      }
+      if (sheet1.detectedTeacher !== 'Fitriani Rahayu, S.Mat') {
+        throw new Error(`Expected detectedTeacher 'Fitriani Rahayu, S.Mat', got '${sheet1.detectedTeacher}'`);
+      }
+
+      // 2. Verifikasi deteksi dari Footer Tanda Tangan Guru
+      const wb2 = XLSX.utils.book_new();
+      const wsData2 = [
+        ['No', 'Nama Siswa', 'Skor PG', 'Total'],
+        [1, 'Najwa Nur Fadillah', 85, 85],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        ['', '', 'Guru Mata Pelajaran,'],
+        [],
+        [],
+        ['', '', '( Dafa Maulana, S.Pd )'],
+        ['', '', 'NIP. 19900101'],
+      ];
+      const ws2 = XLSX.utils.aoa_to_sheet(wsData2);
+      XLSX.utils.book_append_sheet(wb2, ws2, 'MTK');
+      const buf2 = XLSX.write(wb2, { type: 'buffer', bookType: 'xlsx' });
+
+      const parsed2 = await UniversalExcelGradingService.parseExcelBuffer(buf2, 'rekap_nilai.xlsx');
+      const sheet2 = parsed2.sheets[0];
+
+      if (sheet2.detectedSubject !== 'MTK – Matematika') {
+        throw new Error(`Expected detectedSubject 'MTK – Matematika', got '${sheet2.detectedSubject}'`);
+      }
+      if (sheet2.detectedTeacher !== 'Dafa Maulana, S.Pd') {
+        throw new Error(`Expected detectedTeacher 'Dafa Maulana, S.Pd', got '${sheet2.detectedTeacher}'`);
+      }
+
+      results.push({
+        testName: '9. Analisis Cerdas: Berhasil mendeteksi Mata Pelajaran & Nama Guru dari header/footer Excel',
+        status: 'PASS',
+      });
+    } catch (err: any) {
+      results.push({
+        testName: '9. Analisis Cerdas: Berhasil mendeteksi Mata Pelajaran & Nama Guru dari header/footer Excel',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
   } finally {
     ProviderFactory.setProvider(originalProvider);
   }

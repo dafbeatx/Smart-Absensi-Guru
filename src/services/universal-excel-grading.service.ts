@@ -23,6 +23,7 @@ import { AdministrationRepository } from '../repositories/AdministrationReposito
 import { normalizeClassCode, areClassCodesEqual } from '../utils/class.utils';
 import { normalizeAcademicYearString } from '../utils/academic-year.utils';
 import { logger } from '../utils/logger.utils';
+import { OFFICIAL_SCHOOL_SUBJECTS } from '../config/school-subjects.config';
 
 export interface UniversalExcelStudentRow {
   rowNumber: number;
@@ -106,10 +107,16 @@ export class UniversalExcelGradingService {
    */
   public static async parseExcelFile(
     file: File | ArrayBuffer | Uint8Array,
-    allDirectoryStudents: StudentItem[] = []
+    allDirectoryStudents: StudentItem[] = [],
+    availableTeachers: UserProfile[] = [],
+    currentUser?: UserProfile,
+    customFileName: string = ''
   ): Promise<UniversalExcelParsedSheet[]> {
     let data: Uint8Array;
+    let fileName = customFileName;
+
     if (typeof File !== 'undefined' && file instanceof File) {
+      fileName = file.name || customFileName;
       const buffer = await file.arrayBuffer();
       data = new Uint8Array(buffer);
     } else if (file instanceof Uint8Array) {
@@ -130,10 +137,32 @@ export class UniversalExcelGradingService {
 
     const idSheet = wb.Sheets['IDENTITAS SEKOLAH'];
     if (idSheet) {
-      globalAcademicYear = String(idSheet['B8']?.v || globalAcademicYear);
-      globalSemester = String(idSheet['B9']?.v || globalSemester);
-      globalTeacher = String(idSheet['B10']?.v || globalTeacher);
-      globalSubject = String(idSheet['B11']?.v || globalSubject);
+      const idGrid: any[][] = XLSX.utils.sheet_to_json<any[]>(idSheet, { header: 1, defval: '' });
+      for (const row of idGrid) {
+        const rowStr = row.map((c) => String(c || '').trim().toLowerCase()).join(' ');
+        if (rowStr.includes('tahun pelajaran') || rowStr.includes('tahun ajaran')) {
+          const val = row.find((c: any) => /\b202\d\/202\d\b/.test(String(c || '')));
+          if (val) globalAcademicYear = String(val).trim();
+        }
+        if (rowStr.includes('semester')) {
+          if (rowStr.includes('genap')) globalSemester = 'Genap';
+          else if (rowStr.includes('ganjil')) globalSemester = 'Ganjil';
+        }
+        if (row[0] && /^guru$/i.test(String(row[0]).trim())) {
+          const val = String(row[1] || '').trim();
+          if (val && val !== '0') globalTeacher = this.cleanTeacherName(val);
+        }
+        if (row[0] && /^mata\s*pelajaran$/i.test(String(row[0]).trim())) {
+          const val = String(row[1] || '').trim();
+          if (val && val !== '0') globalSubject = this.resolveOfficialSubjectLabel(val) || val;
+        }
+      }
+      if (!globalTeacher && idSheet['B10']?.v) {
+        globalTeacher = this.cleanTeacherName(String(idSheet['B10'].v));
+      }
+      if (!globalSubject && idSheet['B11']?.v) {
+        globalSubject = this.resolveOfficialSubjectLabel(String(idSheet['B11'].v)) || String(idSheet['B11'].v);
+      }
     }
 
     const formatSheet = wb.Sheets['FORMAT PENILAIAN'];
@@ -277,12 +306,23 @@ export class UniversalExcelGradingService {
           desc = 'Format Penilaian Resmi ASTS/ASAS (Nilai Ujian diambil dari kolom ASTS/ASAS, Nilai Akhir rapor diabaikan)';
         }
 
+        const detectedSub =
+          this.detectSubjectFromContext(sheetName, rawGrid, fileName) ||
+          globalSubject ||
+          'Informatika';
+
+        const detectedTch =
+          this.detectTeacherFromContext(rawGrid, availableTeachers, currentUser) ||
+          globalTeacher ||
+          currentUser?.full_name ||
+          '';
+
         sheetsResult.push({
           sheetName,
           detectedClass: detectedClass !== 'ALL' ? detectedClass : '8A',
           detectedClassName: detectedClass !== 'ALL' ? detectedClass : '8A',
-          detectedSubject: this.detectSubjectFromContext(sheetName, rawGrid) || globalSubject || 'Informatika',
-          detectedTeacher: globalTeacher || '',
+          detectedSubject: detectedSub,
+          detectedTeacher: detectedTch,
           detectedAcademicYear: globalAcademicYear || AdministrationRepository.getActiveAcademicYear() || '2026/2027',
           detectedSemester: globalSemester || (AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil'),
           detectedKkm: globalKkm || 75,
@@ -301,10 +341,18 @@ export class UniversalExcelGradingService {
    */
   public static async parseExcelBuffer(
     buffer: ArrayBuffer | Uint8Array | Buffer,
-    _fileName: string = 'import.xlsx',
-    allDirectoryStudents: StudentItem[] = []
+    fileName: string = 'import.xlsx',
+    allDirectoryStudents: StudentItem[] = [],
+    availableTeachers: UserProfile[] = [],
+    currentUser?: UserProfile
   ): Promise<{ sheets: UniversalExcelParsedSheet[] }> {
-    const sheets = await this.parseExcelFile(buffer as any, allDirectoryStudents);
+    const sheets = await this.parseExcelFile(
+      buffer as any,
+      allDirectoryStudents,
+      availableTeachers,
+      currentUser,
+      fileName
+    );
     return { sheets };
   }
 
@@ -640,41 +688,289 @@ export class UniversalExcelGradingService {
     return '8A';
   }
 
-  private static detectSubjectFromContext(sheetName: string, grid: any[][]): string {
-    for (let r = 0; r < Math.min(6, grid.length); r++) {
-      for (const cell of grid[r] || []) {
-        const str = String(cell || '');
-        const match = str.match(/mata pelajaran\s*[:\s]*([a-zA-Z0-9\s]+)/i);
-        if (match && match[1]) {
-          return match[1].trim();
+  /**
+   * Menganalisis dan mendeteksi nama mata pelajaran dari:
+   * 1. Sel-sel header sheet (baris 0 - 15) baik format 1-sel ("Mapel: ...") maupun 2-sel ([A: "Mata Pelajaran", B: "Informatika"])
+   * 2. Nama sheet (misal: "Informatika 8A", "Hadits Arbain", "MTK")
+   * 3. Nama berkas file (misal: "koreksian soal oea.xlsx", "hadits_arbain.xlsx")
+   * 4. Normalisasi ke subjek resmi sekolah dari OFFICIAL_SCHOOL_SUBJECTS (mengembalikan label resmi untuk dropdown)
+   */
+  public static detectSubjectFromContext(sheetName: string, grid: any[][], fileName: string = ''): string {
+    let candidate = '';
+
+    // 1. Cek sel header (baris 0 s/d 15)
+    for (let r = 0; r < Math.min(15, grid.length); r++) {
+      const row = grid[r] || [];
+      for (let c = 0; c < row.length; c++) {
+        const cellStr = String(row[c] || '').trim();
+        if (!cellStr) continue;
+
+        // A. Format 1 sel: "Mata Pelajaran : Informatika" atau "Mapel: Matematika" (Wajib ada pemisah titik dua/strip)
+        const inlineMatch = cellStr.match(
+          /^(?:mata\s*pelajaran|mata\s*uji|mata\s*diklat|mapel)\s*[:\-]\s*([a-zA-Z0-9\s().&'/\\-]+)$/i
+        );
+        if (inlineMatch && inlineMatch[1] && inlineMatch[1].trim() && inlineMatch[1].trim() !== '0') {
+          const val = inlineMatch[1].trim();
+          if (!/^(pelajaran|uji|diklat)$/i.test(val)) {
+            candidate = val;
+            break;
+          }
         }
+
+        // B. Format 2 sel: Sel ini bertuliskan label "Mata Pelajaran", sel di sebelahnya berisi nilainya!
+        if (/^(mata\s*pelajaran|mata\s*uji|mapel)$/i.test(cellStr.replace(/[:\s]/g, ''))) {
+          for (let nextC = c + 1; nextC < Math.min(c + 4, row.length); nextC++) {
+            const nextVal = String(row[nextC] || '').trim().replace(/^[:\-\s]+/, '');
+            if (nextVal && nextVal !== '0' && isNaN(Number(nextVal))) {
+              candidate = nextVal;
+              break;
+            }
+          }
+          if (candidate) break;
+        }
+      }
+      if (candidate) break;
+    }
+
+    // 2. Jika belum ditemukan di grid, cek nama sheet
+    if (!candidate) {
+      const cleanSheet = sheetName.replace(/kelas\s*[0-9]{1,2}[a-zA-Z]?|[0-9]{1,2}[a-zA-Z]?/gi, '').trim();
+      if (cleanSheet.length >= 3) {
+        candidate = cleanSheet;
       }
     }
 
-    // Cek kata kunci umum di nama sheet
-    const subMap: Record<string, string> = {
-      mtk: 'Matematika',
-      matematika: 'Matematika',
-      ipa: 'Ilmu Pengetahuan Alam (IPA)',
-      ips: 'Ilmu Pengetahuan Sosial (IPS)',
-      bing: 'Bahasa Inggris',
-      inggris: 'Bahasa Inggris',
-      bindo: 'Bahasa Indonesia',
-      indonesia: 'Bahasa Indonesia',
-      pai: 'Pendidikan Agama Islam',
+    // 3. Jika belum ditemukan, cek nama file
+    if (!candidate && fileName) {
+      const baseName = fileName.replace(/\.[^/.]+$/, '');
+      const cleanFile = baseName
+        .replace(/koreksian|format|soal|rekap|nilai|penilaian|kelas\s*[0-9]{1,2}[a-zA-Z]?/gi, '')
+        .replace(/[_\-\s]+/g, ' ')
+        .trim();
+      if (cleanFile.length >= 3) {
+        candidate = cleanFile;
+      }
+    }
+
+    // 4. Normalisasi candidate ke daftar mata pelajaran resmi sekolah (OFFICIAL_SCHOOL_SUBJECTS)
+    if (candidate) {
+      const normalizedOfficialLabel = this.resolveOfficialSubjectLabel(candidate);
+      if (normalizedOfficialLabel) return normalizedOfficialLabel;
+      return candidate;
+    }
+
+    // 5. Cek kata kunci umum di nama sheet atau nama file sebagai fallback
+    const contextToSearch = `${sheetName} ${fileName}`.toLowerCase();
+    const fallbackMap: Record<string, string> = {
+      mtk: 'MTK – Matematika',
+      matematika: 'MTK – Matematika',
+      ipa: 'IPA – Ilmu Pengetahuan Alam',
+      ips: 'IPS – Ilmu Pengetahuan Sosial',
+      bing: 'B. Inggris – Bahasa Inggris',
+      inggris: 'B. Inggris – Bahasa Inggris',
+      bindo: 'B. Indonesia – Bahasa Indonesia',
+      indonesia: 'B. Indonesia – Bahasa Indonesia',
+      pai: 'PAI – Pendidikan Agama Islam',
       pjok: 'PJOK',
-      pkn: 'Pendidikan Pancasila / PKn',
+      olahraga: 'PJOK',
+      pkn: 'PP – Pendidikan Pancasila',
+      pancasila: 'PP – Pendidikan Pancasila',
       infor: 'Informatika',
-      seni: 'Seni Budaya',
-      hadits: 'Hadits Arbain',
+      informatika: 'Informatika',
+      komputer: 'Informatika',
+      tik: 'Informatika',
+      oea: 'Informatika',
+      seni: 'SBPK – Seni Budaya dan Prakarya',
+      sbk: 'SBPK – Seni Budaya dan Prakarya',
+      prakarya: 'SBPK – Seni Budaya dan Prakarya',
+      hadits: 'Hadits',
+      hadist: 'Hadits',
+      arab: 'B. Arab – Bahasa Arab',
+      btq: "BTQ – Baca Tulis Al-Qur'an",
+      tahfidz: "BTQ – Baca Tulis Al-Qur'an",
     };
 
-    const lowerSheet = sheetName.toLowerCase();
-    for (const [key, val] of Object.entries(subMap)) {
-      if (lowerSheet.includes(key)) return val;
+    for (const [key, val] of Object.entries(fallbackMap)) {
+      if (contextToSearch.includes(key)) {
+        return val;
+      }
     }
 
     return 'Informatika';
+  }
+
+  /**
+   * Menemukan label resmi dari daftar OFFICIAL_SCHOOL_SUBJECTS berdasarkan nama, kode, atau alias.
+   */
+  public static resolveOfficialSubjectLabel(text: string): string | null {
+    if (!text) return null;
+    const clean = text.trim().toLowerCase();
+
+    for (const subj of OFFICIAL_SCHOOL_SUBJECTS) {
+      if (
+        subj.name.toLowerCase() === clean ||
+        subj.label.toLowerCase() === clean ||
+        subj.code.toLowerCase() === clean
+      ) {
+        return subj.label;
+      }
+      for (const alias of subj.aliases) {
+        if (alias.toLowerCase() === clean || clean.includes(alias.toLowerCase())) {
+          return subj.label;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Menganalisis dan mendeteksi nama Guru Pengampu dari berkas Excel:
+   * 1. Sel Header (baris 0 - 15)
+   * 2. Blok Tanda Tangan / Footer (di bawah tabel siswa)
+   * 3. Pencocokan dengan direktori guru terdaftar di sekolah (availableTeachers / currentUser)
+   */
+  public static detectTeacherFromContext(
+    grid: any[][],
+    availableTeachers: UserProfile[] = [],
+    currentUser?: UserProfile
+  ): string {
+    let candidate = '';
+
+    // 1. Cek sel header (baris 0 s/d 15)
+    for (let r = 0; r < Math.min(15, grid.length); r++) {
+      const row = grid[r] || [];
+      for (let c = 0; c < row.length; c++) {
+        const cellStr = String(row[c] || '').trim();
+        if (!cellStr) continue;
+
+        // A. Format 1 sel: "Guru Pengampu : Dafa Maulana" atau "Nama Guru: ..." (Wajib ada pemisah titik dua/strip)
+        const inlineMatch = cellStr.match(
+          /^(?:guru\s*pengampu|guru\s*mata\s*pelajaran|guru\s*mapel|nama\s*guru|guru|pengajar|pendidik)\s*[:\-]\s*([a-zA-Z\s.,'`-]+)$/i
+        );
+        if (inlineMatch && inlineMatch[1]) {
+          const val = this.cleanTeacherName(inlineMatch[1]);
+          if (
+            this.isLegitimateStudentName(val) &&
+            !/^(pengampu|mata\s*pelajaran|mapel|kelas|bidang\s*studi)$/i.test(val)
+          ) {
+            candidate = val;
+            break;
+          }
+        }
+
+        // B. Format 2 sel: Sel ini adalah label "Guru Pengampu" / "Guru", sel di sebelahnya adalah namanya
+        if (
+          /^(guru\s*pengampu|guru\s*mata\s*pelajaran|guru\s*mapel|nama\s*guru|guru|pengajar|pendidik)$/i.test(
+            cellStr.replace(/[:\s]/g, '')
+          )
+        ) {
+          for (let nextC = c + 1; nextC < Math.min(c + 4, row.length); nextC++) {
+            const nextVal = this.cleanTeacherName(String(row[nextC] || ''));
+            if (nextVal && this.isLegitimateStudentName(nextVal) && isNaN(Number(nextVal))) {
+              candidate = nextVal;
+              break;
+            }
+          }
+          if (candidate) break;
+        }
+      }
+      if (candidate) break;
+    }
+
+    // 2. Jika belum ditemukan di header, cari di area footer tanda tangan (r >= 10 s/d akhir sheet)
+    if (!candidate && grid.length >= 10) {
+      for (let r = 10; r < grid.length; r++) {
+        const row = grid[r] || [];
+        for (let c = 0; c < row.length; c++) {
+          const cellStr = String(row[c] || '').trim();
+          if (!cellStr) continue;
+
+          // Cek label tanda tangan guru: "Guru Mata Pelajaran,", "Guru Pengampu,", "Guru Kelas,"
+          if (
+            /^(guru\s*(mata\s*pelajaran|pengampu|kelas|bidang\s*studi|mapel)?|pengajar|pendidik)[,:]?$/i.test(
+              cellStr
+            )
+          ) {
+            // Telusuri 1 s/d 6 baris di bawahnya pada kolom yang sama (atau c-1, c+1)
+            for (let downR = r + 1; downR <= Math.min(r + 6, grid.length - 1); downR++) {
+              for (let colOffset = -1; colOffset <= 1; colOffset++) {
+                const targetCol = c + colOffset;
+                if (targetCol < 0) continue;
+                const signCell = String(grid[downR]?.[targetCol] || '').trim();
+                const cleaned = this.cleanTeacherName(signCell);
+                if (
+                  cleaned &&
+                  cleaned.length >= 3 &&
+                  this.isLegitimateStudentName(cleaned) &&
+                  !/^(nip|nuptk|kepala\s*sekolah|mengetahui)/i.test(cleaned)
+                ) {
+                  candidate = cleaned;
+                  break;
+                }
+              }
+              if (candidate) break;
+            }
+          }
+          if (candidate) break;
+        }
+        if (candidate) break;
+      }
+    }
+
+    // 3. Cocokkan dengan database profil guru resmi (availableTeachers)
+    if (candidate && availableTeachers.length > 0) {
+      const matched = this.matchTeacherWithDirectory(candidate, availableTeachers);
+      if (matched) return matched.full_name;
+    }
+
+    // 4. Jika candidate ditemukan, kembalikan candidate
+    if (candidate) {
+      return candidate;
+    }
+
+    // 5. Fallback ke currentUser jika ada
+    if (currentUser?.full_name) {
+      return currentUser.full_name;
+    }
+
+    return '';
+  }
+
+  /**
+   * Membersihkan string nama guru dari tanda kurung, titik dua, dan spasi berlebih.
+   */
+  public static cleanTeacherName(raw: string): string {
+    return String(raw || '')
+      .replace(/^[(\s:'"-]+|[)\s:'"-]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Mencocokkan nama guru dari Excel dengan master profil guru di sekolah.
+   */
+  public static matchTeacherWithDirectory(rawName: string, teachers: UserProfile[]): UserProfile | null {
+    if (!rawName || !teachers || teachers.length === 0) return null;
+    const cleanRaw = this.cleanTeacherName(rawName).toLowerCase();
+    const stripTitles = (name: string) =>
+      name
+        .toLowerCase()
+        .replace(/,\s*(s\.pd\.?|m\.pd\.?|s\.e\.?|s\.mat\.?|s\.si\.?|s\.kom\.?|s\.pd\.i\.?|g\.r\.?|m\.m\.?|m\.si\.?|ph\.d\.?)/gi, '')
+        .trim();
+
+    const baseRaw = stripTitles(cleanRaw);
+
+    for (const t of teachers) {
+      const tName = (t.full_name || '').toLowerCase();
+      const baseT = stripTitles(tName);
+      if (tName === cleanRaw || baseT === baseRaw) {
+        return t;
+      }
+      if (baseRaw.length >= 4 && (baseT.includes(baseRaw) || baseRaw.includes(baseT))) {
+        return t;
+      }
+    }
+    return null;
   }
 
   private static parseNumericScore(val: any): number | null {

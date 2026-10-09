@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   X,
   FileSpreadsheet,
@@ -20,6 +20,7 @@ import {
   type UniversalExcelStudentRow,
 } from '../../../services/universal-excel-grading.service';
 import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
+import { ProviderFactory } from '../../../providers/provider-factory';
 import { OFFICIAL_SCHOOL_SUBJECTS } from '../../../config/school-subjects.config';
 import { areClassCodesEqual } from '../../../utils/class.utils';
 
@@ -52,12 +53,32 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
   // Editable session configurations
   const [sessionName, setSessionName] = useState('');
   const [subject, setSubject] = useState('Informatika');
+  const [teacherName, setTeacherName] = useState(() => currentUser.full_name || 'Guru Pengampu');
   const [className, setClassName] = useState('8A');
   const [examType, setExamType] = useState('PTS / UTS');
   const [academicYear, setAcademicYear] = useState(() => AdministrationRepository.getActiveAcademicYear() || '2026/2027');
   const [semester, setSemester] = useState(() => AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil');
   const [kkm, setKkm] = useState(75);
   const [examFormat, setExamFormat] = useState<'PG_ONLY' | 'PG_AND_ESSAY'>('PG_ONLY');
+
+  // Registered teachers in school directory
+  const [availableTeachers, setAvailableTeachers] = useState<UserProfile[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      ProviderFactory.getProvider()
+        .getAllUsers('')
+        .then((users) => {
+          if (Array.isArray(users)) {
+            const teachers = users.filter(
+              (u) => u.role === 'GURU' || u.role === 'ADMIN' || u.role === 'OPERATOR'
+            );
+            setAvailableTeachers(teachers.length > 0 ? teachers : users);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   // Rows state for active sheet
   const [activeRows, setActiveRows] = useState<UniversalExcelStudentRow[]>([]);
@@ -91,7 +112,12 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
     setErrorMessage(null);
 
     try {
-      const sheets = await UniversalExcelGradingService.parseExcelFile(file, allDirectoryStudents);
+      const sheets = await UniversalExcelGradingService.parseExcelFile(
+        file,
+        allDirectoryStudents,
+        availableTeachers,
+        currentUser
+      );
       if (sheets.length === 0) {
         setErrorMessage('Tidak dapat menemukan tabel data nilai atau nama siswa pada file Excel ini.');
         setParsedSheets([]);
@@ -116,6 +142,11 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
   const applySheetToForm = (sheet: UniversalExcelParsedSheet) => {
     setClassName(sheet.detectedClass || '8A');
     setSubject(sheet.detectedSubject || 'Informatika');
+    if (sheet.detectedTeacher) {
+      setTeacherName(sheet.detectedTeacher);
+    } else {
+      setTeacherName(currentUser.full_name || 'Guru Pengampu');
+    }
     setAcademicYear(sheet.detectedAcademicYear || '2026/2027');
     setSemester(sheet.detectedSemester || 'Ganjil');
     setKkm(sheet.detectedKkm || 75);
@@ -197,7 +228,7 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
         existingSessionId: selectedExistingSessionId,
         sessionConfig: {
           sessionName: sessionName.trim() || `${examType} - ${subject} - ${className}`,
-          teacherName: currentUser.full_name || 'Guru Pengampu',
+          teacherName: teacherName.trim() || currentUser.full_name || 'Guru Pengampu',
           subject: subject.trim(),
           className: className.trim(),
           examType,
@@ -421,16 +452,50 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-slate-600">Mata Pelajaran</label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-semibold text-slate-600">Mata Pelajaran</label>
+                        {parsedSheets[activeSheetIndex]?.detectedSubject && (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 font-bold px-1.5 py-0.2 rounded border border-emerald-200">
+                            Auto Excel
+                          </span>
+                        )}
+                      </div>
                       <select
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
+                        {subject && !OFFICIAL_SCHOOL_SUBJECTS.some((s) => s.label === subject) && (
+                          <option value={subject}>{subject} (Dari Excel)</option>
+                        )}
                         {OFFICIAL_SCHOOL_SUBJECTS.map((s) => (
                           <option key={s.label} value={s.label}>{s.label}</option>
                         ))}
                       </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-semibold text-slate-600">Guru Pengampu</label>
+                        {parsedSheets[activeSheetIndex]?.detectedTeacher && (
+                          <span className="text-[10px] text-indigo-700 bg-indigo-50 font-bold px-1.5 py-0.2 rounded border border-indigo-200">
+                            Auto Excel
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={teacherName}
+                        onChange={(e) => setTeacherName(e.target.value)}
+                        list="teacher-suggestions"
+                        className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        placeholder="Nama Guru Pengampu..."
+                      />
+                      <datalist id="teacher-suggestions">
+                        {availableTeachers.map((t) => (
+                          <option key={t.id} value={t.full_name} />
+                        ))}
+                      </datalist>
                     </div>
 
                     <div className="space-y-1">
@@ -508,6 +573,16 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                     <span className="text-xs font-bold text-slate-800">
                       Pratinjau Nilai & Pencocokan Siswa ({matchStats.total} Siswa)
                     </span>
+                    {parsedSheets[activeSheetIndex]?.detectedSubject && (
+                      <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md font-medium">
+                        Mapel: <strong>{parsedSheets[activeSheetIndex].detectedSubject}</strong>
+                      </span>
+                    )}
+                    {parsedSheets[activeSheetIndex]?.detectedTeacher && (
+                      <span className="text-[10px] bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-md font-medium">
+                        Guru: <strong>{parsedSheets[activeSheetIndex].detectedTeacher}</strong>
+                      </span>
+                    )}
                     {parsedSheets[activeSheetIndex]?.detectedFormatDescription && (
                       <span className="text-[10px] bg-teal-50 text-teal-800 border border-teal-200 px-2 py-0.5 rounded-md font-medium">
                         {parsedSheets[activeSheetIndex].detectedFormatDescription}
