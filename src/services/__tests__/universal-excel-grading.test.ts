@@ -353,6 +353,106 @@ export async function runUniversalExcelGradingTestSuite(): Promise<TestSuiteResu
         details: err?.message || String(err),
       });
     }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 6: Role Word Engine — Format Koreksian Rinci ('Skor Esai' & Baris KUNCI Diabaikan)
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      const wb = XLSX.utils.book_new();
+      const wsData = [
+        ['No', 'Nama', 'Soal_1', 'Soal_2', 'Skor PG', 'Soal E-1', 'Soal E-2', 'Skor Esai', 'Total', 'Status'],
+        ['', 'KUNCI', 'A', 'B', '', '', '', '', '', ''],
+        [1, 'Caskia Aprilia', 'A', 'B', 42, 15, 20, 35, 77, 'LULUS'],
+        [2, 'Najwa Nur Fadillah', 'A', 'B', 42, 17, 20, 37, 79, 'LULUS'],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, '8A');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const parsed = await UniversalExcelGradingService.parseExcelBuffer(buf, 'koreksian.xlsx');
+      const sheet = parsed.sheets[0];
+
+      // Baris KUNCI wajib dilewati, hanya 2 siswa valid
+      if (sheet.rows.length !== 2) {
+        throw new Error(`Expected 2 student rows (KUNCI skipped), got ${sheet.rows.length}`);
+      }
+
+      const r1 = sheet.rows[0];
+      if (r1.rawStudentName !== 'Caskia Aprilia') {
+        throw new Error(`Expected Caskia Aprilia, got ${r1.rawStudentName}`);
+      }
+
+      // Skor PG dan Skor Esai wajib terisi, dan finalScore harus 77 (bukan 21!)
+      if (r1.pgScore !== 42) {
+        throw new Error(`Expected pgScore 42, got ${r1.pgScore}`);
+      }
+      if (r1.essayScore !== 35) {
+        throw new Error(`Expected essayScore 35, got ${r1.essayScore}`);
+      }
+      if (r1.finalScore !== 77) {
+        throw new Error(`Expected finalScore 77, got ${r1.finalScore}`);
+      }
+
+      results.push({
+        testName: '6. Role Word Engine: Skor PG & Skor Esai keduanya terambil dan Total 77 tepat sasaran',
+        status: 'PASS',
+      });
+    } catch (err: any) {
+      results.push({
+        testName: '6. Role Word Engine: Skor PG & Skor Esai keduanya terambil dan Total 77 tepat sasaran',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 7: Role Word Engine — Format Resmi ASTS (Nilai Akhir Rapor Diabaikan)
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      const wb = XLSX.utils.book_new();
+      const wsData = [
+        ['REKAP PENILAIAN PESERTA DIDIK'],
+        ['SMP TERPADU AL-ITTIHADIYAH'],
+        [],
+        ['Kelas', '9B', '', 'Tahun Pelajaran', '2026/2027'],
+        ['Mata Pelajaran', 'Hadits Arbain'],
+        [],
+        [],
+        ['No', 'Nama Peserta Didik', 'L/P', 'ASTS', 'ASAS', 'Nilai Akhir', 'Predikat', 'Status'],
+        [1, 'Ariiq Safwaan Al Barra', 'L', 67, '', 33.5, 'D', 'Belum Tuntas'],
+        [2, 'Azfia Mauludin Ilham', 'L', 67, '', 33.5, 'D', 'Belum Tuntas'],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, '9B');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const parsed = await UniversalExcelGradingService.parseExcelBuffer(buf, 'hadits_arbain.xlsx');
+      const sheet = parsed.sheets[0];
+
+      if (sheet.rows.length !== 2) {
+        throw new Error(`Expected 2 student rows, got ${sheet.rows.length}`);
+      }
+
+      const r1 = sheet.rows[0];
+      // Nilai ujian sesi ASTS harus 67, BUKAN 33.5 (Nilai Akhir rapor yang membagi dua)
+      if (r1.finalScore !== 67) {
+        throw new Error(`Expected finalScore 67 from ASTS column, but got ${r1.finalScore}`);
+      }
+      if (r1.pgScore !== 67) {
+        throw new Error(`Expected pgScore 67 from ASTS column, but got ${r1.pgScore}`);
+      }
+
+      results.push({
+        testName: '7. Role Word Engine: Format Resmi ASTS mengambil nilai ujian 67 (Nilai Akhir rapor 33.5 diabaikan)',
+        status: 'PASS',
+      });
+    } catch (err: any) {
+      results.push({
+        testName: '7. Role Word Engine: Format Resmi ASTS mengambil nilai ujian 67 (Nilai Akhir rapor 33.5 diabaikan)',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
   } finally {
     ProviderFactory.setProvider(originalProvider);
   }

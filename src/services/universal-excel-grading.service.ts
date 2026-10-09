@@ -2,10 +2,12 @@
  * SMART ABSENSI GURU — UNIVERSAL EXCEL GRADING SERVICE
  * 
  * Modul cerdas untuk mengimpor nilai siswa langsung dari berbagai format file Excel:
- * 1. Mendukung template multi-sheet resmi sekolah ("FORMAT PENILAIAN ASTS & ASAS.xlsx").
- * 2. Mendukung format tabel Excel umum/kustom (kolom Nama, Kelas, Nilai PG, Essay, Nilai Akhir).
- * 3. Pencocokan cerdas siswa (Exact match & Fuzzy match dengan nama Indonesia).
- * 4. Otomatis membuat sesi ujian baru dan mengisi nilai PG/Essay secara atomik.
+ * 1. Mendukung tabel koreksian rinci (kolom Skor PG, Skor Esai/Essay, Total).
+ * 2. Mendukung format penilaian resmi ASTS & ASAS sekolah (nilai ujian diambil dari kolom ASTS/ASAS,
+ *    mengabaikan kolom Nilai Akhir rapor yang diperuntukkan bagi gabungan kedua ujian).
+ * 3. Role Word Engine: Deteksi cerdas kolom PG, Esai (ejaan 'esai' dan 'essay'), Rincian Butir Esai,
+ *    Total Skor, serta penyaringan otomatis baris Kunci Jawaban.
+ * 4. Pencocokan cerdas siswa (Exact match & Fuzzy match dengan nama Indonesia).
  */
 
 import * as XLSX from 'xlsx';
@@ -48,6 +50,7 @@ export interface UniversalExcelParsedSheet {
   detectedSemester: string;
   detectedKkm: number;
   detectedFormat: 'PG_ONLY' | 'PG_AND_ESSAY';
+  detectedFormatDescription?: string;
   rows: UniversalExcelStudentRow[];
 }
 
@@ -82,10 +85,24 @@ export interface ExecuteImportResult {
   message: string;
 }
 
+export interface DetectedHeaderInfo {
+  headerRowIndex: number;
+  nameColIndex: number;
+  pgColIndex: number;
+  essayColIndex: number;
+  subEssayColIndices: number[];
+  totalColIndex: number;
+  astsColIndex: number;
+  asasColIndex: number;
+  semesterNaColIndex: number;
+  classColIndex: number;
+  formatType: 'CORRECTION_TABLE' | 'OFFICIAL_ASSESSMENT' | 'SIMPLE_TABLE';
+}
+
 export class UniversalExcelGradingService {
   /**
-   * Parse sembarang file Excel (.xlsx / .xls) dan mendeteksi apakah itu format
-   * Multi-Sheet resmi sekolah atau format tabel umum.
+   * Parse sembarang file Excel (.xlsx / .xls) dan mendeteksi peran kolom (role words)
+   * secara cerdas: Skor PG, Skor Esai/Essay, Total Ujian, ASTS, ASAS.
    */
   public static async parseExcelFile(
     file: File | ArrayBuffer | Uint8Array,
@@ -104,75 +121,40 @@ export class UniversalExcelGradingService {
     const wb = XLSX.read(data, { type: 'array' });
     const sheetsResult: UniversalExcelParsedSheet[] = [];
 
-    // 1. Periksa apakah ini Template Multi-Sheet Resmi ASTS & ASAS
-    const isOfficialTemplate =
-      wb.SheetNames.includes('IDENTITAS SEKOLAH') ||
-      wb.SheetNames.includes('FORMAT PENILAIAN') ||
-      wb.SheetNames.some((n) => SemesterGradingExcelService.CANONICAL_CLASSES.includes(n as any));
+    // Baca metadata global dari sheet IDENTITAS SEKOLAH & FORMAT PENILAIAN jika ada
+    let globalSubject = '';
+    let globalTeacher = '';
+    let globalAcademicYear = AdministrationRepository.getActiveAcademicYear() || '2026/2027';
+    let globalSemester = AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil';
+    let globalKkm = 75;
 
-    if (isOfficialTemplate) {
-      const parsedOfficial = await SemesterGradingExcelService.importScoresFromExcel(
-        new File([data as any], 'import.xlsx')
-      );
-
-      for (const po of parsedOfficial) {
-        if (po.students.length === 0) continue;
-
-        const filteredDirStudents = allDirectoryStudents.filter((s) =>
-          areClassCodesEqual(s.className || '', po.className)
-        );
-
-        const rows: UniversalExcelStudentRow[] = po.students.map((st, idx) => {
-          const match = this.matchStudent(st.name, filteredDirStudents);
-          const asts = st.asts ?? null;
-          const asas = st.asas ?? null;
-          const finalScore = st.finalScore ?? (asts !== null && asas !== null ? (asts + asas) / 2 : (asts ?? asas ?? 0));
-          const roundedFinal = Math.round(finalScore * 10) / 10;
-
-          return {
-            rowNumber: st.no || idx + 1,
-            rawName: st.name,
-            rawStudentName: st.name,
-            matchedStudentId: match.student?.id,
-            matchedStudentName: match.student?.fullName || (match.student as any)?.name,
-            matchConfidence: match.confidence,
-            matchType: match.confidence,
-            pgScore: asts,
-            essayScore: asas,
-            finalScore: roundedFinal,
-            originalScore: roundedFinal,
-            passed: roundedFinal >= (po.kkm || 75),
-          };
-        });
-
-        sheetsResult.push({
-          sheetName: po.className,
-          detectedClass: po.className,
-          detectedClassName: po.className,
-          detectedSubject: po.subject || 'Mata Pelajaran',
-          detectedTeacher: po.teacher || '',
-          detectedAcademicYear: po.academicYear || AdministrationRepository.getActiveAcademicYear() || '2026/2027',
-          detectedSemester: po.semester || (AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil'),
-          detectedKkm: po.kkm || 75,
-          detectedFormat: 'PG_AND_ESSAY',
-          rows,
-        });
-      }
-
-      if (sheetsResult.length > 0) {
-        return sheetsResult;
-      }
+    const idSheet = wb.Sheets['IDENTITAS SEKOLAH'];
+    if (idSheet) {
+      globalAcademicYear = String(idSheet['B8']?.v || globalAcademicYear);
+      globalSemester = String(idSheet['B9']?.v || globalSemester);
+      globalTeacher = String(idSheet['B10']?.v || globalTeacher);
+      globalSubject = String(idSheet['B11']?.v || globalSubject);
     }
 
-    // 2. Format Tabel Umum (Single-Sheet atau Arbitrary Sheets)
+    const formatSheet = wb.Sheets['FORMAT PENILAIAN'];
+    if (formatSheet && formatSheet['B5']?.v) {
+      globalKkm = Number(formatSheet['B5']?.v) || 75;
+    }
+
+    // Iterasi seluruh sheet yang memuat daftar siswa
     for (const sheetName of wb.SheetNames) {
+      // Abaikan sheet konfigurasi umum
+      if (['IDENTITAS SEKOLAH', 'FORMAT PENILAIAN', 'PETUNJUK', 'COVER'].includes(sheetName.trim().toUpperCase())) {
+        continue;
+      }
+
       const ws = wb.Sheets[sheetName];
       if (!ws) continue;
 
       const rawGrid: any[][] = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '' });
       if (rawGrid.length < 2) continue;
 
-      // Cari baris header yang paling relevan
+      // Cari baris header dan analisis peran kolom (role words)
       const headerInfo = this.detectHeaderRow(rawGrid);
       if (headerInfo.headerRowIndex < 0 || headerInfo.nameColIndex < 0) {
         continue;
@@ -184,38 +166,82 @@ export class UniversalExcelGradingService {
       );
 
       const rows: UniversalExcelStudentRow[] = [];
-      const hasEssay = headerInfo.essayColIndex >= 0;
+      const hasEssay = headerInfo.essayColIndex >= 0 || headerInfo.subEssayColIndices.length > 0;
 
       for (let r = headerInfo.headerRowIndex + 1; r < rawGrid.length; r++) {
         const rowData = rawGrid[r];
         if (!rowData) continue;
 
         const rawNameVal = String(rowData[headerInfo.nameColIndex] || '').trim();
-        // Abaikan baris kosong, baris nomor tanpa nama, atau baris rekap
-        if (!rawNameVal || /^(rekap|rata-rata|jumlah|total|keterangan|ttd)/i.test(rawNameVal)) {
+
+        // 1. Abaikan baris kosong atau baris non-siswa (KUNCI, REKAP, TOTAL, RATA-RATA, KETERANGAN, TTD, dll)
+        if (
+          !rawNameVal ||
+          /^(kunci|kunci\s*jawaban|kunci_jawaban|rekap|rata-rata|jumlah|total|nilai\s*tertinggi|nilai\s*terendah|standar\s*deviasi|keterangan|ttd|pengawas|deskripsi)/i.test(
+            rawNameVal
+          )
+        ) {
           continue;
         }
 
+        // 2. Abaikan baris jika hanya memuat huruf kunci jawaban pilihan ganda (misal baris kunci tanpa nama 'KUNCI')
+        const nonBlank = rowData.filter((x: any) => x !== '' && x !== undefined);
+        if (nonBlank.length > 5 && nonBlank.every((x: any) => typeof x === 'string' && /^[A-E]$/i.test(x.trim()))) {
+          continue;
+        }
+
+        // Ambil nilai per kolom sesuai role words
         const pgVal = headerInfo.pgColIndex >= 0 ? this.parseNumericScore(rowData[headerInfo.pgColIndex]) : null;
-        const essayVal = headerInfo.essayColIndex >= 0 ? this.parseNumericScore(rowData[headerInfo.essayColIndex]) : null;
-        const finalVal = headerInfo.finalColIndex >= 0 ? this.parseNumericScore(rowData[headerInfo.finalColIndex]) : null;
+        let essayVal = headerInfo.essayColIndex >= 0 ? this.parseNumericScore(rowData[headerInfo.essayColIndex]) : null;
 
+        // Jika tidak ada kolom total essay tunggal tetapi ada sub-butir Soal E-1..Soal E-5, jumlahkan
+        if (essayVal === null && headerInfo.subEssayColIndices.length > 0) {
+          const sum = headerInfo.subEssayColIndices.reduce(
+            (acc, colIdx) => acc + (this.parseNumericScore(rowData[colIdx]) || 0),
+            0
+          );
+          if (sum > 0) essayVal = sum;
+        }
+
+        const totalVal = headerInfo.totalColIndex >= 0 ? this.parseNumericScore(rowData[headerInfo.totalColIndex]) : null;
+        const astsVal = headerInfo.astsColIndex >= 0 ? this.parseNumericScore(rowData[headerInfo.astsColIndex]) : null;
+        const asasVal = headerInfo.asasColIndex >= 0 ? this.parseNumericScore(rowData[headerInfo.asasColIndex]) : null;
+        const naVal = headerInfo.semesterNaColIndex >= 0 ? this.parseNumericScore(rowData[headerInfo.semesterNaColIndex]) : null;
+
+        let computedPg: number | null = pgVal;
+        let computedEssay: number | null = essayVal;
         let computedFinal = 0;
-        let computedPg = pgVal;
-        let computedEssay = essayVal;
 
-        if (finalVal !== null) {
-          computedFinal = finalVal;
-          if (computedPg === null && computedEssay === null) {
-            computedPg = finalVal; // Jika hanya nilai akhir, alokasikan ke PG
-            computedEssay = 0;
+        // KASUS A: Format Koreksian Rinci (Ada kolom Skor PG dan/atau Skor Esai/Essay)
+        if (pgVal !== null || essayVal !== null) {
+          if (totalVal !== null) {
+            computedFinal = totalVal;
+          } else if (pgVal !== null && essayVal !== null) {
+            computedFinal = Math.round((pgVal + essayVal) * 10) / 10;
+          } else if (pgVal !== null) {
+            computedFinal = pgVal;
+          } else if (essayVal !== null) {
+            computedFinal = essayVal;
           }
-        } else if (pgVal !== null && essayVal !== null) {
-          computedFinal = Math.round((pgVal * 0.7 + essayVal * 0.3) * 10) / 10;
-        } else if (pgVal !== null) {
-          computedFinal = pgVal;
-        } else if (essayVal !== null) {
-          computedFinal = essayVal;
+        }
+        // KASUS B: Format Penilaian Resmi ASTS & ASAS Sekolah
+        // Kolom "Nilai Akhir" (naVal) di Excel resmi BUKAN acuan sesi karena merupakan rumus rapor (ASTS+ASAS)/2.
+        // Nilai ujian sesi saat ini adalah murni nilai di kolom ASTS atau ASAS!
+        else if (astsVal !== null || asasVal !== null) {
+          const examScore = astsVal !== null ? astsVal : (asasVal || 0);
+          computedFinal = examScore;
+          computedPg = examScore;
+          computedEssay = null; // Di template resmi tidak dipecah esai
+        }
+        // KASUS C: Tabel Nilai Tunggal / Lainnya
+        else if (totalVal !== null) {
+          computedFinal = totalVal;
+          computedPg = totalVal;
+          computedEssay = null;
+        } else if (naVal !== null) {
+          computedFinal = naVal;
+          computedPg = naVal;
+          computedEssay = null;
         }
 
         const match = this.matchStudent(rawNameVal, filteredDirStudents);
@@ -232,21 +258,29 @@ export class UniversalExcelGradingService {
           essayScore: computedEssay,
           finalScore: computedFinal,
           originalScore: computedFinal,
-          passed: computedFinal >= 75,
+          passed: computedFinal >= (globalKkm || 75),
         });
       }
 
       if (rows.length > 0) {
+        let desc = 'Format Tabel Nilai Umum';
+        if (headerInfo.formatType === 'CORRECTION_TABLE') {
+          desc = `Tabel Koreksian Rinci (PG: Kolom ${headerInfo.pgColIndex >= 0 ? headerInfo.pgColIndex + 1 : '-'}, Esai: Kolom ${headerInfo.essayColIndex >= 0 ? headerInfo.essayColIndex + 1 : '-'}, Total: Kolom ${headerInfo.totalColIndex >= 0 ? headerInfo.totalColIndex + 1 : '-'})`;
+        } else if (headerInfo.formatType === 'OFFICIAL_ASSESSMENT') {
+          desc = 'Format Penilaian Resmi ASTS/ASAS (Nilai Ujian diambil dari kolom ASTS/ASAS, Nilai Akhir rapor diabaikan)';
+        }
+
         sheetsResult.push({
           sheetName,
           detectedClass: detectedClass !== 'ALL' ? detectedClass : '8A',
           detectedClassName: detectedClass !== 'ALL' ? detectedClass : '8A',
-          detectedSubject: this.detectSubjectFromContext(sheetName, rawGrid),
-          detectedTeacher: '',
-          detectedAcademicYear: AdministrationRepository.getActiveAcademicYear() || '2026/2027',
-          detectedSemester: AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil',
-          detectedKkm: 75,
+          detectedSubject: this.detectSubjectFromContext(sheetName, rawGrid) || globalSubject || 'Informatika',
+          detectedTeacher: globalTeacher || '',
+          detectedAcademicYear: globalAcademicYear || AdministrationRepository.getActiveAcademicYear() || '2026/2027',
+          detectedSemester: globalSemester || (AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil'),
+          detectedKkm: globalKkm || 75,
           detectedFormat: hasEssay ? 'PG_AND_ESSAY' : 'PG_ONLY',
+          detectedFormatDescription: desc,
           rows,
         });
       }
@@ -435,22 +469,19 @@ export class UniversalExcelGradingService {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Private Helper Detectors
+  // Private Helper Detectors (Role Word Engine)
   // ──────────────────────────────────────────────────────────────────────────
 
-  private static detectHeaderRow(grid: any[][]): {
-    headerRowIndex: number;
-    nameColIndex: number;
-    pgColIndex: number;
-    essayColIndex: number;
-    finalColIndex: number;
-    classColIndex: number;
-  } {
+  private static detectHeaderRow(grid: any[][]): DetectedHeaderInfo {
     let bestRow = -1;
     let nameCol = -1;
     let pgCol = -1;
     let essayCol = -1;
-    let finalCol = -1;
+    let subEssayCols: number[] = [];
+    let totalCol = -1;
+    let astsCol = -1;
+    let asasCol = -1;
+    let semesterNaCol = -1;
     let classCol = -1;
 
     for (let r = 0; r < Math.min(15, grid.length); r++) {
@@ -460,21 +491,50 @@ export class UniversalExcelGradingService {
       let foundName = -1;
       let foundPg = -1;
       let foundEssay = -1;
-      let foundFinal = -1;
+      const foundSubEssays: number[] = [];
+      let foundTotal = -1;
+      let foundAsts = -1;
+      let foundAsas = -1;
+      let foundSemesterNa = -1;
       let foundClass = -1;
 
       for (let c = 0; c < row.length; c++) {
         const val = String(row[c] || '').trim().toLowerCase();
 
-        if (/(nama\s*(siswa|peserta|lengkap)?|^siswa$|^nama$)/i.test(val)) {
+        // 1. Nama Siswa
+        if (/(nama\s*(siswa|peserta|lengkap|peserta\s*didik)?|^siswa$|^nama$)/i.test(val)) {
           foundName = c;
-        } else if (/(skor\s*pg|nilai\s*pg|pilihan\s*ganda|^pg$)/i.test(val)) {
+        }
+        // 2. Skor/Nilai PG
+        else if (/(skor\s*pg|nilai\s*pg|benar\s*\(pg\)|^pg$|total\s*pg|pilihan\s*ganda|mcq)/i.test(val)) {
           foundPg = c;
-        } else if (/(skor\s*essay|nilai\s*essay|uraian|^essay$)/i.test(val)) {
+        }
+        // 3. Skor/Nilai Essay / Esai (mendukung 'esai' dan 'essay')
+        else if (/(skor\s*es[sa]+[iy]|nilai\s*es[sa]+[iy]|^es[sa]+[iy]$|uraian|isian|skor\s*uraian|nilai\s*uraian)/i.test(val)) {
           foundEssay = c;
-        } else if (/(nilai\s*(akhir|total|murni)|skor\s*akhir|^na$|^nilai$)/i.test(val)) {
-          foundFinal = c;
-        } else if (/(kelas|rombel)/i.test(val)) {
+        }
+        // 4. Sub-butir esai (Soal E-1..Soal E-5, E1..E5)
+        else if (/^(soal\s*e[\-_]?\d+|e\d+)$/i.test(val)) {
+          foundSubEssays.push(c);
+        }
+        // 5. Total Skor / Nilai Ujian / Nilai Tunggal
+        else if (/(^total$|^skor\s*total$|^total\s*skor$|^nilai\s*total$|^total\s*nilai$|^nilai\s*ujian$|^skor\s*ujian$|^nilai$|^skor$)/i.test(val)) {
+          foundTotal = c;
+        }
+        // 6. ASTS / PTS / UTS
+        else if (/(^asts$|^sts$|^pts$|^uts$|tengah\s*semester)/i.test(val)) {
+          foundAsts = c;
+        }
+        // 7. ASAS / PAS / UAS / PAT
+        else if (/(^asas$|^sas$|^pas$|^uas$|^pat$|akhir\s*semester)/i.test(val)) {
+          foundAsas = c;
+        }
+        // 8. Nilai Akhir Rapor Semester (gabungan)
+        else if (/(nilai\s*akhir|^na$|^skor\s*akhir|rata[\s\-]*rata\s*semester)/i.test(val)) {
+          foundSemesterNa = c;
+        }
+        // 9. Kelas / Rombel
+        else if (/(kelas|rombel)/i.test(val)) {
           foundClass = c;
         }
       }
@@ -484,10 +544,21 @@ export class UniversalExcelGradingService {
         nameCol = foundName;
         pgCol = foundPg;
         essayCol = foundEssay;
-        finalCol = foundFinal;
+        subEssayCols = foundSubEssays;
+        totalCol = foundTotal;
+        astsCol = foundAsts;
+        asasCol = foundAsas;
+        semesterNaCol = foundSemesterNa;
         classCol = foundClass;
         break;
       }
+    }
+
+    let formatType: 'CORRECTION_TABLE' | 'OFFICIAL_ASSESSMENT' | 'SIMPLE_TABLE' = 'SIMPLE_TABLE';
+    if (pgCol >= 0 || essayCol >= 0 || subEssayCols.length > 0) {
+      formatType = 'CORRECTION_TABLE';
+    } else if (astsCol >= 0 || asasCol >= 0) {
+      formatType = 'OFFICIAL_ASSESSMENT';
     }
 
     return {
@@ -495,8 +566,13 @@ export class UniversalExcelGradingService {
       nameColIndex: nameCol,
       pgColIndex: pgCol,
       essayColIndex: essayCol,
-      finalColIndex: finalCol,
+      subEssayColIndices: subEssayCols,
+      totalColIndex: totalCol,
+      astsColIndex: astsCol,
+      asasColIndex: asasCol,
+      semesterNaColIndex: semesterNaCol,
       classColIndex: classCol,
+      formatType,
     };
   }
 
@@ -550,6 +626,7 @@ export class UniversalExcelGradingService {
       pkn: 'Pendidikan Pancasila / PKn',
       infor: 'Informatika',
       seni: 'Seni Budaya',
+      hadits: 'Hadits Arbain',
     };
 
     const lowerSheet = sheetName.toLowerCase();

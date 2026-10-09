@@ -478,9 +478,16 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
               {/* STEP 3: Student Matching & Grade Preview Table */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-xs font-bold text-slate-800">
-                    Pratinjau Nilai & Pencocokan Siswa ({matchStats.total} Siswa)
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-800">
+                      Pratinjau Nilai & Pencocokan Siswa ({matchStats.total} Siswa)
+                    </span>
+                    {parsedSheets[activeSheetIndex]?.detectedFormatDescription && (
+                      <span className="text-[10px] bg-teal-50 text-teal-800 border border-teal-200 px-2 py-0.5 rounded-md font-medium">
+                        {parsedSheets[activeSheetIndex].detectedFormatDescription}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-[11px]">
                     <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
                       {matchStats.exact} Cocok
@@ -505,9 +512,9 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                         <th className="py-2.5 px-3 text-center w-10">No</th>
                         <th className="py-2.5 px-3">Nama di Excel</th>
                         <th className="py-2.5 px-3">Siswa di Database Sekolah</th>
-                        <th className="py-2.5 px-3 text-center w-16">Nilai PG</th>
-                        <th className="py-2.5 px-3 text-center w-16">Essay</th>
-                        <th className="py-2.5 px-3 text-center w-20">Skor Akhir</th>
+                        <th className="py-2.5 px-3 text-center w-20">Nilai PG</th>
+                        <th className="py-2.5 px-3 text-center w-20">Essay / Esai</th>
+                        <th className="py-2.5 px-3 text-center w-24">Skor Ujian</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
