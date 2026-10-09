@@ -46,20 +46,33 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
   const [parsedSheets, setParsedSheets] = useState<UniversalExcelParsedSheet[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
 
-  // Import mode: 'CREATE_NEW' | 'UPDATE_EXISTING'
-  const [importMode, setImportMode] = useState<'CREATE_NEW' | 'UPDATE_EXISTING'>('CREATE_NEW');
-  const [selectedExistingSessionId, setSelectedExistingSessionId] = useState<string>('');
+  // Defaults derived from context and repository
+  const defaultTeacher = currentUser.full_name || 'Guru Pengampu';
+  const defaultAcademicYear = AdministrationRepository.getActiveAcademicYear() || '2026/2027';
+  const defaultSemester = AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil';
 
-  // Editable session configurations
-  const [sessionName, setSessionName] = useState('');
-  const [subject, setSubject] = useState('Informatika');
-  const [teacherName, setTeacherName] = useState(() => currentUser.full_name || 'Guru Pengampu');
-  const [className, setClassName] = useState('8A');
-  const [examType, setExamType] = useState('PTS / UTS');
-  const [academicYear, setAcademicYear] = useState(() => AdministrationRepository.getActiveAcademicYear() || '2026/2027');
-  const [semester, setSemester] = useState(() => AdministrationRepository.getActiveSemester() === 'GENAP' ? 'Genap' : 'Ganjil');
-  const [kkm, setKkm] = useState(75);
-  const [examFormat, setExamFormat] = useState<'PG_ONLY' | 'PG_AND_ESSAY'>('PG_ONLY');
+  // Per-sheet persistent state
+  const fallbackConfig = useMemo(() => ({
+    sessionName: '',
+    hasCustomSessionName: false,
+    subject: 'Informatika',
+    teacherName: defaultTeacher,
+    className: '8A',
+    examType: 'PTS / UTS',
+    academicYear: defaultAcademicYear,
+    semester: defaultSemester,
+    kkm: 75,
+    examFormat: 'PG_ONLY' as 'PG_ONLY' | 'PG_AND_ESSAY',
+    rows: [] as UniversalExcelStudentRow[],
+    importMode: 'CREATE_NEW' as 'CREATE_NEW' | 'UPDATE_EXISTING',
+    selectedExistingSessionId: '',
+  }), [defaultTeacher, defaultAcademicYear, defaultSemester]);
+
+  type SheetConfigState = typeof fallbackConfig;
+  const [sheetConfigs, setSheetConfigs] = useState<Record<number, SheetConfigState>>({});
+
+  // Active config for current sheet
+  const currentConfig: SheetConfigState = sheetConfigs[activeSheetIndex] || fallbackConfig;
 
   // Registered teachers in school directory
   const [availableTeachers, setAvailableTeachers] = useState<UserProfile[]>([]);
@@ -77,11 +90,17 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
           }
         })
         .catch(() => {});
+    } else {
+      // Reset state cleanly when modal closes
+      setSelectedFile(null);
+      setParsedSheets([]);
+      setSheetConfigs({});
+      setActiveSheetIndex(0);
+      setErrorMessage(null);
+      initialSheetsRef.current = [];
     }
   }, [isOpen]);
 
-  // Rows state for active sheet
-  const [activeRows, setActiveRows] = useState<UniversalExcelStudentRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -96,11 +115,28 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
 
   // Candidates students in selected class
   const classCandidates = useMemo(() => {
-    return allDirectoryStudents.filter((s) => areClassCodesEqual(s.className || '', className));
-  }, [allDirectoryStudents, className]);
+    return allDirectoryStudents.filter((s) => areClassCodesEqual(s.className || '', currentConfig.className));
+  }, [allDirectoryStudents, currentConfig.className]);
 
   // Cached original sheets for resetting rows
   const initialSheetsRef = useRef<UniversalExcelParsedSheet[]>([]);
+
+  // Update active sheet config
+  const updateActiveConfig = (
+    updater: Partial<SheetConfigState> | ((prev: SheetConfigState) => Partial<SheetConfigState>)
+  ) => {
+    setSheetConfigs((prevMap) => {
+      const prev = prevMap[activeSheetIndex] || fallbackConfig;
+      const patch = typeof updater === 'function' ? updater(prev) : updater;
+      return {
+        ...prevMap,
+        [activeSheetIndex]: {
+          ...prev,
+          ...patch,
+        },
+      };
+    });
+  };
 
   // Handle file select
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,72 +157,113 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
       if (sheets.length === 0) {
         setErrorMessage('Tidak dapat menemukan tabel data nilai atau nama siswa pada file Excel ini.');
         setParsedSheets([]);
-        setActiveRows([]);
+        setSheetConfigs({});
         initialSheetsRef.current = [];
       } else {
+        const initialConfigs: Record<number, SheetConfigState> = {};
+        sheets.forEach((sh, idx) => {
+          const teacher = sh.detectedTeacher || defaultTeacher;
+          const cls = sh.detectedClass || '8A';
+          const subj = sh.detectedSubject || 'Informatika';
+          const acadYear = sh.detectedAcademicYear || defaultAcademicYear;
+          const sem = sh.detectedSemester || defaultSemester;
+          const exType = 'PTS / UTS';
+          const generatedName = `${exType} - ${subj} - ${cls} (${acadYear})`;
+
+          initialConfigs[idx] = {
+            sessionName: generatedName,
+            hasCustomSessionName: false,
+            subject: subj,
+            teacherName: teacher,
+            className: cls,
+            examType: exType,
+            academicYear: acadYear,
+            semester: sem,
+            kkm: sh.detectedKkm || 75,
+            examFormat: sh.detectedFormat || 'PG_ONLY',
+            rows: JSON.parse(JSON.stringify(sh.rows)),
+            importMode: 'CREATE_NEW',
+            selectedExistingSessionId: '',
+          };
+        });
+
         setParsedSheets(sheets);
         initialSheetsRef.current = JSON.parse(JSON.stringify(sheets));
+        setSheetConfigs(initialConfigs);
         setActiveSheetIndex(0);
-        applySheetToForm(sheets[0]);
       }
     } catch (err: any) {
       setErrorMessage(`Gagal membaca file Excel: ${err?.message || 'Format tidak valid'}`);
       setParsedSheets([]);
-      setActiveRows([]);
+      setSheetConfigs({});
       initialSheetsRef.current = [];
     } finally {
       setIsParsing(false);
     }
   };
 
-  const applySheetToForm = (sheet: UniversalExcelParsedSheet) => {
-    setClassName(sheet.detectedClass || '8A');
-    setSubject(sheet.detectedSubject || 'Informatika');
-    if (sheet.detectedTeacher) {
-      setTeacherName(sheet.detectedTeacher);
-    } else {
-      setTeacherName(currentUser.full_name || 'Guru Pengampu');
-    }
-    setAcademicYear(sheet.detectedAcademicYear || '2026/2027');
-    setSemester(sheet.detectedSemester || 'Ganjil');
-    setKkm(sheet.detectedKkm || 75);
-    setExamFormat(sheet.detectedFormat || 'PG_ONLY');
-    setActiveRows(sheet.rows);
-
-    const generatedName = `${examType} - ${sheet.detectedSubject || 'Mata Pelajaran'} - ${sheet.detectedClass || '8A'} (${sheet.detectedAcademicYear || '2026/2027'})`;
-    setSessionName(generatedName);
-  };
-
-  // Switch sheet tab
+  // Switch sheet tab without losing edits
   const handleSelectSheet = (index: number) => {
     if (index >= 0 && index < parsedSheets.length) {
       setActiveSheetIndex(index);
-      applySheetToForm(parsedSheets[index]);
     }
   };
 
-  // Hapus satu baris dari daftar pratinjau import
-  const handleDeleteRow = (rowIndex: number) => {
-    setActiveRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+  // Terapkan pengaturan sesi (mapel, guru, jenis ujian, tahun ajaran, semester, format, kkm) ke seluruh sheet
+  const handleApplySettingsToAllSheets = () => {
+    setSheetConfigs((prevMap) => {
+      const updated = { ...prevMap };
+      parsedSheets.forEach((_, idx) => {
+        if (updated[idx]) {
+          const prev = updated[idx];
+          const newSessionName = !prev.hasCustomSessionName
+            ? `${currentConfig.examType} - ${currentConfig.subject} - ${prev.className} (${currentConfig.academicYear})`
+            : prev.sessionName;
+          updated[idx] = {
+            ...prev,
+            subject: currentConfig.subject,
+            teacherName: currentConfig.teacherName,
+            examType: currentConfig.examType,
+            academicYear: currentConfig.academicYear,
+            semester: currentConfig.semester,
+            kkm: currentConfig.kkm,
+            examFormat: currentConfig.examFormat,
+            sessionName: newSessionName,
+          };
+        }
+      });
+      return updated;
+    });
   };
 
-  // Bersihkan semua baris yang belum cocok dengan database siswa
+  // Hapus satu baris dari daftar pratinjau import pada sheet aktif
+  const handleDeleteRow = (rowIndex: number) => {
+    updateActiveConfig((prev) => ({
+      rows: prev.rows.filter((_, idx) => idx !== rowIndex),
+    }));
+  };
+
+  // Bersihkan semua baris yang belum cocok dengan database siswa pada sheet aktif
   const handleClearUnmatchedRows = () => {
-    setActiveRows((prev) => prev.filter((r) => r.matchConfidence !== 'UNMATCHED'));
+    updateActiveConfig((prev) => ({
+      rows: prev.rows.filter((r) => r.matchConfidence !== 'UNMATCHED'),
+    }));
   };
 
   // Kembalikan semua baris sheet aktif ke kondisi awal dari berkas Excel
   const handleResetCurrentSheet = () => {
     const origSheet = initialSheetsRef.current[activeSheetIndex];
     if (origSheet && origSheet.rows) {
-      setActiveRows(JSON.parse(JSON.stringify(origSheet.rows)));
+      updateActiveConfig({
+        rows: JSON.parse(JSON.stringify(origSheet.rows)),
+      });
     }
   };
 
-  // Update matched student manually for a row
+  // Update matched student manually for a row in active sheet
   const handleUpdateStudentMatch = (rowIndex: number, studentId: string) => {
-    setActiveRows((prev) =>
-      prev.map((r, i) => {
+    updateActiveConfig((prev) => ({
+      rows: prev.rows.map((r, i) => {
         if (i !== rowIndex) return r;
         if (!studentId) {
           return {
@@ -203,18 +280,18 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
           matchedStudentName: found?.fullName,
           matchConfidence: 'MANUAL',
         };
-      })
-    );
+      }),
+    }));
   };
 
   // Execute import & creation
   const handleExecuteImport = async () => {
-    if (activeRows.length === 0) {
+    if (currentConfig.rows.length === 0) {
       setErrorMessage('Tidak ada baris siswa yang dapat diimpor.');
       return;
     }
 
-    if (importMode === 'UPDATE_EXISTING' && !selectedExistingSessionId) {
+    if (currentConfig.importMode === 'UPDATE_EXISTING' && !currentConfig.selectedExistingSessionId) {
       setErrorMessage('Pilih sesi ujian yang sudah ada yang ingin diperbarui.');
       return;
     }
@@ -224,20 +301,20 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
 
     try {
       const res = await UniversalExcelGradingService.executeImport({
-        mode: importMode,
-        existingSessionId: selectedExistingSessionId,
+        mode: currentConfig.importMode,
+        existingSessionId: currentConfig.selectedExistingSessionId,
         sessionConfig: {
-          sessionName: sessionName.trim() || `${examType} - ${subject} - ${className}`,
-          teacherName: teacherName.trim() || currentUser.full_name || 'Guru Pengampu',
-          subject: subject.trim(),
-          className: className.trim(),
-          examType,
-          academicYear,
-          semester,
-          kkm,
-          format: examFormat,
+          sessionName: currentConfig.sessionName.trim() || `${currentConfig.examType} - ${currentConfig.subject} - ${currentConfig.className}`,
+          teacherName: currentConfig.teacherName.trim() || defaultTeacher,
+          subject: currentConfig.subject.trim(),
+          className: currentConfig.className.trim(),
+          examType: currentConfig.examType,
+          academicYear: currentConfig.academicYear,
+          semester: currentConfig.semester,
+          kkm: currentConfig.kkm,
+          format: currentConfig.examFormat,
         },
-        rows: activeRows,
+        rows: currentConfig.rows,
         currentUser,
       });
 
@@ -260,15 +337,15 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
     let manual = 0;
     let unmatched = 0;
 
-    activeRows.forEach((r) => {
+    currentConfig.rows.forEach((r) => {
       if (r.matchConfidence === 'EXACT') exact++;
       else if (r.matchConfidence === 'FUZZY') fuzzy++;
       else if (r.matchConfidence === 'MANUAL') manual++;
       else unmatched++;
     });
 
-    return { exact, fuzzy, manual, unmatched, total: activeRows.length };
-  }, [activeRows]);
+    return { exact, fuzzy, manual, unmatched, total: currentConfig.rows.length };
+  }, [currentConfig.rows]);
 
   if (!isOpen) return null;
 
@@ -297,7 +374,7 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
             type="button"
             disabled={isSaving || isParsing}
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-40"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-40 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -370,22 +447,38 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
             <div className="space-y-4">
               {/* Sheet Tabs if multi-sheet */}
               {parsedSheets.length > 1 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200">
-                  <span className="text-xs font-bold text-slate-500 mr-1 shrink-0">Pilih Sheet:</span>
-                  {parsedSheets.map((sh, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleSelectSheet(idx)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                        activeSheetIndex === idx
-                          ? 'bg-emerald-600 text-white shadow-2xs'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      {sh.sheetName} ({sh.rows.length} siswa)
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 border-b border-slate-200">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-xs font-bold text-slate-500 mr-1 shrink-0">Pilih Sheet:</span>
+                    {parsedSheets.map((sh, idx) => {
+                      const cfg = sheetConfigs[idx];
+                      const rowCount = cfg ? cfg.rows.length : sh.rows.length;
+                      const isSelected = activeSheetIndex === idx;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectSheet(idx)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          {sh.sheetName} ({rowCount} siswa)
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplySettingsToAllSheets}
+                    title="Terapkan guru, mapel, jenis ujian, tahun ajaran, semester, dan format dari sheet ini ke seluruh sheet lainnya"
+                    className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors shrink-0 cursor-pointer flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Terapkan Pengaturan ke Semua Sheet</span>
+                  </button>
                 </div>
               )}
 
@@ -401,8 +494,8 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                       <input
                         type="radio"
                         name="importMode"
-                        checked={importMode === 'CREATE_NEW'}
-                        onChange={() => setImportMode('CREATE_NEW')}
+                        checked={currentConfig.importMode === 'CREATE_NEW'}
+                        onChange={() => updateActiveConfig({ importMode: 'CREATE_NEW' })}
                         className="text-emerald-600 focus:ring-emerald-500"
                       />
                       Buat Sesi Baru
@@ -411,8 +504,8 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                       <input
                         type="radio"
                         name="importMode"
-                        checked={importMode === 'UPDATE_EXISTING'}
-                        onChange={() => setImportMode('UPDATE_EXISTING')}
+                        checked={currentConfig.importMode === 'UPDATE_EXISTING'}
+                        onChange={() => updateActiveConfig({ importMode: 'UPDATE_EXISTING' })}
                         className="text-emerald-600 focus:ring-emerald-500"
                       />
                       Isi ke Sesi yang Ada
@@ -420,14 +513,14 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                   </div>
                 </div>
 
-                {importMode === 'UPDATE_EXISTING' ? (
+                {currentConfig.importMode === 'UPDATE_EXISTING' ? (
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-slate-600">
                       Pilih Sesi Ujian yang Sudah Ada
                     </label>
                     <select
-                      value={selectedExistingSessionId}
-                      onChange={(e) => setSelectedExistingSessionId(e.target.value)}
+                      value={currentConfig.selectedExistingSessionId}
+                      onChange={(e) => updateActiveConfig({ selectedExistingSessionId: e.target.value })}
                       className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       <option value="">-- Pilih Sesi Ujian --</option>
@@ -444,8 +537,8 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                       <label className="text-[11px] font-semibold text-slate-600">Nama Sesi Ujian</label>
                       <input
                         type="text"
-                        value={sessionName}
-                        onChange={(e) => setSessionName(e.target.value)}
+                        value={currentConfig.sessionName}
+                        onChange={(e) => updateActiveConfig({ sessionName: e.target.value, hasCustomSessionName: true })}
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="PTS - Matematika - 9A (2026/2027)"
                       />
@@ -461,12 +554,20 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                         )}
                       </div>
                       <select
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
+                        value={currentConfig.subject}
+                        onChange={(e) => {
+                          const newSubject = e.target.value;
+                          updateActiveConfig((prev) => ({
+                            subject: newSubject,
+                            ...(!prev.hasCustomSessionName
+                              ? { sessionName: `${prev.examType} - ${newSubject} - ${prev.className} (${prev.academicYear})` }
+                              : {}),
+                          }));
+                        }}
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
-                        {subject && !OFFICIAL_SCHOOL_SUBJECTS.some((s) => s.label === subject) && (
-                          <option value={subject}>{subject} (Dari Excel)</option>
+                        {currentConfig.subject && !OFFICIAL_SCHOOL_SUBJECTS.some((s) => s.label === currentConfig.subject) && (
+                          <option value={currentConfig.subject}>{currentConfig.subject} (Dari Excel)</option>
                         )}
                         {OFFICIAL_SCHOOL_SUBJECTS.map((s) => (
                           <option key={s.label} value={s.label}>{s.label}</option>
@@ -485,8 +586,8 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                       </div>
                       <input
                         type="text"
-                        value={teacherName}
-                        onChange={(e) => setTeacherName(e.target.value)}
+                        value={currentConfig.teacherName}
+                        onChange={(e) => updateActiveConfig({ teacherName: e.target.value })}
                         list="teacher-suggestions"
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         placeholder="Nama Guru Pengampu..."
@@ -501,8 +602,16 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                     <div className="space-y-1">
                       <label className="text-[11px] font-semibold text-slate-600">Kelas / Rombel</label>
                       <select
-                        value={className}
-                        onChange={(e) => setClassName(e.target.value)}
+                        value={currentConfig.className}
+                        onChange={(e) => {
+                          const newClass = e.target.value;
+                          updateActiveConfig((prev) => ({
+                            className: newClass,
+                            ...(!prev.hasCustomSessionName
+                              ? { sessionName: `${prev.examType} - ${prev.subject} - ${newClass} (${prev.academicYear})` }
+                              : {}),
+                          }));
+                        }}
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         {availableClasses.map((cls) => (
@@ -514,8 +623,16 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                     <div className="space-y-1">
                       <label className="text-[11px] font-semibold text-slate-600">Jenis Ujian</label>
                       <select
-                        value={examType}
-                        onChange={(e) => setExamType(e.target.value)}
+                        value={currentConfig.examType}
+                        onChange={(e) => {
+                          const newExamType = e.target.value;
+                          updateActiveConfig((prev) => ({
+                            examType: newExamType,
+                            ...(!prev.hasCustomSessionName
+                              ? { sessionName: `${newExamType} - ${prev.subject} - ${prev.className} (${prev.academicYear})` }
+                              : {}),
+                          }));
+                        }}
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="PTS / UTS">PTS / UTS</option>
@@ -529,8 +646,16 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                     <div className="space-y-1">
                       <label className="text-[11px] font-semibold text-slate-600">Tahun Ajaran</label>
                       <select
-                        value={academicYear}
-                        onChange={(e) => setAcademicYear(e.target.value)}
+                        value={currentConfig.academicYear}
+                        onChange={(e) => {
+                          const newYear = e.target.value;
+                          updateActiveConfig((prev) => ({
+                            academicYear: newYear,
+                            ...(!prev.hasCustomSessionName
+                              ? { sessionName: `${prev.examType} - ${prev.subject} - ${prev.className} (${newYear})` }
+                              : {}),
+                          }));
+                        }}
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="2026/2027">2026/2027 (Aktif)</option>
@@ -542,8 +667,8 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                     <div className="space-y-1">
                       <label className="text-[11px] font-semibold text-slate-600">Semester</label>
                       <select
-                        value={semester}
-                        onChange={(e) => setSemester(e.target.value)}
+                        value={currentConfig.semester}
+                        onChange={(e) => updateActiveConfig({ semester: e.target.value })}
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="Ganjil">Semester Ganjil (1)</option>
@@ -554,8 +679,8 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                     <div className="space-y-1">
                       <label className="text-[11px] font-semibold text-slate-600">Format Nilai</label>
                       <select
-                        value={examFormat}
-                        onChange={(e) => setExamFormat(e.target.value as any)}
+                        value={currentConfig.examFormat}
+                        onChange={(e) => updateActiveConfig({ examFormat: e.target.value as any })}
                         className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="PG_ONLY">Hanya PG (100%)</option>
@@ -610,7 +735,7 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                       </button>
                     )}
                     {initialSheetsRef.current[activeSheetIndex] &&
-                      activeRows.length !== initialSheetsRef.current[activeSheetIndex]?.rows.length && (
+                      currentConfig.rows.length !== initialSheetsRef.current[activeSheetIndex]?.rows.length && (
                       <button
                         type="button"
                         onClick={handleResetCurrentSheet}
@@ -638,15 +763,15 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {activeRows.length === 0 ? (
+                      {currentConfig.rows.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="text-center py-8 text-slate-400 text-xs">
                             Semua baris telah dihapus. Klik &quot;Reset Baris&quot; untuk memulihkan.
                           </td>
                         </tr>
                       ) : (
-                        activeRows.map((r, idx) => {
-                          const isPass = r.finalScore >= kkm;
+                        currentConfig.rows.map((r, idx) => {
+                          const isPass = r.finalScore >= currentConfig.kkm;
                           return (
                             <tr key={idx} className="hover:bg-slate-50/80 group">
                               <td className="py-2 px-3 text-center font-mono text-slate-500">
@@ -668,6 +793,11 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
                                   }`}
                                 >
                                   <option value="">-- Belum Cocok (Buat Akun Siswa Baru) --</option>
+                                  {r.matchedStudentId && !classCandidates.some((c) => c.id === r.matchedStudentId) && (
+                                    <option value={r.matchedStudentId}>
+                                      {r.matchedStudentName || 'Siswa Terpilih'}
+                                    </option>
+                                  )}
                                   {classCandidates.map((c) => (
                                     <option key={c.id} value={c.id}>
                                       {c.fullName}
@@ -713,7 +843,7 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
         {/* Footer Actions */}
         <div className="flex items-center justify-between pt-3.5 border-t border-slate-200 shrink-0">
           <span className="text-xs text-slate-500">
-            {parsedSheets.length > 0 ? `${activeRows.length} siswa siap diimpor` : 'Pilih berkas Excel untuk memulai'}
+            {parsedSheets.length > 0 ? `${currentConfig.rows.length} siswa siap diimpor` : 'Pilih berkas Excel untuk memulai'}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -726,7 +856,7 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
             </button>
             <button
               type="button"
-              disabled={parsedSheets.length === 0 || activeRows.length === 0 || isSaving}
+              disabled={parsedSheets.length === 0 || currentConfig.rows.length === 0 || isSaving}
               onClick={handleExecuteImport}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
             >
