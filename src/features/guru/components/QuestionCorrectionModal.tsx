@@ -4324,7 +4324,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                           setBulkSyncYear(e.target.value);
                           setBulkSyncResult(null);
                         }}
-                        className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-100 disabled:text-slate-400"
+                        className={`w-full text-xs font-bold border border-slate-300 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                          isBulkSyncing || bulkSyncScope === 'ACTIVE_SESSION'
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-white text-slate-800'
+                        }`}
                       >
                         <option value="2026/2027">2026/2027 (Aktif)</option>
                         <option value="2025/2026">2025/2026</option>
@@ -4343,7 +4347,11 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                           setBulkSyncSemester(e.target.value);
                           setBulkSyncResult(null);
                         }}
-                        className="w-full text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-100 disabled:text-slate-400"
+                        className={`w-full text-xs font-bold border border-slate-300 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                          isBulkSyncing || bulkSyncScope === 'ACTIVE_SESSION'
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-white text-slate-800'
+                        }`}
                       >
                         <option value="Ganjil">Semester Ganjil (1)</option>
                         <option value="Genap">Semester Genap (2)</option>
