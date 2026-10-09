@@ -86,6 +86,45 @@ export interface ExecuteImportResult {
   message: string;
 }
 
+export interface SingleSheetImportPlan {
+  sheetName: string;
+  mode?: 'CREATE_NEW' | 'UPDATE_EXISTING';
+  existingSessionId?: string;
+  sessionConfig: {
+    sessionName: string;
+    teacherName?: string;
+    subject: string;
+    className: string;
+    examType: string;
+    academicYear?: string;
+    semester?: string;
+    kkm?: number;
+    format?: 'PG_ONLY' | 'PG_AND_ESSAY';
+    examFormat?: 'PG_ONLY' | 'PG_AND_ESSAY';
+  };
+  rows: UniversalExcelStudentRow[];
+}
+
+export interface ExecuteImportAllSheetsParams {
+  sheets: SingleSheetImportPlan[];
+  currentUser: UserProfile;
+  onProgress?: (current: number, total: number, currentSheet: string) => void;
+}
+
+export interface ExecuteImportAllSheetsResult {
+  success: boolean;
+  totalSavedCount: number;
+  totalSessionsCount: number;
+  sessions: ExamSessionRecord[];
+  results: {
+    sheetName: string;
+    className: string;
+    session: ExamSessionRecord;
+    savedCount: number;
+  }[];
+  message: string;
+}
+
 export interface DetectedHeaderInfo {
   headerRowIndex: number;
   nameColIndex: number;
@@ -553,6 +592,60 @@ export class UniversalExcelGradingService {
       sessionId: targetSession.id,
       savedCount,
       message: `Berhasil mengimpor ${savedCount} nilai siswa ke sesi "${targetSession.session_name}".`,
+    };
+  }
+
+  /**
+   * Eksekusi import massal untuk seluruh sheet/kelas sekaligus dalam satu proses.
+   */
+  public static async executeImportAllSheets(
+    params: ExecuteImportAllSheetsParams
+  ): Promise<ExecuteImportAllSheetsResult> {
+    const validSheets = (params.sheets || []).filter((s) => s.rows && s.rows.length > 0);
+    if (validSheets.length === 0) {
+      throw new Error('Tidak ada sheet atau kelas dengan data siswa yang dapat diimpor.');
+    }
+
+    const createdSessions: ExamSessionRecord[] = [];
+    const itemResults: { sheetName: string; className: string; session: ExamSessionRecord; savedCount: number }[] = [];
+    let totalSaved = 0;
+
+    for (let i = 0; i < validSheets.length; i++) {
+      const plan = validSheets[i];
+      const targetName = plan.sessionConfig.className || plan.sheetName;
+      params.onProgress?.(i + 1, validSheets.length, targetName);
+
+      const singleResult = await this.executeImport(
+        {
+          mode: plan.mode || 'CREATE_NEW',
+          existingSessionId: plan.existingSessionId,
+          sessionConfig: plan.sessionConfig,
+          rows: plan.rows,
+          currentUser: params.currentUser,
+        },
+        params.currentUser
+      );
+
+      if (singleResult.success && singleResult.session) {
+        createdSessions.push(singleResult.session);
+        totalSaved += singleResult.savedCount;
+        itemResults.push({
+          sheetName: plan.sheetName,
+          className: targetName,
+          session: singleResult.session,
+          savedCount: singleResult.savedCount,
+        });
+      }
+    }
+
+    const classNames = itemResults.map((r) => r.className).join(', ');
+    return {
+      success: true,
+      totalSavedCount: totalSaved,
+      totalSessionsCount: createdSessions.length,
+      sessions: createdSessions,
+      results: itemResults,
+      message: `Berhasil mengimpor ${totalSaved} nilai siswa ke ${createdSessions.length} kelas (${classNames})!`,
     };
   }
 

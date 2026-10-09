@@ -585,6 +585,123 @@ export async function runUniversalExcelGradingTestSuite(): Promise<TestSuiteResu
         details: err?.message || String(err),
       });
     }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Test 10: Eksekusi Import Massal Langsung Semua Kelas (executeImportAllSheets)
+    // ─────────────────────────────────────────────────────────────────────────────
+    try {
+      const bulkRes = await UniversalExcelGradingService.executeImportAllSheets({
+        sheets: [
+          {
+            sheetName: '7',
+            mode: 'CREATE_NEW',
+            sessionConfig: {
+              sessionName: 'ASTS - Informatika - 7 (2026/2027)',
+              subject: 'Informatika',
+              className: '7',
+              examType: 'ASTS',
+              academicYear: '2026/2027',
+              semester: 'Ganjil',
+              kkm: 75,
+              teacherName: 'Dafiq Guru Pengampu',
+            },
+            rows: [
+              {
+                rowNumber: 1,
+                rawName: 'Siti Nurhaliza',
+                matchedStudentId: 'bulk_1',
+                matchedStudentName: 'Siti Nurhaliza',
+                matchConfidence: 'EXACT',
+                pgScore: 80,
+                essayScore: null,
+                finalScore: 80,
+                originalScore: 80,
+              },
+              {
+                rowNumber: 2,
+                rawName: 'Muhammad Rizki Pratama',
+                matchedStudentId: 'bulk_2',
+                matchedStudentName: 'Muhammad Rizki Pratama',
+                matchConfidence: 'EXACT',
+                pgScore: 90,
+                essayScore: null,
+                finalScore: 90,
+                originalScore: 90,
+              },
+            ],
+          },
+          {
+            sheetName: '8A',
+            mode: 'CREATE_NEW',
+            sessionConfig: {
+              sessionName: 'ASTS - Informatika - 8A (2026/2027)',
+              subject: 'Informatika',
+              className: '8A',
+              examType: 'ASTS',
+              academicYear: '2026/2027',
+              semester: 'Ganjil',
+              kkm: 75,
+              teacherName: 'Dafiq Guru Pengampu',
+            },
+            rows: [
+              {
+                rowNumber: 1,
+                rawName: 'Faturrahman Al-Farisi',
+                matchedStudentId: 'bulk_3',
+                matchedStudentName: 'Faturrahman Al-Farisi',
+                matchConfidence: 'EXACT',
+                pgScore: 85,
+                essayScore: null,
+                finalScore: 85,
+                originalScore: 85,
+              },
+            ],
+          },
+        ],
+        currentUser: { id: 'usr_dafiq', full_name: 'Dafiq Guru Pengampu', role: 'GURU' } as any,
+      });
+
+      if (!bulkRes.success) {
+        throw new Error(`Bulk import failed: ${bulkRes.message}`);
+      }
+      if (bulkRes.totalSessionsCount !== 2) {
+        throw new Error(`Expected 2 sessions created, got ${bulkRes.totalSessionsCount}`);
+      }
+      if (bulkRes.totalSavedCount !== 3) {
+        throw new Error(`Expected 3 total student grades saved, got ${bulkRes.totalSavedCount}`);
+      }
+      if (bulkRes.sessions.length !== 2) {
+        throw new Error(`Expected 2 sessions in result array, got ${bulkRes.sessions.length}`);
+      }
+
+      // Pastikan kedua sesi tersimpan di repository
+      const sessClass7 = bulkRes.sessions.find((s) => s.class_name === '7');
+      const sessClass8A = bulkRes.sessions.find((s) => s.class_name === '8A');
+      if (!sessClass7 || !sessClass8A) {
+        throw new Error('Sesi untuk kelas 7 dan 8A tidak lengkap');
+      }
+
+      const grades7 = await ExamCorrectionRepository.getGradedStudentsBySession(sessClass7.id);
+      if (grades7.data.length !== 2) {
+        throw new Error(`Expected 2 grades for kelas 7, got ${grades7.data.length}`);
+      }
+
+      const grades8A = await ExamCorrectionRepository.getGradedStudentsBySession(sessClass8A.id);
+      if (grades8A.data.length !== 1) {
+        throw new Error(`Expected 1 grade for kelas 8A, got ${grades8A.data.length}`);
+      }
+
+      results.push({
+        testName: '10. Eksekusi import massal langsung semua kelas (executeImportAllSheets) sukses',
+        status: 'PASS',
+      });
+    } catch (err: any) {
+      results.push({
+        testName: '10. Eksekusi import massal langsung semua kelas (executeImportAllSheets) sukses',
+        status: 'FAIL',
+        details: err?.message || String(err),
+      });
+    }
   } finally {
     ProviderFactory.setProvider(originalProvider);
   }

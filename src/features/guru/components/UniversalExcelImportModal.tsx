@@ -18,6 +18,7 @@ import {
   UniversalExcelGradingService,
   type UniversalExcelParsedSheet,
   type UniversalExcelStudentRow,
+  type SingleSheetImportPlan,
 } from '../../../services/universal-excel-grading.service';
 import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
 import { ProviderFactory } from '../../../providers/provider-factory';
@@ -97,12 +98,33 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
       setSheetConfigs({});
       setActiveSheetIndex(0);
       setErrorMessage(null);
+      setSavingProgress(null);
       initialSheetsRef.current = [];
     }
   }, [isOpen]);
 
   const [isSaving, setIsSaving] = useState(false);
+  const [savingProgress, setSavingProgress] = useState<{
+    current: number;
+    total: number;
+    sheetName: string;
+  } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Total students and classes across all sheets
+  const allSheetsSummary = useMemo(() => {
+    let totalStudents = 0;
+    let validSheetsCount = 0;
+    parsedSheets.forEach((sh, idx) => {
+      const cfg = sheetConfigs[idx];
+      const count = cfg ? cfg.rows.length : sh.rows.length;
+      if (count > 0) {
+        validSheetsCount++;
+        totalStudents += count;
+      }
+    });
+    return { totalStudents, validSheetsCount };
+  }, [parsedSheets, sheetConfigs]);
 
   // Available classes in directory
   const availableClasses = useMemo(() => {
@@ -284,8 +306,8 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
     }));
   };
 
-  // Execute import & creation
-  const handleExecuteImport = async () => {
+  // Execute single sheet import & creation
+  const handleExecuteImportSingle = async () => {
     if (currentConfig.rows.length === 0) {
       setErrorMessage('Tidak ada baris siswa yang dapat diimpor.');
       return;
@@ -327,6 +349,64 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
       setErrorMessage(`Gagal menyimpan sesi & nilai: ${err?.message || 'Error database'}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Execute ALL sheets import directly across all classes
+  const handleExecuteImportAll = async () => {
+    const plans: SingleSheetImportPlan[] = [];
+    parsedSheets.forEach((sh, idx) => {
+      const cfg = sheetConfigs[idx] || fallbackConfig;
+      if (cfg.rows.length > 0) {
+        plans.push({
+          sheetName: sh.sheetName,
+          mode: cfg.importMode,
+          existingSessionId: cfg.selectedExistingSessionId,
+          sessionConfig: {
+            sessionName: cfg.sessionName.trim() || `${cfg.examType} - ${cfg.subject} - ${cfg.className}`,
+            teacherName: cfg.teacherName.trim() || defaultTeacher,
+            subject: cfg.subject.trim(),
+            className: cfg.className.trim(),
+            examType: cfg.examType,
+            academicYear: cfg.academicYear,
+            semester: cfg.semester,
+            kkm: cfg.kkm,
+            format: cfg.examFormat,
+          },
+          rows: cfg.rows,
+        });
+      }
+    });
+
+    if (plans.length === 0) {
+      setErrorMessage('Tidak ada data siswa pada seluruh sheet yang dapat diimpor.');
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage(null);
+    setSavingProgress({ current: 1, total: plans.length, sheetName: plans[0].sessionConfig.className });
+
+    try {
+      const bulkRes = await UniversalExcelGradingService.executeImportAllSheets({
+        sheets: plans,
+        currentUser,
+        onProgress: (cur, tot, name) => {
+          setSavingProgress({ current: cur, total: tot, sheetName: name });
+        },
+      });
+
+      const activeSessionCreated =
+        bulkRes.sessions.find((s) => s.class_name === currentConfig.className) ||
+        bulkRes.sessions[0];
+
+      onSuccess(activeSessionCreated, bulkRes.message);
+      onClose();
+    } catch (err: any) {
+      setErrorMessage(`Gagal menyimpan import seluruh kelas: ${err?.message || 'Error database'}`);
+    } finally {
+      setIsSaving(false);
+      setSavingProgress(null);
     }
   };
 
@@ -445,6 +525,35 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
           {/* If Sheets Detected */}
           {parsedSheets.length > 0 && !isParsing && (
             <div className="space-y-4">
+              {/* Multi-Class Bulk Import Banner */}
+              {parsedSheets.length > 1 && (
+                <div className="bg-linear-to-r from-emerald-50 via-teal-50/60 to-emerald-50 border border-emerald-200/90 rounded-xl p-3 flex items-center justify-between gap-3 text-xs shadow-2xs">
+                  <div className="flex items-center gap-2.5 text-emerald-950 min-w-0">
+                    <div className="p-1.5 bg-emerald-100/80 text-emerald-800 rounded-lg shrink-0 font-bold text-xs">
+                      ⚡
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-900 block truncate">
+                        Terdeteksi {parsedSheets.length} Kelas ({allSheetsSummary.totalStudents} Siswa)
+                      </span>
+                      <span className="text-[11px] text-slate-500 block truncate">
+                        Anda dapat langsung mengimpor seluruh kelas sekaligus tanpa perlu satu per satu.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isSaving || allSheetsSummary.totalStudents === 0}
+                    onClick={handleExecuteImportAll}
+                    title="Buat sesi ujian dan simpan nilai untuk seluruh kelas sekaligus"
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors disabled:opacity-40"
+                  >
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin' : ''}`} />
+                    <span>Import Semua {parsedSheets.length} Kelas</span>
+                  </button>
+                </div>
+              )}
+
               {/* Sheet Tabs if multi-sheet */}
               {parsedSheets.length > 1 && (
                 <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 border-b border-slate-200">
@@ -842,9 +951,24 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
 
         {/* Footer Actions */}
         <div className="flex items-center justify-between pt-3.5 border-t border-slate-200 shrink-0">
-          <span className="text-xs text-slate-500">
-            {parsedSheets.length > 0 ? `${currentConfig.rows.length} siswa siap diimpor` : 'Pilih berkas Excel untuk memulai'}
-          </span>
+          <div className="text-xs text-slate-500 min-w-0">
+            {savingProgress ? (
+              <span className="text-emerald-700 font-bold flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-600 shrink-0" />
+                <span className="truncate">
+                  Menyimpan kelas {savingProgress.current} dari {savingProgress.total} ({savingProgress.sheetName})...
+                </span>
+              </span>
+            ) : parsedSheets.length > 1 ? (
+              <span>
+                Total <strong>{allSheetsSummary.validSheetsCount} kelas</strong> ({allSheetsSummary.totalStudents} siswa) siap diimpor
+              </span>
+            ) : parsedSheets.length === 1 ? (
+              <span>{currentConfig.rows.length} siswa siap diimpor</span>
+            ) : (
+              <span>Pilih berkas Excel untuk memulai</span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -854,15 +978,44 @@ export const UniversalExcelImportModal: React.FC<UniversalExcelImportModalProps>
             >
               Batal
             </button>
-            <button
-              type="button"
-              disabled={parsedSheets.length === 0 || currentConfig.rows.length === 0 || isSaving}
-              onClick={handleExecuteImport}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
-            >
-              <CheckCircle2 className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
-              <span>{isSaving ? 'Menyimpan Sesi & Nilai...' : 'Buat Sesi & Simpan Nilai'}</span>
-            </button>
+
+            {parsedSheets.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  disabled={currentConfig.rows.length === 0 || isSaving}
+                  onClick={handleExecuteImportSingle}
+                  title={`Hanya impor kelas ${currentConfig.className} pada sheet ini`}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-colors disabled:opacity-40 cursor-pointer min-h-10"
+                >
+                  <span>Import Sheet Ini Saja ({currentConfig.className})</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={allSheetsSummary.totalStudents === 0 || isSaving}
+                  onClick={handleExecuteImportAll}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
+                >
+                  <CheckCircle2 className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isSaving
+                      ? `Menyimpan ${savingProgress ? `${savingProgress.current}/${savingProgress.total}` : 'Kelas'}...`
+                      : `Import Semua Kelas (${allSheetsSummary.validSheetsCount} Kelas • ${allSheetsSummary.totalStudents} Siswa)`}
+                  </span>
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={parsedSheets.length === 0 || currentConfig.rows.length === 0 || isSaving}
+                onClick={handleExecuteImportSingle}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer min-h-10"
+              >
+                <CheckCircle2 className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
+                <span>{isSaving ? 'Menyimpan Sesi & Nilai...' : 'Buat Sesi & Simpan Nilai'}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
