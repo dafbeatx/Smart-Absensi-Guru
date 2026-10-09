@@ -5083,24 +5083,26 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           />
         )}
 
-        {/* ── LAYER: SUARA GURU & EVALUASI SEKOLAH (DEDICATED FULL VIEW - NON-POPUP) ─── */}
+        {/* ── LAYER: SUARA GURU & EVALUASI SEKOLAH (DEDICATED FULL SCREEN - NON-POPUP) ─── */}
         {activeTab === 'BERANDA' && berandaLayer === 'SURVEY_ANALYTICS' && (
-          <SurveyAnalyticsView
-            onBack={() => {
-              setBerandaLayer(surveyAnalyticsReturnTarget === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
-              if (surveyAnalyticsReturnTarget === 'PROFIL') {
-                setActiveTab('PROFIL');
+          <div className="fixed inset-0 z-50 bg-[#F4F6F8] overflow-y-auto">
+            <SurveyAnalyticsView
+              onBack={() => {
+                setBerandaLayer(surveyAnalyticsReturnTarget === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+                if (surveyAnalyticsReturnTarget === 'PROFIL') {
+                  setActiveTab('PROFIL');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              backLabel={
+                surveyAnalyticsReturnTarget === 'PROFIL'
+                  ? 'Kembali ke Profil'
+                  : surveyAnalyticsReturnTarget === 'ALL_FEATURES'
+                  ? 'Kembali ke Semua Fitur'
+                  : 'Kembali ke Beranda'
               }
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            backLabel={
-              surveyAnalyticsReturnTarget === 'PROFIL'
-                ? 'Kembali ke Profil'
-                : surveyAnalyticsReturnTarget === 'ALL_FEATURES'
-                ? 'Kembali ke Semua Fitur'
-                : 'Kembali ke Beranda'
-            }
-          />
+            />
+          </div>
         )}
 
         {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}

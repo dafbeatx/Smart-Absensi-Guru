@@ -161,7 +161,7 @@ export const SurveyAnalyticsView: React.FC<SurveyAnalyticsViewProps> = ({
   };
 
   return (
-    <div className={`space-y-4 pb-12 w-full max-w-4xl mx-auto px-1 sm:px-0 ${className}`}>
+    <div className={`space-y-4 pb-safe-or-12 w-full max-w-xl sm:max-w-4xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 ${className}`}>
       {/* ── TOP NAV BAR: TOMBOL KEMBALI & INDIKATOR LAYER ─── */}
       <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3">
         <button
@@ -181,7 +181,7 @@ export const SurveyAnalyticsView: React.FC<SurveyAnalyticsViewProps> = ({
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             100% Rahasia &amp; Anonim
           </span>
-          <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-1">
+          <span className="hidden sm:block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-1">
             Layer Suara Pendidik
           </span>
         </div>
@@ -372,65 +372,65 @@ export const SurveyAnalyticsView: React.FC<SurveyAnalyticsViewProps> = ({
       ) : (
         <div className="space-y-4">
           {/* ── 4 KARTU RINGKASAN CEPAT (KPI SEHARI-HARI) ─── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {/* Total Responden */}
-            <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
-              <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <Users className="w-3.5 h-3.5 text-slate-400" />
-                Rekan Guru Mengisi
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-1 overflow-hidden min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">Guru Mengisi</span>
               </span>
-              <p className="text-2xl sm:text-3xl font-black text-slate-900">
-                {summary.totalRespondents} <span className="text-xs font-bold text-slate-500">Guru</span>
+              <p className="text-xl sm:text-3xl font-black text-slate-900 truncate">
+                {summary.totalRespondents} <span className="text-[10px] font-bold text-slate-500">Guru</span>
               </p>
-              <p className="text-[10px] text-slate-500 font-medium truncate">
-                Guru: {summary.roleBreakdown.guru} • Staf: {summary.roleBreakdown.admin} • KS: {summary.roleBreakdown.kepsek}
+              <p className="text-[9px] text-slate-500 font-medium truncate">
+                G: {summary.roleBreakdown.guru} · S: {summary.roleBreakdown.admin} · KS: {summary.roleBreakdown.kepsek}
               </p>
             </div>
 
             {/* Indeks Kepuasan Rerata */}
-            <div className="bg-emerald-50/60 p-3.5 sm:p-4 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
-              <span className="text-[10px] sm:text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                Nilai Kepuasan Rerata
+            <div className="bg-emerald-50/60 p-3 sm:p-4 rounded-2xl border border-emerald-200 shadow-2xs space-y-1 overflow-hidden min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 shrink-0" />
+                <span className="truncate">Nilai Rerata</span>
               </span>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl sm:text-3xl font-black text-emerald-700">
+                <span className="text-xl sm:text-3xl font-black text-emerald-700">
                   {summary.overallMean.toFixed(2)}
                 </span>
-                <span className="text-xs font-bold text-emerald-600">/ 5.00</span>
+                <span className="text-[10px] font-bold text-emerald-600">/ 5</span>
               </div>
-              <p className="text-[10px] font-extrabold text-emerald-700 truncate">
-                {summary.overallMean >= 4.0 ? 'Kategori: Sangat Memuaskan' : 'Kategori: Baik / Cukup'}
+              <p className="text-[9px] font-extrabold text-emerald-700 truncate">
+                {summary.overallMean >= 4.0 ? '✓ Sangat Memuaskan' : 'Baik / Cukup'}
               </p>
             </div>
 
             {/* Bukti Manfaat Nyata */}
-            <div className="bg-purple-50/60 p-3.5 sm:p-4 rounded-2xl border border-purple-200 shadow-2xs space-y-1">
-              <span className="text-[10px] sm:text-[11px] font-extrabold text-purple-800 uppercase tracking-wider flex items-center gap-1">
-                <Award className="w-3.5 h-3.5 text-purple-600" />
-                Bukti Manfaat
+            <div className="bg-purple-50/60 p-3 sm:p-4 rounded-2xl border border-purple-200 shadow-2xs space-y-1 overflow-hidden min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-extrabold text-purple-800 uppercase tracking-wider flex items-center gap-1">
+                <Award className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600 shrink-0" />
+                <span className="truncate">Bukti Manfaat</span>
               </span>
-              <p className="text-2xl sm:text-3xl font-black text-purple-700">
+              <p className="text-xl sm:text-3xl font-black text-purple-700">
                 {summary.hypotheses.filter((h: SurveyHypothesisResult) => h.isConfirmed).length} / 3
               </p>
-              <p className="text-[10px] font-extrabold text-purple-700 truncate">
+              <p className="text-[9px] font-extrabold text-purple-700 truncate">
                 {summary.hypotheses.every((h: SurveyHypothesisResult) => h.isConfirmed)
-                  ? 'Semua Terbukti Membantu'
-                  : 'Dalam Pemantauan'}
+                  ? '✓ Semua Terbukti'
+                  : 'Dipantau'}
               </p>
             </div>
 
             {/* Rencana Solusi Sekolah */}
-            <div className="bg-amber-50/60 p-3.5 sm:p-4 rounded-2xl border border-amber-200 shadow-2xs space-y-1">
-              <span className="text-[10px] sm:text-[11px] font-extrabold text-amber-800 uppercase tracking-wider flex items-center gap-1">
-                <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
-                Rencana Solusi
+            <div className="bg-amber-50/60 p-3 sm:p-4 rounded-2xl border border-amber-200 shadow-2xs space-y-1 overflow-hidden min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-extrabold text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                <Lightbulb className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600 shrink-0" />
+                <span className="truncate">Rencana Aksi</span>
               </span>
-              <p className="text-2xl sm:text-3xl font-black text-amber-700">
-                {summary.solutions ? summary.solutions.length : 4} <span className="text-xs font-bold text-amber-600">Aksi</span>
+              <p className="text-xl sm:text-3xl font-black text-amber-700">
+                {summary.solutions ? summary.solutions.length : 4} <span className="text-[10px] font-bold text-amber-600">Aksi</span>
               </p>
-              <p className="text-[10px] font-extrabold text-amber-700 truncate">
-                Langkah Nyata Perbaikan
+              <p className="text-[9px] font-extrabold text-amber-700 truncate">
+                Perbaikan Nyata
               </p>
             </div>
           </div>
