@@ -32,6 +32,8 @@ import {
   ExternalLink,
   Calendar,
   Edit3,
+  Sliders,
+  Check,
 } from 'lucide-react';
 import type {
   ExamSessionRecord,
@@ -157,6 +159,27 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [quickKeyInput, setQuickKeyInput] = useState('');
   const [editingSessionFormat, setEditingSessionFormat] = useState<'PG_ONLY' | 'PG_AND_ESSAY'>('PG_AND_ESSAY');
 
+  // Edit Session Configuration Modal State
+  const [isEditSessionModalOpen, setIsEditSessionModalOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<ExamSessionRecord | null>(null);
+  const [editSessionName, setEditSessionName] = useState('');
+  const [editTeacherName, setEditTeacherName] = useState('');
+  const [editSubject, setEditSubject] = useState('Informatika');
+  const [editCustomSubject, setEditCustomSubject] = useState('');
+  const [editClass, setEditClass] = useState('8A');
+  const [editCustomClass, setEditCustomClass] = useState('');
+  const [editExamType, setEditExamType] = useState('PTS / UTS');
+  const [editExamFormat, setEditExamFormat] = useState<'PG_ONLY' | 'PG_AND_ESSAY'>('PG_AND_ESSAY');
+  const [editEssayCount, setEditEssayCount] = useState(5);
+  const [editEssayMaxScore, setEditEssayMaxScore] = useState(20);
+  const [editPgWeight, setEditPgWeight] = useState(70);
+  const [editEssayWeight, setEditEssayWeight] = useState(30);
+  const [editKkm, setEditKkm] = useState(75);
+  const [editAcademicYear, setEditAcademicYear] = useState('2026/2027');
+  const [editSemester, setEditSemester] = useState('Ganjil');
+  const [editKeyInput, setEditKeyInput] = useState('');
+  const [isSavingEditSession, setIsSavingEditSession] = useState(false);
+
   // Quick Essay Batch & Inline Edit State
   const [isEditingFromRecap, setIsEditingFromRecap] = useState(false);
   const [isBatchEssayModalOpen, setIsBatchEssayModalOpen] = useState(false);
@@ -271,7 +294,9 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isKeyEditorModalOpen) {
+        if (isEditSessionModalOpen) {
+          setIsEditSessionModalOpen(false);
+        } else if (isKeyEditorModalOpen) {
           setIsKeyEditorModalOpen(false);
         } else if (isCreatingSession) {
           setIsCreatingSession(false);
@@ -290,7 +315,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = originalOverflow;
     };
-  }, [isOpen, isKeyEditorModalOpen, isCreatingSession, onClose]);
+  }, [isOpen, isKeyEditorModalOpen, isEditSessionModalOpen, isCreatingSession, onClose]);
 
   const handleOpenCreateSession = () => {
     if (currentUser?.teaching_assignment) {
@@ -489,6 +514,205 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     } catch (err) {
       logger.error('QuestionCorrectionModal', 'Failed to save answer key:', err);
       setToastMessage({ text: 'Gagal memperbarui kunci jawaban.', type: 'error' });
+    }
+  };
+
+  // Open Edit Session Modal (Format PG/Essay, KKM, Title, Mapel, Kelas)
+  const handleOpenEditSession = async (session: ExamSessionRecord, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingSession(session);
+
+    const isPgOnly =
+      (session.scoring_config?.essayCount ?? 0) === 0 ||
+      (session.scoring_config?.essayWeight ?? 0) === 0;
+
+    setEditSessionName(session.session_name || '');
+    setEditTeacherName(session.teacher || currentUser?.full_name || '');
+
+    // Match subject
+    const officialSub = PREDEFINED_SUBJECTS.find(
+      (s) => s.toLowerCase() === (session.subject || '').toLowerCase()
+    );
+    if (officialSub) {
+      setEditSubject(officialSub);
+      setEditCustomSubject('');
+    } else {
+      setEditSubject('CUSTOM');
+      setEditCustomSubject(session.subject || '');
+    }
+
+    // Match class
+    const matchedCls = availableClasses.find(
+      (c) => c.toUpperCase() === (session.class_name || '').toUpperCase()
+    );
+    if (matchedCls) {
+      setEditClass(matchedCls);
+      setEditCustomClass('');
+    } else {
+      setEditClass('CUSTOM');
+      setEditCustomClass(session.class_name || '');
+    }
+
+    setEditExamType(session.exam_type || 'PTS / UTS');
+    setEditExamFormat(isPgOnly ? 'PG_ONLY' : 'PG_AND_ESSAY');
+    setEditEssayCount(session.scoring_config?.essayCount || 5);
+    setEditEssayMaxScore(session.scoring_config?.essayMaxScore || 20);
+    setEditPgWeight(Math.round((session.scoring_config?.pgWeight ?? 0.7) * 100));
+    setEditEssayWeight(Math.round((session.scoring_config?.essayWeight ?? 0.3) * 100));
+    setEditKkm(Number(session.kkm) || 75);
+    setEditAcademicYear(session.academic_year || '2026/2027');
+    setEditSemester(session.semester || 'Ganjil');
+
+    // Answer keys
+    let keys = Array.isArray(session.answer_key) ? session.answer_key : [];
+    if (keys.length === 0 && session.id) {
+      try {
+        const detailed = await ExamCorrectionRepository.getSessionById(session.id);
+        if (detailed && Array.isArray(detailed.answer_key) && detailed.answer_key.length > 0) {
+          keys = detailed.answer_key;
+        }
+      } catch {}
+    }
+    if (keys.length > 0) {
+      setEditKeyInput(keys.map((k, i) => `${i + 1}.${k}`).join(' '));
+    } else {
+      setEditKeyInput('1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D 9.A 10.B');
+    }
+
+    setIsEditSessionModalOpen(true);
+  };
+
+  // Save edited session configuration
+  const handleSaveEditSession = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!editingSession) return;
+
+    const finalSubject = editSubject === 'CUSTOM' ? editCustomSubject.trim() : editSubject;
+    const finalClass = editClass === 'CUSTOM' ? editCustomClass.trim().toUpperCase() : editClass;
+
+    if (!finalSubject) {
+      setToastMessage({ text: 'Mata pelajaran wajib diisi!', type: 'error' });
+      return;
+    }
+    if (!finalClass) {
+      setToastMessage({ text: 'Kelas / rombel wajib diisi!', type: 'error' });
+      return;
+    }
+
+    const parsedKeys = parseAnswerKey(editKeyInput);
+    if (parsedKeys.length === 0) {
+      setToastMessage({ text: 'Kunci jawaban belum valid! Masukkan minimal 1 butir soal.', type: 'error' });
+      return;
+    }
+
+    const isPgOnly = editExamFormat === 'PG_ONLY';
+    const newScoringConfig = isPgOnly
+      ? {
+          pgWeight: 1.0,
+          essayWeight: 0,
+          essayMaxScore: 0,
+          essayCount: 0,
+        }
+      : {
+          pgWeight: Number(editPgWeight) / 100 || 0.7,
+          essayWeight: Number(editEssayWeight) / 100 || 0.3,
+          essayMaxScore: Number(editEssayMaxScore) || 20,
+          essayCount: Number(editEssayCount) || 5,
+        };
+
+    const finalYear = normalizeAcademicYearString(editAcademicYear) || '2026/2027';
+
+    setIsSavingEditSession(true);
+    try {
+      const updated = await ExamCorrectionRepository.saveSession({
+        id: editingSession.id,
+        session_name: editSessionName.trim() || `${editExamType} - ${finalSubject} - ${finalClass} (${finalYear})`,
+        teacher: editTeacherName.trim() || currentUser?.full_name || 'Guru Pengampu',
+        subject: finalSubject,
+        class_name: finalClass,
+        class_code: normalizeClassCode(finalClass),
+        owner_user_id: editingSession.owner_user_id || currentUser?.id,
+        school_level: resolveSchoolLevel(finalClass, editingSession.school_level),
+        answer_key: parsedKeys,
+        student_list: editingSession.student_list || [],
+        kkm: Number(editKkm) || 75,
+        academic_year: finalYear,
+        semester: editSemester,
+        exam_type: editExamType,
+        scoring_config: newScoringConfig,
+      });
+
+      // Update in sessions list
+      setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+
+      // If active session is updated, refresh activeSession and recalculate students
+      if (activeSession?.id === updated.id) {
+        setActiveSession(updated);
+
+        // Recalculate graded students if any exist
+        if (gradedStudents.length > 0) {
+          const pgW = newScoringConfig.pgWeight;
+          const essayW = newScoringConfig.essayWeight;
+          const hasEssay = (newScoringConfig.essayCount > 0) && (newScoringConfig.essayMaxScore > 0);
+
+          const updatedGraded = gradedStudents.map((st) => {
+            const mcq = Number(st.mcq_score) || 0;
+            const essay = Number(st.essay_score) || 0;
+            const newFinal = hasEssay
+              ? Math.round(mcq * pgW + essay * essayW)
+              : Math.round(mcq);
+            const newLps = Math.round(mcq * 0.6 + essay * 0.4);
+            return {
+              ...st,
+              final_score: newFinal,
+              original_score: newFinal,
+              lps: newLps,
+            };
+          });
+
+          setGradedStudents(updatedGraded);
+
+          // Background update records to cloud / repository so data stays consistent
+          for (const s of updatedGraded) {
+            ExamCorrectionRepository.saveGradedStudent({
+              id: s.id,
+              session_id: updated.id,
+              name: s.name,
+              student_user_id: s.student_user_id,
+              mcq_answers: s.mcq_answers,
+              essay_scores: s.essay_scores,
+              mcq_score: s.mcq_score,
+              essay_score: s.essay_score,
+              final_score: s.final_score,
+              original_score: s.final_score,
+              is_deleted: false,
+              csi: s.csi,
+              lps: s.lps,
+              correct: s.correct,
+              wrong: s.wrong,
+              answer_key: updated.answer_key,
+              source: 'SESSION_CONFIG_EDIT',
+            }).catch(() => {});
+          }
+        }
+      }
+
+      setIsEditSessionModalOpen(false);
+      setEditingSession(null);
+      setToastMessage({
+        text: isPgOnly
+          ? 'Sesi berhasil diperbarui (Format: Pilihan Ganda Saja).'
+          : `Sesi berhasil diperbarui! Format kini mendukung Essay (${newScoringConfig.essayCount} soal, bobot ${Math.round(newScoringConfig.essayWeight * 100)}%).`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      logger.error('QuestionCorrectionModal', 'Failed to update session:', err);
+      setToastMessage({
+        text: `Gagal memperbarui sesi: ${err?.message || 'Error'}`,
+        type: 'error',
+      });
+    } finally {
+      setIsSavingEditSession(false);
     }
   };
 
@@ -2308,12 +2532,22 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                               {hasKey ? (
                                 <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1">
                                   <CheckCircle2 className="w-2.5 h-2.5" />
-                                  {keyCount} Soal PG
+                                  {keyCount} PG
                                 </span>
                               ) : (
                                 <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded-full flex items-center gap-1">
                                   <AlertCircle className="w-2.5 h-2.5" />
-                                  Kunci Belum Diisi
+                                  Kunci Kosong
+                                </span>
+                              )}
+                              <span className="text-slate-300">•</span>
+                              {((sess.scoring_config?.essayCount ?? 0) > 0 && (sess.scoring_config?.essayWeight ?? 0) > 0) ? (
+                                <span className="px-2 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full">
+                                  PG + Essay ({sess.scoring_config?.essayCount || 5})
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 rounded-full">
+                                  Hanya PG
                                 </span>
                               )}
                             </div>
@@ -2326,12 +2560,21 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                                 <>
                                   <button
                                     type="button"
+                                    onClick={(e) => handleOpenEditSession(sess, e)}
+                                    className="px-2 py-1 rounded-md text-[10px] font-bold text-teal-800 hover:text-teal-950 bg-teal-50 hover:bg-teal-100 border border-teal-200 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Edit Format Sesi (Ubah PG / Essay), KKM, Mapel, dll"
+                                  >
+                                    <Edit3 className="w-3 h-3 text-teal-600" />
+                                    <span>Edit</span>
+                                  </button>
+                                  <button
+                                    type="button"
                                     onClick={(e) => handleOpenKeyEditor(sess, e)}
-                                    className="px-2 py-1 rounded-md text-[10px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center gap-1 transition-colors"
+                                    className="px-2 py-1 rounded-md text-[10px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
                                     title="Atur Kunci Jawaban"
                                   >
-                                    <Key className="w-3 h-3 text-teal-600" />
-                                    <span>{hasKey ? 'Edit Kunci' : 'Atur Kunci'}</span>
+                                    <Key className="w-3 h-3 text-slate-600" />
+                                    <span>{hasKey ? 'Kunci' : 'Atur Kunci'}</span>
                                   </button>
                                   <button
                                     type="button"
@@ -2462,6 +2705,27 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 )}
               </div>
 
+              {/* Alert & Quick Converter if Session is PG ONLY */}
+              {((activeSession.scoring_config?.essayCount ?? 0) === 0 || (activeSession.scoring_config?.essayWeight ?? 0) === 0) && !isReadOnly && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2.5 text-xs text-amber-900 shadow-2xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="truncate">
+                      Format sesi: <strong className="font-bold">Pilihan Ganda Saja (100% PG)</strong>. Ada soal essay di ujian ini?
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditSession(activeSession)}
+                    className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shrink-0 flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                    title="Ubah format sesi ini menjadi PG + Essay"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Ubah ke PG + Essay</span>
+                  </button>
+                </div>
+              )}
+
               {/* Question Keypad Sheet */}
               <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
@@ -2473,12 +2737,23 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                     <button
                       type="button"
                       onClick={() => handleOpenKeyEditor(activeSession)}
-                      className="px-2 py-0.5 rounded-md bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-[10px] font-bold flex items-center gap-1 transition-colors ml-1"
+                      className="px-2 py-0.5 rounded-md bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-[10px] font-bold flex items-center gap-1 transition-colors ml-1 cursor-pointer"
                       title="Edit Kunci Jawaban Sesi Ini"
                     >
                       <Key className="w-3 h-3" />
                       <span>{activeSession.answer_key && activeSession.answer_key.length > 0 ? `Kunci (${activeSession.answer_key.length})` : 'Atur Kunci'}</span>
                     </button>
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditSession(activeSession)}
+                        className="px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Edit Konfigurasi Sesi (Ubah PG / Essay, KKM, dll)"
+                      >
+                        <Edit3 className="w-3 h-3 text-amber-600" />
+                        <span>Edit Sesi</span>
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -2846,6 +3121,27 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               </div>
             </div>
 
+            {/* Alert & Quick Converter if Session is PG ONLY */}
+            {((activeSession.scoring_config?.essayCount ?? 0) === 0 || (activeSession.scoring_config?.essayWeight ?? 0) === 0) && !isReadOnly && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2.5 text-xs text-amber-900 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="truncate">
+                    Format sesi saat ini: <strong className="font-bold">Pilihan Ganda Saja (100% PG)</strong>. Ada soal essay di ujian ini?
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditSession(activeSession)}
+                  className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shrink-0 flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                  title="Ubah format sesi ini menjadi PG + Essay"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Ubah ke PG + Essay</span>
+                </button>
+              </div>
+            )}
+
             {/* Action Bar: Export Buttons */}
             <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-white rounded-xl border border-slate-200/90 shadow-xs">
               <div className="text-xs text-slate-600 font-semibold">
@@ -2853,6 +3149,19 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* Edit Konfigurasi Sesi Button */}
+                {!isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditSession(activeSession)}
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 border border-slate-300 shadow-2xs transition-all min-h-10 cursor-pointer"
+                    title="Edit Konfigurasi Sesi (Ubah format PG/Essay, Bobot, KKM, dll)"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Edit Sesi</span>
+                  </button>
+                )}
+
                 {/* 0. Input Cepat Essay Batch Button */}
                 {((activeSession.scoring_config?.essayCount ?? 0) > 0 &&
                   (activeSession.scoring_config?.essayMaxScore ?? 0) > 0) && (
@@ -3188,6 +3497,319 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
                 <span>Simpan Kunci</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* EDIT SESSION CONFIGURATION MODAL (Format PG/Essay, Bobot, KKM, dll) */}
+      {/* ========================================================================= */}
+      {isEditSessionModalOpen && editingSession && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs animate-fadeIn p-3 sm:p-4">
+          <div className="bg-white w-full max-w-xl max-h-[92vh] rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-2xl flex flex-col justify-between space-y-4 overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-teal-50 text-teal-700 rounded-xl border border-teal-200">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Edit Konfigurasi Sesi Ujian
+                  </h3>
+                  <p className="text-xs text-slate-500 line-clamp-1">
+                    {editingSession.session_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditSessionModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <form onSubmit={handleSaveEditSession} className="space-y-4 flex-1 overflow-y-auto pr-1">
+              {/* 1. Format Penilaian (PG Saja vs PG + Essay) */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                    Format Lembar Soal &amp; Penilaian
+                  </label>
+                  <span className="text-[10px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                    Krusial
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditExamFormat('PG_ONLY')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      editExamFormat === 'PG_ONLY'
+                        ? 'bg-white border-teal-600 shadow-xs ring-2 ring-teal-500/20'
+                        : 'bg-white/60 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-slate-900">100% Pilihan Ganda</span>
+                      {editExamFormat === 'PG_ONLY' && (
+                        <Check className="w-4 h-4 text-teal-600" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Hanya butir soal PG. Nilai akhir dihitung penuh dari jawaban PG.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditExamFormat('PG_AND_ESSAY')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      editExamFormat === 'PG_AND_ESSAY'
+                        ? 'bg-white border-teal-600 shadow-xs ring-2 ring-teal-500/20'
+                        : 'bg-white/60 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-slate-900">Kombinasi PG + Essay</span>
+                      {editExamFormat === 'PG_AND_ESSAY' && (
+                        <Check className="w-4 h-4 text-teal-600" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Aktifkan kolom nilai essay (skala 0–100) dan butir essay pada lembar koreksi.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Essay Config Sub-section */}
+                {editExamFormat === 'PG_AND_ESSAY' && (
+                  <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-3 animate-fadeIn">
+                    <span className="text-xs font-bold text-indigo-950 block">
+                      Pengaturan Bobot &amp; Butir Essay
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                          Bobot PG (%)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="99"
+                          value={editPgWeight}
+                          onChange={(e) => {
+                            const val = Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 70));
+                            setEditPgWeight(val);
+                            setEditEssayWeight(100 - val);
+                          }}
+                          className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                          Bobot Essay (%)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="99"
+                          value={editEssayWeight}
+                          onChange={(e) => {
+                            const val = Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 30));
+                            setEditEssayWeight(val);
+                            setEditPgWeight(100 - val);
+                          }}
+                          className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                          Jumlah Soal Essay
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={editEssayCount}
+                          onChange={(e) => setEditEssayCount(Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 5)))}
+                          className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                          Skor Maks Essay
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={editEssayMaxScore}
+                          onChange={(e) => setEditEssayMaxScore(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 20)))}
+                          className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-indigo-700">
+                      Rumus Nilai Akhir: ({editPgWeight}% × Skor PG) + ({editEssayWeight}% × Nilai Essay).
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Kunci Jawaban Soal PG */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Kunci Jawaban Soal PG
+                </label>
+                <textarea
+                  rows={4}
+                  value={editKeyInput}
+                  onChange={(e) => setEditKeyInput(e.target.value)}
+                  placeholder="Contoh: 1.A 2.B 3.C 4.D 5.A 6.B 7.C 8.D atau ABCDABCD"
+                  className="w-full bg-white border border-slate-300 rounded-xl p-3 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 min-h-24"
+                />
+                <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                  <span>Terdeteksi: <strong className="text-teal-700">{parseAnswerKey(editKeyInput).length}</strong> butir soal PG</span>
+                  <span className="text-[10px] text-slate-400">Mendukung A, B, C, D, E</span>
+                </div>
+              </div>
+
+              {/* 3. Detail Identitas Sesi */}
+              <div className="space-y-3 pt-2 border-t border-slate-200">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Judul / Nama Sesi Ujian
+                  </label>
+                  <input
+                    type="text"
+                    value={editSessionName}
+                    onChange={(e) => setEditSessionName(e.target.value)}
+                    placeholder="Contoh: PTS - Matematika - 9A (2026/2027)"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Mata Pelajaran</label>
+                    <select
+                      value={editSubject}
+                      onChange={(e) => setEditSubject(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                    >
+                      {PREDEFINED_SUBJECTS.map((sub) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                      <option value="CUSTOM">+ Ketik Mapel Lain...</option>
+                    </select>
+                  </div>
+
+                  {editSubject === 'CUSTOM' && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Nama Mapel Kustom</label>
+                      <input
+                        type="text"
+                        value={editCustomSubject}
+                        onChange={(e) => setEditCustomSubject(e.target.value)}
+                        placeholder="Contoh: Geografi"
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Kelas / Rombel</label>
+                    <select
+                      value={editClass}
+                      onChange={(e) => setEditClass(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                    >
+                      {availableClasses.map((cls) => (
+                        <option key={cls} value={cls}>
+                          {cls === 'SMA' ? 'SMA (Umum)' : `Kelas ${cls}`} ({resolveSchoolLevel(cls)})
+                        </option>
+                      ))}
+                      <option value="CUSTOM">+ Ketik Kelas Lain...</option>
+                    </select>
+                  </div>
+
+                  {editClass === 'CUSTOM' && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">Nama Kelas Kustom</label>
+                      <input
+                        type="text"
+                        value={editCustomClass}
+                        onChange={(e) => setEditCustomClass(e.target.value)}
+                        placeholder="Contoh: 10A, 8C..."
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 uppercase font-mono"
+                        required
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Jenis Ujian</label>
+                    <select
+                      value={editExamType}
+                      onChange={(e) => setEditExamType(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                    >
+                      {PREDEFINED_EXAM_TYPES.map((et) => (
+                        <option key={et} value={et}>
+                          {et}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Nilai KKM</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editKkm}
+                      onChange={(e) => setEditKkm(Number(e.target.value))}
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditSessionModalOpen(false)}
+                  disabled={isSavingEditSession}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold min-h-11 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEditSession}
+                  className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 min-h-11 transition-colors cursor-pointer"
+                >
+                  {isSavingEditSession ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  <span>{isSavingEditSession ? 'Menyimpan...' : 'Simpan Perubahan Sesi'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
