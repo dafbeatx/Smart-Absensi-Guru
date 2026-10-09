@@ -69,6 +69,7 @@ import { resolveSessionAcademicYear } from '../utils/academic-year.utils';
 import type {
   ExamCommitteeMember,
   ExamScheduleData,
+  ExamPeriodSettings,
 } from '../types/exam-schedule.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
@@ -3744,6 +3745,38 @@ export class MockProvider implements IDataProvider {
           localStorage.removeItem(`smart_absensi_exam_schedule_${academicYear}_${examType}_smp`.replace(/[^\w]/g, '_'));
           localStorage.removeItem(`smart_absensi_exam_schedule_${academicYear}_${examType}_sma`.replace(/[^\w]/g, '_'));
         }
+      }
+    } catch {}
+    return true;
+  }
+
+  // ── Exam Period Active & Expiration Status API (Mock) ────────────────────
+  private mockExamPeriodSettings = new Map<string, ExamPeriodSettings>();
+
+  public async getExamPeriodSettings(academicYear?: string, _token?: string): Promise<ExamPeriodSettings | null> {
+    const targetYear = academicYear || '2026/2027';
+    const cleanYear = targetYear.replace(/[^\w]/g, '_');
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(`smart_absensi_exam_period_${cleanYear}`);
+        if (raw) return JSON.parse(raw);
+        const globalRaw = localStorage.getItem('smart_absensi_exam_period_settings');
+        if (globalRaw) {
+          const parsed = JSON.parse(globalRaw);
+          if (!targetYear || parsed.academicYear === targetYear) return parsed;
+        }
+      }
+    } catch {}
+    return this.mockExamPeriodSettings.get(cleanYear) || null;
+  }
+
+  public async saveExamPeriodSettings(settings: ExamPeriodSettings, _token?: string): Promise<boolean> {
+    const cleanYear = (settings.academicYear || '2026/2027').replace(/[^\w]/g, '_');
+    this.mockExamPeriodSettings.set(cleanYear, settings);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`smart_absensi_exam_period_${cleanYear}`, JSON.stringify(settings));
+        localStorage.setItem('smart_absensi_exam_period_settings', JSON.stringify(settings));
       }
     } catch {}
     return true;

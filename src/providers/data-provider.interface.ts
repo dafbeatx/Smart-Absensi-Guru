@@ -59,6 +59,7 @@ import type {
 import type {
   ExamCommitteeMember,
   ExamScheduleData,
+  ExamPeriodSettings,
 } from '../types/exam-schedule.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 
@@ -223,6 +224,11 @@ export interface IDataProvider {
   getExamSchedule(academicYear: string, examType: string, token?: string, level?: 'SMP' | 'SMA'): Promise<ExamScheduleData | null>;
   saveExamSchedule(schedule: ExamScheduleData, token?: string, level?: 'SMP' | 'SMA'): Promise<boolean>;
   deleteExamSchedule(academicYear: string, examType: string, token?: string, level?: 'SMP' | 'SMA'): Promise<boolean>;
+
+  // Exam Period Active & Auto-Expiration Status API (Toggle On-Off & Waktu Usai)
+  getExamPeriodSettings(academicYear?: string, token?: string): Promise<ExamPeriodSettings | null>;
+  saveExamPeriodSettings(settings: ExamPeriodSettings, token?: string): Promise<boolean>;
+
 
   // Meeting Minutes & Notulen AI Persistence API (Cloud Multi-Device Sync)
   getMeetingMinutes(token?: string): Promise<MeetingMinute[]>;

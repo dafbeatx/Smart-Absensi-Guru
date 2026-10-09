@@ -12,10 +12,35 @@ import { formatTimeForInput } from '../../../utils/time.utils';
 import { GPSService } from '../../../services/gps.service';
 import { LiveLocationMap } from '../../../components/ui/LiveLocationMap';
 import { handleAppError } from '../../../utils/error.utils';
+import { SlidersHorizontal, Clock } from 'lucide-react';
+import { ExamPeriodRepository, EXAM_PERIOD_CHANGED_EVENT } from '../../../repositories/ExamPeriodRepository';
+import { ExamPeriodSettingsModal } from '../../administration/components/ExamPeriodSettingsModal';
+import type { ExamPeriodStatus } from '../../../types/exam-schedule.types';
 
 export const SystemSettingsForm: React.FC = () => {
   const { user } = useAuthStore();
   const { showToast } = useToastStore();
+
+  const [examPeriodStatus, setExamPeriodStatus] = useState<ExamPeriodStatus | null>(null);
+  const [isExamPeriodModalOpen, setIsExamPeriodModalOpen] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadPeriod = async () => {
+      try {
+        const status = await ExamPeriodRepository.getPeriodStatus();
+        if (isMounted) setExamPeriodStatus(status);
+      } catch (e) {
+        console.warn('Failed to load exam period in SystemSettingsForm:', e);
+      }
+    };
+    loadPeriod();
+    window.addEventListener(EXAM_PERIOD_CHANGED_EVENT, loadPeriod);
+    return () => {
+      isMounted = false;
+      window.removeEventListener(EXAM_PERIOD_CHANGED_EVENT, loadPeriod);
+    };
+  }, []);
 
   const [appName, setAppName] = useState('Smart Absensi Guru');
   const [institution, setInstitution] = useState('SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam');
@@ -415,11 +440,58 @@ export const SystemSettingsForm: React.FC = () => {
         </div>
       </div>
 
+      {/* Section 5: Masa Pelaksanaan Ujian & Kepanitiaan (ASTS/ASAS) */}
+      <div className="space-y-3 pt-3 border-t border-slate-100">
+        <div className="flex items-center justify-between">
+          <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">📋 Masa Pelaksanaan Ujian &amp; Kepanitiaan (ASTS / ASAS)</h4>
+          <span
+            className={`px-2.5 py-0.5 text-[10px] font-extrabold rounded-full border ${
+              examPeriodStatus?.isActive
+                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                : 'bg-amber-100 text-amber-800 border-amber-200'
+            }`}
+          >
+            {examPeriodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+          Kontrol saklar toggle dan waktu berakhir otomatis untuk bagian administrasi ujian serta banner penugasan kepanitiaan guru di portal utama.
+        </p>
+
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1 min-w-0">
+            <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-[#023246]" />
+              <span>Status: {examPeriodStatus?.remainingText || 'Masa Ujian Sedang Berlangsung'}</span>
+            </div>
+            <p className="text-[10px] text-slate-500">
+              Jika dinonaktifkan atau waktu telah lewat, banner kepanitiaan dan jadwal mengawas guru otomatis disembunyikan.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsExamPeriodModalOpen(true)}
+            className="h-10 px-4 rounded-xl bg-[#023246] hover:bg-[#03445e] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-300" />
+            <span>Atur Masa Ujian &amp; Batas Waktu</span>
+          </button>
+        </div>
+      </div>
+
       <div className="pt-2 flex justify-end">
         <Button type="submit" variant="primary" className="bg-emerald-600 hover:bg-emerald-700 font-extrabold px-6" isLoading={isLoading}>
           💾 Simpan Perubahan Pengaturan Permanen
         </Button>
       </div>
+
+      {/* Modal Kontrol Periode Ujian & Kepanitiaan */}
+      <ExamPeriodSettingsModal
+        isOpen={isExamPeriodModalOpen}
+        onClose={() => setIsExamPeriodModalOpen(false)}
+        onSettingsSaved={(_s, status) => setExamPeriodStatus(status)}
+      />
     </form>
   );
 };

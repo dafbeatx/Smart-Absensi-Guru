@@ -85,6 +85,7 @@ import type {
 import type {
   ExamCommitteeMember,
   ExamScheduleData,
+  ExamPeriodSettings,
 } from '../types/exam-schedule.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
@@ -7264,6 +7265,98 @@ export class SupabaseProvider implements IDataProvider {
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'Failed to delete exam schedule from system_settings:', err);
+    }
+
+    return true;
+  }
+
+  // ── Exam Period Active & Expiration Status API (Supabase Cloud Sync) ──────
+  private cachedExamPeriodSettings: Map<string, { data: ExamPeriodSettings; timestamp: number }> = new Map();
+
+  public async getExamPeriodSettings(academicYear?: string, _token?: string): Promise<ExamPeriodSettings | null> {
+    const targetYear = academicYear || '2026/2027';
+    const cleanYear = targetYear.replace(/[^\w]/g, '_');
+    const storageKey = `exam_period_${cleanYear}`;
+
+    const cached = this.cachedExamPeriodSettings.get(cleanYear);
+    if (cached && Date.now() - cached.timestamp < 300000) {
+      return cached.data;
+    }
+
+    return this.dedupeRequest(`getExamPeriod_${cleanYear}`, async () => {
+      // 1. Try system_settings key
+      try {
+        const { data, error } = await this.client
+          .from('system_settings')
+          .select('value')
+          .eq('key', storageKey)
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          const parsed: ExamPeriodSettings = JSON.parse(data.value);
+          this.cachedExamPeriodSettings.set(cleanYear, { data: parsed, timestamp: Date.now() });
+
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(`smart_absensi_exam_period_${cleanYear}`, JSON.stringify(parsed));
+              localStorage.setItem('smart_absensi_exam_period_settings', JSON.stringify(parsed));
+            }
+          } catch {}
+
+          return parsed;
+        }
+      } catch (err) {
+        logger.warn('SupabaseProvider', 'Failed to fetch exam period settings from system_settings:', err);
+      }
+
+      // 2. Fallback to localStorage
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const raw = localStorage.getItem(`smart_absensi_exam_period_${cleanYear}`);
+          if (raw) return JSON.parse(raw);
+          const globalRaw = localStorage.getItem('smart_absensi_exam_period_settings');
+          if (globalRaw) {
+            const parsed = JSON.parse(globalRaw);
+            if (!targetYear || parsed.academicYear === targetYear) return parsed;
+          }
+        }
+      } catch {}
+
+      return null;
+    });
+  }
+
+  public async saveExamPeriodSettings(settings: ExamPeriodSettings, _token?: string): Promise<boolean> {
+    const targetYear = settings.academicYear || '2026/2027';
+    const cleanYear = targetYear.replace(/[^\w]/g, '_');
+    const storageKey = `exam_period_${cleanYear}`;
+
+    this.cachedExamPeriodSettings.delete(cleanYear);
+
+    // 1. Update localStorage
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`smart_absensi_exam_period_${cleanYear}`, JSON.stringify(settings));
+        localStorage.setItem('smart_absensi_exam_period_settings', JSON.stringify(settings));
+      }
+    } catch {}
+
+    // 2. Persist to Supabase cloud system_settings table
+    try {
+      const payload = {
+        key: storageKey,
+        value: JSON.stringify(settings),
+        updated_at: new Date().toISOString(),
+      };
+      await this.client.from('system_settings').upsert(payload, { onConflict: 'key' });
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'Failed to save exam period settings to system_settings:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_exam_period_changed', { detail: settings })
+      );
     }
 
     return true;

@@ -37,6 +37,7 @@ import {
   Edit3,
   ChevronDown,
   GraduationCap,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { formatTimeForInput } from '../../../utils/time.utils';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -61,7 +62,10 @@ import { ExamWordExporterService } from '../../../services/exam-word-exporter.se
 import { ExamAdministrativeDocsModal } from './ExamAdministrativeDocsModal';
 import { ExamProctorSwapModal } from './ExamProctorSwapModal';
 import { ExamSubjectSwapModal } from './ExamSubjectSwapModal';
+import { ExamPeriodSettingsModal } from './ExamPeriodSettingsModal';
+import { ExamPeriodRepository, EXAM_PERIOD_CHANGED_EVENT } from '../../../repositories/ExamPeriodRepository';
 import type { AdminDocType } from '../../../services/exam-administrative-docs.service';
+import type { ExamPeriodStatus } from '../../../types/exam-schedule.types';
 import {
   ExamScheduleAIGeneratorService,
   getExamAIPromptPresets,
@@ -240,6 +244,36 @@ export const ExamScheduleAndProctorModal: React.FC<ExamScheduleAndProctorModalPr
   const [subjectSwapInitialSlot, setSubjectSwapInitialSlot] = useState<{ date: string; sessionNumber: number } | undefined>(undefined);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState<boolean>(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // ── EXAM PERIOD ACTIVE / AUTO-EXPIRE STATE ──
+  const [periodStatus, setPeriodStatus] = useState<ExamPeriodStatus | null>(null);
+  const [isPeriodModalOpen, setIsPeriodModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadPeriod = async () => {
+      try {
+        const status = await ExamPeriodRepository.getPeriodStatus(activeAcademicYear);
+        if (isMounted) setPeriodStatus(status);
+      } catch (err) {
+        logger.warn('ExamScheduleAndProctorModal', 'Failed to load exam period status:', err);
+      }
+    };
+
+    if (isOpen) {
+      loadPeriod();
+    }
+
+    const handlePeriodChanged = () => {
+      loadPeriod();
+    };
+
+    window.addEventListener(EXAM_PERIOD_CHANGED_EVENT, handlePeriodChanged);
+    return () => {
+      isMounted = false;
+      window.removeEventListener(EXAM_PERIOD_CHANGED_EVENT, handlePeriodChanged);
+    };
+  }, [isOpen, activeAcademicYear]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -1849,6 +1883,26 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
             </>
           )}
 
+          {/* Tombol Kontrol Periode Ujian & Kepanitiaan (Admin & Panitia) */}
+          {(accessInfo.isAdmin || accessInfo.isCommittee) && (
+            <button
+              type="button"
+              onClick={() => setIsPeriodModalOpen(true)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer border ${
+                periodStatus?.isActive
+                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : periodStatus?.isExpiredByTime
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+              }`}
+              title="Atur status aktif/nonaktif masa ujian dan batas waktu otomatis"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Periode:</span>
+              <span>{periodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onClose}
@@ -1859,6 +1913,27 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
           </button>
         </div>
       </header>
+
+      {/* Banner Peringatan Status Periode Ujian Telah Usai / Selesai */}
+      {periodStatus && !periodStatus.isActive && (
+        <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-300 text-amber-950 text-xs font-semibold flex items-center justify-between gap-3 shrink-0 animate-fadeIn">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 animate-pulse" />
+            <span className="truncate">
+              <strong>Masa Ujian Telah Usai / Nonaktif:</strong> Bagian ujian dan kartu tugas kepanitiaan saat ini disembunyikan otomatis dari beranda guru.
+            </span>
+          </div>
+          {(accessInfo.isAdmin || accessInfo.isCommittee) && (
+            <button
+              type="button"
+              onClick={() => setIsPeriodModalOpen(true)}
+              className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 font-bold text-[11px] shrink-0 cursor-pointer shadow-2xs"
+            >
+              Atur Periode
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Tab Navigation Bar */}
       <div className="px-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 overflow-x-auto shrink-0 shadow-2xs">
@@ -5050,6 +5125,20 @@ Mohon pertahankan nama lengkap beserta gelar, urutan P1 sampai P5, dan alokasi p
           }}
         />
       )}
+
+      {/* MODAL PENGATURAN PERIODE UJIAN & KEPANITIAAN (TOGGLE & AUTO EXPIRE) */}
+      <ExamPeriodSettingsModal
+        isOpen={isPeriodModalOpen}
+        onClose={() => setIsPeriodModalOpen(false)}
+        academicYear={activeAcademicYear}
+        onSettingsSaved={(_newSettings, newStatus) => {
+          setPeriodStatus(newStatus);
+          setToast({
+            type: 'success',
+            text: `Status masa ujian berhasil diperbarui: ${newStatus.isActive ? 'Aktif' : 'Usai / Nonaktif'}`,
+          });
+        }}
+      />
     </div>,
     document.body
   );

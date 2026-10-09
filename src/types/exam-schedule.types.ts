@@ -177,3 +177,27 @@ export interface SmartReassignCandidate {
   isOwnSubject: boolean;
   reason: string;
 }
+
+export interface ExamPeriodSettings {
+  isEnabled: boolean; // Manual master switch (true = aktif di beranda, false = nonaktif / selesai)
+  autoDeactivateEnabled: boolean; // Otomatis nonaktifkan jika waktu berakhir ujian telah lewat
+  endDate: string; // YYYY-MM-DD tanggal selesai pelaksanaan ujian
+  endTime: string; // HH:mm batas jam selesai ujian (misal "17:00")
+  examTitle?: string; // Judul asesmen (misal "Asesmen Sumatif Tengah Semester - ASTS")
+  academicYear: string; // Tahun ajaran terkait (misal "2026/2027")
+  hideCommitteeBanner?: boolean; // Sembunyikan banner tugas kepanitiaan di beranda (default true jika usai)
+  hideExamDutiesCard?: boolean; // Sembunyikan kartu jadwal mengawas guru di beranda (default true jika usai)
+  hideAdministrationModules?: boolean; // Sembunyikan modul kategori ujian di administrasi jika usai (default true)
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+export interface ExamPeriodStatus {
+  isActive: boolean; // Apakah bagian ujian dan kepanitiaan saat ini aktif ditampilkan
+  isExpiredByTime: boolean; // Apakah waktu sekarang sudah melewati batas tanggal & jam selesai
+  isManuallyDisabled: boolean; // Apakah dinonaktifkan secara manual via saklar toggle
+  statusLabel: 'AKTIF' | 'TELAH_USAI_WAKTU' | 'NONAKTIF_MANUAL';
+  remainingText?: string; // Keterangan waktu (misal: "Aktif s/d 15 Okt 2026 17:00" atau "Ujian telah usai")
+  expiryFormatted?: string; // Tanggal & jam format Indonesia
+}
+

@@ -5,6 +5,8 @@ import {
   FolderCheck,
   ChevronRight,
   ExternalLink,
+  SlidersHorizontal,
+  Clock,
 } from 'lucide-react';
 import type {
   AdministrationModuleItem,
@@ -19,6 +21,12 @@ import {
   ADMIN_YEAR_CHANGED_EVENT,
   ADMIN_MODULES_CHANGED_EVENT,
 } from '../../../repositories/AdministrationRepository';
+import {
+  ExamPeriodRepository,
+  EXAM_PERIOD_CHANGED_EVENT,
+} from '../../../repositories/ExamPeriodRepository';
+import { ExamPeriodSettingsModal } from './ExamPeriodSettingsModal';
+import type { ExamPeriodStatus } from '../../../types/exam-schedule.types';
 import { CustomizeAdministrationModal } from './CustomizeAdministrationModal';
 
 export interface AdministrationHubViewProps {
@@ -32,7 +40,7 @@ export interface AdministrationHubViewProps {
 
 export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
   userId = 'default_user',
-  userRole: _userRole = 'GURU',
+  userRole = 'GURU',
   userName: _userName = 'Pendidik',
   onOpenModule,
   onBackToDashboard: _onBackToDashboard,
@@ -48,6 +56,35 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
     AdministrationRepository.getModules(userId, academicYear)
   );
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+
+  // Exam Period Active & Expiration Status State
+  const [examPeriodStatus, setExamPeriodStatus] = useState<ExamPeriodStatus | null>(null);
+  const [isExamPeriodModalOpen, setIsExamPeriodModalOpen] = useState(false);
+  const [showArchivedExamModules, setShowArchivedExamModules] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadPeriod = async () => {
+      try {
+        const status = await ExamPeriodRepository.getPeriodStatus(academicYear);
+        if (isMounted) setExamPeriodStatus(status);
+      } catch (err) {
+        console.warn('Failed to load exam period status in AdministrationHubView:', err);
+      }
+    };
+
+    loadPeriod();
+
+    const handlePeriodChanged = () => {
+      loadPeriod();
+    };
+
+    window.addEventListener(EXAM_PERIOD_CHANGED_EVENT, handlePeriodChanged);
+    return () => {
+      isMounted = false;
+      window.removeEventListener(EXAM_PERIOD_CHANGED_EVENT, handlePeriodChanged);
+    };
+  }, [academicYear]);
 
   // Sync state when academic year or modules change
   useEffect(() => {
@@ -200,15 +237,27 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
               </div>
             </div>
 
-            {/* Customize Module Button */}
-            <button
-              type="button"
-              onClick={() => setIsCustomizeOpen(true)}
-              className="w-full py-1.5 px-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 active:scale-95 text-[#023246] text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
-            >
-              <Settings2 className="w-3.5 h-3.5" />
-              <span>Atur Modul Administrasi</span>
-            </button>
+            {/* Action Buttons: Atur Modul & Status Periode Ujian */}
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => setIsCustomizeOpen(true)}
+                className="w-full py-1.5 px-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 active:scale-95 text-[#023246] text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                <span>Atur Modul Administrasi</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsExamPeriodModalOpen(true)}
+                className="w-full py-1.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-white/20 shadow-2xs"
+                title="Atur status aktif/nonaktif dan waktu berakhir masa ujian"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-300" />
+                <span>Masa Ujian: {examPeriodStatus?.isActive ? 'Aktif' : 'Usai / Nonaktif'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -229,81 +278,140 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
       {/* ── CATEGORIZED MODULE GRIDS ── */}
       <div className="space-y-6">
         {categories.map((cat) => {
+          const isExamCat = cat.id === 'UJIAN';
+          const isExamActive = examPeriodStatus ? examPeriodStatus.isActive : true;
+
+          // If exam category is not active and user is not admin, hide when not expanding archive
+          if (isExamCat && !isExamActive && userRole !== 'ADMIN' && !showArchivedExamModules) {
+            return null;
+          }
+
           const catModules = enabledModules.filter((m) => m.category === cat.id);
           if (catModules.length === 0) return null;
 
           return (
             <div key={cat.id} className="space-y-2.5">
               {/* Category Header */}
-              <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+              <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{cat.icon}</span>
                   <div>
-                    <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
-                      {cat.title}
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">
+                        {cat.title}
+                      </h3>
+                      {isExamCat && (
+                        <button
+                          type="button"
+                          onClick={() => setIsExamPeriodModalOpen(true)}
+                          className={`text-[9.5px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 cursor-pointer transition-all shadow-2xs ${
+                            isExamActive
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                          }`}
+                          title="Klik untuk mengubah pengaturan periode masa ujian"
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${isExamActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                          <span>{isExamActive ? 'Masa Ujian Aktif' : 'Ujian Telah Usai'}</span>
+                          <SlidersHorizontal className="w-2.5 h-2.5 ml-0.5 opacity-70" />
+                        </button>
+                      )}
+                    </div>
                     <p className="text-[10px] sm:text-[11px] text-slate-500 hidden sm:block">
                       {cat.subtitle}
                     </p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                  {catModules.length} Layanan
-                </span>
+
+                <div className="flex items-center gap-1.5">
+                  {isExamCat && !isExamActive && (
+                    <button
+                      type="button"
+                      onClick={() => setShowArchivedExamModules((prev) => !prev)}
+                      className="text-[10px] font-bold px-2.5 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer transition-colors"
+                    >
+                      {showArchivedExamModules ? 'Sembunyikan' : 'Buka Arsip'}
+                    </button>
+                  )}
+                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {catModules.length} Layanan
+                  </span>
+                </div>
               </div>
+
+              {/* Informative notice if exam is ended */}
+              {isExamCat && !isExamActive && (
+                <div className="p-3 bg-amber-50/80 border border-amber-200 text-amber-950 rounded-2xl flex items-center justify-between gap-2 text-xs animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      Masa ujian telah usai. Kategori ini disimpan sebagai arsip dan disembunyikan otomatis dari guru.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsExamPeriodModalOpen(true)}
+                    className="font-bold text-[#023246] hover:underline shrink-0 cursor-pointer text-[11px]"
+                  >
+                    Atur Status
+                  </button>
+                </div>
+              )}
 
               {/* Module Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
-                {catModules.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      if (item.actionId === 'custom_link' && item.customUrl) {
-                        window.open(item.customUrl, '_blank', 'noopener,noreferrer');
-                        return;
-                      }
-                      onOpenModule(item.actionId, item, academicYear);
-                    }}
-                    className="p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50/90 active:scale-[0.98] border border-slate-200/90 hover:border-[#023246]/40 shadow-xs hover:shadow-md transition-all flex items-start justify-between gap-3 text-left cursor-pointer group relative overflow-hidden"
-                  >
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      {/* Icon */}
-                      <div
-                        className={`w-11 h-11 rounded-2xl bg-linear-to-b ${item.colorClass} text-white flex items-center justify-center text-xl shrink-0 shadow-xs group-hover:scale-105 transition-transform`}
-                      >
-                        {item.icon}
-                      </div>
-
-                      {/* Text */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 group-hover:text-[#023246] transition-colors truncate">
-                            {item.title}
-                          </h4>
-                          {item.badge && (
-                            <span className="text-[9px] font-extrabold px-1.5 py-0.2 bg-cyan-50 text-cyan-800 border border-cyan-200 rounded-md">
-                              {item.badge}
-                            </span>
-                          )}
+              {(!isExamCat || isExamActive || showArchivedExamModules || userRole === 'ADMIN') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+                  {catModules.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        if (item.actionId === 'custom_link' && item.customUrl) {
+                          window.open(item.customUrl, '_blank', 'noopener,noreferrer');
+                          return;
+                        }
+                        onOpenModule(item.actionId, item, academicYear);
+                      }}
+                      className="p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50/90 active:scale-[0.98] border border-slate-200/90 hover:border-[#023246]/40 shadow-xs hover:shadow-md transition-all flex items-start justify-between gap-3 text-left cursor-pointer group relative overflow-hidden"
+                    >
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        {/* Icon */}
+                        <div
+                          className={`w-11 h-11 rounded-2xl bg-linear-to-b ${item.colorClass} text-white flex items-center justify-center text-xl shrink-0 shadow-xs group-hover:scale-105 transition-transform`}
+                        >
+                          {item.icon}
                         </div>
-                        <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Arrow / External indicator */}
-                    <div className="text-slate-400 group-hover:text-[#023246] group-hover:translate-x-0.5 transition-all shrink-0 self-center">
-                      {item.actionId === 'custom_link' && item.customUrl ? (
-                        <ExternalLink className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4" />
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
+                        {/* Text */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 group-hover:text-[#023246] transition-colors truncate">
+                              {item.title}
+                            </h4>
+                            {item.badge && (
+                              <span className="text-[9px] font-extrabold px-1.5 py-0.2 bg-cyan-50 text-cyan-800 border border-cyan-200 rounded-md">
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Arrow / External indicator */}
+                      <div className="text-slate-400 group-hover:text-[#023246] group-hover:translate-x-0.5 transition-all shrink-0 self-center">
+                        {item.actionId === 'custom_link' && item.customUrl ? (
+                          <ExternalLink className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -317,6 +425,16 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
         academicYear={academicYear}
         modules={modules}
         onModulesUpdated={(updated) => setModules(updated)}
+      />
+
+      {/* Modal Pengaturan Periode Ujian & Kepanitiaan (Toggle & Waktu Berakhir) */}
+      <ExamPeriodSettingsModal
+        isOpen={isExamPeriodModalOpen}
+        onClose={() => setIsExamPeriodModalOpen(false)}
+        academicYear={academicYear}
+        onSettingsSaved={(_newSettings, newStatus) => {
+          setExamPeriodStatus(newStatus);
+        }}
       />
     </div>
   );
