@@ -675,7 +675,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
             {/* The Main Interactive Assessment Table */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-2xs">
-              <div className="overflow-x-auto max-h-[460px] relative">
+              <div className="overflow-x-auto max-h-115 relative">
                 {isChecklistMode ? (
                   /* ========================================================= */
                   /* TEMPLATE 2: CHECKLIST BAHASA INGGRIS & ARAB (15 SOAL)     */
@@ -686,7 +686,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                         <th rowSpan={2} className="p-2 text-center w-10 border-r border-slate-200">
                           No
                         </th>
-                        <th rowSpan={2} className="p-2.5 min-w-[150px] border-r border-slate-200 sticky left-0 bg-slate-50 z-20 shadow-xs">
+                        <th rowSpan={2} className="p-2.5 min-w-37.5 border-r border-slate-200 sticky left-0 bg-slate-50 z-20 shadow-xs">
                           Nama Peserta
                         </th>
                         <th colSpan={18} className="p-2 text-center font-black bg-blue-50/80 text-blue-950 border-r border-slate-200">
@@ -729,7 +729,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                             <td className="p-1.5 text-center font-semibold text-slate-400 border-r border-slate-200">
                               {idx + 1}
                             </td>
-                            <td className="p-2 font-bold text-slate-900 border-r border-slate-200 sticky left-0 bg-white z-10 shadow-xs truncate max-w-[160px]">
+                            <td className="p-2 font-bold text-slate-900 border-r border-slate-200 sticky left-0 bg-white z-10 shadow-xs truncate max-w-40">
                               <span>{s.studentName}</span>
                               <div className="flex items-center gap-1.5 pt-0.5">
                                 <button
@@ -838,7 +838,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
                         <th rowSpan={2} className="p-2.5 text-center w-12 border-r border-slate-200">
                           No
                         </th>
-                        <th rowSpan={2} className="p-2.5 min-w-[200px] border-r border-slate-200 sticky left-0 bg-slate-50 z-20 shadow-xs">
+                        <th rowSpan={2} className="p-2.5 min-w-50 border-r border-slate-200 sticky left-0 bg-slate-50 z-20 shadow-xs">
                           Nama Siswa
                         </th>
                         <th colSpan={2} className="p-2 text-center font-black bg-emerald-50/80 text-emerald-950 border-r border-slate-200">
