@@ -19,9 +19,10 @@ import {
   BookOpen,
   Languages,
   Search,
+  ArrowLeft,
+  X,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
-import { Modal } from '../../../components/ui/Modal';
 import { useToastStore } from '../../../store/useToastStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
@@ -381,19 +382,80 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
 
   const isChecklistMode = currentSession?.templateType === 'BAHASA_INGGRIS_ARAB';
 
+  const handleClose = useCallback(() => {
+    if (isDirty && !window.confirm('Ada perubahan yang belum disimpan. Yakin ingin keluar?')) {
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleClose]);
+
+  if (!isOpen) return null;
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={() => {
-        if (isDirty && !window.confirm('Ada perubahan yang belum disimpan. Yakin ingin keluar?')) {
-          return;
-        }
-        onClose();
-      }}
-      title="🗣️ Penilaian Ujian Lisan"
-      maxWidth="2xl"
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="oral-exam-title"
+      className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
     >
-      <div className="space-y-4 text-slate-800">
+      {/* Fullscreen Workspace Header */}
+      <header className="px-4 py-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="p-2 -ml-1 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-semibold shrink-0 cursor-pointer min-h-11"
+            title="Kembali ke Administrasi"
+          >
+            <ArrowLeft className="w-5 h-5 text-slate-600" />
+            <span className="hidden sm:inline">Kembali</span>
+          </button>
+          <div className="h-6 w-px bg-slate-200 hidden sm:block shrink-0" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-linear-to-br from-[#18536B] to-[#023246] text-white flex items-center justify-center shadow-xs shrink-0">
+            <span className="text-xl">🗣️</span>
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 id="oral-exam-title" className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
+                Penilaian Ujian Lisan
+              </h2>
+              <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full shrink-0">
+                Resmi A4 &amp; Excel
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 truncate">
+              {currentSession
+                ? `${currentSession.title} • Penguji: ${currentSession.examinerName} • Kelas ${currentSession.className} • TA: ${currentSession.academicYear}`
+                : 'Pencatatan & lembar rekapitulasi nilai lisan BTQ, Hafalan, Bahasa Inggris, dan Bahasa Arab'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer min-h-11 min-w-11 flex items-center justify-center"
+            title="Tutup (Esc)"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* Main Fullscreen Scrollable Body Container */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#F8FAFC]">
+        <div className="max-w-7xl mx-auto w-full space-y-4">
         {/* Top Header Controls: Sessions Bar & Add Button */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200">
           <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 sm:pb-0">
@@ -979,6 +1041,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
           )
         )}
       </div>
-    </Modal>
-  );
+    </div>
+  </div>
+);
 };
