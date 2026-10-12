@@ -54,6 +54,7 @@ import { ExamScheduleAndProctorModal } from '../../administration/components/Exa
 import { HomeroomModal } from '../../homeroom/components/HomeroomModal';
 import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
+import { OralExamAssessmentModal } from '../../administration/components/OralExamAssessmentModal';
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -69,6 +70,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
+  const [isOralExamModalOpen, setIsOralExamModalOpen] = useState(false);
   const [isHomeroomModalOpen, setIsHomeroomModalOpen] = useState(false);
   const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
@@ -749,6 +751,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                   setIsHomeroomModalOpen(true);
                 } else if (actionId === 'materials') {
                   setIsTeachingMaterialsModalOpen(true);
+                } else if (actionId === 'oral_exam') {
+                  setIsOralExamModalOpen(true);
                 }
               }}
               onBackToDashboard={() => setActiveTab('DASHBOARD')}
@@ -1084,6 +1088,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           user={user}
         />
       )}
+
+      {/* Modal Penilaian Ujian Lisan (BTQ & Bahasa Inggris/Arab) */}
+      <OralExamAssessmentModal
+        isOpen={isOralExamModalOpen}
+        onClose={() => setIsOralExamModalOpen(false)}
+      />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
       <OfflineSyncIndicator />

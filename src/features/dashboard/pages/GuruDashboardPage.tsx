@@ -36,6 +36,7 @@ import { StudentBehaviorView } from '../../guru/components/StudentBehaviorView';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
 import { AdministrationHubModal } from '../../administration/components/AdministrationHubModal';
 import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
+import { OralExamAssessmentModal } from '../../administration/components/OralExamAssessmentModal';
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
 import {
   CustomizeQuickIconsModal,
@@ -477,6 +478,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   });
   const [isPointHistoryModalOpen, setIsPointHistoryModalOpen] = useState(false);
   const [isAdministrationModalOpen, setIsAdministrationModalOpen] = useState(false);
+  const [isOralExamModalOpen, setIsOralExamModalOpen] = useState(false);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
   const [isExamScheduleReadOnly, setIsExamScheduleReadOnly] = useState(false);
   const [examScheduleInitialTab, setExamScheduleInitialTab] = useState<'proctors' | 'subjects' | 'my_schedule' | 'ai_prompt' | 'form'>('proctors');
@@ -6395,6 +6397,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             case 'rekap':
               setIsRecapModalOpen(true);
               break;
+            case 'oral_exam':
+              setIsOralExamModalOpen(true);
+              break;
             default:
               break;
           }
@@ -6421,6 +6426,12 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           readOnly={isExamScheduleReadOnly}
         />
       )}
+
+      {/* 🗣️ Modal Penilaian Ujian Lisan (BTQ & Hafalan / Bahasa Inggris & Arab) */}
+      <OralExamAssessmentModal
+        isOpen={isOralExamModalOpen}
+        onClose={() => setIsOralExamModalOpen(false)}
+      />
 
       {/* 13. Terminal Presensi RFID Siswa 2 (Akses Cepat Guru Piket & Pengajar) */}
       <StudentRfidKioskModal

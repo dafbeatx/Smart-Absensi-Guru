@@ -84,6 +84,18 @@ export const DEFAULT_ADMINISTRATION_MODULES: AdministrationModuleItem[] = [
     isEnabled: true,
     order: 3,
   },
+  {
+    id: 'oral_exam_assessment',
+    title: 'Penilaian Ujian Lisan',
+    category: 'UJIAN',
+    description: 'Format penilaian lisan resmi: BTQ & Hafalan serta Bahasa Inggris & Arab (Checklist 15 Soal)',
+    icon: '🗣️',
+    colorClass: 'from-emerald-700 to-teal-900',
+    badge: 'Lisan & BTQ',
+    actionId: 'oral_exam',
+    isEnabled: true,
+    order: 4,
+  },
 
   // --- KATEGORI: PERANGKAT AJAR & KBM ---
   {

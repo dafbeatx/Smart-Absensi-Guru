@@ -54,6 +54,7 @@ import { runPaydayNotificationAntiSpamTestSuite } from './__tests__/payday-notif
 import { runExamPeriodToggleTestSuite } from './__tests__/exam-period-toggle.test';
 import { runGradeMasterScoreSyncTestSuite } from './__tests__/grademaster-score-sync.test';
 import { runUniversalExcelGradingTestSuite } from './__tests__/universal-excel-grading.test';
+import { runOralExamAssessmentTestSuite } from './__tests__/oral-exam-assessment.test';
 
 export interface TestResultItem {
   testName: string;
@@ -145,6 +146,7 @@ export class MasterTestRunner {
       { name: 'Exam Period Settings & Auto-Expiry Engine (Phase 5.2)', fn: runExamPeriodToggleTestSuite },
       { name: 'GradeMaster Score Sync Suite (TA 2026/2027)', fn: runGradeMasterScoreSyncTestSuite },
       { name: 'Universal Excel Grading & Auto Session Importer Suite', fn: runUniversalExcelGradingTestSuite },
+      { name: 'Oral Exam Assessment Engine (BTQ, Hafalan, English & Arabic Checklist)', fn: runOralExamAssessmentTestSuite },
     ];
 
     let totalPassed = 0;
