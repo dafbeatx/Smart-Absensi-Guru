@@ -47,7 +47,7 @@ export interface OralExamAssessmentModalProps {
   academicYear?: string;
 }
 
-const AVAILABLE_CLASSES = ['7A', '7B', '8A', '8B', '9A', '9B', '10', '11', '12'];
+const AVAILABLE_CLASSES = ['7', '8A', '8B', '9A', '9B', '10', '11', '12'];
 
 export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = ({
   isOpen,
@@ -73,7 +73,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   const [sessionTitle, setSessionTitle] = useState('');
   const [examinerName, setExaminerName] = useState('');
   const [roomNumber, setRoomNumber] = useState('Ruang 01');
-  const [selectedClass, setSelectedClass] = useState('7A');
+  const [selectedClass, setSelectedClass] = useState('7');
   const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().substring(0, 10));
 
   // Active editing session
@@ -136,7 +136,15 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     try {
       const allStudents = await StudentRepository.getStudents();
       classStudents = allStudents
-        .filter((st: any) => ((st.className || st.class_name || '') as string).toUpperCase() === selectedClass.toUpperCase())
+        .filter((st: any) => {
+          const rawClass = ((st.className || st.class_name || '') as string).trim().toUpperCase();
+          const targetClass = selectedClass.trim().toUpperCase();
+          if (rawClass === targetClass) return true;
+          if (targetClass === '7' && (rawClass === '7' || rawClass === '7A' || rawClass === '7B' || rawClass === 'VII')) {
+            return true;
+          }
+          return false;
+        })
         .map((st: any) => ({
           studentId: st.id,
           studentName: st.fullName || st.full_name || 'Siswa',
