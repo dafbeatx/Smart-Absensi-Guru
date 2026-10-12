@@ -967,14 +967,19 @@ export class NotificationPermissionService {
   ): AttendanceNotificationPayload {
     const todayIso = new Date().toISOString().substring(0, 10);
     const dateRangeStr = startDate === endDate ? startDate : `${startDate} s.d. ${endDate}`;
-    const dutyPreview = dutyNotes && dutyNotes.trim().length > 0
+    const isCuti = String(leaveType).toUpperCase() === 'CUTI';
+    const dutyPreview = isCuti
+      ? ''
+      : dutyNotes && dutyNotes.trim().length > 0
       ? ` Tugas untuk guru piket: "${dutyNotes.trim().slice(0, 80)}${dutyNotes.trim().length > 80 ? '...' : ''}"`
       : ' Guru piket dimohon memantau instruksi kelas di Beranda.';
 
     const payload: AttendanceNotificationPayload = {
       id: `notif_leave_broadcast_${teacherName.replace(/\s+/g, '_')}_${todayIso}_${Date.now()}`,
-      title: `📢 Info Izin Guru: ${teacherName}`,
-      body: `Bapak/Ibu ${teacherName} mengajukan ${leaveType} (${dateRangeStr}) - ${reason}.${dutyPreview}`,
+      title: isCuti ? `🏖️ Info Cuti Guru: ${teacherName}` : `📢 Info Izin Guru: ${teacherName}`,
+      body: isCuti
+        ? `Bapak/Ibu ${teacherName} mengambil cuti (${dateRangeStr}) - ${reason}.`
+        : `Bapak/Ibu ${teacherName} mengajukan ${leaveType} (${dateRangeStr}) - ${reason}.${dutyPreview}`,
       type: 'PENGUMUMAN',
       teacherName,
       roleTarget: 'ALL',
@@ -986,8 +991,10 @@ export class NotificationPermissionService {
     // Otomatis kirimkan Web Push ke seluruh guru dan staf
     this.triggerServerWebPush({
       targetRoles: ['GURU', 'ADMIN', 'KEPSEK'],
-      title: `📢 Info Izin Guru: ${teacherName}`,
-      body: `Bapak/Ibu ${teacherName} mengajukan ${leaveType} (${dateRangeStr}). Guru piket dimohon memeriksa tugas kelas.`,
+      title: isCuti ? `🏖️ Info Cuti Guru: ${teacherName}` : `📢 Info Izin Guru: ${teacherName}`,
+      body: isCuti
+        ? `Bapak/Ibu ${teacherName} mengambil cuti (${dateRangeStr}).`
+        : `Bapak/Ibu ${teacherName} mengajukan ${leaveType} (${dateRangeStr}). Guru piket dimohon memeriksa tugas kelas.`,
       tag: `leave_broadcast_${Date.now()}`,
       url: '/?tab=BERANDA',
     }).catch(() => {});

@@ -1425,14 +1425,34 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       try {
         const todayStr = getTodayDateInJakarta();
         const allLeavesList = await LeaveRepository.getAllLeaves(authToken || '');
-        const activeLeaves = (allLeavesList || []).filter((l) => {
+
+        // 1. Cek apakah pengguna yang sedang login sedang cuti / izin hari ini
+        const isUserOnLeaveToday = (allLeavesList || []).some((l) => {
           if (!l || l.approval_status === 'REJECTED' || l.status === 'REJECTED') return false;
-          if (l.user_id === effectiveUser.id) return false;
+          if (l.user_id !== effectiveUser.id) return false;
           const sDate = l.start_date;
           const eDate = l.end_date || l.start_date;
           return sDate <= todayStr && eDate >= todayStr;
         });
-        setActiveDutyLeavesToday(activeLeaves);
+
+        if (isUserOnLeaveToday) {
+          // Guru yang sedang cuti/izin tidak bertugas piket dan tidak dibebani tugas titipan
+          setIsDutyTeacherToday(false);
+          setActiveDutyLeavesToday([]);
+        } else {
+          // 2. Filter izin dari rekan guru: JIKA YANG CUTI, JANGAN ADA TUGAS TITIPAN DARI GURU IZIN
+          const activeLeaves = (allLeavesList || []).filter((l) => {
+            if (!l || l.approval_status === 'REJECTED' || l.status === 'REJECTED') return false;
+            if (l.user_id === effectiveUser.id) return false;
+            const lType = String(l.leave_type || (l as any).type || '').toUpperCase();
+            // Cuti resmi tidak dibebani tugas titipan untuk guru piket
+            if (lType === 'CUTI') return false;
+            const sDate = l.start_date;
+            const eDate = l.end_date || l.start_date;
+            return sDate <= todayStr && eDate >= todayStr;
+          });
+          setActiveDutyLeavesToday(activeLeaves);
+        }
       } catch (errLeaves) {
         console.warn('Failed to load active duty leaves today:', errLeaves);
       }

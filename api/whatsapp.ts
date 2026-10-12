@@ -117,9 +117,10 @@ export function formatWhatsAppLeaveMessage(payload: WhatsAppLeavePayload): strin
   const endDate = payload.endDate || startDate;
   const dateDisplay = startDate === endDate ? startDate : `${startDate} s.d. ${endDate}`;
 
+  const isCuti = rawType === 'CUTI';
   const dutyNotes = (payload.dutyTeacherNotes || '').trim() || 'Siswa belajar mandiri / mengerjakan materi buku paket.';
 
-  return [
+  const lines = [
     `📢 *${badgeTitle}*`,
     `━━━━━━━━━━━━━━━━━━━━`,
     `${typeEmoji} *Jenis:* ${typeLabel}`,
@@ -130,11 +131,19 @@ export function formatWhatsAppLeaveMessage(payload: WhatsAppLeavePayload): strin
     `📝 *Keterangan / Alasan:*`,
     `${payload.reason || '-'}`,
     `━━━━━━━━━━━━━━━━━━━━`,
-    `📋 *TUGAS UNTUK GURU PIKET:*`,
-    `"${dutyNotes}"`,
-    `━━━━━━━━━━━━━━━━━━━━`,
-    `_Smart Absensi Guru • Terverifikasi Otomatis_`,
-  ].join('\n');
+  ];
+
+  if (!isCuti) {
+    lines.push(
+      `📋 *TUGAS UNTUK GURU PIKET:*`,
+      `"${dutyNotes}"`,
+      `━━━━━━━━━━━━━━━━━━━━`
+    );
+  }
+
+  lines.push(`_Smart Absensi Guru • Terverifikasi Otomatis_`);
+
+  return lines.join('\n');
 }
 
 export default async function handler(req: any, res: any) {

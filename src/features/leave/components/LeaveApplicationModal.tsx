@@ -154,9 +154,11 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
       return;
     }
 
-    if (!dutyTeacherNotes || dutyTeacherNotes.trim().length < 5) {
-      setErrorMsg('Wajib memberikan instruksi / tugas kelas untuk Guru Piket (minimal 5 karakter).');
-      return;
+    if (leaveType !== 'CUTI') {
+      if (!dutyTeacherNotes || dutyTeacherNotes.trim().length < 5) {
+        setErrorMsg('Wajib memberikan instruksi / tugas kelas untuk Guru Piket (minimal 5 karakter).');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -170,10 +172,16 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
         reason,
         attachment_url: attachmentBase64 || undefined,
         attachment_base64: attachmentBase64,
-        duty_teacher_notes: dutyTeacherNotes.trim(),
+        duty_teacher_notes: leaveType === 'CUTI' ? undefined : dutyTeacherNotes.trim(),
       });
 
-      showToast('success', 'Pengajuan Berhasil!', 'Pengajuan izin & tugas piket telah dicatat di sistem.');
+      showToast(
+        'success',
+        'Pengajuan Berhasil!',
+        leaveType === 'CUTI'
+          ? 'Pengajuan cuti resmi telah dicatat di sistem.'
+          : 'Pengajuan izin & tugas piket telah dicatat di sistem.'
+      );
 
       const leaveParams: WhatsAppLeaveParams = {
         teacherName: user?.full_name || 'Guru',
@@ -183,7 +191,7 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
         startDate,
         endDate,
         reason,
-        dutyTeacherNotes: dutyTeacherNotes.trim(),
+        dutyTeacherNotes: leaveType === 'CUTI' ? undefined : dutyTeacherNotes.trim(),
       };
 
       // Auto-trigger WhatsApp universal share dialog in 1 click
@@ -237,10 +245,12 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
               ✓
             </div>
             <h3 className="text-sm font-black text-emerald-950">
-              Pengajuan Izin Berhasil Dicatat!
+              {submittedLeave.leaveType === 'CUTI' ? 'Pengajuan Cuti Berhasil Dicatat!' : 'Pengajuan Izin Berhasil Dicatat!'}
             </h3>
             <p className="text-xs text-emerald-800 leading-relaxed max-w-sm mx-auto">
-              Data absensi & pesan tugas untuk Guru Piket telah tersimpan. Silakan teruskan laporan ini langsung ke <strong>Grup WhatsApp Sekolah</strong>.
+              {submittedLeave.leaveType === 'CUTI'
+                ? 'Data absensi cuti resmi telah tersimpan. Silakan teruskan laporan ini langsung ke Grup WhatsApp Sekolah.'
+                : 'Data absensi & pesan tugas untuk Guru Piket telah tersimpan. Silakan teruskan laporan ini langsung ke Grup WhatsApp Sekolah.'}
             </p>
           </div>
 
@@ -294,16 +304,18 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
               </div>
             </div>
 
-            {/* Prominent Duty Teacher Tasks Box */}
-            <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-300 space-y-1 shadow-3xs">
-              <div className="flex items-center gap-1.5 text-amber-950 font-black text-[10.5px] uppercase tracking-wider">
-                <span>📋</span>
-                <span>Tugas untuk Guru Piket / Pengganti:</span>
+            {/* Prominent Duty Teacher Tasks Box (Hanya jika BUKAN cuti) */}
+            {submittedLeave.leaveType !== 'CUTI' && (
+              <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-300 space-y-1 shadow-3xs">
+                <div className="flex items-center gap-1.5 text-amber-950 font-black text-[10.5px] uppercase tracking-wider">
+                  <span>📋</span>
+                  <span>Tugas untuk Guru Piket / Pengganti:</span>
+                </div>
+                <p className="text-xs font-bold text-amber-900 leading-relaxed italic">
+                  "{submittedLeave.dutyTeacherNotes || 'Siswa belajar mandiri / tugas buku paket.'}"
+                </p>
               </div>
-              <p className="text-xs font-bold text-amber-900 leading-relaxed italic">
-                "{submittedLeave.dutyTeacherNotes || 'Siswa belajar mandiri / tugas buku paket.'}"
-              </p>
-            </div>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -406,51 +418,60 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
             />
           </div>
 
-          {/* Tugas / Pesan Titipan untuk Guru Piket (Wajib) */}
-          <div className="space-y-2 p-3 rounded-2xl bg-amber-50/60 border border-amber-200/90 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
-                <span>📋</span>
-                <span>Tugas / Pesan untuk Guru Piket</span>
-              </label>
-              <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
-                Wajib Diisi
-              </span>
+          {/* Tugas / Pesan Titipan untuk Guru Piket (Hanya untuk Sakit / Izin / Dinas Luar, Bukan Cuti) */}
+          {leaveType === 'CUTI' ? (
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 text-xs flex items-center gap-2.5 shadow-2xs">
+              <span className="text-base">🏖️</span>
+              <p className="text-[11.5px] text-slate-600 leading-relaxed font-medium">
+                <strong>Pengajuan Cuti Resmi:</strong> Tidak memerlukan pengisian tugas titipan untuk Guru Piket.
+              </p>
             </div>
-            <textarea
-              rows={2}
-              value={dutyTeacherNotes}
-              onChange={(e) => setDutyTeacherNotes(e.target.value)}
-              placeholder="Tuliskan materi/tugas kelas atau instruksi untuk guru piket/pengganti..."
-              className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-            />
-            {/* Quick Preset Chips */}
-            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-              <span className="text-[10px] font-bold text-slate-500">Pilihan Cepat:</span>
-              {[
-                'Tugas Mandiri Kelas / LKS',
-                'Materi di Google Classroom',
-                'Mohon Awasi Ketertiban Kelas',
-                'Kuis / Latihan Harian',
-              ].map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() =>
-                    setDutyTeacherNotes((prev) =>
-                      prev.trim() ? `${prev.trim()} • ${preset}` : preset
-                    )
-                  }
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-100 active:scale-95 transition-all cursor-pointer shadow-3xs"
-                >
-                  + {preset}
-                </button>
-              ))}
+          ) : (
+            <div className="space-y-2 p-3 rounded-2xl bg-amber-50/60 border border-amber-200/90 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
+                  <span>📋</span>
+                  <span>Tugas / Pesan untuk Guru Piket</span>
+                </label>
+                <span className="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+                  Wajib Diisi
+                </span>
+              </div>
+              <textarea
+                rows={2}
+                value={dutyTeacherNotes}
+                onChange={(e) => setDutyTeacherNotes(e.target.value)}
+                placeholder="Tuliskan materi/tugas kelas atau instruksi untuk guru piket/pengganti..."
+                className="w-full bg-white border border-amber-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+              />
+              {/* Quick Preset Chips */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[10px] font-bold text-slate-500">Pilihan Cepat:</span>
+                {[
+                  'Tugas Mandiri Kelas / LKS',
+                  'Materi di Google Classroom',
+                  'Mohon Awasi Ketertiban Kelas',
+                  'Kuis / Latihan Harian',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() =>
+                      setDutyTeacherNotes((prev) =>
+                        prev.trim() ? `${prev.trim()} • ${preset}` : preset
+                      )
+                    }
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-100 active:scale-95 transition-all cursor-pointer shadow-3xs"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-amber-800 leading-tight">
+                *Pesan ini akan otomatis dimunculkan pada <strong>Beranda Guru Piket</strong> yang bertugas pada hari izin Anda.
+              </p>
             </div>
-            <p className="text-[10px] text-amber-800 leading-tight">
-              *Pesan ini akan otomatis dimunculkan pada <strong>Beranda Guru Piket</strong> yang bertugas pada hari izin Anda.
-            </p>
-          </div>
+          )}
 
           {/* Custom File Upload (hidden native input + styled UI) */}
           <div className="space-y-1.5">

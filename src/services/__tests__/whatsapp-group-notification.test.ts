@@ -241,5 +241,28 @@ export const runWhatsAppGroupNotificationTestSuite = async (): Promise<{
     'Leave notification proxy dispatch absorbed safely'
   );
 
+  // Test 16: CUTI leave message formatting excludes duty teacher tasks
+  const cutiPayload = {
+    teacherName: 'Sri Wahyuni, S.Pd.',
+    npp: 'NPP-198203152006042008',
+    role: 'GURU',
+    leaveType: 'CUTI',
+    startDate: '2026-10-01',
+    endDate: '2026-10-10',
+    reason: 'Cuti tahunan keperluan keluarga',
+    dutyTeacherNotes: 'Catatan ini tidak boleh muncul',
+  };
+  const cutiShareText = WhatsAppNotificationService.generateWhatsAppLeaveShareText(cutiPayload);
+  const cutiFormattedMsg = formatWhatsAppLeaveMessage(cutiPayload);
+
+  assert(
+    'WA Notif 16: CUTI leave share text & formatted message exclude duty teacher tasks',
+    !cutiShareText.includes('TUGAS UNTUK GURU PIKET') &&
+      !cutiFormattedMsg.includes('TUGAS UNTUK GURU PIKET') &&
+      cutiShareText.includes('PERMOHONAN CUTI RESMI') &&
+      cutiFormattedMsg.includes('PERMOHONAN CUTI RESMI'),
+    'CUTI messages correctly omit duty teacher tasks'
+  );
+
   return { passed, failed, results };
 };

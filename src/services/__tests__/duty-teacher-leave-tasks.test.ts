@@ -117,8 +117,43 @@ export const runDutyTeacherLeaveTasksTestSuite = async (): Promise<{
     // =========================================================================
     // Test 4: Duty Teacher Beranda Task Filter Logic
     // =========================================================================
+    // =========================================================================
+    // Test 4: Cuti Leave Submission & Broadcast without Duty Notes
+    // =========================================================================
+    const submittedCuti = await LeaveRepository.submitLeave({
+      token: 'mock_duty_test_token',
+      leave_type: 'CUTI',
+      start_date: todayStr,
+      end_date: todayStr,
+      reason: 'Cuti tahunan keperluan keluarga penting',
+    });
+
+    assert(
+      'Leave Submission Cuti - Pengajuan cuti berhasil tanpa tugas titipan guru piket',
+      Boolean(submittedCuti && submittedCuti.id && !submittedCuti.duty_teacher_notes),
+      `Cuti notes: ${submittedCuti.duty_teacher_notes}`
+    );
+
+    const cutiBroadcast = NotificationService.broadcastTeacherLeaveAnnouncement(
+      'Budi Santoso, S.Pd.',
+      'CUTI',
+      todayStr,
+      todayStr,
+      'Cuti tahunan keperluan keluarga penting'
+    );
+
+    assert(
+      'Broadcast Cuti - Pengumuman cuti tidak memuat tugas titipan guru piket',
+      !cutiBroadcast.body.includes('Tugas untuk guru piket') &&
+        !cutiBroadcast.body.includes('memantau instruksi kelas'),
+      `Cuti Broadcast Body: ${cutiBroadcast.body}`
+    );
+
+    // =========================================================================
+    // Test 5: Duty Teacher Beranda Task Filter Logic (Excludes CUTI)
+    // =========================================================================
     // Emulate GuruDashboardPage filter:
-    // start_date <= todayStr && end_date >= todayStr && status !== 'REJECTED' && user_id !== currentDutyTeacherId
+    // start_date <= todayStr && end_date >= todayStr && status !== 'REJECTED' && user_id !== currentDutyTeacherId && leave_type !== 'CUTI'
     const currentDutyTeacherId = 'usr_duty_teacher_today_99';
     const allLeaves = await provider.getAllLeaves('mock_token');
 
@@ -137,11 +172,27 @@ export const runDutyTeacherLeaveTasksTestSuite = async (): Promise<{
       created_at: new Date().toISOString(),
     };
 
-    const activeLeavesForDutyTeacher = [...allLeaves, rejectedLeave].filter((l) => {
+    // Create a CUTI leave from another teacher that might have duty notes
+    const cutiLeaveOther: LeaveRequest = {
+      id: 'leave_cuti_mock',
+      user_id: 'usr_other_teacher_03',
+      leave_type: 'CUTI',
+      start_date: todayStr,
+      end_date: todayStr,
+      reason: 'Cuti melahirkan 3 bulan',
+      duty_teacher_notes: 'Tidak boleh muncul di tugas piket',
+      attachment_url: null,
+      approval_deadline: new Date().toISOString(),
+      approval_status: 'APPROVED',
+      created_at: new Date().toISOString(),
+    };
+
+    const activeLeavesForDutyTeacher = [...allLeaves, rejectedLeave, cutiLeaveOther].filter((l) => {
       const isDateMatch = l.start_date <= todayStr && l.end_date >= todayStr;
       const isNotRejected = l.approval_status !== 'REJECTED';
       const isNotMe = l.user_id !== currentDutyTeacherId;
-      return isDateMatch && isNotRejected && isNotMe && Boolean(l.duty_teacher_notes);
+      const isNotCuti = String(l.leave_type || (l as any).type || '').toUpperCase() !== 'CUTI';
+      return isDateMatch && isNotRejected && isNotMe && isNotCuti;
     });
 
     const hasOurSubmittedTask = activeLeavesForDutyTeacher.some(
@@ -149,6 +200,7 @@ export const runDutyTeacherLeaveTasksTestSuite = async (): Promise<{
     );
 
     const hasRejectedTask = activeLeavesForDutyTeacher.some((l) => l.id === 'leave_rejected_mock');
+    const hasCutiTask = activeLeavesForDutyTeacher.some((l) => l.id === 'leave_cuti_mock' || l.id === submittedCuti.id);
 
     assert(
       'Duty Teacher Filter - Menemukan tugas titipan guru izin hari ini untuk beranda piket',
@@ -160,6 +212,12 @@ export const runDutyTeacherLeaveTasksTestSuite = async (): Promise<{
       'Duty Teacher Filter - Mengabaikan tugas dari izin berstatus REJECTED',
       hasRejectedTask === false,
       'Rejected task wrongly included'
+    );
+
+    assert(
+      'Duty Teacher Filter - Guru yang CUTI tidak dimasukkan ke dalam tugas titipan piket',
+      hasCutiTask === false,
+      'Cuti task wrongly included in duty teacher tasks'
     );
   } finally {
     // Restore previous auth state

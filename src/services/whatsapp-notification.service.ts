@@ -210,9 +210,10 @@ export class WhatsAppNotificationService {
         ? startDate
         : `${startDate} s.d. ${endDate}`;
 
+    const isCuti = rawType === 'CUTI';
     const dutyNotes = (params.dutyTeacherNotes || '').trim() || 'Siswa belajar mandiri / mengerjakan materi buku paket.';
 
-    return [
+    const lines = [
       `📢 *${badgeTitle}*`,
       `━━━━━━━━━━━━━━━━━━━━`,
       `${typeEmoji} *Jenis:* ${typeLabel}`,
@@ -223,11 +224,19 @@ export class WhatsAppNotificationService {
       `📝 *Keterangan / Alasan:*`,
       `${params.reason || '-'}`,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `📋 *TUGAS UNTUK GURU PIKET:*`,
-      `"${dutyNotes}"`,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      `_Smart Absensi Guru • Terverifikasi Otomatis_`,
-    ].join('\n');
+    ];
+
+    if (!isCuti) {
+      lines.push(
+        `📋 *TUGAS UNTUK GURU PIKET:*`,
+        `"${dutyNotes}"`,
+        `━━━━━━━━━━━━━━━━━━━━`
+      );
+    }
+
+    lines.push(`_Smart Absensi Guru • Terverifikasi Otomatis_`);
+
+    return lines.join('\n');
   }
 
   /**
@@ -267,7 +276,7 @@ export class WhatsAppNotificationService {
         startDate: params.startDate,
         endDate: params.endDate || params.startDate,
         reason: params.reason || '',
-        dutyTeacherNotes: params.dutyTeacherNotes || '',
+        dutyTeacherNotes: String(params.leaveType || '').toUpperCase() === 'CUTI' ? undefined : (params.dutyTeacherNotes || ''),
       };
 
       const response = await fetch(this.PROXY_ENDPOINT, {
