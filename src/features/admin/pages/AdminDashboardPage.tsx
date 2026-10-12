@@ -54,7 +54,12 @@ import { ExamScheduleAndProctorModal } from '../../administration/components/Exa
 import { HomeroomModal } from '../../homeroom/components/HomeroomModal';
 import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
-import { OralExamAssessmentModal } from '../../administration/components/OralExamAssessmentModal';
+
+const OralExamAssessmentModal = React.lazy(() =>
+  import('../../administration/components/OralExamAssessmentModal').then((m) => ({
+    default: m.OralExamAssessmentModal,
+  }))
+);
 
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
@@ -1090,10 +1095,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       )}
 
       {/* Modal Penilaian Ujian Lisan (BTQ & Bahasa Inggris/Arab) */}
-      <OralExamAssessmentModal
-        isOpen={isOralExamModalOpen}
-        onClose={() => setIsOralExamModalOpen(false)}
-      />
+      {isOralExamModalOpen && (
+        <React.Suspense fallback={null}>
+          <OralExamAssessmentModal
+            isOpen={isOralExamModalOpen}
+            onClose={() => setIsOralExamModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
       <OfflineSyncIndicator />

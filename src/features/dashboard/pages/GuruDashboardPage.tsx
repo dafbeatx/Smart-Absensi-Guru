@@ -36,8 +36,13 @@ import { StudentBehaviorView } from '../../guru/components/StudentBehaviorView';
 import { ClassroomEmergencyModal } from '../../guru/components/ClassroomEmergencyModal';
 import { AdministrationHubModal } from '../../administration/components/AdministrationHubModal';
 import { ExamScheduleAndProctorModal } from '../../administration/components/ExamScheduleAndProctorModal';
-import { OralExamAssessmentModal } from '../../administration/components/OralExamAssessmentModal';
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
+
+const OralExamAssessmentModal = React.lazy(() =>
+  import('../../administration/components/OralExamAssessmentModal').then((m) => ({
+    default: m.OralExamAssessmentModal,
+  }))
+);
 import {
   CustomizeQuickIconsModal,
   ALL_QUICK_ICONS,
@@ -6428,10 +6433,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       )}
 
       {/* 🗣️ Modal Penilaian Ujian Lisan (BTQ & Hafalan / Bahasa Inggris & Arab) */}
-      <OralExamAssessmentModal
-        isOpen={isOralExamModalOpen}
-        onClose={() => setIsOralExamModalOpen(false)}
-      />
+      {isOralExamModalOpen && (
+        <React.Suspense fallback={null}>
+          <OralExamAssessmentModal
+            isOpen={isOralExamModalOpen}
+            onClose={() => setIsOralExamModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
       {/* 13. Terminal Presensi RFID Siswa 2 (Akses Cepat Guru Piket & Pengajar) */}
       <StudentRfidKioskModal

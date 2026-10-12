@@ -28,7 +28,6 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { AdministrationRepository } from '../../../repositories/AdministrationRepository';
 import { StudentRepository } from '../../../repositories/StudentRepository';
 import { OralExamRepository } from '../../../repositories/OralExamRepository';
-import { OralExamExportService } from '../../../lib/oral-exam-export.lib';
 import type {
   OralExamSession,
   OralExamTemplateType,
@@ -349,6 +348,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     if (!currentSession) return;
     try {
       setIsExporting(true);
+      const { OralExamExportService } = await import('../../../lib/oral-exam-export.lib');
       await OralExamExportService.exportToPdf(currentSession);
       showToast('success', 'PDF Siap!', 'Dokumen lembar penilaian resmi berhasil diunduh.');
     } catch (err) {
@@ -360,9 +360,10 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
   };
 
   // Export Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!currentSession) return;
     try {
+      const { OralExamExportService } = await import('../../../lib/oral-exam-export.lib');
       OralExamExportService.exportToExcel(currentSession);
       showToast('success', 'Excel Berhasil Diunduh!', 'File rekap penilaian .xlsx telah disimpan.');
     } catch (err) {

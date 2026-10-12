@@ -1,0 +1,19 @@
+# Vercel Deployment Optimization - Prevent Storage Bloat & Quota Exceeded
+.git
+.github
+.agents
+.ai
+android/
+electron/
+wa-gateway/
+database_backup/
+scratch/
+File/
+sql/
+*.sql
+*.md
+!README.md
+dist-electron/
+release/
+.tempmediaStorage/
+supabase/.temp/
