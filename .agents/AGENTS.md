@@ -51,3 +51,9 @@
 - **Efisiensi Token AI Agent**: Terapkan pembacaan selektif, hindari dump file besar (lockfile, bundle, node_modules) ke konteks agent, hindari repetisi aturan, dan sajikan diff atau ringkasan fokus.
 - **Larangan Destruktif**: Dilarang menghapus test demi meloloskan build, dilarang melonggarkan typecheck/lint untuk menyembunyikan error, dilarang menyentuh secrets/.env/database tanpa izin, dan dilarang menjalankan `npm audit fix --force`.
 
+## React + Vite Feature Engineering Protocol
+- **Feature Engineering Mandate**: Seluruh penambahan dan penyempurnaan fitur WAJIB mematuhi panduan teknis mendalam di [.agents/rules/REACT_VITE_FEATURE_ENGINEERING.md](file:///c:/Smart-Absensi-Guru/.agents/rules/REACT_VITE_FEATURE_ENGINEERING.md).
+- **Arsitektur Tuntas**: Fitur harus bekerja tuntas dari alur input, validasi, state/jaringan, hingga 5 status antarmuka (Normal, Loading, Empty, Error, Recovery). Dilarang menyisakan tombol tanpa aksi atau data palsu di produksi.
+- **Kualitas & Quality Gates**: Wajib mematuhi alur 7 langkah (*Inspect → Trace → Plan → Implement → Verify → Review → Report*), tidak merusak fondasi/library yang ada, dan memvalidasi test (`npm test`) serta production build (`npm run build`).
+
+
