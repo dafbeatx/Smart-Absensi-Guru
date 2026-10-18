@@ -261,7 +261,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-xl bg-white/10 active:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shrink-0"
+            className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer border border-white/10 shrink-0"
             title="Kembali ke Dashboard"
             aria-label="Kembali"
           >
@@ -336,7 +336,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
               <button
                 type="button"
                 onClick={onOpenCreateSession}
-                className="flex-1 h-11 px-3.5 rounded-xl bg-teal-600 active:bg-teal-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-98"
+                className="flex-1 h-11 px-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-98"
               >
                 <Plus className="w-4 h-4" />
                 <span>Buat Sesi Ujian</span>
@@ -371,7 +371,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
                 value={sessionSearchQuery}
                 onChange={(e) => setSessionSearchQuery(e.target.value)}
                 placeholder="Cari mapel, kelas, atau nama ujian..."
-                className="w-full h-11 bg-white border border-slate-200 rounded-xl pl-10 pr-3 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                className="w-full h-11 bg-white border border-slate-200 rounded-xl pl-10 pr-3 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-600"
               />
             </div>
 
@@ -494,7 +494,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
                             onSelectSession(sess);
                             setActiveTab('grading');
                           }}
-                          className="h-10 rounded-xl bg-teal-600 active:bg-teal-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                          className="h-10 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-98 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
                         >
                           <ClipboardList className="w-3.5 h-3.5" />
                           <span>Koreksi Siswa</span>
@@ -506,7 +506,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
                             onSelectSession(sess);
                             setActiveTab('recap');
                           }}
-                          className="h-10 rounded-xl bg-[#023246] active:bg-[#034560] text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                          className="h-10 rounded-xl bg-[#023246] hover:bg-[#034560] active:scale-98 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
                         >
                           <TrendingUp className="w-3.5 h-3.5" />
                           <span>Rekap Nilai</span>
@@ -566,7 +566,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
                   type="button"
                   disabled={!hasPrevStudent}
                   onClick={handlePrevStudent}
-                  className="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center text-slate-700 shrink-0 cursor-pointer"
+                  className="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center text-slate-700 shrink-0 cursor-pointer transition-all"
                   title="Siswa Sebelumnya"
                   aria-label="Siswa Sebelumnya"
                 >
@@ -592,7 +592,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
                   type="button"
                   disabled={!hasNextStudent}
                   onClick={handleNextStudent}
-                  className="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center text-slate-700 shrink-0 cursor-pointer"
+                  className="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center text-slate-700 shrink-0 cursor-pointer transition-all"
                   title="Siswa Berikutnya"
                   aria-label="Siswa Berikutnya"
                 >
@@ -902,7 +902,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
                 <button
                   type="button"
                   onClick={onOpenDownloadFormat}
-                  className="h-10 rounded-xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-200 cursor-pointer"
+                  className="h-10 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-200 cursor-pointer transition-all"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Unduh Excel</span>
@@ -912,7 +912,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
                   type="button"
                   disabled={isSyncingGradeMaster}
                   onClick={onSyncToGradeMaster}
-                  className="h-10 rounded-xl bg-teal-600 active:bg-teal-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                  className="h-10 rounded-xl bg-teal-600 hover:bg-teal-700 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50 transition-all"
                 >
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${isSyncingGradeMaster ? 'animate-spin' : ''}`}
@@ -931,7 +931,7 @@ export const QuestionCorrectionMobileView: React.FC<QuestionCorrectionMobileView
                   value={recapSearch}
                   onChange={(e) => setRecapSearch(e.target.value)}
                   placeholder="Cari siswa dalam rekap..."
-                  className="w-full h-11 bg-white border border-slate-200 rounded-xl pl-10 pr-3 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                  className="w-full h-11 bg-white border border-slate-200 rounded-xl pl-10 pr-3 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-600"
                 />
               </div>
 
