@@ -42,7 +42,7 @@ Di mobile (`< md` atau `< 768px`), setiap komponen interaktif (pembuat soal, for
 
 | Komponen / Properti | Nilai Mobile (Infinix Note 8) | Catatan Khusus Tailwind / CSS |
 | :--- | :--- | :--- |
-| **Container Height** | **`100dvh`** (`h-[100dvh]`) | Wajib `dvh` (Dynamic Viewport Height) agar tidak tertutup address bar browser mobile. |
+| **Container Height** | **`100dvh`** (`h-dvh`) | Wajib `dvh` (Dynamic Viewport Height, class: `h-dvh`) agar tidak tertutup address bar browser mobile. |
 | **Container Width** | **`100vw` / `w-full`** | Di mobile dilarang menggunakan margin samping luar (`m-0 rounded-none`). |
 | **Safe Area Inset** | `env(safe-area-inset-*)` | `pt-[max(12px,env(safe-area-inset-top))]`, `pb-[max(12px,env(safe-area-inset-bottom))]`. |
 | **Tinggi Header** | **`56px`** (`h-14`) | Sticky di `top-0`, `backdrop-blur-md`, z-index `z-20` atau `z-30`. |
@@ -87,7 +87,7 @@ export const FeatureFullView: React.FC<FeatureModalProps> = ({ isOpen, onClose }
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 md:p-4 md:backdrop-blur-sm animate-in fade-in duration-200">
       
       {/* MAIN CONTAINER: 100dvh & w-full di mobile; rounded-2xl & max-w-2xl di desktop */}
-      <div className="w-full h-[100dvh] md:h-auto md:max-h-[90vh] md:max-w-2xl bg-white md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full h-dvh md:h-auto md:max-h-[90vh] md:max-w-2xl bg-white md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         
         {/* 1. STICKY HEADER */}
         <header className="h-14 sm:h-16 px-4 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between shrink-0 sticky top-0 z-20 pt-[env(safe-area-inset-top)]">
@@ -162,7 +162,7 @@ export const FeatureFullView: React.FC<FeatureModalProps> = ({ isOpen, onClose }
 
 Sebelum menyatakan tugas pembuatan/pembaruan fitur selesai, jalankan checklist ini:
 - [ ] **Bukan Popup Melayang di Mobile**: Apakah di layar lebar `< 768px` komponen memenuhi layar tanpa batas margin/backdrop kosong di kiri/kanan?
-- [ ] **Tinggi Dinamis 100dvh**: Apakah menggunakan `h-[100dvh]` dan bukan `h-screen` murni (yang sering terpotong oleh browser bar mobile)?
+- [ ] **Tinggi Dinamis 100dvh**: Apakah menggunakan `h-dvh` (100dvh) dan bukan `h-screen` murni (yang sering terpotong oleh browser bar mobile)?
 - [ ] **Sticky Action Bar**: Apakah tombol simpan/aksi utama menempel di bagian bawah viewport dan langsung terlihat tanpa harus scroll panjang mencari tombol submit?
 - [ ] **Pencegahan Double-Scroll**: Apakah saat modal dibuka, scrolling halaman belakang (`document.body.style.overflow = 'hidden'`) terkunci rapat?
 - [ ] **Sentuhan Ergonomis**: Apakah tombol dan input memiliki tinggi minimum 44px agar ramah jempol satu tangan di HP Infinix Note 8?
