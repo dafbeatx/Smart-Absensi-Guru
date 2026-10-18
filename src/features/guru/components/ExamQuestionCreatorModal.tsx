@@ -778,22 +778,24 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                         <h5 className="text-xs font-black text-slate-900 uppercase mb-2">
                           Rubrik Penskoran Soal Uraian / Essay
                         </h5>
-                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                          {generatedData.essayQuestions.map((eq) => (
-                            <div key={eq.number} className="p-3 text-xs space-y-1">
-                              <div className="flex items-center justify-between">
-                                <span className="font-extrabold text-slate-900">Nomor {eq.number}</span>
-                                <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 font-bold text-[10px]">
-                                  Maks {eq.maxScore} Poin
-                                </span>
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                          <div className="divide-y divide-slate-100">
+                            {generatedData.essayQuestions.map((eq) => (
+                              <div key={eq.number} className="p-3 text-xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-extrabold text-slate-900">Nomor {eq.number}</span>
+                                  <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 font-bold text-[10px]">
+                                    Maks {eq.maxScore} Poin
+                                  </span>
+                                </div>
+                                <p className="text-slate-600 font-serif">{eq.question}</p>
+                                <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/80 mt-1">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Kriteria Jawaban Diharapkan:</span>
+                                  <p className="text-[11px] text-slate-800 mt-0.5 leading-relaxed">{eq.expectedAnswer}</p>
+                                </div>
                               </div>
-                              <p className="text-slate-600 font-serif">{eq.question}</p>
-                              <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/80 mt-1">
-                                <span className="text-[10px] font-bold text-slate-500 uppercase block">Kriteria Jawaban Diharapkan:</span>
-                                <p className="text-[11px] text-slate-800 mt-0.5 leading-relaxed">{eq.expectedAnswer}</p>
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}
