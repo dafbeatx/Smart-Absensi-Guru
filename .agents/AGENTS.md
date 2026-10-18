@@ -18,6 +18,7 @@
 
 ## Naming Standards & UI Design System Protocol
 - **Anti AI-Generic / Anti AI-Slop UI Protocol**: Setiap kali diminta membuat, memperbarui, atau memperbaiki antarmuka (UI/UX), WAJIB selalu merujuk dan mematuhi pedoman di [.ai/UI_DESIGN_SYSTEM_ANTI_AI_SLOP.md](file:///c:/Smart-Absensi-Guru/.ai/UI_DESIGN_SYSTEM_ANTI_AI_SLOP.md).
+- **Always-On Infinix Note 8 & Mobile Full-Screen Mandate**: DILARANG KERAS membuat fitur, formulir, atau panel alur kerja sebagai floating popup / centered modal melayang di layar mobile. Di perangkat mobile (terutama smartphone **Infinix Note 8** rasio 20.5:9, 720×1640 px), fitur WAJIB menggunakan **Full-Screen Viewport (`100dvh`)** tanpa celah margin luar, dilengkapi sticky header dan sticky bottom action bar yang ergonomis bagi jempol. Panduan teknis lengkap & template wajib: [.agents/rules/INFINIX_NOTE_8_FULLSCREEN_RULE.md](file:///c:/Smart-Absensi-Guru/.agents/rules/INFINIX_NOTE_8_FULLSCREEN_RULE.md).
 - **NPP Naming Standard**: Seluruh penamaan ID pegawai di UI, modal, pencarian, dan laporan PDF/CSV wajib menggunakan istilah **NPP (Nomor Pokok Pegawai)**.
 - **Time Input Sanitizer**: Input HTML5 `type="time"` wajib diformat `HH:mm` menggunakan `formatTimeForInput` dari `src/utils/time.utils.ts`.
 - **Single Typography & Theme**: Wajib mengunci font family global menggunakan **Inter** dan menggunakan design tokens warna yang didefinisikan di `src/index.css`.
