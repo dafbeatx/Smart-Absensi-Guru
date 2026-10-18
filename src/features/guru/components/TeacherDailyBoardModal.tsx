@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import type { AttendanceRecord, UserProfile } from '../../../types/database.types';
+import type { AttendanceRecord, UserProfile, LeaveRequest } from '../../../types/database.types';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
@@ -9,43 +9,97 @@ interface TeacherDailyBoardModalProps {
   onClose: () => void;
 }
 
-type BoardTab = 'SEMUA' | 'HADIR' | 'PULANG' | 'IZIN' | 'BELUM';
+export type BoardCategory =
+  | 'HADIR'
+  | 'PULANG'
+  | 'IZIN'
+  | 'TUGAS'
+  | 'SAKIT'
+  | 'CUTI'
+  | 'BELUM';
 
-interface TeacherBoardEntry {
+export type BoardTab = 'SEMUA' | BoardCategory;
+
+export interface TeacherBoardEntry {
   user: UserProfile;
   record: AttendanceRecord | null;
-  bucket: 'HADIR' | 'PULANG' | 'IZIN' | 'BELUM';
+  leave: LeaveRequest | null;
+  category: BoardCategory;
 }
 
-// Tentukan bucket berdasarkan status absensi
-function resolveBucket(record: AttendanceRecord | null): TeacherBoardEntry['bucket'] {
-  if (!record) return 'BELUM';
-  if (record.status === 'IZIN' || record.status === 'SAKIT' || record.status === 'DINAS_LUAR') return 'IZIN';
-  if (record.status === 'HADIR' || record.status === 'TERLAMBAT') {
-    return record.check_out_time ? 'PULANG' : 'HADIR';
+// Tentukan kategori spesifik: memisahkan izin, tugas, sakit, cuti secara presisi
+function resolveCategory(
+  record: AttendanceRecord | null,
+  activeLeave: LeaveRequest | null
+): BoardCategory {
+  // 1. Prioritaskan permohonan izin/tugas/sakit/cuti resmi yang sudah disetujui
+  if (activeLeave) {
+    const lType = String(activeLeave.leave_type || '').toUpperCase();
+    if (lType === 'SAKIT') return 'SAKIT';
+    if (lType === 'DINAS_LUAR') return 'TUGAS';
+    if (lType === 'CUTI') return 'CUTI';
+    if (lType === 'IZIN') return 'IZIN';
   }
-  if (record.status === 'ALFA' || record.status === 'BELUM_ABSEN') return 'BELUM';
+
+  // 2. Periksa status dan catatan di record absensi
+  if (record) {
+    const st = String(record.status || '').toUpperCase();
+    const notes = String(record.notes || '').toUpperCase();
+
+    // Deteksi cuti
+    if (notes.includes('CUTI')) return 'CUTI';
+
+    // Deteksi sakit
+    if (st === 'SAKIT' || notes.includes('SAKIT')) return 'SAKIT';
+
+    // Deteksi tugas luar / dinas luar
+    if (st === 'DINAS_LUAR' || notes.includes('DINAS_LUAR') || notes.includes('TUGAS')) {
+      return 'TUGAS';
+    }
+
+    // Deteksi izin
+    if (st === 'IZIN' || notes.includes('IZIN')) return 'IZIN';
+
+    // Deteksi kehadiran masuk atau sudah pulang
+    if (st === 'HADIR' || st === 'TERLAMBAT') {
+      return record.check_out_time ? 'PULANG' : 'HADIR';
+    }
+
+    if (st === 'ALFA' || st === 'BELUM_ABSEN') {
+      return 'BELUM';
+    }
+  }
+
   return 'BELUM';
 }
 
-const STATUS_DOT: Record<TeacherBoardEntry['bucket'], string> = {
+const CATEGORY_DOT: Record<BoardCategory, string> = {
   HADIR: 'bg-emerald-500',
-  PULANG: 'bg-blue-500',
+  PULANG: 'bg-teal-500',
   IZIN: 'bg-amber-400',
-  BELUM: 'bg-rose-400',
+  TUGAS: 'bg-blue-500',
+  SAKIT: 'bg-rose-500',
+  CUTI: 'bg-purple-500',
+  BELUM: 'bg-slate-400',
 };
 
-const STATUS_BADGE: Record<TeacherBoardEntry['bucket'], string> = {
-  HADIR: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  PULANG: 'bg-blue-50 text-blue-700 border-blue-200',
-  IZIN: 'bg-amber-50 text-amber-700 border-amber-200',
-  BELUM: 'bg-rose-50 text-rose-600 border-rose-200',
+const CATEGORY_BADGE: Record<BoardCategory, string> = {
+  HADIR: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  PULANG: 'bg-teal-50 text-teal-800 border-teal-200',
+  IZIN: 'bg-amber-50 text-amber-800 border-amber-200',
+  TUGAS: 'bg-blue-50 text-blue-800 border-blue-200',
+  SAKIT: 'bg-rose-50 text-rose-800 border-rose-200',
+  CUTI: 'bg-purple-50 text-purple-800 border-purple-200',
+  BELUM: 'bg-slate-100 text-slate-600 border-slate-200',
 };
 
-const STATUS_LABEL: Record<TeacherBoardEntry['bucket'], string> = {
+const CATEGORY_LABEL: Record<BoardCategory, string> = {
   HADIR: 'Hadir',
   PULANG: 'Sudah Pulang',
-  IZIN: 'Izin / Sakit',
+  IZIN: 'Izin',
+  TUGAS: 'Tugas Luar',
+  SAKIT: 'Sakit',
+  CUTI: 'Cuti',
   BELUM: 'Belum Absen',
 };
 
@@ -54,18 +108,21 @@ const TAB_LIST: { key: BoardTab; label: string }[] = [
   { key: 'HADIR', label: 'Hadir' },
   { key: 'PULANG', label: 'Pulang' },
   { key: 'IZIN', label: 'Izin' },
+  { key: 'TUGAS', label: 'Tugas' },
+  { key: 'SAKIT', label: 'Sakit' },
+  { key: 'CUTI', label: 'Cuti' },
   { key: 'BELUM', label: 'Belum' },
 ];
 
-// Skeleton satu baris
+// Skeleton satu baris saat loading
 const RowSkeleton: React.FC = () => (
   <div className="flex items-center gap-3 p-3.5 animate-pulse">
-    <div className="w-9 h-9 rounded-full bg-slate-200 shrink-0" />
+    <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0" />
     <div className="flex-1 space-y-2">
-      <div className="h-3 w-2/3 bg-slate-200 rounded" />
+      <div className="h-3.5 w-2/3 bg-slate-200 rounded" />
       <div className="h-2.5 w-1/2 bg-slate-100 rounded" />
     </div>
-    <div className="h-5 w-16 bg-slate-100 rounded-full shrink-0" />
+    <div className="h-6 w-16 bg-slate-100 rounded-full shrink-0" />
   </div>
 );
 
@@ -88,9 +145,10 @@ export const TeacherDailyBoardModal: React.FC<TeacherDailyBoardModalProps> = ({
     setError(null);
     try {
       const provider = ProviderFactory.getProvider();
-      const [records, users] = await Promise.all([
+      const [records, users, allLeaves] = await Promise.all([
         provider.getDailyAttendance(todayStr, token),
         provider.getAllUsers(token),
+        provider.getAllLeaves ? provider.getAllLeaves(token).catch(() => []) : Promise.resolve([]),
       ]);
 
       const activeTeachers = (users || []).filter(
@@ -100,15 +158,54 @@ export const TeacherDailyBoardModal: React.FC<TeacherDailyBoardModalProps> = ({
       const recordByUserId = new Map<string, AttendanceRecord>();
       (records || []).forEach((r) => recordByUserId.set(r.user_id, r));
 
-      const merged: TeacherBoardEntry[] = activeTeachers.map((user) => {
-        const record = recordByUserId.get(user.id) ?? null;
-        return { user, record, bucket: resolveBucket(record) };
+      // Peta leave aktif yang disetujui untuk hari ini
+      const activeLeavesMap = new Map<string, LeaveRequest>();
+      (allLeaves || []).forEach((l) => {
+        const isApproved = l.approval_status === 'APPROVED' || l.status === 'APPROVED';
+        if (isApproved && l.start_date <= todayStr && l.end_date >= todayStr) {
+          activeLeavesMap.set(l.user_id, l);
+        }
       });
 
-      // Urutkan: HADIR → PULANG → IZIN → BELUM, lalu nama A-Z
-      const order: Record<TeacherBoardEntry['bucket'], number> = { HADIR: 0, PULANG: 1, IZIN: 2, BELUM: 3 };
+      // Lengkapi dengan leaves dari localStorage cache
+      try {
+        const savedRaw = localStorage.getItem('smart_absensi_leaves');
+        if (savedRaw) {
+          const localList: LeaveRequest[] = JSON.parse(savedRaw);
+          if (Array.isArray(localList)) {
+            localList.forEach((l) => {
+              const isApproved = l.approval_status === 'APPROVED' || l.status === 'APPROVED';
+              if (isApproved && l.start_date <= todayStr && l.end_date >= todayStr) {
+                if (!activeLeavesMap.has(l.user_id)) {
+                  activeLeavesMap.set(l.user_id, l);
+                }
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('TeacherDailyBoardModal: failed to parse local leaves', err);
+      }
+
+      const merged: TeacherBoardEntry[] = activeTeachers.map((user) => {
+        const record = recordByUserId.get(user.id) ?? null;
+        const leave = activeLeavesMap.get(user.id) ?? null;
+        const category = resolveCategory(record, leave);
+        return { user, record, leave, category };
+      });
+
+      // Urutkan: HADIR → PULANG → TUGAS → IZIN → SAKIT → CUTI → BELUM, lalu nama A-Z
+      const order: Record<BoardCategory, number> = {
+        HADIR: 0,
+        PULANG: 1,
+        TUGAS: 2,
+        IZIN: 3,
+        SAKIT: 4,
+        CUTI: 5,
+        BELUM: 6,
+      };
       merged.sort((a, b) => {
-        const diff = order[a.bucket] - order[b.bucket];
+        const diff = order[a.category] - order[b.category];
         if (diff !== 0) return diff;
         return a.user.full_name.localeCompare(b.user.full_name, 'id');
       });
@@ -140,16 +237,19 @@ export const TeacherDailyBoardModal: React.FC<TeacherDailyBoardModalProps> = ({
   const counts = useMemo(() => {
     return {
       SEMUA: entries.length,
-      HADIR: entries.filter((e) => e.bucket === 'HADIR').length,
-      PULANG: entries.filter((e) => e.bucket === 'PULANG').length,
-      IZIN: entries.filter((e) => e.bucket === 'IZIN').length,
-      BELUM: entries.filter((e) => e.bucket === 'BELUM').length,
+      HADIR: entries.filter((e) => e.category === 'HADIR').length,
+      PULANG: entries.filter((e) => e.category === 'PULANG').length,
+      IZIN: entries.filter((e) => e.category === 'IZIN').length,
+      TUGAS: entries.filter((e) => e.category === 'TUGAS').length,
+      SAKIT: entries.filter((e) => e.category === 'SAKIT').length,
+      CUTI: entries.filter((e) => e.category === 'CUTI').length,
+      BELUM: entries.filter((e) => e.category === 'BELUM').length,
     };
   }, [entries]);
 
   const filtered = useMemo(() => {
     if (activeTab === 'SEMUA') return entries;
-    return entries.filter((e) => e.bucket === activeTab);
+    return entries.filter((e) => e.category === activeTab);
   }, [entries, activeTab]);
 
   const dateLabel = useMemo(() => {
@@ -168,6 +268,9 @@ export const TeacherDailyBoardModal: React.FC<TeacherDailyBoardModalProps> = ({
     HADIR: 'Belum ada guru yang hadir.',
     PULANG: 'Belum ada guru yang pulang.',
     IZIN: 'Tidak ada guru yang izin hari ini.',
+    TUGAS: 'Tidak ada guru yang bertugas luar hari ini.',
+    SAKIT: 'Tidak ada guru yang sakit hari ini.',
+    CUTI: 'Tidak ada guru yang cuti hari ini.',
     BELUM: 'Semua guru sudah presensi! 🎉',
   };
 
@@ -229,7 +332,7 @@ export const TeacherDailyBoardModal: React.FC<TeacherDailyBoardModalProps> = ({
             </p>
           )}
 
-          {/* ── Tab Bar ── */}
+          {/* ── Tab Bar (Termasuk Izin, Tugas, Sakit, Cuti) ── */}
           <div className="flex px-4 pb-0 gap-1 overflow-x-auto scrollbar-none">
             {TAB_LIST.map((tab) => {
               const isActive = activeTab === tab.key;
@@ -321,9 +424,8 @@ export const TeacherDailyBoardModal: React.FC<TeacherDailyBoardModalProps> = ({
 
 // ── Sub-komponen: satu baris guru ──
 const TeacherRow: React.FC<{ entry: TeacherBoardEntry; index: number }> = ({ entry }) => {
-  const { user, record, bucket } = entry;
+  const { user, record, leave, category } = entry;
   const initial = user.full_name.trim().charAt(0).toUpperCase();
-
   const [imgError, setImgError] = useState(false);
 
   const checkInLabel = record?.check_in_time
@@ -334,19 +436,20 @@ const TeacherRow: React.FC<{ entry: TeacherBoardEntry; index: number }> = ({ ent
     ? record.check_out_time.slice(0, 5) + ' WIB'
     : null;
 
-  const leaveTypeLabel: Record<string, string> = {
-    IZIN: 'Izin',
-    SAKIT: 'Sakit',
-    DINAS_LUAR: 'Dinas Luar',
+  const cleanReason = (rawReason?: string | null) => {
+    if (!rawReason) return '';
+    return rawReason
+      .replace(/^(Izin|Koreksi|Pengajuan)\s*Disetujui[^:]*:\s*/i, '')
+      .trim();
   };
 
-  const izinLabel = record?.status ? (leaveTypeLabel[record.status] ?? null) : null;
+  const reasonSnippet = cleanReason(leave?.reason) || cleanReason(record?.notes);
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
       {/* Avatar */}
       <div className="relative shrink-0">
-        <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-white text-sm font-black">
+        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-white text-sm font-black shadow-2xs">
           {user.avatar_url && !imgError ? (
             <img
               src={user.avatar_url}
@@ -358,44 +461,70 @@ const TeacherRow: React.FC<{ entry: TeacherBoardEntry; index: number }> = ({ ent
             <span>{initial}</span>
           )}
         </div>
-        {/* Status dot */}
+        {/* Status dot spesifik */}
         <span
-          className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${STATUS_DOT[bucket]}`}
+          className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow-2xs ${CATEGORY_DOT[category]}`}
         />
       </div>
 
-      {/* Info */}
+      {/* Info Guru */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-slate-800 truncate leading-tight">{user.full_name}</p>
-        <p className="text-[10.5px] text-slate-500 truncate mt-0.5 font-medium">{user.position || 'Pendidik'}</p>
-        {/* Jam masuk / keluar */}
-        {bucket !== 'IZIN' && bucket !== 'BELUM' && (
-          <div className="flex items-center gap-1.5 mt-1">
-            {checkInLabel && (
-              <span className="text-[9.5px] text-slate-400 font-semibold">
-                Masuk {checkInLabel}
-              </span>
-            )}
-            {checkOutLabel && (
-              <>
-                <span className="text-[9px] text-slate-300">·</span>
-                <span className="text-[9.5px] text-slate-400 font-semibold">
-                  Pulang {checkOutLabel}
-                </span>
-              </>
-            )}
-          </div>
+        <p className="text-xs sm:text-[13px] font-bold text-slate-900 truncate leading-tight">
+          {user.full_name}
+        </p>
+        <p className="text-[11px] text-slate-500 truncate mt-0.5 font-medium">
+          {user.position || 'Pendidik'}
+        </p>
+
+        {/* Keterangan Status Presisi */}
+        {category === 'HADIR' && (
+          <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+            Masuk {checkInLabel || '--:--'}
+          </p>
         )}
-        {bucket === 'IZIN' && izinLabel && (
-          <p className="text-[9.5px] text-amber-600 font-semibold mt-1">{izinLabel}</p>
+
+        {category === 'PULANG' && (
+          <p className="text-[10px] text-teal-700 font-semibold mt-0.5">
+            Masuk {checkInLabel || '--:--'} · Pulang {checkOutLabel || '--:--'}
+          </p>
+        )}
+
+        {category === 'IZIN' && (
+          <p className="text-[10px] text-amber-700 font-semibold mt-0.5 truncate">
+            📝 Izin{reasonSnippet ? ` • ${reasonSnippet}` : ''}
+          </p>
+        )}
+
+        {category === 'TUGAS' && (
+          <p className="text-[10px] text-blue-700 font-semibold mt-0.5 truncate">
+            💼 Tugas Luar{reasonSnippet ? ` • ${reasonSnippet}` : ''}
+          </p>
+        )}
+
+        {category === 'SAKIT' && (
+          <p className="text-[10px] text-rose-700 font-semibold mt-0.5 truncate">
+            🤒 Sakit{reasonSnippet ? ` • ${reasonSnippet}` : ''}
+          </p>
+        )}
+
+        {category === 'CUTI' && (
+          <p className="text-[10px] text-purple-700 font-semibold mt-0.5 truncate">
+            🏖️ Cuti{reasonSnippet ? ` • ${reasonSnippet}` : ''}
+          </p>
+        )}
+
+        {category === 'BELUM' && (
+          <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+            Belum presensi hari ini
+          </p>
         )}
       </div>
 
-      {/* Status badge */}
+      {/* Status badge spesifik: memisahkan Izin, Tugas Luar, Sakit, Cuti */}
       <span
-        className={`shrink-0 text-[9.5px] font-bold px-2 py-1 rounded-full border ${STATUS_BADGE[bucket]}`}
+        className={`shrink-0 text-[10px] font-extrabold px-2.5 py-1 rounded-full border shadow-2xs ${CATEGORY_BADGE[category]}`}
       >
-        {STATUS_LABEL[bucket]}
+        {CATEGORY_LABEL[category]}
       </span>
     </div>
   );
