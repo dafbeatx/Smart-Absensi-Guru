@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const widthClasses = {
     sm: 'max-w-sm',
@@ -41,7 +42,7 @@ export const Modal: React.FC<ModalProps> = ({
     '2xl': 'max-w-2xl',
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
       <div
         className="fixed inset-0"
@@ -64,6 +65,8 @@ export const Modal: React.FC<ModalProps> = ({
         )}
         <div className="flex-1 overflow-y-auto min-h-0">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
+

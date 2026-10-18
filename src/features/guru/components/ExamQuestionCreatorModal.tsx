@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Sparkles,
@@ -84,7 +85,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const effectiveSubject = subject === 'LAINNYA' ? (customSubject.trim() || 'Mata Pelajaran') : subject;
 
@@ -207,10 +208,15 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 w-full h-dvh bg-slate-100 flex flex-col overflow-hidden animate-in fade-in duration-150">
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="exam-creator-title"
+      className="fixed inset-0 z-[100] w-screen h-screen bg-[#F8FAFC] flex flex-col overflow-hidden font-sans select-none sm:select-auto"
+    >
       {/* Full-width Workspace Top Navigation */}
-      <header className="bg-[#023246] text-white px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between shrink-0 sticky top-0 z-30 shadow-md border-b border-teal-900/50 pt-[max(10px,env(safe-area-inset-top))]">
+      <header className="bg-[#023246] text-white px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between shrink-0 shadow-md border-b border-teal-900/50 pt-[max(10px,env(safe-area-inset-top))] z-30">
         <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
           <button
             type="button"
@@ -304,8 +310,8 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
       </div>
 
       {/* Full-width Workspace Scroll Canvas */}
-      <main className="flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-6 lg:p-8 bg-slate-100/70 custom-scrollbar space-y-6">
-        <div className="max-w-4xl mx-auto w-full space-y-5">
+      <main className="flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-6 lg:p-8 bg-[#F1F5F9] custom-scrollbar space-y-6">
+        <div className="max-w-4xl mx-auto w-full space-y-5 pb-8">
           {/* ═══════════════════════════════════════════════════════════ */}
           {/* LANGKAH 1: PARAMETER UJIAN                                 */}
           {/* ═══════════════════════════════════════════════════════════ */}
@@ -877,7 +883,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
       </main>
 
       {/* Sticky Bottom Action Bar */}
-      <footer className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3.5 sm:px-6 lg:px-8 py-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0 z-30 shadow-lg">
+      <footer className="w-full shrink-0 bg-white border-t border-slate-200 px-3.5 sm:px-6 lg:px-8 py-3.5 pb-[max(14px,env(safe-area-inset-bottom))] shadow-lg z-30">
         <div className="max-w-4xl mx-auto w-full flex items-center justify-between gap-3 flex-wrap">
           {step === 'PARAMS' && (
             <>
@@ -986,6 +992,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
           )}
         </div>
       </footer>
-    </div>
+    </div>,
+    document.body
   );
 };

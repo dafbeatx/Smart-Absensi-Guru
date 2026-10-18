@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus,
   Trash2,
@@ -408,14 +409,14 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, handleClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="oral-exam-title"
-      className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
+      className="fixed inset-0 z-[100] w-screen h-screen flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
     >
       {/* Fullscreen Workspace Header */}
       <header className="px-4 py-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">
@@ -1049,8 +1050,9 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
             </div>
           )
         )}
+        </div>
       </div>
-    </div>
-  </div>
-);
+    </div>,
+    document.body
+  );
 };

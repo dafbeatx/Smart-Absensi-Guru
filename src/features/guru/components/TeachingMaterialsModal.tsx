@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { UserProfile } from '../../../types/database.types';
 import { WebTrafficService } from '../../../services/web-traffic.service';
 
@@ -121,10 +122,10 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] w-screen h-screen bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
       <div className="bg-white w-full max-w-120 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="bg-[#023246] text-white p-4 px-5 flex items-center justify-between shrink-0">
@@ -347,6 +348,7 @@ export const TeachingMaterialsModal: React.FC<TeachingMaterialsModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
