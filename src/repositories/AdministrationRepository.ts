@@ -116,13 +116,19 @@ export class AdministrationRepository {
           parsed.forEach((m) => parsedMap.set(m.id, m));
 
           const merged: AdministrationModuleItem[] = [...parsed];
+          let hasNewModules = false;
           DEFAULT_ADMINISTRATION_MODULES.forEach((def) => {
             if (!parsedMap.has(def.id)) {
               merged.push(def);
+              hasNewModules = true;
             }
           });
 
-          return merged.sort((a, b) => (a.order || 0) - (b.order || 0));
+          const sorted = merged.sort((a, b) => (a.order || 0) - (b.order || 0));
+          if (hasNewModules) {
+            safeSetStorage(key, JSON.stringify(sorted));
+          }
+          return sorted;
         }
       } catch {
         // ignore parse error and fallback to default

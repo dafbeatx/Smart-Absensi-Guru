@@ -28,6 +28,7 @@ interface MoreFeaturesModalProps {
   onOpenEmergencyModal?: () => void;
   onOpenSarprasModal?: () => void;
   onOpenExamCardModal?: () => void;
+  onOpenExamCreatorModal?: () => void;
   onOpenQuestionCorrectionModal?: () => void;
   onOpenHomeroomModal?: () => void;
   onOpenAdministrationModal?: () => void;
@@ -60,6 +61,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenEmergencyModal,
   onOpenSarprasModal,
   onOpenExamCardModal,
+  onOpenExamCreatorModal,
   onOpenQuestionCorrectionModal,
   onOpenHomeroomModal,
   onOpenAdministrationModal,
@@ -148,6 +150,27 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                   });
                   onClose();
                   onOpenExamCardModal();
+                },
+              },
+            ]
+          : []),
+        ...(onOpenExamCreatorModal
+          ? [
+              {
+                id: 'buat_soal_ai',
+                title: 'Pembuat Soal & Kisi-Kisi AI',
+                subtitle: 'Generator naskah soal KOP SMPT Al-Ittihadiyah, kunci & kisi-kisi',
+                icon: '✨',
+                action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'buat_soal_ai',
+                  });
+                  onClose();
+                  onOpenExamCreatorModal();
                 },
               },
             ]

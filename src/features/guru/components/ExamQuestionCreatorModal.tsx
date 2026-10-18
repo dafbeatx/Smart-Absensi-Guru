@@ -72,6 +72,17 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generatedData, setGeneratedData] = useState<ExamPaperData | null>(null);
   const [isSavingToCorrection, setIsSavingToCorrection] = useState<boolean>(false);
+  // Lock body scroll saat modal aktif di mobile
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -197,10 +208,10 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      <div className="bg-white w-full max-w-4xl rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 md:p-4 md:backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full h-dvh md:h-auto md:max-h-[92vh] md:max-w-4xl bg-white md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header Modal */}
-        <div className="bg-[#023246] text-white p-4 sm:p-4.5 px-4 sm:px-6 flex items-center justify-between shrink-0">
+        <div className="bg-[#023246] text-white p-3.5 sm:p-4.5 px-4 sm:px-6 flex items-center justify-between shrink-0 sticky top-0 z-20 pt-[max(12px,env(safe-area-inset-top))]">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-linear-to-br from-teal-400 to-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-xs shrink-0">
               <Sparkles className="w-5 h-5" />

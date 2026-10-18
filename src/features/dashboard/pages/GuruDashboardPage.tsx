@@ -828,6 +828,18 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       case 'koreksi':
         handleOpenCorrectionModal();
         break;
+      case 'buat_soal_ai':
+        if (effectiveUser) {
+          WebTrafficService.recordFeatureVisit({
+            user_id: effectiveUser.id,
+            user_name: effectiveUser.full_name,
+            user_npp: effectiveUser.nip,
+            user_role: effectiveUser.role,
+            feature_id: 'buat_soal_ai',
+          });
+        }
+        setIsExamCreatorModalOpen(true);
+        break;
       case 'koreksi_soal':
         setIsQuestionCorrectionModalOpen(true);
         break;
@@ -6468,6 +6480,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
         onOpenSarprasModal={() => setIsSarprasModalOpen(true)}
         onOpenExamCardModal={() => setIsExamCardModalOpen(true)}
+        onOpenExamCreatorModal={() => setIsExamCreatorModalOpen(true)}
         onOpenQuestionCorrectionModal={() => setIsQuestionCorrectionModalOpen(true)}
         onOpenHomeroomModal={() => setIsHomeroomModalOpen(true)}
         onOpenAdministrationModal={() => {

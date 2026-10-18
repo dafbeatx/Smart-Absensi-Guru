@@ -61,6 +61,12 @@ const OralExamAssessmentModal = React.lazy(() =>
   }))
 );
 
+const ExamQuestionCreatorModal = React.lazy(() =>
+  import('../../guru/components/ExamQuestionCreatorModal').then((m) => ({
+    default: m.ExamQuestionCreatorModal,
+  }))
+);
+
 export interface AdminDashboardPageProps {
   onOpenScanner?: () => void;
   onSwitchToGuruView?: () => void;
@@ -73,6 +79,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false);
   const [isQuestionCorrectionModalOpen, setIsQuestionCorrectionModalOpen] = useState(false);
+  const [isExamCreatorModalOpen, setIsExamCreatorModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isExamScheduleModalOpen, setIsExamScheduleModalOpen] = useState(false);
   const [isOralExamModalOpen, setIsOralExamModalOpen] = useState(false);
@@ -720,7 +727,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               userRole={user?.role || 'ADMIN'}
               userName={user?.full_name || 'Administrator'}
               onOpenModule={(actionId) => {
-                if (actionId === 'koreksi_soal') {
+                if (actionId === 'buat_soal_ai') {
+                  if (user) {
+                    WebTrafficService.recordFeatureVisit({
+                      user_id: user.id,
+                      user_name: user.full_name,
+                      user_npp: user.nip,
+                      user_role: user.role,
+                      feature_id: 'buat_soal_ai',
+                    });
+                  }
+                  setIsExamCreatorModalOpen(true);
+                } else if (actionId === 'koreksi_soal') {
                   if (user) {
                     WebTrafficService.recordFeatureVisit({
                       user_id: user.id,
@@ -1100,6 +1118,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           <OralExamAssessmentModal
             isOpen={isOralExamModalOpen}
             onClose={() => setIsOralExamModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
+
+      {/* ✨ Modal Pembuat Soal Otomatis AI, Kunci Jawaban & Kisi-Kisi (KOP SMPT Al-Ittihadiyah) */}
+      {isExamCreatorModalOpen && user && (
+        <React.Suspense fallback={null}>
+          <ExamQuestionCreatorModal
+            isOpen={isExamCreatorModalOpen}
+            onClose={() => setIsExamCreatorModalOpen(false)}
+            currentUser={user}
+            onOpenCorrectionWithSession={(_session) => {
+              setIsExamCreatorModalOpen(false);
+              setIsQuestionCorrectionModalOpen(true);
+            }}
           />
         </React.Suspense>
       )}

@@ -60,7 +60,6 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
   // Exam Period Active & Expiration Status State
   const [examPeriodStatus, setExamPeriodStatus] = useState<ExamPeriodStatus | null>(null);
   const [isExamPeriodModalOpen, setIsExamPeriodModalOpen] = useState(false);
-  const [showArchivedExamModules, setShowArchivedExamModules] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -281,11 +280,6 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
           const isExamCat = cat.id === 'UJIAN';
           const isExamActive = examPeriodStatus ? examPeriodStatus.isActive : true;
 
-          // If exam category is not active and user is not admin, hide when not expanding archive
-          if (isExamCat && !isExamActive && userRole !== 'ADMIN' && !showArchivedExamModules) {
-            return null;
-          }
-
           const catModules = enabledModules.filter((m) => m.category === cat.id);
           if (catModules.length === 0) return null;
 
@@ -303,17 +297,23 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
                       {isExamCat && (
                         <button
                           type="button"
-                          onClick={() => setIsExamPeriodModalOpen(true)}
-                          className={`text-[9.5px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 cursor-pointer transition-all shadow-2xs ${
+                          onClick={() => {
+                            if (userRole === 'ADMIN') {
+                              setIsExamPeriodModalOpen(true);
+                            }
+                          }}
+                          className={`text-[9.5px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all shadow-2xs ${
+                            userRole === 'ADMIN' ? 'cursor-pointer' : 'cursor-default'
+                          } ${
                             isExamActive
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
                               : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                           }`}
-                          title="Klik untuk mengubah pengaturan periode masa ujian"
+                          title={userRole === 'ADMIN' ? 'Klik untuk mengubah status periode ujian' : undefined}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full ${isExamActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                          <span>{isExamActive ? 'Masa Ujian Aktif' : 'Ujian Telah Usai'}</span>
-                          <SlidersHorizontal className="w-2.5 h-2.5 ml-0.5 opacity-70" />
+                          <span>{isExamActive ? 'Masa Ujian Aktif' : 'Periode Ujian Selesai'}</span>
+                          {userRole === 'ADMIN' && <SlidersHorizontal className="w-2.5 h-2.5 ml-0.5 opacity-70" />}
                         </button>
                       )}
                     </div>
@@ -324,15 +324,6 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  {isExamCat && !isExamActive && (
-                    <button
-                      type="button"
-                      onClick={() => setShowArchivedExamModules((prev) => !prev)}
-                      className="text-[10px] font-bold px-2.5 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer transition-colors"
-                    >
-                      {showArchivedExamModules ? 'Sembunyikan' : 'Buka Arsip'}
-                    </button>
-                  )}
                   <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                     {catModules.length} Layanan
                   </span>
@@ -345,22 +336,23 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                     <span>
-                      Masa ujian telah usai. Kategori ini disimpan sebagai arsip dan disembunyikan otomatis dari guru.
+                      Masa pelaksanaan ujian telah usai. Layanan <strong>Pembuat Soal &amp; Kisi-Kisi AI</strong> dan koreksi tetap dapat Anda akses secara normal.
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsExamPeriodModalOpen(true)}
-                    className="font-bold text-[#023246] hover:underline shrink-0 cursor-pointer text-[11px]"
-                  >
-                    Atur Status
-                  </button>
+                  {userRole === 'ADMIN' && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExamPeriodModalOpen(true)}
+                      className="font-bold text-[#023246] hover:underline shrink-0 cursor-pointer text-[11px]"
+                    >
+                      Atur Status
+                    </button>
+                  )}
                 </div>
               )}
 
               {/* Module Cards Grid */}
-              {(!isExamCat || isExamActive || showArchivedExamModules || userRole === 'ADMIN') && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
                   {catModules.map((item) => (
                     <button
                       key={item.id}
@@ -411,7 +403,6 @@ export const AdministrationHubView: React.FC<AdministrationHubViewProps> = ({
                     </button>
                   ))}
                 </div>
-              )}
             </div>
           );
         })}
