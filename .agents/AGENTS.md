@@ -44,3 +44,10 @@
 
 ## Windows CLI Execution Protocol
 - Pada lingkungan Windows PowerShell di mana eksekusi script `.ps1` diblokir, selalu jalankan perintah build dan pengujian melalui shell `cmd /c "npm run build"`.
+
+## React + Vite Codebase Hygiene & Agent Token Protocol
+- **Codebase Hygiene Mandate**: Seluruh pembersihan, refactoring, audit kode mati, manajemen dependensi, effect/resource cleanup, dan optimasi bundle WAJIB mematuhi panduan di [.agents/rules/REACT_VITE_CODEBASE_HYGIENE.md](file:///c:/Smart-Absensi-Guru/.agents/rules/REACT_VITE_CODEBASE_HYGIENE.md).
+- **Prinsip Hapus Terbukti**: Hanya hapus kode, fungsi, file, atau paket yang terbukti 100% tidak diperlukan setelah memverifikasi dynamic import, konfigurasi, test, dan entry point. Kode pendek tidak selalu lebih baik.
+- **Efisiensi Token AI Agent**: Terapkan pembacaan selektif, hindari dump file besar (lockfile, bundle, node_modules) ke konteks agent, hindari repetisi aturan, dan sajikan diff atau ringkasan fokus.
+- **Larangan Destruktif**: Dilarang menghapus test demi meloloskan build, dilarang melonggarkan typecheck/lint untuk menyembunyikan error, dilarang menyentuh secrets/.env/database tanpa izin, dan dilarang menjalankan `npm audit fix --force`.
+
