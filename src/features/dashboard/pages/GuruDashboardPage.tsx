@@ -3447,7 +3447,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                         }
                         setIsTeacherBoardOpen(true);
                       }}
-                      className={`w-full min-h-[46px] px-3.5 py-2.5 rounded-2xl border text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer active:scale-[0.98] ${
+                      className={`w-full min-h-11.5 px-3.5 py-2.5 rounded-2xl border text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer active:scale-[0.98] ${
                         isTeacherBoardTourActive
                           ? 'bg-teal-50/90 border-teal-400 ring-2 ring-teal-500/70 shadow-sm'
                           : 'bg-slate-50/90 hover:bg-teal-50/70 border-slate-200/90 hover:border-teal-300 text-slate-800'
