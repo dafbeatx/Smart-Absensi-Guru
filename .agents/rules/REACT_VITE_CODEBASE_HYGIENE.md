@@ -1,193 +1,157 @@
 # React + Vite Codebase Hygiene
 
 ## Misi
-Menjaga proyek tetap ramping, mudah dipahami, efisien untuk developer dan AI agent, serta stabil saat dibangun dan dijalankan. Kurangi kompleksitas, token konteks yang terbuang, ukuran bundle, request jaringan, dan pekerjaan berulang tanpa mengorbankan fitur, keamanan, keterbacaan, atau keandalan.
+Menjaga proyek ramping, mudah dipahami, efisien bagi developer & AI agent, serta stabil saat build dan runtime. Kurangi kompleksitas, pemborosan token, ukuran bundle, dan request tanpa mengorbankan fitur, keamanan, keterbacaan, atau keandalan.
 
-**Prinsip Inti**: Hapus hanya yang terbukti tidak diperlukan. Kode pendek tidak selalu lebih baik, dan pengurangan token prompt tidak otomatis berarti performa aplikasi meningkat.
+**Prinsip Inti**: Hapus hanya yang terbukti 100% tidak diperlukan. Kode pendek tidak selalu lebih baik; pengurangan token tidak otomatis meningkatkan performa.
 
 ---
 
 ## 1. Aturan Keselamatan Sebelum Membersihkan
-1. **Baca Aturan & Konteks**: Baca `AGENTS.md`, `README.md`, dokumentasi, dan aturan repository yang relevan sebelum melakukan tindakan apapun.
-2. **Periksa Status Git**: Periksa `git status` dan perubahan yang belum di-commit. Jangan menimpa atau membuang perubahan pengguna.
-3. **Pahami Arsitektur**: Pahami struktur folder, `package.json`, lockfile, konfigurasi Vite/TypeScript/lint/test, serta entry point aplikasi.
-4. **Verifikasi Referensi Menyeluruh**: Cari semua referensi dan cara penggunaan sebelum menghapus file, export, komponen, fungsi, dependency, atau konfigurasi.
-5. **Perubahan Bertahap**: Buat perubahan bertahap, kecil, dan mudah ditinjau. Pisahkan refactor luas dari perubahan fitur bila memungkinkan.
-6. **Berdasarkan Bukti, Bukan Asumsi**: Jangan menghapus berdasarkan nama file, jumlah baris, usia kode, atau perkiraan agent saja.
-7. **Larangan Aksi Destruktif**: Jangan menjalankan perintah destruktif, menghapus database/data pengguna, mengubah secrets, atau memaksa perubahan dependency tanpa persetujuan.
-8. **Prinsip Kehati-hatian**: Jika dampak penghapusan belum jelas, pertahankan item tersebut dan laporkan sebagai kandidat untuk pemeriksaan manual.
+1. **Baca Konteks**: Baca `AGENTS.md`, `README.md`, dan aturan repository sebelum tindakan apa pun.
+2. **Cek Git**: Periksa `git status`. Jangan menimpa atau membuang perubahan pengguna.
+3. **Pahami Arsitektur**: Pahami folder, `package.json`, lockfile, konfigurasi Vite/TS/lint/test, serta entry point.
+4. **Verifikasi Referensi**: Cari semua referensi sebelum menghapus file, export, komponen, fungsi, dependency, atau konfigurasi.
+5. **Perubahan Bertahap**: Buat perubahan kecil, bertahap, dan mudah ditinjau. Pisahkan refactor dari perubahan fitur.
+6. **Berdasarkan Bukti**: Dilarang menghapus hanya berdasarkan nama file, jumlah baris, usia kode, atau tebakan agent.
+7. **Anti-Destruktif**: Dilarang menjalankan perintah destruktif, menghapus database/data pengguna, mengubah secrets, atau memaksakan dependency tanpa izin.
+8. **Prinsip Kehati-hatian**: Jika dampak belum jelas, pertahankan item dan laporkan untuk tinjauan manual.
 
 ---
 
 ## 2. Kategori yang Harus Diaudit
 
 ### A. Kode Mati dan Duplikasi
-Cari dan verifikasi:
-- Import yang tidak digunakan.
-- Variabel, fungsi, tipe, konstanta, dan export yang tidak digunakan.
-- Komponen atau hook yang tidak pernah dipakai.
-- File duplikat, helper dengan fungsi identik, dan implementasi fitur yang berulang.
-- CSS selector, class, aset, ikon, gambar, atau font yang tidak lagi direferensikan.
-- Komentar usang, blok kode yang sudah dikomentari, log debug sementara, dan TODO yang telah selesai.
-- State yang dapat dihitung dari props/state lain dan tidak perlu disimpan terpisah (*derived state*).
-- Abstraksi atau wrapper yang tidak memberi manfaat nyata.
+Verifikasi sebelum menghapus:
+- Import, variabel, fungsi, tipe, konstanta, dan export yang tidak terpakai.
+- Komponen, hook, helper duplikat, serta implementasi fitur berulang.
+- CSS selector, class, aset, ikon, gambar, atau font tak terpakai.
+- Komentar usang, dead code blocks, log debug sementara, TODO selesai.
+- State turunan (*derived state*) yang dapat dihitung langsung dari props/state lain.
+- Abstraksi atau wrapper tanpa manfaat nyata.
 
 > [!IMPORTANT]
-> Sebelum menghapus, periksa dynamic import, lazy route, registrasi plugin, file yang diakses berdasarkan string/path, konfigurasi, public assets, test, script build, serta penggunaan oleh konsumen eksternal. Tidak semua referensi terlihat melalui import biasa.
+> Selalu cek dynamic import, lazy route, plugin, path string, konfigurasi, public assets, test, script build, dan pemakaian eksternal. Referensi tidak selalu tampak via import statis.
 
 ### B. Dependensi dan Konfigurasi
-- Periksa `dependencies` langsung dan `devDependencies` yang benar-benar digunakan.
-- Cari paket yang fungsinya sudah disediakan platform modern atau dependency lain yang telah ada.
-- Gunakan alat analisis dependency yang tersedia di proyek jika cocok; perlakukan hasilnya sebagai petunjuk, bukan bukti mutlak.
-- Jangan menghapus paket yang dipakai melalui plugin, konfigurasi, CLI, script, atau tooling hanya karena tidak di-import di `src/`.
-- Jangan memperbarui semua dependency sebagai bagian dari pembersihan rutin.
-- Jangan menghapus atau membuat ulang lockfile demi "merapikan".
-- Jangan menjalankan `npm audit fix --force` sebagai jalan pintas.
-- Pertahankan versi runtime, konfigurasi Vite, alias, environment, dan toolchain kecuali ada alasan yang teruji.
+- Periksa dependensi langsung & `devDependencies` yang benar-benar aktif.
+- Identifikasi paket yang fungsinya sudah ada di web platform atau paket lain.
+- Jangan hapus paket tooling, plugin Vite, script build, atau CLI hanya karena tidak di-import di `src/`.
+- Jangan update massal dependensi saat pembersihan rutin.
+- Jangan hapus/regenerate lockfile demi sekadar merapikan.
+- Dilarang menjalankan `npm audit fix --force`.
+- Pertahankan konfigurasi Vite, TS alias, dan environment yang sudah stabil.
 
 ### C. Struktur dan Kompleksitas
-- Satukan logika yang benar-benar identik jika perubahan mengurangi duplikasi tanpa membuat abstraksi sulit dipahami.
-- Pecah komponen besar hanya saat ada batas tanggung jawab yang jelas atau manfaat pengujian/reuse yang nyata.
-- Hapus lapisan wrapper, adapter, context, hook, dan helper yang tidak memiliki alasan arsitektural.
-- Hindari membuat sistem konfigurasi generik untuk satu kasus sederhana (*over-engineering*).
-- Hindari satu file raksasa demi mengurangi jumlah file.
-- Pertahankan batas tanggung jawab yang membuat kode lebih mudah ditelusuri dan diuji.
-- Jangan mengganti nama, memindahkan, atau mengubah API publik tanpa mengecek semua konsumen dan kebutuhan kompatibilitas.
+- Satukan logika identik jika mengurangi duplikasi tanpa merusak keterbacaan.
+- Pecah komponen hanya saat ada pemisahan tanggung jawab atau reuse yang jelas.
+- Hapus adapter/wrapper/context/hook artifisial yang over-engineered.
+- Hindari membuat satu file raksasa hanya demi mengurangi jumlah file.
+- Jangan ubah API publik tanpa verifikasi seluruh konsumen.
 
 ### D. State, Effect, dan Resource
-- Cari `useEffect` yang dipakai untuk menghitung state turunan, memicu workflow yang lebih cocok berada di event handler, atau menyinkronkan state yang sama berulang kali.
-- Periksa dependency effect, cleanup function, listener, subscription, observer, timer, dan interval.
-- Cegah loop render/effect, stale closure, race condition, request ganda, dan update yang tidak lagi relevan.
-- Hindari `useMemo`, `useCallback`, dan `React.memo` yang tidak memiliki manfaat terukur atau kebutuhan stabilitas referensi.
-- Pastikan event listener, WebSocket/realtime, observer, dan subscription dilepas (*cleaned up*) saat unmount atau tidak lagi diperlukan.
-- Hindari polling agresif. Pilih mekanisme update yang sesuai dengan kebutuhan dan backend.
-- Jangan menghapus cleanup yang penting hanya untuk mengurangi jumlah baris.
+- Hindari `useEffect` untuk derived state atau logic yang lebih tepat di event handler.
+- Pastikan cleanup listener, timer, subscription, WebSocket, dan observer selalu dilepas saat unmount.
+- Cegah loop render, stale closure, race condition, dan request ganda.
+- Hindari `useMemo`/`useCallback` tanpa kebutuhan stabilitas referensi terukur.
+- Hindari polling agresif; pilih mekanisme update sesuai kebutuhan backend.
 
 ### E. Network dan Data
-- Cari request duplikat, polling berlebihan, payload besar, query yang mengambil terlalu banyak kolom, serta pola N+1.
-- Periksa apakah beberapa komponen mengambil data yang sama tanpa koordinasi atau caching yang sudah tersedia.
-- Gunakan pagination, filtering, debounce, caching, atau lazy loading ketika sesuai dengan pola dan kebutuhan aplikasi.
-- Jangan menambahkan caching tanpa aturan invalidasi yang benar.
-- Jangan menghapus validasi, otorisasi, penanganan error, atau audit log yang diperlukan demi mengurangi kode.
-- Jangan mengubah kontrak API, skema database, atau kebijakan akses sebagai efek samping pembersihan.
-- Jangan mencatat token, password, data sensitif, atau respons privat ke log (*zero data leak*).
+- Eliminasi request duplikat, polling berlebih, payload raksasa, dan query N+1.
+- Gunakan debounce, pagination, filtering, atau caching dengan invalidasi yang tepat.
+- Jangan hapus validasi, otorisasi, error handling, atau audit log demi memendekkan kode.
+- Jangan ubah kontrak API atau skema database sebagai efek samping pembersihan.
+- **Zero Leak**: Dilarang mencatat token, password, atau data sensitif ke console/log.
 
-### F. Aset dan Frontend Performance
-- Cari gambar yang tidak digunakan, aset duplikat, file sumber besar yang ikut masuk build tanpa alasan, dan font yang tidak terpakai.
-- Optimalkan ukuran/format gambar dan gunakan lazy loading untuk konten di luar viewport jika sesuai.
-- Periksa dynamic import dan code splitting pada route/fitur besar.
-- Hindari dependency UI berat untuk satu ikon atau fungsi kecil jika alternatif yang sudah tersedia memadai.
-- Audit CSS yang tidak terpakai dengan memperhatikan class dinamis, CSS Modules, Tailwind, dan pemakaian dari file yang tidak terdeteksi alat.
-- Jangan menghapus CSS hanya karena tidak ditemukan sebagai string literal; class dapat dibentuk secara dinamis atau dipakai dari template.
-- Jangan melakukan optimasi sebelum ada indikasi yang jelas, terutama bila perubahan menambah kompleksitas.
+### F. Aset dan Performa Frontend
+- Audit gambar tak terpakai, aset duplikat, dan font berlebih.
+- Terapkan lazy loading & format modern (WebP/AVIF) untuk gambar di luar viewport.
+- Periksa route code splitting & dynamic import pada modal/fitur besar.
+- Waspadai dynamic CSS class pada Tailwind/CSS modules sebelum menghapus selector.
+- Hindari optimasi dini yang menambah kompleksitas tanpa metrik jelas.
 
 ---
 
 ## 3. Mengurangi Pemborosan Token AI
-Token konteks AI berbeda dari performa runtime aplikasi. Terapkan aturan berikut agar agent tidak membaca, menghasilkan, atau mengulang informasi yang tidak diperlukan:
-- **Baca Selektif**: Baca hanya file dan bagian yang relevan terlebih dahulu; perluas pemeriksaan jika ada dependensi atau risiko yang ditemukan.
-- **Pencarian Tertarget**: Gunakan pencarian simbol, import, route, dan referensi untuk menemukan lokasi kode sebelum membuka banyak file.
-- **Hindari Dump Besar**: Jangan menyalin seluruh repository, file lock, output build, `node_modules`, source map, atau file minified ke konteks tanpa kebutuhan spesifik.
-- **Rujuk, Jangan Duplikasi**: Jangan mengulang isi `AGENTS.md` atau dokumentasi yang sudah dipahami; simpan aturan permanen di satu sumber yang jelas dan rujuk seperlunya.
-- **Cegah Aturan Tumpang Tindih**: Hindari membuat banyak file aturan yang isinya tumpang tindih atau saling bertentangan.
-- **Ringkasan Kerja Terfokus**: Gunakan ringkasan kerja singkat yang berisi tujuan, keputusan, file relevan, hasil test, dan pekerjaan yang tersisa.
-- **Gunakan Diff / Slice**: Jangan mengeluarkan ulang file penuh jika cukup memberi diff atau bagian yang berubah.
-- **Dokumentasi Efisien**: Jangan menghasilkan dokumentasi panjang untuk perubahan kecil. Dokumentasikan keputusan yang memengaruhi pemeliharaan, kontrak, keamanan, atau operasi.
-- **Komentar Bermakna**: Hindari komentar yang hanya menerjemahkan kode baris demi baris. Pertahankan komentar yang menjelaskan alasan, batasan, atau perilaku tidak jelas.
-- **Filter Log Output**: Jangan menampilkan output terminal yang sangat panjang jika ringkasan dan bagian error sudah cukup.
-- **Verifikasi Efektif**: Gunakan output test, lint, dan build secara selektif; jangan mengulang pemeriksaan yang sama tanpa perubahan kode atau alasan baru.
-- **Rencana Proporsional**: Hindari rencana panjang untuk perubahan kecil. Buat rencana sesuai kompleksitas dan risiko.
-- **Hindari Boilerplate Buatan**: Jangan membuat helper, abstraksi, dokumen, atau test duplikat hanya untuk memenuhi checklist secara mekanis.
-- **Pertahankan Konteks Kunci**: Jangan menghapus konteks penting yang diperlukan agent berikutnya demi membuat prompt tampak pendek.
-
-### Aturan untuk Konteks Repository
-Jika proyek menggunakan file instruksi agent:
-- Simpan aturan lintas proyek yang benar-benar penting di satu file utama yang mudah ditemukan (`AGENTS.md`).
-- Pecah instruksi per direktori hanya jika aturan lokal berbeda secara material.
-- Hindari menaruh salinan lengkap aturan global di banyak file.
-- Buat dokumentasi arsitektur singkat: struktur inti, sumber kebenaran data, cara menjalankan test/build, dan batasan berisiko tinggi.
-- Jangan menambahkan instruksi yang hanya menyatakan hal umum tanpa memengaruhi keputusan agent.
-- Jangan menyimpan rahasia, token, kredensial, data pribadi, atau dump lingkungan dalam dokumentasi maupun konteks agent.
+- **Baca Selektif**: Buka hanya file dan line range relevan; gunakan grep/symbol search sebelum membuka banyak file.
+- **Hindari Dump Besar**: Dilarang memasukkan lockfile, node_modules, build bundle, atau file minified ke konteks prompt.
+- **Rujuk, Jangan Duplikasi**: Rujuk aturan `AGENTS.md` daripada menyalin ulang seluruh teksnya.
+- **Diff Fokus**: Tampilkan diff atau potongan kode esensial, bukan file utuh ribuan baris.
+- **Log Ringkas**: Tampilkan ringkasan error atau status terminal, bukan ribuan baris log mentah.
+- **Komentar Bermakna**: Jangan tulis komentar yang hanya menarasikan ulang kode. Jelaskan *mengapa*, batasan, atau konteks tak terduga.
+- **Rencana Proporsional**: Sesuaikan panjang rencana dengan risiko dan kompleksitas tugas.
+- **Simpan Aturan di Satu Sumber**: Hindari membuat banyak file aturan lokal yang tumpang tindih.
 
 ---
 
-## 4. Strategi Audit yang Aman
-Lakukan audit dengan urutan berikut:
-1. **Baseline**: Periksa status Git, script proyek, test, lint, typecheck, dan build yang tersedia.
-2. **Inventory**: Identifikasi kandidat kode mati, duplikasi, dependency berlebih, request ganda, resource yang tidak dibersihkan, dan konteks yang berulang.
-3. **Evidence**: Cari referensi, import, route, konfigurasi, script, test, dan pemakaian dinamis.
-4. **Prioritize**: Dahulukan item yang manfaatnya jelas, risikonya rendah, dan mudah diverifikasi.
-5. **Change**: Hapus atau sederhanakan satu kelompok kecil dalam satu waktu.
-6. **Verify**: Jalankan pemeriksaan relevan setelah setiap kelompok perubahan.
-7. **Review**: Tinjau diff, perilaku aplikasi, bundle/network jika alat tersedia, serta perubahan yang tidak disengaja.
-8. **Report**: Laporkan apa yang dibersihkan, manfaat yang terbukti, item yang belum aman dihapus, dan pemeriksaan yang benar-benar dijalankan.
-
-> [!NOTE]
-> Jika baseline sudah gagal, catat kegagalan awal agar tidak diklaim sebagai regresi baru tanpa bukti.
+## 4. Strategi Audit 8 Langkah
+1. **Baseline**: Cek status Git, script proyek, test, lint, dan build awal.
+2. **Inventory**: Petakan kandidat kode mati, duplikasi, dependensi, dan resource leak.
+3. **Evidence**: Cari bukti penggunaan via referensi, routes, konfigurasi, dan tests.
+4. **Prioritize**: Dahulukan yang manfaatnya tinggi dan risikonya rendah.
+5. **Change**: Ubah dalam batch kecil yang terisolasi.
+6. **Verify**: Jalankan test dan build setelah setiap kelompok perubahan.
+7. **Review**: Periksa diff untuk mencegah perubahan tidak disengaja.
+8. **Report**: Laporkan item yang dibersihkan, bukti verifikasi, dan apa yang dipertahankan.
 
 ---
 
-## 5. Cara Menentukan Prioritas
-Prioritaskan:
-1. **Bug Nyata**: Infinite loop, request berulang, memory leak, dan crash.
-2. **Kode Mati Terverifikasi**: Yang telah diverifikasi 100% tidak digunakan di mana pun.
-3. **Duplikasi Berulang**: Duplikasi yang membuat perbaikan bug harus dilakukan berkali-kali.
-4. **Aset & Dependency Berlebih**: Yang terbukti tidak terpakai dan membebani bundle.
-5. **Query / Payload Boros**: Yang terukur memperlambat jaringan atau membebani database.
-6. **Kompleksitas Penghambat**: Abstraksi rumit yang benar-benar menghambat pemeliharaan.
-7. **Konteks AI yang Boros**: Pengurangan konteks dan dokumentasi berulang yang menghabiskan token prompt.
+## 5. Skala Prioritas
+1. **Bug Nyata**: Infinite loop, request ganda, memory leak, crash.
+2. **Kode Mati Terverifikasi**: Yang 100% terbukti tidak dipakai.
+3. **Duplikasi Kritis**: Logika ganda yang memicu bug berulang.
+4. **Aset & Paket Berat**: Yang membebani ukuran bundle tanpa dipakai.
+5. **Query / Payload Boros**: Yang terbukti memperlambat respon.
+6. **Kompleksitas Penghambat**: Abstraksi rumit yang menyulitkan perbaikan.
+7. **Konteks AI**: Reduksi token prompt dan dokumen berulang.
 
-*Jangan mengejar jumlah baris kode yang dihapus. Ukur keberhasilan berdasarkan kompleksitas yang berkurang, perilaku yang tetap benar, risiko yang turun, serta manfaat yang dapat dibuktikan.*
+*Ukur keberhasilan dari kompleksitas yang turun dan kestabilan sistem, bukan sekadar jumlah baris yang dihapus.*
 
 ---
 
-## 6. Pemeriksaan Setelah Pembersihan
-Jalankan script yang benar-benar ada di `package.json`:
-- Test unit / integration yang relevan (`npm test`).
-- Lint / Typecheck (`tsc -b`).
-- Production build (`npm run build`).
-- Pemeriksaan route, navigasi, autentikasi, form, dan alur data yang terdampak.
-- Pemeriksaan console / network dan request berulang jika alat tersedia.
-- Pemeriksaan responsivitas jika UI berubah (termasuk standar Mobile Infinix Note 8).
-- Perbandingan bundle atau aset sebelum/sesudah jika tersedia dan relevan.
+## 6. Pemeriksaan Pasca-Pembersihan
+Wajib jalankan script proyek yang relevan:
+- Unit / Integration Test: `cmd /c "npm test"`
+- Lint & Typecheck: `tsc -b`
+- Production Build: `cmd /c "npm run build"`
+- Verifikasi rute, auth, dan form yang terdampak.
+- Verifikasi responsivitas mobile (Infinix Note 8 viewport).
 
 > [!CAUTION]
-> Jangan menyatakan pemeriksaan lulus jika tidak dijalankan. Jangan mengarang angka penghematan token, ukuran bundle, waktu muat, atau penggunaan memori. Jika tidak diukur, nyatakan bahwa manfaatnya masih berupa perkiraan atau belum diverifikasi.
+> Dilarang mengklaim hasil lulus tanpa benar-benar menjalankannya. Dilarang mengarang angka metrik tanpa pengukuran nyata.
 
 ---
 
 ## 7. Larangan Keras
-- **Dilarang** menghapus file hanya karena terlihat tidak dipakai tanpa pembuktian referensi.
-- **Dilarang** membersihkan seluruh proyek secara massal tanpa inventaris dan verifikasi.
-- **Dilarang** menghapus test untuk membuat build hijau.
-- **Dilarang** menonaktifkan lint, TypeScript strictness, atau pemeriksaan keamanan untuk menghilangkan error.
-- **Dilarang** menghapus validasi, permission check, error handling, logging penting, atau cleanup yang dibutuhkan.
-- **Dilarang** menambahkan dependency baru untuk pekerjaan pembersihan sederhana tanpa alasan kuat.
-- **Dilarang** menjalankan format otomatis pada seluruh repository jika hanya beberapa file yang perlu berubah.
-- **Dilarang** mengubah desain atau fitur yang tidak berkaitan dengan pembersihan.
-- **Dilarang** menyentuh `.env`, secrets, database, data pengguna, atau konfigurasi produksi tanpa kebutuhan dan izin.
-- **Dilarang** mengklaim kode sudah bersih seluruhnya; audit selalu bergantung pada cakupan dan bukti yang tersedia.
+- Dilarang menghapus file hanya karena sekilas tampak tidak dipakai.
+- Dilarang pembersihan massal tanpa inventaris dan verifikasi referensi.
+- Dilarang menghapus test agar build lulus.
+- Dilarang mematikan lint / TypeScript strictness demi menghilangkan error.
+- Dilarang menghapus validasi, izin, error handling, atau cleanup penting.
+- Dilarang menambah dependency baru untuk tugas pembersihan sederhana.
+- Dilarang auto-format seluruh repo jika hanya beberapa baris yang diubah.
+- Dilarang menyentuh `.env`, database, secrets, atau data pengguna tanpa izin.
+- Dilarang mengklaim kode 100% bersih tanpa bukti cakupan audit.
 
 ---
 
 ## 8. Format Laporan Akhir
 Laporkan secara ringkas:
-- **Yang Dibersihkan**: File, fungsi, dependency, aset, effect, atau request yang diubah.
-- **Alasan & Bukti**: Bukti bahwa item tersebut tidak diperlukan atau menimbulkan masalah.
-- **Manfaat Nyata**: Hasil yang benar-benar diukur (misal build lulus, bundle berkurang, atau request turun). Jika tidak diukur, jangan membuat klaim kuantitatif.
-- **Verifikasi**: Perintah yang dijalankan (`npm test`, `npm run build`) dan hasilnya.
-- **Yang Dipertahankan**: Kandidat yang tidak dihapus karena masih memiliki referensi atau risiko.
-- **Risiko / Tindak Lanjut**: Hanya temuan nyata yang belum diselesaikan.
+- **Dibersihkan**: File, fungsi, aset, atau dependensi yang diubah.
+- **Alasan & Bukti**: Bukti konkret ketiadaan referensi atau masalah performa.
+- **Manfaat Nyata**: Metrik terukur (misal test lulus, bundle mengecil).
+- **Verifikasi**: Perintah yang dijalankan dan status exit code.
+- **Dipertahankan**: Item yang ditunda karena masih berisiko / berelasi.
+- **Tindak Lanjut**: Temuan nyata yang butuh konfirmasi.
 
 ---
 
 ## Checklist Akhir
-- [ ] Aturan proyek dan status Git sudah diperiksa.
-- [ ] Kandidat yang dihapus sudah diverifikasi referensi dan penggunaannya.
-- [ ] Tidak ada perubahan pengguna yang tertimpa.
-- [ ] Tidak ada kontrak, izin, validasi, atau cleanup penting yang hilang.
-- [ ] Request, effect, listener, dan resource yang relevan sudah ditinjau.
-- [ ] Pengurangan konteks AI tidak menghilangkan informasi penting.
-- [ ] Test, lint, typecheck, dan build yang tersedia sudah dijalankan atau keterbatasannya dicatat.
-- [ ] Diff hanya berisi perubahan yang relevan.
-- [ ] Tidak ada klaim penghematan yang tidak didukung bukti.
+- [ ] Aturan proyek & status Git diperiksa.
+- [ ] Seluruh kandidat hapus terbukti bebas referensi (termasuk dynamic & config).
+- [ ] Tidak ada perubahan pengguna yang terhapus / tertimpa.
+- [ ] Validasi, izin, error handling, dan cleanup tetap utuh.
+- [ ] Efek samping, listener, dan subscription sudah diverifikasi.
+- [ ] Test (`npm test`), typecheck, dan build (`npm run build`) lulus 100%.
+- [ ] Diff terfokus hanya pada item pembersihan.
+- [ ] Tidak ada klaim metrik tanpa bukti empiris.
