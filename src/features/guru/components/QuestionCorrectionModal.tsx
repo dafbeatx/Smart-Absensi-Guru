@@ -70,6 +70,12 @@ import { SemesterGradingExcelService } from '../../../services/semester-grading-
 import { DownloadOfficialGradingModal } from './DownloadOfficialGradingModal';
 import { UniversalExcelImportModal } from './UniversalExcelImportModal';
 
+const ExamQuestionCreatorModal = React.lazy(() =>
+  import('./ExamQuestionCreatorModal').then((m) => ({
+    default: m.ExamQuestionCreatorModal,
+  }))
+);
+
 export type ModalLoadState =
   | 'IDLE'
   | 'LOADING_SESSIONS'
@@ -158,6 +164,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const [sessionClassFilter, setSessionClassFilter] = useState<string>('ALL');
   const [sessionStatusFilter, setSessionStatusFilter] = useState<'ALL' | 'WITH_KEY' | 'WITHOUT_KEY'>('ALL');
+  const [isExamAiCreatorOpen, setIsExamAiCreatorOpen] = useState(false);
   const [sessionYearFilter, setSessionYearFilter] = useState<string>('ALL');
   const [sessionSubjectFilter, setSessionSubjectFilter] = useState<string>('ALL');
 
@@ -1997,6 +2004,16 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span className="hidden sm:inline">Format Penilaian</span>
               <span>Blanko (.xlsx)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsExamAiCreatorOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-linear-to-r from-teal-700 to-[#023246] hover:brightness-110 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-xs shrink-0 min-h-9 cursor-pointer"
+              title="Buat naskah soal resmi, kunci jawaban otomatis, dan kisi-kisi dengan AI"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Buat Soal AI</span>
             </button>
 
             <button
@@ -4617,6 +4634,23 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         currentUser={currentUser}
         onSuccess={handleUniversalExcelSuccess}
       />
+
+      {/* Modal Pembuat Soal Otomatis AI, Kunci Jawaban & Kisi-Kisi */}
+      {isExamAiCreatorOpen && (
+        <React.Suspense fallback={null}>
+          <ExamQuestionCreatorModal
+            isOpen={isExamAiCreatorOpen}
+            onClose={() => setIsExamAiCreatorOpen(false)}
+            currentUser={currentUser}
+            onOpenCorrectionWithSession={async (newSession) => {
+              setIsExamAiCreatorOpen(false);
+              await loadSessions();
+              await handleSelectSession(newSession);
+              setActiveTab('recap');
+            }}
+          />
+        </React.Suspense>
+      )}
     </div>,
     document.body
   );

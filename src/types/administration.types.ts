@@ -49,6 +49,18 @@ export const AVAILABLE_ACADEMIC_YEARS: AcademicYearOption[] = [
 export const DEFAULT_ADMINISTRATION_MODULES: AdministrationModuleItem[] = [
   // --- KATEGORI: UJIAN & EVALUASI ---
   {
+    id: 'exam_ai_creator',
+    title: 'Pembuat Soal & Kisi-Kisi AI',
+    category: 'UJIAN',
+    description: 'Generator naskah soal otomatis (KOP SMPT Al-Ittihadiyah), kunci jawaban, dan kisi-kisi terintegrasi koreksi',
+    icon: '✨',
+    colorClass: 'from-teal-700 to-emerald-900',
+    badge: 'AI Otomatis',
+    actionId: 'buat_soal_ai',
+    isEnabled: true,
+    order: 1,
+  },
+  {
     id: 'exam_correction',
     title: 'Koreksi Lembar Ujian',
     category: 'UJIAN',
@@ -58,7 +70,7 @@ export const DEFAULT_ADMINISTRATION_MODULES: AdministrationModuleItem[] = [
     badge: 'Ujian',
     actionId: 'koreksi_soal',
     isEnabled: true,
-    order: 1,
+    order: 2,
   },
   {
     id: 'exam_cards',

@@ -158,6 +158,12 @@ const TeacherDailyBoardModal = React.lazy(() =>
     default: m.TeacherDailyBoardModal,
   }))
 );
+
+const ExamQuestionCreatorModal = React.lazy(() =>
+  import('../../guru/components/ExamQuestionCreatorModal').then((m) => ({
+    default: m.ExamQuestionCreatorModal,
+  }))
+);
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import { normalizeDayOfWeek } from '../../../utils/teaching-schedule.utils';
 import {
@@ -468,6 +474,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isEventsCalendarModalOpen, setIsEventsCalendarModalOpen] = useState(false);
   const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
   const [isTeacherBoardOpen, setIsTeacherBoardOpen] = useState(false);
+  const [isExamCreatorModalOpen, setIsExamCreatorModalOpen] = useState(false);
   const [isTeacherBoardTourActive, setIsTeacherBoardTourActive] = useState<boolean>(() => {
     try {
       if (typeof window === 'undefined') return false;
@@ -6533,6 +6540,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onOpenModule={(actionId) => {
           setIsAdministrationModalOpen(false);
           switch (actionId) {
+            case 'buat_soal_ai':
+              setIsExamCreatorModalOpen(true);
+              break;
             case 'koreksi_soal':
               setIsQuestionCorrectionModalOpen(true);
               break;
@@ -6744,6 +6754,20 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         onClose={handleCloseQuestionCorrectionModal}
         currentUser={effectiveUser}
       />
+
+      {/* ✨ Modal Pembuat Soal Otomatis AI, Kunci Jawaban & Kisi-Kisi (KOP SMPT Al-Ittihadiyah) */}
+      {isExamCreatorModalOpen && (
+        <React.Suspense fallback={null}>
+          <ExamQuestionCreatorModal
+            isOpen={isExamCreatorModalOpen}
+            onClose={() => setIsExamCreatorModalOpen(false)}
+            currentUser={effectiveUser}
+            onOpenCorrectionWithSession={(_session) => {
+              setIsQuestionCorrectionModalOpen(true);
+            }}
+          />
+        </React.Suspense>
+      )}
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
       <OfflineSyncIndicator />
