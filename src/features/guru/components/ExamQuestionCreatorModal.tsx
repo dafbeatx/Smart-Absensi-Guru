@@ -208,40 +208,56 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 md:p-4 md:backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full h-dvh md:h-auto md:max-h-[92vh] md:max-w-4xl bg-white md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Header Modal */}
-        <div className="bg-[#023246] text-white p-3.5 sm:p-4.5 px-4 sm:px-6 flex items-center justify-between shrink-0 sticky top-0 z-20 pt-[max(12px,env(safe-area-inset-top))]">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-linear-to-br from-teal-400 to-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-xs shrink-0">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-extrabold text-sm sm:text-base tracking-tight leading-tight">
-                  Pembuat Soal &amp; Kisi-Kisi AI
-                </h3>
-                <span className="px-2 py-0.5 rounded-full bg-teal-400/25 text-teal-200 border border-teal-300/30 text-[9.5px] font-black uppercase tracking-wider">
-                  KOP SMPT Al-Ittihadiyah
-                </span>
-              </div>
-              <p className="text-[11px] text-cyan-100/80 mt-0.5 truncate">
-                Otomatis naskah soal, kunci jawaban &amp; kisi-kisi terintegrasi koreksi lembar ujian
-              </p>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 w-full h-dvh bg-slate-100 flex flex-col overflow-hidden animate-in fade-in duration-150">
+      {/* Full-width Workspace Top Navigation */}
+      <header className="bg-[#023246] text-white px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between shrink-0 sticky top-0 z-30 shadow-md border-b border-teal-900/50 pt-[max(10px,env(safe-area-inset-top))]">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Tutup Modal"
+            className="h-9 sm:h-10 px-2.5 sm:px-3.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-white/15 shrink-0"
+            title="Kembali ke Dashboard / Administrasi"
           >
-            <X className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Kembali</span>
           </button>
+          <div className="h-5 w-px bg-white/20 hidden sm:block" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-linear-to-br from-teal-400 to-emerald-500 text-slate-950 flex items-center justify-center font-black shadow-xs shrink-0">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="font-extrabold text-sm sm:text-base lg:text-lg tracking-tight leading-tight truncate">
+                  Pembuat Soal &amp; Kisi-Kisi AI
+                </h1>
+                <span className="px-2 py-0.5 rounded-full bg-teal-400/25 text-teal-200 border border-teal-300/30 text-[9.5px] font-black uppercase tracking-wider hidden sm:inline-block">
+                  KOP SMPT Al-Ittihadiyah
+                </span>
+              </div>
+              <p className="text-[11px] text-cyan-100/80 mt-0.5 truncate hidden sm:block">
+                Otomatis naskah soal resmi, kunci jawaban &amp; kisi-kisi terintegrasi koreksi lembar ujian
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Step Indicator */}
-        <div className="bg-slate-100 border-b border-slate-200 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-3 rounded-xl text-white/80 hover:text-white hover:bg-white/10 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-transparent hover:border-white/15"
+            title="Tutup Workspace"
+          >
+            <X className="w-4 h-4" />
+            <span className="hidden sm:inline">Tutup</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Step Progress Tracker */}
+      <div className="bg-white border-b border-slate-200/90 px-3.5 sm:px-6 lg:px-8 py-2.5 shrink-0 shadow-2xs">
+        <div className="max-w-4xl mx-auto w-full flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <span
               className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
@@ -254,7 +270,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
               Parameter Ujian
             </span>
           </div>
-          <div className="h-0.5 w-8 bg-slate-300 hidden sm:block"></div>
+          <div className="h-0.5 w-10 sm:w-16 bg-slate-200"></div>
           <div className="flex items-center gap-2">
             <span
               className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
@@ -271,7 +287,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
               Input Materi / Draft Soal
             </span>
           </div>
-          <div className="h-0.5 w-8 bg-slate-300 hidden sm:block"></div>
+          <div className="h-0.5 w-10 sm:w-16 bg-slate-200"></div>
           <div className="flex items-center gap-2">
             <span
               className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
@@ -285,9 +301,11 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
             </span>
           </div>
         </div>
+      </div>
 
-        {/* Modal Body Container */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/50 space-y-5">
+      {/* Full-width Workspace Scroll Canvas */}
+      <main className="flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-6 lg:p-8 bg-slate-100/70 custom-scrollbar space-y-6">
+        <div className="max-w-4xl mx-auto w-full space-y-5">
           {/* ═══════════════════════════════════════════════════════════ */}
           {/* LANGKAH 1: PARAMETER UJIAN                                 */}
           {/* ═══════════════════════════════════════════════════════════ */}
@@ -856,9 +874,11 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
             </div>
           )}
         </div>
+      </main>
 
-        {/* Modal Action Bar (Footer) */}
-        <div className="p-3.5 sm:p-4 bg-white border-t border-slate-200 flex items-center justify-between gap-2 flex-wrap shrink-0">
+      {/* Sticky Bottom Action Bar */}
+      <footer className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3.5 sm:px-6 lg:px-8 py-3 pb-[max(12px,env(safe-area-inset-bottom))] shrink-0 z-30 shadow-lg">
+        <div className="max-w-4xl mx-auto w-full flex items-center justify-between gap-3 flex-wrap">
           {step === 'PARAMS' && (
             <>
               <button
@@ -965,7 +985,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
             </>
           )}
         </div>
-      </div>
+      </footer>
     </div>
   );
 };
