@@ -91,6 +91,9 @@ import {
   Coffee,
   NotebookPen,
   SlidersHorizontal,
+  Users,
+  ChevronDown,
+  X,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -465,6 +468,38 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isEventsCalendarModalOpen, setIsEventsCalendarModalOpen] = useState(false);
   const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
   const [isTeacherBoardOpen, setIsTeacherBoardOpen] = useState(false);
+  const [isTeacherBoardTourActive, setIsTeacherBoardTourActive] = useState<boolean>(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return localStorage.getItem('smart_absensi_tour_teacher_board_seen') !== 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissTeacherBoardTour = useCallback(() => {
+    setIsTeacherBoardTourActive(false);
+    try {
+      localStorage.setItem('smart_absensi_tour_teacher_board_seen', 'true');
+    } catch {}
+  }, []);
+
+  const handleOpenTeacherBoardFromTour = useCallback(() => {
+    handleDismissTeacherBoardTour();
+    setIsTeacherBoardOpen(true);
+  }, [handleDismissTeacherBoardTour]);
+
+  // Auto-scroll / langsung mengarahkan pandangan guru ke tombol Papan Presensi di card Log Presensi Hari Ini
+  useEffect(() => {
+    if (!isTeacherBoardTourActive) return;
+    const timer = setTimeout(() => {
+      const el = document.getElementById('tour-teacher-daily-board-entry');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [isTeacherBoardTourActive]);
   const [isHomeroomModalOpen, setIsHomeroomModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isStudentKioskOpen, setIsStudentKioskOpen] = useState(false);
@@ -3344,6 +3379,110 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     >
                       <QrCode className="w-4 h-4 text-teal-700 shrink-0" />
                       <span>Scan QR</span>
+                    </button>
+                  </div>
+
+                  {/* 👥 Papan Presensi Semua Guru Hari Ini & Non-Popup Direct Tour */}
+                  <div id="tour-teacher-daily-board-entry" className="space-y-2 pt-0.5">
+                    {/* Non-Popup Direct Guidance Coachmark (Hanya jika belum pernah dilihat) */}
+                    {isTeacherBoardTourActive && (
+                      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#023246] via-[#18536B] to-teal-800 p-3.5 text-white shadow-md border border-teal-400/40 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-400/25 text-teal-200 border border-teal-300/40 text-[10px] font-black uppercase tracking-wider">
+                            <Sparkles className="w-3 h-3 text-amber-300" />
+                            <span>Fitur Baru Presensi</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleDismissTeacherBoardTour}
+                            className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Tutup petunjuk"
+                            aria-label="Tutup petunjuk"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-1">
+                          <h5 className="text-xs sm:text-sm font-black text-white leading-snug">
+                            Pantau Kehadiran Rekan Guru Hari Ini
+                          </h5>
+                          <p className="text-[11px] text-teal-100/90 leading-relaxed">
+                            Bapak/Ibu Guru sekarang dapat langsung melihat status kehadiran seluruh rekan guru (datang, pulang, atau izin) secara real-time di tombol berikut:
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-white/15">
+                          <button
+                            type="button"
+                            onClick={handleOpenTeacherBoardFromTour}
+                            className="h-8.5 px-3 rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-black text-xs inline-flex items-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer"
+                          >
+                            <span>Buka Sekarang</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDismissTeacherBoardTour}
+                            className="h-8.5 px-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] transition-all active:scale-95 cursor-pointer"
+                          >
+                            Mengerti ✓
+                          </button>
+                        </div>
+
+                        {/* Panah animasi mengarah langsung ke tombol di bawahnya */}
+                        <div className="flex justify-center -mb-2 mt-0.5">
+                          <ChevronDown className="w-4 h-4 text-teal-200 animate-bounce" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tombol Papan Presensi Semua Guru */}
+                    <button
+                      type="button"
+                      id="btn-teacher-daily-board"
+                      onClick={() => {
+                        if (isTeacherBoardTourActive) {
+                          handleDismissTeacherBoardTour();
+                        }
+                        setIsTeacherBoardOpen(true);
+                      }}
+                      className={`w-full min-h-[46px] px-3.5 py-2.5 rounded-2xl border text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer active:scale-[0.98] ${
+                        isTeacherBoardTourActive
+                          ? 'bg-teal-50/90 border-teal-400 ring-2 ring-teal-500/70 shadow-sm'
+                          : 'bg-slate-50/90 hover:bg-teal-50/70 border-slate-200/90 hover:border-teal-300 text-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-colors ${
+                          isTeacherBoardTourActive ? 'bg-teal-700 text-white' : 'bg-teal-600 text-white'
+                        }`}>
+                          <Users className="w-4.5 h-4.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-black text-slate-900 tracking-tight">
+                              Papan Presensi Semua Guru
+                            </span>
+                            {isTeacherBoardTourActive ? (
+                              <span className="px-1.5 py-0.2 rounded-md bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wide shadow-2xs animate-pulse">
+                                Baru ✨
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.2 rounded-md bg-teal-100 text-teal-800 font-extrabold text-[9px] uppercase tracking-wide border border-teal-200/80">
+                                Hadir • Pulang • Izin
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10.5px] text-slate-500 font-medium truncate mt-0.5">
+                            Lihat rekan yang sudah hadir, pulang, atau izin hari ini
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-teal-800 shrink-0 font-bold text-xs pl-1">
+                        <span className="hidden sm:inline">Buka</span>
+                        <ChevronRight className="w-4 h-4 text-teal-600" />
+                      </div>
                     </button>
                   </div>
 
@@ -6334,6 +6473,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }}
         onOpenTeacherBoard={() => {
           setIsMoreFeaturesModalOpen(false);
+          if (isTeacherBoardTourActive) {
+            handleDismissTeacherBoardTour();
+          }
           setIsTeacherBoardOpen(true);
         }}
       />
