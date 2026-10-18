@@ -69,6 +69,7 @@ import { isSemesterMatch } from '../../../services/grademaster-sync.service';
 import { SemesterGradingExcelService } from '../../../services/semester-grading-excel.service';
 import { DownloadOfficialGradingModal } from './DownloadOfficialGradingModal';
 import { UniversalExcelImportModal } from './UniversalExcelImportModal';
+import { QuestionCorrectionMobileView } from './QuestionCorrectionMobileView';
 
 const ExamQuestionCreatorModal = React.lazy(() =>
   import('./ExamQuestionCreatorModal').then((m) => ({
@@ -112,6 +113,23 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
   // Navigation active tab: 'sessions' | 'grading' | 'recap' | 'grademaster_web'
   const [activeTab, setActiveTab] = useState<'sessions' | 'grading' | 'recap' | 'grademaster_web'>('sessions');
+
+  // View mode switcher: 'DESKTOP' vs 'MOBILE' (Khusus Tampilan Guru)
+  const [viewMode, setViewMode] = useState<'DESKTOP' | 'MOBILE'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smart_absensi_correction_view_mode');
+      if (saved === 'DESKTOP' || saved === 'MOBILE') return saved;
+      return window.innerWidth < 1024 ? 'MOBILE' : 'DESKTOP';
+    }
+    return 'DESKTOP';
+  });
+
+  const handleSetViewMode = (mode: 'DESKTOP' | 'MOBILE') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smart_absensi_correction_view_mode', mode);
+    }
+  };
 
   const gradeMasterUrl = useMemo(() => {
     const teacher = encodeURIComponent(currentUser?.full_name || 'Guru');
@@ -1819,6 +1837,106 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
     );
   }
 
+  if (viewMode === 'MOBILE') {
+    return createPortal(
+      <>
+        <QuestionCorrectionMobileView
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          sessions={filteredSessions}
+          activeSession={activeSession}
+          onSelectSession={handleSelectSession}
+          onClose={onClose}
+          viewMode={viewMode}
+          setViewMode={handleSetViewMode}
+          sessionSearchQuery={sessionSearchQuery}
+          setSessionSearchQuery={setSessionSearchQuery}
+          sessionClassFilter={sessionClassFilter}
+          setSessionClassFilter={setSessionClassFilter}
+          availableClasses={availableClasses}
+          classStudents={classStudents}
+          allClassStudents={allClassStudents}
+          gradedStudents={gradedStudents}
+          selectedStudentName={selectedStudentName}
+          selectedStudentUserId={selectedStudentUserId}
+          onSelectStudent={handleSelectStudent}
+          userAnswers={userAnswers}
+          onAnswerSelect={handleAnswerSelect}
+          essayScores={essayScores}
+          setEssayScores={setEssayScores}
+          manualScore={manualScore}
+          onManualScoreChange={handleManualScoreChange}
+          onCancelManualScore={handleCancelManualScore}
+          calculation={calculation}
+          effectiveFinalScore={effectiveFinalScore}
+          availableOptions={availableOptions}
+          onSaveStudent={handleSaveStudent}
+          onDeleteGradedStudent={handleDeleteStudentGrade}
+          onEditStudentScoreFromRecap={(st) => {
+            handleSelectStudent(st.name, st.student_user_id || st.id);
+            setActiveTab('grading');
+          }}
+          onSyncToGradeMaster={handleSyncToGradeMaster}
+          isSyncingGradeMaster={isSyncingGradeMaster}
+          onOpenCreateSession={handleOpenCreateSession}
+          onOpenEditSessionModal={handleOpenEditSession}
+          onOpenKeyEditorModal={handleOpenKeyEditor}
+          onOpenAiCreator={() => setIsExamAiCreatorOpen(true)}
+          onOpenUniversalExcel={() => setIsUniversalExcelModalOpen(true)}
+          onOpenDownloadFormat={() => setIsDownloadFormatModalOpen(true)}
+          onOpenBulkSync={handleOpenBulkSyncModal}
+          onAutoPg100={() => {
+            if (activeSession?.answer_key) {
+              const full: Record<number, string> = {};
+              activeSession.answer_key.forEach((k, idx) => {
+                full[idx + 1] = k;
+              });
+              setUserAnswers(full);
+            }
+          }}
+          onResetGrading={resetGradingForm}
+          isReadOnly={isReadOnly}
+          toastMessage={toastMessage}
+        />
+
+        {/* Modal Pembuat Soal Otomatis AI, Kunci Jawaban & Kisi-Kisi */}
+        {isExamAiCreatorOpen && (
+          <React.Suspense fallback={null}>
+            <ExamQuestionCreatorModal
+              isOpen={isExamAiCreatorOpen}
+              onClose={() => setIsExamAiCreatorOpen(false)}
+              currentUser={currentUser}
+              onOpenCorrectionWithSession={async (newSession) => {
+                setIsExamAiCreatorOpen(false);
+                await loadSessions();
+                await handleSelectSession(newSession);
+                setActiveTab('recap');
+              }}
+            />
+          </React.Suspense>
+        )}
+
+        {/* Modal Blanko Format Penilaian Excel Resmi */}
+        <DownloadOfficialGradingModal
+          isOpen={isDownloadFormatModalOpen}
+          onClose={() => setIsDownloadFormatModalOpen(false)}
+          activeSession={activeSession}
+        />
+
+        {/* Modal Universal Excel Importer */}
+        <UniversalExcelImportModal
+          isOpen={isUniversalExcelModalOpen}
+          onClose={() => setIsUniversalExcelModalOpen(false)}
+          availableSessions={sessions}
+          allDirectoryStudents={allDirectoryStudents.length > 0 ? allDirectoryStudents : classStudents}
+          currentUser={currentUser}
+          onSuccess={handleUniversalExcelSuccess}
+        />
+      </>,
+      document.body
+    );
+  }
+
   return createPortal(
     <div
       role="dialog"
@@ -1879,6 +1997,26 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
         </div>
 
         <div className="flex items-center gap-2 shrink-0 ml-2">
+          {/* Mode Switcher [ 💻 Desktop ] [ 📱 Mobile ] */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('DESKTOP')}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-white text-slate-900 shadow-xs"
+              title="Tampilan Desktop / Laptop (Layar Lebar & Tabel Lengkap)"
+            >
+              <span>💻 Desktop</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('MOBILE')}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer text-slate-500 hover:text-slate-800"
+              title="Tampilan Mobile HP (Khusus Layar Sentuh & Infinix Note 8)"
+            >
+              <span>📱 Mobile</span>
+            </button>
+          </div>
+
           <a
             href={gradeMasterUrl}
             target="_blank"
