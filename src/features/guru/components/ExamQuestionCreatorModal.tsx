@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   CheckCheck,
   RotateCcw,
+  Copy,
+  Printer,
 } from 'lucide-react';
 import type { UserProfile, ExamSessionRecord } from '../../../types/database.types';
 import { OFFICIAL_SCHOOL_SUBJECTS } from '../../../config/school-subjects.config';
@@ -37,6 +39,43 @@ interface ExamQuestionCreatorModalProps {
 
 type WizardStep = 'PARAMS' | 'INPUT_CONTENT' | 'PREVIEW_AND_ACTION';
 type PreviewTab = 'PAPER' | 'KEYS' | 'KISI_KISI';
+
+export const EXAMPLE_MCQ_TEMPLATE = `A. SOAL PILIHAN GANDA
+1. Hasil dari operasi hitung 24 + 16 × 2 adalah...
+A. 80
+B. 56
+C. 48
+D. 40
+
+2. Suatu zat memiliki massa jenis 2,5 g/cm³ dan volume 40 cm³. Berapakah massa total zat tersebut?
+A. 100 gram
+B. 80 gram
+C. 60 gram
+D. 50 gram
+
+3. Salah satu ciri makhluk hidup adalah peka terhadap rangsang yang disebut dengan istilah...
+A. Iritabilitas
+B. Adaptasi
+C. Respirasi
+D. Ekskresi
+
+4. Perhatikan pernyataan berikut: "Mempertahankan integritas dan kejujuran dalam menuntut ilmu." Contoh penerapan nilai tersebut di sekolah adalah...
+A. Mencontek saat ujian berlangsung
+B. Mengakui kesalahan dan mengerjakan tugas secara mandiri
+C. Datang terlambat setiap hari
+D. Tidak mematuhi tata tertib kelas
+
+5. Organ pernapasan manusia yang berfungsi sebagai tempat pertukaran oksigen dan karbondioksida adalah...
+A. Trakea
+B. Bronkus
+C. Alveolus
+D. Laring`;
+
+export const EXAMPLE_ESSAY_TEMPLATE = `B. SOAL URAIAN (ESSAY)
+1. Jelaskan perbedaan mendasar antara perubahan fisika dan perubahan kimia, serta sebutkan masing-masing 2 contoh peristiwanya dalam kehidupan sehari-hari!
+2. Hitunglah luas permukaan sebuah tabung yang memiliki jari-jari alas 7 cm dan tinggi 20 cm! (Gunakan π = 22/7)`;
+
+export const EXAMPLE_RAW_QUESTIONS_TEMPLATE = `${EXAMPLE_MCQ_TEMPLATE}\n\n${EXAMPLE_ESSAY_TEMPLATE}`;
 
 const PREDEFINED_CLASSES = ['7', '8', '9', 'SMA'];
 
@@ -147,6 +186,61 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
     const html = ExamPaperDocxService.generateAnswerKeyAndKisiKisiWordHtml(generatedData);
     ExamPaperDocxService.downloadAsWordFile(filename, html);
     showToast('success', 'Kunci & Kisi-Kisi Terunduh', 'File kunci jawaban & kisi-kisi format .doc berhasil disimpan.');
+  };
+
+  // Salin Naskah Teks Lengkap ke Clipboard
+  const handleCopyPlainTextPaper = async () => {
+    if (!generatedData) return;
+    try {
+      const text = ExamPaperDocxService.generatePlainTextExamPaper(generatedData);
+      await navigator.clipboard.writeText(text);
+      showToast('success', 'Naskah Soal Berhasil Disalin!', 'Format tersusun rapi dengan penomoran otomatis siap ditempel ke Microsoft Word atau Google Docs.');
+    } catch {
+      showToast('error', 'Gagal Menyalin', 'Tidak dapat menyalin naskah soal ke clipboard.');
+    }
+  };
+
+  // Salin Contoh Format Soal Pilihan Ganda (PG)
+  const handleCopyMcqExample = async () => {
+    try {
+      await navigator.clipboard.writeText(EXAMPLE_MCQ_TEMPLATE);
+      showToast('success', 'Format Soal PG Disalin!', 'Contoh format soal pilihan ganda (PG) berhasil disalin ke clipboard.');
+    } catch {
+      showToast('error', 'Gagal Menyalin', 'Tidak dapat menyalin format contoh PG ke clipboard.');
+    }
+  };
+
+  // Salin Contoh Format Soal Uraian (Essay)
+  const handleCopyEssayExample = async () => {
+    try {
+      await navigator.clipboard.writeText(EXAMPLE_ESSAY_TEMPLATE);
+      showToast('success', 'Format Soal Essay Disalin!', 'Contoh format soal uraian (essay) berhasil disalin ke clipboard.');
+    } catch {
+      showToast('error', 'Gagal Menyalin', 'Tidak dapat menyalin format contoh Essay ke clipboard.');
+    }
+  };
+
+  // Salin Contoh Format Soal Mentah Lengkap (PG + Essay)
+  const handleCopyExampleTemplate = async () => {
+    try {
+      await navigator.clipboard.writeText(EXAMPLE_RAW_QUESTIONS_TEMPLATE);
+      showToast('success', 'Format Lengkap Disalin!', 'Contoh format soal PG dan Essay berhasil disalin ke clipboard.');
+    } catch {
+      showToast('error', 'Gagal Menyalin', 'Tidak dapat menyalin format contoh ke clipboard.');
+    }
+  };
+
+  // Terapkan Contoh Format Soal Mentah ke Textarea
+  const handleApplyExampleTemplate = () => {
+    setContentPrompt(EXAMPLE_RAW_QUESTIONS_TEMPLATE);
+    showToast('success', 'Format Contoh Diterapkan!', 'Format acuan soal PG dan Essay telah dimuat ke kotak isian.');
+  };
+
+  // Cetak Naskah Soal Langsung
+  const handlePrintExamPaper = () => {
+    if (!generatedData) return;
+    ExamPaperDocxService.printExamPaper(generatedData);
+    showToast('info', 'Membuka Jendela Cetak', 'Format 2 kolom Times New Roman siap dicetak.');
   };
 
   // Simpan ke Koreksi Soal
@@ -630,11 +724,55 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    {inputMode === 'FROM_TOPIC'
-                      ? 'Tuliskan Materi Pokok / Capaian Pembelajaran (CP):'
-                      : 'Tempelkan Teks Soal Mentah Pilihan Ganda & Essay:'}
-                  </label>
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <label className="block text-xs font-bold text-slate-700">
+                      {inputMode === 'FROM_TOPIC'
+                        ? 'Tuliskan Materi Pokok / Capaian Pembelajaran (CP):'
+                        : 'Tempelkan Teks Soal Mentah Pilihan Ganda & Essay:'}
+                    </label>
+
+                    {inputMode === 'PARSE_RAW_QUESTIONS' && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={handleCopyExampleTemplate}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-slate-200 shadow-2xs"
+                          title="Salin contoh lengkap soal PG & Essay ke clipboard"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Salin Contoh</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCopyMcqExample}
+                          className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-slate-200 shadow-2xs"
+                          title="Salin contoh format soal Pilihan Ganda (PG) saja"
+                        >
+                          <Copy className="w-3 h-3 text-emerald-600" />
+                          <span>Salin PG</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCopyEssayExample}
+                          className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-slate-200 shadow-2xs"
+                          title="Salin contoh format soal Uraian / Essay saja"
+                        >
+                          <Copy className="w-3 h-3 text-amber-600" />
+                          <span>Salin Essay</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleApplyExampleTemplate}
+                          className="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 active:scale-95 text-teal-800 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-teal-200 shadow-2xs"
+                          title="Gunakan format contoh ini langsung ke kotak isian"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Gunakan Contoh</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <textarea
                     rows={8}
                     value={contentPrompt}
@@ -646,9 +784,57 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                     }
                     className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#023246]"
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Tip: Semakin jelas materi atau teks soal yang Anda masukkan, semakin presisi kunci jawaban dan kisi-kisi yang dihasilkan AI.
-                  </p>
+
+                  {inputMode === 'PARSE_RAW_QUESTIONS' && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-teal-50/70 border border-teal-200/80 text-xs text-slate-700 space-y-1.5">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <span className="font-bold text-teal-900 text-[11.5px] flex items-center gap-1">
+                          <span>💡 Acuan Format Baku (Otomatis Dikenali AI &amp; Parser):</span>
+                        </span>
+                        <span className="text-[10.5px] text-teal-700 font-semibold bg-white px-2 py-0.5 rounded border border-teal-200">
+                          Times New Roman • 2 Kolom
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-700 leading-relaxed font-mono bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                        <div className="flex items-center justify-between text-slate-400 font-sans italic mb-1 flex-wrap gap-1">
+                          <span>// Soal Pilihan Ganda (Penomoran 1, 2, 3... Opsi A, B, C, D):</span>
+                          <button
+                            type="button"
+                            onClick={handleCopyMcqExample}
+                            className="text-[10px] not-italic font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                          >
+                            <Copy className="w-2.5 h-2.5" /> Salin Format PG
+                          </button>
+                        </div>
+                        <p>1. Pertanyaan soal nomor satu...</p>
+                        <p className="pl-3">A. Pilihan jawaban A</p>
+                        <p className="pl-3">B. Pilihan jawaban B</p>
+                        <p className="pl-3">C. Pilihan jawaban C</p>
+                        <p className="pl-3">D. Pilihan jawaban D</p>
+                        <div className="flex items-center justify-between text-slate-400 font-sans italic my-1 pt-1.5 border-t border-slate-100 flex-wrap gap-1">
+                          <span>// Soal Uraian / Essay (Penomoran 1, 2, 3...):</span>
+                          <button
+                            type="button"
+                            onClick={handleCopyEssayExample}
+                            className="text-[10px] not-italic font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                          >
+                            <Copy className="w-2.5 h-2.5" /> Salin Format Essay
+                          </button>
+                        </div>
+                        <p>B. SOAL URAIAN (ESSAY)</p>
+                        <p>1. Pertanyaan uraian nomor satu...</p>
+                      </div>
+                      <p className="text-[10.5px] text-slate-500">
+                        *AI akan otomatis merapikan format ke font <strong>Times New Roman</strong> dua kolom, menata penomoran otomatis seperti Microsoft Word, serta membuat kunci jawaban &amp; kisi-kisi resmi.
+                      </p>
+                    </div>
+                  )}
+
+                  {inputMode === 'FROM_TOPIC' && (
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Tip: Semakin jelas materi atau teks soal yang Anda masukkan, semakin presisi kunci jawaban dan kisi-kisi yang dihasilkan AI.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -700,73 +886,135 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                   </button>
                 </div>
 
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{generatedData.mcqQuestions.length} PG + {generatedData.essayQuestions.length} Essay Siap</span>
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{generatedData.mcqQuestions.length} PG + {generatedData.essayQuestions.length} Essay Siap</span>
+                  </span>
+
+                  {previewTab === 'PAPER' && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleCopyPlainTextPaper}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95"
+                        title="Salin teks naskah soal lengkap ke clipboard"
+                      >
+                        <Copy className="w-3 h-3 text-teal-600" />
+                        <span>Salin Naskah</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePrintExamPaper}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95"
+                        title="Cetak Naskah Soal Langsung (2 Kolom Times New Roman)"
+                      >
+                        <Printer className="w-3 h-3 text-slate-700" />
+                        <span>Cetak Soal</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Preview Content Area */}
               <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200/90 shadow-xs max-h-[55vh] overflow-y-auto">
                 {/* 1. PREVIEW NASKAH SOAL */}
                 {previewTab === 'PAPER' && (
-                  <div className="space-y-4 font-serif text-slate-900 leading-normal">
+                  <div
+                    style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                    className="space-y-4 text-slate-900 leading-normal"
+                  >
                     {/* Header KOP Resmi */}
                     <div className="text-center border-b-2 border-slate-900 pb-3">
-                      <p className="text-xs font-bold tracking-wider uppercase text-slate-700">
+                      <p className="text-xs font-bold tracking-wider uppercase text-slate-700" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                         {generatedData.foundationName}
                       </p>
-                      <h3 className="text-base sm:text-lg font-black tracking-wide uppercase text-slate-950 mt-0.5">
+                      <h3 className="text-base sm:text-lg font-black tracking-wide uppercase text-slate-950 mt-0.5" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                         {generatedData.institutionName}
                       </h3>
-                      <p className="text-[10px] text-slate-500 font-sans mt-0.5">
+                      <p className="text-[10px] text-slate-600 mt-0.5" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                         Jl. Raya Cibungbulang - Ciampea, Kab. Bogor, Jawa Barat • Telp: (0251) 8624123
                       </p>
                       <div className="border-t-2 border-b border-slate-900 my-2 h-1"></div>
-                      <h4 className="text-xs sm:text-sm font-bold uppercase text-slate-900">
+                      <h4 className="text-xs sm:text-sm font-bold uppercase text-slate-900" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                         {generatedData.examTypeLabel}
                       </h4>
-                      <p className="text-xs font-bold uppercase text-slate-800">
+                      <p className="text-xs font-bold uppercase text-slate-800" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
                         SEMESTER {generatedData.semester} • TAHUN AJARAN {generatedData.academicYear}
                       </p>
                     </div>
 
                     {/* Meta Table */}
-                    <div className="grid grid-cols-2 text-xs border border-slate-300 p-2.5 rounded-lg bg-slate-50/50 gap-2 font-sans">
+                    <div
+                      style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                      className="grid grid-cols-2 text-xs border border-slate-900 p-2.5 rounded-none bg-white gap-2"
+                    >
                       <div>
-                        <span className="text-slate-500">Mata Pelajaran:</span>{' '}
+                        <span className="font-semibold">Mata Pelajaran:</span>{' '}
                         <strong>{generatedData.subject}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500">Kelas:</span>{' '}
-                        <strong>{generatedData.gradeClass}</strong>
+                        <span className="font-semibold">Kelas:</span>{' '}
+                        <strong>Kelas {generatedData.gradeClass}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500">Alokasi Waktu:</span>{' '}
+                        <span className="font-semibold">Alokasi Waktu:</span>{' '}
                         <strong>{generatedData.durationMinutes} Menit</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500">Kategori:</span>{' '}
-                        <strong>{generatedData.category === 'EKSAK' ? 'Eksak (60:40)' : 'Non-Eksak (70:30)'}</strong>
+                        <span className="font-semibold">Hari, Tanggal:</span>{' '}
+                        <span>........................, .................... 2026</span>
                       </div>
                     </div>
 
-                    {/* Bagian A: Pilihan Ganda */}
+                    {/* Petunjuk Umum */}
+                    <div
+                      style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                      className="border border-slate-900 p-2.5 text-[11px] leading-relaxed bg-slate-50/40"
+                    >
+                      <strong>PETUNJUK UMUM:</strong>
+                      <ol className="list-decimal pl-4 mt-1 space-y-0.5">
+                        <li>Berdoalah sebelum mengerjakan soal!</li>
+                        <li>Tuliskan nama lengkap dan nomor peserta pada lembar jawaban yang tersedia!</li>
+                        <li>Dahulukan menjawab soal-soal yang Anda anggap lebih mudah!</li>
+                        <li>Periksalah kembali seluruh pekerjaan Anda sebelum diserahkan kepada pengawas ujian!</li>
+                      </ol>
+                    </div>
+
+                    {/* Bagian A: Pilihan Ganda (TATA LETAK DUA KOLOM TIMES NEW ROMAN) */}
                     <div className="pt-2">
-                      <h5 className="font-sans text-xs font-black uppercase text-slate-900 border-b border-slate-200 pb-1 mb-3">
-                        A. Soal Pilihan Ganda ({generatedData.mcqQuestions.length} Butir)
-                      </h5>
-                      <div className="space-y-3.5">
+                      <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1 mb-3">
+                        <h5
+                          style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                          className="text-xs sm:text-sm font-bold uppercase text-slate-900"
+                        >
+                          A. Soal Pilihan Ganda ({generatedData.mcqQuestions.length} Butir Soal)
+                        </h5>
+                        <span className="text-[10.5px] font-sans text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                          Format 2 Kolom Times New Roman
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] italic text-slate-600 mb-3" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+                        Pilihlah salah satu jawaban yang paling tepat dengan memberi tanda silang (X) pada huruf A, B, C, atau D pada lembar jawaban!
+                      </p>
+
+                      {/* Kontainer Dua Kolom Berdampingan */}
+                      <div className="columns-1 md:columns-2 gap-6 [column-rule:1px_solid_#cbd5e1] text-justify">
                         {generatedData.mcqQuestions.map((q) => (
-                          <div key={q.number} className="text-xs leading-relaxed">
-                            <p className="font-semibold text-slate-900">
+                          <div
+                            key={q.number}
+                            className="break-inside-avoid mb-4 text-xs leading-relaxed"
+                            style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                          >
+                            <p className="font-bold text-slate-900">
                               {q.number}. {q.question}
                             </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 mt-1 pl-4 text-slate-700">
-                              <span><strong>A.</strong> {q.options.A}</span>
-                              <span><strong>B.</strong> {q.options.B}</span>
-                              <span><strong>C.</strong> {q.options.C}</span>
-                              <span><strong>D.</strong> {q.options.D}</span>
+                            <div className="mt-1 pl-4 space-y-0.5 text-slate-800">
+                              <div><span className="font-bold">A.</span> {q.options.A}</div>
+                              <div><span className="font-bold">B.</span> {q.options.B}</div>
+                              <div><span className="font-bold">C.</span> {q.options.C}</div>
+                              <div><span className="font-bold">D.</span> {q.options.D}</div>
                             </div>
                           </div>
                         ))}
@@ -775,16 +1023,26 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
 
                     {/* Bagian B: Essay */}
                     {generatedData.essayQuestions.length > 0 && (
-                      <div className="pt-4 border-t border-slate-200">
-                        <h5 className="font-sans text-xs font-black uppercase text-slate-900 border-b border-slate-200 pb-1 mb-3">
-                          B. Soal Uraian / Essay ({generatedData.essayQuestions.length} Butir)
+                      <div className="pt-4 border-t-2 border-slate-900">
+                        <h5
+                          style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                          className="text-xs sm:text-sm font-bold uppercase text-slate-900 border-b border-slate-900 pb-1 mb-2"
+                        >
+                          B. Soal Uraian / Essay ({generatedData.essayQuestions.length} Butir Soal)
                         </h5>
+                        <p className="text-[10.5px] italic text-slate-600 mb-3" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+                          Jawablah pertanyaan-pertanyaan berikut dengan jelas, lengkap, runtut, dan benar!
+                        </p>
                         <div className="space-y-3">
                           {generatedData.essayQuestions.map((eq) => (
-                            <div key={eq.number} className="text-xs leading-relaxed">
-                              <p className="font-semibold text-slate-900">
+                            <div
+                              key={eq.number}
+                              className="text-xs leading-relaxed"
+                              style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                            >
+                              <p className="font-bold text-slate-900">
                                 {eq.number}. {eq.question}
-                                <span className="text-[10.5px] text-slate-400 font-sans ml-1 italic">
+                                <span className="text-[10.5px] text-slate-500 ml-1 italic font-normal">
                                   (Skor Maks: {eq.maxScore})
                                 </span>
                               </p>
@@ -793,6 +1051,11 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                         </div>
                       </div>
                     )}
+
+                    {/* Footer Naskah */}
+                    <div className="pt-4 border-t border-dashed border-slate-400 text-center text-[10px] italic text-slate-500">
+                      *** Selamat Mengerjakan &amp; Semoga Sukses — Kejujuran Adalah Kunci Keberkahan ***
+                    </div>
                   </div>
                 )}
 
@@ -958,12 +1221,32 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
+                  onClick={handleCopyPlainTextPaper}
+                  className="h-10 px-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-95"
+                  title="Salin seluruh naskah soal lengkap ke clipboard"
+                >
+                  <Copy className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Salin Naskah</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleDownloadPaperDocx}
                   className="h-10 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                  title="Download File Word (.doc) Naskah Soal"
+                  title="Download File Word (.doc) Naskah Soal 2 Kolom"
                 >
                   <Download className="w-3.5 h-3.5 text-blue-700" />
-                  <span>Word Soal</span>
+                  <span>Word Soal (2 Kolom)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintExamPaper}
+                  className="h-10 px-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-95"
+                  title="Cetak Naskah Soal Langsung (Format 2 Kolom Times New Roman)"
+                >
+                  <Printer className="w-3.5 h-3.5 text-slate-700" />
+                  <span>Cetak Soal</span>
                 </button>
 
                 <button

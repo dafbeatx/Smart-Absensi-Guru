@@ -71,21 +71,21 @@ export class ExamPaperDocxService {
     const mcqHtml = mcqQuestions
       .map(
         (q) => `
-        <div style="margin-bottom: 12pt; page-break-inside: avoid;">
-          <table style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', serif; font-size: 11pt;">
+        <div class="question-item" style="margin-bottom: 11pt; page-break-inside: avoid; break-inside: avoid;">
+          <table style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', Times, serif; font-size: 10.5pt;">
             <tr>
-              <td style="width: 24pt; vertical-align: top; font-weight: bold;">${q.number}.</td>
-              <td style="vertical-align: top; text-align: justify; line-height: 1.35;">${q.question}</td>
+              <td style="width: 22pt; vertical-align: top; font-weight: bold; font-family: 'Times New Roman', Times, serif;">${q.number}.</td>
+              <td style="vertical-align: top; text-align: justify; line-height: 1.35; font-family: 'Times New Roman', Times, serif;">${q.question}</td>
             </tr>
           </table>
-          <table style="width: 100%; margin-left: 24pt; border-collapse: collapse; font-family: 'Times New Roman', serif; font-size: 11pt; margin-top: 3pt;">
+          <table style="width: 100%; margin-left: 22pt; border-collapse: collapse; font-family: 'Times New Roman', Times, serif; font-size: 10.5pt; margin-top: 3pt;">
             <tr>
-              <td style="width: 50%; vertical-align: top; padding: 2pt 0;"><span style="font-weight: bold;">A.</span> ${q.options.A}</td>
-              <td style="width: 50%; vertical-align: top; padding: 2pt 0;"><span style="font-weight: bold;">B.</span> ${q.options.B}</td>
+              <td style="width: 50%; vertical-align: top; padding: 1.5pt 0; font-family: 'Times New Roman', Times, serif;"><span style="font-weight: bold;">A.</span> ${q.options.A}</td>
+              <td style="width: 50%; vertical-align: top; padding: 1.5pt 0; font-family: 'Times New Roman', Times, serif;"><span style="font-weight: bold;">B.</span> ${q.options.B}</td>
             </tr>
             <tr>
-              <td style="width: 50%; vertical-align: top; padding: 2pt 0;"><span style="font-weight: bold;">C.</span> ${q.options.C}</td>
-              <td style="width: 50%; vertical-align: top; padding: 2pt 0;"><span style="font-weight: bold;">D.</span> ${q.options.D}</td>
+              <td style="width: 50%; vertical-align: top; padding: 1.5pt 0; font-family: 'Times New Roman', Times, serif;"><span style="font-weight: bold;">C.</span> ${q.options.C}</td>
+              <td style="width: 50%; vertical-align: top; padding: 1.5pt 0; font-family: 'Times New Roman', Times, serif;"><span style="font-weight: bold;">D.</span> ${q.options.D}</td>
             </tr>
           </table>
         </div>
@@ -96,13 +96,13 @@ export class ExamPaperDocxService {
     const essayHtml = essayQuestions
       .map(
         (q) => `
-        <div style="margin-bottom: 14pt; page-break-inside: avoid;">
-          <table style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', serif; font-size: 11pt;">
+        <div style="margin-bottom: 12pt; page-break-inside: avoid; break-inside: avoid;">
+          <table style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', Times, serif; font-size: 10.5pt;">
             <tr>
-              <td style="width: 24pt; vertical-align: top; font-weight: bold;">${q.number}.</td>
-              <td style="vertical-align: top; text-align: justify; line-height: 1.35;">
+              <td style="width: 22pt; vertical-align: top; font-weight: bold; font-family: 'Times New Roman', Times, serif;">${q.number}.</td>
+              <td style="vertical-align: top; text-align: justify; line-height: 1.35; font-family: 'Times New Roman', Times, serif;">
                 ${q.question}
-                <span style="font-size: 9.5pt; color: #444; font-style: italic;"> (Skor: ${q.maxScore})</span>
+                <span style="font-size: 9.5pt; color: #444; font-style: italic; font-family: 'Times New Roman', Times, serif;"> (Skor Maks: ${q.maxScore})</span>
               </td>
             </tr>
           </table>
@@ -128,17 +128,33 @@ export class ExamPaperDocxService {
         <style>
           @page Section1 {
             size: 210mm 297mm; /* A4 Portrait */
-            margin: 1.8cm 1.8cm 1.8cm 1.8cm;
+            margin: 1.5cm 1.5cm 1.5cm 1.5cm;
             mso-header-margin: 0.5in;
             mso-footer-margin: 0.5in;
           }
           div.Section1 { page: Section1; }
-          body {
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 11pt;
+          body, p, div, table, td, th, span, h1, h2, h3, h4, ol, li {
+            font-family: 'Times New Roman', Times, serif !important;
             color: #000000;
-            line-height: 1.25;
+          }
+          body {
+            font-size: 10.5pt;
+            line-height: 1.3;
             background: #ffffff;
+          }
+          .two-columns-section {
+            column-count: 2;
+            -webkit-column-count: 2;
+            -moz-column-count: 2;
+            column-gap: 22pt;
+            column-rule: 0.75pt solid #c5c5c5;
+            text-align: justify;
+          }
+          .question-item {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            display: inline-block;
+            width: 100%;
           }
           h1, h2, h3 {
             margin: 0;
@@ -184,6 +200,31 @@ export class ExamPaperDocxService {
           }
           .instructions-box li {
             margin-bottom: 2pt;
+          }
+          @media print {
+            @page {
+              size: A4 portrait;
+              margin: 1.5cm;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .two-columns-section {
+              column-count: 2 !important;
+              -webkit-column-count: 2 !important;
+              column-gap: 22pt !important;
+              column-rule: 0.75pt solid #c5c5c5 !important;
+              text-align: justify !important;
+            }
+            .question-item {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              display: inline-block !important;
+              width: 100% !important;
+            }
           }
         </style>
       </head>
@@ -260,7 +301,7 @@ export class ExamPaperDocxService {
             Pilihlah salah satu jawaban yang paling tepat dengan memberi tanda silang (X) pada huruf A, B, C, atau D pada lembar jawaban!
           </p>
 
-          <div>
+          <div class="two-columns-section">
             ${mcqHtml}
           </div>
 
@@ -518,6 +559,70 @@ export class ExamPaperDocxService {
   }
 
   /**
+   * Generates formatted plain text for copying to clipboard with Microsoft Word indentation & layout
+   */
+  public static generatePlainTextExamPaper(data: ExamPaperData): string {
+    const {
+      foundationName,
+      institutionName,
+      examTypeLabel,
+      semester,
+      academicYear,
+      subject,
+      gradeClass,
+      durationMinutes,
+      mcqQuestions,
+      essayQuestions,
+    } = data;
+
+    const lines: string[] = [
+      foundationName.toUpperCase(),
+      institutionName.toUpperCase(),
+      'Jl. Raya Cibungbulang - Ciampea, Kab. Bogor, Jawa Barat',
+      '================================================================================',
+      examTypeLabel.toUpperCase(),
+      `SEMESTER ${semester} • TAHUN AJARAN ${academicYear}`,
+      '--------------------------------------------------------------------------------',
+      `Mata Pelajaran : ${subject}`,
+      `Tingkat Kelas  : Kelas ${gradeClass}`,
+      `Alokasi Waktu  : ${durationMinutes} Menit`,
+      'Hari, Tanggal  : ........................................',
+      'Nama Peserta   : ........................................',
+      '--------------------------------------------------------------------------------',
+      '',
+      `A. SOAL PILIHAN GANDA (${mcqQuestions.length} BUTIR SOAL)`,
+      'Petunjuk: Pilihlah salah satu jawaban yang paling tepat (A, B, C, atau D)!',
+      '',
+    ];
+
+    mcqQuestions.forEach((q) => {
+      lines.push(`${q.number}. ${q.question}`);
+      lines.push(`   A. ${q.options.A}`);
+      lines.push(`   B. ${q.options.B}`);
+      lines.push(`   C. ${q.options.C}`);
+      lines.push(`   D. ${q.options.D}`);
+      lines.push('');
+    });
+
+    if (essayQuestions.length > 0) {
+      lines.push('--------------------------------------------------------------------------------');
+      lines.push(`B. SOAL URAIAN / ESSAY (${essayQuestions.length} BUTIR SOAL)`);
+      lines.push('Petunjuk: Jawablah pertanyaan-pertanyaan berikut dengan jelas, lengkap dan benar!');
+      lines.push('');
+
+      essayQuestions.forEach((eq) => {
+        lines.push(`${eq.number}. ${eq.question} (Skor Maks: ${eq.maxScore})`);
+        lines.push('');
+      });
+    }
+
+    lines.push('================================================================================');
+    lines.push('*** Selamat Mengerjakan & Semoga Sukses ***');
+
+    return lines.join('\n');
+  }
+
+  /**
    * Triggers client-side download as Microsoft Word (.doc) file
    */
   public static downloadAsWordFile(filename: string, htmlContent: string): void {
@@ -534,4 +639,25 @@ export class ExamPaperDocxService {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
+
+  /**
+   * Opens a clean print-ready popup and triggers browser print dialog for printing exam paper
+   */
+  public static printExamPaper(data: ExamPaperData): void {
+    if (typeof window === 'undefined') return;
+    const html = this.generateExamPaperWordHtml(data);
+    const printWindow = window.open('', '_blank', 'width=900,height=900');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 450);
+  }
 }
+

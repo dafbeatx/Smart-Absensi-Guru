@@ -197,11 +197,112 @@ Balas HANYA dengan JSON sesuai struktur ini:
   }
 
   /**
+   * Intelligently parses raw text input pasted by teacher into structured MCQ and Essay questions
+   */
+  public static parseRawQuestionsHeuristic(
+    rawText: string,
+    subject: string
+  ): { mcqQuestions: McqQuestionItem[]; essayQuestions: EssayQuestionItem[] } | null {
+    if (!rawText || !rawText.trim()) return null;
+
+    // Split text into MCQ part and Essay part if available
+    const essaySplitRegex = /(?:^|\n)\s*(?:B\.\s*)?(?:SOAL\s+)?(?:URAIAN|ESSAY)\s*(?::|\n|$)/i;
+    const parts = rawText.split(essaySplitRegex);
+    const mcqPart = parts[0] || '';
+    const essayPart = parts.length > 1 ? parts.slice(1).join('\n') : '';
+
+    const mcqQuestions: McqQuestionItem[] = [];
+
+    // Regex to detect questions: e.g. "1. " or "1) " or "No. 1 "
+    const questionBlocks = mcqPart.split(/(?:^|\n)\s*(?:\d+[\.\)]|No\.\s*\d+)\s*/i).filter((b) => b.trim().length > 0);
+
+    questionBlocks.forEach((block, index) => {
+      // Find options A, B, C, D
+      const optARegex = /(?:^|\n|\s+)(?:[A|a][\.\)]|\([A|a]\))\s*/;
+      const optBRegex = /(?:^|\n|\s+)(?:[B|b][\.\)]|\([B|b]\))\s*/;
+      const optCRegex = /(?:^|\n|\s+)(?:[C|c][\.\)]|\([C|c]\))\s*/;
+      const optDRegex = /(?:^|\n|\s+)(?:[D|d][\.\)]|\([D|d]\))\s*/;
+
+      const posA = block.search(optARegex);
+      const posB = block.search(optBRegex);
+      const posC = block.search(optCRegex);
+      const posD = block.search(optDRegex);
+
+      if (posA !== -1 && posB !== -1) {
+        const questionText = block.slice(0, posA).trim();
+        const optAText = block.slice(posA, posB).replace(optARegex, '').trim();
+        const optBText = posC !== -1 ? block.slice(posB, posC).replace(optBRegex, '').trim() : block.slice(posB).replace(optBRegex, '').trim();
+        const optCText = posC !== -1 ? (posD !== -1 ? block.slice(posC, posD).replace(optCRegex, '').trim() : block.slice(posC).replace(optCRegex, '').trim()) : 'Pilihan C';
+        const optDText = posD !== -1 ? block.slice(posD).replace(optDRegex, '').trim() : 'Pilihan D';
+
+        // Check if there is an explicit key indicator like "Kunci: A" or "(A)"
+        let detectedKey: 'A' | 'B' | 'C' | 'D' = 'A';
+        const keyMatch = block.match(/(?:Kunci|Jawaban|Ans)\s*(?::|\s)\s*([A-D])/i);
+        if (keyMatch && ['A', 'B', 'C', 'D'].includes(keyMatch[1].toUpperCase())) {
+          detectedKey = keyMatch[1].toUpperCase() as 'A' | 'B' | 'C' | 'D';
+        } else {
+          const dist: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D'];
+          detectedKey = dist[index % 4];
+        }
+
+        if (questionText.length > 2) {
+          mcqQuestions.push({
+            number: index + 1,
+            question: questionText,
+            options: {
+              A: optAText || 'Pilihan A',
+              B: optBText || 'Pilihan B',
+              C: optCText || 'Pilihan C',
+              D: optDText || 'Pilihan D',
+            },
+            correctAnswer: detectedKey,
+            topic: subject,
+            indicator: `Memahami konsep pokok ${subject}`,
+            cognitiveLevel: index % 2 === 0 ? 'L2 (C3)' : 'L3 (C4)',
+          });
+        }
+      }
+    });
+
+    const essayQuestions: EssayQuestionItem[] = [];
+    if (essayPart && essayPart.trim()) {
+      const essayBlocks = essayPart.split(/(?:^|\n)\s*(?:\d+[\.\)]|No\.\s*\d+)\s*/i).filter((b) => b.trim().length > 0);
+      essayBlocks.forEach((eb, eIdx) => {
+        const cleanEq = eb.trim();
+        if (cleanEq.length > 3) {
+          essayQuestions.push({
+            number: eIdx + 1,
+            question: cleanEq,
+            expectedAnswer: 'Kriteria jawaban lengkap dan tepat sesuai materi pokok.',
+            maxScore: 20,
+            topic: subject,
+            indicator: `Menganalisis dan menguraikan konsep ${subject}`,
+            cognitiveLevel: 'L3 (C4)',
+          });
+        }
+      });
+    }
+
+    if (mcqQuestions.length > 0) {
+      return { mcqQuestions, essayQuestions };
+    }
+    return null;
+  }
+
+  /**
    * Generates intelligent domain-specific curriculum fallback if AI is offline
    */
   private static generateIntelligentFallback(
     params: ExamGenerationParams
   ): { mcqQuestions: McqQuestionItem[]; essayQuestions: EssayQuestionItem[] } {
+    // If raw questions are provided, attempt heuristic extraction first!
+    if (params.inputMode === 'PARSE_RAW_QUESTIONS' && params.contentPrompt?.trim()) {
+      const parsed = this.parseRawQuestionsHeuristic(params.contentPrompt, params.subject);
+      if (parsed && parsed.mcqQuestions.length > 0) {
+        return parsed;
+      }
+    }
+
     const isEksak = params.category === 'EKSAK';
     const keys: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D'];
 
