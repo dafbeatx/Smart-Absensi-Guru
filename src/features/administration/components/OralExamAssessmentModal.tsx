@@ -416,7 +416,7 @@ export const OralExamAssessmentModal: React.FC<OralExamAssessmentModalProps> = (
       role="dialog"
       aria-modal="true"
       aria-labelledby="oral-exam-title"
-      className="fixed inset-0 z-[100] w-screen h-screen flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
+      className="fixed inset-0 z-100 w-screen h-screen flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden font-sans animate-fadeIn"
     >
       {/* Fullscreen Workspace Header */}
       <header className="px-4 py-3 sm:px-6 sm:py-3.5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 shadow-2xs">

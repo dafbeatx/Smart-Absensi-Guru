@@ -213,7 +213,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
       role="dialog"
       aria-modal="true"
       aria-labelledby="exam-creator-title"
-      className="fixed inset-0 z-[100] w-screen h-screen bg-[#F8FAFC] flex flex-col overflow-hidden font-sans select-none sm:select-auto"
+      className="fixed inset-0 z-100 w-screen h-screen bg-[#F8FAFC] flex flex-col overflow-hidden font-sans select-none sm:select-auto"
     >
       {/* Full-width Workspace Top Navigation */}
       <header className="bg-[#023246] text-white px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between shrink-0 shadow-md border-b border-teal-900/50 pt-[max(10px,env(safe-area-inset-top))] z-30">
