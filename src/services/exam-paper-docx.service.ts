@@ -2,6 +2,7 @@
  * SMART ABSENSI GURU — EXAM PAPER & KISI-KISI DOCX GENERATOR
  * Sesuai format resmi KOP SOAL SMPT AL-ITTIHADIYAH SEMESTER GANJIL T.A 2026-2027
  */
+import { KOP_LOGO_BASE64 } from '../assets/kop-logo.base64';
 
 export interface McqQuestionItem {
   number: number;
@@ -52,21 +53,49 @@ export class ExamPaperDocxService {
    */
   public static generateExamPaperWordHtml(data: ExamPaperData): string {
     const {
-      foundationName,
       institutionName,
-      examTypeLabel,
       semester,
       academicYear,
       subject,
       gradeClass,
-      durationMinutes,
-      examDate,
       mcqQuestions,
       essayQuestions,
     } = data;
 
-    const semesterText = semester === 'GANJIL' ? 'SEMESTER GANJIL' : 'SEMESTER GENAP';
-    const dateText = examDate || '........................, .................... 2026';
+    const isASTS = data.examType === 'ASTS';
+    const examHeadingLine1 = isASTS
+      ? `ASESMEN SUMATIF TENGAH SEMESTER (ASTS) ${semester === 'GANJIL' ? 'GANJIL' : 'GENAP'}`
+      : `ASESMEN SUMATIF AKHIR SEMESTER (ASAS) ${semester === 'GANJIL' ? 'GANJIL' : 'GENAP'}`;
+    const semesterRomawi = semester === 'GANJIL' ? 'Semester I' : 'Semester II';
+
+    // Lembar Jawaban Siswa Grid 4 Kolom x 10 Baris (1..40)
+    let gridRows = '';
+    for (let r = 1; r <= 10; r++) {
+      gridRows += '<tr>';
+      const colStarts = [r, r + 10, r + 20, r + 30];
+      colStarts.forEach((num) => {
+        gridRows += `
+          <td style="width: 4%; text-align: center; font-weight: bold; border: 1pt solid #000; padding: 1.5pt 0; font-size: 9.5pt; background-color: #fafafa;">${num}</td>
+          <td style="width: 5.25%; text-align: center; border: 1pt solid #000; padding: 1.5pt 0; font-size: 9.5pt;">A</td>
+          <td style="width: 5.25%; text-align: center; border: 1pt solid #000; padding: 1.5pt 0; font-size: 9.5pt;">B</td>
+          <td style="width: 5.25%; text-align: center; border: 1pt solid #000; padding: 1.5pt 0; font-size: 9.5pt;">C</td>
+          <td style="width: 5.25%; text-align: center; border: 1pt solid #000; padding: 1.5pt 0; font-size: 9.5pt;">D</td>
+        `;
+      });
+      gridRows += '</tr>';
+    }
+
+    let essayAnswerBoxes = '';
+    for (let e = 1; e <= Math.max(5, essayQuestions.length); e++) {
+      essayAnswerBoxes += `
+        <table style="width: 100%; border-collapse: collapse; border: 1pt solid #000; margin-bottom: 5pt; font-family: 'Times New Roman', Times, serif;">
+          <tr>
+            <td style="width: 22pt; font-weight: bold; border-right: 1pt solid #000; vertical-align: top; padding: 3pt; text-align: center; background-color: #f7f7f7; font-size: 10pt;">${e}</td>
+            <td style="height: 34pt; vertical-align: top; padding: 3pt;"></td>
+          </tr>
+        </table>
+      `;
+    }
 
     const mcqHtml = mcqQuestions
       .map(
@@ -230,102 +259,120 @@ export class ExamPaperDocxService {
       </head>
       <body>
         <div class="Section1">
-          <!-- ── KOP RESMI SMPT AL-ITTIHADIYAH ── -->
-          <div style="text-align: center;">
-            <p style="margin: 0; font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5pt;">
-              ${foundationName}
-            </p>
-            <h1 style="margin: 2pt 0; font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5pt;">
-              ${institutionName}
-            </h1>
-            <p style="margin: 0; font-size: 8.5pt; color: #333;">
-              Jl. Raya Cibungbulang - Ciampea, Kab. Bogor, Jawa Barat • Telp: (0251) 8624123
-            </p>
-            <div class="kop-border"></div>
-            <h2 style="margin: 4pt 0 2pt 0; font-size: 12pt; font-weight: bold; text-transform: uppercase;">
-              ${examTypeLabel}
-            </h2>
-            <h3 style="margin: 0; font-size: 11pt; font-weight: bold; text-transform: uppercase;">
-              ${semesterText} • TAHUN AJARAN ${academicYear}
-            </h3>
-          </div>
-
-          <div style="margin-top: 12pt;"></div>
-
-          <!-- ── TABEL METADATA UJIAN ── -->
-          <table class="table-meta" style="border: 1pt solid #000000;">
+          <!-- ── KOP RESMI PERSIS SESUAI BERKAS FILE KOP SOAL SMPT AL-ITTIHADIYAH ── -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 6pt; border: none;">
             <tr>
-              <td style="width: 18%; font-weight: bold;">Mata Pelajaran</td>
-              <td style="width: 2%;">:</td>
-              <td style="width: 38%; font-weight: bold;">${subject}</td>
-              <td style="width: 16%; font-weight: bold;">Hari, Tanggal</td>
-              <td style="width: 2%;">:</td>
-              <td style="width: 24%;">${dateText}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold;">Kelas</td>
-              <td>:</td>
-              <td style="font-weight: bold;">${gradeClass}</td>
-              <td style="font-weight: bold;">Alokasi Waktu</td>
-              <td>:</td>
-              <td>${durationMinutes} Menit</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold;">Nama Peserta</td>
-              <td>:</td>
-              <td>....................................................</td>
-              <td style="font-weight: bold;">Nomor Peserta</td>
-              <td>:</td>
-              <td>................................</td>
+              <td style="width: 65pt; vertical-align: middle; text-align: left; padding: 0;">
+                <img src="${KOP_LOGO_BASE64}" alt="Logo" style="width: 54pt; height: 54pt; object-fit: contain;" />
+              </td>
+              <td style="vertical-align: middle; text-align: center; padding: 0 4pt;">
+                <h1 style="margin: 0; font-size: 13pt; font-weight: bold; font-family: 'Times New Roman', Times, serif; text-transform: uppercase; line-height: 1.25;">
+                  ${examHeadingLine1}
+                </h1>
+                <h2 style="margin: 2pt 0; font-size: 13pt; font-weight: bold; font-family: 'Times New Roman', Times, serif; text-transform: uppercase; line-height: 1.25;">
+                  ${institutionName}
+                </h2>
+                <h3 style="margin: 0; font-size: 13pt; font-weight: bold; font-family: 'Times New Roman', Times, serif; text-transform: uppercase; line-height: 1.25;">
+                  TAHUN ${academicYear}
+                </h3>
+              </td>
+              <td style="width: 65pt; vertical-align: middle; padding: 0;"></td>
             </tr>
           </table>
 
-          <!-- ── PETUNJUK UMUM ── -->
-          <div class="instructions-box">
-            <strong style="text-transform: uppercase;">Petunjuk Umum:</strong>
-            <ol>
-              <li>Berdoalah sebelum mengerjakan soal!</li>
-              <li>Tuliskan nama lengkap dan nomor peserta Anda pada lembar jawaban yang tersedia!</li>
-              <li>Periksa dan bacalah setiap butir soal dengan teliti sebelum menjawab!</li>
-              <li>Laporkan kepada pengawas jika terdapat tulisan yang kurang jelas, rusak, atau jumlah soal tidak lengkap!</li>
-              <li>Dahulukan menjawab soal-soal yang Anda anggap lebih mudah!</li>
-              <li>Periksalah kembali seluruh pekerjaan Anda sebelum diserahkan kepada pengawas ujian!</li>
-            </ol>
-          </div>
+          <!-- ── TABEL METADATA UJIAN PERSIS SESUAI BERKAS FILE ── -->
+          <table style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', Times, serif; font-size: 11pt; margin-bottom: 10pt; border: none;">
+            <tr>
+              <td style="width: 18%; font-weight: bold; padding: 2.5pt 0;">Mata Pelajaran</td>
+              <td style="width: 32%; font-weight: bold; padding: 2.5pt 0;">: ${subject}</td>
+              <td style="width: 18%; font-weight: bold; padding: 2.5pt 0;">Nama Siswa</td>
+              <td style="width: 32%; padding: 2.5pt 0;">: ........................................</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold; padding: 2.5pt 0;">Kelas/ Semester</td>
+              <td style="font-weight: bold; padding: 2.5pt 0;">: Kelas ${gradeClass}/${semesterRomawi}</td>
+              <td style="font-weight: bold; padding: 2.5pt 0;">Hari/ Tanggal</td>
+              <td style="padding: 2.5pt 0;">: ........................................</td>
+            </tr>
+          </table>
 
           <!-- ── BAGIAN I: PILIHAN GANDA ── -->
-          <div class="section-title">
-            A. SOAL PILIHAN GANDA (${mcqQuestions.length} BUTIR SOAL)
-          </div>
-          <p style="font-size: 10pt; font-style: italic; margin-top: 0; margin-bottom: 8pt;">
-            Pilihlah salah satu jawaban yang paling tepat dengan memberi tanda silang (X) pada huruf A, B, C, atau D pada lembar jawaban!
-          </p>
+          <h4 style="margin: 8pt 0 4pt 0; font-size: 11.5pt; font-weight: bold; font-family: 'Times New Roman', Times, serif;">
+            Pilihan Ganda
+          </h4>
 
           <div class="two-columns-section">
             ${mcqHtml}
           </div>
 
-          <!-- ── BAGIAN II: URAIAN / ESSAY ── -->
-          ${
-            essayQuestions.length > 0
-              ? `
-            <div style="page-break-before: auto; margin-top: 14pt;">
-              <div class="section-title">
-                B. SOAL URAIAN / ESSAY (${essayQuestions.length} BUTIR SOAL)
-              </div>
-              <p style="font-size: 10pt; font-style: italic; margin-top: 0; margin-bottom: 8pt;">
-                Jawablah pertanyaan-pertanyaan berikut dengan jelas, lengkap, runtut, dan benar!
-              </p>
-              <div>
-                ${essayHtml}
-              </div>
-            </div>
-          `
-              : ''
-          }
+          <!-- ── BAGIAN II: ESSAY ── -->
+          <h4 style="margin: 14pt 0 4pt 0; font-size: 11.5pt; font-weight: bold; font-family: 'Times New Roman', Times, serif;">
+            Essay
+          </h4>
+
+          <div>
+            ${essayHtml}
+          </div>
+
+          <!-- ── LEMBAR JAWABAN SISWA (SESUAI BERKAS FILE DOCX) ── -->
+          <div style="page-break-before: always; margin-top: 16pt;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 6pt; border: none;">
+              <tr>
+                <td style="width: 55pt; vertical-align: middle; text-align: left; padding: 0;">
+                  <img src="${KOP_LOGO_BASE64}" alt="Logo" style="width: 46pt; height: 46pt; object-fit: contain;" />
+                </td>
+                <td style="vertical-align: middle; text-align: center; padding: 0 4pt;">
+                  <h2 style="margin: 0; font-size: 12pt; font-weight: bold; font-family: 'Times New Roman', Times, serif; text-transform: uppercase;">
+                    ${examHeadingLine1} — LEMBAR JAWABAN
+                  </h2>
+                  <h3 style="margin: 2pt 0 0 0; font-size: 11pt; font-weight: bold; font-family: 'Times New Roman', Times, serif; text-transform: uppercase;">
+                    ${institutionName} • TAHUN ${academicYear}
+                  </h3>
+                </td>
+                <td style="width: 55pt;"></td>
+              </tr>
+            </table>
+
+            <table style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', Times, serif; font-size: 10pt; margin-bottom: 8pt; border: none;">
+              <tr>
+                <td style="width: 16%; font-weight: bold; padding: 2pt 0;">Mata Pelajaran</td>
+                <td style="width: 34%; padding: 2pt 0;">: ${subject}</td>
+                <td style="width: 16%; font-weight: bold; padding: 2pt 0;">Nama Siswa</td>
+                <td style="width: 34%; padding: 2pt 0;">: ........................................</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 2pt 0;">Kelas/ Semester</td>
+                <td style="padding: 2pt 0;">: Kelas ${gradeClass}/${semesterRomawi}</td>
+                <td style="font-weight: bold; padding: 2pt 0;">Hari/ Tanggal</td>
+                <td style="padding: 2pt 0;">: ........................................</td>
+              </tr>
+            </table>
+
+            <h4 style="margin: 6pt 0 4pt 0; font-size: 11pt; font-weight: bold; font-family: 'Times New Roman', Times, serif;">
+              Pilihan Ganda
+            </h4>
+
+            <table style="width: 100%; border-collapse: collapse; font-family: 'Times New Roman', Times, serif; font-size: 9.5pt; margin-bottom: 8pt;">
+              <thead>
+                <tr>
+                  <th colspan="20" style="text-align: left; padding: 3pt 4pt; border: 1pt solid #000; background-color: #f0f0f0; font-size: 9.5pt;">
+                    Nama : ............................................................................
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                ${gridRows}
+              </tbody>
+            </table>
+
+            <h4 style="margin: 10pt 0 4pt 0; font-size: 11pt; font-weight: bold; font-family: 'Times New Roman', Times, serif;">
+              Essay
+            </h4>
+            ${essayAnswerBoxes}
+          </div>
 
           <!-- Footer Cetak -->
-          <div style="margin-top: 20pt; text-align: center; font-size: 9pt; font-style: italic; color: #555; border-top: 0.5pt dashed #aaa; padding-top: 6pt;">
+          <div style="margin-top: 16pt; text-align: center; font-size: 9pt; font-style: italic; color: #555; border-top: 0.5pt dashed #aaa; padding-top: 6pt;">
             *** Selamat Mengerjakan &amp; Semoga Sukses — Kejujuran Adalah Kunci Keberkahan ***
           </div>
         </div>
@@ -563,35 +610,32 @@ export class ExamPaperDocxService {
    */
   public static generatePlainTextExamPaper(data: ExamPaperData): string {
     const {
-      foundationName,
       institutionName,
-      examTypeLabel,
+      examType,
       semester,
       academicYear,
       subject,
       gradeClass,
-      durationMinutes,
       mcqQuestions,
       essayQuestions,
     } = data;
 
+    const isASTS = examType === 'ASTS';
+    const examHeadingLine1 = isASTS
+      ? `ASESMEN SUMATIF TENGAH SEMESTER (ASTS) ${semester === 'GANJIL' ? 'GANJIL' : 'GENAP'}`
+      : `ASESMEN SUMATIF AKHIR SEMESTER (ASAS) ${semester === 'GANJIL' ? 'GANJIL' : 'GENAP'}`;
+    const semesterRomawi = semester === 'GANJIL' ? 'Semester I' : 'Semester II';
+
     const lines: string[] = [
-      foundationName.toUpperCase(),
+      examHeadingLine1,
       institutionName.toUpperCase(),
-      'Jl. Raya Cibungbulang - Ciampea, Kab. Bogor, Jawa Barat',
+      `TAHUN ${academicYear}`,
       '================================================================================',
-      examTypeLabel.toUpperCase(),
-      `SEMESTER ${semester} • TAHUN AJARAN ${academicYear}`,
-      '--------------------------------------------------------------------------------',
-      `Mata Pelajaran : ${subject}`,
-      `Tingkat Kelas  : Kelas ${gradeClass}`,
-      `Alokasi Waktu  : ${durationMinutes} Menit`,
-      'Hari, Tanggal  : ........................................',
-      'Nama Peserta   : ........................................',
+      `Mata Pelajaran  : ${subject.padEnd(28)} Nama Siswa   : ........................................`,
+      `Kelas/ Semester : Kelas ${gradeClass}/${semesterRomawi.padEnd(20)} Hari/ Tanggal : ........................................`,
       '--------------------------------------------------------------------------------',
       '',
-      `A. SOAL PILIHAN GANDA (${mcqQuestions.length} BUTIR SOAL)`,
-      'Petunjuk: Pilihlah salah satu jawaban yang paling tepat (A, B, C, atau D)!',
+      'Pilihan Ganda',
       '',
     ];
 
@@ -606,8 +650,7 @@ export class ExamPaperDocxService {
 
     if (essayQuestions.length > 0) {
       lines.push('--------------------------------------------------------------------------------');
-      lines.push(`B. SOAL URAIAN / ESSAY (${essayQuestions.length} BUTIR SOAL)`);
-      lines.push('Petunjuk: Jawablah pertanyaan-pertanyaan berikut dengan jelas, lengkap dan benar!');
+      lines.push('Essay');
       lines.push('');
 
       essayQuestions.forEach((eq) => {

@@ -27,8 +27,9 @@ export class ExamAiCreatorService {
    * Main entry: Generates complete ExamPaperData with questions, keys, and kisi-kisi
    */
   public static async generateExamPaper(params: ExamGenerationParams): Promise<ExamPaperData> {
-    const institutionName = 'SMP TERPADU AL-ITTIHADIYAH';
-    const foundationName = 'YAYASAN AL-ITTIHADIYAH';
+    const isSMA = params.gradeClass === 'SMA' || params.gradeClass?.toLowerCase().includes('sma');
+    const institutionName = isSMA ? 'SMA TERPADU AS SALAAM' : 'SMP TERPADU AL-ITTIHADIYAH';
+    const foundationName = isSMA ? 'YAYASAN AS SALAAM' : 'YAYASAN AL-ITTIHADIYAH';
 
     const examTypeLabel =
       params.examType === 'ASTS'
@@ -41,6 +42,31 @@ export class ExamAiCreatorService {
       // 1. Try calling Groq AI
       const aiResult = await this.queryAiEngine(params);
       if (aiResult && aiResult.mcqQuestions.length > 0) {
+        let finalEssay = aiResult.essayQuestions || [];
+
+        // If raw questions mode and AI missed essays, extract from raw content
+        if (finalEssay.length === 0 && params.inputMode === 'PARSE_RAW_QUESTIONS' && params.contentPrompt?.trim()) {
+          const parsedRaw = this.parseRawQuestionsHeuristic(params.contentPrompt, params.subject);
+          if (parsedRaw && parsedRaw.essayQuestions && parsedRaw.essayQuestions.length > 0) {
+            finalEssay = parsedRaw.essayQuestions;
+          }
+        }
+
+        // Guarantee at least params.essayCount essay questions
+        const targetEssayCount = Math.max(1, params.essayCount || 5);
+        if (!finalEssay || finalEssay.length === 0) {
+          finalEssay = this.generateDefaultEssayQuestions(params);
+        } else if (finalEssay.length < targetEssayCount) {
+          const needed = targetEssayCount - finalEssay.length;
+          const extras = this.generateDefaultEssayQuestions({ ...params, essayCount: needed });
+          extras.forEach((ext) => {
+            finalEssay.push({
+              ...ext,
+              number: finalEssay.length + 1,
+            });
+          });
+        }
+
         return {
           institutionName,
           foundationName,
@@ -54,7 +80,7 @@ export class ExamAiCreatorService {
           durationMinutes: params.durationMinutes,
           teacherName: params.teacherName,
           mcqQuestions: aiResult.mcqQuestions,
-          essayQuestions: aiResult.essayQuestions,
+          essayQuestions: finalEssay,
         };
       }
     } catch (err) {
@@ -63,6 +89,21 @@ export class ExamAiCreatorService {
 
     // 2. Intelligent Heuristic Fallback Engine
     const fallback = this.generateIntelligentFallback(params);
+    let finalEssay = fallback.essayQuestions || [];
+    const targetEssayCount = Math.max(1, params.essayCount || 5);
+    if (!finalEssay || finalEssay.length === 0) {
+      finalEssay = this.generateDefaultEssayQuestions(params);
+    } else if (finalEssay.length < targetEssayCount) {
+      const needed = targetEssayCount - finalEssay.length;
+      const extras = this.generateDefaultEssayQuestions({ ...params, essayCount: needed });
+      extras.forEach((ext) => {
+        finalEssay.push({
+          ...ext,
+          number: finalEssay.length + 1,
+        });
+      });
+    }
+
     return {
       institutionName,
       foundationName,
@@ -76,7 +117,7 @@ export class ExamAiCreatorService {
       durationMinutes: params.durationMinutes,
       teacherName: params.teacherName,
       mcqQuestions: fallback.mcqQuestions,
-      essayQuestions: fallback.essayQuestions,
+      essayQuestions: finalEssay,
     };
   }
 
@@ -283,10 +324,194 @@ Balas HANYA dengan JSON sesuai struktur ini:
       });
     }
 
+    // Jika soal essay kosong dari teks mentah, buatkan butir essay berkualitas tinggi otomatis
+    if (essayQuestions.length === 0) {
+      const autoEssays = this.generateDefaultEssayQuestions({
+        subject,
+        gradeClass: '8',
+        category: 'NON_EKSAK',
+        examType: 'ASTS',
+        semester: 'GANJIL',
+        academicYear: '2026/2027',
+        mcqCount: mcqQuestions.length || 25,
+        essayCount: 5,
+        durationMinutes: 90,
+      });
+      essayQuestions.push(...autoEssays);
+    }
+
     if (mcqQuestions.length > 0) {
       return { mcqQuestions, essayQuestions };
     }
     return null;
+  }
+
+  /**
+   * Generates curriculum-aligned default essay questions for a given subject
+   */
+  public static generateDefaultEssayQuestions(
+    params: ExamGenerationParams | { subject: string; gradeClass?: string; category?: string; essayCount?: number }
+  ): EssayQuestionItem[] {
+    const isEksak = params.category === 'EKSAK';
+    const targetCount = Math.max(1, params.essayCount || 5);
+    const essayMax = Math.round(100 / targetCount);
+    const sub = (params.subject || '').toLowerCase();
+    const essayQuestions: EssayQuestionItem[] = [];
+
+    for (let j = 1; j <= targetCount; j++) {
+      let eqText = '';
+      let ansText = '';
+
+      if (sub.includes('matematika')) {
+        const mathBank = [
+          {
+            q: 'Sebuah fungsi linear dirumuskan dengan f(x) = 3x - 5. Tentukan nilai f(4) dan carilah nilai k jika diketahui f(k) = 16! Uraikan langkah penyelesaiannya secara runtut!',
+            a: '1) f(4) = 3(4) - 5 = 12 - 5 = 7 (Skor 10).\n2) 3k - 5 = 16 => 3k = 21 => k = 7 (Skor 10).',
+          },
+          {
+            q: 'Sebuah kolam penampungan air berbentuk balok berukuran panjang 120 cm, lebar 80 cm, dan tinggi 100 cm terisi air setengahnya. Berapa liter volume air yang harus ditambahkan agar kolam terisi penuh?',
+            a: '1) Volume balok = p × l × t = 120 × 80 × 100 = 960.000 cm³ = 960 Liter (Skor 10).\n2) Air tambahan = 1/2 × 960 = 480 Liter (Skor 10).',
+          },
+          {
+            q: 'Dua bilangan cacah berjumlah 45 dan selisihnya adalah 15. Buatlah sistem persamaan linear dua variabel (SPLDV) dan tentukan hasil kali kedua bilangan tersebut!',
+            a: '1) SPLDV: x + y = 45 dan x - y = 15 (Skor 8).\n2) x = 30, y = 15 (Skor 6).\n3) Hasil kali = 30 × 15 = 450 (Skor 6).',
+          },
+          {
+            q: 'Sebuah segitiga siku-siku memiliki panjang hipotenusa 25 cm dan salah satu sisi siku-sikunya 24 cm. Hitunglah panjang sisi tegak lainnya dan luas segitiga tersebut!',
+            a: '1) b = √(25² - 24²) = √(625 - 576) = √49 = 7 cm (Skor 10).\n2) Luas = 1/2 × 7 × 24 = 84 cm² (Skor 10).',
+          },
+          {
+            q: 'Toko perlengkapan sekolah memberikan diskon 20% untuk tas seharga Rp150.000,00 dan diskon 15% untuk sepatu seharga Rp200.000,00. Hitunglah total uang yang harus dibayarkan pembeli!',
+            a: '1) Harga tas setelah diskon = 80% × 150.000 = Rp120.000,00 (Skor 8).\n2) Harga sepatu setelah diskon = 85% × 200.000 = Rp170.000,00 (Skor 8).\n3) Total bayar = Rp290.000,00 (Skor 4).',
+          },
+        ];
+        const item = mathBank[(j - 1) % mathBank.length];
+        eqText = item.q;
+        ansText = item.a;
+      } else if (sub.includes('ipa') || sub.includes('fisika') || sub.includes('biologi')) {
+        const ipaBank = [
+          {
+            q: 'Jelaskan perbedaan mendasar antara perubahan fisika dan perubahan kimia! Berikan masing-masing 2 contoh peristiwanya dalam kehidupan sehari-hari!',
+            a: '1) Perubahan fisika: tidak terbentuk zat baru, sifat zat tetap, bisa kembali (contoh: es mencair, lilin meleleh) (Skor 10).\n2) Perubahan kimia: terbentuk zat baru dengan sifat berbeda, tidak dapat kembali (contoh: besi berkarat, kayu terbakar) (Skor 10).',
+          },
+          {
+            q: 'Uraikan 3 jenis pembuluh darah pada tubuh manusia (arteri, vena, kapiler) beserta fungsi dan ciri-ciri aliran darahnya masing-masing!',
+            a: '1) Arteri: membawa darah kaya O2 keluar jantung, dinding tebal elastis, denyut terasa (Skor 7).\n2) Vena: membawa darah ke jantung, dinding tipis, ada katup (Skor 7).\n3) Kapiler: pertukaran zat dan gas dengan sel tubuh (Skor 6).',
+          },
+          {
+            q: 'Sebuah balok bermassa 5 kg ditarik dengan gaya horizontal 25 N di atas lantai licin tanpa gesekan. Hitunglah percepatan yang dialami balok berdasarkan Hukum II Newton!',
+            a: '1) Rumus Hukum II Newton: a = F / m (Skor 8).\n2) Perhitungan: a = 25 N / 5 kg = 5 m/s² (Skor 12).',
+          },
+          {
+            q: 'Gambarkan rantai makanan pada ekosistem sawah yang terdiri dari minimal 4 tingkat trofik, serta jelaskan apa yang terjadi jika populasi katak menurun drastis!',
+            a: '1) Rantai makanan: Padi (Produsen) -> Belalang (Konsumen I) -> Katak (Konsumen II) -> Ular (Konsumen III) (Skor 10).\n2) Jika katak menurun: populasi belalang melonjak merusak padi, populasi ular menurun karena kurang mangsa (Skor 10).',
+          },
+          {
+            q: 'Jelaskan prinsip Hukum Archimedes mengenai gaya apung dan sebutkan 2 contoh penerapan teknologi yang menggunakannya!',
+            a: '1) Prinsip: Benda yang dicelupkan ke zat cair mengalami gaya apung sebesar berat zat cair yang dipindahkan (Skor 10).\n2) Contoh: Kapal laut, kapal selam, jembatan ponton, hidrometer (Skor 10).',
+          },
+        ];
+        const item = ipaBank[(j - 1) % ipaBank.length];
+        eqText = item.q;
+        ansText = item.a;
+      } else if (sub.includes('pai') || sub.includes('agama') || sub.includes('islam')) {
+        const paiBank = [
+          {
+            q: 'Jelaskan pengertian sikap jujur, amanah, dan istiqamah serta berikan contoh konkret penerapannya bagi seorang pelajar di sekolah!',
+            a: '1) Jujur: keselarasan hati, perkataan, dan perbuatan (contoh: tidak mencontek) (Skor 7).\n2) Amanah: menjaga kepercayaan (contoh: menyampaikan amanah, menjaga fasilitas kelas) (Skor 7).\n3) Istiqamah: teguh pendirian dalam kebaikan (contoh: disiplin shalat berjamaah) (Skor 6).',
+          },
+          {
+            q: 'Sebutkan rukun shalat fardhu dan jelaskan pentingnya thaharah (bersuci) sebelum melaksanakan ibadah shalat!',
+            a: '1) Thaharah adalah syarat sah shalat yang membersihkan diri dari hadats dan najis lahir batin (Skor 8).\n2) Rukun shalat mencakup niat, takbiratul ihram, membaca Al-Fatihah, ruku, sujud, tasyahud, dan salam (Skor 12).',
+          },
+          {
+            q: 'Uraikan hikmah ditetapkannya zakat fitrah dan zakat mal bagi kesejahteraan umat dan pengentasan kemiskinan dalam Islam!',
+            a: '1) Membersihkan jiwa muzakki dari sifat kikir dan sombong (Skor 8).\n2) Membantu fakir miskin memenuhi kebutuhan pokok dan mempererat ukhuwah islamiyah (Skor 12).',
+          },
+          {
+            q: 'Jelaskan nilai-nilai keteladanan dari Nabi Muhammad SAW dalam peristiwa hijrah ke Madinah dan pembentukan Piagam Madinah!',
+            a: '1) Kesabaran, strategi dakwah matang, dan tawakkal kepada Allah SWT (Skor 10).\n2) Piagam Madinah mengajarkan toleransi, persaudaraan, dan persatuan dalam kemajemukan (Skor 10).',
+          },
+          {
+            q: 'Bagaimanakah sikap seorang muslim yang baik ketika menghadapi perbedaan pendapat dalam kehidupan bermasyarakat sesuai kaidah Al-Qur\'an dan As-Sunnah?',
+            a: '1) Menghargai perbedaan (tasamuh), tabayyun, dan mengedepankan musyawarah (Skor 10).\n2) Berbicara santun, tidak mencela, dan menjaga keutuhan ukhuwah (Skor 10).',
+          },
+        ];
+        const item = paiBank[(j - 1) % paiBank.length];
+        eqText = item.q;
+        ansText = item.a;
+      } else if (sub.includes('indonesia')) {
+        const indoBank = [
+          {
+            q: 'Jelaskan struktur teks laporan hasil observasi (LHO) yang baik dan sebutkan 2 ciri kebahasaan yang membedakannya dengan teks deskripsi!',
+            a: '1) Struktur LHO: Pernyataan umum/definisi, Deskripsi bagian, Deskripsi manfaat/kesimpulan (Skor 10).\n2) Ciri kebahasaan: menggunakan kata ilmiah/istilah teknis, verba relasional, kalimat definisi (Skor 10).',
+          },
+          {
+            q: 'Uraikan perbedaan antara fakta dan opini dalam teks persuasi! Berikan masing-masing 1 contoh kalimat fakta dan opini!',
+            a: '1) Fakta: kebenaran objektif yang dapat dibuktikan (contoh: "Indonesia memiliki lebih dari 17.000 pulau") (Skor 10).\n2) Opini: pendapat subjektif (contoh: "Membaca buku adalah kegiatan paling menyenangkan di akhir pekan") (Skor 10).',
+          },
+          {
+            q: 'Jelaskan unsur intrinsik cerita pendek (cerpen) yang meliputi tema, alur, tokoh & penokohan, latar, sudut pandang, dan amanat!',
+            a: 'Siswa menguraikan ke-6 unsur intrinsik secara komprehensif dengan definisi yang tepat masing-masing (Skor 20).',
+          },
+          {
+            q: 'Perbaikilah kalimat tidak efektif berikut agar menjadi kalimat baku sesuai PUEBI: "Bagi para siswa-siswa sekalian diharapkan untuk segera memasuki ke dalam ruangan aula."',
+            a: 'Perbaikan baku: "Para siswa diharapkan segera memasuki ruang aula." (Menghilangkan pemborosan kata: bagi, para + siswa-siswa, sekalian, ke dalam) (Skor 20).',
+          },
+          {
+            q: 'Buatlah sebuah teks iklan singkat bertema ajakan menjaga kebersihan lingkungan sekolah yang memuat unsur imperatif dan persuasif!',
+            a: 'Kriteria: memuat kalimat ajakan jelas, bahasa santun, relevan dengan lingkungan sekolah, dan komunikatif (Skor 20).',
+          },
+        ];
+        const item = indoBank[(j - 1) % indoBank.length];
+        eqText = item.q;
+        ansText = item.a;
+      } else if (sub.includes('inggris') || sub.includes('english')) {
+        const engBank = [
+          {
+            q: 'Explain the social function and generic structure of a Descriptive Text! Write a short descriptive paragraph (3-4 sentences) about your school.',
+            a: '1) Social function: To describe a particular person, place, or thing (Score 8).\n2) Structure: Identification and Description (Score 6).\n3) Paragraph: Clean sentences with appropriate adjectives (Score 6).',
+          },
+          {
+            q: 'Change the following direct sentence into indirect speech: "Teacher said: Do your homework carefully before tomorrow."',
+            a: 'Indirect speech: The teacher told us to do our homework carefully before the next day (Score 20).',
+          },
+          {
+            q: 'Write 3 sentences in Simple Past Tense using regular and irregular verbs about your past weekend holiday activities!',
+            a: 'Criteria: 1) Correct past verb forms (V2), 2) Proper time signals (yesterday, last weekend), 3) Grammatical coherence (Score 20).',
+          },
+          {
+            q: 'What is the difference between a Recount Text and a Narrative Text? Explain their respective purposes and main features.',
+            a: '1) Recount text retells past factual events/experiences chronologically (Score 10).\n2) Narrative text entertains readers with an imaginative story containing complication and resolution (Score 10).',
+          },
+          {
+            q: 'Compose a formal congratulation message to your classmate who just won a national science Olympiad competition!',
+            a: 'Criteria: Appropriate expression of congratulations, appreciation, sincere wish, and proper polite tone (Score 20).',
+          },
+        ];
+        const item = engBank[(j - 1) % engBank.length];
+        eqText = item.q;
+        ansText = item.a;
+      } else if (isEksak) {
+        eqText = `Jelaskan prinsip dasar, formulasi/rumus, serta langkah sistematis dalam menyelesaikan permasalahan nomor ${j} pada materi pembelajaran ${params.subject}! Berikan contoh perhitungannya secara runtut!`;
+        ansText = `Siswa menjelaskan: 1) Identifikasi besaran diketahui dan ditanyakan (skor 6), 2) Penulisan rumus yang tepat (skor 7), 3) Eksekusi perhitungan aljabar runtut dan satuan benar (skor 7).`;
+      } else {
+        eqText = `Uraikan analisis komprehensif Anda mengenai keterkaitan materi ${params.subject} bagian ke-${j} dengan penerapannya dalam kehidupan bermasyarakat! Berikan minimal 2 contoh kontekstual nyata!`;
+        ansText = `Siswa menguraikan: 1) Landasan konsep dan definisi pokok (skor 7), 2) Dua contoh penerapan nyata yang relevan (skor 8), 3) Kesimpulan kritis dan refleksi diri (skor 5).`;
+      }
+
+      essayQuestions.push({
+        number: j,
+        question: eqText,
+        expectedAnswer: ansText,
+        maxScore: essayMax,
+        topic: `${params.subject} - Analisis Bab ${j}`,
+        indicator: `Siswa dapat menguraikan dan memecahkan masalah kontekstual materi ${params.subject}.`,
+        cognitiveLevel: j % 2 === 0 ? 'L3 (C4-C5)' : 'L2 (C3)',
+      });
+    }
+
+    return essayQuestions;
   }
 
   /**
@@ -299,11 +524,13 @@ Balas HANYA dengan JSON sesuai struktur ini:
     if (params.inputMode === 'PARSE_RAW_QUESTIONS' && params.contentPrompt?.trim()) {
       const parsed = this.parseRawQuestionsHeuristic(params.contentPrompt, params.subject);
       if (parsed && parsed.mcqQuestions.length > 0) {
+        if (!parsed.essayQuestions || parsed.essayQuestions.length === 0) {
+          parsed.essayQuestions = this.generateDefaultEssayQuestions(params);
+        }
         return parsed;
       }
     }
 
-    const isEksak = params.category === 'EKSAK';
     const keys: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D'];
 
     // Bank template soal cerdas per mata pelajaran
@@ -367,30 +594,7 @@ Balas HANYA dengan JSON sesuai struktur ini:
       });
     }
 
-    const essayQuestions: EssayQuestionItem[] = [];
-    const essayMax = Math.round(100 / Math.max(1, params.essayCount));
-    for (let j = 1; j <= params.essayCount; j++) {
-      let eqText = '';
-      let ansText = '';
-
-      if (isEksak) {
-        eqText = `Jelaskan langkah-langkah sistematis dalam menyelesaikan permasalahan nomor ${j} pada materi ${params.subject}, kemudian tuliskan rumus serta hasil akhir perhitungan secara runtut!`;
-        ansText = `Siswa menuliskan: 1) Diketahui dan Ditanyakan secara lengkap (skor 5), 2) Rumus/Metode yang tepat (skor 7), 3) Langkah substitusi dan perhitungan aljabar (skor 5), 4) Kesimpulan akhir dan satuan yang benar (skor 3).`;
-      } else {
-        eqText = `Uraikan pendapat dan analisis Anda mengenai keterkaitan konsep materi ${params.subject} dengan penerapannya dalam kehidupan bermasyarakat sehari-hari! Berikan minimal 3 contoh konkret!`;
-        ansText = `Siswa menjelaskan: 1) Definisi konsep secara komprehensif (skor 6), 2) Tiga contoh penerapan konkret yang relevan (skor 9), 3) Analisis dampak positif dan kesimpulan yang logis (skor 5).`;
-      }
-
-      essayQuestions.push({
-        number: j,
-        question: eqText,
-        expectedAnswer: ansText,
-        maxScore: essayMax,
-        topic: `Materi Uraian Komprehensif (${params.subject})`,
-        indicator: `Siswa dapat menguraikan, menganalisis, dan memecahkan masalah kontekstual pada materi ${params.subject}.`,
-        cognitiveLevel: 'L3 (Penalaran/C4-C5)',
-      });
-    }
+    const essayQuestions: EssayQuestionItem[] = this.generateDefaultEssayQuestions(params);
 
     return { mcqQuestions, essayQuestions };
   }

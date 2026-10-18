@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Copy,
   Printer,
+  TableProperties,
 } from 'lucide-react';
 import type { UserProfile, ExamSessionRecord } from '../../../types/database.types';
 import { OFFICIAL_SCHOOL_SUBJECTS } from '../../../config/school-subjects.config';
@@ -29,6 +30,7 @@ import {
   ExamPaperDocxService,
   type ExamPaperData,
 } from '../../../services/exam-paper-docx.service';
+import { KOP_LOGO_BASE64 } from '../../../assets/kop-logo.base64';
 
 interface ExamQuestionCreatorModalProps {
   isOpen: boolean;
@@ -38,7 +40,7 @@ interface ExamQuestionCreatorModalProps {
 }
 
 type WizardStep = 'PARAMS' | 'INPUT_CONTENT' | 'PREVIEW_AND_ACTION';
-type PreviewTab = 'PAPER' | 'KEYS' | 'KISI_KISI';
+type PreviewTab = 'PAPER' | 'KEYS' | 'KISI_KISI' | 'LEMBAR_JAWABAN';
 
 export const EXAMPLE_MCQ_TEMPLATE = `A. SOAL PILIHAN GANDA
 1. Hasil dari operasi hitung 24 + 16 × 2 adalah...
@@ -847,11 +849,11 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
             <div className="space-y-4 animate-fadeIn">
               {/* Tab Selector */}
               <div className="flex items-center justify-between border-b border-slate-200 pb-2 flex-wrap gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setPreviewTab('PAPER')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
                       previewTab === 'PAPER'
                         ? 'bg-[#023246] text-white shadow-xs'
                         : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -863,7 +865,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                   <button
                     type="button"
                     onClick={() => setPreviewTab('KEYS')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
                       previewTab === 'KEYS'
                         ? 'bg-[#023246] text-white shadow-xs'
                         : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -875,7 +877,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                   <button
                     type="button"
                     onClick={() => setPreviewTab('KISI_KISI')}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
                       previewTab === 'KISI_KISI'
                         ? 'bg-[#023246] text-white shadow-xs'
                         : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -883,6 +885,18 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                   >
                     <ClipboardList className="w-3.5 h-3.5" />
                     <span>3. Matriks Kisi-Kisi</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('LEMBAR_JAWABAN')}
+                    className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      previewTab === 'LEMBAR_JAWABAN'
+                        ? 'bg-[#023246] text-white shadow-xs'
+                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    <TableProperties className="w-3.5 h-3.5" />
+                    <span>4. Lembar Jawaban Siswa</span>
                   </button>
                 </div>
 
@@ -892,7 +906,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                     <span>{generatedData.mcqQuestions.length} PG + {generatedData.essayQuestions.length} Essay Siap</span>
                   </span>
 
-                  {previewTab === 'PAPER' && (
+                  {(previewTab === 'PAPER' || previewTab === 'LEMBAR_JAWABAN') && (
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
@@ -907,10 +921,10 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                         type="button"
                         onClick={handlePrintExamPaper}
                         className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs active:scale-95"
-                        title="Cetak Naskah Soal Langsung (2 Kolom Times New Roman)"
+                        title="Cetak Naskah Soal & Lembar Jawaban (Format Times New Roman)"
                       >
                         <Printer className="w-3 h-3 text-slate-700" />
-                        <span>Cetak Soal</span>
+                        <span>Cetak</span>
                       </button>
                     </div>
                   )}
@@ -923,60 +937,60 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                 {previewTab === 'PAPER' && (
                   <div
                     style={{ fontFamily: '"Times New Roman", Times, serif' }}
-                    className="space-y-4 text-slate-900 leading-normal"
+                    className="exam-paper-times-new-roman space-y-4 text-black leading-normal"
                   >
-                    {/* Header KOP Resmi */}
-                    <div className="text-center border-b-2 border-slate-900 pb-3">
-                      <p className="text-xs font-bold tracking-wider uppercase text-slate-700" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                        {generatedData.foundationName}
-                      </p>
-                      <h3 className="text-base sm:text-lg font-black tracking-wide uppercase text-slate-950 mt-0.5" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                        {generatedData.institutionName}
-                      </h3>
-                      <p className="text-[10px] text-slate-600 mt-0.5" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                        Jl. Raya Cibungbulang - Ciampea, Kab. Bogor, Jawa Barat • Telp: (0251) 8624123
-                      </p>
-                      <div className="border-t-2 border-b border-slate-900 my-2 h-1"></div>
-                      <h4 className="text-xs sm:text-sm font-bold uppercase text-slate-900" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                        {generatedData.examTypeLabel}
-                      </h4>
-                      <p className="text-xs font-bold uppercase text-slate-800" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                        SEMESTER {generatedData.semester} • TAHUN AJARAN {generatedData.academicYear}
-                      </p>
+                    {/* Header KOP Resmi Persis Berkas Word Docx */}
+                    <div className="flex items-center justify-between pb-2 border-b-2 border-black">
+                      <div className="shrink-0 w-16 sm:w-20">
+                        <img
+                          src="/kop-soal-logo.jpeg"
+                          alt="Logo Al-Ittihadiyah"
+                          className="w-14 h-14 sm:w-16 sm:h-16 object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = KOP_LOGO_BASE64;
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 text-center px-2">
+                        <h3 className="text-xs sm:text-sm md:text-base font-bold tracking-normal uppercase text-black leading-tight">
+                          {generatedData.examType === 'ASTS'
+                            ? `ASESMEN SUMATIF TENGAH SEMESTER (ASTS) ${generatedData.semester === 'GANJIL' ? 'GANJIL' : 'GENAP'}`
+                            : `ASESMEN SUMATIF AKHIR SEMESTER (ASAS) ${generatedData.semester === 'GANJIL' ? 'GANJIL' : 'GENAP'}`}
+                        </h3>
+                        <h2 className="text-sm sm:text-base md:text-lg font-bold tracking-normal uppercase text-black mt-0.5 leading-tight">
+                          {generatedData.institutionName}
+                        </h2>
+                        <h4 className="text-xs sm:text-sm md:text-base font-bold uppercase text-black mt-0.5 leading-tight">
+                          TAHUN {generatedData.academicYear}
+                        </h4>
+                      </div>
+                      <div className="shrink-0 w-16 sm:w-20 hidden sm:block"></div>
                     </div>
 
-                    {/* Meta Table */}
-                    <div
-                      style={{ fontFamily: '"Times New Roman", Times, serif' }}
-                      className="grid grid-cols-2 text-xs border border-slate-900 p-2.5 rounded-none bg-white gap-2"
-                    >
-                      <div>
-                        <span className="font-semibold">Mata Pelajaran:</span>{' '}
-                        <strong>{generatedData.subject}</strong>
-                      </div>
-                      <div>
-                        <span className="font-semibold">Kelas:</span>{' '}
-                        <strong>Kelas {generatedData.gradeClass}</strong>
-                      </div>
-                      <div>
-                        <span className="font-semibold">Alokasi Waktu:</span>{' '}
-                        <strong>{generatedData.durationMinutes} Menit</strong>
-                      </div>
-                      <div>
-                        <span className="font-semibold">Hari, Tanggal:</span>{' '}
-                        <span>........................, .................... 2026</span>
-                      </div>
-                    </div>
+                    {/* Tabel Metadata Persis Sesuai Berkas Docx */}
+                    <table className="w-full text-xs font-serif text-black border-collapse my-2">
+                      <tbody>
+                        <tr>
+                          <td className="w-[18%] font-bold py-1">Mata Pelajaran</td>
+                          <td className="w-[32%] font-bold py-1">: {generatedData.subject}</td>
+                          <td className="w-[18%] font-bold py-1">Nama Siswa</td>
+                          <td className="w-[32%] py-1">: ........................................</td>
+                        </tr>
+                        <tr>
+                          <td className="font-bold py-1">Kelas/ Semester</td>
+                          <td className="font-bold py-1">: Kelas {generatedData.gradeClass}/{generatedData.semester === 'GANJIL' ? 'Semester I' : 'Semester II'}</td>
+                          <td className="font-bold py-1">Hari/ Tanggal</td>
+                          <td className="py-1">: ........................................</td>
+                        </tr>
+                      </tbody>
+                    </table>
 
                     {/* Petunjuk Umum */}
-                    <div
-                      style={{ fontFamily: '"Times New Roman", Times, serif' }}
-                      className="border border-slate-900 p-2.5 text-[11px] leading-relaxed bg-slate-50/40"
-                    >
+                    <div className="border border-black p-2 text-[11px] leading-relaxed bg-slate-50/40">
                       <strong>PETUNJUK UMUM:</strong>
-                      <ol className="list-decimal pl-4 mt-1 space-y-0.5">
+                      <ol className="list-decimal pl-4 mt-0.5 space-y-0.5">
                         <li>Berdoalah sebelum mengerjakan soal!</li>
-                        <li>Tuliskan nama lengkap dan nomor peserta pada lembar jawaban yang tersedia!</li>
+                        <li>Tuliskan nama lengkap dan kelas pada lembar jawaban yang tersedia!</li>
                         <li>Dahulukan menjawab soal-soal yang Anda anggap lebih mudah!</li>
                         <li>Periksalah kembali seluruh pekerjaan Anda sebelum diserahkan kepada pengawas ujian!</li>
                       </ol>
@@ -984,18 +998,15 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
 
                     {/* Bagian A: Pilihan Ganda (TATA LETAK DUA KOLOM TIMES NEW ROMAN) */}
                     <div className="pt-2">
-                      <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1 mb-3">
-                        <h5
-                          style={{ fontFamily: '"Times New Roman", Times, serif' }}
-                          className="text-xs sm:text-sm font-bold uppercase text-slate-900"
-                        >
-                          A. Soal Pilihan Ganda ({generatedData.mcqQuestions.length} Butir Soal)
-                        </h5>
-                        <span className="text-[10.5px] font-sans text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                      <div className="flex items-center justify-between border-b border-black pb-1 mb-3">
+                        <h4 className="text-xs sm:text-sm font-bold uppercase text-black">
+                          Pilihan Ganda ({generatedData.mcqQuestions.length} Butir Soal)
+                        </h4>
+                        <span className="text-[10px] text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 font-sans">
                           Format 2 Kolom Times New Roman
                         </span>
                       </div>
-                      <p className="text-[10.5px] italic text-slate-600 mb-3" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+                      <p className="text-[10.5px] italic text-slate-700 mb-3">
                         Pilihlah salah satu jawaban yang paling tepat dengan memberi tanda silang (X) pada huruf A, B, C, atau D pada lembar jawaban!
                       </p>
 
@@ -1005,12 +1016,11 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                           <div
                             key={q.number}
                             className="break-inside-avoid mb-4 text-xs leading-relaxed"
-                            style={{ fontFamily: '"Times New Roman", Times, serif' }}
                           >
-                            <p className="font-bold text-slate-900">
+                            <p className="font-bold text-black">
                               {q.number}. {q.question}
                             </p>
-                            <div className="mt-1 pl-4 space-y-0.5 text-slate-800">
+                            <div className="mt-1 pl-4 space-y-0.5 text-black">
                               <div><span className="font-bold">A.</span> {q.options.A}</div>
                               <div><span className="font-bold">B.</span> {q.options.B}</div>
                               <div><span className="font-bold">C.</span> {q.options.C}</div>
@@ -1022,38 +1032,32 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                     </div>
 
                     {/* Bagian B: Essay */}
-                    {generatedData.essayQuestions.length > 0 && (
-                      <div className="pt-4 border-t-2 border-slate-900">
-                        <h5
-                          style={{ fontFamily: '"Times New Roman", Times, serif' }}
-                          className="text-xs sm:text-sm font-bold uppercase text-slate-900 border-b border-slate-900 pb-1 mb-2"
-                        >
-                          B. Soal Uraian / Essay ({generatedData.essayQuestions.length} Butir Soal)
-                        </h5>
-                        <p className="text-[10.5px] italic text-slate-600 mb-3" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-                          Jawablah pertanyaan-pertanyaan berikut dengan jelas, lengkap, runtut, dan benar!
-                        </p>
-                        <div className="space-y-3">
-                          {generatedData.essayQuestions.map((eq) => (
-                            <div
-                              key={eq.number}
-                              className="text-xs leading-relaxed"
-                              style={{ fontFamily: '"Times New Roman", Times, serif' }}
-                            >
-                              <p className="font-bold text-slate-900">
-                                {eq.number}. {eq.question}
-                                <span className="text-[10.5px] text-slate-500 ml-1 italic font-normal">
-                                  (Skor Maks: {eq.maxScore})
-                                </span>
-                              </p>
-                            </div>
-                          ))}
-                        </div>
+                    <div className="pt-4 border-t-2 border-black">
+                      <h4 className="text-xs sm:text-sm font-bold uppercase text-black border-b border-black pb-1 mb-2">
+                        Essay ({generatedData.essayQuestions.length} Butir Soal)
+                      </h4>
+                      <p className="text-[10.5px] italic text-slate-700 mb-3">
+                        Jawablah pertanyaan-pertanyaan berikut dengan jelas, lengkap, runtut, dan benar!
+                      </p>
+                      <div className="space-y-3">
+                        {generatedData.essayQuestions.map((eq) => (
+                          <div
+                            key={eq.number}
+                            className="text-xs leading-relaxed"
+                          >
+                            <p className="font-bold text-black">
+                              {eq.number}. {eq.question}
+                              <span className="text-[10.5px] text-slate-600 ml-1 italic font-normal">
+                                (Skor Maks: {eq.maxScore})
+                              </span>
+                            </p>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    </div>
 
                     {/* Footer Naskah */}
-                    <div className="pt-4 border-t border-dashed border-slate-400 text-center text-[10px] italic text-slate-500">
+                    <div className="pt-4 border-t border-dashed border-slate-400 text-center text-[10px] italic text-slate-600">
                       *** Selamat Mengerjakan &amp; Semoga Sukses — Kejujuran Adalah Kunci Keberkahan ***
                     </div>
                   </div>
@@ -1145,6 +1149,111 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+
+                {/* 4. PREVIEW LEMBAR JAWABAN SISWA (PERSIS BERKAS DOCX) */}
+                {previewTab === 'LEMBAR_JAWABAN' && (
+                  <div
+                    style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                    className="exam-paper-times-new-roman space-y-4 text-black leading-normal"
+                  >
+                    {/* Header Lembar Jawaban */}
+                    <div className="flex items-center justify-between pb-2 border-b-2 border-black">
+                      <div className="shrink-0 w-14 sm:w-16">
+                        <img
+                          src="/kop-soal-logo.jpeg"
+                          alt="Logo Al-Ittihadiyah"
+                          className="w-12 h-12 sm:w-14 sm:h-14 object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = KOP_LOGO_BASE64;
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 text-center px-2">
+                        <h3 className="text-xs sm:text-sm md:text-base font-bold tracking-normal uppercase text-black leading-tight">
+                          {generatedData.examType === 'ASTS'
+                            ? `ASESMEN SUMATIF TENGAH SEMESTER (ASTS) ${generatedData.semester === 'GANJIL' ? 'GANJIL' : 'GENAP'}`
+                            : `ASESMEN SUMATIF AKHIR SEMESTER (ASAS) ${generatedData.semester === 'GANJIL' ? 'GANJIL' : 'GENAP'}`} — LEMBAR JAWABAN
+                        </h3>
+                        <h2 className="text-sm sm:text-base md:text-lg font-bold tracking-normal uppercase text-black mt-0.5 leading-tight">
+                          {generatedData.institutionName} • TAHUN {generatedData.academicYear}
+                        </h2>
+                      </div>
+                      <div className="shrink-0 w-14 sm:w-16 hidden sm:block"></div>
+                    </div>
+
+                    {/* Metadata */}
+                    <table className="w-full text-xs font-serif text-black border-collapse my-2">
+                      <tbody>
+                        <tr>
+                          <td className="w-[18%] font-bold py-1">Mata Pelajaran</td>
+                          <td className="w-[32%] py-1">: {generatedData.subject}</td>
+                          <td className="w-[18%] font-bold py-1">Nama Siswa</td>
+                          <td className="w-[32%] py-1">: ........................................</td>
+                        </tr>
+                        <tr>
+                          <td className="font-bold py-1">Kelas/ Semester</td>
+                          <td className="py-1">: Kelas {generatedData.gradeClass}/{generatedData.semester === 'GANJIL' ? 'Semester I' : 'Semester II'}</td>
+                          <td className="font-bold py-1">Hari/ Tanggal</td>
+                          <td className="py-1">: ........................................</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    {/* Section Pilihan Ganda */}
+                    <div className="pt-2">
+                      <h4 className="text-xs sm:text-sm font-bold text-black mb-2">
+                        Pilihan Ganda
+                      </h4>
+
+                      <div className="border border-black overflow-x-auto">
+                        <div className="p-1.5 bg-slate-100 border-b border-black text-xs font-bold">
+                          Nama : ............................................................................
+                        </div>
+                        <table className="w-full text-xs border-collapse">
+                          <tbody>
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((r) => {
+                              const cols = [r, r + 10, r + 20, r + 30];
+                              return (
+                                <tr key={`lj-row-${r}`} className="border-b border-black last:border-b-0">
+                                  {cols.map((num) => (
+                                    <React.Fragment key={`lj-col-${num}`}>
+                                      <td className="w-[4%] text-center font-bold bg-slate-50 border-r border-black p-1">
+                                        {num}
+                                      </td>
+                                      <td className="w-[5.25%] text-center border-r border-black p-1">A</td>
+                                      <td className="w-[5.25%] text-center border-r border-black p-1">B</td>
+                                      <td className="w-[5.25%] text-center border-r border-black p-1">C</td>
+                                      <td className="w-[5.25%] text-center border-r border-black last:border-r-0 p-1">D</td>
+                                    </React.Fragment>
+                                  ))}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Section Essay */}
+                    <div className="pt-3">
+                      <h4 className="text-xs sm:text-sm font-bold text-black mb-2">
+                        Essay
+                      </h4>
+                      <div className="space-y-2">
+                        {Array.from({ length: Math.max(5, generatedData.essayQuestions.length) }).map((_, idx) => (
+                          <div key={`essay-box-${idx + 1}`} className="border border-black flex">
+                            <div className="w-8 shrink-0 bg-slate-100 border-r border-black text-xs font-bold flex items-center justify-center p-2">
+                              {idx + 1}
+                            </div>
+                            <div className="flex-1 h-14 p-2 text-[11px] text-slate-400 italic">
+                              Tempat menulis jawaban uraian nomor {idx + 1}...
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

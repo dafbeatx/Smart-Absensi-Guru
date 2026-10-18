@@ -269,4 +269,10 @@
   }
 }
 
+/* 📝 Official Exam Paper Typography (Times New Roman Strict Scoping) */
+.exam-paper-times-new-roman,
+.exam-paper-times-new-roman * {
+  font-family: 'Times New Roman', Times, serif !important;
+}
+
 
