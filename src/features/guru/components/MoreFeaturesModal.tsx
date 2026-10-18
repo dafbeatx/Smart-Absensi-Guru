@@ -32,6 +32,7 @@ interface MoreFeaturesModalProps {
   onOpenHomeroomModal?: () => void;
   onOpenAdministrationModal?: () => void;
   onOpenAboutModal?: () => void;
+  onOpenTeacherBoard?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -63,6 +64,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenHomeroomModal,
   onOpenAdministrationModal,
   onOpenAboutModal,
+  onOpenTeacherBoard,
 }) => {
   if (!isOpen) return null;
 
@@ -300,6 +302,27 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
     {
       category: 'Presensi & Kehadiran',
       items: [
+        ...(onOpenTeacherBoard
+          ? [
+              {
+                id: 'teacher_daily_board',
+                title: 'Papan Presensi Harian',
+                subtitle: 'Lihat kehadiran seluruh rekan guru hari ini secara real-time',
+                icon: '👥',
+                action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'teacher_daily_board',
+                  });
+                  onClose();
+                  onOpenTeacherBoard();
+                },
+              },
+            ]
+          : []),
         ...(onOpenCorrectionModal
           ? [
               {

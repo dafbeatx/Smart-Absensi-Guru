@@ -149,6 +149,12 @@ import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeMod
 import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
+
+const TeacherDailyBoardModal = React.lazy(() =>
+  import('../../guru/components/TeacherDailyBoardModal').then((m) => ({
+    default: m.TeacherDailyBoardModal,
+  }))
+);
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
 import { normalizeDayOfWeek } from '../../../utils/teaching-schedule.utils';
 import {
@@ -458,6 +464,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isTeachingMaterialsModalOpen, setIsTeachingMaterialsModalOpen] = useState(false);
   const [isEventsCalendarModalOpen, setIsEventsCalendarModalOpen] = useState(false);
   const [isMoreFeaturesModalOpen, setIsMoreFeaturesModalOpen] = useState(false);
+  const [isTeacherBoardOpen, setIsTeacherBoardOpen] = useState(false);
   const [isHomeroomModalOpen, setIsHomeroomModalOpen] = useState(false);
   const [isExamCardModalOpen, setIsExamCardModalOpen] = useState(false);
   const [isStudentKioskOpen, setIsStudentKioskOpen] = useState(false);
@@ -6325,7 +6332,21 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           setIsMoreFeaturesModalOpen(false);
           handleOpenAboutLayer('HOME');
         }}
+        onOpenTeacherBoard={() => {
+          setIsMoreFeaturesModalOpen(false);
+          setIsTeacherBoardOpen(true);
+        }}
       />
+
+      {/* 📋 Papan Presensi Harian Guru — Read-Only, Semua Guru Bisa Lihat */}
+      {isTeacherBoardOpen && (
+        <React.Suspense fallback={null}>
+          <TeacherDailyBoardModal
+            isOpen={isTeacherBoardOpen}
+            onClose={() => setIsTeacherBoardOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
       {/* 🎓 Ruang Wali Kelas (Pendataan & Verifikasi Rencana Lanjutan Siswa Kelas 9) */}
       <HomeroomModal
