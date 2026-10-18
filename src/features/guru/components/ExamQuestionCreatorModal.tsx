@@ -38,7 +38,7 @@ interface ExamQuestionCreatorModalProps {
 type WizardStep = 'PARAMS' | 'INPUT_CONTENT' | 'PREVIEW_AND_ACTION';
 type PreviewTab = 'PAPER' | 'KEYS' | 'KISI_KISI';
 
-const PREDEFINED_CLASSES = ['7', '8A', '8B', '9A', '9B', 'SMA'];
+const PREDEFINED_CLASSES = ['7', '8', '9', 'SMA'];
 
 export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> = ({
   isOpen,
@@ -59,7 +59,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
     AdministrationRepository.getActiveAcademicYear() || '2026/2027'
   );
   const [semester, setSemester] = useState<'GANJIL' | 'GENAP'>('GANJIL');
-  const [gradeClass, setGradeClass] = useState<string>('8A');
+  const [gradeClass, setGradeClass] = useState<string>('8');
   const [category, setCategory] = useState<'EKSAK' | 'NON_EKSAK'>('EKSAK');
   const [mcqCount, setMcqCount] = useState<number>(25);
   const [essayCount, setEssayCount] = useState<number>(5);
@@ -424,11 +424,16 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                     </div>
                   </div>
 
-                  {/* Tingkat & Rombel Kelas */}
+                  {/* Tingkat & Kelas (Satu Angkatan) */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Tingkat &amp; Kelas <span className="text-rose-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Tingkat &amp; Kelas <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-teal-700 font-semibold bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                        Satu Angkatan
+                      </span>
+                    </div>
                     <select
                       value={gradeClass}
                       onChange={(e) => setGradeClass(e.target.value)}
@@ -440,6 +445,9 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                         </option>
                       ))}
                     </select>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Soal, kunci jawaban, dan kisi-kisi mencakup satu angkatan. Rombel dipisah saat koreksi &amp; input nilai.
+                    </p>
                   </div>
 
                   {/* Tahun Ajaran */}

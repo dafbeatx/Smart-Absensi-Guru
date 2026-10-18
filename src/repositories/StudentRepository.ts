@@ -112,10 +112,25 @@ export class StudentRepository {
       if (areClassCodesEqual(s.className, className)) return true;
       const normS = normalizeClassCode(s.className);
       const normTarget = normalizeClassCode(className);
-      if ((normS === '7' && (normTarget === '7A' || normTarget === '7B')) ||
-          (normTarget === '7' && (normS === '7A' || normS === '7B'))) {
+
+      // Target adalah angkatan murni (misal '7', '8', '9')
+      if (['7', '8', '9'].includes(normTarget)) {
+        if (normS === normTarget || normS.startsWith(normTarget)) return true;
+      }
+
+      // Siswa memiliki data angkatan murni dan target adalah rombel spesifik (misal s='8', target='8A')
+      if (['7', '8', '9'].includes(normS)) {
+        if (normTarget.startsWith(normS)) return true;
+      }
+
+      // Target atau siswa adalah tingkat SMA
+      if (normTarget === 'SMA') {
+        if (normS.includes('SMA') || ['10', '11', '12'].some((lvl) => normS.startsWith(lvl))) return true;
+      }
+      if (normS === 'SMA' && ['10', '11', '12'].some((lvl) => normTarget.startsWith(lvl))) {
         return true;
       }
+
       return false;
     });
   }
