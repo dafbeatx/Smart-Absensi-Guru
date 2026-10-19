@@ -3263,6 +3263,89 @@ export class SupabaseProvider implements IDataProvider {
 
   // ─── ANONYMOUS TEACHER COMPLAINTS & FEEDBACK API ──────────────────────────
 
+  /**
+   * Auto-synchronizes local complaints stored on device (e.g. from previous offline/failed submissions)
+   * up to Supabase Cloud so Admin, Kepsek, and all devices can view them seamlessly.
+   */
+  public async syncPendingLocalComplaints(filterUserId?: string): Promise<void> {
+    if (typeof localStorage === 'undefined') return;
+
+    try {
+      const raw = localStorage.getItem('smart_absensi_teacher_complaints');
+      if (!raw) return;
+
+      const localList: TeacherComplaint[] = JSON.parse(raw);
+      if (!Array.isArray(localList) || localList.length === 0) return;
+
+      // Query current remote complaints to avoid duplicates
+      const { data: remoteData, error } = await this.client
+        .from('teacher_complaints')
+        .select('id, content, date')
+        .limit(100);
+
+      if (error) return;
+
+      const remoteIds = new Set((remoteData || []).map((r: any) => r.id));
+      const remoteContents = new Set((remoteData || []).map((r: any) => `${r.date}__${(r.content || '').trim()}`));
+
+      let hasModifications = false;
+      const updatedLocalList = [...localList];
+
+      for (let i = 0; i < updatedLocalList.length; i++) {
+        const item = updatedLocalList[i];
+        if (filterUserId && item.user_id !== filterUserId) continue;
+
+        // Normalize ID to a valid RFC4122 UUID format
+        const cleanUuid = (item.id || '').replace(/^comp_/, '');
+        const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanUuid);
+        const targetId = isValidUuid
+          ? cleanUuid
+          : (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                  const r = (Math.random() * 16) | 0;
+                  const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                  return v.toString(16);
+                }));
+
+        const contentKey = `${item.date}__${(item.content || '').trim()}`;
+        if (!remoteIds.has(item.id) && !remoteIds.has(targetId) && !remoteContents.has(contentKey)) {
+          const { error: insErr } = await this.client
+            .from('teacher_complaints')
+            .insert({
+              id: targetId,
+              user_id: item.user_id,
+              date: item.date,
+              category: item.category,
+              content: item.content.trim(),
+              status: item.status || 'SUBMITTED',
+              admin_response: item.admin_response || null,
+              responded_at: item.responded_at || null,
+              responded_by_role: item.responded_by_role || null,
+              is_anonymous: item.is_anonymous ?? true,
+              created_at: item.created_at || new Date().toISOString(),
+            });
+
+          if (!insErr) {
+            remoteIds.add(targetId);
+            remoteContents.add(contentKey);
+            updatedLocalList[i] = { ...item, id: targetId };
+            hasModifications = true;
+          }
+        } else if (item.id !== targetId && (remoteIds.has(item.id) || remoteIds.has(targetId))) {
+          updatedLocalList[i] = { ...item, id: targetId };
+          hasModifications = true;
+        }
+      }
+
+      if (hasModifications) {
+        localStorage.setItem('smart_absensi_teacher_complaints', JSON.stringify(updatedLocalList));
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'syncPendingLocalComplaints warning:', err);
+    }
+  }
+
   public async submitComplaint(
     userId: string,
     dto: SubmitComplaintDTO,
@@ -3270,9 +3353,19 @@ export class SupabaseProvider implements IDataProvider {
   ): Promise<TeacherComplaint> {
     try {
       const todayStr = getTodayDateInJakarta();
+      const complaintId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+              const r = (Math.random() * 16) | 0;
+              const v = c === 'x' ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+
       const { data, error } = await this.client
         .from('teacher_complaints')
         .insert({
+          id: complaintId,
           user_id: userId,
           date: todayStr,
           category: dto.category,
@@ -3287,9 +3380,9 @@ export class SupabaseProvider implements IDataProvider {
       if (error) {
         logger.warn('SupabaseProvider', 'submitComplaint Supabase error, falling back to local storage:', error.message);
       } else if (data) {
-        // Also update local cache
+        // Update local cache with exact database record
         const mockProv = new (await import('./mock-provider.service')).MockProvider();
-        await mockProv.submitComplaint(userId, dto);
+        mockProv.saveComplaintToStorage(data as TeacherComplaint);
         return data as TeacherComplaint;
       }
     } catch (err) {
@@ -3301,6 +3394,9 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getUserComplaints(userId: string, _token?: string): Promise<TeacherComplaint[]> {
+    // 1. Recover and push any pending local complaints from this device
+    await this.syncPendingLocalComplaints(userId).catch(() => {});
+
     try {
       const { data, error } = await this.client
         .from('teacher_complaints')
@@ -3312,6 +3408,9 @@ export class SupabaseProvider implements IDataProvider {
       if (error) {
         logger.warn('SupabaseProvider', 'getUserComplaints Supabase error, fallback to local storage:', error.message);
       } else if (data) {
+        // Cache server data locally for seamless offline read
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        (data as TeacherComplaint[]).forEach((c) => mockProv.saveComplaintToStorage(c));
         return data as TeacherComplaint[];
       }
     } catch (err) {
@@ -3323,6 +3422,9 @@ export class SupabaseProvider implements IDataProvider {
   }
 
   public async getAllComplaints(_token?: string): Promise<TeacherComplaint[]> {
+    // 1. Recover and push any pending local complaints to Cloud
+    await this.syncPendingLocalComplaints().catch(() => {});
+
     try {
       const { data, error } = await this.client
         .from('teacher_complaints')

@@ -1917,6 +1917,17 @@ export class MockProvider implements IDataProvider {
     return [];
   }
 
+  public saveComplaintToStorage(complaint: TeacherComplaint): void {
+    const list = this.getStorageComplaints();
+    const existingIndex = list.findIndex((c) => c.id === complaint.id);
+    if (existingIndex >= 0) {
+      list[existingIndex] = complaint;
+    } else {
+      list.unshift(complaint);
+    }
+    safeSetStorage('smart_absensi_teacher_complaints', JSON.stringify(list));
+  }
+
   public async submitComplaint(
     userId: string,
     dto: SubmitComplaintDTO,
@@ -1925,8 +1936,17 @@ export class MockProvider implements IDataProvider {
     const list = this.getStorageComplaints();
 
     const todayStr = getTodayDateInJakarta();
+    const generatedId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
+
     const newComplaint: TeacherComplaint = {
-      id: 'comp_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substring(2, 6)),
+      id: generatedId,
       user_id: userId,
       date: todayStr,
       category: dto.category,
