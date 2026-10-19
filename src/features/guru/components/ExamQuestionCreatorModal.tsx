@@ -32,15 +32,18 @@ import {
 } from '../../../services/exam-paper-docx.service';
 import { KOP_LOGO_BASE64 } from '../../../assets/kop-logo.base64';
 
+import {
+  ExamQuestionCreatorMobileView,
+  type WizardStep,
+  type PreviewTab,
+} from './ExamQuestionCreatorMobileView';
+
 interface ExamQuestionCreatorModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile;
   onOpenCorrectionWithSession?: (session: ExamSessionRecord) => void;
 }
-
-type WizardStep = 'PARAMS' | 'INPUT_CONTENT' | 'PREVIEW_AND_ACTION';
-type PreviewTab = 'PAPER' | 'KEYS' | 'KISI_KISI' | 'LEMBAR_JAWABAN';
 
 export const EXAMPLE_MCQ_TEMPLATE = `A. SOAL PILIHAN GANDA
 1. Hasil dari operasi hitung 24 + 16 × 2 adalah...
@@ -114,6 +117,23 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generatedData, setGeneratedData] = useState<ExamPaperData | null>(null);
   const [isSavingToCorrection, setIsSavingToCorrection] = useState<boolean>(false);
+  // View mode state with localStorage persistence & responsive auto-detect (default MOBILE for screen < 1024px / Infinix Note 8)
+  const [viewMode, setViewMode] = useState<'DESKTOP' | 'MOBILE'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smart_absensi_ai_creator_view_mode');
+      if (saved === 'DESKTOP' || saved === 'MOBILE') return saved;
+      return window.innerWidth < 1024 ? 'MOBILE' : 'DESKTOP';
+    }
+    return 'DESKTOP';
+  });
+
+  const handleSetViewMode = (mode: 'DESKTOP' | 'MOBILE') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smart_absensi_ai_creator_view_mode', mode);
+    }
+  };
+
   // Lock body scroll saat modal aktif di mobile
   React.useEffect(() => {
     if (isOpen) {
@@ -304,6 +324,61 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
     }
   };
 
+  // Render Mobile View dedicated for Infinix Note 8 & Smartphones
+  if (viewMode === 'MOBILE') {
+    return createPortal(
+      <ExamQuestionCreatorMobileView
+        onClose={onClose}
+        currentUser={currentUser}
+        viewMode={viewMode}
+        setViewMode={handleSetViewMode}
+        step={step}
+        setStep={setStep}
+        previewTab={previewTab}
+        setPreviewTab={setPreviewTab}
+        subject={subject}
+        setSubject={setSubject}
+        customSubject={customSubject}
+        setCustomSubject={setCustomSubject}
+        examType={examType}
+        setExamType={setExamType}
+        academicYear={academicYear}
+        setAcademicYear={setAcademicYear}
+        semester={semester}
+        setSemester={setSemester}
+        gradeClass={gradeClass}
+        setGradeClass={setGradeClass}
+        category={category}
+        setCategory={setCategory}
+        mcqCount={mcqCount}
+        setMcqCount={setMcqCount}
+        essayCount={essayCount}
+        setEssayCount={setEssayCount}
+        durationMinutes={durationMinutes}
+        setDurationMinutes={setDurationMinutes}
+        inputMode={inputMode}
+        setInputMode={setInputMode}
+        contentPrompt={contentPrompt}
+        setContentPrompt={setContentPrompt}
+        isGenerating={isGenerating}
+        generatedData={generatedData}
+        effectiveSubject={effectiveSubject}
+        onStartGeneration={handleStartGeneration}
+        onCopyPlainTextPaper={handleCopyPlainTextPaper}
+        onCopyMcqExample={handleCopyMcqExample}
+        onCopyEssayExample={handleCopyEssayExample}
+        onCopyExampleTemplate={handleCopyExampleTemplate}
+        onApplyExampleTemplate={handleApplyExampleTemplate}
+        onPrintExamPaper={handlePrintExamPaper}
+        onDownloadPaperDocx={handleDownloadPaperDocx}
+        onDownloadKeyAndKisiKisiDocx={handleDownloadKeyAndKisiKisiDocx}
+        onSaveAndOpenCorrection={handleSaveAndOpenCorrection}
+        isSavingToCorrection={isSavingToCorrection}
+      />,
+      document.body
+    );
+  }
+
   return createPortal(
     <div
       role="dialog"
@@ -345,6 +420,26 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* View Mode Switcher [ 📱 HP ] [ 💻 PC ] */}
+          <div className="flex items-center bg-white/10 p-0.5 rounded-xl border border-white/15">
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('MOBILE')}
+              className="px-2 py-1 rounded-lg text-[10px] font-black flex items-center gap-1 transition-all cursor-pointer text-white/70 hover:text-white"
+              title="Mode Mobile (Layar Sentuh HP & Infinix Note 8)"
+            >
+              <span>📱 HP</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('DESKTOP')}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-black flex items-center gap-1 transition-all cursor-pointer bg-white text-slate-950 shadow-xs"
+              title="Mode Desktop (Layar Lebar)"
+            >
+              <span>💻 PC</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -1212,26 +1307,32 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
                           Nama : ............................................................................
                         </div>
                         <table className="w-full text-xs border-collapse">
-                          <tbody>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((r) => {
-                              const cols = [r, r + 10, r + 20, r + 30];
-                              return (
-                                <tr key={`lj-row-${r}`} className="border-b border-black last:border-b-0">
-                                  {cols.map((num) => (
-                                    <React.Fragment key={`lj-col-${num}`}>
-                                      <td className="w-[4%] text-center font-bold bg-slate-50 border-r border-black p-1">
-                                        {num}
-                                      </td>
-                                      <td className="w-[5.25%] text-center border-r border-black p-1">A</td>
-                                      <td className="w-[5.25%] text-center border-r border-black p-1">B</td>
-                                      <td className="w-[5.25%] text-center border-r border-black p-1">C</td>
-                                      <td className="w-[5.25%] text-center border-r border-black last:border-r-0 p-1">D</td>
-                                    </React.Fragment>
-                                  ))}
-                                </tr>
-                              );
-                            })}
-                          </tbody>
+                        <tbody className="divide-y divide-black">
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((r) => {
+                            const cols = [r, r + 10, r + 20, r + 30];
+                            return (
+                              <tr key={`lj-row-${r}`}>
+                                {cols.map((num, colIdx) => (
+                                  <React.Fragment key={`lj-col-${num}`}>
+                                    <td className="w-[4%] text-center font-bold bg-slate-50 border-r border-black p-1">
+                                      {num}
+                                    </td>
+                                    <td className="w-[5.25%] text-center border-r border-black p-1">A</td>
+                                    <td className="w-[5.25%] text-center border-r border-black p-1">B</td>
+                                    <td className="w-[5.25%] text-center border-r border-black p-1">C</td>
+                                    <td
+                                      className={`w-[5.25%] text-center border-black p-1 ${
+                                        colIdx === cols.length - 1 ? '' : 'border-r'
+                                      }`}
+                                    >
+                                      D
+                                    </td>
+                                  </React.Fragment>
+                                ))}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
                         </table>
                       </div>
                     </div>
