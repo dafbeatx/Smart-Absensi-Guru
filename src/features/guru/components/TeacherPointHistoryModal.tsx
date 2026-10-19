@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { TeacherPointLog, UserProfile, TeacherPointActivityType } from '../../../types/database.types';
+import { useAuthStore } from '../../../store/useAuthStore';
 import {
   X,
   Clock,
@@ -80,6 +81,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
   selectedMonth,
   selectedYear,
 }) => {
+  const currentAuthUser = useAuthStore((state) => state.user);
   const [filterType, setFilterType] = useState<FilterType>('ALL');
   const [isRulesExpanded, setIsRulesExpanded] = useState(false);
 
@@ -372,6 +374,14 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
         };
     }
   };
+
+  if (!isOpen) return null;
+
+  // Keamanan & Privasi Transaksi Poin: Hanya pemilik akun atau Admin/Kepsek yang dapat melihat riwayat pendapatan poin
+  const isPrivileged = currentAuthUser?.role === 'ADMIN' || currentAuthUser?.role === 'KEPSEK';
+  if (currentAuthUser && teacher?.id && teacher.id !== currentAuthUser.id && !isPrivileged) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs transition-opacity duration-200 overflow-hidden">

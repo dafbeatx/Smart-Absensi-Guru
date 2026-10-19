@@ -26,6 +26,7 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
+  ShieldCheck,
 } from 'lucide-react';
 
 export interface TeacherDisciplineBadgeModalProps {
@@ -335,6 +336,12 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   }, [isOpen, selectedTeacher, onClose]);
 
   const handleOpenPointHistory = async (t: any) => {
+    if (!t) return;
+    const authUser = currentUser || useAuthStore.getState().user;
+    const isPrivileged = authUser?.role === 'ADMIN' || authUser?.role === 'KEPSEK';
+    if (authUser && t.id !== authUser.id && !isPrivileged) {
+      return;
+    }
     setPointHistoryTeacher(t);
     setIsPointHistoryLoading(true);
     setIsPointHistoryModalOpen(true);
@@ -696,7 +703,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                 }`}
               >
                 <span>⭐</span>
-                <span>Riwayat Transaksi Poin</span>
+                <span>Riwayat Poin Saya</span>
               </button>
 
               <button
@@ -989,74 +996,88 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       </p>
                     </div>
 
-                    {/* Transaksi Poin Terakhir Guru */}
-                    <div className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[#023246]">
-                          <Award className="w-4 h-4 text-[#18536B]" />
-                          <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider">
-                            Buku Catatan Poin Disiplin
-                          </h4>
+                    {/* Transaksi Poin Terakhir Guru / Buku Catatan Poin Disiplin */}
+                    {selectedTeacher.id === currentUser?.id || currentUser?.role === 'ADMIN' || currentUser?.role === 'KEPSEK' ? (
+                      <div className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-[#023246]">
+                            <Award className="w-4 h-4 text-[#18536B]" />
+                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider">
+                              Buku Catatan Poin Disiplin
+                            </h4>
+                          </div>
+                          <span className="text-xs font-bold text-amber-600">
+                            Total: {selectedTeacher.totalPoints} Poin
+                          </span>
                         </div>
-                        <span className="text-xs font-bold text-amber-600">
-                          Total: {selectedTeacher.totalPoints} Poin
-                        </span>
-                      </div>
 
-                      {(() => {
-                        const logs = allPointLogs.filter((l) => l.user_id === selectedTeacher.id);
-                        if (logs.length === 0) {
+                        {(() => {
+                          const logs = allPointLogs.filter((l) => l.user_id === selectedTeacher.id);
+                          if (logs.length === 0) {
+                            return (
+                              <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
+                                <span className="text-xl">📋</span>
+                                <p className="text-xs font-bold text-slate-700">Belum Ada Transaksi Poin Khusus</p>
+                                <p className="text-[11px] text-slate-400">
+                                  Poin otomatis bertambah saat presensi masuk tepat waktu (+15), terlambat (+5), atau piket (+10).
+                                </p>
+                              </div>
+                            );
+                          }
                           return (
-                            <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-1.5">
-                              <span className="text-xl">📋</span>
-                              <p className="text-xs font-bold text-slate-700">Belum Ada Transaksi Poin Khusus</p>
-                              <p className="text-[11px] text-slate-400">
-                                Poin otomatis bertambah saat presensi masuk tepat waktu (+15), terlambat (+5), atau piket (+10).
-                              </p>
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                              {logs.slice(0, 5).map((log) => (
+                                <div
+                                  key={log.id}
+                                  className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 text-xs"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-black text-slate-900 truncate">{log.title}</p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                      {log.date} • {log.description || 'Poin kedisiplinan'}
+                                    </p>
+                                  </div>
+                                  <span
+                                    className={`px-2.5 py-1 rounded-xl text-xs font-black border shrink-0 ${
+                                      log.points < 0
+                                        ? 'bg-rose-50 text-rose-800 border-rose-300 ring-1 ring-rose-400/30'
+                                        : log.points >= 15
+                                        ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                        : log.points >= 10
+                                        ? 'bg-cyan-50 text-[#18536B] border-cyan-300'
+                                        : 'bg-amber-50 text-amber-900 border-amber-300'
+                                    }`}
+                                  >
+                                    {log.points > 0 ? `+${log.points}` : log.points} Poin
+                                  </span>
+                                </div>
+                              ))}
                             </div>
                           );
-                        }
-                        return (
-                          <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {logs.slice(0, 5).map((log) => (
-                              <div
-                                key={log.id}
-                                className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 text-xs"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-black text-slate-900 truncate">{log.title}</p>
-                                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                                    {log.date} • {log.description || 'Poin kedisiplinan'}
-                                  </p>
-                                </div>
-                                <span
-                                  className={`px-2.5 py-1 rounded-xl text-xs font-black border shrink-0 ${
-                                    log.points < 0
-                                      ? 'bg-rose-50 text-rose-800 border-rose-300 ring-1 ring-rose-400/30'
-                                      : log.points >= 15
-                                      ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                                      : log.points >= 10
-                                      ? 'bg-cyan-50 text-[#18536B] border-cyan-300'
-                                      : 'bg-amber-50 text-amber-900 border-amber-300'
-                                  }`}
-                                >
-                                  {log.points > 0 ? `+${log.points}` : log.points} Poin
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
+                        })()}
 
-                      <button
-                        type="button"
-                        onClick={() => handleOpenPointHistory(selectedTeacher)}
-                        className="w-full py-3 px-4 rounded-2xl bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 active:scale-98 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
-                      >
-                        <Award className="w-4 h-4 text-amber-300" />
-                        <span>Buka Buku Riwayat Transaksi Lengkap</span>
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPointHistory(selectedTeacher)}
+                          className="w-full py-3 px-4 rounded-2xl bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 active:scale-98 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+                        >
+                          <Award className="w-4 h-4 text-amber-300" />
+                          <span>Buka Buku Riwayat Transaksi Lengkap</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-5 rounded-3xl bg-slate-50 border border-slate-200/90 space-y-2 text-center">
+                        <div className="w-10 h-10 mx-auto rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-[#18536B] shadow-2xs">
+                          <ShieldCheck className="w-5 h-5 text-[#18536B]" />
+                        </div>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-800">
+                          Buku Catatan Poin Disiplin Bersifat Privat
+                        </h4>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                          Riwayat transaksi dan catatan detail poin hanya dapat diakses oleh pemilik akun yang bersangkutan untuk menjaga kerahasiaan dan privasi data pendidik.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1756,35 +1777,75 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               </div>
             )}
 
-                {/* TAB 2: RIWAYAT TRANSAKSI POIN */}
+                {/* TAB 2: RIWAYAT TRANSAKSI POIN (PRIBADI / AKUN LOGIN) */}
                 {activeTab === 'HISTORY' && (
                   <div className="space-y-4">
                     <div className="p-5 rounded-3xl bg-linear-to-br from-[#023246] to-[#0A455E] text-white border border-[#023246]/40 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <span className="text-xs text-cyan-200 uppercase tracking-wider font-extrabold block">
-                          Buku Besar Riwayat Poin Kedisiplinan
+                          Buku Catatan Poin Disiplin • {historyFilterScope === 'CURRENT_MONTH' ? activeMeta.label : 'Semua Riwayat'}
                         </span>
-                        <h4 className="text-base sm:text-lg font-black text-white mt-1">
-                          Log Transparansi Perolehan &amp; Pengurangan Poin
+                        <h4 className="text-base sm:text-lg font-black text-white mt-1 truncate">
+                          {currentUser?.full_name || 'Profil Anda'}
                         </h4>
                         <p className="text-xs text-slate-300 font-medium mt-0.5">
-                          Tercatat otomatis dari check-in presensi fisik, tugas piket, dan komitmen evaluasi
+                          {myFilteredLogs.length} Transaksi Tercatat ({historyPositivePoints > 0 ? `+${historyPositivePoints}` : '0'}{historyPenaltyPoints > 0 ? ` / -${historyPenaltyPoints}` : ''}) • Tercatat otomatis dari presensi fisik &amp; tugas
                         </p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="px-3.5 py-1.5 rounded-2xl bg-amber-400 text-slate-950 text-sm font-black shadow-xs flex items-center gap-1.5 justify-end">
+                          <span>⭐</span>
+                          <span>{historyDisplayPoints} Poin</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-amber-300 block mt-1">
+                          Total Poin {historyFilterScope === 'CURRENT_MONTH' ? 'Bulan Ini' : 'Kumulatif'}
+                        </span>
                       </div>
                     </div>
 
+                    {/* Filter Toggle: Bulan Berjalan vs Semua Riwayat */}
+                    <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/70 text-xs font-bold max-w-md">
+                      <button
+                        type="button"
+                        onClick={() => setHistoryFilterScope('CURRENT_MONTH')}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          historyFilterScope === 'CURRENT_MONTH'
+                            ? 'bg-white text-[#023246] shadow-2xs font-black'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <span>📅</span>
+                        <span className="truncate">{activeMeta.label} ({myFilteredLogs.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistoryFilterScope('ALL')}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          historyFilterScope === 'ALL'
+                            ? 'bg-white text-[#023246] shadow-2xs font-black'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <span>🌐</span>
+                        <span className="truncate">Semua Waktu ({myAllLogs.length})</span>
+                      </button>
+                    </div>
+
                     <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-4 sm:p-6 space-y-3">
-                      {allPointLogs.length === 0 ? (
+                      {myFilteredLogs.length === 0 ? (
                         <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
                           <span className="text-3xl">📋</span>
-                          <h5 className="text-sm font-bold text-slate-700">Belum Ada Transaksi Poin</h5>
+                          <h5 className="text-sm font-bold text-slate-700">Belum Ada Transaksi Poin Pribadi</h5>
                           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                            Log poin otomatis tercatat saat guru melakukan presensi masuk (tepat waktu +15, terlambat +5) atau tugas piket (+10).
+                            {historyFilterScope === 'CURRENT_MONTH'
+                              ? 'Belum ada transaksi poin pada periode ini untuk akun Anda. Klik "Semua Waktu" untuk melihat riwayat kumulatif.'
+                              : 'Log poin otomatis tercatat saat presensi masuk (tepat waktu +15, terlambat +5) atau tugas piket (+10).'}
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2.5">
-                          {allPointLogs.slice(0, 20).map((log) => (
+                        <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                          {myFilteredLogs.map((log) => (
                             <div
                               key={log.id}
                               className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex items-center justify-between gap-3 text-xs"
@@ -1792,14 +1853,14 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-black text-slate-900 truncate text-xs sm:text-sm">
-                                    {log.teacher_name || registeredTeachers.find((r) => r.id === log.user_id)?.full_name || 'Guru Pengajar'}
-                                  </span>
-                                  <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 text-[10px] font-bold rounded border border-slate-200">
                                     {log.title}
+                                  </span>
+                                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200">
+                                    {log.date}
                                   </span>
                                 </div>
                                 <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                                  {log.date} • {log.description || 'Poin kedisiplinan guru'}
+                                  {log.description || 'Poin kedisiplinan guru'}
                                 </p>
                               </div>
                               <span
@@ -1818,6 +1879,17 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                             </div>
                           ))}
                         </div>
+                      )}
+
+                      {currentUser && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPointHistory(currentUser)}
+                          className="w-full py-3 px-4 rounded-2xl bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 active:scale-98 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-3"
+                        >
+                          <Award className="w-4 h-4 text-amber-300" />
+                          <span>Buka Rincian Lengkap &amp; Filter Riwayat Pendapatan Poin Saya</span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -2360,14 +2432,26 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleOpenPointHistory(selectedTeacher)}
-                  className="w-full py-2.5 px-3 rounded-xl bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 active:scale-98 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer mt-2"
-                >
-                  <Award className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Lihat Riwayat Pendapatan Poin Guru Ini</span>
-                </button>
+                {selectedTeacher.id === currentUser?.id || currentUser?.role === 'ADMIN' || currentUser?.role === 'KEPSEK' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPointHistory(selectedTeacher)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-linear-to-r from-[#023246] to-[#18536B] hover:brightness-110 active:scale-98 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                  >
+                    <Award className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Lihat Riwayat Pendapatan Poin Saya</span>
+                  </button>
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-center space-y-1 mt-2">
+                    <div className="flex items-center justify-center gap-1.5 text-slate-700 font-bold text-[11px]">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#18536B]" />
+                      <span>Buku Catatan Poin Bersifat Privat</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      Riwayat pendapatan poin hanya dapat dilihat oleh pemilik akun.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* 📊 GRAFIK 2: GRAFIK BATANG KONSISTENSI MINGGUAN */}
