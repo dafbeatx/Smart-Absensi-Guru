@@ -71,6 +71,22 @@ export interface ExamQuestionCreatorMobileViewProps {
   generatedData: ExamPaperData | null;
   effectiveSubject: string;
 
+  // 2 Opsi Kunci & Kisi-Kisi State (AI vs Manual)
+  keyAndMatrixMode: 'AI' | 'MANUAL';
+  setKeyAndMatrixMode: (m: 'AI' | 'MANUAL') => void;
+  manualKeyText: string;
+  setManualKeyText: (t: string) => void;
+  manualMcqKeys: Record<number, 'A' | 'B' | 'C' | 'D'>;
+  onSetManualMcqKey: (num: number, key: 'A' | 'B' | 'C' | 'D') => void;
+  onFillQuickMcqPattern: () => void;
+  onClearManualMcqKeys: () => void;
+  manualEssayText: string;
+  setManualEssayText: (t: string) => void;
+  onLoadSampleManualEssayRubric: () => void;
+  manualKisiKisiText: string;
+  setManualKisiKisiText: (t: string) => void;
+  onLoadSampleManualKisiKisi: () => void;
+
   // Actions
   onStartGeneration: () => Promise<void>;
   onCopyPlainTextPaper: () => Promise<void>;
@@ -122,6 +138,20 @@ export const ExamQuestionCreatorMobileView: React.FC<ExamQuestionCreatorMobileVi
   isGenerating,
   generatedData,
   effectiveSubject,
+  keyAndMatrixMode,
+  setKeyAndMatrixMode,
+  manualKeyText,
+  setManualKeyText,
+  manualMcqKeys,
+  onSetManualMcqKey,
+  onFillQuickMcqPattern,
+  onClearManualMcqKeys,
+  manualEssayText,
+  setManualEssayText,
+  onLoadSampleManualEssayRubric,
+  manualKisiKisiText,
+  setManualKisiKisiText,
+  onLoadSampleManualKisiKisi,
   onStartGeneration,
   onCopyPlainTextPaper,
   onCopyMcqExample,
@@ -138,6 +168,8 @@ export const ExamQuestionCreatorMobileView: React.FC<ExamQuestionCreatorMobileVi
   const [isFormatGuideOpen, setIsFormatGuideOpen] = useState(false);
   // Matrix view toggle: 'CARD' | 'TABLE'
   const [kisiKisiViewMode, setKisiKisiViewMode] = useState<'CARD' | 'TABLE'>('CARD');
+  // Manual sub-tab: 'KEYS' | 'ESSAY' | 'KISI_KISI'
+  const [manualTab, setManualTab] = useState<'KEYS' | 'ESSAY' | 'KISI_KISI'>('KEYS');
 
   // Handle subject change with auto-detect category
   const handleSubjectChange = (val: string) => {
@@ -791,6 +823,244 @@ export const ExamQuestionCreatorMobileView: React.FC<ExamQuestionCreatorMobileVi
                   </div>
                 )}
               </div>
+
+              {/* Card 2: Konfigurasi Kunci Jawaban & Matriks Kisi-Kisi (2 Opsi: AI vs Manual) */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 flex-wrap gap-1">
+                  <div>
+                    <h2 className="text-xs font-black text-slate-900 uppercase tracking-tight flex items-center gap-1.5">
+                      <span>Kunci Jawaban &amp; Matriks Kisi-Kisi</span>
+                      <span className="text-[9.5px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                        2 Opsi
+                      </span>
+                    </h2>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Pilih gunakan AI atau tentukan kunci &amp; kisi-kisi sendiri secara manual.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Dua Opsi: AI vs Manual */}
+                <div className="space-y-2">
+                  <div
+                    onClick={() => setKeyAndMatrixMode('AI')}
+                    className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 ${
+                      keyAndMatrixMode === 'AI'
+                        ? 'border-teal-600 bg-teal-50/60 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="text-2xl shrink-0">✨</span>
+                    <div className="min-w-0">
+                      <strong className="text-xs font-black text-slate-900 block">
+                        Otomatis oleh AI (Tersedia)
+                      </strong>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                        AI menyusun kunci jawaban PG, rubrik essay, materi pokok, dan indikator kisi-kisi otomatis.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setKeyAndMatrixMode('MANUAL')}
+                    className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 ${
+                      keyAndMatrixMode === 'MANUAL'
+                        ? 'border-teal-600 bg-teal-50/60 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="text-2xl shrink-0">✍️</span>
+                    <div className="min-w-0">
+                      <strong className="text-xs font-black text-slate-900 block">
+                        Tentukan Kunci &amp; Kisi-Kisi Sendiri (Manual)
+                      </strong>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                        Guru menginputkan kunci jawaban PG/Essay dan indikator kisi-kisi secara mandiri.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub-Panel Input Manual jika Mode MANUAL Aktif */}
+                {keyAndMatrixMode === 'MANUAL' && (
+                  <div className="pt-3 border-t border-slate-100 space-y-3 animate-in fade-in duration-150">
+                    {/* Sub-Tab Selector */}
+                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setManualTab('KEYS')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                          manualTab === 'KEYS'
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        1. Kunci PG ({Object.keys(manualMcqKeys).length}/{mcqCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManualTab('ESSAY')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                          manualTab === 'ESSAY'
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        2. Rubrik Essay ({essayCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManualTab('KISI_KISI')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                          manualTab === 'KISI_KISI'
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        3. Kisi-Kisi
+                      </button>
+                    </div>
+
+                    {/* Sub-Tab 1: Kunci Jawaban PG */}
+                    {manualTab === 'KEYS' && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-1.5">
+                          <label className="block text-[11px] font-bold text-slate-700">
+                            Input Teks Kunci Cepat (Contoh: 1.A 2.B 3.C atau A B C D):
+                          </label>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={onFillQuickMcqPattern}
+                              className="px-2 py-0.8 rounded-lg bg-teal-50 text-teal-800 border border-teal-200 text-[10.5px] font-bold cursor-pointer active:scale-95"
+                              title="Isi Pola Acak A-B-C-D"
+                            >
+                              Pola A-B-C-D
+                            </button>
+                            <button
+                              type="button"
+                              onClick={onClearManualMcqKeys}
+                              className="px-2 py-0.8 rounded-lg bg-slate-100 text-rose-700 border border-slate-200 text-[10.5px] font-bold cursor-pointer active:scale-95"
+                              title="Bersihkan Kunci"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        </div>
+
+                        <input
+                          type="text"
+                          value={manualKeyText}
+                          onChange={(e) => setManualKeyText(e.target.value)}
+                          placeholder={`1.A 2.B 3.C 4.D 5.A ... (sampai ${mcqCount})`}
+                          className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+
+                        {/* Visual Key Selector Buttons per Question */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[11px] font-bold text-slate-700">
+                              Atau Ketuk Kunci Jawaban per Nomor:
+                            </span>
+                            <span className="text-[10px] text-teal-800 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                              {Object.keys(manualMcqKeys).length} dari {mcqCount} Kunci Terisi
+                            </span>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50 divide-y divide-slate-200/80 custom-scrollbar">
+                            {Array.from({ length: mcqCount }, (_, i) => i + 1).map((num) => {
+                              const activeOpt = manualMcqKeys[num];
+                              return (
+                                <div
+                                  key={`manual-key-row-${num}`}
+                                  className="py-1.5 flex items-center justify-between"
+                                >
+                                  <span className="text-xs font-bold text-slate-700 w-12">
+                                    No. {num}
+                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    {(['A', 'B', 'C', 'D'] as const).map((opt) => (
+                                      <button
+                                        key={`btn-key-${num}-${opt}`}
+                                        type="button"
+                                        onClick={() => onSetManualMcqKey(num, opt)}
+                                        className={`w-9 h-8 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                          activeOpt === opt
+                                            ? 'bg-[#023246] text-white shadow-xs'
+                                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                                        }`}
+                                      >
+                                        {opt}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sub-Tab 2: Rubrik Penskoran Essay */}
+                    {manualTab === 'ESSAY' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          <label className="block text-[11px] font-bold text-slate-700">
+                            Kriteria Jawaban Uraian &amp; Skor Maksimal:
+                          </label>
+                          <button
+                            type="button"
+                            onClick={onLoadSampleManualEssayRubric}
+                            className="px-2 py-0.8 rounded-lg bg-teal-50 text-teal-800 border border-teal-200 text-[10.5px] font-bold cursor-pointer active:scale-95 flex items-center gap-1"
+                          >
+                            <Sparkles className="w-3 h-3 text-teal-600" />
+                            <span>Contoh Rubrik</span>
+                          </button>
+                        </div>
+                        <textarea
+                          rows={6}
+                          value={manualEssayText}
+                          onChange={(e) => setManualEssayText(e.target.value)}
+                          placeholder={`Format: Nomor. Kriteria Jawaban Diharapkan (Skor: Poin)\n1. Kriteria jawaban nomor 1 (Skor: 20)\n2. Kriteria jawaban nomor 2 (Skor: 20)\n3. Kriteria jawaban nomor 3 (Skor: 20)`}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-mono text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                        <p className="text-[10px] text-slate-500 italic">
+                          *Jika dikosongkan, AI akan menyusun rubrik penskoran standar sesuai butir soal uraian.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Sub-Tab 3: Matriks Kisi-Kisi Manual */}
+                    {manualTab === 'KISI_KISI' && (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          <label className="block text-[11px] font-bold text-slate-700">
+                            Materi Pokok &amp; Indikator Soal (Kisi-Kisi):
+                          </label>
+                          <button
+                            type="button"
+                            onClick={onLoadSampleManualKisiKisi}
+                            className="px-2 py-0.8 rounded-lg bg-teal-50 text-teal-800 border border-teal-200 text-[10.5px] font-bold cursor-pointer active:scale-95 flex items-center gap-1"
+                          >
+                            <Sparkles className="w-3 h-3 text-teal-600" />
+                            <span>Contoh Kisi-Kisi</span>
+                          </button>
+                        </div>
+                        <textarea
+                          rows={6}
+                          value={manualKisiKisiText}
+                          onChange={(e) => setManualKisiKisiText(e.target.value)}
+                          placeholder={`Format: Nomor. Materi Pokok | Indikator Kompetensi | Level\n1. Aljabar | Menghitung persamaan linier | L2\n2. Geometri | Menghitung luas permukaan tabung | L2\n3. Statistika | Menganalisis diagram data | L3`}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-base font-mono text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#023246]"
+                        />
+                        <p className="text-[10px] text-slate-500 italic">
+                          *Tiap baris otomatis dipetakan ke butir soal nomor 1, 2, dst. Format fleksibel dapat menggunakan tanda pipe (|) atau teks langsung.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1268,12 +1538,20 @@ export const ExamQuestionCreatorMobileView: React.FC<ExamQuestionCreatorMobileVi
                 {isGenerating ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>AI Menyusun Soal...</span>
+                    <span>
+                      {keyAndMatrixMode === 'MANUAL'
+                        ? 'Menyusun & Terapkan Kunci...'
+                        : 'AI Menyusun Soal...'}
+                    </span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>🚀 Buat Soal & Kunci AI</span>
+                    <span>
+                      {keyAndMatrixMode === 'MANUAL'
+                        ? '🚀 Buat Soal (Kunci & Kisi Manual)'
+                        : '🚀 Buat Soal & Kunci AI'}
+                    </span>
                   </>
                 )}
               </button>
