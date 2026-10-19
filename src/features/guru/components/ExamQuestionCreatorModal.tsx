@@ -43,6 +43,7 @@ interface ExamQuestionCreatorModalProps {
   onClose: () => void;
   currentUser: UserProfile;
   onOpenCorrectionWithSession?: (session: ExamSessionRecord) => void;
+  defaultViewMode?: 'DESKTOP' | 'MOBILE';
 }
 
 export const EXAMPLE_MCQ_TEMPLATE = `A. SOAL PILIHAN GANDA
@@ -89,6 +90,7 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
   onClose,
   currentUser,
   onOpenCorrectionWithSession,
+  defaultViewMode,
 }) => {
   const { showToast } = useToastStore();
 
@@ -117,14 +119,23 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generatedData, setGeneratedData] = useState<ExamPaperData | null>(null);
   const [isSavingToCorrection, setIsSavingToCorrection] = useState<boolean>(false);
-  // View mode state with localStorage persistence & responsive auto-detect (default MOBILE for screen < 1024px / Infinix Note 8)
+
+  // Deteksi peran Guru: Sesuai mandat, ketika Guru mengklik pembuatan soal langsung ditampilkan mode MOBILE
+  const isGuru =
+    currentUser?.role === 'GURU' ||
+    currentUser?.role !== 'ADMIN' ||
+    Boolean(((currentUser as any)?.position || '').toLowerCase().includes('guru'));
+
+  // View mode state: Default langsung mode MOBILE untuk Guru
   const [viewMode, setViewMode] = useState<'DESKTOP' | 'MOBILE'>(() => {
+    if (defaultViewMode) return defaultViewMode;
+    if (isGuru) return 'MOBILE';
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('smart_absensi_ai_creator_view_mode');
       if (saved === 'DESKTOP' || saved === 'MOBILE') return saved;
       return window.innerWidth < 1024 ? 'MOBILE' : 'DESKTOP';
     }
-    return 'DESKTOP';
+    return 'MOBILE';
   });
 
   const handleSetViewMode = (mode: 'DESKTOP' | 'MOBILE') => {
@@ -133,6 +144,17 @@ export const ExamQuestionCreatorModal: React.FC<ExamQuestionCreatorModalProps> =
       localStorage.setItem('smart_absensi_ai_creator_view_mode', mode);
     }
   };
+
+  // Pastikan ketika modal dibuka oleh Guru, langsung aktifkan mode MOBILE
+  React.useEffect(() => {
+    if (isOpen) {
+      if (defaultViewMode) {
+        setViewMode(defaultViewMode);
+      } else if (isGuru) {
+        setViewMode('MOBILE');
+      }
+    }
+  }, [isOpen, isGuru, defaultViewMode]);
 
   // Lock body scroll saat modal aktif di mobile
   React.useEffect(() => {

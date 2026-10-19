@@ -6775,6 +6775,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             isOpen={isExamCreatorModalOpen}
             onClose={() => setIsExamCreatorModalOpen(false)}
             currentUser={effectiveUser}
+            defaultViewMode="MOBILE"
             onOpenCorrectionWithSession={(_session) => {
               setIsQuestionCorrectionModalOpen(true);
             }}

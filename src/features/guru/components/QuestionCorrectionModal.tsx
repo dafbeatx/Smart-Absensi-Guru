@@ -1906,6 +1906,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
               isOpen={isExamAiCreatorOpen}
               onClose={() => setIsExamAiCreatorOpen(false)}
               currentUser={currentUser}
+              defaultViewMode="MOBILE"
               onOpenCorrectionWithSession={async (newSession) => {
                 setIsExamAiCreatorOpen(false);
                 await loadSessions();
