@@ -966,36 +966,38 @@ export const ExamQuestionCreatorMobileView: React.FC<ExamQuestionCreatorMobileVi
                               {Object.keys(manualMcqKeys).length} dari {mcqCount} Kunci Terisi
                             </span>
                           </div>
-                          <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50 divide-y divide-slate-200/80 custom-scrollbar">
-                            {Array.from({ length: mcqCount }, (_, i) => i + 1).map((num) => {
-                              const activeOpt = manualMcqKeys[num];
-                              return (
-                                <div
-                                  key={`manual-key-row-${num}`}
-                                  className="py-1.5 flex items-center justify-between"
-                                >
-                                  <span className="text-xs font-bold text-slate-700 w-12">
-                                    No. {num}
-                                  </span>
-                                  <div className="flex items-center gap-1.5">
-                                    {(['A', 'B', 'C', 'D'] as const).map((opt) => (
-                                      <button
-                                        key={`btn-key-${num}-${opt}`}
-                                        type="button"
-                                        onClick={() => onSetManualMcqKey(num, opt)}
-                                        className={`w-9 h-8 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                          activeOpt === opt
-                                            ? 'bg-[#023246] text-white shadow-xs'
-                                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                                        }`}
-                                      >
-                                        {opt}
-                                      </button>
-                                    ))}
+                          <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50 custom-scrollbar">
+                            <div className="divide-y divide-slate-200/80">
+                              {Array.from({ length: mcqCount }, (_, i) => i + 1).map((num) => {
+                                const activeOpt = manualMcqKeys[num];
+                                return (
+                                  <div
+                                    key={`manual-key-row-${num}`}
+                                    className="py-1.5 flex items-center justify-between"
+                                  >
+                                    <span className="text-xs font-bold text-slate-700 w-12">
+                                      No. {num}
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                      {(['A', 'B', 'C', 'D'] as const).map((opt) => (
+                                        <button
+                                          key={`btn-key-${num}-${opt}`}
+                                          type="button"
+                                          onClick={() => onSetManualMcqKey(num, opt)}
+                                          className={`w-9 h-8 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                            activeOpt === opt
+                                              ? 'bg-[#023246] text-white shadow-xs'
+                                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                                          }`}
+                                        >
+                                          {opt}
+                                        </button>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
                         </div>
                       </div>
