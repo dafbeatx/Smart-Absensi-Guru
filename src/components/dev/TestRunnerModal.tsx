@@ -358,7 +358,7 @@ export const TestRunnerModal: React.FC<TestRunnerModalProps> = ({ isOpen, onClos
                                   {res.testName}
                                 </p>
                                 {res.details && (
-                                  <p className="text-[10px] text-slate-500 font-mono mt-0.5 break-words">
+                                  <p className="text-[10px] text-slate-500 font-mono mt-0.5 wrap-break-word">
                                     {res.details}
                                   </p>
                                 )}
