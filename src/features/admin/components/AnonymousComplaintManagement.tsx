@@ -48,8 +48,12 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
 
     try {
       const data = await ComplaintRepository.getAllComplaints(token || undefined);
-      setComplaints(data);
-      logger.info('AnonymousComplaintManagement', 'Complaints fetched successfully', { count: data.length });
+      const cleanData = data.filter((c) => !ComplaintRepository.isTestComplaint(c));
+      setComplaints(cleanData);
+      if (cleanData.length !== data.length) {
+        ComplaintRepository.purgeTestComplaints(token || undefined).catch(() => {});
+      }
+      logger.info('AnonymousComplaintManagement', 'Complaints fetched successfully', { count: cleanData.length });
     } catch (err) {
       logger.error('AnonymousComplaintManagement', 'Failed to fetch complaints:', err);
       showToast('error', 'Gagal Memuat Data', 'Gagal memuat catatan dan keluhan dari server.');
@@ -60,6 +64,24 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
   }, [token, showToast]);
 
   useEffect(() => {
+    // Proactively purge test items from local device storage immediately on mount
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('smart_absensi_teacher_complaints');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter((c) => !ComplaintRepository.isTestComplaint(c));
+            if (cleaned.length !== parsed.length) {
+              localStorage.setItem('smart_absensi_teacher_complaints', JSON.stringify(cleaned));
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     fetchComplaints();
 
     const handleUpdateEvent = () => {
@@ -77,24 +99,27 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
 
   // Statistics calculation
   const stats = useMemo(() => {
-    const total = complaints.length;
-    const submitted = complaints.filter((c) => c.status === 'SUBMITTED').length;
-    const inReview = complaints.filter((c) => c.status === 'IN_REVIEW').length;
-    const resolved = complaints.filter((c) => c.status === 'RESOLVED').length;
+    const validComplaints = complaints.filter((c) => !ComplaintRepository.isTestComplaint(c));
+    const total = validComplaints.length;
+    const submitted = validComplaints.filter((c) => c.status === 'SUBMITTED').length;
+    const inReview = validComplaints.filter((c) => c.status === 'IN_REVIEW').length;
+    const resolved = validComplaints.filter((c) => c.status === 'RESOLVED').length;
     return { total, submitted, inReview, resolved };
   }, [complaints]);
 
   // Filtered complaints
   const filteredComplaints = useMemo(() => {
-    return complaints.filter((item) => {
-      const matchCat = selectedCategory === 'ALL' || item.category === selectedCategory;
-      const matchStatus = selectedStatus === 'ALL' || item.status === selectedStatus;
-      const matchSearch =
-        !searchQuery.trim() ||
-        item.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.admin_response && item.admin_response.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchCat && matchStatus && matchSearch;
-    });
+    return complaints
+      .filter((item) => !ComplaintRepository.isTestComplaint(item))
+      .filter((item) => {
+        const matchCat = selectedCategory === 'ALL' || item.category === selectedCategory;
+        const matchStatus = selectedStatus === 'ALL' || item.status === selectedStatus;
+        const matchSearch =
+          !searchQuery.trim() ||
+          item.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (item.admin_response && item.admin_response.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchCat && matchStatus && matchSearch;
+      });
   }, [complaints, selectedCategory, selectedStatus, searchQuery]);
 
   const handleOpenResponseModal = (item: TeacherComplaint) => {

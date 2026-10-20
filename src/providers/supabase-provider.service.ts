@@ -3337,6 +3337,26 @@ export class SupabaseProvider implements IDataProvider {
 
   // ─── ANONYMOUS TEACHER COMPLAINTS & FEEDBACK API ──────────────────────────
 
+  private isTestComplaintItem(item: any): boolean {
+    const content = (item?.content || '').toLowerCase();
+    const id = String(item?.id || '').toLowerCase();
+    const userId = String(item?.user_id || '').toLowerCase();
+
+    return (
+      id.startsWith('comp_sample_') ||
+      id === 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' ||
+      userId.startsWith('usr_guru_') ||
+      userId.startsWith('test_') ||
+      userId === 'mock_user_id' ||
+      content.includes('uji coba') ||
+      content.includes('pendingin ruangan di laboratorium') ||
+      content.includes('aspirasi khusus guru 2') ||
+      content.includes('testing') ||
+      content.includes('dummy') ||
+      content.includes('sample')
+    );
+  }
+
   /**
    * Auto-synchronizes local complaints stored on device (e.g. from previous offline/failed submissions)
    * up to Supabase Cloud so Admin, Kepsek, and all devices can view them seamlessly.
@@ -3367,6 +3387,14 @@ export class SupabaseProvider implements IDataProvider {
 
       for (let i = 0; i < updatedLocalList.length; i++) {
         const item = updatedLocalList[i];
+        if (this.isTestComplaintItem(item)) {
+          // Permanently purge test complaints from local storage so they never reach Supabase
+          updatedLocalList.splice(i, 1);
+          i--;
+          hasModifications = true;
+          continue;
+        }
+
         if (filterUserId && item.user_id !== filterUserId) continue;
 
         // Normalize ID to a valid RFC4122 UUID format
@@ -3483,9 +3511,10 @@ export class SupabaseProvider implements IDataProvider {
         logger.warn('SupabaseProvider', 'getUserComplaints Supabase error, fallback to local storage:', error.message);
       } else if (data) {
         // Cache server data locally for seamless offline read
+        const cleanData = (data as TeacherComplaint[]).filter((c) => !this.isTestComplaintItem(c));
         const mockProv = new (await import('./mock-provider.service')).MockProvider();
-        (data as TeacherComplaint[]).forEach((c) => mockProv.saveComplaintToStorage(c));
-        return data as TeacherComplaint[];
+        cleanData.forEach((c) => mockProv.saveComplaintToStorage(c));
+        return cleanData;
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'getUserComplaints DB exception:', err);
@@ -3509,11 +3538,13 @@ export class SupabaseProvider implements IDataProvider {
       if (error) {
         logger.warn('SupabaseProvider', 'getAllComplaints Supabase error, fallback to local storage:', error.message);
       } else if (data) {
-        // Mask user_id for strict anonymity
-        return (data as any[]).map((c) => ({
-          ...c,
-          user_id: 'ANONYMOUS',
-        }));
+        // Filter out test complaints and mask user_id for strict anonymity
+        return (data as any[])
+          .filter((c) => !this.isTestComplaintItem(c))
+          .map((c) => ({
+            ...c,
+            user_id: 'ANONYMOUS',
+          }));
       }
     } catch (err) {
       logger.warn('SupabaseProvider', 'getAllComplaints DB exception:', err);
