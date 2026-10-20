@@ -3,21 +3,25 @@
 // Protects against unauthorized endpoint takeovers and client-side RLS 401 violations
 
 import { createClient } from '@supabase/supabase-js';
-import process from 'node:process';
+
+const safeEnv: Record<string, string | undefined> =
+  typeof process !== 'undefined' && process?.env
+    ? process.env
+    : ((typeof import.meta !== 'undefined' && (import.meta as any)?.env) || {});
 
 const DEFAULT_SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHBmbWpzYnF4YnRpb3lwbmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzcyNDksImV4cCI6MjEwNDk1MzI0OX0.ewXX-KW3SMEF-KtOZ5P1MY5IpZSJQImDt5g9maTOWfE';
 
 const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY_TOREN2 ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
+  safeEnv.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
+  safeEnv.SUPABASE_SERVICE_ROLE_KEY ||
+  safeEnv.VITE_SUPABASE_ANON_KEY_TOREN2 ||
+  safeEnv.VITE_SUPABASE_ANON_KEY ||
   DEFAULT_SUPABASE_ANON_KEY;
 
 const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL_TOREN2 ||
-  process.env.VITE_SUPABASE_URL ||
+  safeEnv.VITE_SUPABASE_URL_TOREN2 ||
+  safeEnv.VITE_SUPABASE_URL ||
   'https://fnppfmjsbqxbtioypnap.supabase.co';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -77,7 +81,7 @@ async function authenticateUser(req: any): Promise<{ userId: string; role: strin
   }
 
   // 3. Admin Secret Header
-  const expectedSecret = process.env.INTERNAL_PUSH_SECRET || process.env.VAPID_PRIVATE_KEY;
+  const expectedSecret = safeEnv.INTERNAL_PUSH_SECRET || safeEnv.VAPID_PRIVATE_KEY;
   if (expectedSecret && token === expectedSecret) {
     return { userId: 'SYSTEM_INTERNAL', role: 'ADMIN' };
   }

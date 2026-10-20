@@ -118,8 +118,13 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const token = (process.env.VITE_TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || '').trim();
-  const groqKey = (process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY || '').trim();
+  const safeEnv: Record<string, string | undefined> =
+    typeof process !== 'undefined' && process?.env
+      ? process.env
+      : ((typeof import.meta !== 'undefined' && (import.meta as any)?.env) || {});
+
+  const token = (safeEnv.VITE_TELEGRAM_BOT_TOKEN || safeEnv.TELEGRAM_BOT_TOKEN || '').trim();
+  const groqKey = (safeEnv.VITE_GROQ_API_KEY || safeEnv.GROQ_API_KEY || '').trim();
 
   if (!token) {
     return res.status(200).json({ status: 'ignored', reason: 'TELEGRAM_BOT_TOKEN not configured' });
@@ -136,7 +141,7 @@ export default async function handler(req: any, res: any) {
 
   // 0. Secure Outbound Proxy: Send Telegram message without exposing Bot Token to browser
   if (update?.action === 'send_message' || update?.action === 'send') {
-    const targetChat = update.chatId || update.chat_id || process.env.VITE_TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
+    const targetChat = update.chatId || update.chat_id || safeEnv.VITE_TELEGRAM_CHAT_ID || safeEnv.TELEGRAM_CHAT_ID;
     const messageText = update.text;
     if (!messageText || !targetChat) {
       return res.status(400).json({ error: 'Missing text or chatId' });
@@ -147,7 +152,7 @@ export default async function handler(req: any, res: any) {
 
   // 0b. Secure Outbound Photo Proxy: Send photo directly to Telegram without touching Supabase
   if (update?.action === 'send_photo') {
-    const targetChat = update.chatId || update.chat_id || process.env.VITE_TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
+    const targetChat = update.chatId || update.chat_id || safeEnv.VITE_TELEGRAM_CHAT_ID || safeEnv.TELEGRAM_CHAT_ID;
     const caption = update.caption || update.text || '';
     const photoBase64 = update.photoBase64;
     if (!targetChat || !photoBase64) {

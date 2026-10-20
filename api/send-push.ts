@@ -3,13 +3,17 @@
 
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
-import process from 'node:process';
+
+const safeEnv: Record<string, string | undefined> =
+  typeof process !== 'undefined' && process?.env
+    ? process.env
+    : ((typeof import.meta !== 'undefined' && (import.meta as any)?.env) || {});
 
 // Setup VAPID details exclusively from environment secrets
 const VAPID_PUBLIC_KEY =
-  process.env.VITE_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@sekolah.sch.id';
+  safeEnv.VITE_VAPID_PUBLIC_KEY || safeEnv.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = safeEnv.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = safeEnv.VAPID_SUBJECT || 'mailto:admin@sekolah.sch.id';
 
 let isVapidConfigured = false;
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
@@ -25,14 +29,14 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 
 // Supabase client initialization (prefer service role key for backend push delivery)
 const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL_TOREN2 ||
-  process.env.VITE_SUPABASE_URL ||
+  safeEnv.VITE_SUPABASE_URL_TOREN2 ||
+  safeEnv.VITE_SUPABASE_URL ||
   'https://fnppfmjsbqxbtioypnap.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY_TOREN2 ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
+  safeEnv.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
+  safeEnv.SUPABASE_SERVICE_ROLE_KEY ||
+  safeEnv.VITE_SUPABASE_ANON_KEY_TOREN2 ||
+  safeEnv.VITE_SUPABASE_ANON_KEY ||
   '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: {
@@ -109,13 +113,13 @@ export default async function handler(req: any, res: any) {
 
   const authHeader = req.headers.authorization || '';
   const internalSecretHeader = req.headers['x-internal-secret'] || '';
-  const expectedSecret = process.env.INTERNAL_PUSH_SECRET || process.env.VAPID_PRIVATE_KEY;
+  const expectedSecret = safeEnv.INTERNAL_PUSH_SECRET || safeEnv.VAPID_PRIVATE_KEY;
 
   // Verifikasi Autentikasi Pengirim (Bearer token atau internal server secret)
   const isInternalServerCall = expectedSecret && internalSecretHeader === expectedSecret;
   const hasAuthToken = authHeader.startsWith('Bearer ');
 
-  if (!isInternalServerCall && !hasAuthToken && process.env.NODE_ENV === 'production') {
+  if (!isInternalServerCall && !hasAuthToken && safeEnv.NODE_ENV === 'production') {
     return res.status(401).json({
       error: 'Unauthorized: Endpoint ini memerlukan token autentikasi atau signature server.',
     });

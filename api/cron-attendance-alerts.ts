@@ -4,13 +4,17 @@
 
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
-import process from 'node:process';
+
+const safeEnv: Record<string, string | undefined> =
+  typeof process !== 'undefined' && process?.env
+    ? process.env
+    : ((typeof import.meta !== 'undefined' && (import.meta as any)?.env) || {});
 
 // Setup VAPID keys
 const VAPID_PUBLIC_KEY =
-  process.env.VITE_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || 'BJxAOVY7XCFiipXVppN_IPu5rWUzXaLzhM33dytmGI6oQ0SES9Qspm3sTPYcz9euG1NhSOSZb8BHLShozXnotnI';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'OBCW3DLo1qUpLq021YMbV0f-m-kwR_W40hzU47MY68E';
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@sekolah.sch.id';
+  safeEnv.VITE_VAPID_PUBLIC_KEY || safeEnv.VAPID_PUBLIC_KEY || 'BJxAOVY7XCFiipXVppN_IPu5rWUzXaLzhM33dytmGI6oQ0SES9Qspm3sTPYcz9euG1NhSOSZb8BHLShozXnotnI';
+const VAPID_PRIVATE_KEY = safeEnv.VAPID_PRIVATE_KEY || 'OBCW3DLo1qUpLq021YMbV0f-m-kwR_W40hzU47MY68E';
+const VAPID_SUBJECT = safeEnv.VAPID_SUBJECT || 'mailto:admin@sekolah.sch.id';
 
 let isVapidReady = false;
 try {
@@ -24,14 +28,14 @@ try {
 
 // Supabase client initialization
 const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL_TOREN2 ||
-  process.env.VITE_SUPABASE_URL ||
+  safeEnv.VITE_SUPABASE_URL_TOREN2 ||
+  safeEnv.VITE_SUPABASE_URL ||
   'https://fnppfmjsbqxbtioypnap.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY_TOREN2 ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
+  safeEnv.SUPABASE_SERVICE_ROLE_KEY_TOREN2 ||
+  safeEnv.SUPABASE_SERVICE_ROLE_KEY ||
+  safeEnv.VITE_SUPABASE_ANON_KEY_TOREN2 ||
+  safeEnv.VITE_SUPABASE_ANON_KEY ||
   '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },

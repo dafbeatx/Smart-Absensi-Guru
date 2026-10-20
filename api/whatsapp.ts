@@ -168,9 +168,14 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const gatewayUrl = (process.env.WA_GATEWAY_URL || '').replace(/\/+$/, '').trim();
-  const gatewaySecret = (process.env.WA_GATEWAY_SECRET || '').trim();
-  const targetGroupJid = (process.env.WA_GROUP_JID || '').trim();
+  const safeEnv: Record<string, string | undefined> =
+    typeof process !== 'undefined' && process?.env
+      ? process.env
+      : ((typeof import.meta !== 'undefined' && (import.meta as any)?.env) || {});
+
+  const gatewayUrl = (safeEnv.WA_GATEWAY_URL || '').replace(/\/+$/, '').trim();
+  const gatewaySecret = (safeEnv.WA_GATEWAY_SECRET || '').trim();
+  const targetGroupJid = (safeEnv.WA_GROUP_JID || '').trim();
 
   let body: any = req.body;
   if (typeof body === 'string') {

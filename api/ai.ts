@@ -2,7 +2,10 @@
 // Vercel Serverless Function: Secure Server-Side Proxy for Groq AI Engine
 // Protects GROQ_API_KEY from ever being exposed to client-side browser bundles (Zero-Trust)
 
-import process from 'node:process';
+const safeEnv: Record<string, string | undefined> =
+  typeof process !== 'undefined' && process?.env
+    ? process.env
+    : ((typeof import.meta !== 'undefined' && (import.meta as any)?.env) || {});
 
 const DEFAULT_GROQ_MODELS = [
   'qwen/qwen3.8-27b',
@@ -47,7 +50,7 @@ export default async function handler(req: any, res: any) {
   }
 
   // 1. Read secret key strictly from server environment (Never leaked to client bundle)
-  const apiKey = (process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || '').trim();
+  const apiKey = (safeEnv.GROQ_API_KEY || safeEnv.VITE_GROQ_API_KEY || '').trim();
 
   if (!apiKey || apiKey.includes('YOUR_') || apiKey === '') {
     return res.status(503).json({
@@ -91,7 +94,7 @@ export default async function handler(req: any, res: any) {
   }
 
   // Model fallback cascade
-  const configuredModel = model || process.env.VITE_GROQ_MODEL || DEFAULT_GROQ_MODELS[0];
+  const configuredModel = model || safeEnv.VITE_GROQ_MODEL || DEFAULT_GROQ_MODELS[0];
   const candidateModels = Array.from(new Set([configuredModel, ...DEFAULT_GROQ_MODELS]));
 
   let lastErrorDetails: any = null;
