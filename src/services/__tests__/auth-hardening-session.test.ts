@@ -666,9 +666,10 @@ export async function runAuthHardeningSessionTestSuite(): Promise<TestSuiteResul
     // ─────────────────────────────────────────────────────────────────────────
     // 20. Service Role Key Protection: Not present in client bundle or exposed with VITE_ prefix
     // ─────────────────────────────────────────────────────────────────────────
-    const viteEnvKeys = Object.keys(process.env).filter((k) => k.startsWith('VITE_'));
+    const envObj = typeof process !== 'undefined' && process.env ? process.env : ((import.meta as any)?.env || {});
+    const viteEnvKeys = Object.keys(envObj).filter((k) => k.startsWith('VITE_'));
     const isServiceRoleExposedInVite = viteEnvKeys.some(
-      (k) => k.includes('SERVICE_ROLE') || (process.env[k] || '').includes('service_role')
+      (k) => k.includes('SERVICE_ROLE') || ((envObj as any)[k] || '').includes('service_role')
     );
 
     assert(

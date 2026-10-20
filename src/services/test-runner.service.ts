@@ -82,8 +82,16 @@ export interface MasterTestSummary {
 import { ProviderFactory } from '../providers/provider-factory';
 import { MockProvider } from '../providers/mock-provider.service';
 
+export interface TestProgressInfo {
+  currentIndex: number;
+  totalSuites: number;
+  currentSuiteName: string;
+  totalPassed: number;
+  totalFailed: number;
+}
+
 export class MasterTestRunner {
-  public static async runAll(): Promise<MasterTestSummary> {
+  public static async runAll(onProgress?: (progress: TestProgressInfo) => void): Promise<MasterTestSummary> {
     // ⚠️ CRITICAL: Save the original live provider BEFORE switching to MockProvider.
     // Without this, the MockProvider permanently overwrites the SupabaseProvider singleton,
     // causing the logged-in admin session to be replaced by mock user data (e.g. "Rina Fitriani").
@@ -157,7 +165,17 @@ export class MasterTestRunner {
     let totalFailed = 0;
 
     try {
-      for (const suite of suitesToRun) {
+      for (let i = 0; i < suitesToRun.length; i++) {
+        const suite = suitesToRun[i];
+        if (onProgress) {
+          onProgress({
+            currentIndex: i + 1,
+            totalSuites: suitesToRun.length,
+            currentSuiteName: suite.name,
+            totalPassed,
+            totalFailed,
+          });
+        }
         try {
           const res = await suite.fn();
           totalPassed += res.passed;

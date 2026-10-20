@@ -82,10 +82,16 @@ export const DevTestPage: React.FC<{ onBackToDashboard?: () => void }> = ({ onBa
     try {
       const dummyRes = await AttendanceRepository.scanAttendance({
         token: token || 'DEV_TEST_TOKEN',
-        qr_seed: `DEV_TEST_QR_${Date.now()}`,
+        qr_seed: CONSTANTS.DEFAULTS.OFFICIAL_ATTENDANCE_QR_SEED,
         user_lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
         user_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
         device_uuid: deviceUUID || 'DEV_TEST_UUID',
+        user_id: user?.id,
+        distance_meters: 10,
+        gps_accuracy: 5,
+        verification_method: 'QR_GPS',
+        attendance_source: 'QR',
+        bypass_time_window: true,
       });
 
       logger.info('DevTestPage', 'Dummy attendance record saved:', dummyRes);
