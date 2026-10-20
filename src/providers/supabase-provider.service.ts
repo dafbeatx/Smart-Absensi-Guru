@@ -91,7 +91,7 @@ import type {
 } from '../types/exam-schedule.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
 import { CONSTANTS } from '../config/constants';
-import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
+import { calculateDistanceMeters, getEffectiveAllowedRadius, sanitizeCoordinate, sanitizeSchoolCoordinates } from '../utils/geofence.utils';
 import { logger } from '../utils/logger.utils';
 import { convertToWebP } from '../utils/image.utils';
 import {
@@ -481,17 +481,18 @@ export class SupabaseProvider implements IDataProvider {
   public async scanAttendance(dto: ScanAttendanceDTO): Promise<AttendanceResponseDTO> {
     const settings = await this.getSettings();
 
-    const userLat = dto.user_lat;
-    const userLng = dto.user_lng;
+    const schoolCoords = sanitizeSchoolCoordinates(settings.geofence_lat, settings.geofence_lng);
+    const userLat = sanitizeCoordinate(dto.user_lat, true, schoolCoords.lat);
+    const userLng = sanitizeCoordinate(dto.user_lng, false, schoolCoords.lng);
     const distanceMeters = calculateDistanceMeters(
       userLat,
       userLng,
-      settings.geofence_lat,
-      settings.geofence_lng
+      schoolCoords.lat,
+      schoolCoords.lng
     );
 
-    // Use shared effective radius — same rule applied on the frontend
-    const allowedRadius = getEffectiveAllowedRadius(settings.geofence_radius);
+    // Use shared effective radius — buffer radius minimal 500m per geofence protocol
+    const allowedRadius = getEffectiveAllowedRadius(settings.geofence_radius, 500);
     const isOfflineSync = dto.attendance_source === 'OFFLINE_SYNC' || dto.token?.startsWith('SYNC_');
     const isDoorPosterQR = Boolean(
       dto.qr_seed && (
@@ -502,7 +503,7 @@ export class SupabaseProvider implements IDataProvider {
         dto.qr_seed.startsWith('SAG_TEST_SEED')
       )
     );
-    const effectiveAllowedRadius = (isOfflineSync || isDoorPosterQR) ? Math.max(allowedRadius, 500) : allowedRadius;
+    const effectiveAllowedRadius = Math.max(allowedRadius, 500);
 
     logger.info('SupabaseProvider', 'scanAttendance geofence check', {
       distanceMeters,
@@ -1913,9 +1914,9 @@ export class SupabaseProvider implements IDataProvider {
         friday_checkout_start: map.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START,
         saturday_is_holiday: map.saturday_is_holiday !== 'false',
         sunday_is_holiday: map.sunday_is_holiday !== 'false',
-        geofence_lat: map.geofence_lat ? parseFloat(map.geofence_lat) : CONSTANTS.DEFAULTS.GEOFENCE_LAT,
-        geofence_lng: map.geofence_lng ? parseFloat(map.geofence_lng) : CONSTANTS.DEFAULTS.GEOFENCE_LNG,
-        geofence_radius: map.geofence_radius ? parseInt(map.geofence_radius, 10) : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+        geofence_lat: sanitizeSchoolCoordinates(map.geofence_lat, map.geofence_lng).lat,
+        geofence_lng: sanitizeSchoolCoordinates(map.geofence_lat, map.geofence_lng).lng,
+        geofence_radius: map.geofence_radius ? Math.max(parseInt(map.geofence_radius, 10), 500) : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
         admin_reset_password: map.admin_reset_password || undefined,
       };
 

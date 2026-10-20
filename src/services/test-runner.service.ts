@@ -56,6 +56,7 @@ import { runGradeMasterScoreSyncTestSuite } from './__tests__/grademaster-score-
 import { runUniversalExcelGradingTestSuite } from './__tests__/universal-excel-grading.test';
 import { runOralExamAssessmentTestSuite } from './__tests__/oral-exam-assessment.test';
 import { runComplaintRepositorySyncTestSuite } from './__tests__/complaint-repository-sync.test';
+import { runOnlineAttendanceGeofenceFixTestSuite } from './__tests__/online-attendance-geofence-fix.test';
 
 export interface TestResultItem {
   testName: string;
@@ -149,6 +150,7 @@ export class MasterTestRunner {
       { name: 'Universal Excel Grading & Auto Session Importer Suite', fn: runUniversalExcelGradingTestSuite },
       { name: 'Oral Exam Assessment Engine (BTQ, Hafalan, English & Arabic Checklist)', fn: runOralExamAssessmentTestSuite },
       { name: 'Kotak Aspirasi & Keluhan Guru Cross-Device Sync Suite (Phase 5.3)', fn: runComplaintRepositorySyncTestSuite },
+      { name: 'Online Attendance Geofence Sanitization & 500m Safety Buffer Suite (Fix Penolakan Data)', fn: runOnlineAttendanceGeofenceFixTestSuite },
     ];
 
     let totalPassed = 0;

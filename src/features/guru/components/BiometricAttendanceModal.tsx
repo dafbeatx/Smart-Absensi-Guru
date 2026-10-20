@@ -74,7 +74,7 @@ export const BiometricAttendanceModal: React.FC<BiometricAttendanceModalProps> =
     isCheckIn: boolean;
   } | null>(null);
 
-  const effectiveAllowedRadius = getEffectiveAllowedRadius(settings.geofence_radius);
+  const effectiveAllowedRadius = Math.max(getEffectiveAllowedRadius(settings.geofence_radius, 500), 500);
 
   // Ambil lokasi GPS fisik guru dan cocokkan dengan geofence sekolah (Toleransi indoor hingga 100m)
   const checkGPSLocation = useCallback(async () => {

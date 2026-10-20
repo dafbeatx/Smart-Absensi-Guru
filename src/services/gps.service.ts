@@ -1,7 +1,7 @@
 import { CONSTANTS } from '../config/constants';
 import { getErrorDefinition } from '../config/error-codes';
 import type { ErrorDefinition } from '../config/error-codes';
-import { calculateDistanceMeters, getEffectiveAllowedRadius } from '../utils/geofence.utils';
+import { calculateDistanceMeters, getEffectiveAllowedRadius, sanitizeSchoolCoordinates } from '../utils/geofence.utils';
 import { ProviderFactory } from '../providers/provider-factory';
 import { logger } from '../utils/logger.utils';
 
@@ -78,17 +78,6 @@ export class GPSService {
           logger.warn('GPSService', `Suspicious speed jump detected: ${speedKmh.toFixed(1)} km/h over ${timeDeltaSec.toFixed(1)}s`);
           return { isMock: true, reason: `IMPOSSIBLE_SPEED_JUMP_${Math.round(speedKmh)}KMH` };
         }
-      }
-
-      // 4. Zero-Variance Synthetic Fix Check (DevTools Fixed Location Override)
-      if (
-        timeDeltaSec >= 2 &&
-        Math.abs(coords.latitude - previousFix.coords.latitude) < 1e-12 &&
-        Math.abs(coords.longitude - previousFix.coords.longitude) < 1e-12 &&
-        coords.accuracy === previousFix.coords.accuracy &&
-        coords.altitude === previousFix.coords.altitude
-      ) {
-        return { isMock: true, reason: 'ZERO_VARIANCE_SYNTHETIC_OVERRIDE' };
       }
     }
 
@@ -225,19 +214,14 @@ export class GPSService {
         const saved = localStorage.getItem('smart_absensi_system_settings');
         if (saved) {
           const parsed = JSON.parse(saved);
-          let lat = parseFloat(parsed.geofence_lat);
-          let lng = parseFloat(parsed.geofence_lng);
-          const radius = parseInt(parsed.geofence_radius, 10);
-
-          if (lat === -6.200000 || lat === -6.2 || (lat > -6.21 && lat < -6.19 && lng > 106.81 && lng < 106.82)) {
-            lat = CONSTANTS.DEFAULTS.GEOFENCE_LAT;
-            lng = CONSTANTS.DEFAULTS.GEOFENCE_LNG;
-          }
+          const sanitized = sanitizeSchoolCoordinates(parsed.geofence_lat, parsed.geofence_lng);
+          const rawRadius = parseInt(parsed.geofence_radius, 10);
+          const radius = !isNaN(rawRadius) && rawRadius > 0 ? Math.max(rawRadius, 500) : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS;
 
           return {
-            lat: !isNaN(lat) ? lat : CONSTANTS.DEFAULTS.GEOFENCE_LAT,
-            lng: !isNaN(lng) ? lng : CONSTANTS.DEFAULTS.GEOFENCE_LNG,
-            radius: !isNaN(radius) && radius > 0 ? radius : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+            lat: sanitized.lat,
+            lng: sanitized.lng,
+            radius,
           };
         }
       }
@@ -261,9 +245,13 @@ export class GPSService {
       if (settings && typeof localStorage !== 'undefined' && localStorage && typeof localStorage.setItem === 'function') {
         const existing = localStorage.getItem('smart_absensi_system_settings');
         const parsed = existing ? JSON.parse(existing) : {};
+        const sanitized = sanitizeSchoolCoordinates(settings.geofence_lat, settings.geofence_lng);
         const updated = {
           ...parsed,
           ...settings,
+          geofence_lat: sanitized.lat,
+          geofence_lng: sanitized.lng,
+          geofence_radius: Math.max(settings.geofence_radius || 500, 500),
         };
         localStorage.setItem('smart_absensi_system_settings', JSON.stringify(updated));
       }
