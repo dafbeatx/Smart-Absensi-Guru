@@ -117,5 +117,21 @@ export const runComplaintRepositorySyncTestSuite = async (): Promise<{
     `Kategori: ${categories.length}, Status: ${statuses.length}`
   );
 
+  // Test 7: Delete Complaint
+  const deleteResult = await ComplaintRepository.deleteComplaint(c1.id);
+  assert(
+    '7. deleteComplaint berhasil menghapus catatan aspirasi dari sistem',
+    deleteResult === true,
+    `Deleted: ${c1.id}`
+  );
+
+  // Test 8: Purge Test Complaints (Pembersihan Data Uji Coba)
+  const purgedCount = await ComplaintRepository.purgeTestComplaints();
+  assert(
+    '8. purgeTestComplaints membersihkan seluruh data uji coba tanpa sisa',
+    purgedCount >= 1,
+    `Purged: ${purgedCount}`
+  );
+
   return { passed, failed, results };
 };

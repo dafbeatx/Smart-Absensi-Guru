@@ -2071,6 +2071,44 @@ export class MockProvider implements IDataProvider {
     return true;
   }
 
+  public async deleteComplaint(complaintId: string, _token?: string): Promise<boolean> {
+    const list = this.getStorageComplaints();
+    const filtered = list.filter((c) => c.id !== complaintId);
+    if (filtered.length !== list.length) {
+      safeSetStorage('smart_absensi_teacher_complaints', JSON.stringify(filtered));
+      return true;
+    }
+    return false;
+  }
+
+  public async purgeTestComplaints(_token?: string): Promise<number> {
+    const list = this.getStorageComplaints();
+    const isTest = (item: TeacherComplaint) => {
+      const content = (item.content || '').toLowerCase();
+      const id = String(item.id || '').toLowerCase();
+      const userId = String(item.user_id || '').toLowerCase();
+
+      return (
+        id.startsWith('comp_sample_') ||
+        id === 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' ||
+        userId.startsWith('usr_guru_') ||
+        userId.startsWith('test_') ||
+        userId === 'mock_user_id' ||
+        content.includes('uji coba') ||
+        content.includes('pendingin ruangan di laboratorium') ||
+        content.includes('aspirasi khusus guru 2') ||
+        content.includes('testing') ||
+        content.includes('dummy') ||
+        content.includes('sample')
+      );
+    };
+
+    const cleaned = list.filter((c) => !isTest(c));
+    const deletedCount = list.length - cleaned.length;
+    safeSetStorage('smart_absensi_teacher_complaints', JSON.stringify(cleaned));
+    return deletedCount;
+  }
+
   // ── TEACHING SCHEDULES API ────────────────────────────────────────────────
   public async getTeachingSchedules(
     _token?: string,

@@ -157,6 +157,8 @@ export interface IDataProvider {
   getUserComplaints(userId: string, token?: string): Promise<TeacherComplaint[]>;
   getAllComplaints(token?: string): Promise<TeacherComplaint[]>;
   updateComplaintStatus(dto: UpdateComplaintStatusDTO, token?: string): Promise<boolean>;
+  deleteComplaint(complaintId: string, token?: string): Promise<boolean>;
+  purgeTestComplaints(token?: string): Promise<number>;
 
   // Teaching Schedules API (Jadwal Mengajar Guru)
   getTeachingSchedules(

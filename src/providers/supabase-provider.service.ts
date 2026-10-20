@@ -3555,6 +3555,42 @@ export class SupabaseProvider implements IDataProvider {
     return mockProv.updateComplaintStatus(dto);
   }
 
+  public async deleteComplaint(complaintId: string, _token?: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('teacher_complaints')
+        .delete()
+        .eq('id', complaintId);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'deleteComplaint Supabase error:', error.message);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'deleteComplaint DB exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.deleteComplaint(complaintId);
+  }
+
+  public async purgeTestComplaints(_token?: string): Promise<number> {
+    try {
+      const { error } = await this.client
+        .from('teacher_complaints')
+        .delete()
+        .or('content.ilike.%uji coba%,content.ilike.%test%,content.ilike.%testing%,content.ilike.%dummy%,content.ilike.%sample%,content.ilike.%pendingin ruangan di laboratorium%,content.ilike.%aspirasi khusus guru 2%,user_id.eq.usr_guru_001,user_id.eq.usr_guru_002,user_id.eq.usr_guru_003,user_id.eq.mock_user_id');
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'purgeTestComplaints Supabase warning:', error.message);
+      }
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'purgeTestComplaints exception:', err);
+    }
+
+    const mockProv = new (await import('./mock-provider.service')).MockProvider();
+    return mockProv.purgeTestComplaints();
+  }
+
   // ── TEACHING SCHEDULES API ────────────────────────────────────────────────
   private mapDbRowToTeachingSlot(row: any): TeachingSlot {
     const dayOfWeek = row.day_of_week !== undefined && row.day_of_week !== null

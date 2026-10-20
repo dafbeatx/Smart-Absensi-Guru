@@ -34,6 +34,11 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
   const [responseStatus, setResponseStatus] = useState<ComplaintStatus>('RESOLVED');
   const [isSavingResponse, setIsSavingResponse] = useState<boolean>(false);
 
+  // Deletion & Purge Test Data States
+  const [complaintToDelete, setComplaintToDelete] = useState<TeacherComplaint | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isPurging, setIsPurging] = useState<boolean>(false);
+
   const { token } = useAuthStore();
   const { showToast } = useToastStore();
 
@@ -162,6 +167,46 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!complaintToDelete) return;
+    setIsDeleting(true);
+    try {
+      const ok = await ComplaintRepository.deleteComplaint(complaintToDelete.id, token || undefined);
+      if (ok) {
+        showToast('success', 'Catatan Berhasil Dihapus! 🗑️', 'Catatan aspirasi telah dihapus permanen.');
+        setComplaintToDelete(null);
+        fetchComplaints(true);
+      } else {
+        showToast('error', 'Gagal Menghapus', 'Catatan tidak ditemukan atau sudah terhapus.');
+      }
+    } catch (err) {
+      logger.error('AnonymousComplaintManagement', 'Failed to delete complaint:', err);
+      showToast('error', 'Gagal Menghapus', 'Terjadi kesalahan sistem saat menghapus catatan.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handlePurgeTestComplaints = async () => {
+    setIsPurging(true);
+    try {
+      const purged = await ComplaintRepository.purgeTestComplaints(token || undefined);
+      showToast('success', 'Data Test Dibersihkan! 🧹', `Berhasil menghapus ${purged} catatan aspirasi uji coba.`);
+      fetchComplaints(true);
+    } catch (err) {
+      logger.error('AnonymousComplaintManagement', 'Failed to purge test complaints:', err);
+      showToast('error', 'Gagal Membersihkan', 'Terjadi kesalahan saat membersihkan data uji coba.');
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
+  const testComplaints = useMemo(() => {
+    return complaints.filter((c) => ComplaintRepository.isTestComplaint(c));
+  }, [complaints]);
+
+  const hasTestComplaints = testComplaints.length > 0;
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* ── 1. HEADER BANNER & SYNC CONTROL ───────────────────────────── */}
@@ -186,7 +231,20 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {hasTestComplaints && (
+            <button
+              type="button"
+              onClick={handlePurgeTestComplaints}
+              disabled={isPurging}
+              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-black rounded-xl border border-rose-300 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-2xs"
+              title="Hapus seluruh data test/dummy dari kotak aspirasi"
+            >
+              <span>🧹</span>
+              <span>{isPurging ? 'Membersihkan...' : `Hapus Data Test (${testComplaints.length})`}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => fetchComplaints(true)}
@@ -431,14 +489,26 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
                     )}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenResponseModal(item)}
-                    className="px-4 py-1.5 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-extrabold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95 ml-auto"
-                  >
-                    <span>💬</span>
-                    <span>{item.admin_response ? 'Ubah Tanggapan' : 'Beri Tanggapan Resmi'}</span>
-                  </button>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setComplaintToDelete(item)}
+                      className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1"
+                      title="Hapus catatan aspirasi ini secara permanen"
+                    >
+                      <span>🗑️</span>
+                      <span className="hidden sm:inline">Hapus</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenResponseModal(item)}
+                      className="px-4 py-1.5 bg-[#0D7A5F] hover:bg-[#095744] text-white text-xs font-extrabold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
+                    >
+                      <span>💬</span>
+                      <span>{item.admin_response ? 'Ubah Tanggapan' : 'Beri Tanggapan Resmi'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -505,26 +575,80 @@ export const AnonymousComplaintManagement: React.FC<AnonymousComplaintManagement
             </div>
 
             {/* Action Buttons */}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const toDelete = selectedComplaint;
+                  handleCloseResponseModal();
+                  setComplaintToDelete(toDelete);
+                }}
+                className="px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <span>🗑️</span>
+                <span>Hapus Catatan</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCloseResponseModal}
+                  disabled={isSavingResponse}
+                  className="min-h-11 px-4 text-xs font-bold"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={isSavingResponse || !responseText.trim()}
+                  className="min-h-11 px-5 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-md active:scale-98 cursor-pointer"
+                >
+                  <span>{isSavingResponse ? 'Menyimpan...' : 'Simpan & Kirim Tanggapan'}</span>
+                </Button>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── 6. DELETE CONFIRMATION MODAL ─────────────────────────────────── */}
+      {complaintToDelete && (
+        <Modal
+          isOpen={true}
+          onClose={() => setComplaintToDelete(null)}
+          title="🗑️ Konfirmasi Hapus Aspirasi"
+          maxWidth="sm"
+        >
+          <div className="space-y-4 pt-1 text-xs">
+            <p className="text-slate-700 leading-relaxed font-medium">
+              Apakah Anda yakin ingin menghapus catatan aspirasi ini secara permanen dari sistem sekolah?
+            </p>
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-slate-800 italic line-clamp-3">
+              "{complaintToDelete.content}"
+            </div>
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <Button
-                type="button"
                 variant="secondary"
-                onClick={handleCloseResponseModal}
-                disabled={isSavingResponse}
-                className="min-h-11 px-4 text-xs font-bold"
+                type="button"
+                onClick={() => setComplaintToDelete(null)}
+                disabled={isDeleting}
+                className="min-h-10 px-4 text-xs font-bold"
               >
                 Batal
               </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={isSavingResponse || !responseText.trim()}
-                className="min-h-11 px-5 bg-[#0D7A5F] hover:bg-[#095744] text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-md active:scale-98 cursor-pointer"
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="min-h-10 px-4 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
               >
-                <span>{isSavingResponse ? 'Menyimpan...' : 'Simpan & Kirim Tanggapan'}</span>
-              </Button>
+                <span>🗑️</span>
+                <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Permanen'}</span>
+              </button>
             </div>
-          </form>
+          </div>
         </Modal>
       )}
     </div>

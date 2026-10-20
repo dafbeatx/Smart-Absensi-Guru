@@ -135,4 +135,49 @@ export class ComplaintRepository {
     }
     return success;
   }
+
+  /**
+   * Delete a complaint (permanently remove record)
+   */
+  public static async deleteComplaint(complaintId: string, token?: string): Promise<boolean> {
+    const success = await ProviderFactory.getProvider().deleteComplaint(complaintId, token);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_complaints_updated'));
+    }
+    return success;
+  }
+
+  /**
+   * Purge all dummy/test records from the complaints box
+   */
+  public static async purgeTestComplaints(token?: string): Promise<number> {
+    const count = await ProviderFactory.getProvider().purgeTestComplaints(token);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_complaints_updated'));
+    }
+    return count;
+  }
+
+  /**
+   * Helper to check if a complaint appears to be a test/dummy entry
+   */
+  public static isTestComplaint(item: TeacherComplaint): boolean {
+    const content = (item.content || '').toLowerCase();
+    const id = String(item.id || '').toLowerCase();
+    const userId = String(item.user_id || '').toLowerCase();
+
+    return (
+      id.startsWith('comp_sample_') ||
+      id === 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' ||
+      userId.startsWith('usr_guru_') ||
+      userId.startsWith('test_') ||
+      userId === 'mock_user_id' ||
+      content.includes('uji coba') ||
+      content.includes('pendingin ruangan di laboratorium') ||
+      content.includes('aspirasi khusus guru 2') ||
+      content.includes('testing') ||
+      content.includes('dummy') ||
+      content.includes('sample')
+    );
+  }
 }
