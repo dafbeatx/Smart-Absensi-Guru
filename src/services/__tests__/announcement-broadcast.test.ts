@@ -290,6 +290,64 @@ export const runAnnouncementBroadcastTestSuite = async (): Promise<{
     `Event dispatched: ${isRealtimeSyncValid}`
   );
 
+  // ── 8. Multi-Targeting Tests: Role-Based & Single Specific User ──────────
+  // Test 14: Target Admin Saja
+  AnnouncementRepository.setCooldownTimestamp(Date.now() - 200 * 1000);
+  const adminTargetBroadcast = await AnnouncementRepository.publishAnnouncement({
+    title: 'Pengumuman Internal Admin',
+    message: 'Hanya administrator yang menerima pesan teknis ini.',
+    severity: 'WARNING',
+    audience_role: 'ADMIN',
+    user: mockKepsekUser,
+    token: 'MOCK_TOKEN',
+  });
+  assert(
+    '14. Target penerima ADMIN saja berhasil dipublikasikan oleh Kepala Sekolah',
+    adminTargetBroadcast?.success === true,
+    `Notification ID: ${adminTargetBroadcast?.notificationId}`
+  );
+
+  // Test 15: Target Kepsek Saja
+  AnnouncementRepository.setCooldownTimestamp(Date.now() - 200 * 1000);
+  const kepsekTargetBroadcast = await AnnouncementRepository.publishAnnouncement({
+    title: 'Laporan Khusus untuk Kepala Sekolah',
+    message: 'Dokumen evaluasi tahunan telah siap untuk ditinjau.',
+    severity: 'INFO',
+    audience_role: 'KEPSEK',
+    user: mockAdminUser,
+    token: 'MOCK_TOKEN',
+  });
+  assert(
+    '15. Target penerima KEPSEK saja berhasil dipublikasikan oleh Administrator',
+    kepsekTargetBroadcast?.success === true,
+    `Notification ID: ${kepsekTargetBroadcast?.notificationId}`
+  );
+
+  // Test 16: Target 1 Orang Tertentu (Specific Single User)
+  AnnouncementRepository.setCooldownTimestamp(Date.now() - 200 * 1000);
+  const singleUserBroadcast = await AnnouncementRepository.publishAnnouncement({
+    title: 'Pemberitahuan Khusus Pak Budi',
+    message: 'Jadwal supervisi kelas Anda ditetapkan hari Kamis jam ke-3.',
+    severity: 'INFO',
+    target_user_id: mockGuruUser.id,
+    target_user_name: mockGuruUser.full_name,
+    user: mockKepsekUser,
+    token: 'MOCK_TOKEN',
+  });
+
+  // Verify recipient isolation: Pak Budi receives it, other user doesn't
+  const guruNotifs = await mockProvider.getNotifications(mockGuruUser.id, 'MOCK_TOKEN', 'GURU');
+  const otherGuruNotifs = await mockProvider.getNotifications('other_guru_id_99', 'MOCK_TOKEN', 'GURU');
+
+  const budiHasNotification = guruNotifs.some((n) => n.title.includes('Pemberitahuan Khusus Pak Budi'));
+  const otherHasNotification = otherGuruNotifs.some((n) => n.title.includes('Pemberitahuan Khusus Pak Budi'));
+
+  assert(
+    '16. Target 1 orang tertentu (spesifik) hanya diterima oleh user yang dituju secara terisolasi',
+    singleUserBroadcast.success === true && budiHasNotification === true && otherHasNotification === false,
+    `Budi received: ${budiHasNotification}, Other received: ${otherHasNotification}`
+  );
+
   // Clean up
   AnnouncementRepository.clearCooldown();
   AnnouncementRepository.clearHistory();

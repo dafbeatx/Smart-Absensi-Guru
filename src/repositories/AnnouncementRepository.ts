@@ -15,11 +15,15 @@ import type {
 } from '../types/database.types';
 import { logger } from '../utils/logger.utils';
 
+export type AnnouncementTargetType = 'GURU' | 'ADMIN' | 'KEPSEK' | 'ALL' | 'SPECIFIC_USER';
+
 export interface PublishAnnouncementParams {
   title: string;
   message: string;
   severity?: NotificationSeverity;
   audience_role?: NotificationAudience;
+  target_user_id?: string | null;
+  target_user_name?: string | null;
   action_url?: string;
   user: UserProfile;
   token?: string;
@@ -161,7 +165,17 @@ export class AnnouncementRepository {
   public static async publishAnnouncement(
     params: PublishAnnouncementParams
   ): Promise<BroadcastResult & { pushDetails?: any }> {
-    const { title, message, severity = 'INFO', audience_role = 'GURU', action_url = '/', user, token } = params;
+    const {
+      title,
+      message,
+      severity = 'INFO',
+      audience_role = 'GURU',
+      target_user_id = null,
+      target_user_name = null,
+      action_url = '/',
+      user,
+      token,
+    } = params;
 
     // 1. Validasi Hak Akses (Hanya Admin, Operator, dan Kepsek)
     if (!user || (user.role !== 'ADMIN' && user.role !== 'OPERATOR' && user.role !== 'KEPSEK')) {
@@ -196,7 +210,15 @@ export class AnnouncementRepository {
       throw new Error('⚠️ Pengumuman dengan judul dan isi yang persis sama telah dipublikasikan dalam 1 jam terakhir. Mohon perbarui isi pesan untuk menghindari duplikasi.');
     }
 
-    logger.info('AnnouncementRepository', `Broadcasting announcement "${trimmedTitle}" by ${user.full_name} (${user.role}) to ${audience_role}`);
+    const isDirectUser = Boolean(target_user_id);
+    const targetLabel = isDirectUser
+      ? `User: ${target_user_name || target_user_id}`
+      : `Role: ${audience_role}`;
+
+    logger.info(
+      'AnnouncementRepository',
+      `Broadcasting announcement "${trimmedTitle}" by ${user.full_name} (${user.role}) to ${targetLabel}`
+    );
 
     // 5. Simpan ke Database Master Notifikasi via Provider
     const provider = ProviderFactory.getProvider();
@@ -205,7 +227,9 @@ export class AnnouncementRepository {
         title: trimmedTitle,
         message: trimmedMsg,
         severity,
-        audience_role,
+        audience_role: isDirectUser ? undefined : audience_role,
+        recipient_user_id: target_user_id || undefined,
+        target_user_name: target_user_name || undefined,
         action_url,
         created_by: user.id,
         sender_name: user.full_name,
@@ -213,14 +237,37 @@ export class AnnouncementRepository {
       token
     );
 
-    // 6. Trigger Web Push ke seluruh HP Guru via Serverless Function
+    // 6. Trigger Web Push ke HP Penerima via Serverless Function
     let pushSent = false;
     let pushCount = 0;
     let pushDetails: any = null;
 
     try {
-      const targetRoles: ('GURU' | 'ADMIN' | 'KEPSEK')[] =
-        audience_role === 'ALL' ? ['GURU', 'ADMIN', 'KEPSEK'] : ['GURU'];
+      const pushBody: Record<string, any> = {
+        title: trimmedTitle,
+        body: trimmedMsg,
+        severity,
+        eventType: 'ANNOUNCEMENT',
+        url: action_url,
+        action_url,
+        senderUserId: user.id,
+        senderRole: user.role,
+        tag: `announcement_${Date.now()}`,
+      };
+
+      if (isDirectUser && target_user_id) {
+        pushBody.targetUserId = target_user_id;
+      } else {
+        const targetRoles: ('GURU' | 'ADMIN' | 'KEPSEK')[] =
+          audience_role === 'ALL'
+            ? ['GURU', 'ADMIN', 'KEPSEK']
+            : audience_role === 'ADMIN'
+            ? ['ADMIN']
+            : audience_role === 'KEPSEK'
+            ? ['KEPSEK']
+            : ['GURU'];
+        pushBody.targetRoles = targetRoles;
+      }
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -232,18 +279,7 @@ export class AnnouncementRepository {
       const res = await fetch('/api/send-push', {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          targetRoles,
-          title: trimmedTitle,
-          body: trimmedMsg,
-          severity,
-          eventType: 'ANNOUNCEMENT',
-          url: action_url,
-          action_url,
-          senderUserId: user.id,
-          senderRole: user.role,
-          tag: `announcement_${Date.now()}`,
-        }),
+        body: JSON.stringify(pushBody),
       });
 
       if (res.ok) {
@@ -265,9 +301,10 @@ export class AnnouncementRepository {
     // 8. Simpan ke Riwayat Lokal
     const newRecord: AppNotification = {
       id: dbResult.notificationId || `ann_${Date.now()}`,
-      user_id: null,
-      recipient_user_id: null,
-      audience_role,
+      user_id: target_user_id || null,
+      recipient_user_id: target_user_id || null,
+      audience_role: isDirectUser ? undefined : audience_role,
+      target_user_name: target_user_name || null,
       title: trimmedTitle,
       message: trimmedMsg,
       type: 'ANNOUNCEMENT',

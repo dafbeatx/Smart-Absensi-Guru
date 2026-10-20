@@ -2579,8 +2579,16 @@ export class SupabaseProvider implements IDataProvider {
         continue;
       }
 
+      // 1b. Direct recipient filter (jika notifikasi khusus 1 user tertentu)
+      if (n.recipient_user_id && n.recipient_user_id !== userId) {
+        continue;
+      }
+      if (n.user_id && n.type === 'ANNOUNCEMENT' && n.user_id !== userId) {
+        continue;
+      }
+
       // 2. Strict Role/Audience filter (mencegah kebocoran notifikasi role khusus ke role lain)
-      if (n.audience_role && n.audience_role !== 'ALL') {
+      if (!n.recipient_user_id && n.audience_role && n.audience_role !== 'ALL') {
         const targetRole = String(n.audience_role).toUpperCase().trim();
         const currentRole = userRole ? String(userRole).toUpperCase().trim() : '';
         if (targetRole !== currentRole) {
@@ -2845,11 +2853,11 @@ export class SupabaseProvider implements IDataProvider {
   ): Promise<BroadcastResult> {
     try {
       const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `notif_${Date.now()}`;
-      const payloadToInsert = {
+      const payloadToInsert: Record<string, any> = {
         id: newId,
-        user_id: null,
-        recipient_user_id: null,
-        audience_role: dto.audience_role || 'GURU',
+        user_id: dto.recipient_user_id || null,
+        recipient_user_id: dto.recipient_user_id || null,
+        audience_role: dto.recipient_user_id ? null : (dto.audience_role || 'GURU'),
         type: 'ANNOUNCEMENT',
         severity: dto.severity || 'INFO',
         title: dto.title.trim(),
@@ -2858,6 +2866,10 @@ export class SupabaseProvider implements IDataProvider {
         created_by: dto.created_by || null,
         created_at: new Date().toISOString(),
       };
+
+      if (dto.target_user_name) {
+        payloadToInsert.payload = { target_user_name: dto.target_user_name };
+      }
 
       const { data, error } = await this.client
         .from('notifications')

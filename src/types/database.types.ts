@@ -71,6 +71,7 @@ export interface AppNotification {
   created_by?: string | null;
   sync_state?: 'SYNCED' | 'LOCAL_DRAFT' | 'FAILED';
   category?: NotificationItemCategory;
+  target_user_name?: string | null;
   created_at: string;
 }
 
@@ -109,6 +110,8 @@ export interface BroadcastAnnouncementDTO {
   action_url?: string;
   created_by?: string;
   sender_name?: string;
+  recipient_user_id?: string | null;
+  target_user_name?: string | null;
 }
 
 export interface BroadcastResult {

@@ -1296,6 +1296,11 @@ export class MockProvider implements IDataProvider {
     return items
       .filter((n) => {
         if (n.expires_at && new Date(n.expires_at).getTime() < now) return false;
+        // Check recipient_user_id or personal announcement targeting
+        if (n.recipient_user_id || (n.user_id && n.type === 'ANNOUNCEMENT')) {
+          const targetId = n.recipient_user_id || n.user_id;
+          if (targetId && targetId !== effectiveUserId) return false;
+        }
         if (n.audience_role && n.audience_role !== 'ALL') {
           if (!userRole) return false;
           return n.audience_role.toUpperCase().trim() === userRole.toUpperCase().trim();
@@ -1409,9 +1414,10 @@ export class MockProvider implements IDataProvider {
     const newId = `mock_notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const notif: AppNotification = {
       id: newId,
-      user_id: null,
-      recipient_user_id: null,
-      audience_role: dto.audience_role || 'GURU',
+      user_id: dto.recipient_user_id || null,
+      recipient_user_id: dto.recipient_user_id || null,
+      audience_role: dto.recipient_user_id ? undefined : (dto.audience_role || 'GURU'),
+      target_user_name: dto.target_user_name || null,
       type: 'ANNOUNCEMENT',
       severity: dto.severity || 'INFO',
       title: dto.title.trim(),
