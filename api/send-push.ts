@@ -137,13 +137,26 @@ export default async function handler(req: any, res: any) {
     url = '/',
     action_url,
     tag = `push_${Date.now()}`,
-    icon = '/pwa-192x192.png',
-    badge = '/pwa-192x192.png',
+    icon = '/school-logo.png',
+    badge = '/favicon.png',
     actions = [
       { action: 'open_app', title: '📱 Buka Aplikasi' },
       { action: 'close', title: 'Tutup' },
     ],
   }: PushRequestBody = req.body || {};
+
+  const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
+  const host = (req.headers['x-forwarded-host'] as string) || (req.headers.host as string) || '';
+  const siteOrigin = host ? `${proto}://${host}` : '';
+
+  const resolveAssetUrl = (path?: string, fallback = '/school-logo.png') => {
+    const p = path || fallback;
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    return siteOrigin ? `${siteOrigin}${p.startsWith('/') ? '' : '/'}${p}` : p;
+  };
+
+  const resolvedIcon = resolveAssetUrl(icon, '/school-logo.png');
+  const resolvedBadge = resolveAssetUrl(badge, '/favicon.png');
 
   if (!title || !body) {
     return res.status(400).json({ error: 'Field "title" dan "body" wajib diisi.' });
@@ -285,8 +298,8 @@ export default async function handler(req: any, res: any) {
       tag,
       severity,
       eventType,
-      icon,
-      badge,
+      icon: resolvedIcon,
+      badge: resolvedBadge,
       actions,
     });
 

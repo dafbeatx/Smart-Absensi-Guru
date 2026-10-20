@@ -617,11 +617,13 @@ export class NotificationPermissionService {
 
     // 3. Kirim Native OS Browser Notification via Service Worker (Android & PWA Safe) dengan Fallback
     if (this.isPermissionGranted() && typeof window !== 'undefined') {
-      const iconPath = '/pwa-192x192.png';
+      const origin = window.location.origin || '';
+      const iconPath = origin ? `${origin}/school-logo.png` : '/school-logo.png';
+      const badgePath = origin ? `${origin}/favicon.png` : '/favicon.png';
       const notificationOptions: NotificationOptions & { renotify?: boolean } = {
         body: payload.body,
         icon: iconPath,
-        badge: iconPath,
+        badge: badgePath,
         tag: payload.id || `sag_notif_${payload.type || 'general'}`,
         renotify: payload.severity === 'CRITICAL',
         requireInteraction: payload.severity === 'CRITICAL',

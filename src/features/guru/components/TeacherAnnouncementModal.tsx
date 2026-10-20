@@ -35,8 +35,19 @@ export const TeacherAnnouncementModal: React.FC<TeacherAnnouncementModalProps> =
         {/* Header */}
         <div className="bg-[#023246] text-white p-4 px-5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center text-white text-xl shadow-xs shrink-0">
-              📢
+            <div className="w-10 h-10 bg-white/10 rounded-2xl p-1.5 flex items-center justify-center border border-white/20 shadow-xs shrink-0 overflow-hidden">
+              <img
+                src="/school-logo.png"
+                alt="Logo Sekolah"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                  if (target.parentElement) {
+                    target.parentElement.innerHTML = '<span class="text-xl">📢</span>';
+                  }
+                }}
+              />
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-extrabold leading-tight truncate">Pengumuman & Warta Sekolah</h3>

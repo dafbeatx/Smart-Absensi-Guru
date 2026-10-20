@@ -5754,9 +5754,25 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           <section className="space-y-3 sm:space-y-4">
             <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-[#D4D4CE]/30 shadow-xs sm:shadow-card space-y-3 sm:space-y-4">
               <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                <div>
-                  <h2 className="font-black text-[#023246] text-xs sm:text-base">Notifikasi & Pengumuman</h2>
-                  <p className="text-[10px] sm:text-xs text-slate-400 font-semibold">{unreadCount} belum dibaca</p>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 p-1 flex items-center justify-center border border-emerald-100 shadow-2xs shrink-0 overflow-hidden">
+                    <img
+                      src="/school-logo.png"
+                      alt="Logo Sekolah"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        if (target.parentElement) {
+                          target.parentElement.innerHTML = '<span class="text-sm">🔔</span>';
+                        }
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <h2 className="font-black text-[#023246] text-xs sm:text-base">Notifikasi & Pengumuman</h2>
+                    <p className="text-[10px] sm:text-xs text-slate-400 font-semibold">{unreadCount} belum dibaca</p>
+                  </div>
                 </div>
                 {unreadCount > 0 && (
                   <button

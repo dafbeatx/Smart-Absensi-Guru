@@ -3,12 +3,13 @@
  * Handles offline caching strategies, background sync, and local push reminders
  */
 
-const CACHE_NAME = 'smart-absensi-cache-v1';
+const CACHE_NAME = 'smart-absensi-cache-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/favicon.png',
+  '/school-logo.png',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
 ];
@@ -97,11 +98,19 @@ self.addEventListener('fetch', (event) => {
 
 // Push Event - Handle Web Push Notifications
 self.addEventListener('push', (event) => {
+  const swOrigin = self.location.origin || '';
+  const resolveAssetUrl = (path, fallback) => {
+    const p = path || fallback;
+    if (!p) return `${swOrigin}/school-logo.png`;
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    return `${swOrigin}${p.startsWith('/') ? '' : '/'}${p}`;
+  };
+
   let payload = {
     title: '🔔 Smart Absensi Guru',
     body: 'Pemberitahuan presensi baru tersedia.',
-    icon: '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
+    icon: '/school-logo.png',
+    badge: '/favicon.png',
     url: '/',
   };
 
@@ -117,8 +126,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: payload.body,
-    icon: payload.icon || '/pwa-192x192.png',
-    badge: payload.badge || '/pwa-192x192.png',
+    icon: resolveAssetUrl(payload.icon, '/school-logo.png'),
+    badge: resolveAssetUrl(payload.badge, '/favicon.png'),
     vibrate: [100, 50, 100],
     tag: payload.tag || `sag_push_${payload.eventType || 'general'}`,
     renotify: payload.severity === 'CRITICAL',

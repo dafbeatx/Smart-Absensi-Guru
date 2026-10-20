@@ -130,9 +130,20 @@ export const NotificationPermissionBanner: React.FC<NotificationPermissionBanner
       <div className="flex items-center gap-3 w-full md:w-auto min-w-0">
         <div
           aria-hidden="true"
-          className="w-10 h-10 rounded-2xl bg-white/10 text-amber-300 flex items-center justify-center font-bold text-xl shrink-0 border border-white/15"
+          className="w-10 h-10 rounded-2xl bg-white/10 p-1.5 flex items-center justify-center shrink-0 border border-white/15 overflow-hidden shadow-xs"
         >
-          🔔
+          <img
+            src="/school-logo.png"
+            alt="Logo Sekolah"
+            className="w-full h-full object-contain"
+            onError={(e) => {
+              const target = e.currentTarget;
+              target.style.display = 'none';
+              if (target.parentElement) {
+                target.parentElement.innerHTML = '<span class="text-xl">🔔</span>';
+              }
+            }}
+          />
         </div>
         <div className="space-y-0.5 min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">

@@ -622,8 +622,21 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-fade-in text-slate-800">
           {/* Header */}
           <div className="bg-[#023246] text-white p-4 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-lg shrink-0">🔔</span>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-white/10 p-1 flex items-center justify-center shrink-0 border border-white/20 shadow-xs overflow-hidden">
+                <img
+                  src="/school-logo.png"
+                  alt="Logo Sekolah"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    if (target.parentElement) {
+                      target.parentElement.innerHTML = '<span class="text-base">🔔</span>';
+                    }
+                  }}
+                />
+              </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <h3 className="font-extrabold text-sm tracking-tight truncate">Notifikasi Presensi</h3>

@@ -642,8 +642,19 @@ export const BroadcastAnnouncementView: React.FC<BroadcastAnnouncementViewProps>
                 {/* Notification App Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
-                      SA
+                    <div className="w-5 h-5 rounded-md bg-white p-0.5 flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
+                      <img
+                        src="/school-logo.png"
+                        alt="Logo Smart Absensi"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          if (target.parentElement) {
+                            target.parentElement.innerHTML = '<span class="text-[9px] font-black text-emerald-800">SA</span>';
+                          }
+                        }}
+                      />
                     </div>
                     <span className="text-[11px] font-extrabold text-slate-200">Smart Absensi</span>
                     <span className="text-[10px] text-slate-400">• sekarang</span>

@@ -5,11 +5,19 @@
 
 // 1. Push Event Listener (Incoming Web Push from Server)
 self.addEventListener('push', (event) => {
+  const swOrigin = self.location.origin || '';
+  const resolveAssetUrl = (path, fallback) => {
+    const p = path || fallback;
+    if (!p) return `${swOrigin}/school-logo.png`;
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    return `${swOrigin}${p.startsWith('/') ? '' : '/'}${p}`;
+  };
+
   let payload = {
     title: '🔔 Smart Absensi Guru',
     body: 'Pemberitahuan presensi atau warta sekolah baru tersedia.',
-    icon: '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
+    icon: '/school-logo.png',
+    badge: '/favicon.png',
     tag: 'smart-absensi-push',
     url: '/',
   };
@@ -25,8 +33,8 @@ self.addEventListener('push', (event) => {
 
   const notificationOptions = {
     body: payload.body,
-    icon: payload.icon || '/pwa-192x192.png',
-    badge: payload.badge || '/pwa-192x192.png',
+    icon: resolveAssetUrl(payload.icon, '/school-logo.png'),
+    badge: resolveAssetUrl(payload.badge, '/favicon.png'),
     vibrate: [200, 100, 200, 100, 200],
     tag: payload.tag || `push_${payload.eventType || 'general'}`,
     renotify: payload.severity === 'CRITICAL',

@@ -182,8 +182,19 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
         {/* Header */}
         <div className="bg-[#023246] text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center font-bold text-lg border border-white/20">
-              ⚙️
+            <div className="w-10 h-10 rounded-2xl bg-white/10 p-1.5 flex items-center justify-center border border-white/20 shadow-xs shrink-0 overflow-hidden">
+              <img
+                src="/school-logo.png"
+                alt="Logo Sekolah"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                  if (target.parentElement) {
+                    target.parentElement.innerHTML = '<span class="text-lg font-bold">⚙️</span>';
+                  }
+                }}
+              />
             </div>
             <div>
               <h3 id="notif-pref-title" className="font-extrabold text-sm sm:text-base tracking-tight">
