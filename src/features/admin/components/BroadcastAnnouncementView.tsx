@@ -383,7 +383,7 @@ export const BroadcastAnnouncementView: React.FC<BroadcastAnnouncementViewProps>
                 placeholder="Contoh: Rapat Evaluasi Bulanan &amp; Penyerahan Rapor"
                 maxLength={80}
                 required
-                className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-900 font-semibold placeholder:text-slate-400 placeholder:font-normal"
+                className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-900 font-semibold placeholder-slate-400"
               />
             </div>
 
@@ -408,7 +408,7 @@ export const BroadcastAnnouncementView: React.FC<BroadcastAnnouncementViewProps>
                 maxLength={350}
                 rows={4}
                 required
-                className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-900 leading-relaxed placeholder:text-slate-400"
+                className="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-900 leading-relaxed placeholder-slate-400"
               />
             </div>
 
@@ -457,7 +457,7 @@ export const BroadcastAnnouncementView: React.FC<BroadcastAnnouncementViewProps>
             {targetScope === 'SPECIFIC_USER' && (
               <div className="p-4 bg-sky-50/70 border border-sky-200 rounded-2xl space-y-2.5 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-black text-sky-950 flex items-center gap-1.5">
+                  <label className="text-xs font-black text-sky-950 flex items-center gap-1.5">
                     <span>👤</span>
                     <span>Pilih Nama Guru / Pegawai Penerima</span>
                   </label>
@@ -472,7 +472,7 @@ export const BroadcastAnnouncementView: React.FC<BroadcastAnnouncementViewProps>
                   value={userSearchQuery}
                   onChange={(e) => setUserSearchQuery(e.target.value)}
                   placeholder="🔍 Cari nama guru, admin, kepsek, atau NPP..."
-                  className="w-full text-xs px-3 py-1.5 bg-white border border-sky-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500 text-slate-900 placeholder:text-slate-400"
+                  className="w-full text-xs px-3 py-1.5 bg-white border border-sky-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500 text-slate-900 placeholder-slate-400"
                 />
 
                 {/* Main Dropdown Select */}
@@ -692,7 +692,7 @@ export const BroadcastAnnouncementView: React.FC<BroadcastAnnouncementViewProps>
             <div className="bg-slate-800/60 p-3.5 rounded-2xl border border-slate-700/50 space-y-1.5 text-xs">
               <div className="flex items-center justify-between text-slate-300 font-bold">
                 <span>Target Penerima:</span>
-                <span className="text-emerald-400 text-right truncate max-w-[200px]">
+                <span className="text-emerald-400 text-right truncate max-w-50">
                   {getTargetScopeLabel(targetScope, selectedUser)}
                 </span>
               </div>
