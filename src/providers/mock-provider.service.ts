@@ -10,6 +10,8 @@ import type {
   MarkNotificationDTO,
   MarkBatchNotificationsDTO,
   MarkReadResult,
+  BroadcastAnnouncementDTO,
+  BroadcastResult,
   DeviceBindingCheckResult,
   AttendanceAction,
   TeacherMoodType,
@@ -1273,6 +1275,21 @@ export class MockProvider implements IDataProvider {
       safeSetStorage(key, JSON.stringify(items));
     }
 
+    // Merge broadcast notifications (user_id is null / audience-based)
+    const rawBroadcasts = safeGetStorage('smart_absensi_mock_broadcasts');
+    if (rawBroadcasts) {
+      try {
+        const broadcasts: AppNotification[] = JSON.parse(rawBroadcasts);
+        if (Array.isArray(broadcasts)) {
+          broadcasts.forEach((b) => {
+            if (!items.some((existing) => existing.id === b.id)) {
+              items.unshift(b);
+            }
+          });
+        }
+      } catch (_) {}
+    }
+
     const readIds = await this.getNotificationReads(effectiveUserId);
     const now = Date.now();
 
@@ -1383,6 +1400,59 @@ export class MockProvider implements IDataProvider {
     _callback: (event: { table: string; eventType: string; payload?: any }) => void
   ): () => void {
     return () => {};
+  }
+
+  public async createBroadcastNotification(
+    dto: BroadcastAnnouncementDTO,
+    _token?: string
+  ): Promise<BroadcastResult> {
+    const newId = `mock_notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const notif: AppNotification = {
+      id: newId,
+      user_id: null,
+      recipient_user_id: null,
+      audience_role: dto.audience_role || 'GURU',
+      type: 'ANNOUNCEMENT',
+      severity: dto.severity || 'INFO',
+      title: dto.title.trim(),
+      message: dto.message.trim(),
+      action_url: dto.action_url || '/',
+      created_by: dto.created_by || null,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    };
+
+    const saved = safeGetStorage('smart_absensi_mock_broadcasts') || '[]';
+    try {
+      const list = JSON.parse(saved);
+      list.unshift(notif);
+      safeSetStorage('smart_absensi_mock_broadcasts', JSON.stringify(list.slice(0, 50)));
+    } catch (_) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('smart_absensi_notifications_updated'));
+    }
+
+    return {
+      success: true,
+      notificationId: newId,
+      pushSent: true,
+      pushCount: 15,
+    };
+  }
+
+  public async getBroadcastAnnouncements(
+    _token?: string,
+    limit = 20
+  ): Promise<AppNotification[]> {
+    const saved = safeGetStorage('smart_absensi_mock_broadcasts');
+    if (!saved) return [];
+    try {
+      const list = JSON.parse(saved);
+      return list.slice(0, limit);
+    } catch {
+      return [];
+    }
   }
 
   public async getNotificationPreferences(userId: string, _token?: string): Promise<NotificationPreferences | null> {

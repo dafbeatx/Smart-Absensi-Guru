@@ -21,7 +21,7 @@ export type VerificationMethod = 'QR_GPS' | 'MANUAL_OPERATOR' | 'SYSTEM_AUTO' | 
 
 export type AttendanceSource = 'QR' | 'MANUAL' | 'OFFLINE_SYNC' | 'BIOMETRIC';
 
-export type NotificationType = 'IN_APP' | 'WHATSAPP' | 'SYSTEM' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+export type NotificationType = 'IN_APP' | 'WHATSAPP' | 'SYSTEM' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR' | 'ANNOUNCEMENT';
 
 export type AttendanceAction = 'CHECK_IN' | 'CHECK_OUT' | 'ALREADY_COMPLETED';
 
@@ -98,6 +98,24 @@ export interface MarkReadResult {
   syncState?: 'SYNCED' | 'LOCAL_DRAFT' | 'FAILED';
   failedIds?: string[];
   errorCode?: string;
+  error?: string;
+}
+
+export interface BroadcastAnnouncementDTO {
+  title: string;
+  message: string;
+  severity?: NotificationSeverity;
+  audience_role?: NotificationAudience;
+  action_url?: string;
+  created_by?: string;
+  sender_name?: string;
+}
+
+export interface BroadcastResult {
+  success: boolean;
+  notificationId?: string;
+  pushSent?: boolean;
+  pushCount?: number;
   error?: string;
 }
 

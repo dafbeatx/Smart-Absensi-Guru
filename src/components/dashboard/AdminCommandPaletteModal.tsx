@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, User, LayoutDashboard, Eye, Users, Calendar, Settings, QrCode, Edit3, TestTube, ArrowRight, MessageSquare, GraduationCap, BarChart3, ClipboardCheck, Trophy } from 'lucide-react';
+import { Search, X, User, LayoutDashboard, Eye, Users, Calendar, Settings, QrCode, Edit3, TestTube, ArrowRight, MessageSquare, GraduationCap, BarChart3, ClipboardCheck, Trophy, Megaphone } from 'lucide-react';
 import type { UserProfile } from '../../types/database.types';
 
 export interface CommandItem {
@@ -51,6 +51,7 @@ export const AdminCommandPaletteModal: React.FC<AdminCommandPaletteModalProps> =
     const pages = [
       { id: 'DASHBOARD', title: 'Dashboard Eksekutif', subtitle: 'Ringkasan presensi & KPI sekolah', icon: <LayoutDashboard className="w-4 h-4 text-emerald-600" /> },
       { id: 'ATTENDANCE_TRACKING', title: 'Live Tracking Presensi', subtitle: 'Pantau kehadiran real-time hari ini', icon: <Eye className="w-4 h-4 text-teal-600" /> },
+      { id: 'ANNOUNCEMENT', title: 'Pengumuman Notifikasi Guru', subtitle: 'Siarkan pengumuman & push notifikasi anti-spam ke HP guru', icon: <Megaphone className="w-4 h-4 text-rose-500" /> },
       { id: 'TRAFFIC', title: 'Trafik Fitur Web Guru', subtitle: 'Lacak fitur dan menu web yang sering dibuka guru', icon: <BarChart3 className="w-4 h-4 text-[#287094]" /> },
       { id: 'TEACHERS', title: 'Kelola Data Guru & Staf', subtitle: 'Manajemen akun, NIP, & status aktif', icon: <Users className="w-4 h-4 text-sky-600" /> },
       { id: 'STUDENTS', title: 'Direktori Siswa & Kontak Wali', subtitle: 'Master data siswa & nomor WA orang tua/wali', icon: <GraduationCap className="w-4 h-4 text-emerald-600" /> },

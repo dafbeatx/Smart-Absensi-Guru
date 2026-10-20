@@ -38,6 +38,7 @@ import type { TeacherPointLog } from '../../../types/database.types';
 import { TeacherPointRepository } from '../../../repositories/TeacherPointRepository';
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
 import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
+import { BroadcastAnnouncementView } from '../../admin/components/BroadcastAnnouncementView';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -45,7 +46,7 @@ export interface KepsekDashboardPageProps {
 }
 
 export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpenScanner, onSwitchToGuruView }) => {
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const { showToast } = useToastStore();
   const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -541,6 +542,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       icon: '🏠',
     },
     {
+      id: 'ANNOUNCEMENT',
+      label: 'Pengumuman Notifikasi',
+      icon: '📢',
+    },
+    {
       id: 'MY_ATTENDANCE',
       label: 'Absensi Pribadi',
       icon: '👆',
@@ -874,6 +880,16 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                 </>
               )}
             </div>
+          )}
+
+          {/* TAB: PENGUMUMAN NOTIFIKASI GURU (BROADCAST ANTI-SPAM) */}
+          {activeTab === 'ANNOUNCEMENT' && (
+            <BroadcastAnnouncementView
+              user={user}
+              token={token}
+              role="KEPSEK"
+              onBackToDashboard={() => setActiveTab('DASHBOARD')}
+            />
           )}
 
           {/* TAB 2: ACCOUNT APPLICATIONS */}

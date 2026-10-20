@@ -54,6 +54,7 @@ import { ExamScheduleAndProctorModal } from '../../administration/components/Exa
 import { HomeroomModal } from '../../homeroom/components/HomeroomModal';
 import { TeachingMaterialsModal } from '../../guru/components/TeachingMaterialsModal';
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
+import { BroadcastAnnouncementView } from '../components/BroadcastAnnouncementView';
 
 const OralExamAssessmentModal = React.lazy(() =>
   import('../../administration/components/OralExamAssessmentModal').then((m) => ({
@@ -513,6 +514,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
       badgeVariant: 'RED',
     },
     {
+      id: 'ANNOUNCEMENT',
+      label: 'Pengumuman Notifikasi',
+      icon: '📢',
+    },
+    {
       id: 'ADMINISTRATION',
       label: 'Administrasi',
       icon: '📁',
@@ -718,6 +724,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 <PendingApprovalWidget requests={allLeaves.length > 0 ? allLeaves : pendingRequests} teachers={teachers} onRefresh={fetchPendingRequests} />
               </div>
             </div>
+          )}
+
+          {/* TAB: PENGUMUMAN NOTIFIKASI GURU (BROADCAST ANTI-SPAM) */}
+          {activeTab === 'ANNOUNCEMENT' && (
+            <BroadcastAnnouncementView
+              user={user}
+              token={token}
+              role="ADMIN"
+              onBackToDashboard={() => setActiveTab('DASHBOARD')}
+            />
           )}
 
           {/* TAB: PUSAT ADMINISTRASI & UJIAN */}

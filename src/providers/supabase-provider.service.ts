@@ -11,6 +11,8 @@ import type {
   MarkNotificationDTO,
   MarkBatchNotificationsDTO,
   MarkReadResult,
+  BroadcastAnnouncementDTO,
+  BroadcastResult,
   AttendanceStatus,
   LeaveType,
   ApprovalStatus,
@@ -2835,6 +2837,77 @@ export class SupabaseProvider implements IDataProvider {
         logger.warn('SupabaseProvider', 'Error removing realtime notifications channel:', err);
       }
     };
+  }
+
+  public async createBroadcastNotification(
+    dto: BroadcastAnnouncementDTO,
+    _token?: string
+  ): Promise<BroadcastResult> {
+    try {
+      const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `notif_${Date.now()}`;
+      const payloadToInsert = {
+        id: newId,
+        user_id: null,
+        recipient_user_id: null,
+        audience_role: dto.audience_role || 'GURU',
+        type: 'ANNOUNCEMENT',
+        severity: dto.severity || 'INFO',
+        title: dto.title.trim(),
+        message: dto.message.trim(),
+        action_url: dto.action_url || '/',
+        created_by: dto.created_by || null,
+        created_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await this.client
+        .from('notifications')
+        .insert([payloadToInsert])
+        .select('id')
+        .single();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'createBroadcastNotification insert warning:', error.message);
+      }
+
+      this.cachedNotifications.clear();
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smart_absensi_notifications_updated'));
+      }
+
+      return {
+        success: true,
+        notificationId: data?.id || newId,
+      };
+    } catch (err: unknown) {
+      logger.error('SupabaseProvider', 'createBroadcastNotification exception:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  public async getBroadcastAnnouncements(
+    _token?: string,
+    limit = 20
+  ): Promise<AppNotification[]> {
+    try {
+      const { data, error } = await this.client
+        .from('notifications')
+        .select('*')
+        .eq('type', 'ANNOUNCEMENT')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error || !data) {
+        return [];
+      }
+      return data as AppNotification[];
+    } catch (err) {
+      logger.warn('SupabaseProvider', 'getBroadcastAnnouncements error:', err);
+      return [];
+    }
   }
 
   public async getNotificationPreferences(userId: string, _token?: string): Promise<NotificationPreferences | null> {

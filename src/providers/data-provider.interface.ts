@@ -8,6 +8,8 @@ import type {
   MarkNotificationDTO,
   MarkBatchNotificationsDTO,
   MarkReadResult,
+  BroadcastAnnouncementDTO,
+  BroadcastResult,
   DeviceBindingCheckResult,
   TeacherMoodType,
   TeacherMoodLog,
@@ -115,6 +117,14 @@ export interface IDataProvider {
     userId: string,
     callback: (event: { table: string; eventType: string; payload?: any }) => void
   ): () => void;
+  createBroadcastNotification(
+    dto: BroadcastAnnouncementDTO,
+    token?: string
+  ): Promise<BroadcastResult>;
+  getBroadcastAnnouncements(
+    token?: string,
+    limit?: number
+  ): Promise<AppNotification[]>;
 
   // Settings API
   getSettings(): Promise<SystemSettings>;
