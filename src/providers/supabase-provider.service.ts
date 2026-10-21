@@ -3721,6 +3721,31 @@ export class SupabaseProvider implements IDataProvider {
           // Log complete HTTP status, PGRST code, and error details per instructions
           logger.error('SupabaseProvider', `getTeachingSchedules failed: HTTP ${status || 'unknown'} (${statusText || ''}) - PGRST Code: ${error.code || 'none'} - Message: ${error.message || ''} - Details: ${error.details || ''} - Hint: ${error.hint || ''}`);
 
+          // Coba serverless GET endpoint sebelum cooldown & mock fallback
+          if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+            try {
+              const qParams = new URLSearchParams();
+              if (filter?.teacher_user_id) qParams.set('teacher_user_id', filter.teacher_user_id);
+              if (filter?.academic_year) qParams.set('academic_year', filter.academic_year);
+              if (filter?.day_of_week !== undefined) qParams.set('day_of_week', String(filter.day_of_week));
+
+              const ep = `/api/admin/teaching-schedules${qParams.toString() ? '?' + qParams.toString() : ''}`;
+              const sResp = await fetch(ep, { method: 'GET' });
+              if (sResp.ok) {
+                const sJson = await sResp.json().catch(() => null);
+                if (sJson?.success && Array.isArray(sJson?.data)) {
+                  this.teachingSchedulesCooldownUntil = 0;
+                  const mapped = sJson.data.map((row: any) => this.mapDbRowToTeachingSlot(row));
+                  const sorted = sortTeachingSlots(mapped);
+                  this.cachedTeachingSchedules.set(cacheKey, { data: sorted, timestamp: Date.now() });
+                  return sorted;
+                }
+              }
+            } catch {
+              // Ignore serverless get fallback error
+            }
+          }
+
           // Set a temporary cooldown (120 seconds) to protect egress from thousands of repeating errors
           this.teachingSchedulesCooldownUntil = Date.now() + 120000;
 
@@ -3818,7 +3843,21 @@ export class SupabaseProvider implements IDataProvider {
       };
 
       // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
-      const token = _token || (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') || '';
+      const token =
+        _token ||
+        useAuthStore.getState().token ||
+        (typeof window !== 'undefined'
+          ? (() => {
+              try {
+                return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
+              } catch {
+                return null;
+              }
+            })()
+          : null) ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') ||
+        '';
+
       if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
         try {
           const resp = await fetch('/api/admin/teaching-schedules', {
@@ -3829,8 +3868,8 @@ export class SupabaseProvider implements IDataProvider {
             },
             body: JSON.stringify(payload),
           });
-          const resData = await resp.json();
-          if (resp.ok && resData.success && resData.data) {
+          const resData = await resp.json().catch(() => null);
+          if (resp.ok && resData?.success && resData?.data) {
             const created = this.mapDbRowToTeachingSlot(resData.data);
             try {
               const mockProv = new (await import('./mock-provider.service')).MockProvider();
@@ -3842,9 +3881,10 @@ export class SupabaseProvider implements IDataProvider {
             this.teachingSchedulesCooldownUntil = 0;
             return { success: true, data: created };
           }
-          if (!resp.ok || !resData.success) {
-            return { success: false, error: resData.errorMessage || resData.error || 'Gagal menambahkan jadwal' };
+          if (resp.status !== 401 && resp.status !== 403 && (!resp.ok || !resData?.success)) {
+            return { success: false, error: resData?.errorMessage || resData?.error || 'Gagal menambahkan jadwal' };
           }
+          logger.warn('SupabaseProvider', `Serverless endpoint returned HTTP ${resp.status}, attempting direct client fallback...`);
         } catch (fetchErr: any) {
           logger.warn('SupabaseProvider', 'Serverless endpoint unavailable, attempting direct fallback:', fetchErr);
         }
@@ -3952,7 +3992,21 @@ export class SupabaseProvider implements IDataProvider {
       if (dto.effective_until !== undefined) updatePayload.effective_until = dto.effective_until;
 
       // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
-      const token = _token || (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') || '';
+      const token =
+        _token ||
+        useAuthStore.getState().token ||
+        (typeof window !== 'undefined'
+          ? (() => {
+              try {
+                return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
+              } catch {
+                return null;
+              }
+            })()
+          : null) ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') ||
+        '';
+
       if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
         try {
           const resp = await fetch('/api/admin/teaching-schedules', {
@@ -3963,8 +4017,8 @@ export class SupabaseProvider implements IDataProvider {
             },
             body: JSON.stringify({ ...updatePayload, id: dto.id }),
           });
-          const resData = await resp.json();
-          if (resp.ok && resData.success && resData.data) {
+          const resData = await resp.json().catch(() => null);
+          if (resp.ok && resData?.success && resData?.data) {
             const updated = this.mapDbRowToTeachingSlot(resData.data);
             try {
               const mockProv = new (await import('./mock-provider.service')).MockProvider();
@@ -3976,9 +4030,10 @@ export class SupabaseProvider implements IDataProvider {
             this.teachingSchedulesCooldownUntil = 0;
             return { success: true, data: updated };
           }
-          if (!resp.ok || !resData.success) {
-            return { success: false, error: resData.errorMessage || resData.error || 'Gagal memperbarui jadwal' };
+          if (resp.status !== 401 && resp.status !== 403 && (!resp.ok || !resData?.success)) {
+            return { success: false, error: resData?.errorMessage || resData?.error || 'Gagal memperbarui jadwal' };
           }
+          logger.warn('SupabaseProvider', `Serverless PUT endpoint returned HTTP ${resp.status}, attempting direct client fallback...`);
         } catch (fetchErr: any) {
           logger.warn('SupabaseProvider', 'Serverless PUT endpoint unavailable, attempting direct fallback:', fetchErr);
         }
@@ -4017,7 +4072,21 @@ export class SupabaseProvider implements IDataProvider {
   public async deleteTeachingSchedule(id: string, _token?: string): Promise<boolean> {
     try {
       // Jalur Utama: Serverless Controlled Admin Endpoint (/api/admin/teaching-schedules)
-      const token = _token || (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') || '';
+      const token =
+        _token ||
+        useAuthStore.getState().token ||
+        (typeof window !== 'undefined'
+          ? (() => {
+              try {
+                return JSON.parse(localStorage.getItem('smart_absensi_auth_storage') || '{}')?.state?.token;
+              } catch {
+                return null;
+              }
+            })()
+          : null) ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('saga_auth_token') : '') ||
+        '';
+
       if (typeof window !== 'undefined' && typeof window.fetch === 'function' && token) {
         try {
           const resp = await fetch(`/api/admin/teaching-schedules?id=${encodeURIComponent(id)}`, {
@@ -4026,8 +4095,8 @@ export class SupabaseProvider implements IDataProvider {
               Authorization: `Bearer ${token}`,
             },
           });
-          const resData = await resp.json();
-          if (resp.ok && resData.success) {
+          const resData = await resp.json().catch(() => null);
+          if (resp.ok && resData?.success) {
             try {
               const mockProv = new (await import('./mock-provider.service')).MockProvider();
               await mockProv.deleteTeachingSchedule(id);
@@ -4038,6 +4107,7 @@ export class SupabaseProvider implements IDataProvider {
             this.teachingSchedulesCooldownUntil = 0;
             return true;
           }
+          logger.warn('SupabaseProvider', `Serverless DELETE endpoint returned HTTP ${resp.status}, attempting direct client fallback...`);
         } catch (fetchErr: any) {
           logger.warn('SupabaseProvider', 'Serverless DELETE endpoint unavailable, attempting direct fallback:', fetchErr);
         }
