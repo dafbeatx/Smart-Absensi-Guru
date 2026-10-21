@@ -10,6 +10,43 @@ import { pwaService } from './services/pwa.service';
 
 // Global Unhandled Error & Promise Rejection Handlers
 if (typeof window !== 'undefined') {
+  // Seamless Native APK API Resolver: Routes relative /api/* requests to production Vercel backend
+  // when the application is running inside a Capacitor/Android native container.
+  const isLocalContainer =
+    window.location.protocol === 'file:' ||
+    window.location.protocol === 'capacitor:' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+
+  if (isLocalContainer && !import.meta.env.DEV) {
+    const PROD_API_ORIGIN = 'https://smart-absensi-guru-eight.vercel.app';
+    const originalFetch = window.fetch;
+
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      let urlStr: string;
+      if (typeof input === 'string') {
+        urlStr = input;
+      } else if (input instanceof URL) {
+        urlStr = input.toString();
+      } else {
+        urlStr = input.url;
+      }
+
+      if (urlStr.startsWith('/api/')) {
+        const fullUrl = `${PROD_API_ORIGIN}${urlStr}`;
+        if (typeof input === 'string') {
+          return originalFetch(fullUrl, init);
+        } else if (input instanceof URL) {
+          return originalFetch(new URL(fullUrl), init);
+        } else {
+          return originalFetch(new Request(fullUrl, input), init);
+        }
+      }
+
+      return originalFetch(input, init);
+    };
+  }
+
   // Initialize Auto-Update & Version Monitoring Engine for HP Mobile & Desktop
   AutoUpdateService.initAutoUpdateEngine();
 

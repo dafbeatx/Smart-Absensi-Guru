@@ -6,9 +6,12 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
-    name: Build Android APK
+    name: Build Android APK (Release & Debug)
     runs-on: ubuntu-latest
 
     steps:
@@ -33,16 +36,19 @@ jobs:
       - name: Accept Licenses & Install Android SDK Platforms
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "platforms;android-35" "build-tools;36.0.0" "build-tools;35.0.0" "platform-tools" || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools" || true
 
       - name: Install Node Dependencies
         run: npm install
 
+      - name: Setup Keystore & Signing Configuration
+        run: node scripts/setup-keystore.cjs
+
       - name: Build Web Assets
         env:
           VITE_PROVIDER: "supabase"
-          VITE_SUPABASE_URL: "https://fwhdjqvtjzesbdcqorsn.supabase.co"
-          VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY"
+          VITE_SUPABASE_URL: "https://fnppfmjsbqxbtioypnap.supabase.co"
+          VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHBmbWpzYnF4YnRpb3lwbmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzcyNDksImV4cCI6MjEwNDk1MzI0OX0.ewXX-KW3SMEF-KtOZ5P1MY5IpZSJQImDt5g9maTOWfE"
         run: npm run build
 
       - name: Sync Capacitor Android
@@ -51,13 +57,44 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x android/gradlew
 
-      - name: Build Debug APK
+      - name: Build Signed Release APK
         working-directory: android
-        run: ./gradlew clean assembleDebug --stacktrace
+        run: ./gradlew clean assembleRelease --stacktrace
 
-      - name: Upload APK
-        if: success()
+      - name: Prepare APK Package
+        run: |
+          mkdir -p build-output
+          cp android/app/build/outputs/apk/release/app-release.apk build-output/Smart-Absensi-Guru-v1.0-release.apk
+
+      - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Smart-Absensi-Guru-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: Smart-Absensi-Guru-Release-APK
+          path: build-output/Smart-Absensi-Guru-v1.0-release.apk
+
+      - name: Create / Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.0-apk
+          name: "Smart Absensi Guru - Android APK (Resmi & Terverifikasi)"
+          body: |
+            ### 📱 Smart Absensi Guru - Android Native APK (v1.0)
+            
+            Aplikasi resmi Smart Absensi Guru versi Android Native (Capacitor).
+            
+            #### ✨ Keunggulan Versi Ini:
+            - **Bebas Peringatan Virus & Play Protect:** Ditandatangani secara resmi (*Signed Release Certificate RSA-2048*).
+            - **100% Selaras dengan Browser:** Terintegrasi langsung dengan Serverless Proxy Vercel & Supabase Cloud tanpa putus koneksi.
+            - **Suara Notifikasi Custom Android:** Dilengkapi Android Notification Channel khusus (`smart_absensi_notifications`) dengan file audio custom.
+            - **Dukungan Penuh Hardware:** Kamera pemindai QR Code super responsif & koordinat GPS Geofencing akurat.
+            - **Tampilan Khusus Mobile HP:** Full-screen viewport ergonomis untuk Infinix Note 8 dan smartphone Android lainnya.
+            
+            #### 📥 Cara Instalasi di HP:
+            1. Unduh file `Smart-Absensi-Guru-v1.0-release.apk` di bawah.
+            2. Buka file `.apk` yang telah diunduh di HP Anda.
+            3. Jika muncul pertanyaan izin pasang aplikasi dari peramban/file manager, pilih **Izinkan**.
+            4. Buka aplikasi dan login menggunakan Nomor HP / NPP dan PIN Anda.
+          files: build-output/Smart-Absensi-Guru-v1.0-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
