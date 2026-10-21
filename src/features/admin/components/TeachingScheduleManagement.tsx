@@ -35,14 +35,17 @@ const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const FILTER_DAYS = ['Semua', ...DAYS];
 
 // Standard KBM Schedule: 1 JP = 40 Menit, 08:00 - 12:00 (Senin - Jumat), 4 Mata Pelajaran
+// Waktu Istirahat Resmi: 09.30 - 10.00 WIB
 const TIME_PRESETS = [
   { label: 'Mapel 1 (08:00 - 08:40)', start: '08:00', end: '08:40' },
   { label: 'Mapel 2 (08:40 - 09:20)', start: '08:40', end: '09:20' },
-  { label: 'Mapel 3 (09:40 - 10:20)', start: '09:40', end: '10:20' },
+  { label: 'Mapel 2 Alt (08:50 - 09:30)', start: '08:50', end: '09:30' },
+  { label: '☕ Istirahat (09:30 - 10:00)', start: '09:30', end: '10:00' },
+  { label: 'Mapel 3 (10:00 - 10:40)', start: '10:00', end: '10:40' },
   { label: 'Mapel 4 (10:40 - 11:20)', start: '10:40', end: '11:20' },
   { label: 'Mapel 4 Alt (11:20 - 12:00)', start: '11:20', end: '12:00' },
   { label: '2 JP Pagi (08:00 - 09:20)', start: '08:00', end: '09:20' },
-  { label: '2 JP Siang (09:40 - 11:00)', start: '09:40', end: '11:00' },
+  { label: '2 JP Siang (10:00 - 11:20)', start: '10:00', end: '11:20' },
   { label: '2 JP Akhir (10:40 - 12:00)', start: '10:40', end: '12:00' },
 ];
 
@@ -458,7 +461,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
             </span>
           </div>
           <p className="text-xs text-slate-500 font-medium">
-            Waktu KBM: 08.00 - 12.00 WIB (Senin – Jumat) • 4 Mata Pelajaran • Kelas VII Tunggal
+            Waktu KBM: 08.00 - 12.00 WIB (Senin – Jumat) • Istirahat: 09.30 - 10.00 • Mapel 3 (10.00-10.40) & 4 (10.40-11.20) • Kelas VII Tunggal
           </p>
         </div>
 
@@ -698,13 +701,18 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
             {/* Section 2: Waktu & Alokasi Hari */}
             <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
                   2. Hari & Jam Mengajar (1 JP = 40 Menit)
                 </span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                  08.00 - 12.00 (4 Mapel)
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    ☕ Istirahat: 09.30 - 10.00
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    08.00 - 12.00 (4 Mapel)
+                  </span>
+                </div>
               </div>
 
               {/* Day Segmented Selector */}
@@ -754,23 +762,31 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
               <div className="space-y-1.5 pt-0.5">
                 <span className="text-[10px] font-bold text-slate-400 block">Pilihan Jam / Sesi Pelajaran:</span>
                 <div className="flex gap-1.5 flex-wrap">
-                  {TIME_PRESETS.map((p) => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => {
-                        setFormTimeStart(p.start);
-                        setFormTimeEnd(p.end);
-                      }}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                        formTimeStart === p.start && formTimeEnd === p.end
-                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+                  {TIME_PRESETS.map((p) => {
+                    const isIstirahat = p.label.includes('Istirahat');
+                    const isSelected = formTimeStart === p.start && formTimeEnd === p.end;
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => {
+                          setFormTimeStart(p.start);
+                          setFormTimeEnd(p.end);
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? isIstirahat
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
+                              : 'bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-xs'
+                            : isIstirahat
+                            ? 'bg-amber-50/80 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>

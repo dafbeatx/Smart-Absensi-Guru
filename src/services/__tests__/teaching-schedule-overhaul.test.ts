@@ -499,17 +499,23 @@ export async function runTeachingScheduleOverhaulTestSuite(): Promise<{
   const p2 = parseScheduleTime('08.40 - 09.20');
   const p3 = parseScheduleTime('Jam 1-2 (08:00 - 09:20)');
   const p4 = parseScheduleTime('Mapel 1 (08:00 - 08:40)');
+  const pBreak = parseScheduleTime('☕ Istirahat (09:30 - 10:00)');
+  const pMapel3 = parseScheduleTime('Mapel 3 (10:00 - 10:40)');
+  const pMapel4 = parseScheduleTime('Mapel 4 (10:40 - 11:20)');
 
   const timeParsingValid =
     p1?.startTime === '08:00' && p1?.endTime === '08:40' &&
     p2?.startTime === '08:40' && p2?.endTime === '09:20' &&
     p3?.startTime === '08:00' && p3?.endTime === '09:20' &&
-    p4?.startTime === '08:00' && p4?.endTime === '08:40';
+    p4?.startTime === '08:00' && p4?.endTime === '08:40' &&
+    pBreak?.startTime === '09:30' && pBreak?.endTime === '10:00' &&
+    pMapel3?.startTime === '10:00' && pMapel3?.endTime === '10:40' &&
+    pMapel4?.startTime === '10:40' && pMapel4?.endTime === '11:20';
 
   assert(
     'Test 22: Time Parsing for 40-Minute JP and Labeled Intervals',
     timeParsingValid,
-    `Parsed 1 JP 40m: ${p1?.startTime}-${p1?.endTime}, Labeled: ${p3?.startTime}-${p3?.endTime}`
+    `Parsed 1 JP 40m: ${p1?.startTime}-${p1?.endTime}, Istirahat: ${pBreak?.startTime}-${pBreak?.endTime}, Mapel 3: ${pMapel3?.startTime}-${pMapel3?.endTime}`
   );
 
   // ── TEST 23: Generic Classroom Exemption (No False Room Conflict Across Classes) ─
