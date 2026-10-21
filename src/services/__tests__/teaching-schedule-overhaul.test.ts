@@ -9,7 +9,12 @@ import path from 'path';
 import { MockProvider } from '../../providers/mock-provider.service';
 import { ProviderFactory } from '../../providers/provider-factory';
 import { TeachingScheduleRepository } from '../../repositories/TeachingScheduleRepository';
-import { isTimeIntervalOverlapping } from '../../utils/teaching-schedule.utils';
+import {
+  isTimeIntervalOverlapping,
+  normalizeClassName,
+  parseScheduleTime,
+  isGenericClassroom,
+} from '../../utils/teaching-schedule.utils';
 import { evaluateSmartClassAlarm } from '../../utils/smart-class-alarm.utils';
 import type { TeachingSlot } from '../../types/database.types';
 
@@ -455,6 +460,145 @@ export async function runTeachingScheduleOverhaulTestSuite(): Promise<{
     'Test 20: Provider getTeachingSchedules Strictly Reads Available Schema Columns',
     hasNoLegacyDayCol && hasNoLegacyTimeCol && hasTeacherUserId && hasDayOfWeek,
     `Columns audited: ${selectedCols}`
+  );
+
+  // ── TEST 21: Class 7 Normalization Unification (Jadikan Kelas VII Saja) ────
+  const n7_1 = normalizeClassName('Kelas 7');
+  const n7_2 = normalizeClassName('Kelas 7A');
+  const n7_3 = normalizeClassName('Kelas 7B');
+  const n7_4 = normalizeClassName('Kelas VII-A');
+  const n7_5 = normalizeClassName('Kelas VII-B');
+  const n7_6 = normalizeClassName('7');
+  const n7_7 = normalizeClassName('VII');
+  const n8_1 = normalizeClassName('Kelas 8-A');
+  const n8_2 = normalizeClassName('8B');
+  const n9_1 = normalizeClassName('Kelas IX-A');
+
+  const allGrade7Unified =
+    n7_1 === 'Kelas VII' &&
+    n7_2 === 'Kelas VII' &&
+    n7_3 === 'Kelas VII' &&
+    n7_4 === 'Kelas VII' &&
+    n7_5 === 'Kelas VII' &&
+    n7_6 === 'Kelas VII' &&
+    n7_7 === 'Kelas VII';
+
+  const otherGradesCorrect =
+    n8_1 === 'Kelas VIII-A' &&
+    n8_2 === 'Kelas VIII-B' &&
+    n9_1 === 'Kelas IX-A';
+
+  assert(
+    'Test 21: Class 7 Unification into "Kelas VII" (No Sub-Class Split)',
+    allGrade7Unified && otherGradesCorrect,
+    `Grade 7 normalized: ${n7_1}, ${n7_4}, ${n7_7} -> All 'Kelas VII'`
+  );
+
+  // ── TEST 22: Time Parsing for 40-Minute JP and Labeled Intervals ───────────
+  const p1 = parseScheduleTime('08:00 - 08:40');
+  const p2 = parseScheduleTime('08.40 - 09.20');
+  const p3 = parseScheduleTime('Jam 1-2 (08:00 - 09:20)');
+  const p4 = parseScheduleTime('Mapel 1 (08:00 - 08:40)');
+
+  const timeParsingValid =
+    p1?.startTime === '08:00' && p1?.endTime === '08:40' &&
+    p2?.startTime === '08:40' && p2?.endTime === '09:20' &&
+    p3?.startTime === '08:00' && p3?.endTime === '09:20' &&
+    p4?.startTime === '08:00' && p4?.endTime === '08:40';
+
+  assert(
+    'Test 22: Time Parsing for 40-Minute JP and Labeled Intervals',
+    timeParsingValid,
+    `Parsed 1 JP 40m: ${p1?.startTime}-${p1?.endTime}, Labeled: ${p3?.startTime}-${p3?.endTime}`
+  );
+
+  // ── TEST 23: Generic Classroom Exemption (No False Room Conflict Across Classes) ─
+  // Setup slot for Kelas VIII in generic "Ruang Kelas" at 08:00 - 08:40 on Rabu
+  await provider.createTeachingSchedule({
+    teacher_user_id: 'usr_guru_delta',
+    day_of_week: 3, // Rabu
+    day: 'Rabu',
+    start_time: '08:00',
+    end_time: '08:40',
+    class_name: 'Kelas VIII-A',
+    subject: 'IPA',
+    room: 'Ruang Kelas',
+    academic_year: '2024/2025',
+  });
+
+  // Guru Epsilon creates schedule for Kelas VII at same time (08:00 - 08:40) in "Ruang Kelas"
+  const crossClassGenericRoomRes = await provider.createTeachingSchedule({
+    teacher_user_id: 'usr_guru_epsilon',
+    day_of_week: 3, // Rabu
+    day: 'Rabu',
+    start_time: '08:00',
+    end_time: '08:40',
+    class_name: 'Kelas VII',
+    subject: 'Bahasa Inggris',
+    room: 'Ruang Kelas', // generic room should not trigger false room conflict
+    academic_year: '2024/2025',
+  });
+
+  assert(
+    'Test 23: Generic Classroom Exemption (No False Conflict Across Different Classes)',
+    crossClassGenericRoomRes.success === true &&
+      isGenericClassroom('Ruang Kelas') === true &&
+      isGenericClassroom('Lab Komputer') === false,
+    `Different classes using standard 'Ruang Kelas' at same time permitted without false conflict`
+  );
+
+  // ── TEST 24: Specific Shared Facility Conflict (Lab Komputer) ──────────────
+  // Guru Zeta attempts to book Lab Komputer for Kelas IX-A on Rabu at 08:00 - 08:40
+  await provider.createTeachingSchedule({
+    teacher_user_id: 'usr_guru_zeta',
+    day_of_week: 3, // Rabu
+    day: 'Rabu',
+    start_time: '08:00',
+    end_time: '08:40',
+    class_name: 'Kelas IX-A',
+    subject: 'Informatika',
+    room: 'Lab Komputer',
+    academic_year: '2024/2025',
+  });
+
+  // Guru Eta attempts to ALSO book Lab Komputer for Kelas VIII-B on Rabu at 08:00 - 08:40
+  const labConflictRes = await provider.createTeachingSchedule({
+    teacher_user_id: 'usr_guru_eta',
+    day_of_week: 3, // Rabu
+    day: 'Rabu',
+    start_time: '08:00',
+    end_time: '08:40',
+    class_name: 'Kelas VIII-B',
+    subject: 'Prakarya',
+    room: 'Lab Komputer',
+    academic_year: '2024/2025',
+  });
+
+  assert(
+    'Test 24: Specific Shared Facility Conflict Detection (Lab Komputer)',
+    labConflictRes.success === false && labConflictRes.conflict?.conflict_type === 'ROOM',
+    `Lab Komputer double booking correctly trapped: ${labConflictRes.error}`
+  );
+
+  // ── TEST 25: Unified Grade 7 Conflict Detection ───────────────────────────
+  // Kelas VII already has Bahasa Inggris on Rabu 08:00 - 08:40 (from Test 23).
+  // Attempting to schedule another subject for "Kelas 7" at same time should trigger CLASS conflict.
+  const grade7ConflictRes = await provider.createTeachingSchedule({
+    teacher_user_id: 'usr_guru_theta',
+    day_of_week: 3, // Rabu
+    day: 'Rabu',
+    start_time: '08:00',
+    end_time: '08:40',
+    class_name: 'Kelas 7', // Will normalize to 'Kelas VII'
+    subject: 'Seni Budaya',
+    room: 'Ruang Kelas VII',
+    academic_year: '2024/2025',
+  });
+
+  assert(
+    'Test 25: Unified Grade 7 Conflict Detection (Kelas 7 maps to Kelas VII)',
+    grade7ConflictRes.success === false && grade7ConflictRes.conflict?.conflict_type === 'CLASS',
+    `Class conflict correctly detected for unified Kelas VII: ${grade7ConflictRes.error}`
   );
 
   return { passed, failed, results };

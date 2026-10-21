@@ -17,6 +17,7 @@ import {
   validateScheduleConflict,
   normalizeDayOfWeek,
   timeStringToMinutes,
+  normalizeClassName,
 } from '../../../utils/teaching-schedule.utils';
 import { normalizeSubjectName } from '../../../config/school-subjects.config';
 
@@ -33,15 +34,37 @@ const STORAGE_KEY = 'smart_absensi_teaching_schedules';
 const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const FILTER_DAYS = ['Semua', ...DAYS];
 
+// Standard KBM Schedule: 1 JP = 40 Menit, 08:00 - 12:00 (Senin - Jumat), 4 Mata Pelajaran
 const TIME_PRESETS = [
-  { label: 'Jam 1-2 (07:30 - 08:50)', start: '07:30', end: '08:50' },
-  { label: 'Jam 3-4 (08:50 - 10:10)', start: '08:50', end: '10:10' },
-  { label: 'Jam 5-6 (10:30 - 11:50)', start: '10:30', end: '11:50' },
-  { label: 'Jam 7-8 (12:30 - 13:50)', start: '12:30', end: '13:50' },
+  { label: 'Mapel 1 (08:00 - 08:40)', start: '08:00', end: '08:40' },
+  { label: 'Mapel 2 (08:40 - 09:20)', start: '08:40', end: '09:20' },
+  { label: 'Mapel 3 (09:40 - 10:20)', start: '09:40', end: '10:20' },
+  { label: 'Mapel 4 (10:40 - 11:20)', start: '10:40', end: '11:20' },
+  { label: 'Mapel 4 Alt (11:20 - 12:00)', start: '11:20', end: '12:00' },
+  { label: '2 JP Pagi (08:00 - 09:20)', start: '08:00', end: '09:20' },
+  { label: '2 JP Siang (09:40 - 11:00)', start: '09:40', end: '11:00' },
+  { label: '2 JP Akhir (10:40 - 12:00)', start: '10:40', end: '12:00' },
 ];
 
-const CLASS_PRESETS = ['Kelas VII-A', 'Kelas VII-B', 'Kelas VIII-A', 'Kelas VIII-B', 'Kelas IX-A', 'Kelas IX-B'];
-const ROOM_PRESETS = ['Ruang Teori 7A', 'Ruang Teori 8A', 'Ruang Teori 9A', 'Lab Komputer', 'Lab IPA', 'Lapangan'];
+// Kelas 7 disatukan menjadi 'Kelas VII' saja (tanpa split A/B)
+const CLASS_PRESETS = [
+  'Kelas VII',
+  'Kelas VIII-A',
+  'Kelas VIII-B',
+  'Kelas IX-A',
+  'Kelas IX-B',
+];
+
+const ROOM_PRESETS = [
+  'Ruang Kelas VII',
+  'Ruang Kelas VIII-A',
+  'Ruang Kelas VIII-B',
+  'Ruang Kelas IX-A',
+  'Ruang Kelas IX-B',
+  'Lab Komputer',
+  'Lab IPA',
+  'Lapangan',
+];
 
 export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProps> = ({ teachers }) => {
   const { showToast } = useToastStore();
@@ -74,6 +97,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   });
 
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('ALL');
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>('ALL');
   const [selectedDay, setSelectedDay] = useState<string>('Semua');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
 
@@ -86,14 +110,14 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   // Modal State for Subject Management
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
 
-  // Form Fields
+  // Form Fields (Defaults: 1 JP 40m 08:00 - 08:40, Kelas VII, Ruang Kelas VII)
   const [formTeacherId, setFormTeacherId] = useState<string>('');
   const [formDay, setFormDay] = useState<string>('Senin');
-  const [formTimeStart, setFormTimeStart] = useState<string>('07:30');
-  const [formTimeEnd, setFormTimeEnd] = useState<string>('08:50');
-  const [formClassName, setFormClassName] = useState<string>('');
+  const [formTimeStart, setFormTimeStart] = useState<string>('08:00');
+  const [formTimeEnd, setFormTimeEnd] = useState<string>('08:40');
+  const [formClassName, setFormClassName] = useState<string>('Kelas VII');
   const [formSubject, setFormSubject] = useState<string>('');
-  const [formRoom, setFormRoom] = useState<string>('');
+  const [formRoom, setFormRoom] = useState<string>('Ruang Kelas VII');
 
   // Initial load from cloud provider repository with cache fallback
   useEffect(() => {
@@ -156,15 +180,24 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     return () => window.removeEventListener('smart_absensi_subjects_updated', onSubjectsUpdated);
   }, []);
 
+  // Select class chip with automatic room synchronization to avoid room conflict traps
+  const handleSelectClass = (cls: string) => {
+    const normalized = normalizeClassName(cls);
+    setFormClassName(normalized);
+    if (!formRoom || formRoom.startsWith('Ruang Kelas') || formRoom.startsWith('Ruang Teori')) {
+      setFormRoom(`Ruang ${normalized}`);
+    }
+  };
+
   const handleOpenAddModal = () => {
     setEditingId(null);
     const firstTeacher = teachers[0];
     const initialTeacherId = firstTeacher?.id || '';
     setFormTeacherId(initialTeacherId);
     setFormDay('Senin');
-    setFormTimeStart('07:30');
-    setFormTimeEnd('08:50');
-    setFormClassName('Kelas VII-A');
+    setFormTimeStart('08:00');
+    setFormTimeEnd('08:40');
+    setFormClassName('Kelas VII');
 
     if (firstTeacher?.teaching_assignment) {
       const firstSubject = Array.isArray(firstTeacher.teaching_assignment)
@@ -186,7 +219,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
       setFormSubject(subjects[0]?.name || '');
     }
 
-    setFormRoom('Ruang Teori 7A');
+    setFormRoom('Ruang Kelas VII');
     setIsModalOpen(true);
   };
 
@@ -258,6 +291,8 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
     setIsSaving(true);
     const token = useAuthStore.getState().token || undefined;
+    const sanitizedClass = normalizeClassName(formClassName) || formClassName.trim();
+    const sanitizedRoom = formRoom.trim() || `Ruang ${sanitizedClass}`;
 
     try {
       if (editingId) {
@@ -270,9 +305,9 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
             day: formDay,
             start_time: formTimeStart,
             end_time: formTimeEnd,
-            class_name: formClassName,
+            class_name: sanitizedClass,
             subject: formSubject,
-            room: formRoom || 'Ruang Kelas',
+            room: sanitizedRoom,
             version: currentSlot?.version || 1,
           },
           token
@@ -292,9 +327,9 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
             day: formDay,
             start_time: formTimeStart,
             end_time: formTimeEnd,
-            class_name: formClassName,
+            class_name: sanitizedClass,
             subject: formSubject,
-            room: formRoom || 'Ruang Kelas',
+            room: sanitizedRoom,
           },
           token
         );
@@ -405,7 +440,10 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     const matchTeacher = selectedTeacherId === 'ALL' || s.user_id === selectedTeacherId;
     const matchDay = selectedDay === 'Semua' || s.day === selectedDay;
     const matchSubject = selectedSubjectFilter === 'ALL' || s.subject === selectedSubjectFilter;
-    return matchTeacher && matchDay && matchSubject;
+    const matchClass =
+      selectedClassFilter === 'ALL' ||
+      normalizeClassName(s.className || s.class_name) === normalizeClassName(selectedClassFilter);
+    return matchTeacher && matchDay && matchSubject && matchClass;
   });
 
   return (
@@ -413,9 +451,14 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
       {/* Header & Quick Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
         <div>
-          <h2 className="text-lg font-black text-[#023246]">🗓️ Kelola Jadwal Mengajar Guru</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-black text-[#023246]">🗓️ Kelola Jadwal Mengajar Guru</h2>
+            <span className="px-2.5 py-0.5 text-[10px] font-black bg-emerald-100 text-[#0D7A5F] rounded-full border border-emerald-200">
+              1 JP = 40 Menit
+            </span>
+          </div>
           <p className="text-xs text-slate-500 font-medium">
-            Input & atur alokasi mata pelajaran, kelas, dan jam mengajar guru
+            Waktu KBM: 08.00 - 12.00 WIB (Senin – Jumat) • 4 Mata Pelajaran • Kelas VII Tunggal
           </p>
         </div>
 
@@ -441,7 +484,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
       </div>
 
       {/* Filter Control Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
         {/* Teacher Filter */}
         <div className="space-y-1">
           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
@@ -456,6 +499,25 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.full_name} ({t.position || 'Guru'})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Class Filter */}
+        <div className="space-y-1">
+          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider">
+            Filter Kelas:
+          </label>
+          <select
+            value={selectedClassFilter}
+            onChange={(e) => setSelectedClassFilter(e.target.value)}
+            className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none cursor-pointer"
+          >
+            <option value="ALL">🏫 Semua Kelas</option>
+            {CLASS_PRESETS.map((c) => (
+              <option key={c} value={c}>
+                {c}
               </option>
             ))}
           </select>
@@ -491,7 +553,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
                 key={d}
                 type="button"
                 onClick={() => setSelectedDay(d)}
-                className={`py-2 px-2.5 rounded-xl text-[10px] font-extrabold transition-all cursor-pointer whitespace-nowrap flex-1 text-center ${
+                className={`py-2 px-2 rounded-xl text-[10px] font-extrabold transition-all cursor-pointer whitespace-nowrap flex-1 text-center ${
                   selectedDay === d
                     ? 'bg-[#023246] text-white shadow-xs'
                     : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
@@ -636,9 +698,14 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
             {/* Section 2: Waktu & Alokasi Hari */}
             <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
-                2. Hari & Jam Mengajar
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                  2. Hari & Jam Mengajar (1 JP = 40 Menit)
+                </span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  08.00 - 12.00 (4 Mapel)
+                </span>
+              </div>
 
               {/* Day Segmented Selector */}
               <div className="space-y-1">
@@ -684,25 +751,27 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
               </div>
 
               {/* Time Presets */}
-              <div className="flex gap-1.5 flex-wrap pt-0.5">
-                <span className="text-[10px] font-bold text-slate-400 self-center">Preset:</span>
-                {TIME_PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => {
-                      setFormTimeStart(p.start);
-                      setFormTimeEnd(p.end);
-                    }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                      formTimeStart === p.start && formTimeEnd === p.end
-                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    {p.start} - {p.end}
-                  </button>
-                ))}
+              <div className="space-y-1.5 pt-0.5">
+                <span className="text-[10px] font-bold text-slate-400 block">Pilihan Jam / Sesi Pelajaran:</span>
+                <div className="flex gap-1.5 flex-wrap">
+                  {TIME_PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => {
+                        setFormTimeStart(p.start);
+                        setFormTimeEnd(p.end);
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                        formTimeStart === p.start && formTimeEnd === p.end
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -714,23 +783,32 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700">Kelas *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700">Kelas *</label>
+                    <span className="text-[10px] font-bold text-emerald-700">
+                      Kelas 7 disatukan: Kelas VII
+                    </span>
+                  </div>
                   <Input
                     value={formClassName}
                     onChange={(e) => setFormClassName(e.target.value)}
-                    placeholder="Contoh: Kelas VII-A"
+                    placeholder="Contoh: Kelas VII"
                     required
                   />
                   {/* Quick Class Chips */}
                   <div className="flex gap-1 overflow-x-auto no-scrollbar pt-1">
-                    {CLASS_PRESETS.slice(0, 4).map((cls) => (
+                    {CLASS_PRESETS.map((cls) => (
                       <button
                         key={cls}
                         type="button"
-                        onClick={() => setFormClassName(cls)}
-                        className="px-1.5 py-0.5 text-[9px] font-bold bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-100 cursor-pointer shrink-0"
+                        onClick={() => handleSelectClass(cls)}
+                        className={`px-2 py-1 text-[10px] font-extrabold rounded-md border transition-colors cursor-pointer shrink-0 ${
+                          normalizeClassName(formClassName) === cls
+                            ? 'bg-[#023246] text-white border-[#023246]'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
                       >
-                        {cls.replace('Kelas ', '')}
+                        {cls}
                       </button>
                     ))}
                   </div>
@@ -741,18 +819,22 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
                   <Input
                     value={formRoom}
                     onChange={(e) => setFormRoom(e.target.value)}
-                    placeholder="Contoh: Ruang Teori 7A"
+                    placeholder="Contoh: Ruang Kelas VII"
                   />
                   {/* Quick Room Chips */}
                   <div className="flex gap-1 overflow-x-auto no-scrollbar pt-1">
-                    {ROOM_PRESETS.slice(0, 3).map((rm) => (
+                    {ROOM_PRESETS.slice(0, 5).map((rm) => (
                       <button
                         key={rm}
                         type="button"
                         onClick={() => setFormRoom(rm)}
-                        className="px-1.5 py-0.5 text-[9px] font-bold bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-100 cursor-pointer shrink-0"
+                        className={`px-2 py-1 text-[9px] font-bold rounded-md border transition-colors cursor-pointer shrink-0 ${
+                          formRoom === rm
+                            ? 'bg-emerald-700 text-white border-emerald-700'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
                       >
-                        {rm}
+                        {rm.replace('Ruang Kelas ', '').replace('Ruang ', '')}
                       </button>
                     ))}
                   </div>

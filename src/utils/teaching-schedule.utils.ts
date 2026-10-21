@@ -74,30 +74,107 @@ export function getDayNameIndonesian(dayOfWeek: number): string {
 }
 
 /**
- * Parses time string like "07:30 - 08:50" or "07.30 - 08.50" into start and end times in HH:mm.
+ * Normalizes class names.
+ * In accordance with school policy:
+ * Grade 7 is unified strictly into "Kelas VII" (no VII-A/VII-B/7A/7B split).
+ */
+export function normalizeClassName(rawName?: string | null): string {
+  if (!rawName) return '';
+  const trimmed = rawName.trim();
+  if (!trimmed) return '';
+
+  const clean = trimmed
+    .replace(/^kelas\s+/i, '')
+    .trim()
+    .toUpperCase();
+
+  // Grade 7 / VII unification: "untuk kelas 7 jadikan kelas VII saja"
+  if (/^(7|VII)([-_\s]*[AB])?$/i.test(clean)) {
+    return 'Kelas VII';
+  }
+
+  // Grade 8 / VIII
+  if (/^(8|VIII)[-_\s]*A$/i.test(clean)) return 'Kelas VIII-A';
+  if (/^(8|VIII)[-_\s]*B$/i.test(clean)) return 'Kelas VIII-B';
+  if (/^(8|VIII)$/i.test(clean)) return 'Kelas VIII';
+
+  // Grade 9 / IX
+  if (/^(9|IX)[-_\s]*A$/i.test(clean)) return 'Kelas IX-A';
+  if (/^(9|IX)[-_\s]*B$/i.test(clean)) return 'Kelas IX-B';
+  if (/^(9|IX)$/i.test(clean)) return 'Kelas IX';
+
+  if (!/^kelas\s+/i.test(trimmed)) {
+    return `Kelas ${trimmed}`;
+  }
+  return trimmed;
+}
+
+/**
+ * Determines whether a room designation is a generic classroom indicator
+ * that should NOT cause room conflict across different classes.
+ */
+export function isGenericClassroom(room?: string | null): boolean {
+  if (!room) return true;
+  const r = room.trim().toLowerCase();
+  return (
+    r === '' ||
+    r === '-' ||
+    r === 'online' ||
+    r === 'ruang kelas' ||
+    r === 'kelas' ||
+    r === 'ruang teori' ||
+    r === 'ruang belajar'
+  );
+}
+
+/**
+ * Parses time string like "08:00 - 08:40", "08.00 - 08.40", or "Jam 1-2 (08:00 - 09:20)"
+ * into start and end times in HH:mm.
  */
 export function parseScheduleTime(timeStr: string): { startTime: string; endTime: string } | null {
   if (!timeStr) return null;
-  const cleaned = String(timeStr).replace(/\./g, ':').trim();
+  const str = String(timeStr).trim();
+
+  // Find all HH:mm matches (supports : or .)
+  const timeRegex = /\b(\d{1,2})[:.](\d{2})\b/g;
+  const matches = [...str.matchAll(timeRegex)];
+
+  if (matches.length >= 2) {
+    const formatMatch = (m: RegExpMatchArray): string | null => {
+      const hh = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    };
+
+    const start = formatMatch(matches[0]);
+    const end = formatMatch(matches[1]);
+    if (start && end) {
+      return { startTime: start, endTime: end };
+    }
+  }
+
+  // Fallback: split by dash/range separators
+  const cleaned = str.replace(/\./g, ':');
   const parts = cleaned.split(/[-–—]/).map((p) => p.trim());
-  if (parts.length < 2) return null;
+  if (parts.length >= 2) {
+    const sanitizeTime = (t: string): string | null => {
+      const m = t.match(/(\d{1,2})[:.](\d{1,2})/);
+      if (!m) return null;
+      const hh = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    };
 
-  const sanitizeTime = (t: string): string | null => {
-    const m = t.match(/(\d{1,2})[:.](\d{1,2})/);
-    if (!m) return null;
-    const hh = m[1].padStart(2, '0');
-    const mm = m[2].padStart(2, '0');
-    const hNum = parseInt(hh, 10);
-    const mNum = parseInt(mm, 10);
-    if (hNum < 0 || hNum > 23 || mNum < 0 || mNum > 59) return null;
-    return `${hh}:${mm}`;
-  };
+    const start = sanitizeTime(parts[0]);
+    const end = sanitizeTime(parts[parts.length - 1]);
+    if (start && end) {
+      return { startTime: start, endTime: end };
+    }
+  }
 
-  const start = sanitizeTime(parts[0]);
-  const end = sanitizeTime(parts[1]);
-
-  if (!start || !end) return null;
-  return { startTime: start, endTime: end };
+  return null;
 }
 
 /**
@@ -150,7 +227,7 @@ export function isTimeIntervalOverlapping(
  * 1. Invalid time: start_time >= end_time
  * 2. Teacher overlap (same teacher cannot teach two classes at the same time)
  * 3. Class overlap (same class cannot have two teachers/subjects at the same time)
- * 4. Room overlap (same room cannot be occupied by two classes at the same time, if room specified)
+ * 4. Room overlap (same specific room cannot be occupied by two classes at the same time; generic classrooms exempt)
  */
 export function validateScheduleConflict(
   candidate: {
@@ -177,7 +254,7 @@ export function validateScheduleConflict(
   }
 
   const candDay = normalizeDayOfWeek(candidate.day_of_week);
-  const candClassName = candidate.class_name.trim().toLowerCase();
+  const candClassName = normalizeClassName(candidate.class_name).toLowerCase();
   const candRoom = candidate.room ? candidate.room.trim().toLowerCase() : '';
 
   for (const slot of existingSchedules) {
@@ -215,7 +292,7 @@ export function validateScheduleConflict(
       const slotTimeStr = slot.time || formatTimeRange(slotStart, slotEnd);
       const slotTeacherId = slot.teacher_user_id || slot.user_id;
 
-      // 1. Teacher Conflict
+      // 1. Teacher Conflict (same teacher cannot teach two classes at the same time)
       if (slotTeacherId && candidate.teacher_user_id && slotTeacherId === candidate.teacher_user_id) {
         return {
           conflict_type: 'TEACHER',
@@ -224,8 +301,8 @@ export function validateScheduleConflict(
         };
       }
 
-      // 2. Class Conflict
-      const existingClassName = (slot.className || slot.class_name || '').trim().toLowerCase();
+      // 2. Class Conflict (same class cannot have two teachers/subjects at the same time)
+      const existingClassName = normalizeClassName(slot.className || slot.class_name || '').toLowerCase();
       if (candClassName && existingClassName && candClassName === existingClassName) {
         return {
           conflict_type: 'CLASS',
@@ -234,13 +311,13 @@ export function validateScheduleConflict(
         };
       }
 
-      // 3. Room Conflict (ignore virtual / online / '-' rooms)
+      // 3. Room Conflict (ignore virtual / generic classrooms to prevent false alarms across classes)
       const existingRoom = (slot.room || '').trim().toLowerCase();
       if (
         candRoom &&
         existingRoom &&
-        candRoom !== 'online' &&
-        candRoom !== '-' &&
+        !isGenericClassroom(candRoom) &&
+        !isGenericClassroom(existingRoom) &&
         candRoom === existingRoom
       ) {
         return {
