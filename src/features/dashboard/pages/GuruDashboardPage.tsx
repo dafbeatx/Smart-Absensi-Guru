@@ -2497,19 +2497,32 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('NOTIFIKASI')}
-            className="relative p-2.5 text-white/90 hover:text-white hover:bg-white/10 rounded-2xl transition-colors cursor-pointer shrink-0 min-h-11 min-w-11 flex items-center justify-center active:scale-95"
-            aria-label="Notifikasi"
-          >
-            <Megaphone className="w-5 h-5 text-cyan-200" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 px-1.5 py-0.2 text-[9px] font-black bg-red-500 text-white rounded-full min-w-4 text-center ring-2 ring-[#023246] shadow-2xs animate-pulse">
-                {unreadCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('smart_absensi_open_app_install'))}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 rounded-2xl transition-all cursor-pointer shrink-0 min-h-11 active:scale-95"
+              title="Unduh File APK Android / Pasang Aplikasi"
+              aria-label="Unduh APK"
+            >
+              <span className="text-sm">📱</span>
+              <span className="text-[11px] font-extrabold hidden min-[360px]:inline">APK</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('NOTIFIKASI')}
+              className="relative p-2.5 text-white/90 hover:text-white hover:bg-white/10 rounded-2xl transition-colors cursor-pointer shrink-0 min-h-11 min-w-11 flex items-center justify-center active:scale-95"
+              aria-label="Notifikasi"
+            >
+              <Megaphone className="w-5 h-5 text-cyan-200" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 px-1.5 py-0.2 text-[9px] font-black bg-red-500 text-white rounded-full min-w-4 text-center ring-2 ring-[#023246] shadow-2xs animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-xs text-slate-200">
