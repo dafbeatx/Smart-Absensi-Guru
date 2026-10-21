@@ -165,7 +165,7 @@ const ExamQuestionCreatorModal = React.lazy(() =>
   }))
 );
 import { evaluateSmartClassAlarm } from '../../../utils/smart-class-alarm.utils';
-import { normalizeDayOfWeek } from '../../../utils/teaching-schedule.utils';
+import { normalizeDayOfWeek, sanitizeTimeString, getDayNameIndonesian } from '../../../utils/teaching-schedule.utils';
 import {
   ExamCommitteeRepository,
   EXAM_COMMITTEE_CHANGED_EVENT,
@@ -250,11 +250,12 @@ const UserAvatar: React.FC<{
 
 // Helper: Real-time Live Status for Teaching Slot
 const getSlotLiveStatus = (
-  timeStr: string,
+  timeStr: string | null | undefined,
   now: Date
 ): 'CURRENT' | 'NEXT' | 'FINISHED' | 'UPCOMING' => {
   try {
-    const parts = timeStr.split('-').map((p) => p.trim());
+    if (!timeStr || typeof timeStr !== 'string') return 'UPCOMING';
+    const parts = timeStr.replace(' WIB', '').split('-').map((p) => p.trim());
     if (parts.length < 2) return 'UPCOMING';
     const [startStr, endStr] = parts;
     const [sh, sm] = startStr.split(':').map((n) => parseInt(n, 10));
@@ -4256,7 +4257,13 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
               if (todaySlots.length === 0) {
                 const hasOtherDays = teachingSlots.length > 0;
-                const otherDaysList = [...new Set(teachingSlots.map((s) => s.day))].join(', ');
+                const otherDaysList = [
+                  ...new Set(
+                    teachingSlots
+                      .map((s) => s.day || (s.day_of_week != null ? getDayNameIndonesian(s.day_of_week) : ''))
+                      .filter(Boolean)
+                  ),
+                ].join(', ');
 
                 return (
                   <section className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-sm flex items-center justify-between gap-3">
@@ -4331,7 +4338,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                       </div>
                       <div className="flex items-center gap-3 text-xs text-slate-500 font-medium pt-0.5">
                         <span className="flex items-center gap-1 font-mono font-semibold text-slate-700">
-                          ⏱️ {activeOrNextSlot.time} WIB
+                          ⏱️ {activeOrNextSlot.start_time && activeOrNextSlot.end_time
+                            ? `${sanitizeTimeString(activeOrNextSlot.start_time)} - ${sanitizeTimeString(activeOrNextSlot.end_time)}`
+                            : activeOrNextSlot.time
+                              ? activeOrNextSlot.time.replace(' WIB', '').split('-').map((t) => sanitizeTimeString(t.trim())).join(' - ')
+                              : '08:00 - 08:40'} WIB
                         </span>
                         <span>📍 {activeOrNextSlot.room || 'Kelas'}</span>
                       </div>

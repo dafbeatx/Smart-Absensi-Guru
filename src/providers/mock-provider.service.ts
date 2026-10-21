@@ -104,6 +104,7 @@ import {
   formatTimeRange,
   validateScheduleConflict,
   sortTeachingSlots,
+  sanitizeTimeString,
 } from '../utils/teaching-schedule.utils';
 import { resolveSchoolLevel } from '../utils/class.utils';
 import { normalizeAcademicYearString } from '../utils/academic-year.utils';
@@ -2180,7 +2181,9 @@ export class MockProvider implements IDataProvider {
   ): Promise<TeachingScheduleResult> {
     const dayOfWeek = normalizeDayOfWeek(dto.day_of_week !== undefined ? dto.day_of_week : dto.day);
     const dayName = dto.day || getDayNameIndonesian(dayOfWeek);
-    const timeRange = formatTimeRange(dto.start_time, dto.end_time);
+    const startTime = sanitizeTimeString(dto.start_time);
+    const endTime = sanitizeTimeString(dto.end_time);
+    const timeRange = formatTimeRange(startTime, endTime);
 
     const existing = await this.getTeachingSchedules(_token, {
       academic_year: dto.academic_year || '2024/2025',
@@ -2191,8 +2194,8 @@ export class MockProvider implements IDataProvider {
       {
         teacher_user_id: dto.teacher_user_id,
         day_of_week: dayOfWeek,
-        start_time: dto.start_time,
-        end_time: dto.end_time,
+        start_time: startTime,
+        end_time: endTime,
         class_name: dto.class_name,
         room: dto.room,
         academic_year: dto.academic_year,
@@ -2204,16 +2207,18 @@ export class MockProvider implements IDataProvider {
       return { success: false, error: conflict.message, conflict };
     }
 
+    const resolvedTeacherName = dto.teacher_name || 'Guru';
+
     const all = await this.getTeachingSchedules(_token);
     const newSlot: TeachingSlot = {
       id: `sched_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       user_id: dto.teacher_user_id,
       teacher_user_id: dto.teacher_user_id,
-      teacher_name: 'Guru',
+      teacher_name: resolvedTeacherName || 'Guru',
       day_of_week: dayOfWeek,
       day: dayName,
-      start_time: dto.start_time,
-      end_time: dto.end_time,
+      start_time: startTime,
+      end_time: endTime,
       time: timeRange,
       className: dto.class_name,
       class_name: dto.class_name,
@@ -2259,8 +2264,8 @@ export class MockProvider implements IDataProvider {
         : (dto.day || current.day_of_week || current.day)
     );
     const dayName = dto.day || getDayNameIndonesian(dayOfWeek);
-    const startTime = dto.start_time || current.start_time || parseScheduleTime(current.time)?.startTime || '07:00';
-    const endTime = dto.end_time || current.end_time || parseScheduleTime(current.time)?.endTime || '08:00';
+    const startTime = sanitizeTimeString(dto.start_time || current.start_time || parseScheduleTime(current.time)?.startTime || '07:00');
+    const endTime = sanitizeTimeString(dto.end_time || current.end_time || parseScheduleTime(current.time)?.endTime || '08:00');
     const className = dto.class_name || current.className || current.class_name || '';
     const room = dto.room !== undefined ? dto.room : current.room;
     const academicYear = dto.academic_year || current.academic_year || '2024/2025';
@@ -2283,10 +2288,13 @@ export class MockProvider implements IDataProvider {
       return { success: false, error: conflict.message, conflict };
     }
 
+    const updatedTeacherName = dto.teacher_name || current.teacher_name || 'Guru';
+
     const updated: TeachingSlot = {
       ...current,
       user_id: teacherUserId,
       teacher_user_id: teacherUserId,
+      teacher_name: updatedTeacherName || 'Guru',
       day_of_week: dayOfWeek,
       day: dayName,
       start_time: startTime,

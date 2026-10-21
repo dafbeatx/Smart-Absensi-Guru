@@ -14,6 +14,8 @@ import {
   normalizeClassName,
   parseScheduleTime,
   isGenericClassroom,
+  sanitizeTimeString,
+  validateScheduleConflict,
 } from '../../utils/teaching-schedule.utils';
 import { evaluateSmartClassAlarm } from '../../utils/smart-class-alarm.utils';
 import type { TeachingSlot } from '../../types/database.types';
@@ -605,6 +607,38 @@ export async function runTeachingScheduleOverhaulTestSuite(): Promise<{
     'Test 25: Unified Grade 7 Conflict Detection (Kelas 7 maps to Kelas VII)',
     grade7ConflictRes.success === false && grade7ConflictRes.conflict?.conflict_type === 'CLASS',
     `Class conflict correctly detected for unified Kelas VII: ${grade7ConflictRes.error}`
+  );
+
+  // ── TEST 26: Official Break Time Guard (09:30 - 10:00 WIB Protected) ─────
+  const breakConflict = validateScheduleConflict(
+    {
+      teacher_user_id: 'usr_guru_theta',
+      day_of_week: 1, // Senin
+      start_time: '09:30',
+      end_time: '10:00',
+      class_name: 'Kelas VII',
+      room: 'Ruang Kelas VII',
+    },
+    []
+  );
+
+  assert(
+    'Test 26: Official Break Time Guard (09:30 - 10:00 WIB Protected)',
+    breakConflict !== null &&
+      breakConflict.conflict_type === 'BREAK_TIME' &&
+      breakConflict.message.includes('09:30 - 10:00 WIB'),
+    `Break time successfully protected against lessons: ${breakConflict?.message}`
+  );
+
+  // ── TEST 27: Time Sanitizer Strips Seconds (HH:mm:ss -> HH:mm) ────────────
+  const s1 = sanitizeTimeString('08:00:00');
+  const s2 = sanitizeTimeString('08:40');
+  const s3 = sanitizeTimeString('09:30:15');
+
+  assert(
+    'Test 27: Time Sanitizer Formats to HH:mm without Seconds',
+    s1 === '08:00' && s2 === '08:40' && s3 === '09:30',
+    `Sanitized: ${s1}, ${s2}, ${s3}`
   );
 
   return { passed, failed, results };

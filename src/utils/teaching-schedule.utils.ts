@@ -110,8 +110,9 @@ export function normalizeClassName(rawName?: string | null): string {
 }
 
 /**
- * Determines whether a room designation is a generic classroom indicator
+ * Determines whether a room designation is a generic homeroom/classroom indicator
  * that should NOT cause room conflict across different classes.
+ * Specific shared facilities (Lab, Lapangan, Aula, Perpustakaan, Masjid) WILL trigger room conflicts.
  */
 export function isGenericClassroom(room?: string | null): boolean {
   if (!room) return true;
@@ -126,6 +127,28 @@ export function isGenericClassroom(room?: string | null): boolean {
     r === 'ruang belajar'
   );
 }
+
+/**
+ * Sanitizes "HH:mm:ss" or "HH:mm" to canonical "HH:mm".
+ */
+export function sanitizeTimeString(t?: string | null): string {
+  if (!t) return '08:00';
+  const clean = String(t).trim().replace(/\./g, ':');
+  const m = clean.match(/\b(\d{1,2}):(\d{2})/);
+  if (!m) return clean;
+  const hh = String(parseInt(m[1], 10)).padStart(2, '0');
+  const mm = m[2];
+  return `${hh}:${mm}`;
+}
+
+/**
+ * Official School Recess / Break Time configuration.
+ */
+export const SCHOOL_BREAK_TIME = {
+  start: '09:30',
+  end: '10:00',
+  label: '09:30 - 10:00 WIB',
+};
 
 /**
  * Parses time string like "08:00 - 08:40", "08.00 - 08.40", or "Jam 1-2 (08:00 - 09:20)"
@@ -178,10 +201,12 @@ export function parseScheduleTime(timeStr: string): { startTime: string; endTime
 }
 
 /**
- * Formats start and end times into standard "HH:mm - HH:mm" string.
+ * Formats start and end times into standard "HH:mm - HH:mm" string (strips seconds).
  */
 export function formatTimeRange(startTime: string, endTime: string): string {
-  return `${startTime.trim()} - ${endTime.trim()}`;
+  const start = sanitizeTimeString(startTime);
+  const end = sanitizeTimeString(endTime);
+  return `${start} - ${end}`;
 }
 
 /**
@@ -225,9 +250,10 @@ export function isTimeIntervalOverlapping(
 /**
  * Validates schedule candidates against existing schedules for conflicts:
  * 1. Invalid time: start_time >= end_time
- * 2. Teacher overlap (same teacher cannot teach two classes at the same time)
- * 3. Class overlap (same class cannot have two teachers/subjects at the same time)
- * 4. Room overlap (same specific room cannot be occupied by two classes at the same time; generic classrooms exempt)
+ * 2. Official Break Time Guard (09:30 - 10:00 WIB)
+ * 3. Teacher overlap (same teacher cannot teach two classes at the same time)
+ * 4. Class overlap (same class cannot have two teachers/subjects at the same time)
+ * 5. Room overlap (shared facilities cannot be occupied by two classes at the same time)
  */
 export function validateScheduleConflict(
   candidate: {
@@ -249,7 +275,7 @@ export function validateScheduleConflict(
     return {
       conflict_type: 'TEACHER',
       conflicting_schedule: {} as TeachingSlot,
-      message: `Waktu selesai (${candidate.end_time}) harus lebih akhir dari waktu mulai (${candidate.start_time}).`,
+      message: `Waktu selesai (${sanitizeTimeString(candidate.end_time)}) harus lebih akhir dari waktu mulai (${sanitizeTimeString(candidate.start_time)}).`,
     };
   }
 
@@ -257,9 +283,31 @@ export function validateScheduleConflict(
   const candClassName = normalizeClassName(candidate.class_name).toLowerCase();
   const candRoom = candidate.room ? candidate.room.trim().toLowerCase() : '';
 
+  // 1. Guard against scheduling inside Official School Recess (Senin - Jumat 09:30 - 10:00)
+  if (candDay >= 1 && candDay <= 5) {
+    const candStartMin = timeStringToMinutes(candidate.start_time);
+    const candEndMin = timeStringToMinutes(candidate.end_time);
+    const breakStartMin = timeStringToMinutes(SCHOOL_BREAK_TIME.start); // 09:30
+    const breakEndMin = timeStringToMinutes(SCHOOL_BREAK_TIME.end); // 10:00
+
+    const isInsideBreak =
+      (candStartMin >= breakStartMin && candStartMin < breakEndMin) ||
+      (candEndMin > breakStartMin && candEndMin <= breakEndMin);
+
+    if (isInsideBreak) {
+      return {
+        conflict_type: 'BREAK_TIME',
+        conflicting_schedule: {} as TeachingSlot,
+        message: `Waktu KBM (${formatTimeRange(candidate.start_time, candidate.end_time)}) bertabrakan dengan Jam Istirahat Resmi Sekolah (${SCHOOL_BREAK_TIME.label}). KBM tidak dapat dijadwalkan pada waktu istirahat.`,
+      };
+    }
+  }
+
   for (const slot of existingSchedules) {
-    // Skip self
-    if (candidate.id && slot.id === candidate.id) continue;
+    // Skip self (normalized ID comparison)
+    if (candidate.id && slot.id && String(slot.id).trim().toLowerCase() === String(candidate.id).trim().toLowerCase()) {
+      continue;
+    }
     // Skip inactive slots
     if (slot.is_active === false) continue;
 
@@ -272,7 +320,8 @@ export function validateScheduleConflict(
       continue;
     }
 
-    const slotDay = normalizeDayOfWeek(slot.day_of_week !== undefined ? slot.day_of_week : slot.day);
+    const rawSlotDay = slot.day_of_week != null ? slot.day_of_week : slot.day;
+    const slotDay = normalizeDayOfWeek(rawSlotDay);
     if (slotDay !== candDay) continue;
 
     // Resolve slot times
@@ -289,11 +338,11 @@ export function validateScheduleConflict(
     if (!slotStart || !slotEnd) continue;
 
     if (isTimeIntervalOverlapping(candidate.start_time, candidate.end_time, slotStart, slotEnd)) {
-      const slotTimeStr = slot.time || formatTimeRange(slotStart, slotEnd);
+      const slotTimeStr = slot.time ? slot.time.replace(/:\d{2}\b/g, '') : formatTimeRange(slotStart, slotEnd);
       const slotTeacherId = slot.teacher_user_id || slot.user_id;
 
       // 1. Teacher Conflict (same teacher cannot teach two classes at the same time)
-      if (slotTeacherId && candidate.teacher_user_id && slotTeacherId === candidate.teacher_user_id) {
+      if (slotTeacherId && candidate.teacher_user_id && slotTeacherId.trim().toLowerCase() === candidate.teacher_user_id.trim().toLowerCase()) {
         return {
           conflict_type: 'TEACHER',
           conflicting_schedule: slot,
@@ -304,14 +353,16 @@ export function validateScheduleConflict(
       // 2. Class Conflict (same class cannot have two teachers/subjects at the same time)
       const existingClassName = normalizeClassName(slot.className || slot.class_name || '').toLowerCase();
       if (candClassName && existingClassName && candClassName === existingClassName) {
+        const displayClassName = slot.className || slot.class_name || candidate.class_name;
+        const cleanName = displayClassName.startsWith('Kelas') ? displayClassName : `Kelas ${displayClassName}`;
         return {
           conflict_type: 'CLASS',
           conflicting_schedule: slot,
-          message: `Kelas ${slot.className || slot.class_name} sudah memiliki jadwal (${slot.subject} bersama ${slot.teacher_name || 'guru lain'}) pada waktu yang sama (${slotTimeStr}).`,
+          message: `${cleanName} sudah memiliki jadwal (${slot.subject} bersama ${slot.teacher_name || 'guru lain'}) pada waktu yang sama (${slotTimeStr}).`,
         };
       }
 
-      // 3. Room Conflict (ignore virtual / generic classrooms to prevent false alarms across classes)
+      // 3. Room Conflict (ignore virtual / regular homeroom classrooms to prevent false alarms across classes)
       const existingRoom = (slot.room || '').trim().toLowerCase();
       if (
         candRoom &&

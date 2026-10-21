@@ -263,6 +263,7 @@ export interface TeachingSlot {
 
 export interface CreateTeachingScheduleDTO {
   teacher_user_id: string;
+  teacher_name?: string;
   day_of_week: number;
   day?: string;
   start_time: string;
@@ -279,6 +280,7 @@ export interface CreateTeachingScheduleDTO {
 export interface UpdateTeachingScheduleDTO {
   id: string;
   teacher_user_id?: string;
+  teacher_name?: string;
   day_of_week?: number;
   day?: string;
   start_time?: string;
@@ -294,7 +296,7 @@ export interface UpdateTeachingScheduleDTO {
 }
 
 export interface TeachingScheduleConflictError {
-  conflict_type: 'TEACHER' | 'CLASS' | 'ROOM';
+  conflict_type: 'TEACHER' | 'CLASS' | 'ROOM' | 'BREAK_TIME';
   conflicting_schedule: TeachingSlot;
   message: string;
 }

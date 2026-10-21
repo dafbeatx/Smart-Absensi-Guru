@@ -103,6 +103,7 @@ import {
   formatTimeRange,
   validateScheduleConflict,
   sortTeachingSlots,
+  sanitizeTimeString,
 } from '../utils/teaching-schedule.utils';
 import { parseAnswerKey } from '../utils/scoring.utils';
 import { normalizeClassCode, resolveSchoolLevel } from '../utils/class.utils';
@@ -3640,9 +3641,9 @@ export class SupabaseProvider implements IDataProvider {
       ? row.day_of_week
       : normalizeDayOfWeek(row.day);
     const day = row.day || getDayNameIndonesian(dayOfWeek);
-    const startTime = row.start_time || parseScheduleTime(row.time)?.startTime || '07:00';
-    const endTime = row.end_time || parseScheduleTime(row.time)?.endTime || '08:00';
-    const time = row.time || formatTimeRange(startTime, endTime);
+    const startTime = sanitizeTimeString(row.start_time || parseScheduleTime(row.time)?.startTime || '07:00');
+    const endTime = sanitizeTimeString(row.end_time || parseScheduleTime(row.time)?.endTime || '08:00');
+    const time = formatTimeRange(startTime, endTime);
     const teacherId = row.teacher_user_id || row.user_id;
 
     return {
@@ -3715,7 +3716,7 @@ export class SupabaseProvider implements IDataProvider {
           query = query.eq('day_of_week', filter.day_of_week);
         }
 
-        const { data, error, status, statusText } = await query.order('day_of_week', { ascending: true }).limit(50);
+        const { data, error, status, statusText } = await query.order('day_of_week', { ascending: true }).limit(500);
 
         if (error) {
           // Log complete HTTP status, PGRST code, and error details per instructions
@@ -3731,7 +3732,7 @@ export class SupabaseProvider implements IDataProvider {
 
               const ep = `/api/admin/teaching-schedules${qParams.toString() ? '?' + qParams.toString() : ''}`;
               const sResp = await fetch(ep, { method: 'GET' });
-              if (sResp.ok) {
+              if (sResp.ok && sResp.headers.get('content-type')?.includes('application/json')) {
                 const sJson = await sResp.json().catch(() => null);
                 if (sJson?.success && Array.isArray(sJson?.data)) {
                   this.teachingSchedulesCooldownUntil = 0;
@@ -3784,6 +3785,8 @@ export class SupabaseProvider implements IDataProvider {
   ): Promise<TeachingScheduleResult> {
     try {
       const dayOfWeek = normalizeDayOfWeek(dto.day_of_week !== undefined ? dto.day_of_week : dto.day);
+      const startTime = sanitizeTimeString(dto.start_time);
+      const endTime = sanitizeTimeString(dto.end_time);
 
       // Pre-validate schedule conflicts
       const existing = await this.getTeachingSchedules(_token, {
@@ -3794,8 +3797,8 @@ export class SupabaseProvider implements IDataProvider {
         {
           teacher_user_id: dto.teacher_user_id,
           day_of_week: dayOfWeek,
-          start_time: dto.start_time,
-          end_time: dto.end_time,
+          start_time: startTime,
+          end_time: endTime,
           class_name: dto.class_name,
           room: dto.room,
           academic_year: dto.academic_year,
@@ -3806,32 +3809,34 @@ export class SupabaseProvider implements IDataProvider {
         return { success: false, error: conflict.message, conflict };
       }
 
-      let teacherName = 'Guru';
-      try {
-        let userRowQuery = await this.client
-          .from('users_public_view')
-          .select('full_name')
-          .eq('id', dto.teacher_user_id)
-          .maybeSingle();
-        if (userRowQuery.error && (userRowQuery.error.code === '42P01' || userRowQuery.error.message?.includes('does not exist'))) {
-          userRowQuery = await this.client
-            .from('users')
+      let teacherName = dto.teacher_name || 'Guru';
+      if (!dto.teacher_name) {
+        try {
+          let userRowQuery = await this.client
+            .from('users_public_view')
             .select('full_name')
             .eq('id', dto.teacher_user_id)
             .maybeSingle();
+          if (userRowQuery.error && (userRowQuery.error.code === '42P01' || userRowQuery.error.message?.includes('does not exist'))) {
+            userRowQuery = await this.client
+              .from('users')
+              .select('full_name')
+              .eq('id', dto.teacher_user_id)
+              .maybeSingle();
+          }
+          const userRow = userRowQuery.data;
+          if (userRow?.full_name) teacherName = userRow.full_name;
+        } catch {
+          // Fallback to default
         }
-        const userRow = userRowQuery.data;
-        if (userRow?.full_name) teacherName = userRow.full_name;
-      } catch {
-        // Fallback to default
       }
 
       const payload = {
         teacher_user_id: dto.teacher_user_id,
         teacher_name: teacherName,
         day_of_week: dayOfWeek,
-        start_time: dto.start_time,
-        end_time: dto.end_time,
+        start_time: startTime,
+        end_time: endTime,
         class_name: dto.class_name,
         subject: dto.subject,
         room: dto.room || 'Ruang Kelas',
@@ -3944,9 +3949,10 @@ export class SupabaseProvider implements IDataProvider {
       }
 
       const dayOfWeek = normalizeDayOfWeek(dto.day_of_week !== undefined ? dto.day_of_week : (dto.day ? dto.day : existingRow.day_of_week));
-      const startTime = dto.start_time || existingRow.start_time;
-      const endTime = dto.end_time || existingRow.end_time;
+      const startTime = sanitizeTimeString(dto.start_time || existingRow.start_time);
+      const endTime = sanitizeTimeString(dto.end_time || existingRow.end_time);
       const teacherUserId = dto.teacher_user_id || existingRow.teacher_user_id;
+      const teacherName = dto.teacher_name || existingRow.teacher_name;
       const className = dto.class_name || existingRow.class_name;
       const room = dto.room || existingRow.room;
       const academicYear = dto.academic_year || existingRow.academic_year || '2026/2027';
@@ -3977,6 +3983,7 @@ export class SupabaseProvider implements IDataProvider {
       const nextVersion = (existingRow.version || 1) + 1;
       const updatePayload: Record<string, any> = {
         teacher_user_id: teacherUserId,
+        teacher_name: teacherName,
         day_of_week: dayOfWeek,
         start_time: startTime,
         end_time: endTime,

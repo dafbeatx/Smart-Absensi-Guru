@@ -18,6 +18,8 @@ import {
   normalizeDayOfWeek,
   timeStringToMinutes,
   normalizeClassName,
+  sanitizeTimeString,
+  getDayNameIndonesian,
 } from '../../../utils/teaching-schedule.utils';
 import { normalizeSubjectName } from '../../../config/school-subjects.config';
 
@@ -35,12 +37,11 @@ const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const FILTER_DAYS = ['Semua', ...DAYS];
 
 // Standard KBM Schedule: 1 JP = 40 Menit, 08:00 - 12:00 (Senin - Jumat), 4 Mata Pelajaran
-// Waktu Istirahat Resmi: 09.30 - 10.00 WIB
+// Waktu Istirahat Resmi: 09.30 - 10.00 WIB (Dilindungi dari jadwal KBM)
 const TIME_PRESETS = [
   { label: 'Mapel 1 (08:00 - 08:40)', start: '08:00', end: '08:40' },
   { label: 'Mapel 2 (08:40 - 09:20)', start: '08:40', end: '09:20' },
   { label: 'Mapel 2 Alt (08:50 - 09:30)', start: '08:50', end: '09:30' },
-  { label: '☕ Istirahat (09:30 - 10:00)', start: '09:30', end: '10:00' },
   { label: 'Mapel 3 (10:00 - 10:40)', start: '10:00', end: '10:40' },
   { label: 'Mapel 4 (10:40 - 11:20)', start: '10:40', end: '11:20' },
   { label: 'Mapel 4 Alt (11:20 - 12:00)', start: '11:20', end: '12:00' },
@@ -192,15 +193,48 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     }
   };
 
+  // Helper to find first available non-conflicting time slot for selected class & teacher
+  const findFirstAvailableSlot = (cls: string, teacherId?: string) => {
+    const candidateDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+    const candidateTimes = [
+      { start: '08:00', end: '08:40' },
+      { start: '08:40', end: '09:20' },
+      { start: '10:00', end: '10:40' },
+      { start: '10:40', end: '11:20' },
+    ];
+    for (const d of candidateDays) {
+      for (const t of candidateTimes) {
+        const conflict = validateScheduleConflict(
+          {
+            teacher_user_id: teacherId || '',
+            day_of_week: normalizeDayOfWeek(d),
+            start_time: t.start,
+            end_time: t.end,
+            class_name: cls,
+            room: `Ruang ${cls}`,
+          },
+          schedules
+        );
+        if (!conflict) {
+          return { day: d, start: t.start, end: t.end };
+        }
+      }
+    }
+    return { day: 'Senin', start: '08:00', end: '08:40' };
+  };
+
   const handleOpenAddModal = () => {
     setEditingId(null);
+    const initialClass = 'Kelas VII';
     const firstTeacher = teachers[0];
     const initialTeacherId = firstTeacher?.id || '';
+    const freeSlot = findFirstAvailableSlot(initialClass, initialTeacherId);
+
     setFormTeacherId(initialTeacherId);
-    setFormDay('Senin');
-    setFormTimeStart('08:00');
-    setFormTimeEnd('08:40');
-    setFormClassName('Kelas VII');
+    setFormDay(freeSlot.day);
+    setFormTimeStart(freeSlot.start);
+    setFormTimeEnd(freeSlot.end);
+    setFormClassName(initialClass);
 
     if (firstTeacher?.teaching_assignment) {
       const firstSubject = Array.isArray(firstTeacher.teaching_assignment)
@@ -249,16 +283,16 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
   const handleOpenEditModal = (slot: ExtendedTeachingSlot) => {
     setEditingId(slot.id);
     setFormTeacherId(slot.teacher_user_id || slot.user_id || '');
-    setFormDay(slot.day || 'Senin');
+    setFormDay(slot.day || (slot.day_of_week != null ? getDayNameIndonesian(slot.day_of_week) : 'Senin'));
 
     if (slot.start_time && slot.end_time) {
-      setFormTimeStart(slot.start_time);
-      setFormTimeEnd(slot.end_time);
+      setFormTimeStart(sanitizeTimeString(slot.start_time));
+      setFormTimeEnd(sanitizeTimeString(slot.end_time));
     } else if (slot.time) {
       const parts = slot.time.replace(' WIB', '').split('-');
       if (parts.length === 2) {
-        setFormTimeStart(parts[0].trim());
-        setFormTimeEnd(parts[1].trim());
+        setFormTimeStart(sanitizeTimeString(parts[0].trim()));
+        setFormTimeEnd(sanitizeTimeString(parts[1].trim()));
       }
     }
 
@@ -296,6 +330,10 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
     const token = useAuthStore.getState().token || undefined;
     const sanitizedClass = normalizeClassName(formClassName) || formClassName.trim();
     const sanitizedRoom = formRoom.trim() || `Ruang ${sanitizedClass}`;
+    const selectedTeacher = (teachers || []).find((t) => t.id === formTeacherId);
+    const teacherName = selectedTeacher?.full_name || undefined;
+    const cleanStart = sanitizeTimeString(formTimeStart);
+    const cleanEnd = sanitizeTimeString(formTimeEnd);
 
     try {
       if (editingId) {
@@ -304,10 +342,11 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
           {
             id: editingId,
             teacher_user_id: formTeacherId,
+            teacher_name: teacherName,
             day_of_week: normalizeDayOfWeek(formDay),
             day: formDay,
-            start_time: formTimeStart,
-            end_time: formTimeEnd,
+            start_time: cleanStart,
+            end_time: cleanEnd,
             class_name: sanitizedClass,
             subject: formSubject,
             room: sanitizedRoom,
@@ -326,10 +365,11 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
         const result = await TeachingScheduleRepository.createSchedule(
           {
             teacher_user_id: formTeacherId,
+            teacher_name: teacherName,
             day_of_week: normalizeDayOfWeek(formDay),
             day: formDay,
-            start_time: formTimeStart,
-            end_time: formTimeEnd,
+            start_time: cleanStart,
+            end_time: cleanEnd,
             class_name: sanitizedClass,
             subject: formSubject,
             room: sanitizedRoom,
@@ -440,7 +480,10 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
   // Filtered List
   const filteredSchedules = schedules.filter((s) => {
-    const matchTeacher = selectedTeacherId === 'ALL' || s.user_id === selectedTeacherId;
+    const matchTeacher =
+      selectedTeacherId === 'ALL' ||
+      s.teacher_user_id === selectedTeacherId ||
+      s.user_id === selectedTeacherId;
     const matchDay = selectedDay === 'Semua' || s.day === selectedDay;
     const matchSubject = selectedSubjectFilter === 'ALL' || s.subject === selectedSubjectFilter;
     const matchClass =
@@ -590,7 +633,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-emerald-100 text-[#0D7A5F] rounded-md border border-emerald-200 shrink-0">
-                        {slot.day}
+                        {slot.day || (slot.day_of_week != null ? getDayNameIndonesian(slot.day_of_week) : 'Senin')}
                       </span>
                       <span className="text-xs font-black text-[#023246] truncate">
                         {slot.className}
@@ -606,7 +649,11 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
                   <div className="text-right space-y-1 shrink-0">
                     <span className="inline-block px-2.5 py-1 text-[10px] font-mono font-bold bg-slate-100 text-slate-800 rounded-lg border border-slate-200">
-                      ⏱️ {slot.time}
+                      ⏱️ {slot.start_time && slot.end_time
+                        ? `${sanitizeTimeString(slot.start_time)} - ${sanitizeTimeString(slot.end_time)}`
+                        : slot.time
+                          ? slot.time.replace(' WIB', '').split('-').map((t) => sanitizeTimeString(t.trim())).join(' - ')
+                          : '08:00 - 08:40'}
                     </span>
                     <p className="text-[10px] text-slate-400 font-medium">📍 {slot.room}</p>
                   </div>
@@ -760,10 +807,14 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
 
               {/* Time Presets */}
               <div className="space-y-1.5 pt-0.5">
-                <span className="text-[10px] font-bold text-slate-400 block">Pilihan Jam / Sesi Pelajaran:</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 block">Pilihan Jam / Sesi Pelajaran:</span>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                    ☕ 09.30 - 10.00 WIB (Istirahat)
+                  </span>
+                </div>
                 <div className="flex gap-1.5 flex-wrap">
                   {TIME_PRESETS.map((p) => {
-                    const isIstirahat = p.label.includes('Istirahat');
                     const isSelected = formTimeStart === p.start && formTimeEnd === p.end;
                     return (
                       <button
@@ -775,11 +826,7 @@ export const TeachingScheduleManagement: React.FC<TeachingScheduleManagementProp
                         }}
                         className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
                           isSelected
-                            ? isIstirahat
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
-                              : 'bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-xs'
-                            : isIstirahat
-                            ? 'bg-amber-50/80 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                            ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-xs'
                             : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                         }`}
                       >

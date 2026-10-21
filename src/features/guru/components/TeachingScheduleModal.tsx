@@ -8,6 +8,8 @@ import {
 import {
   normalizeDayOfWeek,
   sortTeachingSlots,
+  sanitizeTimeString,
+  getDayNameIndonesian,
 } from '../../../utils/teaching-schedule.utils';
 
 interface TeachingScheduleModalProps {
@@ -71,11 +73,12 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
       });
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-      <div className="bg-white w-full max-w-105 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[88vh]">
+    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 animate-fadeIn">
+      {/* Mobile Full-Screen 100dvh Container (Infinix Note 8 Mandate) */}
+      <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[88vh] sm:max-w-md rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border sm:border-slate-100 overflow-hidden flex flex-col">
         
-        {/* Header */}
-        <div className="bg-[#023246] text-white p-4 px-5 flex items-center justify-between">
+        {/* Sticky Header */}
+        <div className="bg-[#023246] text-white p-4 px-5 flex items-center justify-between shrink-0 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-[#0D7A5F] rounded-2xl flex items-center justify-center text-white text-base shadow-xs">
               📅
@@ -87,6 +90,7 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Tutup Jadwal"
             className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-slate-200 transition-colors cursor-pointer text-sm font-bold"
           >
             ✕
@@ -94,7 +98,7 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
         </div>
 
         {/* Day Filter Pills */}
-        <div className="p-3 px-5 bg-slate-50 border-b border-slate-200 flex gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="p-3 px-5 bg-slate-50 border-b border-slate-200 flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">
           {days.map((d) => (
             <button
               key={d}
@@ -110,6 +114,17 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
           ))}
         </div>
 
+        {/* Official Recess Badge */}
+        <div className="mx-4 mt-3 p-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-center justify-between text-amber-900 text-xs shrink-0">
+          <div className="flex items-center gap-1.5 font-bold">
+            <span>☕</span>
+            <span>Istirahat KBM:</span>
+          </div>
+          <span className="font-mono font-black text-[11px] bg-amber-100/90 px-2 py-0.5 rounded-md border border-amber-300/60">
+            09:30 - 10:00 WIB
+          </span>
+        </div>
+
         {/* Schedule Items List */}
         <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
           {filteredSchedule.length === 0 ? (
@@ -123,43 +138,52 @@ export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
               </p>
             </div>
           ) : (
-            filteredSchedule.map((slot) => (
-              <div
-                key={slot.id}
-                className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between hover:border-emerald-300 transition-colors"
-              >
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-[#0D7A5F] rounded-md border border-emerald-200">
-                      {slot.day}
-                    </span>
-                    <span className="text-xs font-extrabold text-[#023246] truncate">
-                      {slot.className}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[11px] text-slate-600 font-semibold truncate">
-                    <span>📖 {slot.subject}</span>
-                  </div>
-                </div>
+            filteredSchedule.map((slot) => {
+              const displayDay = slot.day || (slot.day_of_week != null ? getDayNameIndonesian(slot.day_of_week) : 'Senin');
+              const displayTime = slot.start_time && slot.end_time
+                ? `${sanitizeTimeString(slot.start_time)} - ${sanitizeTimeString(slot.end_time)}`
+                : slot.time
+                  ? slot.time.replace(' WIB', '').split('-').map((t) => sanitizeTimeString(t.trim())).join(' - ')
+                  : '08:00 - 08:40';
 
-                <div className="text-right space-y-1 shrink-0 ml-3">
-                  <div className="text-[10px] font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
-                    ⏱️ {slot.time}
+              return (
+                <div
+                  key={slot.id}
+                  className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between hover:border-emerald-300 transition-colors"
+                >
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-[#0D7A5F] rounded-md border border-emerald-200">
+                        {displayDay}
+                      </span>
+                      <span className="text-xs font-extrabold text-[#023246] truncate">
+                        {slot.className}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-slate-600 font-semibold truncate">
+                      <span>📖 {slot.subject}</span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 font-medium">
-                    📍 {slot.room}
+
+                  <div className="text-right space-y-1 shrink-0 ml-3">
+                    <div className="text-[10px] font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                      ⏱️ {displayTime}
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium">
+                      📍 {slot.room}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200 text-center">
+        {/* Sticky Bottom Action Bar (Thumb-friendly for Infinix Note 8) */}
+        <div className="p-3.5 bg-slate-50 border-t border-slate-200 text-center shrink-0">
           <button
             onClick={onClose}
-            className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            className="w-full h-11 bg-[#023246] hover:bg-[#03445e] text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer shadow-xs active:scale-98"
           >
             Tutup
           </button>
