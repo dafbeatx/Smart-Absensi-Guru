@@ -87,12 +87,27 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
     };
   }, [isStandalone]);
 
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+
   const isOpen = propsIsOpen !== undefined ? propsIsOpen : internalIsOpen;
 
   const handleClose = () => {
     sessionStorage.setItem('smart_absensi_install_prompt_seen', 'true');
     setInternalIsOpen(false);
+    setDownloadNotice(null);
     if (propsOnClose) propsOnClose();
+  };
+
+  const handleDownloadFile = (url: string, label: string) => {
+    setDownloadNotice(`Sedang membuka tautan unduhan ${label}. Periksa panel unduhan peramban Anda.`);
+    // Trigger download cleanly
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handlePwaInstallClick = async () => {
@@ -140,6 +155,23 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Download Status Notification */}
+          {downloadNotice && (
+            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-semibold flex items-center justify-between gap-2 animate-fade-in shadow-xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{downloadNotice}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDownloadNotice(null)}
+                className="text-emerald-700 hover:text-emerald-950 text-xs font-bold px-1.5 py-0.5 rounded cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Platform Tab Switcher: 3 Platforms */}
           <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold">
@@ -215,16 +247,26 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
               </div>
 
               {/* Direct Download Button */}
-              <a
-                href={APK_DOWNLOAD_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={handleClose}
+              <button
+                type="button"
+                onClick={() => handleDownloadFile(APK_DOWNLOAD_URL, 'APK Android (v1.0-release.apk)')}
                 className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/25 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Unduh File APK Android (v1.0-release.apk)</span>
-              </a>
+              </button>
+
+              {/* PWA Fast Install Button (Instant Home Screen Shortcut) */}
+              {deferredPrompt && (
+                <button
+                  type="button"
+                  onClick={handlePwaInstallClick}
+                  className="w-full py-2.5 px-3 bg-teal-50 hover:bg-teal-100 border border-teal-300 text-teal-900 font-bold text-xs rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-teal-700" />
+                  <span>⚡ Pasang Cepat Tanpa Unduh (Layar Utama HP)</span>
+                </button>
+              )}
 
               {/* Step by step install note */}
               <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1 text-left">
@@ -286,11 +328,9 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
 
               {/* Dua Pilihan Download: Installer & Portable */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <a
-                  href={WIN_SETUP_DOWNLOAD_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={handleClose}
+                <button
+                  type="button"
+                  onClick={() => handleDownloadFile(WIN_SETUP_DOWNLOAD_URL, 'Installer Windows Setup (.exe)')}
                   className="p-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-1 text-center cursor-pointer"
                 >
                   <div className="flex items-center gap-1.5">
@@ -298,13 +338,11 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
                     <span>Installer Setup (.exe)</span>
                   </div>
                   <span className="text-[9.5px] font-normal text-blue-100">Pasang di Desktop &amp; Start Menu</span>
-                </a>
+                </button>
 
-                <a
-                  href={WIN_PORTABLE_DOWNLOAD_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={handleClose}
+                <button
+                  type="button"
+                  onClick={() => handleDownloadFile(WIN_PORTABLE_DOWNLOAD_URL, 'Windows Portable (.exe)')}
                   className="p-3 bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-1 text-center cursor-pointer"
                 >
                   <div className="flex items-center gap-1.5">
@@ -312,7 +350,7 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
                     <span>Versi Portable (.exe)</span>
                   </div>
                   <span className="text-[9.5px] font-normal text-slate-300">Langsung klik tanpa install</span>
-                </a>
+                </button>
               </div>
 
               {/* Panduan SmartScreen */}
