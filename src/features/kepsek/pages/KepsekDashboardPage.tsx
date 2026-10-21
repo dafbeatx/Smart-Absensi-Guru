@@ -24,6 +24,7 @@ import { CONSTANTS } from '../../../config/constants';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { QrCodeScanIcon } from '../../../components/ui/QrCodeScanIcon';
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
+import { PWAInstallPrompt } from '../../../components/ui/PWAInstallPrompt';
 import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
 import { KepsekRewardSuggestionModal } from '../components/KepsekRewardSuggestionModal';
 import { TeacherExcellenceCertificateModal } from '../../guru/components/TeacherExcellenceCertificateModal';
@@ -647,6 +648,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
             user={user || undefined}
             onOpenPreferences={() => setIsPreferencesModalOpen(true)}
           />
+          <PWAInstallPrompt />
 
           {/* Data Source Sync Status Indicator Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2.5 p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs">

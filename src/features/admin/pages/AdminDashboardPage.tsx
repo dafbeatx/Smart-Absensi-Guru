@@ -40,6 +40,7 @@ import { CONSTANTS } from '../../../config/constants';
 import { useToastStore } from '../../../store/useToastStore';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { NotificationPermissionBanner } from '../../../components/dashboard/NotificationPermissionBanner';
+import { PWAInstallPrompt } from '../../../components/ui/PWAInstallPrompt';
 import { NotificationPreferencesModal } from '../../../components/dashboard/NotificationPreferencesModal';
 import { OfflineSyncIndicator } from '../../../components/ui/OfflineSyncIndicator';
 import { OfflineSyncService } from '../../../services/offline-sync.service';
@@ -681,6 +682,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
             user={user || undefined}
             onOpenPreferences={() => setIsPreferencesModalOpen(true)}
           />
+          <PWAInstallPrompt />
 
           {/* TAB 1: EXECUTIVE DASHBOARD OVERVIEW (DEFAULT) */}
           {activeTab === 'DASHBOARD' && (

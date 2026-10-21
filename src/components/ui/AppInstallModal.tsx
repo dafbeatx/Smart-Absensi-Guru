@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
+import { Download, Smartphone, ShieldCheck, Volume2, Globe, CheckCircle2, ExternalLink } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -20,14 +21,22 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [internalIsOpen, setInternalIsOpen] = useState<boolean>(false);
   const [isIos, setIsIos] = useState<boolean>(false);
+  const [activeDownloadTab, setActiveDownloadTab] = useState<'APK' | 'PWA'>('APK');
+
+  const APK_DOWNLOAD_URL =
+    'https://github.com/dafbeatx/Smart-Absensi-Guru/releases/download/v1.0-apk/Smart-Absensi-Guru-v1.0-release.apk';
+  const GITHUB_RELEASES_URL =
+    'https://github.com/dafbeatx/Smart-Absensi-Guru/releases';
 
   useEffect(() => {
-    // 1. Detect if app is already running as installed PWA (Standalone mode)
+    // 1. Detect if app is already running as installed PWA or Native standalone
     const checkStandalone = () => {
       const isStandaloneMode =
         window.matchMedia('(display-mode: standalone)').matches ||
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (navigator as any).standalone === true;
+        (navigator as any).standalone === true ||
+        window.location.protocol === 'capacitor:' ||
+        window.location.protocol === 'file:';
       setIsStandalone(Boolean(isStandaloneMode));
     };
 
@@ -37,6 +46,9 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIos(isIosDevice);
+    if (isIosDevice) {
+      setActiveDownloadTab('PWA');
+    }
 
     // 3. Listen for native PWA install prompt on Android/Chrome/Edge
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -44,23 +56,29 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    // 4. Global Event to open download modal from Guru, Admin, or Kepsek dashboards
+    const handleOpenModal = () => {
+      setInternalIsOpen(true);
+    };
 
-    // 4. Auto-trigger modal popup on first visit if not dismissed in session
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('smart_absensi_open_app_install', handleOpenModal);
+
+    // 5. Auto-trigger modal popup on first visit if not dismissed in session
     const hasSeenPrompt = sessionStorage.getItem('smart_absensi_install_prompt_seen');
     if (!hasSeenPrompt && !isStandalone) {
       const timer = setTimeout(() => {
         setInternalIsOpen(true);
-      }, 1200);
+      }, 1500);
       return () => clearTimeout(timer);
     }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('smart_absensi_open_app_install', handleOpenModal);
     };
   }, [isStandalone]);
 
-  // Determine actual open state (either controlled by props or internal state)
   const isOpen = propsIsOpen !== undefined ? propsIsOpen : internalIsOpen;
 
   const handleClose = () => {
@@ -69,7 +87,7 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
     if (propsOnClose) propsOnClose();
   };
 
-  const handleInstallClick = async () => {
+  const handlePwaInstallClick = async () => {
     if (deferredPrompt) {
       try {
         await deferredPrompt.prompt();
@@ -86,96 +104,195 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
   };
 
   if (isStandalone) {
-    return null; // Hide if already installed as PWA app
+    return null;
   }
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={handleClose} title="📲 Install Aplikasi Smart Absensi">
-        <div className="text-center space-y-4 py-2">
-          {/* Official School Logo Header */}
-          <div className="relative inline-block">
-            <div className="w-24 h-24 mx-auto rounded-3xl bg-white p-2.5 shadow-md border-2 border-emerald-500/30 flex items-center justify-center ring-4 ring-emerald-50">
+      <Modal isOpen={isOpen} onClose={handleClose} title="📱 Unduh Aplikasi Smart Absensi Guru">
+        <div className="space-y-4 py-1 text-slate-800">
+          {/* Header Banner */}
+          <div className="flex items-center gap-3 p-3 bg-linear-to-r from-[#023246] to-[#0a485e] rounded-2xl text-white shadow-md">
+            <div className="w-12 h-12 rounded-xl bg-white p-1.5 shrink-0 shadow-sm border border-emerald-400/40 flex items-center justify-center">
               <img
                 src="/school-logo.png"
-                alt="Logo SMP Terpadu Al-Ittihadiyah Ciampea-Bogor"
-                className="w-full h-full object-contain drop-shadow-sm"
+                alt="Logo Sekolah"
+                className="w-full h-full object-contain"
               />
             </div>
-            <span className="absolute -bottom-1 -right-1 bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs border border-white">
-              OFFICIAL
-            </span>
-          </div>
-
-          <div className="space-y-1 max-w-sm mx-auto">
-            <h3 className="font-extrabold text-slate-900 text-base">
-              Download & Install di HP Anda
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Dapatkan akses cepat <strong>Smart Absensi Guru</strong> langsung dari layar utama HP Anda (*Guru, Admin & Kepsek*).
-            </p>
-          </div>
-
-          {/* Feature Highlights */}
-          <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200 text-left text-[11px]">
-            <div className="space-y-0.5">
-              <div className="font-bold text-emerald-700 flex items-center gap-1">
-                <span>⚡</span> Cepat
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-extrabold text-sm text-white">Smart Absensi Guru</span>
+                <span className="px-1.5 py-0.2 bg-emerald-500 text-slate-950 text-[9px] font-black rounded-md tracking-wider uppercase">
+                  OFFICIAL v1.0
+                </span>
               </div>
-              <p className="text-slate-500 text-[10px] leading-tight">Tanpa perlu ketik URL lagi</p>
-            </div>
-            <div className="space-y-0.5 border-x border-slate-200 px-2">
-              <div className="font-bold text-emerald-700 flex items-center gap-1">
-                <span>📷</span> Scan QR
-              </div>
-              <p className="text-slate-500 text-[10px] leading-tight">Kamera HP lebih responsif</p>
-            </div>
-            <div className="space-y-0.5 pl-1">
-              <div className="font-bold text-emerald-700 flex items-center gap-1">
-                <span>🔔</span> Notif
-              </div>
-              <p className="text-slate-500 text-[10px] leading-tight">Update absensi real-time</p>
+              <p className="text-[11px] text-teal-100 font-medium">
+                Tersedia untuk Akun Guru, Admin &amp; Kepala Sekolah
+              </p>
             </div>
           </div>
 
-          {/* Installation Instructions */}
-          {deferredPrompt ? (
-            <div className="pt-2">
-              <Button
-                variant="primary"
-                className="w-full py-3 text-sm font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 cursor-pointer"
-                onClick={handleInstallClick}
+          {/* Platform Tab Switcher */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setActiveDownloadTab('APK')}
+              className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                activeDownloadTab === 'APK'
+                  ? 'bg-white text-[#023246] shadow-xs border border-slate-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Smartphone className="w-4 h-4 text-emerald-600" />
+              <span>Android APK (Resmi)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveDownloadTab('PWA')}
+              className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                activeDownloadTab === 'PWA'
+                  ? 'bg-white text-[#023246] shadow-xs border border-slate-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Globe className="w-4 h-4 text-cyan-600" />
+              <span>Web PWA (iPhone/Web)</span>
+            </button>
+          </div>
+
+          {/* TAB 1: ANDROID APK DOWNLOAD (RECOMMENDED) */}
+          {activeDownloadTab === 'APK' && (
+            <div className="space-y-3 animate-fade-in">
+              <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-xs text-emerald-950 flex items-center gap-1.5">
+                    <span>🤖</span> Format File APK Asli (Android)
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full">
+                    Disarankan
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-900 leading-relaxed">
+                  Pasang langsung di HP Android Anda untuk pengalaman presensi tercepat dan terintegrasi penuh.
+                </p>
+
+                {/* Badges / Keunggulan */}
+                <div className="grid grid-cols-1 gap-1.5 pt-1 text-[11px] text-slate-700">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span><b>Signed Release Certificate:</b> 100% Bebas peringatan virus &amp; Play Protect</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-teal-600 shrink-0" />
+                    <span><b>Suara Notifikasi Custom:</b> Bunyi alarm presensi khas langsung di HP</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span><b>Geofencing &amp; Kamera Cepat:</b> Pindai QR poster sekolah tanpa jeda</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Direct Download Button */}
+              <a
+                href={APK_DOWNLOAD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleClose}
+                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/25 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>📲</span> Install Aplikasi Sekarang
-              </Button>
-            </div>
-          ) : isIos ? (
-            <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl text-left text-xs space-y-1.5 text-slate-700">
-              <p className="font-bold text-emerald-900 flex items-center gap-1">
-                <span>🍎</span> Cara Pasang di iPhone / iPad (Safari):
-              </p>
-              <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed text-slate-600">
-                <li>Klik tombol <strong>Bagikan (Share ⎋)</strong> di bagian bawah browser Safari.</li>
-                <li>Geser ke bawah lalu pilih <strong>"Tambah ke Layar Utama"</strong> (*Add to Home Screen*).</li>
-                <li>Klik <strong>Tambah</strong> di pojok kanan atas.</li>
-              </ol>
-            </div>
-          ) : (
-            <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl text-left text-xs space-y-1.5 text-slate-700">
-              <p className="font-bold text-emerald-900 flex items-center gap-1">
-                <span>🤖</span> Cara Pasang di HP Android (Chrome):
-              </p>
-              <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed text-slate-600">
-                <li>Klik tombol <strong>⋮ (Tiga Titik)</strong> di pojok kanan atas Chrome HP.</li>
-                <li>Pilih opsi <strong>"Install Aplikasi"</strong> atau <strong>"Tambahkan ke Layar Utama"</strong>.</li>
-                <li>Konfirmasi pemasangan ikon di layar HP Anda.</li>
-              </ol>
+                <Download className="w-4 h-4" />
+                <span>Unduh File APK Android (v1.0-release.apk)</span>
+              </a>
+
+              {/* Step by step install note */}
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1 text-left">
+                <p className="font-bold text-slate-800">💡 Cara Pasang di HP:</p>
+                <ol className="list-decimal list-inside space-y-0.5 text-[10.5px]">
+                  <li>Klik tombol unduh di atas untuk mendownload file APK.</li>
+                  <li>Buka file <code className="bg-slate-200 px-1 rounded text-slate-900">.apk</code> yang selesai diunduh.</li>
+                  <li>Pilih <b>"Install / Pasang"</b> saat diminta oleh sistem Android.</li>
+                  <li>Buka aplikasi lalu login dengan No HP / NPP dan PIN Anda.</li>
+                </ol>
+              </div>
+
+              <div className="text-center">
+                <a
+                  href={GITHUB_RELEASES_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-slate-500 hover:text-emerald-700 font-medium inline-flex items-center gap-1"
+                >
+                  <span>Lihat Riwayat Rilis di GitHub</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
           )}
 
-          <div className="pt-1 flex justify-center gap-2">
-            <Button variant="secondary" size="sm" className="w-full text-xs cursor-pointer" onClick={handleClose}>
-              Nanti Saja
+          {/* TAB 2: PWA WEB INSTALLATION (iOS & CHROME) */}
+          {activeDownloadTab === 'PWA' && (
+            <div className="space-y-3 animate-fade-in text-left">
+              {deferredPrompt ? (
+                <div className="space-y-2">
+                  <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-2xl text-xs text-cyan-900">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <span>⚡</span> Pemasangan Instan Web PWA Didukung
+                    </p>
+                    <p className="text-[11px] mt-1 text-cyan-800">
+                      Browser Anda mendukung instalasi langsung tanpa unduh file besar.
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    className="w-full py-3 text-xs font-extrabold flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                    onClick={handlePwaInstallClick}
+                  >
+                    <span>📲</span> Tambahkan ke Layar Utama Sekarang
+                  </Button>
+                </div>
+              ) : isIos ? (
+                <div className="bg-cyan-50/70 border border-cyan-200 p-3.5 rounded-2xl text-xs space-y-2 text-slate-700">
+                  <p className="font-bold text-cyan-950 flex items-center gap-1.5">
+                    <span>🍎</span> Cara Pasang di iPhone / iPad (Safari):
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1.5 text-[11px] leading-relaxed text-slate-600">
+                    <li>
+                      Tekan tombol <b>Bagikan (Share)</b> <span className="font-mono text-xs">⎋</span> di bilah bawah Safari.
+                    </li>
+                    <li>
+                      Gulir ke bawah dan ketuk <b>"Tambah ke Layar Utama"</b> (<i>Add to Home Screen</i>).
+                    </li>
+                    <li>
+                      Ketuk <b>"Tambah"</b> di pojok kanan atas. Ikon aplikasi akan langsung terpasang di HP Anda.
+                    </li>
+                  </ol>
+                </div>
+              ) : (
+                <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl text-xs space-y-2 text-slate-700">
+                  <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>🌐</span> Cara Tambahkan ke Layar Utama (Chrome):
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed text-slate-600">
+                    <li>Ketuk ikon <b>⋮ (Tiga Titik)</b> di sudut kanan atas Chrome.</li>
+                    <li>Pilih menu <b>"Install Aplikasi"</b> atau <b>"Tambahkan ke Layar Utama"</b>.</li>
+                    <li>Konfirmasi pemasangan untuk menambahkan shortcut di layar HP Anda.</li>
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Footer Dismiss Button */}
+          <div className="pt-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full text-xs cursor-pointer py-2"
+              onClick={handleClose}
+            >
+              Tutup
             </Button>
           </div>
         </div>
@@ -185,11 +302,15 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
       {!isOpen && !isStandalone && (
         <button
           onClick={() => setInternalIsOpen(true)}
-          className="fixed bottom-36 right-4 sm:bottom-20 sm:right-28 z-40 bg-[#023246] hover:bg-[#03445e] text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-xl border-2 border-emerald-400 flex items-center gap-1.5 transition-all active:scale-95 animate-bounce"
-          title="Install Aplikasi Smart Absensi Guru ke HP"
+          className="fixed bottom-36 right-4 sm:bottom-20 sm:right-28 z-40 bg-[#023246] hover:bg-[#03445e] text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-xl border-2 border-emerald-400 flex items-center gap-1.5 transition-all active:scale-95 animate-bounce cursor-pointer"
+          title="Unduh APK Android / Pasang Smart Absensi Guru"
         >
-          <img src="/school-logo.png" alt="Icon" className="w-4 h-4 object-contain rounded-full bg-white p-0.5" />
-          <span className="text-[11px]">📲 Install App</span>
+          <img
+            src="/school-logo.png"
+            alt="Icon"
+            className="w-4 h-4 object-contain rounded-full bg-white p-0.5"
+          />
+          <span className="text-[11px]">📱 Unduh APK</span>
         </button>
       )}
     </>
