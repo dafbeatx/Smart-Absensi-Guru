@@ -1,0 +1,18 @@
+{
+  "gradle.nestedProjects": [
+    "android"
+  ],
+  "java.project.resourceFilters": [
+    "node_modules",
+    ".git"
+  ],
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/dist/**"
+  ],
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/android/build/**": true,
+    "**/android/.gradle/**": true
+  }
+}
