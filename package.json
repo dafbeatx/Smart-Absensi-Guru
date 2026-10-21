@@ -1,7 +1,9 @@
 {
   "name": "smart-absensi-guru",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Sistem Presensi Digital & Manajemen Akademik Guru Sekolah Resmi",
+  "author": "SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam",
   "type": "module",
   "scripts": {
     "dev": "vite",

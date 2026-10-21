@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { Download, Smartphone, ShieldCheck, Volume2, Globe, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Download, Smartphone, ShieldCheck, Volume2, Globe, CheckCircle2, ExternalLink, Monitor } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -21,10 +21,14 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [internalIsOpen, setInternalIsOpen] = useState<boolean>(false);
   const [isIos, setIsIos] = useState<boolean>(false);
-  const [activeDownloadTab, setActiveDownloadTab] = useState<'APK' | 'PWA'>('APK');
+  const [activeDownloadTab, setActiveDownloadTab] = useState<'APK' | 'WINDOWS' | 'PWA'>('APK');
 
   const APK_DOWNLOAD_URL =
     'https://github.com/dafbeatx/Smart-Absensi-Guru/releases/download/v1.0-apk/Smart-Absensi-Guru-v1.0-release.apk';
+  const WIN_SETUP_DOWNLOAD_URL =
+    'https://github.com/dafbeatx/Smart-Absensi-Guru/releases/download/v1.0-exe/Smart-Absensi-Guru-Setup-1.0.0.exe';
+  const WIN_PORTABLE_DOWNLOAD_URL =
+    'https://github.com/dafbeatx/Smart-Absensi-Guru/releases/download/v1.0-exe/Smart-Absensi-Guru-Portable-1.0.0.exe';
   const GITHUB_RELEASES_URL =
     'https://github.com/dafbeatx/Smart-Absensi-Guru/releases';
 
@@ -42,11 +46,15 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
 
     checkStandalone();
 
-    // 2. Detect iOS device
+    // 2. Detect platform to open appropriate default tab
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+    const isWindowsDevice = /windows|win32|win64/.test(userAgent);
+
     setIsIos(isIosDevice);
-    if (isIosDevice) {
+    if (isWindowsDevice) {
+      setActiveDownloadTab('WINDOWS');
+    } else if (isIosDevice) {
       setActiveDownloadTab('PWA');
     }
 
@@ -133,35 +141,47 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
             </div>
           </div>
 
-          {/* Platform Tab Switcher */}
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold">
+          {/* Platform Tab Switcher: 3 Platforms */}
+          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold">
             <button
               type="button"
               onClick={() => setActiveDownloadTab('APK')}
-              className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer text-center ${
                 activeDownloadTab === 'APK'
                   ? 'bg-white text-[#023246] shadow-xs border border-slate-200'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Smartphone className="w-4 h-4 text-emerald-600" />
-              <span>Android APK (Resmi)</span>
+              <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="truncate">Android APK</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveDownloadTab('WINDOWS')}
+              className={`py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer text-center ${
+                activeDownloadTab === 'WINDOWS'
+                  ? 'bg-white text-[#023246] shadow-xs border border-slate-200'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="truncate">Windows PC</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveDownloadTab('PWA')}
-              className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer text-center ${
                 activeDownloadTab === 'PWA'
                   ? 'bg-white text-[#023246] shadow-xs border border-slate-200'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              <Globe className="w-4 h-4 text-cyan-600" />
-              <span>Web PWA (iPhone/Web)</span>
+              <Globe className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+              <span className="truncate">PWA / Web</span>
             </button>
           </div>
 
-          {/* TAB 1: ANDROID APK DOWNLOAD (RECOMMENDED) */}
+          {/* TAB 1: ANDROID APK DOWNLOAD (RECOMMENDED FOR PHONES) */}
           {activeDownloadTab === 'APK' && (
             <div className="space-y-3 animate-fade-in">
               <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2 text-left">
@@ -170,7 +190,7 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
                     <span>🤖</span> Format File APK Asli (Android)
                   </span>
                   <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full">
-                    Disarankan
+                    Disarankan di HP
                   </span>
                 </div>
                 <p className="text-[11px] text-emerald-900 leading-relaxed">
@@ -225,6 +245,94 @@ export const AppInstallModal: React.FC<AppInstallModalProps> = ({
                   className="text-[11px] text-slate-500 hover:text-emerald-700 font-medium inline-flex items-center gap-1"
                 >
                   <span>Lihat Riwayat Rilis di GitHub</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: WINDOWS PC & LAPTOP DESKTOP APP */}
+          {activeDownloadTab === 'WINDOWS' && (
+            <div className="space-y-3 animate-fade-in text-left">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-xs text-blue-950 flex items-center gap-1.5">
+                    <span>💻</span> Aplikasi Desktop Windows (Laptop &amp; PC)
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-200 text-blue-900 rounded-full">
+                    v1.0 Native
+                  </span>
+                </div>
+                <p className="text-[11px] text-blue-900 leading-relaxed">
+                  Pilihan utama untuk Admin, Kepala Sekolah, dan Guru saat input jadwal, cetak kartu &amp; laporan, serta presensi via Laptop/PC.
+                </p>
+
+                {/* Badges / Keunggulan */}
+                <div className="grid grid-cols-1 gap-1.5 pt-1 text-[11px] text-slate-700">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span><b>Aman &amp; Bersih:</b> Tanpa virus/adware, konfigurasi hak akses aman <code>asInvoker</code></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span><b>Kamera Webcam &amp; Lokasi:</b> Mendukung pemindaian QR absensi dan barcode kartu</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-teal-600 shrink-0" />
+                    <span><b>Notifikasi Desktop Windows:</b> Peringatan jadwal &amp; status absensi langsung di layar</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dua Pilihan Download: Installer & Portable */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a
+                  href={WIN_SETUP_DOWNLOAD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleClose}
+                  className="p-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-1 text-center cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Download className="w-4 h-4" />
+                    <span>Installer Setup (.exe)</span>
+                  </div>
+                  <span className="text-[9.5px] font-normal text-blue-100">Pasang di Desktop &amp; Start Menu</span>
+                </a>
+
+                <a
+                  href={WIN_PORTABLE_DOWNLOAD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleClose}
+                  className="p-3 bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-1 text-center cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Download className="w-4 h-4" />
+                    <span>Versi Portable (.exe)</span>
+                  </div>
+                  <span className="text-[9.5px] font-normal text-slate-300">Langsung klik tanpa install</span>
+                </a>
+              </div>
+
+              {/* Panduan SmartScreen */}
+              <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-1">
+                <p className="font-bold text-amber-950 flex items-center gap-1">
+                  <span>🛡️</span> Tips Jika Muncul Peringatan Windows SmartScreen:
+                </p>
+                <p className="text-[10.5px] leading-relaxed text-amber-900">
+                  Karena aplikasi baru diterbitkan, jika Windows menampilkan <i>"Windows protected your PC"</i>, cukup klik <b>"More info" (Informasi selengkapnya)</b> lalu klik tombol <b>"Run anyway" (Tetap jalankan)</b>.
+                </p>
+              </div>
+
+              <div className="text-center">
+                <a
+                  href={GITHUB_RELEASES_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-slate-500 hover:text-blue-700 font-medium inline-flex items-center gap-1"
+                >
+                  <span>Lihat Rilis Windows di GitHub</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>

@@ -41,13 +41,13 @@ export const PWAInstallPrompt: React.FC = () => {
           <h4 className="font-extrabold text-xs text-white tracking-tight flex items-center gap-1.5 flex-wrap">
             <span>Unduh Smart Absensi Guru</span>
             <span className="px-1.5 py-0.2 bg-emerald-500 text-[9px] font-black uppercase rounded text-slate-950">
-              APK &amp; PWA
+              APK &amp; WINDOWS EXE
             </span>
           </h4>
           <p className="text-[11px] text-teal-100 font-medium truncate">
             {isIOS
-              ? 'Unduh atau pasang ke Layar Utama HP iPhone / iPad Anda'
-              : 'Unduh File APK Android Resmi (Suara Custom) atau pasang Web PWA'}
+              ? 'Unduh atau pasang ke Layar Utama iPhone / iPad Anda'
+              : 'Tersedia Aplikasi Windows PC (.exe), Android APK Resmi &amp; Web PWA'}
           </p>
         </div>
       </div>

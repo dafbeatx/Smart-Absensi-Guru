@@ -2502,11 +2502,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('smart_absensi_open_app_install'))}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 rounded-2xl transition-all cursor-pointer shrink-0 min-h-11 active:scale-95"
-              title="Unduh File APK Android / Pasang Aplikasi"
-              aria-label="Unduh APK"
+              title="Unduh Aplikasi (Android APK & Windows EXE)"
+              aria-label="Unduh Aplikasi"
             >
-              <span className="text-sm">📱</span>
-              <span className="text-[11px] font-extrabold hidden min-[360px]:inline">APK</span>
+              <span className="text-sm">📥</span>
+              <span className="text-[11px] font-extrabold hidden min-[360px]:inline">Aplikasi</span>
             </button>
 
             <button

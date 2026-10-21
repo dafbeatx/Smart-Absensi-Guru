@@ -27,8 +27,8 @@ jobs:
       - name: 🏗️ Build Web Assets
         env:
           VITE_PROVIDER: "supabase"
-          VITE_SUPABASE_URL: "https://fwhdjqvtjzesbdcqorsn.supabase.co"
-          VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzAyNDgsImV4cCI6MjA4Mjk0NjI0OH0.jgKMD9Yg0iWw3JQMeH7_HQ3ZDOmYBqZ70Y-HZEjOyuY"
+          VITE_SUPABASE_URL: "https://fnppfmjsbqxbtioypnap.supabase.co"
+          VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZucHBmbWpzYnF4YnRpb3lwbmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNzcyNDksImV4cCI6MjEwNDk1MzI0OX0.ewXX-KW3SMEF-KtOZ5P1MY5IpZSJQImDt5g9maTOWfE"
         run: npm run build
 
       - name: 💻 Compile Windows Executable (.exe)
@@ -39,3 +39,36 @@ jobs:
         with:
           name: Smart-Absensi-Guru-Windows-EXE
           path: release/*.exe
+
+      - name: 🚀 Create / Update Windows GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.0-exe
+          name: "Smart Absensi Guru - Windows Desktop App (Setup & Portable)"
+          body: |
+            ### 💻 Smart Absensi Guru - Windows Desktop Native (v1.0)
+            
+            Aplikasi resmi desktop Windows (Laptop & PC) Smart Absensi Guru untuk Admin, Guru, dan Kepala Sekolah.
+            
+            #### 📦 Paket Rilis yang Tersedia:
+            1. **`Smart-Absensi-Guru-Setup-1.0.0.exe`** (Installer Lengkap)
+               - Membuat shortcut di Desktop & Start Menu secara otomatis.
+               - Mendukung pembaruan aplikasi dan pencopotan resmi via Windows Control Panel.
+            2. **`Smart-Absensi-Guru-Portable-1.0.0.exe`** (Versi Portable)
+               - Langsung jalan tanpa perlu proses instalasi (bisa disimpan di Flashdisk / USB drive).
+            
+            #### ✨ Keunggulan Versi Windows Desktop:
+            - **Bebas Error & 100% Selaras:** Otomatis terhubung ke Supabase Cloud & Vercel API Gateway tanpa masalah CORS.
+            - **Kamera QR Terintegrasi:** Langsung mengenali webcam laptop/PC untuk pemindaian presensi dan barcode kartu.
+            - **Kinerja Optimal untuk Admin & Kepsek:** Nyaman untuk input jadwal pelajaran, cetak ID card, rekapitulasi presensi, dan export PDF/Excel.
+            - **Notifikasi Desktop:** Pengumuman dan notifikasi absensi langsung muncul di Action Center Windows.
+            
+            #### 📥 Panduan Menjalankan di Windows:
+            1. Unduh file `Smart-Absensi-Guru-Setup-1.0.0.exe` atau versi Portable di bawah.
+            2. Jalankan file `.exe` tersebut.
+            3. Jika Windows SmartScreen menampilkan *"Windows protected your PC"*, klik **"More info" (Informasi selengkapnya)** lalu klik tombol **"Run anyway" (Tetap jalankan)**.
+            4. Aplikasi siap digunakan untuk Guru, Admin, maupun Kepala Sekolah.
+          files: release/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

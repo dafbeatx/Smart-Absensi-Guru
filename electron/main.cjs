@@ -11,6 +11,7 @@ function createWindow() {
     minHeight: 700,
     title: 'Smart Absensi Guru',
     icon: path.join(__dirname, '../public/school-logo.png'),
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -45,6 +46,14 @@ function createWindow() {
 
 // App lifecycle management
 app.whenReady().then(() => {
+  const { session } = require('electron');
+  
+  // Grant camera & geolocation permissions for QR scanning and attendance
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = ['media', 'geolocation', 'notifications'].includes(permission);
+    callback(allowed);
+  });
+
   createWindow();
 
   app.on('activate', () => {

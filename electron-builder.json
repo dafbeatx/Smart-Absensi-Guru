@@ -1,6 +1,7 @@
 {
   "appId": "com.smartabsensi.guru.desktop",
   "productName": "Smart Absensi Guru",
+  "copyright": "Copyright © 2026 SMP Terpadu Al-Ittihadiyah & SMA Terpadu As Salaam",
   "directories": {
     "output": "release"
   },
@@ -23,13 +24,20 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "public/school-logo.png"
+    "icon": "public/school-logo.png",
+    "publisherName": "SMP Terpadu Al-Ittihadiyah",
+    "requestedExecutionLevel": "asInvoker",
+    "legalTrademarks": "Smart Absensi Guru"
   },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Smart Absensi Guru"
+    "shortcutName": "Smart Absensi Guru",
+    "artifactName": "Smart-Absensi-Guru-Setup-${version}.${ext}"
+  },
+  "portable": {
+    "artifactName": "Smart-Absensi-Guru-Portable-${version}.${ext}"
   }
 }

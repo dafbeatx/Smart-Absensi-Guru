@@ -101,10 +101,10 @@ export const TopDashboardNavbar: React.FC<TopDashboardNavbarProps> = ({
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('smart_absensi_open_app_install'))}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 shadow-2xs transition-all cursor-pointer active:scale-95"
-            title="Unduh File APK Android / Pasang Aplikasi"
+            title="Unduh Aplikasi (Android APK & Windows EXE)"
           >
-            <span>📱</span>
-            <span className="hidden md:inline">Unduh APK</span>
+            <span>📥</span>
+            <span className="hidden md:inline">Unduh Aplikasi</span>
           </button>
 
           {/* Dynamic Realtime Notification Bell Dropdown */}
