@@ -147,3 +147,4 @@ export const runAttendanceReminderSettingsTestSuite = async (): Promise<{
 
   return { passed, failed, results };
 };
+
