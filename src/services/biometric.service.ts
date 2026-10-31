@@ -70,9 +70,6 @@ export function safeBase64UrlToBuffer(input: string): ArrayBuffer | null {
   }
 }
 
-// Backward-compatibility aliases
-export const bufferToBase64 = bufferToBase64Url;
-export const base64ToBuffer = base64UrlToBuffer;
 
 /**
  * Mendapatkan RP ID yang valid sesuai spesifikasi WebAuthn W3C.

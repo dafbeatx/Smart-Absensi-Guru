@@ -4795,4 +4795,3 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
   );
 };
 
-export const QuestionCorrectionLayer = QuestionCorrectionModal;

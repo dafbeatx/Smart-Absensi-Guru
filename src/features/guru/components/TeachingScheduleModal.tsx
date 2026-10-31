@@ -19,7 +19,6 @@ interface TeachingScheduleModalProps {
   user?: UserProfile;
 }
 
-export const defaultTeachingSchedule: TeachingSlot[] = [];
 
 export const TeachingScheduleModal: React.FC<TeachingScheduleModalProps> = ({
   isOpen,
