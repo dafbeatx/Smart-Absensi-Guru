@@ -48,6 +48,13 @@ export const SystemSettingsForm: React.FC = () => {
   const [checkInEnd, setCheckInEnd] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKIN_END);
   const [checkOutStart, setCheckOutStart] = useState<string>(CONSTANTS.DEFAULTS.WORK_CHECKOUT_START);
   const [fridayCheckoutStart, setFridayCheckoutStart] = useState<string>(CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START);
+
+  const [reminderCheckinTime, setReminderCheckinTime] = useState<string>(CONSTANTS.DEFAULTS.REMINDER_CHECKIN_TIME);
+  const [reminderCheckinEnabled, setReminderCheckinEnabled] = useState<boolean>(CONSTANTS.DEFAULTS.REMINDER_CHECKIN_ENABLED);
+  const [reminderCheckoutTime, setReminderCheckoutTime] = useState<string>(CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME);
+  const [reminderFridayCheckoutTime, setReminderFridayCheckoutTime] = useState<string>(CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME);
+  const [reminderCheckoutEnabled, setReminderCheckoutEnabled] = useState<boolean>(CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_ENABLED);
+  const [reminderEarlyCheckoutEnabled, setReminderEarlyCheckoutEnabled] = useState<boolean>(CONSTANTS.DEFAULTS.REMINDER_EARLY_CHECKOUT_ENABLED);
   
   const [saturdayIsHoliday, setSaturdayIsHoliday] = useState<boolean>(true);
   const [sundayIsHoliday, setSundayIsHoliday] = useState<boolean>(true);
@@ -98,6 +105,12 @@ export const SystemSettingsForm: React.FC = () => {
           if (parsed.work_checkin_end) setCheckInEnd(formatTimeForInput(parsed.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END));
           if (parsed.work_checkout_start) setCheckOutStart(formatTimeForInput(parsed.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START));
           if (parsed.friday_checkout_start) setFridayCheckoutStart(formatTimeForInput(parsed.friday_checkout_start, CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START));
+          if (parsed.reminder_checkin_time) setReminderCheckinTime(formatTimeForInput(parsed.reminder_checkin_time, CONSTANTS.DEFAULTS.REMINDER_CHECKIN_TIME));
+          if (parsed.reminder_checkin_enabled !== undefined) setReminderCheckinEnabled(Boolean(parsed.reminder_checkin_enabled));
+          if (parsed.reminder_checkout_time) setReminderCheckoutTime(formatTimeForInput(parsed.reminder_checkout_time, CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME));
+          if (parsed.reminder_friday_checkout_time) setReminderFridayCheckoutTime(formatTimeForInput(parsed.reminder_friday_checkout_time, CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME));
+          if (parsed.reminder_checkout_enabled !== undefined) setReminderCheckoutEnabled(Boolean(parsed.reminder_checkout_enabled));
+          if (parsed.reminder_early_checkout_enabled !== undefined) setReminderEarlyCheckoutEnabled(Boolean(parsed.reminder_early_checkout_enabled));
           if (parsed.saturday_is_holiday !== undefined) setSaturdayIsHoliday(Boolean(parsed.saturday_is_holiday));
           if (parsed.sunday_is_holiday !== undefined) setSundayIsHoliday(Boolean(parsed.sunday_is_holiday));
           if (parsed.geofence_lat !== undefined) setGeofenceLat(sanitizeCoord(parsed.geofence_lat, true));
@@ -123,6 +136,12 @@ export const SystemSettingsForm: React.FC = () => {
           if (fetched.work_checkin_end) setCheckInEnd(formatTimeForInput(fetched.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END));
           if (fetched.work_checkout_start) setCheckOutStart(formatTimeForInput(fetched.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START));
           if (fetched.friday_checkout_start) setFridayCheckoutStart(formatTimeForInput(fetched.friday_checkout_start, CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START));
+          if (fetched.reminder_checkin_time) setReminderCheckinTime(formatTimeForInput(fetched.reminder_checkin_time, CONSTANTS.DEFAULTS.REMINDER_CHECKIN_TIME));
+          if (fetched.reminder_checkin_enabled !== undefined) setReminderCheckinEnabled(Boolean(fetched.reminder_checkin_enabled));
+          if (fetched.reminder_checkout_time) setReminderCheckoutTime(formatTimeForInput(fetched.reminder_checkout_time, CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME));
+          if (fetched.reminder_friday_checkout_time) setReminderFridayCheckoutTime(formatTimeForInput(fetched.reminder_friday_checkout_time, CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME));
+          if (fetched.reminder_checkout_enabled !== undefined) setReminderCheckoutEnabled(Boolean(fetched.reminder_checkout_enabled));
+          if (fetched.reminder_early_checkout_enabled !== undefined) setReminderEarlyCheckoutEnabled(Boolean(fetched.reminder_early_checkout_enabled));
           if (fetched.saturday_is_holiday !== undefined) setSaturdayIsHoliday(Boolean(fetched.saturday_is_holiday));
           if (fetched.sunday_is_holiday !== undefined) setSundayIsHoliday(Boolean(fetched.sunday_is_holiday));
           if (fetched.geofence_lat !== undefined) setGeofenceLat(sanitizeCoord(fetched.geofence_lat, true));
@@ -141,6 +160,12 @@ export const SystemSettingsForm: React.FC = () => {
             work_checkin_end: formatTimeForInput(fetched.work_checkin_end, CONSTANTS.DEFAULTS.WORK_CHECKIN_END),
             work_checkout_start: formatTimeForInput(fetched.work_checkout_start, CONSTANTS.DEFAULTS.WORK_CHECKOUT_START),
             friday_checkout_start: formatTimeForInput(fetched.friday_checkout_start, CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START),
+            reminder_checkin_time: formatTimeForInput(fetched.reminder_checkin_time, CONSTANTS.DEFAULTS.REMINDER_CHECKIN_TIME),
+            reminder_checkin_enabled: fetched.reminder_checkin_enabled !== false,
+            reminder_checkout_time: formatTimeForInput(fetched.reminder_checkout_time, CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME),
+            reminder_friday_checkout_time: formatTimeForInput(fetched.reminder_friday_checkout_time, CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME),
+            reminder_checkout_enabled: fetched.reminder_checkout_enabled !== false,
+            reminder_early_checkout_enabled: fetched.reminder_early_checkout_enabled !== false,
           }));
         }
       } catch (err) {
@@ -211,6 +236,12 @@ export const SystemSettingsForm: React.FC = () => {
       geofence_lng: finalLng,
       geofence_radius: finalRadius,
       admin_reset_password: adminResetPassword,
+      reminder_checkin_time: reminderCheckinTime,
+      reminder_checkin_enabled: reminderCheckinEnabled,
+      reminder_checkout_time: reminderCheckoutTime,
+      reminder_friday_checkout_time: reminderFridayCheckoutTime,
+      reminder_checkout_enabled: reminderCheckoutEnabled,
+      reminder_early_checkout_enabled: reminderEarlyCheckoutEnabled,
     };
 
     try {
@@ -230,11 +261,11 @@ export const SystemSettingsForm: React.FC = () => {
         actionType: 'UPDATE_SETTINGS',
         targetEntity: 'System_Settings',
         newValue: JSON.stringify(updatedSettings),
-        reason: 'Pembaruan Detail Jam Kerja Hari Jumat & Geofence Sekolah oleh Admin Website',
+        reason: 'Pembaruan Detail Jam Kerja, Waktu Notifikasi Pengingat Masuk & Pulang (13:00 / 11:00 WIB), serta Geofence Sekolah',
       });
 
       setIsLoading(false);
-      showToast('success', 'Pengaturan Tersimpan Permanen!', 'Pengaturan jam kerja per hari (Jumat 11:00, Sabtu-Minggu Libur) & geofence berhasil disimpan.');
+      showToast('success', 'Pengaturan Tersimpan Permanen!', 'Pengaturan jam kerja, waktu notifikasi pengingat masuk & pulang (Senin-Kamis 13:00, Jumat 11:00), serta geofence berhasil disimpan.');
     } catch (err: unknown) {
       setIsLoading(false);
       handleAppError(err, 'SystemSettingsForm.handleSave', 'Gagal Menyimpan Pengaturan Sistem');
@@ -347,7 +378,131 @@ export const SystemSettingsForm: React.FC = () => {
         </div>
       </div>
 
-      {/* Section 3: GPS Geofence & Auto Location */}
+      {/* Section 3: Waktu Notifikasi Pengingat Masuk & Pulang Sekolah */}
+      <div className="space-y-4 pt-3 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="space-y-0.5">
+            <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🔔</span> Pengaturan Waktu Notifikasi Pengingat Masuk &amp; Pulang
+            </h4>
+            <p className="text-[11px] text-slate-500">
+              Atur waktu pengingat otomatis (Push Notification ke HP Guru &amp; Web Browser) agar tepat waktu dan tidak salah sasaran.
+            </p>
+          </div>
+          <span className="px-2.5 py-0.5 bg-blue-100 text-blue-900 text-[10px] font-extrabold rounded-full border border-blue-200 self-start sm:self-auto">
+            Standar Pulang: 13.00 WIB (Jumat 11.00 WIB)
+          </span>
+        </div>
+
+        {/* Info Banner Anti Salah Sasaran */}
+        <div className="p-3.5 bg-sky-50/80 rounded-2xl border border-sky-200 text-xs text-sky-900 space-y-1">
+          <div className="font-extrabold flex items-center gap-1.5 text-sky-950">
+            <span>ℹ️</span> Jadwal Pengingat Resmi Terintegrasi:
+          </div>
+          <p className="text-[11px] text-sky-900/90 leading-relaxed">
+            Pengingat kepulangan sekolah aktif mulai pukul <strong>{reminderCheckoutTime} WIB</strong> (Senin s/d Kamis) dan <strong>{reminderFridayCheckoutTime} WIB</strong> (khusus Jumat). Sistem juga menyiarkan peringatan dini H-1 jam sebelumnya agar tidak ada guru yang terlewat scan kepulangan.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Card Pengingat Masuk */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                  <h5 className="font-extrabold text-xs text-slate-900">⏰ Pengingat Presensi Masuk Pagi</h5>
+                </div>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold text-slate-600">
+                  <span>Aktif</span>
+                  <input
+                    type="checkbox"
+                    checked={reminderCheckinEnabled}
+                    onChange={(e) => setReminderCheckinEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-blue-600 rounded cursor-pointer"
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Notifikasi dikirimkan ke HP guru setiap pagi hari kerja sebelum jam pembelajaran dimulai.
+              </p>
+            </div>
+
+            <div className="pt-1">
+              <Input
+                label="Jam Pengingat Masuk (Default: 06.30 WIB)"
+                type="time"
+                value={reminderCheckinTime}
+                onChange={(e) => setReminderCheckinTime(e.target.value)}
+                disabled={!reminderCheckinEnabled}
+                required={reminderCheckinEnabled}
+              />
+            </div>
+          </div>
+
+          {/* Card Pengingat Pulang */}
+          <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-600" />
+                  <h5 className="font-extrabold text-xs text-amber-950">🔔 Pengingat Presensi Pulang Sekolah</h5>
+                </div>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold text-amber-900">
+                  <span>Aktif</span>
+                  <input
+                    type="checkbox"
+                    checked={reminderCheckoutEnabled}
+                    onChange={(e) => setReminderCheckoutEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                  />
+                </label>
+              </div>
+              <p className="text-[11px] text-amber-900/80 leading-relaxed">
+                Notifikasi kepulangan resmi dikirim tepat waktu agar presensi terekam utuh tanpa salah sasaran.
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Input
+                  label="Pulang Sen - Kam (13.00)"
+                  type="time"
+                  value={reminderCheckoutTime}
+                  onChange={(e) => setReminderCheckoutTime(e.target.value)}
+                  disabled={!reminderCheckoutEnabled}
+                  required={reminderCheckoutEnabled}
+                />
+                <Input
+                  label="Pulang Jumat (11.00)"
+                  type="time"
+                  value={reminderFridayCheckoutTime}
+                  onChange={(e) => setReminderFridayCheckoutTime(e.target.value)}
+                  disabled={!reminderCheckoutEnabled}
+                  required={reminderCheckoutEnabled}
+                />
+              </div>
+
+              {/* Toggle H-1 Jam */}
+              <label className="flex items-center justify-between p-2.5 bg-white/80 rounded-xl border border-amber-200/70 cursor-pointer hover:bg-white transition-colors">
+                <div className="pr-2 space-y-0.5">
+                  <span className="font-bold text-[11px] text-amber-950 block">Peringatan 1 Jam Sebelumnya (H-1 Jam)</span>
+                  <span className="text-[10px] text-slate-500 block">Kirim notifikasi persiapan 1 jam sebelum jam pulang tiba</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={reminderEarlyCheckoutEnabled}
+                  onChange={(e) => setReminderEarlyCheckoutEnabled(e.target.checked)}
+                  disabled={!reminderCheckoutEnabled}
+                  className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 4: GPS Geofence & Auto Location */}
       <div className="space-y-3 pt-3 border-t border-slate-100">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">📍 Koordinat GPS Sekolah & Radius Geofence</h4>

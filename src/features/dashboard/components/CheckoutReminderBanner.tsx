@@ -37,13 +37,15 @@ export const CheckoutReminderBanner: React.FC<CheckoutReminderBannerProps> = ({
   const isFriday = dayOfWeek === 5;
   const currentTime = getCurrentTimeInJakarta().slice(0, 5); // Format "HH:mm"
 
-  // Jam Target Pulang Resmi
+  // Jam Target Pulang Resmi (Dinamis: Senin-Kamis default 13:00 WIB, Jumat default 11:00 WIB)
   const targetCheckoutTime = (isFriday
-    ? settings?.friday_checkout_start || CONSTANTS.DEFAULTS.FRIDAY_CHECKOUT_START
-    : settings?.work_checkout_start || CONSTANTS.DEFAULTS.WORK_CHECKOUT_START).slice(0, 5);
+    ? settings?.reminder_friday_checkout_time || settings?.friday_checkout_start || CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME || '11:00'
+    : settings?.reminder_checkout_time || settings?.work_checkout_start || CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME || '13:00').slice(0, 5);
 
-  // Jam Peringatan 1 Jam Sebelumnya (Jumat: 09:00, Senin-Kamis: 11:00)
-  const earlyWarningThreshold = isFriday ? '09:00' : '11:00';
+  // Jam Peringatan 1 Jam Sebelumnya (Dihitung presisi 1 jam sebelum jam kepulangan resmi)
+  const [targetH, targetM] = targetCheckoutTime.split(':').map((n) => parseInt(n, 10));
+  const earlyH = (targetH - 1 + 24) % 24;
+  const earlyWarningThreshold = `${String(earlyH).padStart(2, '0')}:${String(isNaN(targetM) ? 0 : targetM).padStart(2, '0')}`;
 
   // Periksa apakah waktu saat ini sudah memasuki window peringatan (>= threshold)
   if (currentTime < earlyWarningThreshold) {

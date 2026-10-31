@@ -8,6 +8,8 @@ import { pwaService } from './pwa.service';
 import { ProviderFactory } from '../providers/provider-factory';
 import { useAuthStore } from '../store/useAuthStore';
 import { getTodayDateInJakarta } from '../utils/time.utils';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { CONSTANTS } from '../config/constants';
 import type { SavePushSubscriptionResult } from '../types/database.types';
 
 /**
@@ -1097,14 +1099,59 @@ export class NotificationPermissionService {
    */
   public getCheckoutTargetTimeForDate(date: Date = new Date()): { hours: number; minutes: number; label: string } {
     const dayOfWeek = date.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
-    if (dayOfWeek === 5) {
-      return { hours: 11, minutes: 0, label: '11.00 WIB (Jumat)' };
+    let settings = null;
+    try {
+      settings = useSettingsStore.getState().settings;
+    } catch {
+      // ignore
     }
-    return { hours: 13, minutes: 0, label: '13.00 WIB (Senin - Kamis)' };
+
+    if (dayOfWeek === 5) {
+      const timeStr = settings?.reminder_friday_checkout_time || settings?.friday_checkout_start || CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME || '11:00';
+      const [h, m] = timeStr.split(':').map((n) => parseInt(n, 10));
+      const hours = isNaN(h) ? 11 : h;
+      const minutes = isNaN(m) ? 0 : m;
+      return {
+        hours,
+        minutes,
+        label: `${String(hours).padStart(2, '0')}.${String(minutes).padStart(2, '0')} WIB (Jumat)`,
+      };
+    }
+
+    const timeStr = settings?.reminder_checkout_time || settings?.work_checkout_start || CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME || '13:00';
+    const [h, m] = timeStr.split(':').map((n) => parseInt(n, 10));
+    const hours = isNaN(h) ? 13 : h;
+    const minutes = isNaN(m) ? 0 : m;
+    return {
+      hours,
+      minutes,
+      label: `${String(hours).padStart(2, '0')}.${String(minutes).padStart(2, '0')} WIB (Senin - Kamis)`,
+    };
   }
 
   /**
-   * Dapatkan Waktu Peringatan 1 Jam Sebelum Pulang (Senin-Kamis 12.00 WIB, Jumat 10.00 WIB)
+   * Dapatkan Jam Target Masuk Pagi dari Pengaturan Sistem (default 06.30 WIB)
+   */
+  public getCheckinTargetTimeForDate(_date: Date = new Date()): { hours: number; minutes: number; label: string } {
+    let settings = null;
+    try {
+      settings = useSettingsStore.getState().settings;
+    } catch {
+      // ignore
+    }
+    const timeStr = settings?.reminder_checkin_time || CONSTANTS.DEFAULTS.REMINDER_CHECKIN_TIME || '06:30';
+    const [h, m] = timeStr.split(':').map((n) => parseInt(n, 10));
+    const hours = isNaN(h) ? 6 : h;
+    const minutes = isNaN(m) ? 30 : m;
+    return {
+      hours,
+      minutes,
+      label: `${String(hours).padStart(2, '0')}.${String(minutes).padStart(2, '0')} WIB`,
+    };
+  }
+
+  /**
+   * Dapatkan Waktu Peringatan 1 Jam Sebelum Pulang (Dihitung 1 jam sebelum jam kepulangan resmi)
    */
   public getEarlyCheckoutTargetTimeForDate(date: Date = new Date()): {
     hours: number;
@@ -1112,26 +1159,20 @@ export class NotificationPermissionService {
     departureLabel: string;
     label: string;
   } {
-    const dayOfWeek = date.getDay();
-    if (dayOfWeek === 5) {
-      return {
-        hours: 10,
-        minutes: 0,
-        departureLabel: '11.00 WIB',
-        label: '10.00 WIB (1 Jam Menuju Kepulangan 11.00 WIB)',
-      };
-    }
+    const target = this.getCheckoutTargetTimeForDate(date);
+    const earlyHours = (target.hours - 1 + 24) % 24;
+    const earlyMinutes = target.minutes;
+    const earlyTimeStr = `${String(earlyHours).padStart(2, '0')}.${String(earlyMinutes).padStart(2, '0')} WIB`;
+    const departureStr = `${String(target.hours).padStart(2, '0')}.${String(target.minutes).padStart(2, '0')} WIB`;
+
     return {
-      hours: 12,
-      minutes: 0,
-      departureLabel: '13.00 WIB',
-      label: '12.00 WIB (1 Jam Menuju Kepulangan 13.00 WIB)',
+      hours: earlyHours,
+      minutes: earlyMinutes,
+      departureLabel: departureStr,
+      label: `${earlyTimeStr} (1 Jam Menuju Kepulangan ${departureStr})`,
     };
   }
 
-  /**
-   * Cek apakah notifikasi H-1 jam kepulangan sudah pernah dikirimkan hari ini (Peringatan 1x)
-   */
   public isEarlyCheckoutReminderFiredToday(userId?: string): boolean {
     if (typeof window === 'undefined') return false;
     const now = new Date();
@@ -1147,6 +1188,16 @@ export class NotificationPermissionService {
    * 2. Pengingat Tepat Jam Pulang (13.00 WIB Sen-Kam / 11.00 WIB Jum)
    */
   public scheduleCheckoutReminder(teacherName: string, userId?: string) {
+    let settings = null;
+    try {
+      settings = useSettingsStore.getState().settings;
+    } catch {
+      // ignore
+    }
+    if (settings?.reminder_checkout_enabled === false) {
+      return;
+    }
+
     const now = new Date();
     const dayOfWeek = now.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) return; // Akhir pekan libur
@@ -1167,7 +1218,8 @@ export class NotificationPermissionService {
       this.activeEarlyCheckoutTimer = null;
     }
 
-    if (!alreadyFiredEarly) {
+    const isEarlyEnabled = settings?.reminder_early_checkout_enabled !== false;
+    if (!alreadyFiredEarly && isEarlyEnabled) {
       const fireEarlyReminder = () => {
         const notifTitle = '⏰ Pengingat 1 Jam Menuju Waktu Pulang!';
         const notifBody = `Bapak/Ibu ${teacherName}, 1 jam lagi jam kepulangan resmi (${earlyInfo.departureLabel}) tiba. Pastikan Anda tidak lupa melakukan presensi pulang sebelum meninggalkan sekolah.`;
@@ -1268,6 +1320,54 @@ export class NotificationPermissionService {
   /**
    * Membatalkan Alarm / Pengingat Pulang setelah Guru berhasil melakukan Absen Pulang
    */
+
+  /**
+   * Menjadwalkan Pengingat Presensi Masuk Pagi (default 06:30 WIB)
+   */
+  public scheduleCheckinReminder(teacherName: string, userId?: string) {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return; // Akhir pekan libur
+
+    let settings = null;
+    try {
+      settings = useSettingsStore.getState().settings;
+    } catch {
+      // ignore
+    }
+    if (settings?.reminder_checkin_enabled === false) return;
+
+    const todayStr = now.toISOString().split('T')[0];
+    const storageKey = `smart_absensi_checkin_reminder_fired_${userId || 'guest'}_${todayStr}`;
+    if (typeof window !== 'undefined' && localStorage.getItem(storageKey) === '1') return;
+
+    const checkinInfo = this.getCheckinTargetTimeForDate(now);
+    const targetTime = new Date();
+    targetTime.setHours(checkinInfo.hours, checkinInfo.minutes, 0, 0);
+
+    const delayMs = targetTime.getTime() - now.getTime();
+    if (delayMs <= 0) return;
+
+    const notifTitle = '⏰ Pengingat Presensi Masuk Pagi';
+    const notifBody = `Selamat pagi Bapak/Ibu ${teacherName}! Pengingat presensi masuk pagi (${checkinInfo.label}). Jangan lupa scan QR masuk sebelum batas toleransi.`;
+
+    pwaService.scheduleAttendanceReminder(notifTitle, notifBody, delayMs, 'checkin-reminder');
+    setTimeout(() => {
+      this.sendNativeNotification({
+        title: notifTitle,
+        body: notifBody,
+        type: 'CHECK_IN',
+        teacherName,
+        userId,
+        roleTarget: 'GURU',
+        actionUrl: '/?tab=BERANDA',
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(storageKey, '1');
+      }
+    }, delayMs);
+  }
+
   public cancelScheduledCheckoutReminder() {
     if (this.activeEarlyCheckoutTimer) {
       clearTimeout(this.activeEarlyCheckoutTimer);

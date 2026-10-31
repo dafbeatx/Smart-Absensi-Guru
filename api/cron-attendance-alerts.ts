@@ -71,6 +71,32 @@ export default async function handler(req: any, res: any) {
 
   const reqType = (req.query && req.query.type) || (req.body && req.body.type) || 'auto';
 
+  // Dynamic system settings from Supabase
+  let reminderCheckinTime = '06:30';
+  let reminderCheckoutTime = '13:00';
+  let reminderFridayCheckoutTime = '11:00';
+  let reminderCheckinEnabled = true;
+  let reminderCheckoutEnabled = true;
+
+  try {
+    const { data: dbSettings } = await supabase.from('system_settings').select('key, value');
+    if (dbSettings && Array.isArray(dbSettings)) {
+      const map: Record<string, string> = {};
+      dbSettings.forEach((item) => {
+        if (item.key && item.value) map[item.key] = item.value;
+      });
+      if (map.reminder_checkin_time) reminderCheckinTime = map.reminder_checkin_time;
+      if (map.reminder_checkin_enabled !== undefined) reminderCheckinEnabled = map.reminder_checkin_enabled !== 'false';
+      if (map.reminder_checkout_time) reminderCheckoutTime = map.reminder_checkout_time;
+      else if (map.work_checkout_start) reminderCheckoutTime = map.work_checkout_start;
+      if (map.reminder_friday_checkout_time) reminderFridayCheckoutTime = map.reminder_friday_checkout_time;
+      else if (map.friday_checkout_start) reminderFridayCheckoutTime = map.friday_checkout_start;
+      if (map.reminder_checkout_enabled !== undefined) reminderCheckoutEnabled = map.reminder_checkout_enabled !== 'false';
+    }
+  } catch (err: any) {
+    console.warn('[CronPush] Warning fetching system_settings:', err.message);
+  }
+
   const alertsToSend: Array<{
     title: string;
     body: string;
@@ -79,9 +105,13 @@ export default async function handler(req: any, res: any) {
     targetRoles?: string[];
   }> = [];
 
+  const isFriday = dayName === 'Fri';
+  const [checkinH] = reminderCheckinTime.split(':').map((n) => parseInt(n, 10));
+  const morningSlotHour = isNaN(checkinH) ? 6 : checkinH;
+
   // 1. 💰 PENGINGAT HARI GAJIAN BULANAN (H-3, H-2, H-1, HARI H TANGGAL 10)
   // Hanya dikirimkan 1x per hari pada slot pagi (bukan slot checkout kepulangan siang)
-  const isMorningSlot = reqType === 'morning' || (curH >= 6 && curH <= 8);
+  const isMorningSlot = reqType === 'morning' || curH === morningSlotHour;
   if (isMorningSlot && reqType !== 'checkout') {
     if (dayOfMonth === 7) {
       alertsToSend.push({
@@ -115,20 +145,23 @@ export default async function handler(req: any, res: any) {
   }
 
   // 2. ⏰ PENGINGAT PRESENSI MASUK PAGI (Hari Kerja, Pagi)
-  if (!isWeekend && isMorningSlot && reqType !== 'checkout') {
+  if (!isWeekend && isMorningSlot && reqType !== 'checkout' && reminderCheckinEnabled) {
     alertsToSend.push({
       title: '⏰ Pengingat Presensi Masuk Pagi',
-      body: 'Selamat pagi Bapak/Ibu Guru! Jangan lupa melakukan presensi masuk sebelum jam pembelajaran dimulai.',
+      body: `Selamat pagi Bapak/Ibu Guru! Pengingat presensi masuk (${reminderCheckinTime} WIB). Jangan lupa melakukan presensi masuk sebelum jam pembelajaran dimulai.`,
       tag: `checkin_morning_${todayDateStr}`,
       url: '/?tab=BERANDA',
     });
   }
 
-  // 3. 🔔 PENGINGAT PRESENSI PULANG (Hari Kerja, Siang)
-  const isCheckoutSlot = reqType === 'checkout' || (curH >= 11 && curH <= 14);
-  if (!isWeekend && isCheckoutSlot && reqType !== 'morning') {
-    const isFriday = dayName === 'Fri';
-    const departureTime = isFriday ? '11.00 WIB' : '13.00 WIB';
+  // 3. 🔔 PENGINGAT PRESENSI PULANG (Hari Kerja, Siang - Standar 13.00 WIB / Jumat 11.00 WIB)
+  const targetCheckoutTimeStr = isFriday ? reminderFridayCheckoutTime : reminderCheckoutTime;
+  const [checkoutTargetH] = targetCheckoutTimeStr.split(':').map((n) => parseInt(n, 10));
+  const targetHour = isNaN(checkoutTargetH) ? (isFriday ? 11 : 13) : checkoutTargetH;
+  const isCheckoutSlot = reqType === 'checkout' || curH === targetHour;
+
+  if (!isWeekend && isCheckoutSlot && reqType !== 'morning' && reminderCheckoutEnabled) {
+    const departureTime = `${targetCheckoutTimeStr.replace(':', '.')} WIB`;
     alertsToSend.push({
       title: '🔔 Waktu Pulang Sekolah Tiba!',
       body: `Bapak/Ibu Guru, jam kepulangan resmi (${departureTime}) telah tiba. Jangan lupa scan QR / Absen Pulang sebelum meninggalkan area sekolah.`,

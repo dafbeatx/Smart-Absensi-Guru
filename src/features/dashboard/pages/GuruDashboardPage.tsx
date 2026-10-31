@@ -1186,6 +1186,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       try {
         const today = await provider.getTodayAttendance(effectiveUser.id, authToken);
         setTodayAttendance(today);
+        if (!today?.check_in_time) {
+          NotificationService.scheduleCheckinReminder(effectiveUser.full_name, effectiveUser.id);
+        } else if (!today?.check_out_time) {
+          NotificationService.scheduleCheckoutReminder(effectiveUser.full_name, effectiveUser.id);
+        }
       } catch (err) {
         handleAppError(err, 'GuruDashboard.loadTodayAttendance', 'Gagal memuat presensi hari ini', false);
       }

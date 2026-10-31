@@ -4,6 +4,7 @@ import { SoundService } from '../../services/audio.service';
 import { NotificationService, type DetailedPermissionStatus } from '../../services/notification-permission.service';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToastStore } from '../../store/useToastStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { formatTimeForInput } from '../../utils/time.utils';
 import type { NotificationPreferences } from '../../types/database.types';
 
@@ -18,6 +19,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
 }) => {
   const { user, token } = useAuthStore();
   const { showToast } = useToastStore();
+  const { settings } = useSettingsStore();
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -306,20 +308,53 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                   Kategori Notifikasi
                 </h4>
 
-                <label className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-200 cursor-pointer transition-colors">
-                  <div className="space-y-0.5 pr-2">
-                    <span className="font-bold text-slate-800 block">Peringatan Presensi Masuk &amp; Pulang</span>
-                    <span className="text-[11px] text-slate-500 block">
-                      Notifikasi presensi berhasil, guru terlambat, dan pengingat waktu pulang.
-                    </span>
+                <div className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200 transition-colors space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5 pr-2">
+                      <span className="font-bold text-slate-800 block">Peringatan Presensi Masuk &amp; Pulang</span>
+                      <span className="text-[11px] text-slate-500 block">
+                        Notifikasi presensi berhasil, konfirmasi kehadiran, dan pengingat waktu pulang.
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={prefs.attendance_alerts}
+                      onChange={() => handleToggle('attendance_alerts')}
+                      className="w-5 h-5 accent-[#0D7A5F] cursor-pointer"
+                    />
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={prefs.attendance_alerts}
-                    onChange={() => handleToggle('attendance_alerts')}
-                    className="w-5 h-5 accent-[#0D7A5F] cursor-pointer"
-                  />
-                </label>
+
+                  {/* Info Jadwal Pengingat Sekolah */}
+                  <div className="p-2.5 bg-white rounded-xl border border-slate-200/80 text-[10.5px] text-slate-600 space-y-1.5">
+                    <div className="font-bold text-[#023246] flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <span>⏰</span>
+                        <span>Jadwal Pengingat Resmi (Sinkron Pengaturan):</span>
+                      </span>
+                      <span className="text-[9.5px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold rounded-md">
+                        Aktif
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-[10px]">
+                      <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block">Pengingat Masuk:</span>
+                        <strong className="text-slate-800">{settings?.reminder_checkin_time || '06:30'} WIB</strong>
+                      </div>
+                      <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block">Pulang Sen - Kam:</span>
+                        <strong className="text-slate-800">{settings?.reminder_checkout_time || settings?.work_checkout_start || '13:00'} WIB</strong>
+                      </div>
+                      <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block">Pulang Jumat:</span>
+                        <strong className="text-slate-800">{settings?.reminder_friday_checkout_time || settings?.friday_checkout_start || '11:00'} WIB</strong>
+                      </div>
+                      <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block">Peringatan Dini:</span>
+                        <strong className="text-amber-800">H-1 Jam Kepulangan</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <label className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-200 cursor-pointer transition-colors">
                   <div className="space-y-0.5 pr-2">

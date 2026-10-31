@@ -1575,6 +1575,12 @@ export class MockProvider implements IDataProvider {
       geofence_lat: CONSTANTS.DEFAULTS.GEOFENCE_LAT,
       geofence_lng: CONSTANTS.DEFAULTS.GEOFENCE_LNG,
       geofence_radius: CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
+      reminder_checkin_time: CONSTANTS.DEFAULTS.REMINDER_CHECKIN_TIME,
+      reminder_checkin_enabled: CONSTANTS.DEFAULTS.REMINDER_CHECKIN_ENABLED,
+      reminder_checkout_time: CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME,
+      reminder_friday_checkout_time: CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME,
+      reminder_checkout_enabled: CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_ENABLED,
+      reminder_early_checkout_enabled: CONSTANTS.DEFAULTS.REMINDER_EARLY_CHECKOUT_ENABLED,
     };
   }
 

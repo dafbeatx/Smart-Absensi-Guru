@@ -58,6 +58,7 @@ import { runOralExamAssessmentTestSuite } from './__tests__/oral-exam-assessment
 import { runComplaintRepositorySyncTestSuite } from './__tests__/complaint-repository-sync.test';
 import { runOnlineAttendanceGeofenceFixTestSuite } from './__tests__/online-attendance-geofence-fix.test';
 import { runAnnouncementBroadcastTestSuite } from './__tests__/announcement-broadcast.test';
+import { runAttendanceReminderSettingsTestSuite } from './__tests__/attendance-reminder-settings.test';
 
 export interface TestResultItem {
   testName: string;
@@ -161,6 +162,7 @@ export class MasterTestRunner {
       { name: 'Kotak Aspirasi & Keluhan Guru Cross-Device Sync Suite (Phase 5.3)', fn: runComplaintRepositorySyncTestSuite },
       { name: 'Online Attendance Geofence Sanitization & 500m Safety Buffer Suite (Fix Penolakan Data)', fn: runOnlineAttendanceGeofenceFixTestSuite },
       { name: 'Pengumuman Notifikasi Push Guru & Anti-Spam Safeguards Suite (Phase 5.4)', fn: runAnnouncementBroadcastTestSuite },
+      { name: 'Attendance Reminder Settings & 13:00 Accuracy Engine', fn: runAttendanceReminderSettingsTestSuite },
     ];
 
     let totalPassed = 0;

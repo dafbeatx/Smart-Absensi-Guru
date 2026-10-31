@@ -211,6 +211,12 @@ export interface SystemSettings {
   geofence_lng: number;
   geofence_radius: number;
   admin_reset_password?: string; // Password keamanan khusus buatan Admin untuk reset absensi harian
+  reminder_checkin_time?: string; // Jam pengingat presensi masuk pagi (default '06:30')
+  reminder_checkin_enabled?: boolean; // Status pengingat presensi masuk (default true)
+  reminder_checkout_time?: string; // Jam pengingat presensi pulang Senin-Kamis (default '13:00')
+  reminder_friday_checkout_time?: string; // Jam pengingat presensi pulang Jumat (default '11:00')
+  reminder_checkout_enabled?: boolean; // Status pengingat presensi pulang (default true)
+  reminder_early_checkout_enabled?: boolean; // Status pengingat H-1 jam sebelum pulang (default true)
 }
 
 export type CalendarCategoryType = 'HOLIDAY' | 'SCHEDULE';
@@ -690,6 +696,8 @@ export interface NotificationPreferences {
   event_alerts?: boolean;
   attendance_policy_agreed?: boolean;
   attendance_policy_agreed_at?: string;
+  reminder_checkin_time?: string;
+  reminder_checkout_time?: string;
   updated_at?: string;
 }
 

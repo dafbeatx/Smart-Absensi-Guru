@@ -1921,6 +1921,12 @@ export class SupabaseProvider implements IDataProvider {
         geofence_lng: sanitizeSchoolCoordinates(map.geofence_lat, map.geofence_lng).lng,
         geofence_radius: map.geofence_radius ? Math.max(parseInt(map.geofence_radius, 10), 500) : CONSTANTS.DEFAULTS.GEOFENCE_RADIUS_METERS,
         admin_reset_password: map.admin_reset_password || undefined,
+        reminder_checkin_time: map.reminder_checkin_time || CONSTANTS.DEFAULTS.REMINDER_CHECKIN_TIME,
+        reminder_checkin_enabled: map.reminder_checkin_enabled !== 'false',
+        reminder_checkout_time: map.reminder_checkout_time || CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME,
+        reminder_friday_checkout_time: map.reminder_friday_checkout_time || CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME,
+        reminder_checkout_enabled: map.reminder_checkout_enabled !== 'false',
+        reminder_early_checkout_enabled: map.reminder_early_checkout_enabled !== 'false',
       };
 
       this.cachedSettings = parsed;
@@ -1945,6 +1951,12 @@ export class SupabaseProvider implements IDataProvider {
       { key: 'friday_checkout_start', value: settings.friday_checkout_start },
       { key: 'saturday_is_holiday', value: String(settings.saturday_is_holiday) },
       { key: 'sunday_is_holiday', value: String(settings.sunday_is_holiday) },
+      { key: 'reminder_checkin_time', value: settings.reminder_checkin_time || CONSTANTS.DEFAULTS.REMINDER_CHECKIN_TIME },
+      { key: 'reminder_checkin_enabled', value: String(settings.reminder_checkin_enabled !== false) },
+      { key: 'reminder_checkout_time', value: settings.reminder_checkout_time || CONSTANTS.DEFAULTS.REMINDER_CHECKOUT_TIME },
+      { key: 'reminder_friday_checkout_time', value: settings.reminder_friday_checkout_time || CONSTANTS.DEFAULTS.REMINDER_FRIDAY_CHECKOUT_TIME },
+      { key: 'reminder_checkout_enabled', value: String(settings.reminder_checkout_enabled !== false) },
+      { key: 'reminder_early_checkout_enabled', value: String(settings.reminder_early_checkout_enabled !== false) },
     ];
 
     if (settings.admin_reset_password !== undefined) {
