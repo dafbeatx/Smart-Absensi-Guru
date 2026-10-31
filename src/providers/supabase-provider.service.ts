@@ -1664,6 +1664,8 @@ export class SupabaseProvider implements IDataProvider {
                 .from('attendance')
                 .upsert(attendancePayload, { onConflict: 'id' });
 
+              NotificationService.dismissMissingAttendanceNotification(leaveRow.user_id, dateStr);
+
               if (upsertErr) {
                 // Fallback: Check if record exists, then update or insert
                 const { data: existing } = await this.client

@@ -1125,6 +1125,8 @@ export class MockProvider implements IDataProvider {
           allRecords.push(newRec);
         }
 
+        NotificationService.dismissMissingAttendanceNotification(targetLeave.user_id, dateStr);
+
         const dayKey = `smart_absensi_daily_attendance_${dateStr}`;
         let dayRecords: AttendanceRecord[] = [];
         try {

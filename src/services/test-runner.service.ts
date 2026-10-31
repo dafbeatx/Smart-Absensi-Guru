@@ -59,6 +59,7 @@ import { runComplaintRepositorySyncTestSuite } from './__tests__/complaint-repos
 import { runOnlineAttendanceGeofenceFixTestSuite } from './__tests__/online-attendance-geofence-fix.test';
 import { runAnnouncementBroadcastTestSuite } from './__tests__/announcement-broadcast.test';
 import { runAttendanceReminderSettingsTestSuite } from './__tests__/attendance-reminder-settings.test';
+import { runAttendanceCorrectionNotificationExclusionTestSuite } from './__tests__/attendance-correction-notification-exclusion.test';
 
 export interface TestResultItem {
   testName: string;
@@ -163,6 +164,7 @@ export class MasterTestRunner {
       { name: 'Online Attendance Geofence Sanitization & 500m Safety Buffer Suite (Fix Penolakan Data)', fn: runOnlineAttendanceGeofenceFixTestSuite },
       { name: 'Pengumuman Notifikasi Push Guru & Anti-Spam Safeguards Suite (Phase 5.4)', fn: runAnnouncementBroadcastTestSuite },
       { name: 'Attendance Reminder Settings & 13:00 Accuracy Engine', fn: runAttendanceReminderSettingsTestSuite },
+      { name: 'Attendance Correction & Leave Notification Exclusion Engine', fn: runAttendanceCorrectionNotificationExclusionTestSuite },
     ];
 
     let totalPassed = 0;

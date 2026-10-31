@@ -88,34 +88,107 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
 
       // 1. STATUS ABSEN SAYA (OPERATIONAL)
       const myTodayAtt = await provider.getTodayAttendance(user.id, authToken).catch(() => null);
-      if (!myTodayAtt) {
-        const notifId = `notif_my_status_pending_${user.id}_${todayIso}`;
+
+      // Verifikasi apakah guru memiliki izin / cuti / sakit / dinas luar / koreksi hari ini
+      const myLeaves: LeaveRequest[] = await provider.getUserLeaves(user.id, authToken).catch(() => []);
+      const activeLeaveToday = myLeaves.find((l) => {
+        const isApprovedOrPending =
+          l.approval_status === 'APPROVED' ||
+          l.approval_status === 'PENDING' ||
+          (l as any).status === 'APPROVED' ||
+          (l as any).status === 'PENDING';
+        return isApprovedOrPending && l.start_date <= todayIso && todayIso <= l.end_date;
+      });
+
+      // Cek draft koreksi lokal
+      let localPendingCorrection: any = null;
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const raw = localStorage.getItem(`smart_absensi_pending_correction_${user.id}_${todayIso}`);
+          if (raw) localPendingCorrection = JSON.parse(raw);
+        } catch {}
+      }
+
+      const sysSettings = useSettingsStore.getState().settings || (await provider.getSettings().catch(() => null));
+      const offCheckToday = isDateOffDay(todayIso, sysSettings);
+      const myStatusNotifId = `notif_my_status_${user.id}_${todayIso}`;
+
+      if (offCheckToday.isOff) {
         items.push({
-          id: notifId,
+          id: myStatusNotifId,
+          category: 'MY_STATUS',
+          title: '🏖️ Libur Sekolah Hari Ini',
+          message: `Hari ini (${offCheckToday.reason || 'Akhir Pekan / Hari Libur'}) tidak ada kewajiban presensi sekolah. Selamat beristirahat!`,
+          time: 'Hari ini',
+          badgeType: 'INFO',
+          isRead: currentReadSet.has(myStatusNotifId),
+        });
+      } else if (activeLeaveToday || localPendingCorrection) {
+        const leave = activeLeaveToday;
+        const isCorrection = leave?.leave_type === 'KOREKSI_ABSEN' || Boolean(localPendingCorrection);
+        const isPending = !leave || leave.approval_status === 'PENDING' || Boolean(localPendingCorrection);
+        const lType = isCorrection
+          ? 'Koreksi Absen'
+          : leave?.leave_type === 'SAKIT'
+          ? 'Sakit'
+          : leave?.leave_type === 'CUTI'
+          ? 'Cuti'
+          : leave?.leave_type === 'DINAS_LUAR'
+          ? 'Dinas Luar'
+          : 'Izin';
+
+        items.push({
+          id: myStatusNotifId,
+          category: 'MY_STATUS',
+          title: isPending ? `⏳ ${lType} Sedang Diproses` : `✅ Status Kehadiran: ${lType}`,
+          message: isPending
+            ? `Pengajuan ${lType} Anda untuk hari ini (${todayIso}) telah terkirim dan sedang menunggu verifikasi Admin / Kepala Sekolah.`
+            : `Status kehadiran Anda hari ini tercatat sebagai ${lType} resmi (Telah Disetujui).`,
+          time: 'Hari ini',
+          badgeType: isPending ? 'WARNING' : 'SUCCESS',
+          isRead: currentReadSet.has(myStatusNotifId),
+          actionType: isPending ? 'NAVIGATE_TAB' : undefined,
+          actionDate: todayIso,
+        });
+      } else if (!myTodayAtt || myTodayAtt.status === 'BELUM_ABSEN' || !myTodayAtt.check_in_time) {
+        items.push({
+          id: myStatusNotifId,
           category: 'MY_STATUS',
           title: '⚠️ Status Presensi Anda Hari Ini',
           message: `Halo ${user.full_name}, Anda BELUM melakukan presensi masuk hari ini. Batas waktu tepat waktu adalah pukul 07:30 WIB.`,
           time: 'Hari ini',
           badgeType: 'ALERT',
-          isRead: currentReadSet.has(notifId),
+          isRead: currentReadSet.has(myStatusNotifId),
           actionType: 'CORRECTION',
           actionDate: todayIso,
         });
       } else {
-        const statusText = myTodayAtt.status === 'TERLAMBAT' ? 'Terlambat' : 'Tepat Waktu';
-        const checkInTimeClean = myTodayAtt.check_in_time
-          ? myTodayAtt.check_in_time.substring(0, 5) + ' WIB'
-          : 'Tercatat';
-        const notifId = `notif_my_status_success_${user.id}_${todayIso}`;
-        items.push({
-          id: notifId,
-          category: 'MY_STATUS',
-          title: '✅ Status Presensi Anda Hari Ini',
-          message: `Presensi Masuk Anda tercatat pada jam ${checkInTimeClean} (${statusText}).`,
-          time: checkInTimeClean,
-          badgeType: 'SUCCESS',
-          isRead: currentReadSet.has(notifId),
-        });
+        const isLeaveStatus = ['IZIN', 'SAKIT', 'CUTI', 'DINAS_LUAR'].includes(myTodayAtt.status);
+        if (isLeaveStatus) {
+          items.push({
+            id: myStatusNotifId,
+            category: 'MY_STATUS',
+            title: `✅ Status Kehadiran: ${myTodayAtt.status}`,
+            message: `Status kehadiran Anda hari ini tercatat resmi sebagai ${myTodayAtt.status}.`,
+            time: 'Hari ini',
+            badgeType: 'SUCCESS',
+            isRead: currentReadSet.has(myStatusNotifId),
+          });
+        } else {
+          const statusText = myTodayAtt.status === 'TERLAMBAT' ? 'Terlambat' : 'Tepat Waktu';
+          const checkInTimeClean = myTodayAtt.check_in_time
+            ? myTodayAtt.check_in_time.substring(0, 5) + ' WIB'
+            : 'Tercatat';
+          items.push({
+            id: myStatusNotifId,
+            category: 'MY_STATUS',
+            title: '✅ Status Presensi Anda Hari Ini',
+            message: `Presensi Masuk Anda tercatat pada jam ${checkInTimeClean} (${statusText}).`,
+            time: checkInTimeClean,
+            badgeType: 'SUCCESS',
+            isRead: currentReadSet.has(myStatusNotifId),
+          });
+        }
       }
 
       // 2. PRESENSI GURU TERKINI & ACTIVE ALERTS (FOR ADMIN / KEPSEK / OPERATOR)
@@ -164,12 +237,26 @@ export const NotificationBellDropdown: React.FC<NotificationBellDropdownProps> =
         const offCheck = isDateOffDay(new Date(), sysSettings);
 
         const absentedUserIds = new Set(todayAttendanceList.map((a) => a.user_id));
+        const todayLeaves: LeaveRequest[] = await provider.getAllLeaves(authToken).catch(() => []);
+        const excusedUserIds = new Set(
+          todayLeaves
+            .filter((l) => {
+              const isApprovedOrPending =
+                l.approval_status === 'APPROVED' ||
+                l.approval_status === 'PENDING' ||
+                (l as any).status === 'APPROVED' ||
+                (l as any).status === 'PENDING';
+              return isApprovedOrPending && l.start_date <= todayIso && todayIso <= l.end_date;
+            })
+            .map((l) => l.user_id)
+        );
+
         const activeGuruTeachers = allTeachers.filter(
           (t) => t.is_active !== false && (t.role === 'GURU' || !t.role)
         );
         const unabsentedCount = offCheck.isOff
           ? 0
-          : activeGuruTeachers.filter((t) => !absentedUserIds.has(t.id)).length;
+          : activeGuruTeachers.filter((t) => !absentedUserIds.has(t.id) && !excusedUserIds.has(t.id)).length;
 
         if (!offCheck.isOff && unabsentedCount > 0) {
           const unabsentNotifId = `alert_unabsented_${todayIso}`;

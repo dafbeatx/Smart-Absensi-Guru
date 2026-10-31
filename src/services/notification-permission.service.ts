@@ -416,6 +416,67 @@ export class NotificationPermissionService {
   }
 
   /**
+   * Hapus notifikasi "Presensi Belum Tercatat" atau "Status Presensi Anda Hari Ini"
+   * untuk tanggal tertentu (misalnya setelah mengajukan koreksi, izin/sakit/cuti, atau presensi dikonfirmasi)
+   */
+  public dismissMissingAttendanceNotification(userId: string, dateStr?: string): void {
+    if (!userId) return;
+
+    const filterFn = (item: AttendanceNotificationPayload) => {
+      // Hapus notifikasi koreksi/missing untuk tanggal yang cocok
+      if (dateStr) {
+        if (item.actionType === 'CORRECTION' && item.actionDate === dateStr) return false;
+        if (item.id && item.id.includes('missing_att_') && item.id.includes(dateStr)) return false;
+        if (item.id && item.id.includes('my_status_pending_') && item.id.includes(dateStr)) return false;
+        if (item.title && item.title.includes('Presensi Belum Tercatat') && item.title.includes(dateStr)) return false;
+      } else {
+        // Jika dateStr tidak diberikan, hapus semua missing att user tersebut
+        if (item.actionType === 'CORRECTION' && item.userId === userId) return false;
+        if (item.id && item.id.includes(`missing_att_${userId}`)) return false;
+      }
+      return true;
+    };
+
+    // Bersihkan di memory
+    const filteredMem = memoryNotificationList.filter(filterFn);
+    memoryNotificationList.length = 0;
+    memoryNotificationList.push(...filteredMem);
+
+    // Bersihkan di localStorage
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('smart_absensi_notifications_cache');
+        if (saved) {
+          const list: AttendanceNotificationPayload[] = JSON.parse(saved);
+          if (Array.isArray(list)) {
+            localStorage.setItem('smart_absensi_notifications_cache', JSON.stringify(list.filter(filterFn)));
+          }
+        }
+
+        const sessionUser = useAuthStore.getState().user;
+        const uRole = sessionUser?.role;
+        if (uRole) {
+          const nsKey = this.getCacheKey(userId, uRole);
+          const nsSaved = localStorage.getItem(nsKey);
+          if (nsSaved) {
+            const nsList: AttendanceNotificationPayload[] = JSON.parse(nsSaved);
+            if (Array.isArray(nsList)) {
+              localStorage.setItem(nsKey, JSON.stringify(nsList.filter(filterFn)));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to clean missing attendance notification cache:', e);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smart_absensi_notifications_read_updated'));
+      window.dispatchEvent(new Event('smart_absensi_notifications_updated'));
+    }
+  }
+
+  /**
    * Ambil Set ID notifikasi yang sudah dibaca oleh user tertentu dari LocalStorage yang terisolasi
    */
   public getReadNotificationIds(userId?: string): Set<string> {

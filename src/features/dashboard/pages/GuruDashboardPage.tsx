@@ -1183,14 +1183,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       }
 
       // 2. Today Attendance
+      let loadedTodayAttendance: AttendanceRecord | null = null;
       try {
         const today = await provider.getTodayAttendance(effectiveUser.id, authToken);
+        loadedTodayAttendance = today;
         setTodayAttendance(today);
-        if (!today?.check_in_time) {
-          NotificationService.scheduleCheckinReminder(effectiveUser.full_name, effectiveUser.id);
-        } else if (!today?.check_out_time) {
-          NotificationService.scheduleCheckoutReminder(effectiveUser.full_name, effectiveUser.id);
-        }
       } catch (err) {
         handleAppError(err, 'GuruDashboard.loadTodayAttendance', 'Gagal memuat presensi hari ini', false);
       }
@@ -1259,6 +1256,53 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setUserLeaves(loadedLeaves);
       } catch (err) {
         console.warn('Failed to load user leaves for unabsented check:', err);
+      }
+
+      // 4.6. Intelligent Attendance Reminder Scheduling
+      // Hanya jadwalkan pengingat jika hari kerja aktif dan TIDAK sedang dalam status Izin/Cuti/Sakit/Koreksi
+      try {
+        const todayStr = getTodayDateInJakarta();
+        const hasLeaveOrCorrectionToday = loadedLeaves.some((l) => {
+          const isPendingOrApproved =
+            l.approval_status === 'APPROVED' ||
+            l.approval_status === 'PENDING' ||
+            (l as any).status === 'APPROVED' ||
+            (l as any).status === 'PENDING';
+          return isPendingOrApproved && l.start_date <= todayStr && todayStr <= l.end_date;
+        });
+
+        let hasLocalPendingCorrectionToday = false;
+        if (typeof localStorage !== 'undefined') {
+          try {
+            hasLocalPendingCorrectionToday = Boolean(
+              localStorage.getItem(`smart_absensi_pending_correction_${effectiveUser.id}_${todayStr}`)
+            );
+          } catch {}
+        }
+
+        const isTodayNonAttendingStatus =
+          loadedTodayAttendance?.status === 'IZIN' ||
+          loadedTodayAttendance?.status === 'SAKIT' ||
+          (loadedTodayAttendance?.status as any) === 'CUTI' ||
+          loadedTodayAttendance?.status === 'DINAS_LUAR';
+
+        if (
+          !loadedTodayAttendance?.check_in_time &&
+          !hasLeaveOrCorrectionToday &&
+          !hasLocalPendingCorrectionToday &&
+          !isTodayNonAttendingStatus
+        ) {
+          NotificationService.scheduleCheckinReminder(effectiveUser.full_name, effectiveUser.id);
+        } else if (
+          loadedTodayAttendance?.check_in_time &&
+          !loadedTodayAttendance?.check_out_time &&
+          !hasLeaveOrCorrectionToday &&
+          !hasLocalPendingCorrectionToday
+        ) {
+          NotificationService.scheduleCheckoutReminder(effectiveUser.full_name, effectiveUser.id);
+        }
+      } catch (errReminder) {
+        console.warn('Failed to schedule attendance reminders:', errReminder);
       }
 
       // 5. Backend-Driven Notifications & Official School Announcements
@@ -1565,17 +1609,43 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             continue;
           }
 
-          // Check if teacher has physical attendance record
+          // 1. Check if teacher has physical attendance record
           const hasAttendance = loadedHistory.some(
             (r) => r.date === dateStr && r.status && r.status !== 'BELUM_ABSEN'
           );
-          if (hasAttendance) continue;
+          if (hasAttendance) {
+            NotificationService.dismissMissingAttendanceNotification(effectiveUser.id, dateStr);
+            continue;
+          }
 
-          // Check if teacher has approved leave
-          const hasLeave = loadedLeaves.some(
-            (l) => l.approval_status === 'APPROVED' && l.start_date <= dateStr && dateStr <= l.end_date
-          );
-          if (hasLeave) continue;
+          // 2. Check if teacher has approved OR pending leave / koreksi absen
+          const hasLeaveOrCorrection = loadedLeaves.some((l) => {
+            const isApprovedOrPending =
+              l.approval_status === 'APPROVED' ||
+              l.approval_status === 'PENDING' ||
+              (l as any).status === 'APPROVED' ||
+              (l as any).status === 'PENDING';
+            return isApprovedOrPending && l.start_date <= dateStr && dateStr <= l.end_date;
+          });
+
+          // 3. Check local pending correction draft
+          let hasLocalPendingCorrection = false;
+          if (typeof localStorage !== 'undefined') {
+            try {
+              hasLocalPendingCorrection = Boolean(
+                localStorage.getItem(`smart_absensi_pending_correction_${effectiveUser.id}_${dateStr}`)
+              );
+            } catch {
+              hasLocalPendingCorrection = false;
+            }
+          }
+
+          if (hasLeaveOrCorrection || hasLocalPendingCorrection) {
+            // Guru sudah mengajukan izin / koreksi absen untuk tanggal ini!
+            // Bersihkan notifikasi peringatan lama yang mungkin tersisa
+            NotificationService.dismissMissingAttendanceNotification(effectiveUser.id, dateStr);
+            continue;
+          }
 
           // Missing attendance identified!
           const notifId = `notif_missing_att_${effectiveUser.id}_${dateStr}`;
@@ -1607,20 +1677,27 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           }
         }
 
-        if (missingAttNotifs.length > 0) {
-          setNotifications((prev) => {
-            const combined = [...prev];
-            missingAttNotifs.forEach((newN) => {
-              const idx = combined.findIndex((n) => n.id === newN.id);
-              if (idx !== -1) {
-                combined[idx] = { ...newN, is_read: Boolean(combined[idx].is_read) || newN.is_read };
-              } else {
-                combined.unshift(newN);
-              }
-            });
-            return combined;
+        setNotifications((prev) => {
+          const validMissingIds = new Set(missingAttNotifs.map((m) => m.id));
+          // Filter out missing attendance notifications for dates that are now resolved/attended/excused
+          const filtered = prev.filter((n) => {
+            if (n.id && n.id.startsWith(`notif_missing_att_${effectiveUser.id}_`)) {
+              return validMissingIds.has(n.id);
+            }
+            return true;
           });
-        }
+
+          const combined = [...filtered];
+          missingAttNotifs.forEach((newN) => {
+            const idx = combined.findIndex((n) => n.id === newN.id);
+            if (idx !== -1) {
+              combined[idx] = { ...newN, is_read: Boolean(combined[idx].is_read) || newN.is_read };
+            } else {
+              combined.unshift(newN);
+            }
+          });
+          return combined;
+        });
       } catch (err) {
         console.warn('Failed to detect unabsented working days for guru:', err);
       }

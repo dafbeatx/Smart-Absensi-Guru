@@ -9,6 +9,7 @@ import type { AttendanceRecord } from '../../../types/database.types';
 import { CONSTANTS } from '../../../config/constants';
 import { ProviderFactory } from '../../../providers/provider-factory';
 import { getTodayDateInJakarta, formatTimeForInput } from '../../../utils/time.utils';
+import { NotificationService } from '../../../services/notification-permission.service';
 import {
   Calendar,
   Clock,
@@ -197,9 +198,12 @@ export const GuruCorrectionRequestModal: React.FC<GuruCorrectionRequestModalProp
           localStorage.setItem(`smart_absensi_pending_correction_${user.id}_${date}`, JSON.stringify(draftPayload));
         } catch {}
 
+        NotificationService.dismissMissingAttendanceNotification(user.id, date);
+
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('smart_absensi_pending_correction_updated'));
           window.dispatchEvent(new Event('smart_absensi_records_updated'));
+          window.dispatchEvent(new Event('smart_absensi_notifications_updated'));
         }
       }
 

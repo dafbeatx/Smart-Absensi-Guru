@@ -9,6 +9,7 @@ import { useToastStore } from '../../../store/useToastStore';
 import { getTodayDateInJakarta } from '../../../services/analytics.service';
 import type { LeaveType } from '../../../types/database.types';
 import { convertToWebP, isImageFile, formatFileSize } from '../../../utils/image.utils';
+import { NotificationService } from '../../../services/notification-permission.service';
 import {
   WhatsAppNotificationService,
   type WhatsAppLeaveParams,
@@ -174,6 +175,24 @@ export const LeaveApplicationModal: React.FC<LeaveApplicationModalProps> = ({
         attachment_base64: attachmentBase64,
         duty_teacher_notes: leaveType === 'CUTI' ? undefined : dutyTeacherNotes.trim(),
       });
+
+      // Bersihkan notifikasi peringatan belum absen untuk tanggal izin ini
+      if (user?.id) {
+        try {
+          const curr = new Date(`${startDate}T12:00:00Z`);
+          const end = new Date(`${endDate}T12:00:00Z`);
+          while (curr <= end) {
+            const dStr = curr.toISOString().substring(0, 10);
+            NotificationService.dismissMissingAttendanceNotification(user.id, dStr);
+            curr.setDate(curr.getDate() + 1);
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('smart_absensi_notifications_updated'));
+            window.dispatchEvent(new Event('smart_absensi_leaves_updated'));
+            window.dispatchEvent(new Event('smart_absensi_records_updated'));
+          }
+        } catch {}
+      }
 
       showToast(
         'success',
