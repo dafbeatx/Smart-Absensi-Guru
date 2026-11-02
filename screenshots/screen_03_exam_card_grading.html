@@ -1,0 +1,249 @@
+
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>SAGA Terpadu Capture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    padding: 16px;
+    height: 720px;
+    width: 1280px;
+    overflow: hidden;
+  }
+  .app-frame {
+    background: #ffffff;
+    border-radius: 20px;
+    height: 688px;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .navbar {
+    background: #023246;
+    color: #ffffff;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #287094;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .brand-text h1 {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+  .brand-text p {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+  .user-badge {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge-role {
+    background: #10b981;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+  }
+  .content-area {
+    padding: 20px 28px;
+    flex: 1;
+    overflow-y: auto;
+    background: #f8fafc;
+  }
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    padding: 20px;
+  }
+  .page-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #023246;
+    margin-bottom: 4px;
+  }
+  .page-subtitle {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 16px;
+  }
+  .btn-primary {
+    background: #023246;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-emerald {
+    background: #10b981;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    background: #f1f5f9;
+    color: #334155;
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 700;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+  }
+  .tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .tag-green { background: #dcfce7; color: #15803d; }
+  .tag-blue { background: #e0f2fe; color: #0369a1; }
+  .tag-yellow { background: #fef9c3; color: #854d0e; }
+</style>
+</head>
+
+<body>
+  <div class="app-frame">
+    <div class="navbar">
+      <div class="brand">
+        <div class="brand-text">
+          <h1>SAGA TERPADU</h1>
+          <p>SMP Terpadu Al-Ittihadiyah — Administrasi Akademik</p>
+        </div>
+      </div>
+      <div class="user-badge">
+        <span>👨‍🏫 Wali Kelas &amp; Panitia</span>
+        <span class="badge-role">AKADEMIK</span>
+      </div>
+    </div>
+    <div class="content-area">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 class="page-title">🎓 Kartu Peserta Ujian &amp; Format Nilai Semester Excel</h2>
+          <p class="page-subtitle">Penerbitan kartu identitas berbarcode dan template buku nilai ASTS/ASAS</p>
+        </div>
+        <button class="btn-emerald">📥 Unduh Format Nilai Excel (6 Kelas)</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap: 20px;">
+        <!-- Kartu Peserta Ujian Preview -->
+        <div class="card" style="border:2px solid #023246;">
+          <div style="text-align:center; border-bottom:2px solid #023246; padding-bottom:8px; margin-bottom:12px;">
+            <p style="font-size:11px; font-weight:800; color:#023246;">KARTU PESERTA ASESMEN SUMATIF</p>
+            <p style="font-size:10px; color:#64748b;">SMP TERPADU AL-ITTIHADIYAH — TA 2026/2027</p>
+          </div>
+          <div style="display:flex; gap:14px; align-items:center;">
+            <div style="width:70px; height:85px; background:#e2e8f0; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:24px;">
+              👤
+            </div>
+            <div style="font-size:11px; line-height:1.7; color:#1e293b;">
+              <p><strong>Nama:</strong> AMANDA HASNA MIRZA</p>
+              <p><strong>NIS / NISN:</strong> 242507001 / 0098765432</p>
+              <p><strong>Kelas / Ruang:</strong> 9A / Ruang 01</p>
+              <p><strong>Nomor Peserta:</strong> 09-026-001-8</p>
+            </div>
+          </div>
+          <div style="margin-top:14px; padding-top:10px; border-top:1px dashed #cbd5e1; text-align:center;">
+            <div style="background:#f1f5f9; padding:6px; font-family:monospace; letter-spacing:4px; font-size:13px; font-weight:bold;">
+              ||| | |||| || ||| |||| |
+            </div>
+            <span style="font-size:9px; color:#64748b;">Barcode Verifikasi Identitas Peserta Ujian</span>
+          </div>
+        </div>
+
+        <!-- Format Penilaian Preview -->
+        <div class="card">
+          <h3 style="font-size:13px; font-weight:700; color:#023246; margin-bottom:10px;">📊 Buku Nilai Semester (Formula Terkunci)</h3>
+          <p style="font-size:11px; color:#64748b; margin-bottom:12px;">Format Microsoft Excel multi-sheet otomatis (Sheet: 7A, 7B, 8A, 8B, 9A, 9B, SMA):</p>
+          <table>
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Nama Siswa</th>
+                <th>ASTS</th>
+                <th>ASAS</th>
+                <th>Nilai Rapor</th>
+                <th>Predikat</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>AMANDA HASNA MIRZA</td>
+                <td style="color:#0369a1; font-weight:700;">88</td>
+                <td style="color:#0369a1; font-weight:700;">92</td>
+                <td style="background:#f0fdf4; font-weight:700;">90.0</td>
+                <td><span class="tag tag-green">A (Sangat Baik)</span></td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>BUDI SANTOSO</td>
+                <td style="color:#0369a1; font-weight:700;">82</td>
+                <td style="color:#0369a1; font-weight:700;">86</td>
+                <td style="background:#f0fdf4; font-weight:700;">84.0</td>
+                <td><span class="tag tag-green">B (Baik)</span></td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>SITI RAHMAWATI</td>
+                <td style="color:#0369a1; font-weight:700;">90</td>
+                <td style="color:#0369a1; font-weight:700;">94</td>
+                <td style="background:#f0fdf4; font-weight:700;">92.0</td>
+                <td><span class="tag tag-green">A (Sangat Baik)</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1355,8 +1355,8 @@ export const runTeacherPointsTestSuite = async (): Promise<{
 
   // 43. Dynamic Calendar Month Engine: Automatically resolves CURRENT_MONTH to October 2026 and PREVIOUS_MONTH to September 2026
   try {
-    const currentMeta = getDisciplinePeriodMetadata('CURRENT_MONTH');
-    const prevMeta = getDisciplinePeriodMetadata('PREVIOUS_MONTH');
+    const currentMeta = getDisciplinePeriodMetadata('CURRENT_MONTH', new Date('2026-10-15T00:00:00Z'));
+    const prevMeta = getDisciplinePeriodMetadata('PREVIOUS_MONTH', new Date('2026-10-15T00:00:00Z'));
 
     assert(
       'Dynamic Calendar Engine: CURRENT_MONTH dynamically resolves to October 2026',

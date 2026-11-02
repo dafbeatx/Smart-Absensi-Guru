@@ -84,6 +84,8 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   allRegisteredTeachers: allRegisteredTeachersProp,
   allPointLogs: allPointLogsProp,
   initialPeriod = 'CURRENT_MONTH',
+  selectedMonth,
+  selectedYear,
 }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('LEADERBOARD');
   const [selectedPeriod, setSelectedPeriod] = useState<DisciplinePeriodType>(initialPeriod);
@@ -216,6 +218,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
         logs = await TeacherPointReconciliationService.reconcileAllTeachers(token, true);
       } else {
         logs = await provider.getTeacherPointHistory('ALL', token);
+        if (!logs || logs.length === 0) {
+          logs = await TeacherPointReconciliationService.reconcileAllTeachers(token, false).catch(() => []);
+        }
       }
 
       if (abortCtrl.signal.aborted) return;
@@ -362,6 +367,41 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     }
   };
 
+  const effectivePointLogs = useMemo(() => {
+    if (!currentUser?.id || !currentUserScore || typeof currentUserScore.totalPoints !== 'number' || currentUserScore.totalPoints <= 0) {
+      return allPointLogs;
+    }
+    const currentPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const targetPrefix = selectedYear && selectedMonth
+      ? `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+      : currentPrefix;
+
+    const hasUserLogsForPeriod = allPointLogs.some((l) => {
+      if (l.user_id !== currentUser.id) return false;
+      if (l.status === 'VOIDED') return false;
+      const d = l.date || l.created_at;
+      return d && d.startsWith(targetPrefix);
+    });
+
+    if (hasUserLogsForPeriod) {
+      return allPointLogs;
+    }
+
+    const syntheticLog: TeacherPointLog = {
+      id: `synthetic_user_${currentUser.id}_${targetPrefix}`,
+      user_id: currentUser.id,
+      teacher_name: currentUser.full_name || 'Guru',
+      points: currentUserScore.totalPoints,
+      activity_type: 'CHECK_IN_ON_TIME',
+      title: 'Akumulasi Poin Kehadiran',
+      description: 'Rekapitulasi poin kedisiplinan dan kehadiran bulan berjalan',
+      date: `${targetPrefix}-01`,
+      created_at: new Date().toISOString(),
+    };
+
+    return [...allPointLogs, syntheticLog];
+  }, [allPointLogs, currentUser, currentUserScore, selectedYear, selectedMonth]);
+
   const {
     leaderboard,
     topTeacher,
@@ -372,14 +412,19 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     snapshotId,
     lastCalculated,
   } = useMemo(() => {
+    const targetYearMonth = selectedYear && selectedMonth
+      ? `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
+      : undefined;
+
     return getTeacherDisciplineLeaderboard(
       currentUser,
       null, // DILARANG mengirim currentUserScore untuk mengoverride ledger global!
       selectedPeriod,
-      allPointLogs,
-      registeredTeachers.length > 0 ? registeredTeachers : allRegisteredTeachersProp
+      effectivePointLogs,
+      registeredTeachers.length > 0 ? registeredTeachers : allRegisteredTeachersProp,
+      targetYearMonth ? { targetYearMonth } : undefined
     );
-  }, [currentUser, selectedPeriod, allPointLogs, registeredTeachers, allRegisteredTeachersProp]);
+  }, [currentUser, selectedPeriod, effectivePointLogs, registeredTeachers, allRegisteredTeachersProp, selectedYear, selectedMonth]);
 
   // Keep selectedTeacher synchronized with fresh avatar
   useEffect(() => {
@@ -2099,7 +2144,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               <span>Sedang meninjau: <strong>{selectedTeacher.name}</strong></span>
             ) : (
               <span>
-                Juara 1: <strong>{formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}</strong> ({topTeacher?.totalPoints ?? 0} Poin) • {totalTeachers} Guru Terdaftar
+                {topTeacher && topTeacher.totalPoints > 0 ? (
+                  <>Juara 1: <strong>{formatShortTeacherName(topTeacher.name)}</strong> ({topTeacher.totalPoints} Poin)</>
+                ) : (
+                  <>Klasemen: <strong>Sedang Berjalan</strong></>
+                )} • {totalTeachers} Guru Terdaftar
               </span>
             )}
           </div>
@@ -2657,73 +2706,110 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   ) : (
                     <>
                       {/* 👑 HERO CARD: JUARA 1 POIN TERBANYAK (DAPAT DIKLIK) */}
-                      <div
-                    onClick={() => topTeacher && setSelectedTeacher(topTeacher)}
-                    className="relative overflow-hidden rounded-2xl border border-amber-300 bg-linear-to-br from-amber-50 via-white to-amber-50/50 p-3 sm:p-3.5 shadow-2xs cursor-pointer hover:border-amber-400 active:scale-[0.99] transition-all group"
-                  >
-                    <div className="flex items-center justify-between gap-1.5 mb-2">
-                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-900 text-[9px] sm:text-[10px] font-extrabold tracking-wide uppercase truncate">
-                        <span>👑</span>
-                        <span>{selectedPeriod === 'CURRENT_MONTH' ? 'Poin Terbanyak Bulan Ini' : `Poin Tertinggi Rekap ${prevMeta.monthName}`}</span>
-                      </div>
-                      <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200 transition-colors shrink-0">
-                        <span>Lihat Grafik</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="relative w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm border-2 border-amber-300 shrink-0 overflow-hidden shadow-2xs">
-                          <span>{topTeacher?.name ? topTeacher.name.charAt(0) : 'G'}</span>
-                          {topTeacher?.avatar_url && (
-                            <img
-                              src={topTeacher.avatar_url}
-                              alt={topTeacher.name}
-                              className="absolute inset-0 w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
-                            {formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}
-                          </h4>
-                          <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-                            {topTeacher?.position || 'Guru Pengajar'}
-                          </p>
-
-                          <div className="flex items-center gap-2 mt-1.5">
-                            {topTeacher && (
-                              <div className="flex items-end gap-0.5 h-3.5 w-6 bg-amber-100/60 p-0.5 rounded">
-                                {getWeeklyDisciplineRates(topTeacher).map((r, i) => (
-                                  <div
-                                    key={i}
-                                    className="w-1 bg-amber-500 rounded-xs"
-                                    style={{ height: `${Math.max(20, (r.rate / 100) * 12)}px` }}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                            <span className="text-[9px] font-bold text-amber-800">
-                              {topTeacher?.hadirTepatWaktuCount ?? 0} Hari On-Time
+                      {topTeacher && topTeacher.totalPoints > 0 ? (
+                        <div
+                          onClick={() => setSelectedTeacher(topTeacher)}
+                          className="relative overflow-hidden rounded-2xl border border-amber-300 bg-linear-to-br from-amber-50 via-white to-amber-50/50 p-3 sm:p-3.5 shadow-2xs cursor-pointer hover:border-amber-400 active:scale-[0.99] transition-all group"
+                        >
+                          <div className="flex items-center justify-between gap-1.5 mb-2">
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-900 text-[9px] sm:text-[10px] font-extrabold tracking-wide uppercase truncate">
+                              <span>👑</span>
+                              <span>{selectedPeriod === 'CURRENT_MONTH' ? 'Poin Terbanyak Bulan Ini' : `Poin Tertinggi Rekap ${prevMeta.monthName}`}</span>
+                            </div>
+                            <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200 transition-colors shrink-0">
+                              <span>Lihat Grafik</span>
+                              <ChevronRight className="w-3 h-3" />
                             </span>
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="text-right shrink-0">
-                        <div className="px-2 py-0.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs">
-                          ⭐ {topTeacher?.totalPoints ?? 0} Poin
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className="relative w-10 h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-sm border-2 border-amber-300 shrink-0 overflow-hidden shadow-2xs">
+                                <span>{topTeacher.name ? topTeacher.name.charAt(0) : 'G'}</span>
+                                {topTeacher.avatar_url && (
+                                  <img
+                                    src={topTeacher.avatar_url}
+                                    alt={topTeacher.name}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight group-hover:text-[#023246]">
+                                  {formatShortTeacherName(topTeacher.name)}
+                                </h4>
+                                <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                                  {topTeacher.position || 'Guru Pengajar'}
+                                </p>
+
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  <div className="flex items-end gap-0.5 h-3.5 w-6 bg-amber-100/60 p-0.5 rounded">
+                                    {getWeeklyDisciplineRates(topTeacher).map((r, i) => (
+                                      <div
+                                        key={i}
+                                        className="w-1 bg-amber-500 rounded-xs"
+                                        style={{ height: `${Math.max(20, (r.rate / 100) * 12)}px` }}
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className="text-[9px] font-bold text-amber-800">
+                                    {topTeacher.hadirTepatWaktuCount ?? 0} Hari On-Time
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="px-2 py-0.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs">
+                                ⭐ {topTeacher.totalPoints} Poin
+                              </div>
+                              <span className="text-[9px] font-bold text-amber-800 block mt-1">
+                                Juara 1 🥇
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-[9px] font-bold text-amber-800 block mt-1">
-                          Juara 1 🥇
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                      ) : (
+                        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-slate-50 via-white to-slate-50/50 p-3 sm:p-3.5 shadow-2xs">
+                          <div className="flex items-center justify-between gap-1.5 mb-2">
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[9px] sm:text-[10px] font-extrabold tracking-wide uppercase truncate">
+                              <span>📊</span>
+                              <span>{selectedPeriod === 'CURRENT_MONTH' ? 'Klasemen Bulan Berjalan' : `Rekap ${prevMeta.monthName}`}</span>
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
+                              Sedang Berjalan
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div className="relative w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-base border border-slate-200 shrink-0">
+                                <span>🏆</span>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-xs sm:text-sm font-bold text-slate-800 truncate leading-tight">
+                                  Belum Ada Peringkat Teratas
+                                </h4>
+                                <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                                  Akumulasi poin kedisiplinan bulan berjalan sedang dihitung
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="px-2 py-0.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold shadow-2xs">
+                                0 Poin
+                              </div>
+                              <span className="text-[9px] font-medium text-slate-400 block mt-1">
+                                Klasemen Terbuka
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                   {/* Posisi Anda Saat Ini (Dapat Diklik untuk melihat grafik Anda) */}
                   {(currentUserLeaderboardItem || currentUserScore) && (
@@ -3217,7 +3303,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
               <div className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate flex-1 min-w-0">
                 {activeTab === 'LEADERBOARD' && (
                   <span className="truncate block">
-                    Juara 1: <strong>{formatShortTeacherName(topTeacher?.name || 'Guru Teladan')}</strong> ({topTeacher?.totalPoints ?? 0} Poin) • <span className="text-[10px] text-slate-400">Snapshot: {snapshotId.slice(0, 16)} • {new Date(lastCalculated).toLocaleTimeString('id-ID')} WIB</span>
+                    {topTeacher && topTeacher.totalPoints > 0 ? (
+                      <>Juara 1: <strong>{formatShortTeacherName(topTeacher.name)}</strong> ({topTeacher.totalPoints} Poin)</>
+                    ) : (
+                      <>Klasemen: <strong>Sedang Berjalan</strong></>
+                    )} • <span className="text-[10px] text-slate-400">Snapshot: {snapshotId.slice(0, 16)} • {new Date(lastCalculated).toLocaleTimeString('id-ID')} WIB</span>
                   </span>
                 )}
                 {activeTab === 'HISTORY' && <span className="truncate block">Buku Catatan Riwayat Transaksi Poin Guru</span>}

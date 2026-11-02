@@ -1,0 +1,231 @@
+
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>SAGA Terpadu Capture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    padding: 16px;
+    height: 720px;
+    width: 1280px;
+    overflow: hidden;
+  }
+  .app-frame {
+    background: #ffffff;
+    border-radius: 20px;
+    height: 688px;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .navbar {
+    background: #023246;
+    color: #ffffff;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #287094;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .brand-text h1 {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+  .brand-text p {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+  .user-badge {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge-role {
+    background: #10b981;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+  }
+  .content-area {
+    padding: 20px 28px;
+    flex: 1;
+    overflow-y: auto;
+    background: #f8fafc;
+  }
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    padding: 20px;
+  }
+  .page-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #023246;
+    margin-bottom: 4px;
+  }
+  .page-subtitle {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 16px;
+  }
+  .btn-primary {
+    background: #023246;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-emerald {
+    background: #10b981;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    background: #f1f5f9;
+    color: #334155;
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 700;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+  }
+  .tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .tag-green { background: #dcfce7; color: #15803d; }
+  .tag-blue { background: #e0f2fe; color: #0369a1; }
+  .tag-yellow { background: #fef9c3; color: #854d0e; }
+</style>
+</head>
+
+<body>
+  <div class="app-frame">
+    <div class="navbar">
+      <div class="brand">
+        <div class="brand-text">
+          <h1>SAGA TERPADU</h1>
+          <p>SMP Terpadu Al-Ittihadiyah</p>
+        </div>
+      </div>
+      <div class="user-badge">
+        <span>👨‍🏫 M. Iqbal Gustiawan, S.Pd</span>
+        <span class="badge-role">GURU MAPEL</span>
+      </div>
+    </div>
+    <div class="content-area">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 class="page-title">📝 Layanan Pengajuan Izin & Ketidakhadiran</h2>
+          <p class="page-subtitle">Formulir digital pengajuan Izin, Cuti, Sakit, dan Dinas Luar resmi</p>
+        </div>
+        <button class="btn-emerald">+ Buat Pengajuan Baru</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+        <div class="card">
+          <h3 style="font-size:14px; font-weight:700; color:#023246; margin-bottom:12px;">Riwayat Pengajuan Izin Saya</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal Pengajuan</th>
+                <th>Jenis Izin</th>
+                <th>Keterangan / Alasan</th>
+                <th>Lampiran Surat</th>
+                <th>Status Verifikasi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>28 Okt 2026</td>
+                <td><span class="tag tag-blue">DINAS LUAR</span></td>
+                <td>Bimtek Pemanfaatan Digitalisasi BOSP Kinerja</td>
+                <td>📄 Surat_Tugas_Dinas.pdf</td>
+                <td><span class="tag tag-green">✅ DISETUJUI</span></td>
+              </tr>
+              <tr>
+                <td>14 Okt 2026</td>
+                <td><span class="tag tag-yellow">SAKIT</span></td>
+                <td>Demam dan flu (Istirahat Dokter)</td>
+                <td>📄 Surat_Keterangan_Dokter.pdf</td>
+                <td><span class="tag tag-green">✅ DISETUJUI</span></td>
+              </tr>
+              <tr>
+                <td>02 Sep 2026</td>
+                <td><span class="tag tag-blue">IZIN RESMI</span></td>
+                <td>Keperluan pengurusan berkas sertifikasi pendidik</td>
+                <td>📄 Lampiran_Pengantar.pdf</td>
+                <td><span class="tag tag-green">✅ DISETUJUI</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card" style="background:#f8fafc; border:2px dashed #cbd5e1;">
+          <h3 style="font-size:13px; font-weight:700; color:#023246; margin-bottom:8px;">📌 Pratinjau Surat Tugas Terlampir</h3>
+          <div style="background:#ffffff; padding:16px; border-radius:10px; border:1px solid #e2e8f0; font-size:11px; text-align:center;">
+            <p style="font-weight:700; color:#023246;">SURAT TUGAS DINAS</p>
+            <p style="color:#64748b;">Nomor: 421.3/088/SMP-IT/X/2026</p>
+            <hr style="margin:8px 0; border:none; border-top:1px solid #f1f5f9;">
+            <p style="text-align:left; color:#334155; line-height:1.6;">Menugaskan: <strong>M. Iqbal Gustiawan, S.Pd</strong><br>Tugas: Mengikuti Bimtek Penguatan Digitalisasi Sekolah<br>Tempat: Aula Ki Hajar Dewantara</p>
+            <div style="margin-top:12px; display:inline-block; padding:4px 10px; background:#e0f2fe; color:#0369a1; border-radius:6px; font-weight:700; font-size:10px;">
+              Telah Diverifikasi Kepala Sekolah
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

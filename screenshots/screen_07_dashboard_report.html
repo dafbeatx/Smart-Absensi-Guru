@@ -1,0 +1,240 @@
+
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>SAGA Terpadu Capture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    padding: 16px;
+    height: 720px;
+    width: 1280px;
+    overflow: hidden;
+  }
+  .app-frame {
+    background: #ffffff;
+    border-radius: 20px;
+    height: 688px;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .navbar {
+    background: #023246;
+    color: #ffffff;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #287094;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .brand-text h1 {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+  .brand-text p {
+    font-size: 11px;
+    color: #94a3b8;
+  }
+  .user-badge {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge-role {
+    background: #10b981;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+  }
+  .content-area {
+    padding: 20px 28px;
+    flex: 1;
+    overflow-y: auto;
+    background: #f8fafc;
+  }
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    padding: 20px;
+  }
+  .page-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #023246;
+    margin-bottom: 4px;
+  }
+  .page-subtitle {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 16px;
+  }
+  .btn-primary {
+    background: #023246;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-emerald {
+    background: #10b981;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    background: #f1f5f9;
+    color: #334155;
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 700;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+  }
+  .tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .tag-green { background: #dcfce7; color: #15803d; }
+  .tag-blue { background: #e0f2fe; color: #0369a1; }
+  .tag-yellow { background: #fef9c3; color: #854d0e; }
+</style>
+</head>
+
+<body>
+  <div class="app-frame">
+    <div class="navbar">
+      <div class="brand">
+        <div class="brand-text">
+          <h1>SAGA TERPADU</h1>
+          <p>SMP Terpadu Al-Ittihadiyah — Pimpinan Sekolah</p>
+        </div>
+      </div>
+      <div class="user-badge">
+        <span>👔 Farhan Sopian Sahid, S.Pd.I</span>
+        <span class="badge-role" style="background:#0284c7;">KEPALA SEKOLAH</span>
+      </div>
+    </div>
+    <div class="content-area">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 class="page-title">📊 Dashboard Pimpinan &amp; Rangkuman Laporan Sekolah</h2>
+          <p class="page-subtitle">Ikhtisar harian kedisiplinan pendidik, perizinan, dan laporan rekapitulasi sekolah</p>
+        </div>
+        <button class="btn-emerald">📥 Unduh Rekap Laporan PDF Berstempel</button>
+      </div>
+
+      <!-- Stat Cards -->
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:14px; margin-bottom:16px;">
+        <div class="card" style="padding:14px; text-align:center;">
+          <p style="font-size:11px; color:#64748b;">Total Tenaga Pendidik</p>
+          <p style="font-size:24px; font-weight:800; color:#023246;">28</p>
+          <span style="font-size:10px; color:#10b981;">● 100% Terdaftar Aktif</span>
+        </div>
+        <div class="card" style="padding:14px; text-align:center;">
+          <p style="font-size:11px; color:#64748b;">Hadir Hari Ini</p>
+          <p style="font-size:24px; font-weight:800; color:#15803d;">26</p>
+          <span style="font-size:10px; color:#15803d;">Tepat Waktu di Sekolah</span>
+        </div>
+        <div class="card" style="padding:14px; text-align:center;">
+          <p style="font-size:11px; color:#64748b;">Tugas Dinas Luar</p>
+          <p style="font-size:24px; font-weight:800; color:#0369a1;">2</p>
+          <span style="font-size:10px; color:#0369a1;">Bimtek Digitalisasi</span>
+        </div>
+        <div class="card" style="padding:14px; text-align:center;">
+          <p style="font-size:11px; color:#64748b;">Tanpa Keterangan</p>
+          <p style="font-size:24px; font-weight:800; color:#64748b;">0</p>
+          <span style="font-size:10px; color:#10b981;">Nihil (Tertib Terdata)</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:13px; font-weight:700; color:#023246; margin-bottom:10px;">Daftar Konfirmasi Kehadiran &amp; Disposisi Hari Ini</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Nama Pendidik</th>
+              <th>Jabatan / Tugas</th>
+              <th>Status Hari Ini</th>
+              <th>Jam Masuk</th>
+              <th>Keterangan Sistem</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Nurul Fahriya, S.Pd., G.r</td>
+              <td>Wakasek Kurikulum</td>
+              <td><span class="tag tag-green">HADIR</span></td>
+              <td>06.42 WIB</td>
+              <td>Area Sekolah Tervalidasi</td>
+            </tr>
+            <tr>
+              <td>M. Iqbal Gustiawan, S.Pd</td>
+              <td>Wakasek Sarpras</td>
+              <td><span class="tag tag-blue">DINAS LUAR</span></td>
+              <td>-</td>
+              <td>Surat Tugas Bimtek BOSP Kinerja Disetujui</td>
+            </tr>
+            <tr>
+              <td>Adi Prasetyo, S.Pd., G.r</td>
+              <td>Guru Bahasa Inggris</td>
+              <td><span class="tag tag-green">HADIR</span></td>
+              <td>06.48 WIB</td>
+              <td>Area Sekolah Tervalidasi</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

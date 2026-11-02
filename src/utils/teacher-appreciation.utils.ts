@@ -543,16 +543,23 @@ export function getTeacherDisciplineLeaderboard(
     }
   }
 
-  // 2. Sertakan currentUser jika aktif dan belum ada di teachers (pencocokan murni berdasarkan id)
+  // 2. Sertakan currentUser jika aktif dan belum ada di teachers (pencocokan id, NPP, atau nama)
   if (currentUser && currentUser.id) {
-    const existingIdx = teachers.findIndex((t) => t.id === currentUser.id);
+    const existingIdx = teachers.findIndex((t) =>
+      t.id === currentUser.id ||
+      (currentUser.nip && t.nip && t.nip.replace(/\s+/g, '') === currentUser.nip.replace(/\s+/g, '')) ||
+      (currentUser.full_name && t.name && t.name.trim().toLowerCase() === currentUser.full_name.trim().toLowerCase())
+    );
     const role = ((currentUser as any).role || 'GURU').toUpperCase().trim();
-    const isEligible = role === 'GURU' || ((currentUser as any).position || '').toLowerCase().includes('guru');
+    const isEligible = role === 'GURU' || role === 'ADMIN' || ((currentUser as any).position || '').toLowerCase().includes('guru');
 
     if (existingIdx !== -1) {
       teachers[existingIdx].isCurrentUser = true;
       if (currentUser.avatar_url) {
         teachers[existingIdx].avatar_url = currentUser.avatar_url;
+      }
+      if (currentUser.id && teachers[existingIdx].id !== currentUser.id) {
+        teachers[existingIdx].id = currentUser.id;
       }
     } else if (isEligible) {
       teachers.push({

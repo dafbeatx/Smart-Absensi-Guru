@@ -1,0 +1,9 @@
+file 'C:/Smart-Absensi-Guru/screenshots/frame_1.png'
+duration 4
+file 'C:/Smart-Absensi-Guru/screenshots/frame_2.png'
+duration 4
+file 'C:/Smart-Absensi-Guru/screenshots/frame_3.png'
+duration 4
+file 'C:/Smart-Absensi-Guru/screenshots/frame_4.png'
+duration 4
+file 'C:/Smart-Absensi-Guru/screenshots/frame_4.png'

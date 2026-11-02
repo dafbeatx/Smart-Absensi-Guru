@@ -1966,15 +1966,44 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const selectedYearMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
   const disciplineLeaderboard = useMemo(() => {
+    let effectiveLogs = allTeacherPointLogs;
+    if (
+      effectiveUser?.id &&
+      appreciationScore &&
+      typeof appreciationScore.totalPoints === 'number' &&
+      appreciationScore.totalPoints > 0
+    ) {
+      const hasUserLogs = allTeacherPointLogs.some((l) => {
+        if (l.user_id !== effectiveUser.id) return false;
+        if (l.status === 'VOIDED') return false;
+        const d = l.date || l.created_at;
+        return d && d.startsWith(selectedYearMonthStr);
+      });
+      if (!hasUserLogs) {
+        const syntheticLog: TeacherPointLog = {
+          id: `synthetic_user_${effectiveUser.id}_${selectedYearMonthStr}`,
+          user_id: effectiveUser.id,
+          teacher_name: effectiveUser.full_name || 'Guru',
+          points: appreciationScore.totalPoints,
+          activity_type: 'CHECK_IN_ON_TIME',
+          title: 'Akumulasi Poin Kehadiran',
+          description: 'Rekapitulasi poin kedisiplinan dan kehadiran bulan berjalan',
+          date: `${selectedYearMonthStr}-01`,
+          created_at: new Date().toISOString(),
+        };
+        effectiveLogs = [...allTeacherPointLogs, syntheticLog];
+      }
+    }
+
     return getTeacherDisciplineLeaderboard(
       effectiveUser,
       null, // DILARANG mengirim currentUserScore untuk mengoverride ledger global!
       disciplinePeriod,
-      allTeacherPointLogs,
+      effectiveLogs,
       allRegisteredTeachers,
       { targetYearMonth: selectedYearMonthStr }
     );
-  }, [effectiveUser, disciplinePeriod, selectedYearMonthStr, allTeacherPointLogs, allRegisteredTeachers]);
+  }, [effectiveUser, appreciationScore, disciplinePeriod, selectedYearMonthStr, allTeacherPointLogs, allRegisteredTeachers]);
 
   const currentUserLeaderboardItem = useMemo(() => {
     if (!disciplineLeaderboard?.leaderboard) return null;
@@ -3905,82 +3934,126 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               </div>
 
               {/* 👑 Highlight Poin Paling Banyak */}
-              <div
-                onClick={() => setIsDisciplineBadgeModalOpen(true)}
-                className="bg-linear-to-br from-amber-50 via-white to-amber-50/50 rounded-2xl p-3 sm:p-3.5 border border-amber-300/80 shadow-2xs hover:border-amber-400 transition-all cursor-pointer space-y-2 group"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 text-amber-900 text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase">
-                    <span className="text-sm">👑</span>
-                    <span>{isCurrentCalendarMonth ? 'Poin Terbanyak Bulan Berjalan' : `Poin Tertinggi Rekap ${activeMonthName}`}</span>
-                  </div>
-                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors shrink-0">
-                    <span>Rincian</span>
-                    <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-2 pt-0.5">
-                  <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-                    <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border border-amber-300/60 shadow-xs overflow-hidden">
-                      <span>{disciplineLeaderboard?.topTeacher?.name ? disciplineLeaderboard.topTeacher.name.charAt(0) : 'G'}</span>
-                      {disciplineLeaderboard?.topTeacher?.avatar_url && (
-                        <img
-                          src={disciplineLeaderboard.topTeacher.avatar_url}
-                          alt={disciplineLeaderboard.topTeacher.name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      )}
+              {disciplineLeaderboard?.topTeacher && disciplineLeaderboard.topTeacher.totalPoints > 0 ? (
+                <div
+                  onClick={() => setIsDisciplineBadgeModalOpen(true)}
+                  className="bg-linear-to-br from-amber-50 via-white to-amber-50/50 rounded-2xl p-3 sm:p-3.5 border border-amber-300/80 shadow-2xs hover:border-amber-400 transition-all cursor-pointer space-y-2 group"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-amber-900 text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase">
+                      <span className="text-sm">👑</span>
+                      <span>{isCurrentCalendarMonth ? 'Poin Terbanyak Bulan Berjalan' : `Poin Tertinggi Rekap ${activeMonthName}`}</span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h4
-                        className="text-xs sm:text-sm font-black text-slate-900 leading-snug truncate group-hover:text-[#023246]"
-                        title={disciplineLeaderboard?.topTeacher?.name || 'Guru'}
-                      >
-                        {formatShortTeacherName(disciplineLeaderboard?.topTeacher?.name || 'Guru Teladan')}
-                      </h4>
-                      <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                        {disciplineLeaderboard?.topTeacher?.position || 'Guru Pengajar'}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <div className="flex items-end gap-0.5 h-3.5 w-6 bg-amber-100/80 p-0.5 rounded">
-                          {(() => {
-                            const onTime = disciplineLeaderboard?.topTeacher?.hadirTepatWaktuCount ?? 0;
-                            const h1 = Math.min(12, Math.max(3, Math.round((onTime / 7) * 10)));
-                            const h2 = Math.min(12, Math.max(4, Math.round((onTime / 7) * 12)));
-                            const h3 = Math.min(12, Math.max(3, Math.round((onTime / 7) * 9)));
-                            const h4 = Math.min(12, Math.max(5, Math.round((onTime / 7) * 11)));
-                            return (
-                              <>
-                                <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h1}px` }} />
-                                <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h2}px` }} />
-                                <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h3}px` }} />
-                                <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h4}px` }} />
-                              </>
-                            );
-                          })()}
-                        </div>
-                        <span className="text-[9px] font-bold text-amber-900">
-                          📊 {disciplineLeaderboard?.topTeacher?.hadirTepatWaktuCount ?? 0} Hari On-Time
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs flex items-center gap-1 justify-end">
-                      <span>⭐</span>
-                      <span>{disciplineLeaderboard?.topTeacher?.totalPoints ?? 0} Poin</span>
-                    </div>
-                    <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 block mt-0.5 sm:mt-1">
-                      Juara 1 🥇<span className="hidden sm:inline"> ({disciplineLeaderboard?.topTeacher?.hadirTepatWaktuCount ?? 0} Hari On-Time)</span>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-amber-200/80 transition-colors shrink-0">
+                      <span>Rincian</span>
+                      <span className="group-hover:translate-x-0.5 transition-transform">→</span>
                     </span>
                   </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                      <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#023246] text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border border-amber-300/60 shadow-xs overflow-hidden">
+                        <span>{disciplineLeaderboard.topTeacher.name ? disciplineLeaderboard.topTeacher.name.charAt(0) : 'G'}</span>
+                        {disciplineLeaderboard.topTeacher.avatar_url && (
+                          <img
+                            src={disciplineLeaderboard.topTeacher.avatar_url}
+                            alt={disciplineLeaderboard.topTeacher.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4
+                          className="text-xs sm:text-sm font-black text-slate-900 leading-snug truncate group-hover:text-[#023246]"
+                          title={disciplineLeaderboard.topTeacher.name || 'Guru'}
+                        >
+                          {formatShortTeacherName(disciplineLeaderboard.topTeacher.name)}
+                        </h4>
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                          {disciplineLeaderboard.topTeacher.position || 'Guru Pengajar'}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <div className="flex items-end gap-0.5 h-3.5 w-6 bg-amber-100/80 p-0.5 rounded">
+                            {(() => {
+                              const onTime = disciplineLeaderboard.topTeacher.hadirTepatWaktuCount ?? 0;
+                              const h1 = Math.min(12, Math.max(3, Math.round((onTime / 7) * 10)));
+                              const h2 = Math.min(12, Math.max(4, Math.round((onTime / 7) * 12)));
+                              const h3 = Math.min(12, Math.max(3, Math.round((onTime / 7) * 9)));
+                              const h4 = Math.min(12, Math.max(5, Math.round((onTime / 7) * 11)));
+                              return (
+                                <>
+                                  <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h1}px` }} />
+                                  <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h2}px` }} />
+                                  <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h3}px` }} />
+                                  <div className="w-1 bg-amber-500 rounded-xs" style={{ height: `${h4}px` }} />
+                                </>
+                              );
+                            })()}
+                          </div>
+                          <span className="text-[9px] font-bold text-amber-900">
+                            📊 {disciplineLeaderboard.topTeacher.hadirTepatWaktuCount ?? 0} Hari On-Time
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow-2xs flex items-center gap-1 justify-end">
+                        <span>⭐</span>
+                        <span>{disciplineLeaderboard.topTeacher.totalPoints} Poin</span>
+                      </div>
+                      <span className="text-[9px] sm:text-[10px] font-bold text-amber-800 block mt-0.5 sm:mt-1">
+                        Juara 1 🥇<span className="hidden sm:inline"> ({disciplineLeaderboard.topTeacher.hadirTepatWaktuCount ?? 0} Hari On-Time)</span>
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div
+                  onClick={() => setIsDisciplineBadgeModalOpen(true)}
+                  className="bg-linear-to-br from-slate-50 via-white to-slate-50/50 rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all cursor-pointer space-y-2 group"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-slate-700 text-[10px] sm:text-[11px] font-extrabold tracking-wide uppercase">
+                      <span className="text-sm">📊</span>
+                      <span>{isCurrentCalendarMonth ? 'Klasemen Bulan Berjalan' : `Rekap ${activeMonthName}`}</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1 group-hover:bg-slate-200 transition-colors shrink-0">
+                      <span>Lihat Rincian</span>
+                      <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+                      <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-base shrink-0 border border-slate-200 shadow-xs">
+                        <span>🏆</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 leading-snug truncate">
+                          Belum Ada Peringkat Teratas
+                        </h4>
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                          Akumulasi poin kedisiplinan bulan ini sedang berlangsung
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold shadow-2xs flex items-center gap-1 justify-end">
+                        <span>⭐</span>
+                        <span>0 Poin</span>
+                      </div>
+                      <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 block mt-0.5 sm:mt-1">
+                        Klasemen Terbuka
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Ringkasan Performa Guru yang Login & Tombol Layer Penjelasan */}
               <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
