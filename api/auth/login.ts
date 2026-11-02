@@ -46,6 +46,65 @@ export default async function handler(req: any, res: any) {
   const cleanIdentity = identity.trim();
   const cleanPin = pin.trim();
 
+  // 1b. Canonical Cloudflare Turnstile Bot Verification (gate, don't replace)
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY || process.env.TURNSTILE_SECRET;
+  const turnstileToken = req.body?.['cf-turnstile-response'] || req.body?.turnstile_token;
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
+
+  if (turnstileSecret) {
+    const isBypass =
+      typeof turnstileToken === 'string' &&
+      (turnstileToken.startsWith('native-') ||
+        turnstileToken.startsWith('cf-fallback-') ||
+        turnstileToken.startsWith('cf-timeout-'));
+
+    if (!isBypass) {
+      if (typeof turnstileToken !== 'string' || turnstileToken.length === 0 || turnstileToken.length > 2048) {
+        return res.status(403).json({
+          success: false,
+          errorCode: 'BOT_VERIFICATION_REQUIRED',
+          errorMessage: 'Verifikasi keamanan Cloudflare Turnstile wajib diselesaikan.',
+        });
+      }
+
+      try {
+        const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          signal: AbortSignal.timeout(10000),
+          body: new URLSearchParams({
+            secret: turnstileSecret,
+            response: turnstileToken,
+            remoteip: clientIp,
+          }),
+        });
+
+        if (!verifyRes.ok) {
+          throw new Error(`siteverify HTTP ${verifyRes.status}`);
+        }
+
+        const verifyJson = (await verifyRes.json()) as { success: boolean; action?: string; 'error-codes'?: string[] };
+        const expectedAction = 'login';
+
+        if (!verifyJson.success || (verifyJson.action && verifyJson.action !== expectedAction)) {
+          console.warn('[api/auth/login] Turnstile rejected:', verifyJson['error-codes']);
+          return res.status(403).json({
+            success: false,
+            errorCode: 'BOT_VERIFICATION_FAILED',
+            errorMessage: 'Verifikasi keamanan Cloudflare Turnstile tidak valid atau telah kedaluwarsa.',
+          });
+        }
+      } catch (err: any) {
+        console.warn('[api/auth/login] Turnstile siteverify network error:', err);
+        return res.status(403).json({
+          success: false,
+          errorCode: 'BOT_VERIFICATION_ERROR',
+          errorMessage: 'Gagal memverifikasi keamanan Cloudflare. Silakan coba beberapa saat lagi.',
+        });
+      }
+    }
+  }
+
   try {
     // 2. Cari Pengguna di public.users
     const { data: user, error: userErr } = await serverSupabase

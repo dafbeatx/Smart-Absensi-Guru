@@ -23,6 +23,10 @@ declare global {
   }
 }
 
+export interface TurnstileWidgetHandle {
+  reset: () => void;
+}
+
 export interface TurnstileWidgetProps {
   siteKey?: string;
   onVerify?: (token: string) => void;
@@ -35,6 +39,7 @@ export interface TurnstileWidgetProps {
 
 // Cloudflare's Official Testing Site Key (Always Passes) for dev/fallback
 const DEFAULT_TEST_SITE_KEY = '1x00000000000000000000AA';
+const CANONICAL_PROJECT_SITE_KEY = '0x4AAAAAAEIxMhyntpJB_Iqo';
 
 const isLocalOrLanHost = (): boolean => {
   if (typeof window === 'undefined') return false;
@@ -72,7 +77,7 @@ const checkNativeEnvironment = (): { isNative: boolean; type: 'android' | 'windo
   return { isNative: false, type: 'none', label: '' };
 };
 
-export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
+export const TurnstileWidget = React.forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(({
   siteKey: propsSiteKey,
   onVerify,
   onError,
@@ -80,17 +85,29 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   action = 'login',
   theme = 'light',
   className = 'flex justify-center my-3',
-}) => {
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [nativeEnv] = useState(checkNativeEnvironment);
   const [useFallbackBadge, setUseFallbackBadge] = useState<boolean>(false);
 
-  // Determine effective sitekey: on localhost or LAN private WiFi IP use test key to avoid domain reject
+  React.useImperativeHandle(ref, () => ({
+    reset: () => {
+      if (widgetIdRef.current && window.turnstile) {
+        try {
+          window.turnstile.reset(widgetIdRef.current);
+        } catch {
+          // ignore
+        }
+      }
+    },
+  }));
+
+  // Canonical Sitekey Resolution
   const isLocal = isLocalOrLanHost();
   const siteKey = isLocal
     ? DEFAULT_TEST_SITE_KEY
-    : (propsSiteKey || import.meta.env.VITE_TURNSTILE_SITE_KEY || DEFAULT_TEST_SITE_KEY);
+    : (propsSiteKey || import.meta.env.VITE_TURNSTILE_SITE_KEY || CANONICAL_PROJECT_SITE_KEY);
 
   useEffect(() => {
     // 1. Native Mobile APK & Desktop EXE Bypass
@@ -221,4 +238,6 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   }
 
   return <div ref={containerRef} className={className} />;
-};
+});
+
+TurnstileWidget.displayName = 'TurnstileWidget';

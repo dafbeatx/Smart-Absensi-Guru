@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { Button } from '../../../components/ui/Button';
@@ -8,7 +8,7 @@ import { validatePIN, validateIdentity } from '../../../utils/validation.utils';
 import { AuthRepository } from '../../../repositories/AuthRepository';
 import { logger } from '../../../utils/logger.utils';
 import { handleAppError, notifySuccess } from '../../../utils/error.utils';
-import { TurnstileWidget } from '../../../components/ui/TurnstileWidget';
+import { TurnstileWidget, type TurnstileWidgetHandle } from '../../../components/ui/TurnstileWidget';
 import { TelegramService } from '../../../services/telegram.service';
 import { getCurrentTimeInJakarta, getTodayDateInJakarta } from '../../../utils/time.utils';
 
@@ -20,6 +20,7 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
   const { loginSuccess } = useAuthStore();
   const appName = useSettingsStore((s) => s.settings.app_name) || 'SMART ABSENSI GURU';
@@ -62,6 +63,7 @@ export const LoginPage: React.FC = () => {
         pin,
         device_uuid: deviceUUID,
         device_model: deviceModel,
+        turnstile_token: turnstileToken || undefined,
       });
 
       logger.info('LoginPage', `Login successful for user: ${res.user.full_name} (${res.user.role})`);
@@ -79,6 +81,9 @@ export const LoginPage: React.FC = () => {
       }).catch((e) => console.warn('Telegram login notification error:', e));
     } catch (err: unknown) {
       setIsLoading(false);
+      // Single-use token lifecycle: reset widget on failure before retry
+      turnstileRef.current?.reset();
+      setTurnstileToken(null);
       const cleanMsg = handleAppError(err, 'LoginPage', 'Kendala Login', false);
       setErrorMessage(cleanMsg);
     }
@@ -141,6 +146,9 @@ export const LoginPage: React.FC = () => {
           />
 
           <TurnstileWidget
+            ref={turnstileRef}
+            siteKey="0x4AAAAAAEIxMhyntpJB_Iqo"
+            action="login"
             onVerify={(token) => setTurnstileToken(token)}
             onExpire={() => setTurnstileToken(null)}
             onError={() => setTurnstileToken(null)}

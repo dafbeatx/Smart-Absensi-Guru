@@ -7,6 +7,7 @@ export interface LoginDTO {
   device_uuid: string;
   device_model: string;
   user_agent?: string;
+  turnstile_token?: string;
 }
 
 export interface LoginResponseDTO {

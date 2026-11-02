@@ -260,6 +260,8 @@ export class SupabaseProvider implements IDataProvider {
             pin: dto.pin,
             device_uuid: dto.device_uuid,
             device_model: dto.device_model,
+            turnstile_token: dto.turnstile_token,
+            'cf-turnstile-response': dto.turnstile_token,
           }),
         });
 
