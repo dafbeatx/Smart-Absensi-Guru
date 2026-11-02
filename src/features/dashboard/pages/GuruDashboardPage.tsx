@@ -94,6 +94,7 @@ import {
   Users,
   ChevronDown,
   X,
+  Gamepad2,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -149,6 +150,7 @@ import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHist
 import { TopDisciplineCelebrationModal } from '../../guru/components/TopDisciplineCelebrationModal';
 import { TeacherDailyChallengeWidget } from '../../guru/components/TeacherDailyChallengeWidget';
 import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeModal';
+import { GamePidModal } from '../../guru/components/GamePidModal';
 import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
@@ -543,6 +545,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
+  const [isGamePidOpen, setIsGamePidOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // Exam Committee State (Hak Panitia Ujian & Role Title)
@@ -901,6 +904,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         setSurveyAnalyticsReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
         setBerandaLayer('SURVEY_ANALYTICS');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'game_pid':
+        setIsGamePidOpen(true);
         break;
       default:
         setIsMoreFeaturesModalOpen(true);
@@ -5072,6 +5078,35 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </span>
                   </button>
 
+                  {/* Game PID (Arena Gamifikasi & Kuis Edukasi) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (effectiveUser) {
+                        WebTrafficService.recordFeatureVisit({
+                          user_id: effectiveUser.id,
+                          user_name: effectiveUser.full_name,
+                          user_npp: effectiveUser.nip,
+                          user_role: effectiveUser.role,
+                          feature_id: 'game_pid',
+                        });
+                      }
+                      setIsGamePidOpen(true);
+                    }}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    title="Game PID: Arena Permainan Edukasi Digital"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-violet-600 to-indigo-800 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <Gamepad2 className="w-6 h-6 stroke-[1.8]" />
+                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-amber-400 text-slate-950 rounded-full min-w-3 text-center ring-2 ring-white">
+                        Baru
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-violet-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Game PID
+                    </span>
+                  </button>
+
                   {/* Poin Kebaikan Siswa */}
                   <button
                     type="button"
@@ -6693,6 +6728,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
           }
           setIsTeacherBoardOpen(true);
         }}
+        onOpenGamePidModal={() => {
+          setIsMoreFeaturesModalOpen(false);
+          setIsGamePidOpen(true);
+        }}
       />
 
       {/* 📋 Papan Presensi Harian Guru — Read-Only, Semua Guru Bisa Lihat */}
@@ -6915,6 +6954,14 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         totalTeachers={disciplineLeaderboard.totalTeachers}
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
+      />
+
+      {/* 14d. Modal Tempat & Staging Game PID (Pekan Inovasi Digital) */}
+      <GamePidModal
+        isOpen={isGamePidOpen}
+        onClose={() => setIsGamePidOpen(false)}
+        user={effectiveUser}
+        totalPoints={effectiveTotalPoints}
       />
 
       {/* 15. Modal Pop-up Apresiasi Kehormatan Juara 1, 2, dan 3 */}

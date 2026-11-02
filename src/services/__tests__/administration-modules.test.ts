@@ -208,5 +208,20 @@ export const runAdministrationModulesTestSuite = async (): Promise<{
     assert('Admin Hub 08: Error testing academic year isolation', false, err?.message);
   }
 
+  // ---------------------------------------------------------------------------
+  // TEST 9: Game PID Container & Quick Icon Integration
+  // ---------------------------------------------------------------------------
+  try {
+    const gamePidIcon = ALL_QUICK_ICONS.find((icon) => icon.id === 'game_pid');
+
+    assert(
+      'Admin Hub 09: ALL_QUICK_ICONS includes "game_pid" staging item for Game PID',
+      Boolean(gamePidIcon && gamePidIcon.title === 'Game PID' && gamePidIcon.category === 'Akademik & Nilai'),
+      `Found: ${JSON.stringify(gamePidIcon?.title)} (${gamePidIcon?.category})`
+    );
+  } catch (err: any) {
+    assert('Admin Hub 09: Error verifying Game PID in ALL_QUICK_ICONS', false, err?.message);
+  }
+
   return { passed, failed, results };
 };

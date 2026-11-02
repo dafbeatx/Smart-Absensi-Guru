@@ -30,6 +30,7 @@ import {
   FolderCheck,
   CalendarCheck,
   NotebookPen,
+  Gamepad2,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
@@ -163,6 +164,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     description: 'Notulen rapat AI & arsip risalah rapat sekolah untuk seluruh guru',
     icon: NotebookPen,
     colorClass: 'from-[#18536B] to-[#023246]',
+  },
+  {
+    id: 'game_pid',
+    title: 'Game PID',
+    category: 'Akademik & Nilai',
+    description: 'Arena permainan edukasi & kuis interaktif digital sekolah (PID)',
+    icon: Gamepad2,
+    colorClass: 'from-violet-600 to-indigo-800',
   },
   {
     id: 'direktori_siswa',

@@ -34,6 +34,7 @@ interface MoreFeaturesModalProps {
   onOpenAdministrationModal?: () => void;
   onOpenAboutModal?: () => void;
   onOpenTeacherBoard?: () => void;
+  onOpenGamePidModal?: () => void;
 }
 
 export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
@@ -67,6 +68,7 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
   onOpenAdministrationModal,
   onOpenAboutModal,
   onOpenTeacherBoard,
+  onOpenGamePidModal,
 }) => {
   if (!isOpen) return null;
 
@@ -107,6 +109,28 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
                   });
                   onClose();
                   onOpenAdministrationModal();
+                },
+              },
+            ]
+          : []),
+        ...(onOpenGamePidModal
+          ? [
+              {
+                id: 'game_pid',
+                title: 'Game PID (Pekan Inovasi Digital)',
+                subtitle: 'Arena permainan edukasi & kuis interaktif sekolah berbasis karakter',
+                icon: '🎮',
+                badge: 'Staging Area',
+                action: () => {
+                  WebTrafficService.recordFeatureVisit({
+                    user_id: user.id,
+                    user_name: user.full_name,
+                    user_npp: user.nip,
+                    user_role: user.role,
+                    feature_id: 'game_pid',
+                  });
+                  onClose();
+                  onOpenGamePidModal();
                 },
               },
             ]

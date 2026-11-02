@@ -40,6 +40,7 @@ import { TeacherPointRepository } from '../../../repositories/TeacherPointReposi
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
 import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
 import { BroadcastAnnouncementView } from '../../admin/components/BroadcastAnnouncementView';
+import { GamePidModal } from '../../guru/components/GamePidModal';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -70,6 +71,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
+  const [isGamePidOpen, setIsGamePidOpen] = useState(false);
   const [savedChampionReward, setSavedChampionReward] = useState<string | null>(null);
 
   // Settings for Geofence & Work Hours
@@ -601,6 +603,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       label: 'Hasil Survey & Solusi Guru',
       icon: '📊',
     },
+    {
+      id: 'GAME_PID',
+      label: 'Game PID (Staging)',
+      icon: '🎮',
+    },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 
@@ -616,6 +623,10 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         items={sidebarItems}
         activeTab={activeTab}
         onSelectTab={(id) => {
+          if (id === 'GAME_PID') {
+            setIsGamePidOpen(true);
+            return;
+          }
           if (id === 'LEADERBOARD') {
             setIsLeaderboardModalOpen(true);
             return;
@@ -1176,6 +1187,13 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         isFullscreen={true}
         allRegisteredTeachers={teachers}
         allPointLogs={allTeacherPointLogs}
+      />
+
+      {/* Modal Wadah Game PID (Pekan Inovasi Digital) */}
+      <GamePidModal
+        isOpen={isGamePidOpen}
+        onClose={() => setIsGamePidOpen(false)}
+        user={user}
       />
     </div>
   );

@@ -47,6 +47,7 @@ import { OfflineSyncService } from '../../../services/offline-sync.service';
 import { QuestionCorrectionModal } from '../../guru/components/QuestionCorrectionModal';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { AboutAppView } from '../../guru/components/AboutAppView';
+import { GamePidModal } from '../../guru/components/GamePidModal';
 import { WebTrafficService } from '../../../services/web-traffic.service';
 import { AdministrationHubView } from '../../administration/components/AdministrationHubView';
 import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
@@ -97,6 +98,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
+  const [isGamePidOpen, setIsGamePidOpen] = useState(false);
 
   // Buku besar poin seluruh guru tersinkronisasi
   const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
@@ -596,11 +598,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
     { id: 'SYSTEM_HEALTH', label: 'Kesehatan Cloud & AI', icon: '🩺' },
     { id: 'ABOUT', label: 'Tentang Aplikasi', icon: 'ℹ️' },
+    { id: 'GAME_PID', label: 'Game PID (Staging)', icon: '🎮' },
     { id: 'TESTS', label: 'Tests / Diagnostik', icon: '🧪' },
     ...(isDevTestModeEnabled() ? [{ id: 'DEV_TEST', label: 'Mode Tes Developer', icon: '🧪' }] : []),
   ];
 
   const handleSelectSidebarTab = (id: string) => {
+    if (id === 'GAME_PID') {
+      setIsGamePidOpen(true);
+      return;
+    }
     if (id === 'SURVEY_RESEARCH') {
       setActiveTab('SURVEY_RESEARCH');
       return;
@@ -1154,6 +1161,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
           />
         </React.Suspense>
       )}
+
+      {/* Modal Wadah Game PID (Pekan Inovasi Digital) */}
+      <GamePidModal
+        isOpen={isGamePidOpen}
+        onClose={() => setIsGamePidOpen(false)}
+        user={user}
+      />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
       <OfflineSyncIndicator />
