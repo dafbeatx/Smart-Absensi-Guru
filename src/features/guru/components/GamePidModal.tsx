@@ -12,8 +12,10 @@ import {
   CheckCircle2,
   Info,
   Clock,
+  ExternalLink,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
+import { getGamePidPlatformUrl } from '../../../config/game-pid.config';
 
 export interface GamePidModalProps {
   isOpen: boolean;
@@ -207,6 +209,20 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
                   Engine: Next Update
                 </span>
               </div>
+
+              {/* Direct Launch Link Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.open(getGamePidPlatformUrl(), '_blank', 'noopener,noreferrer');
+                  }
+                }}
+                className="w-full py-2.5 px-3 rounded-xl font-black text-xs bg-linear-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-950 hover:brightness-105 active:scale-[0.99] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer mt-2"
+              >
+                <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Buka Platform Game PID Langsung 🚀</span>
+              </button>
             </div>
           </div>
 

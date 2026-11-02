@@ -47,7 +47,7 @@ import { OfflineSyncService } from '../../../services/offline-sync.service';
 import { QuestionCorrectionModal } from '../../guru/components/QuestionCorrectionModal';
 import { TeacherDisciplineBadgeModal } from '../../guru/components/TeacherDisciplineBadgeModal';
 import { AboutAppView } from '../../guru/components/AboutAppView';
-import { GamePidModal } from '../../guru/components/GamePidModal';
+import { GamePidView } from '../../guru/components/GamePidView';
 import { WebTrafficService } from '../../../services/web-traffic.service';
 import { AdministrationHubView } from '../../administration/components/AdministrationHubView';
 import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
@@ -98,7 +98,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
-  const [isGamePidOpen, setIsGamePidOpen] = useState(false);
 
   // Buku besar poin seluruh guru tersinkronisasi
   const [allTeacherPointLogs, setAllTeacherPointLogs] = useState<TeacherPointLog[]>(() => {
@@ -605,7 +604,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
 
   const handleSelectSidebarTab = (id: string) => {
     if (id === 'GAME_PID') {
-      setIsGamePidOpen(true);
+      setActiveTab('GAME_PID');
       return;
     }
     if (id === 'SURVEY_RESEARCH') {
@@ -996,6 +995,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
               layoutMode="desktop"
             />
           )}
+
+          {/* TAB: WADAH PLATFORM GAME PID (LAYER RESMI NON-POPUP) */}
+          {activeTab === 'GAME_PID' && (
+            <div className="max-w-4xl mx-auto">
+              <GamePidView
+                onBack={() => setActiveTab('DASHBOARD')}
+                backLabel="Kembali ke Dashboard Utama"
+                user={user}
+              />
+            </div>
+          )}
         </main>
       </div>
 
@@ -1162,12 +1172,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
         </React.Suspense>
       )}
 
-      {/* Modal Wadah Game PID (Pekan Inovasi Digital) */}
-      <GamePidModal
-        isOpen={isGamePidOpen}
-        onClose={() => setIsGamePidOpen(false)}
-        user={user}
-      />
 
       {/* Indikator Status Koneksi & Antrean Sinkronisasi Dexie.js */}
       <OfflineSyncIndicator />

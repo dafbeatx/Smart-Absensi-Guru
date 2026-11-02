@@ -40,7 +40,7 @@ import { TeacherPointRepository } from '../../../repositories/TeacherPointReposi
 import { MeetingMinutesView } from '../../meeting-minutes/components/MeetingMinutesView';
 import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
 import { BroadcastAnnouncementView } from '../../admin/components/BroadcastAnnouncementView';
-import { GamePidModal } from '../../guru/components/GamePidModal';
+import { GamePidView } from '../../guru/components/GamePidView';
 
 export interface KepsekDashboardPageProps {
   onOpenScanner?: () => void;
@@ -71,7 +71,6 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
   const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
-  const [isGamePidOpen, setIsGamePidOpen] = useState(false);
   const [savedChampionReward, setSavedChampionReward] = useState<string | null>(null);
 
   // Settings for Geofence & Work Hours
@@ -624,7 +623,7 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         activeTab={activeTab}
         onSelectTab={(id) => {
           if (id === 'GAME_PID') {
-            setIsGamePidOpen(true);
+            setActiveTab('GAME_PID');
             return;
           }
           if (id === 'LEADERBOARD') {
@@ -1053,6 +1052,17 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           {/* TAB 5: DEV TEST MODE */}
           {activeTab === 'DEV_TEST' && <DevTestPage onBackToDashboard={() => setActiveTab('DASHBOARD')} />}
+
+          {/* TAB: WADAH PLATFORM GAME PID (LAYER RESMI NON-POPUP) */}
+          {activeTab === 'GAME_PID' && (
+            <div className="max-w-4xl mx-auto">
+              <GamePidView
+                onBack={() => setActiveTab('DASHBOARD')}
+                backLabel="Kembali ke Dashboard Utama"
+                user={user}
+              />
+            </div>
+          )}
         </main>
       </div>
 
@@ -1189,12 +1199,6 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         allPointLogs={allTeacherPointLogs}
       />
 
-      {/* Modal Wadah Game PID (Pekan Inovasi Digital) */}
-      <GamePidModal
-        isOpen={isGamePidOpen}
-        onClose={() => setIsGamePidOpen(false)}
-        user={user}
-      />
     </div>
   );
 };

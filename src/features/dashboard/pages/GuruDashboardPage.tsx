@@ -95,6 +95,7 @@ import {
   ChevronDown,
   X,
   Gamepad2,
+  ExternalLink,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -150,7 +151,8 @@ import { TeacherPointHistoryModal } from '../../guru/components/TeacherPointHist
 import { TopDisciplineCelebrationModal } from '../../guru/components/TopDisciplineCelebrationModal';
 import { TeacherDailyChallengeWidget } from '../../guru/components/TeacherDailyChallengeWidget';
 import { TeacherChallengeModal } from '../../guru/components/TeacherChallengeModal';
-import { GamePidModal } from '../../guru/components/GamePidModal';
+import { GamePidView } from '../../guru/components/GamePidView';
+import { getGamePidPlatformUrl } from '../../../config/game-pid.config';
 import { TeacherChallengeService } from '../../../services/teacher-challenge.service';
 import { CheckoutReminderBanner } from '../components/CheckoutReminderBanner';
 import { AttendancePolicyAgreementModal } from '../../guru/components/AttendancePolicyAgreementModal';
@@ -346,9 +348,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS' | 'GAME_PID'>('HOME');
   const berandaLayerRef = React.useRef(berandaLayer);
   berandaLayerRef.current = berandaLayer;
+  const [gamePidReturnTarget, setGamePidReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [surveyAnalyticsReturnTarget, setSurveyAnalyticsReturnTarget] = useState<'HOME' | 'ALL_FEATURES' | 'PROFIL'>('HOME');
   const [notulenReturnTarget, setNotulenReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const [studentBehaviorReturnTarget, setStudentBehaviorReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
@@ -545,7 +548,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
-  const [isGamePidOpen, setIsGamePidOpen] = useState(false);
   const pendingAttendanceActionRef = useRef<(() => void) | null>(null);
 
   // Exam Committee State (Hak Panitia Ujian & Role Title)
@@ -906,7 +908,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'game_pid':
-        setIsGamePidOpen(true);
+        setGamePidReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+        setBerandaLayer('GAME_PID');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       default:
         setIsMoreFeaturesModalOpen(true);
@@ -4372,6 +4376,64 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                 </button>
               </div>
 
+              {/* 🎮 Platform Game PID (Pekan Inovasi Digital - Akses Langsung Guru) */}
+              <div className="pt-2 border-t border-slate-100">
+                <div className="rounded-2xl bg-linear-to-r from-violet-900 via-indigo-900 to-[#023246] p-3 sm:p-3.5 text-white shadow-xs border border-violet-700/40 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-violet-600/80 text-white flex items-center justify-center shrink-0 shadow-2xs border border-violet-400/30">
+                        <Gamepad2 className="w-5 h-5 text-amber-300" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs sm:text-sm font-black text-white truncate leading-tight">
+                            Platform Game PID
+                          </p>
+                          <span className="px-1.5 py-0.2 rounded-md bg-amber-400 text-slate-950 text-[8.5px] font-black uppercase tracking-wider shrink-0">
+                            Pekan Inovasi
+                          </span>
+                        </div>
+                        <p className="text-[10px] sm:text-[10.5px] text-violet-200 truncate mt-0.5 font-medium">
+                          Wahana kuis interaktif &amp; gamifikasi edukasi sekolah
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    {/* Tombol 1: Link Langsung ke Platform Game PID */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.open(getGamePidPlatformUrl(), '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                      className="py-2 px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-slate-950 font-black text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs truncate"
+                      title="Buka platform game PID di tab baru"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Buka Platform ↗</span>
+                    </button>
+
+                    {/* Tombol 2: Buka Ruang Wadah Game PID di Aplikasi (Non-Popup) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGamePidReturnTarget('HOME');
+                        setBerandaLayer('GAME_PID');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="py-2 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 active:scale-[0.98] text-white border border-white/25 font-black text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs truncate"
+                      title="Lihat arena & mode game di SAGA (Non-Popup)"
+                    >
+                      <Gamepad2 className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                      <span className="truncate">Ruang Game PID →</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Tulisan & Tombol More: Pindah Layer ke Semua Fitur */}
               <div className="pt-2 border-t border-slate-100">
                 <button
@@ -5091,7 +5153,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                           feature_id: 'game_pid',
                         });
                       }
-                      setIsGamePidOpen(true);
+                      setGamePidReturnTarget('ALL_FEATURES');
+                      setBerandaLayer('GAME_PID');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
                     title="Game PID: Arena Permainan Edukasi Digital"
@@ -5512,6 +5576,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               }
             />
           </div>
+        )}
+
+        {/* ── LAYER: GAME PID (PEKAN INOVASI DIGITAL - DEDICATED FULL VIEW - NON-POPUP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'GAME_PID' && (
+          <GamePidView
+            onBack={() => {
+              setBerandaLayer(gamePidReturnTarget);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            backLabel={gamePidReturnTarget === 'ALL_FEATURES' ? 'Kembali ke Semua Fitur' : 'Kembali ke Beranda'}
+            user={effectiveUser}
+            totalPoints={effectiveTotalPoints}
+          />
         )}
 
         {/* ── TAB 2: RIWAYAT BULANAN ──────────────────────────────────────── */}
@@ -6730,7 +6807,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         }}
         onOpenGamePidModal={() => {
           setIsMoreFeaturesModalOpen(false);
-          setIsGamePidOpen(true);
+          setGamePidReturnTarget('ALL_FEATURES');
+          setBerandaLayer('GAME_PID');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />
 
@@ -6956,13 +7035,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
         selectedYear={selectedYear}
       />
 
-      {/* 14d. Modal Tempat & Staging Game PID (Pekan Inovasi Digital) */}
-      <GamePidModal
-        isOpen={isGamePidOpen}
-        onClose={() => setIsGamePidOpen(false)}
-        user={effectiveUser}
-        totalPoints={effectiveTotalPoints}
-      />
 
       {/* 15. Modal Pop-up Apresiasi Kehormatan Juara 1, 2, dan 3 */}
       <TopDisciplineCelebrationModal
