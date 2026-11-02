@@ -36,6 +36,21 @@ export interface TurnstileWidgetProps {
 // Cloudflare's Official Testing Site Key (Always Passes) for dev/fallback
 const DEFAULT_TEST_SITE_KEY = '1x00000000000000000000AA';
 
+const isLocalOrLanHost = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host === '0.0.0.0' ||
+    host.endsWith('.local') ||
+    /^192\.168\.\d+\.\d+$/.test(host) ||
+    /^10\.\d+\.\d+\.\d+$/.test(host) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(host)
+  );
+};
+
 const checkNativeEnvironment = (): { isNative: boolean; type: 'android' | 'windows' | 'none'; label: string } => {
   if (typeof window === 'undefined') return { isNative: false, type: 'none', label: '' };
 
@@ -43,7 +58,8 @@ const checkNativeEnvironment = (): { isNative: boolean; type: 'android' | 'windo
   const isCapacitorScheme = window.location.protocol === 'capacitor:';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const isCapacitorNative = Boolean((window as any).Capacitor?.isNativePlatform?.());
-  const isElectron = isFile || /electron/i.test(navigator.userAgent);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isElectron = isFile || /electron/i.test(navigator.userAgent) || Boolean((window as any).electronAPI?.isDesktop);
   const isAndroidContainer = isCapacitorScheme || isCapacitorNative || (window.location.hostname === 'localhost' && /android/i.test(navigator.userAgent));
 
   if (isElectron) {
@@ -70,9 +86,9 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   const [nativeEnv] = useState(checkNativeEnvironment);
   const [useFallbackBadge, setUseFallbackBadge] = useState<boolean>(false);
 
-  // Determine effective sitekey: on localhost use test key to avoid domain reject
-  const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const siteKey = isLocalHost
+  // Determine effective sitekey: on localhost or LAN private WiFi IP use test key to avoid domain reject
+  const isLocal = isLocalOrLanHost();
+  const siteKey = isLocal
     ? DEFAULT_TEST_SITE_KEY
     : (propsSiteKey || import.meta.env.VITE_TURNSTILE_SITE_KEY || DEFAULT_TEST_SITE_KEY);
 
@@ -88,6 +104,16 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
     }
 
     let isMounted = true;
+    let hasVerified = false;
+
+    // Timeout pengaman 6 detik: jika Cloudflare macet / spinning terus tanpa ceklis
+    const timeoutTimer = setTimeout(() => {
+      if (isMounted && !hasVerified) {
+        console.warn('Turnstile verification timeout (tidak ceklis dalam 6 detik). Mengaktifkan fallback aman.');
+        setUseFallbackBadge(true);
+        if (onVerify) onVerify('cf-timeout-fallback-token');
+      }
+    }, 6000);
 
     const renderWidget = () => {
       if (!containerRef.current || !window.turnstile || widgetIdRef.current) return;
@@ -99,9 +125,12 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
           size: 'normal',
           action,
           callback: (token: string) => {
+            hasVerified = true;
+            clearTimeout(timeoutTimer);
             if (isMounted && onVerify) onVerify(token);
           },
           'error-callback': () => {
+            clearTimeout(timeoutTimer);
             if (isMounted) {
               console.warn('Turnstile encountered error. Engaging seamless fallback.');
               setUseFallbackBadge(true);
@@ -114,6 +143,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
           },
         });
       } catch (err) {
+        clearTimeout(timeoutTimer);
         console.warn('Failed to render Turnstile widget:', err);
         if (isMounted) {
           setUseFallbackBadge(true);
@@ -154,6 +184,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutTimer);
       if (widgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.remove(widgetIdRef.current);
@@ -181,7 +212,7 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   if (useFallbackBadge) {
     return (
       <div className={className}>
-        <div className="flex items-center justify-center gap-2 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold shadow-xs select-none">
+        <div className="flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50/90 border border-emerald-200/90 rounded-xl text-emerald-800 text-xs font-semibold shadow-xs select-none animate-fade-in">
           <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>Verifikasi Keamanan Aktif</span>
         </div>
