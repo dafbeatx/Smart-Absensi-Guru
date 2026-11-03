@@ -49,7 +49,7 @@ export async function runCounselingBkTestSuite(): Promise<{
       class_name: '8A',
       counselor_id: counselorId,
       counselor_name: 'Mawar Andinia, S.Pd., G.r',
-      counselor_npp: '19940725 202201 2 008',
+      counselor_npp: null,
       counseling_date: '2026-11-03',
       counseling_time: '10:00',
       counseling_type: 'BEHAVIOR_MEDIATION',

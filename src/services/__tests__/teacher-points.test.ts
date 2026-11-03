@@ -926,7 +926,7 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       {
         id: 'usr_guru_002',
         full_name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r',
-        nip: '19880512 201503 1 002',
+        nip: null,
         position: 'Wakasek Sarana dan Prasarana',
         role: 'GURU',
         phone_number: '08123456789',
