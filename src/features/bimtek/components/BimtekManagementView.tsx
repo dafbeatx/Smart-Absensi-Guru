@@ -346,7 +346,7 @@ export const BimtekManagementView: React.FC<BimtekManagementViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari nama bimtek, penyelenggara, atau lokasi..."
-              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none text-slate-900 transition-all placeholder:text-slate-400"
+              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all placeholder-slate-400"
             />
           </div>
 

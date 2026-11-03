@@ -259,7 +259,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Contoh: Bimtek Pemanfaatan AI untuk Asesmen Pembelajaran SMP"
                 required
-                className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none font-medium text-slate-900 transition-all placeholder:text-slate-400"
+                className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900 transition-all placeholder-slate-400"
               />
             </div>
 
@@ -271,7 +271,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                 <select
                   value={activityType}
                   onChange={(e) => setActivityType(e.target.value as BimtekActivityType)}
-                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none font-medium text-slate-900 transition-all cursor-pointer"
+                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900 transition-all cursor-pointer"
                 >
                   {Object.entries(BIMTEK_ACTIVITY_LABELS).map(([k, label]) => (
                     <option key={k} value={k}>
@@ -288,7 +288,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                 <select
                   value={scope}
                   onChange={(e) => setScope(e.target.value as BimtekScope)}
-                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none font-medium text-slate-900 transition-all cursor-pointer"
+                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900 transition-all cursor-pointer"
                 >
                   {Object.entries(BIMTEK_SCOPE_LABELS).map(([k, label]) => (
                     <option key={k} value={k}>
@@ -311,7 +311,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                   onChange={(e) => setOrganizer(e.target.value)}
                   placeholder="Ketik nama penyelenggara atau pilih rekomendasi di bawah"
                   required
-                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none font-medium text-slate-900 transition-all placeholder:text-slate-400"
+                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900 transition-all placeholder-slate-400"
                 />
               </div>
               <div className="flex items-center gap-1.5 flex-wrap mt-2">
@@ -337,7 +337,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as BimtekRole)}
-                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none font-medium text-slate-900 transition-all cursor-pointer"
+                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900 transition-all cursor-pointer"
                 >
                   {Object.entries(BIMTEK_ROLE_LABELS).map(([k, label]) => (
                     <option key={k} value={k}>
@@ -354,7 +354,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                 <select
                   value={executionMethod}
                   onChange={(e) => setExecutionMethod(e.target.value as BimtekMethod)}
-                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none font-medium text-slate-900 transition-all cursor-pointer"
+                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-900 transition-all cursor-pointer"
                 >
                   {Object.entries(BIMTEK_METHOD_LABELS).map(([k, label]) => (
                     <option key={k} value={k}>
@@ -383,7 +383,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   required
-                  className="w-full h-11 px-3 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none font-medium text-slate-900 transition-all"
+                  className="w-full h-11 px-3 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-900 transition-all"
                 />
               </div>
 
@@ -396,7 +396,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   required
-                  className="w-full h-11 px-3 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none font-medium text-slate-900 transition-all"
+                  className="w-full h-11 px-3 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-900 transition-all"
                 />
               </div>
 
@@ -412,7 +412,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                     value={durationHours}
                     onChange={(e) => setDurationHours(Math.max(1, parseInt(e.target.value, 10) || 1))}
                     required
-                    className="w-full h-11 pl-3 pr-10 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none font-black text-slate-900 transition-all"
+                    className="w-full h-11 pl-3 pr-10 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-black text-slate-900 transition-all"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                     JP
@@ -431,7 +431,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                 onChange={(e) => setLocationOrPlatform(e.target.value)}
                 placeholder="Contoh: Zoom Meeting ID / BBGP Jawa Barat / Aula Utama SMPT"
                 required
-                className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none font-medium text-slate-900 transition-all placeholder:text-slate-400"
+                className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-900 transition-all placeholder-slate-400"
               />
             </div>
           </div>
@@ -453,7 +453,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                   value={certificateNumber}
                   onChange={(e) => setCertificateNumber(e.target.value)}
                   placeholder="Contoh: 1245/B.BBGP/PK.01/2026"
-                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none font-medium text-slate-900 transition-all placeholder:text-slate-400"
+                  className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-900 transition-all placeholder-slate-400"
                 />
               </div>
 
@@ -465,7 +465,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                   type="date"
                   value={certificateDate}
                   onChange={(e) => setCertificateDate(e.target.value)}
-                  className="w-full h-11 px-3 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none font-medium text-slate-900 transition-all"
+                  className="w-full h-11 px-3 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-900 transition-all"
                 />
               </div>
             </div>
@@ -480,7 +480,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                   value={certificateUrl}
                   onChange={(e) => setCertificateUrl(e.target.value)}
                   placeholder="https://drive.google.com/file/d/..."
-                  className="w-full h-11 pl-9 pr-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none font-medium text-slate-900 transition-all placeholder:text-slate-400"
+                  className="w-full h-11 pl-9 pr-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-900 transition-all placeholder-slate-400"
                 />
                 <LinkIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               </div>
@@ -495,7 +495,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
                 value={assignmentLetterNumber}
                 onChange={(e) => setAssignmentLetterNumber(e.target.value)}
                 placeholder="Contoh: 421.3/089/SMPT-AL/ST/2026"
-                className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none font-medium text-slate-900 transition-all placeholder:text-slate-400"
+                className="w-full h-11 px-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-900 transition-all placeholder-slate-400"
               />
             </div>
           </div>
@@ -511,7 +511,7 @@ export const BimtekRecordModal: React.FC<BimtekRecordModalProps> = ({
               value={summaryNotes}
               onChange={(e) => setSummaryNotes(e.target.value)}
               placeholder="Deskripsikan secara ringkas substansi materi yang diperoleh dan rencana diseminasi / penerapannya kepada rekan sejawat atau siswa di kelas..."
-              className="w-full p-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none font-medium text-slate-900 transition-all placeholder:text-slate-400"
+              className="w-full p-3 text-sm sm:text-base bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-900 transition-all placeholder-slate-400"
             />
           </div>
         </form>

@@ -322,7 +322,7 @@ export const BimtekDetailModal: React.FC<BimtekDetailModalProps> = ({
                   value={verificationNotes}
                   onChange={(e) => setVerificationNotes(e.target.value)}
                   placeholder="Contoh: Dokumen sertifikat valid dan terverifikasi untuk 32 JP"
-                  className="w-full h-11 px-3 text-sm bg-white border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none font-medium text-slate-900"
+                  className="w-full h-11 px-3 text-sm bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-900"
                 />
               </div>
 
