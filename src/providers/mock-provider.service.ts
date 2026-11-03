@@ -4,6 +4,12 @@ import type {
   UpdateBimtekDTO,
   VerifyBimtekDTO,
 } from '../types/bimtek.types';
+import type {
+  CounselingRecord,
+  CreateCounselingDTO,
+  UpdateCounselingDTO,
+  CounselingFilter,
+} from '../types/counseling.types';
 import type { IDataProvider } from './data-provider.interface';
 import type {
   UserProfile,
@@ -4488,6 +4494,214 @@ export class MockProvider implements IDataProvider {
     if (filtered.length === list.length) return false;
 
     safeSetStorage('smart_absensi_bimtek_records', JSON.stringify(filtered));
+    return true;
+  }
+
+  // ── Counseling & Guidance (Catatan BK Siswa) ─────────────────────────
+  private getStoredCounseling(): CounselingRecord[] {
+    const raw = safeGetStorage('smart_absensi_counseling_records');
+    if (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.error('MockProvider: Failed to parse stored counseling records:', e);
+      }
+    }
+
+    const defaultRecords: CounselingRecord[] = [
+      {
+        id: 'bk_seed_001',
+        student_id: 'std_998f8f03',
+        student_name: 'TASYIRA AFIFA',
+        student_nisn: '0098712345',
+        class_name: '7A',
+        counselor_id: 'usr_guru_010',
+        counselor_name: 'Mawar Andinia, S.Pd., G.r',
+        counselor_npp: '19940725 202201 2 008',
+        counseling_date: '2026-11-02',
+        counseling_time: '09:30',
+        counseling_type: 'ACADEMIC_GUIDANCE',
+        urgency: 'LOW',
+        status: 'RESOLVED',
+        visibility: 'PUBLIC_STUDENT',
+        topic: 'Strategi Manajemen Waktu Belajar & Pembiasaan Belajar Mandiri di Rumah',
+        background_narrative: 'Siswa menyampaikan kendala membagi waktu antara mengerjakan tugas proyek kelompok dan hafalan mandiri.',
+        action_taken: 'Konselor membimbing penyusunan jadwal belajar harian terstruktur dan teknik pomodoro 25 menit.',
+        student_commitment: 'Berkomitmen menjalankan jadwal belajar baru dan melapor berkala setiap hari Senin.',
+        parent_involvement: 'Orang tua telah dihubungi dan mendukung pendampingan belajar ramah anak di rumah.',
+        follow_up_plan: 'Monitoring berkala pada capaian formatif tengah semester.',
+        follow_up_date: '2026-11-16',
+        academic_year: '2026/2027',
+        semester: 'GANJIL',
+        synced_to_nawasena: true,
+        created_at: new Date(Date.now() - 86400000).toISOString(),
+        updated_at: new Date(Date.now() - 86400000).toISOString(),
+      },
+      {
+        id: 'bk_seed_002',
+        student_id: 'std_876a1102',
+        student_name: 'MUHAMMAD RIZKY PRATAMA',
+        student_nisn: '0089123412',
+        class_name: '8B',
+        counselor_id: 'usr_guru_010',
+        counselor_name: 'Mawar Andinia, S.Pd., G.r',
+        counselor_npp: '19940725 202201 2 008',
+        counseling_date: '2026-11-03',
+        counseling_time: '08:15',
+        counseling_type: 'BEHAVIOR_MEDIATION',
+        urgency: 'HIGH',
+        status: 'IN_PROGRESS',
+        visibility: 'PUBLIC_STUDENT',
+        topic: 'Pembinaan Kedisiplinan Jam Masuk Sekolah & Pengurangan Poin Pelanggaran',
+        background_narrative: 'Tercatat 3 kali keterlambatan masuk gerbang di atas pukul 07:15 WIB pada pekan terakhir.',
+        action_taken: 'Konseling empatik untuk menggali akar masalah transportasi dan pembinaan komitmen disiplin.',
+        student_commitment: 'Berangkat 20 menit lebih awal bersama angkutan jemputan dan tidur maksimal 21:30 WIB.',
+        parent_involvement: 'Orang tua dijadwalkan hadir ke ruang BK pada hari Kamis jam 10:00 WIB.',
+        follow_up_plan: 'Evaluasi presensi RFID gerbang sekolah selama 1 pekan ke depan.',
+        follow_up_date: '2026-11-10',
+        academic_year: '2026/2027',
+        semester: 'GANJIL',
+        synced_to_nawasena: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ];
+
+    safeSetStorage('smart_absensi_counseling_records', JSON.stringify(defaultRecords));
+    return defaultRecords;
+  }
+
+  public async getCounselingRecords(filter?: CounselingFilter, _token?: string): Promise<CounselingRecord[]> {
+    let list = this.getStoredCounseling();
+
+    if (filter) {
+      if (filter.className && filter.className !== 'ALL') {
+        list = list.filter((r) => r.class_name === filter.className);
+      }
+      if (filter.counselingType && filter.counselingType !== 'ALL') {
+        list = list.filter((r) => r.counseling_type === filter.counselingType);
+      }
+      if (filter.status && filter.status !== 'ALL') {
+        list = list.filter((r) => r.status === filter.status);
+      }
+      if (filter.urgency && filter.urgency !== 'ALL') {
+        list = list.filter((r) => r.urgency === filter.urgency);
+      }
+      if (filter.counselorId) {
+        list = list.filter((r) => r.counselor_id === filter.counselorId);
+      }
+      if (filter.studentName && filter.studentName.trim()) {
+        const query = filter.studentName.trim().toLowerCase();
+        list = list.filter(
+          (r) =>
+            r.student_name.toLowerCase().includes(query) ||
+            r.topic.toLowerCase().includes(query) ||
+            (r.student_nisn && r.student_nisn.includes(query))
+        );
+      }
+      if (filter.academicYear) {
+        list = list.filter((r) => r.academic_year === filter.academicYear);
+      }
+    }
+
+    return [...list].sort(
+      (a, b) => new Date(b.counseling_date || b.created_at).getTime() - new Date(a.counseling_date || a.created_at).getTime()
+    );
+  }
+
+  public async createCounselingRecord(dto: CreateCounselingDTO, _token?: string): Promise<CounselingRecord> {
+    const list = this.getStoredCounseling();
+    const newRecord: CounselingRecord = {
+      id: 'bk_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      student_id: dto.student_id,
+      student_name: dto.student_name.trim(),
+      student_nisn: dto.student_nisn ? dto.student_nisn.trim() : null,
+      class_name: dto.class_name,
+      counselor_id: dto.counselor_id,
+      counselor_name: dto.counselor_name.trim(),
+      counselor_npp: dto.counselor_npp ? dto.counselor_npp.trim() : null,
+      counseling_date: dto.counseling_date || new Date().toISOString().slice(0, 10),
+      counseling_time: dto.counseling_time || null,
+      counseling_type: dto.counseling_type || 'INDIVIDUAL',
+      urgency: dto.urgency || 'MEDIUM',
+      status: dto.status || 'IN_PROGRESS',
+      visibility: dto.visibility || 'PUBLIC_STUDENT',
+      topic: dto.topic.trim(),
+      background_narrative: dto.background_narrative ? dto.background_narrative.trim() : null,
+      action_taken: dto.action_taken.trim(),
+      student_commitment: dto.student_commitment ? dto.student_commitment.trim() : null,
+      parent_involvement: dto.parent_involvement ? dto.parent_involvement.trim() : null,
+      follow_up_plan: dto.follow_up_plan ? dto.follow_up_plan.trim() : null,
+      follow_up_date: dto.follow_up_date || null,
+      academic_year: dto.academic_year || '2026/2027',
+      semester: dto.semester || 'GANJIL',
+      synced_to_nawasena: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const updated = [newRecord, ...list];
+    safeSetStorage('smart_absensi_counseling_records', JSON.stringify(updated));
+    return newRecord;
+  }
+
+  public async updateCounselingRecord(
+    id: string,
+    dto: UpdateCounselingDTO,
+    _token?: string
+  ): Promise<CounselingRecord | null> {
+    const list = this.getStoredCounseling();
+    const index = list.findIndex((item) => item.id === id);
+    if (index === -1) return null;
+
+    const target = list[index];
+    const updatedRecord: CounselingRecord = {
+      ...target,
+      counseling_type: dto.counseling_type !== undefined ? dto.counseling_type : target.counseling_type,
+      urgency: dto.urgency !== undefined ? dto.urgency : target.urgency,
+      status: dto.status !== undefined ? dto.status : target.status,
+      visibility: dto.visibility !== undefined ? dto.visibility : target.visibility,
+      topic: dto.topic !== undefined ? dto.topic.trim() : target.topic,
+      background_narrative:
+        dto.background_narrative !== undefined
+          ? dto.background_narrative
+            ? dto.background_narrative.trim()
+            : null
+          : target.background_narrative,
+      action_taken: dto.action_taken !== undefined ? dto.action_taken.trim() : target.action_taken,
+      student_commitment:
+        dto.student_commitment !== undefined
+          ? dto.student_commitment
+            ? dto.student_commitment.trim()
+            : null
+          : target.student_commitment,
+      parent_involvement:
+        dto.parent_involvement !== undefined
+          ? dto.parent_involvement
+            ? dto.parent_involvement.trim()
+            : null
+          : target.parent_involvement,
+      follow_up_plan:
+        dto.follow_up_plan !== undefined
+          ? dto.follow_up_plan
+            ? dto.follow_up_plan.trim()
+            : null
+          : target.follow_up_plan,
+      follow_up_date: dto.follow_up_date !== undefined ? dto.follow_up_date : target.follow_up_date,
+      updated_at: new Date().toISOString(),
+    };
+
+    list[index] = updatedRecord;
+    safeSetStorage('smart_absensi_counseling_records', JSON.stringify(list));
+    return updatedRecord;
+  }
+
+  public async deleteCounselingRecord(id: string, _token?: string): Promise<boolean> {
+    const list = this.getStoredCounseling();
+    const filtered = list.filter((item) => item.id !== id);
+    if (filtered.length === list.length) return false;
+
+    safeSetStorage('smart_absensi_counseling_records', JSON.stringify(filtered));
     return true;
   }
 

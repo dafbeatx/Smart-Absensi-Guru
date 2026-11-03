@@ -1,4 +1,5 @@
 import { BimtekManagementView } from '../../bimtek/components/BimtekManagementView';
+import { CounselingManagementView } from '../../counseling/components/CounselingManagementView';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
@@ -97,6 +98,7 @@ import {
   X,
   Gamepad2,
   ExternalLink,
+  HeartHandshake,
 } from 'lucide-react';
 import { BiometricAttendanceModal } from '../../guru/components/BiometricAttendanceModal';
 import { AttendanceMethodChoiceModal } from '../../guru/components/AttendanceMethodChoiceModal';
@@ -349,8 +351,9 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS' | 'GAME_PID' | 'BIMTEK'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS' | 'GAME_PID' | 'BIMTEK' | 'COUNSELING_BK'>('HOME');
   const [bimtekReturnTarget, setBimtekReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
+  const [counselingReturnTarget, setCounselingReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const berandaLayerRef = React.useRef(berandaLayer);
   berandaLayerRef.current = berandaLayer;
   const [gamePidReturnTarget, setGamePidReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
@@ -912,6 +915,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       case 'bimtek':
         setBimtekReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
         setBerandaLayer('BIMTEK');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'counseling_bk':
+        setCounselingReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+        setBerandaLayer('COUNSELING_BK');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'game_pid':
@@ -5232,6 +5240,37 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                     </span>
                   </button>
 
+                  {/* Catatan Bimbingan Konseling (BK) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (effectiveUser) {
+                        WebTrafficService.recordFeatureVisit({
+                          user_id: effectiveUser.id,
+                          user_name: effectiveUser.full_name,
+                          user_npp: effectiveUser.nip,
+                          user_role: effectiveUser.role,
+                          feature_id: 'counseling_bk',
+                        });
+                      }
+                      setCounselingReturnTarget('ALL_FEATURES');
+                      setBerandaLayer('COUNSELING_BK');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="group flex flex-col items-center justify-start text-center cursor-pointer active:scale-95 transition-all p-1 min-w-0"
+                    title="Catatan Bimbingan Konseling (BK) & Nawasena Sync"
+                  >
+                    <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-linear-to-b from-emerald-700 to-teal-900 text-white flex items-center justify-center shadow-xs group-hover:brightness-110 transition-all shrink-0 relative">
+                      <HeartHandshake className="w-6 h-6 stroke-[1.8] text-emerald-200" />
+                      <span className="absolute -top-1 -right-1 px-1 py-0.2 text-[8px] font-black bg-blue-500 text-white rounded-full min-w-3 text-center ring-2 ring-white">
+                        BK
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 group-hover:text-emerald-800 transition-colors mt-1.5 leading-tight tracking-tight text-center truncate w-full">
+                      Catatan BK
+                    </span>
+                  </button>
+
                   {/* Terminal RFID Siswa (Jika Piket Aktif) */}
                   {isDutyTeacherToday && (
                     <button
@@ -5608,6 +5647,17 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
             backLabel={gamePidReturnTarget === 'ALL_FEATURES' ? 'Kembali ke Semua Fitur' : 'Kembali ke Beranda'}
             user={effectiveUser}
             totalPoints={effectiveTotalPoints}
+          />
+        )}
+
+        {/* ── LAYER: CATATAN BIMBINGAN KONSELING (BK) (DEDICATED FULL VIEW - NON-POPUP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'COUNSELING_BK' && (
+          <CounselingManagementView
+            currentUser={effectiveUser}
+            onBack={() => {
+              setBerandaLayer(counselingReturnTarget);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 

@@ -74,6 +74,12 @@ import type {
   UpdateBimtekDTO,
   VerifyBimtekDTO,
 } from '../types/bimtek.types';
+import type {
+  CounselingRecord,
+  CreateCounselingDTO,
+  UpdateCounselingDTO,
+  CounselingFilter,
+} from '../types/counseling.types';
 
 export interface IDataProvider {
   // Auth API
@@ -282,6 +288,13 @@ export interface IDataProvider {
   updateBimtekRecord(id: string, dto: UpdateBimtekDTO, token?: string): Promise<BimtekRecord | null>;
   verifyBimtekRecord(id: string, dto: VerifyBimtekDTO, token?: string): Promise<boolean>;
   deleteBimtekRecord(id: string, token?: string): Promise<boolean>;
+
+  // Student Counseling & Guidance (Catatan Bimbingan Konseling - BK) API
+  // Terkoneksi ke Nawasena Platform Siswa (https://nawasena-platform-siswa.vercel.app)
+  getCounselingRecords(filter?: CounselingFilter, token?: string): Promise<CounselingRecord[]>;
+  createCounselingRecord(dto: CreateCounselingDTO, token?: string): Promise<CounselingRecord>;
+  updateCounselingRecord(id: string, dto: UpdateCounselingDTO, token?: string): Promise<CounselingRecord | null>;
+  deleteCounselingRecord(id: string, token?: string): Promise<boolean>;
 }
 
 

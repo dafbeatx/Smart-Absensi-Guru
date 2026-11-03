@@ -1,4 +1,5 @@
 import { BimtekManagementView } from '../../bimtek/components/BimtekManagementView';
+import { CounselingManagementView } from '../../counseling/components/CounselingManagementView';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
@@ -604,6 +605,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       icon: '📊',
     },
     {
+      id: 'COUNSELING_BK',
+      label: 'Catatan BK & Nawasena',
+      icon: '💚',
+    },
+    {
       id: 'BIMTEK',
       label: 'Validasi Bimtek & Diklat',
       icon: '🎖️',
@@ -628,6 +634,10 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         items={sidebarItems}
         activeTab={activeTab}
         onSelectTab={(id) => {
+          if (id === 'COUNSELING_BK') {
+            setActiveTab('COUNSELING_BK');
+            return;
+          }
           if (id === 'BIMTEK') {
             setActiveTab('BIMTEK');
             return;
@@ -1070,6 +1080,16 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
                 currentUser={user}
                 onBack={() => setActiveTab('DASHBOARD')}
                 initialTab="ALL_TEACHERS"
+              />
+            </div>
+          )}
+
+          {/* TAB: CATATAN BIMBINGAN KONSELING (BK) & NAWASENA SYNC */}
+          {activeTab === 'COUNSELING_BK' && (
+            <div className="max-w-5xl mx-auto">
+              <CounselingManagementView
+                currentUser={user || { id: 'kepsek', full_name: 'Kepala Sekolah', role: 'KEPSEK' }}
+                onBack={() => setActiveTab('DASHBOARD')}
               />
             </div>
           )}

@@ -62,6 +62,7 @@ import { runAttendanceReminderSettingsTestSuite } from './__tests__/attendance-r
 import { runAttendanceCorrectionNotificationExclusionTestSuite } from './__tests__/attendance-correction-notification-exclusion.test';
 
 import { runBimtekTestSuite } from './__tests__/bimtek-engine.test';
+import { runCounselingBkTestSuite } from './__tests__/counseling-bk.test';
 export interface TestResultItem {
   testName: string;
   status: 'PASS' | 'FAIL';
@@ -166,6 +167,7 @@ export class MasterTestRunner {
       { name: 'Pengumuman Notifikasi Push Guru & Anti-Spam Safeguards Suite (Phase 5.4)', fn: runAnnouncementBroadcastTestSuite },
       { name: 'Attendance Reminder Settings & 13:00 Accuracy Engine', fn: runAttendanceReminderSettingsTestSuite },
       { name: 'Bimtek & Diklat Guru Recording Engine (Phase 5.5)', fn: runBimtekTestSuite },
+      { name: 'Catatan Bimbingan Konseling (BK) & Nawasena Sync Engine (Phase 5.6)', fn: runCounselingBkTestSuite },
       { name: 'Attendance Correction & Leave Notification Exclusion Engine', fn: runAttendanceCorrectionNotificationExclusionTestSuite },
     ];
 

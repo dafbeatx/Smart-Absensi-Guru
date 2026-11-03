@@ -1,4 +1,5 @@
 import { BimtekManagementView } from '../../bimtek/components/BimtekManagementView';
+import { CounselingManagementView } from '../../counseling/components/CounselingManagementView';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Button } from '../../../components/ui/Button';
@@ -598,6 +599,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
     { id: 'QR_POSTER', label: 'Poster QR', icon: '🖨️' },
     { id: 'SYSTEM_HEALTH', label: 'Kesehatan Cloud & AI', icon: '🩺' },
     { id: 'ABOUT', label: 'Tentang Aplikasi', icon: 'ℹ️' },
+    { id: 'COUNSELING_BK', label: 'Catatan BK Siswa', icon: '💚' },
     { id: 'BIMTEK', label: 'Pencatatan Bimtek Guru', icon: '🎖️' },
     { id: 'GAME_PID', label: 'Game PID (Staging)', icon: '🎮' },
     { id: 'TESTS', label: 'Tests / Diagnostik', icon: '🧪' },
@@ -605,6 +607,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   ];
 
   const handleSelectSidebarTab = (id: string) => {
+    if (id === 'COUNSELING_BK') {
+      setActiveTab('COUNSELING_BK');
+      return;
+    }
     if (id === 'BIMTEK') {
       setActiveTab('BIMTEK');
       return;
@@ -1009,6 +1015,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
                 currentUser={user}
                 onBack={() => setActiveTab('DASHBOARD')}
                 initialTab="ALL_TEACHERS"
+              />
+            </div>
+          )}
+
+          {/* TAB: CATATAN BIMBINGAN KONSELING (BK) & NAWASENA SYNC */}
+          {activeTab === 'COUNSELING_BK' && (
+            <div className="max-w-5xl mx-auto">
+              <CounselingManagementView
+                currentUser={user || { id: 'admin', full_name: 'Administrator', role: 'ADMIN' }}
+                onBack={() => setActiveTab('DASHBOARD')}
               />
             </div>
           )}

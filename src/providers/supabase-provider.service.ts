@@ -4,6 +4,12 @@ import type {
   UpdateBimtekDTO,
   VerifyBimtekDTO,
 } from '../types/bimtek.types';
+import type {
+  CounselingRecord,
+  CreateCounselingDTO,
+  UpdateCounselingDTO,
+  CounselingFilter,
+} from '../types/counseling.types';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { IDataProvider } from './data-provider.interface';
@@ -8361,6 +8367,285 @@ export class SupabaseProvider implements IDataProvider {
       logger.error('SupabaseProvider', 'deleteBimtekRecord exception, falling back to mock provider:', err);
       const mockProv = new (await import('./mock-provider.service')).MockProvider();
       return mockProv.deleteBimtekRecord(id);
+    }
+  }
+
+  // ─── STUDENT COUNSELING (CATATAN BK & SINKRONISASI NAWASENA) ─────────────
+  private toren1Client: SupabaseClient | null = null;
+  private cachedCounselingRecords: CounselingRecord[] | null = null;
+  private cachedCounselingTimestamp = 0;
+
+  public getToren1Client(): SupabaseClient | null {
+    if (!this.toren1Client) {
+      const url =
+        (typeof import.meta !== 'undefined' && import.meta.env
+          ? (import.meta.env.VITE_SUPABASE_URL_TOREN1 as string)
+          : '') || 'https://fwhdjqvtjzesbdcqorsn.supabase.co';
+      const key =
+        (typeof import.meta !== 'undefined' && import.meta.env
+          ? (import.meta.env.VITE_SUPABASE_ANON_KEY_TOREN1 as string)
+          : '') ||
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3aGRqcXZ0anplc2JkY3FvcnNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM2NzI5MjAsImV4cCI6MjEwOTI0ODkyMH0.placeholder';
+      if (url && key) {
+        try {
+          this.toren1Client = createClient(url, key);
+        } catch (e) {
+          logger.warn('SupabaseProvider', 'Failed to initialize toren1Client (Nawasena):', e);
+        }
+      }
+    }
+    return this.toren1Client;
+  }
+
+  public async getCounselingRecords(filter?: CounselingFilter, _token?: string): Promise<CounselingRecord[]> {
+    const now = Date.now();
+    const hasFilter = Boolean(
+      filter &&
+      (filter.className ||
+        filter.counselingType ||
+        filter.status ||
+        filter.urgency ||
+        filter.counselorId ||
+        filter.studentName)
+    );
+
+    if (!hasFilter && this.cachedCounselingRecords && now - this.cachedCounselingTimestamp < 30000) {
+      return this.cachedCounselingRecords;
+    }
+
+    const dedupeKey = `getCounselingRecords_${JSON.stringify(filter || {})}`;
+    return this.dedupeRequest(dedupeKey, async () => {
+      try {
+        let query = this.client
+          .from('counseling_records')
+          .select('*')
+          .order('counseling_date', { ascending: false });
+
+        if (filter) {
+          if (filter.className && filter.className !== 'ALL') {
+            query = query.eq('class_name', filter.className);
+          }
+          if (filter.counselingType && filter.counselingType !== 'ALL') {
+            query = query.eq('counseling_type', filter.counselingType);
+          }
+          if (filter.status && filter.status !== 'ALL') {
+            query = query.eq('status', filter.status);
+          }
+          if (filter.urgency && filter.urgency !== 'ALL') {
+            query = query.eq('urgency', filter.urgency);
+          }
+          if (filter.counselorId) {
+            query = query.eq('counselor_id', filter.counselorId);
+          }
+          if (filter.academicYear) {
+            query = query.eq('academic_year', filter.academicYear);
+          }
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          logger.warn('SupabaseProvider', 'getCounselingRecords error, trying toren1 or mock fallback:', error.message);
+          // Try toren 1 (Nawasena) before mock
+          const toren1 = this.getToren1Client();
+          if (toren1) {
+            const { data: t1Data, error: t1Error } = await toren1
+              .from('counseling_records')
+              .select('*')
+              .order('counseling_date', { ascending: false });
+            if (!t1Error && Array.isArray(t1Data)) {
+              return t1Data as CounselingRecord[];
+            }
+          }
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          return mockProv.getCounselingRecords(filter);
+        }
+
+        let result = (data as CounselingRecord[]) || [];
+        if (filter?.studentName && filter.studentName.trim()) {
+          const q = filter.studentName.trim().toLowerCase();
+          result = result.filter(
+            (r) =>
+              r.student_name.toLowerCase().includes(q) ||
+              r.topic.toLowerCase().includes(q) ||
+              (r.student_nisn && r.student_nisn.includes(q))
+          );
+        }
+
+        if (!hasFilter) {
+          this.cachedCounselingRecords = result;
+          this.cachedCounselingTimestamp = now;
+        }
+
+        return result;
+      } catch (err) {
+        logger.error('SupabaseProvider', 'getCounselingRecords exception, falling back to mock provider:', err);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getCounselingRecords(filter);
+      }
+    });
+  }
+
+  public async createCounselingRecord(dto: CreateCounselingDTO, _token?: string): Promise<CounselingRecord> {
+    this.cachedCounselingRecords = null;
+    this.cachedCounselingTimestamp = 0;
+
+    const payload = {
+      student_id: dto.student_id,
+      student_name: dto.student_name.trim(),
+      student_nisn: dto.student_nisn ? dto.student_nisn.trim() : null,
+      class_name: dto.class_name,
+      counselor_id: dto.counselor_id,
+      counselor_name: dto.counselor_name.trim(),
+      counselor_npp: dto.counselor_npp ? dto.counselor_npp.trim() : null,
+      counseling_date: dto.counseling_date || new Date().toISOString().slice(0, 10),
+      counseling_time: dto.counseling_time || null,
+      counseling_type: dto.counseling_type || 'INDIVIDUAL',
+      urgency: dto.urgency || 'MEDIUM',
+      status: dto.status || 'IN_PROGRESS',
+      visibility: dto.visibility || 'PUBLIC_STUDENT',
+      topic: dto.topic.trim(),
+      background_narrative: dto.background_narrative ? dto.background_narrative.trim() : null,
+      action_taken: dto.action_taken.trim(),
+      student_commitment: dto.student_commitment ? dto.student_commitment.trim() : null,
+      parent_involvement: dto.parent_involvement ? dto.parent_involvement.trim() : null,
+      follow_up_plan: dto.follow_up_plan ? dto.follow_up_plan.trim() : null,
+      follow_up_date: dto.follow_up_date || null,
+      academic_year: dto.academic_year || '2026/2027',
+      semester: dto.semester || 'GANJIL',
+      synced_to_nawasena: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Dual-Write Sync ke Toren 1 (Nawasena Platform Siswa)
+    const toren1 = this.getToren1Client();
+    if (toren1) {
+      (async () => {
+        try {
+          const { error } = await toren1.from('counseling_records').insert([payload]);
+          if (error) {
+            logger.info('SupabaseProvider', 'Toren 1 (Nawasena) insert notice (table might be pending migration):', error.message);
+          } else {
+            logger.info('SupabaseProvider', 'Successfully synced counseling record to Nawasena Toren 1');
+          }
+        } catch (e: any) {
+          logger.warn('SupabaseProvider', 'Toren 1 sync error:', e?.message || e);
+        }
+      })();
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('counseling_records')
+        .insert([payload])
+        .select('*')
+        .single();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'createCounselingRecord error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.createCounselingRecord(dto);
+      }
+
+      return data as CounselingRecord;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'createCounselingRecord exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.createCounselingRecord(dto);
+    }
+  }
+
+  public async updateCounselingRecord(
+    id: string,
+    dto: UpdateCounselingDTO,
+    _token?: string
+  ): Promise<CounselingRecord | null> {
+    this.cachedCounselingRecords = null;
+    this.cachedCounselingTimestamp = 0;
+
+    const payload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (dto.counseling_type !== undefined) payload.counseling_type = dto.counseling_type;
+    if (dto.urgency !== undefined) payload.urgency = dto.urgency;
+    if (dto.status !== undefined) payload.status = dto.status;
+    if (dto.visibility !== undefined) payload.visibility = dto.visibility;
+    if (dto.topic !== undefined) payload.topic = dto.topic.trim();
+    if (dto.background_narrative !== undefined) payload.background_narrative = dto.background_narrative ? dto.background_narrative.trim() : null;
+    if (dto.action_taken !== undefined) payload.action_taken = dto.action_taken.trim();
+    if (dto.student_commitment !== undefined) payload.student_commitment = dto.student_commitment ? dto.student_commitment.trim() : null;
+    if (dto.parent_involvement !== undefined) payload.parent_involvement = dto.parent_involvement ? dto.parent_involvement.trim() : null;
+    if (dto.follow_up_plan !== undefined) payload.follow_up_plan = dto.follow_up_plan ? dto.follow_up_plan.trim() : null;
+    if (dto.follow_up_date !== undefined) payload.follow_up_date = dto.follow_up_date || null;
+
+    // Dual-Write Sync ke Toren 1
+    const toren1 = this.getToren1Client();
+    if (toren1) {
+      (async () => {
+        try {
+          await toren1.from('counseling_records').update(payload).eq('id', id);
+        } catch {
+          // ignore
+        }
+      })();
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('counseling_records')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'updateCounselingRecord error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.updateCounselingRecord(id, dto);
+      }
+
+      return data as CounselingRecord;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'updateCounselingRecord exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.updateCounselingRecord(id, dto);
+    }
+  }
+
+  public async deleteCounselingRecord(id: string, _token?: string): Promise<boolean> {
+    this.cachedCounselingRecords = null;
+    this.cachedCounselingTimestamp = 0;
+
+    const toren1 = this.getToren1Client();
+    if (toren1) {
+      (async () => {
+        try {
+          await toren1.from('counseling_records').delete().eq('id', id);
+        } catch {
+          // ignore
+        }
+      })();
+    }
+
+    try {
+      const { error } = await this.client
+        .from('counseling_records')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'deleteCounselingRecord error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.deleteCounselingRecord(id);
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'deleteCounselingRecord exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.deleteCounselingRecord(id);
     }
   }
 

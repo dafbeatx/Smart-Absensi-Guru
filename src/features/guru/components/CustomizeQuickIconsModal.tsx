@@ -32,6 +32,7 @@ import {
   NotebookPen,
   Gamepad2,
   Award,
+  HeartHandshake,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
@@ -181,6 +182,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     description: 'Arena permainan edukasi & kuis interaktif digital sekolah (PID)',
     icon: Gamepad2,
     colorClass: 'from-violet-600 to-indigo-800',
+  },
+  {
+    id: 'counseling_bk',
+    title: 'Catatan BK',
+    category: 'Kesiswaan & Rombel',
+    description: 'Catatan bimbingan konseling siswa terintegrasi dengan Nawasena Platform Siswa',
+    icon: HeartHandshake,
+    colorClass: 'from-emerald-700 to-teal-900',
   },
   {
     id: 'direktori_siswa',
