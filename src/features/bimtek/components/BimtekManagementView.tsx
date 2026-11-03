@@ -346,7 +346,7 @@ export const BimtekManagementView: React.FC<BimtekManagementViewProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari nama bimtek, penyelenggara, atau lokasi..."
-              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all"
+              className="w-full h-10 pl-9 pr-3 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition-all"
             />
           </div>
 
@@ -521,7 +521,7 @@ export const BimtekManagementView: React.FC<BimtekManagementViewProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-700 flex items-center gap-1">
                         <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                        <span className="truncate max-w-[160px] sm:max-w-xs">{item.organizer}</span>
+                        <span className="truncate max-w-40 sm:max-w-xs">{item.organizer}</span>
                       </span>
                       {activeTab === 'ALL_TEACHERS' && (
                         <span className="text-slate-400">
