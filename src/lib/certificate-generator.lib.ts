@@ -39,10 +39,10 @@ export const generateExcellenceCertificateHTML = (payload: CertificatePayload): 
   const rankBadgeText = isRank1 ? 'TOP #1' : isRank2 ? 'TOP #2' : 'TOP #3';
   const rankTitle = payload.awardTitle || (
     isRank1
-      ? 'Juara 1 Disiplin (Pendidik Teladan Utama)'
+      ? 'Juara 1 Disiplin (Super Disiplin)'
       : isRank2
-      ? 'Juara 2 Disiplin (Pendidik Emas)'
-      : 'Juara 3 Disiplin (Pendidik Perak)'
+      ? 'Juara 2 Disiplin (Sangat Disiplin)'
+      : 'Juara 3 Disiplin (Disiplin)'
   );
 
   const certNumber = payload.certificateNumber || `00${rank}/SMART-ABS/DISIPLIN/TOP${rank}/09/2026`;

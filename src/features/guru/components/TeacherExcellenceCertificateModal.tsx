@@ -53,10 +53,10 @@ export const TeacherExcellenceCertificateModal: React.FC<TeacherExcellenceCertif
   const rankEmoji = isRank1 ? '🥇' : isRank2 ? '🥈' : '🥉';
   const rankBadgeText = isRank1 ? 'Top #1' : isRank2 ? 'Top #2' : 'Top #3';
   const rankTitle = isRank1
-    ? 'Juara 1 Disiplin (Pendidik Teladan Utama)'
+    ? 'Juara 1 Disiplin (Super Disiplin)'
     : isRank2
-    ? 'Juara 2 Disiplin (Pendidik Emas)'
-    : 'Juara 3 Disiplin (Pendidik Perak)';
+    ? 'Juara 2 Disiplin (Sangat Disiplin)'
+    : 'Juara 3 Disiplin (Disiplin)';
 
   const certNumber = `00${activeRank}/SMART-ABS/DISIPLIN/TOP${activeRank}/09/2026`;
   const dateIssued = 'Bogor, 30 September 2026';

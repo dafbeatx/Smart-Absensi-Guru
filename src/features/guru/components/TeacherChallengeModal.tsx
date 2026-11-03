@@ -441,19 +441,19 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                       <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200 text-center space-y-1">
                         <span className="text-lg">🥇</span>
                         <strong className="text-[11px] text-slate-900 block font-black leading-tight">Juara 1</strong>
-                        <span className="text-[9.5px] text-slate-600 block leading-tight">Piagam Teladan Utama + Hadiah Kepsek</span>
+                        <span className="text-[9.5px] text-slate-600 block leading-tight">Piagam Super Disiplin + Hadiah Kepsek</span>
                         <span className="inline-block px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 text-[8.5px] font-bold">🔒 Akhir Bulan</span>
                       </div>
                       <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-1">
                         <span className="text-lg">🥈</span>
                         <strong className="text-[11px] text-slate-900 block font-black leading-tight">Juara 2</strong>
-                        <span className="text-[9.5px] text-slate-600 block leading-tight">Piagam Pendidik Disiplin Emas</span>
+                        <span className="text-[9.5px] text-slate-600 block leading-tight">Piagam Sangat Disiplin</span>
                         <span className="inline-block px-1.5 py-0.2 rounded bg-slate-200 text-slate-800 text-[8.5px] font-bold">🔒 Akhir Bulan</span>
                       </div>
                       <div className="p-2.5 rounded-xl bg-amber-50/40 border border-amber-200/60 text-center space-y-1">
                         <span className="text-lg">🥉</span>
                         <strong className="text-[11px] text-slate-900 block font-black leading-tight">Juara 3</strong>
-                        <span className="text-[9.5px] text-slate-600 block leading-tight">Piagam Pendidik Disiplin Perak</span>
+                        <span className="text-[9.5px] text-slate-600 block leading-tight">Piagam Disiplin</span>
                         <span className="inline-block px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 text-[8.5px] font-bold">🔒 Akhir Bulan</span>
                       </div>
                     </div>
@@ -513,7 +513,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                               <span className="text-2xl">🥇</span>
                               <div>
                                 <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
-                                  Juara 1 Disiplin (Pendidik Teladan Utama)
+                                  Juara 1 Disiplin (Super Disiplin)
                                 </h4>
                                 <p className="text-[10.5px] text-amber-900 font-bold">
                                   Piagam Resmi &amp; Hadiah Khusus Kepala Sekolah
@@ -583,7 +583,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                               <span className="text-2xl">🥈</span>
                               <div>
                                 <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
-                                  Juara 2 Disiplin (Pendidik Disiplin Emas)
+                                  Juara 2 Disiplin (Sangat Disiplin)
                                 </h4>
                                 <p className="text-[10.5px] text-slate-600 font-bold">
                                   Piagam Penghargaan Resmi Kepala Sekolah
@@ -596,7 +596,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                           </div>
 
                           <p className="text-[11px] text-slate-600 leading-relaxed">
-                            Selamat! Dedikasi dan kepatuhan waktu Anda diakui resmi melalui Piagam Penghargaan Pendidik Disiplin Emas.
+                            Selamat! Dedikasi dan kepatuhan waktu Anda diakui resmi melalui Piagam Penghargaan Sangat Disiplin.
                           </p>
 
                           <div className="grid grid-cols-2 gap-2 pt-0.5">
@@ -640,7 +640,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                               <span className="text-2xl">🥉</span>
                               <div>
                                 <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
-                                  Juara 3 Disiplin (Pendidik Disiplin Perak)
+                                  Juara 3 Disiplin (Disiplin)
                                 </h4>
                                 <p className="text-[10.5px] text-amber-900 font-bold">
                                   Piagam Penghargaan Resmi Kepala Sekolah
@@ -653,7 +653,7 @@ export const TeacherChallengeModal: React.FC<TeacherChallengeModalProps> = ({
                           </div>
 
                           <p className="text-[11px] text-slate-600 leading-relaxed">
-                            Selamat! Keteladanan disiplin harian Anda dianugerahi Piagam Penghargaan Pendidik Disiplin Perak resmi bertanda tangan Kepala Sekolah.
+                            Selamat! Keteladanan disiplin harian Anda dianugerahi Piagam Penghargaan Disiplin resmi bertanda tangan Kepala Sekolah.
                           </p>
 
                           <div className="grid grid-cols-2 gap-2 pt-0.5">

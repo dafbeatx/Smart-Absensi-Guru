@@ -8,6 +8,8 @@ import {
   getTeacherDisciplineLeaderboard,
   getDisciplinePeriodMetadata,
   formatShortTeacherName,
+  getTeacherRankTierInfo,
+  TEACHER_RANK_CRITERIA_CATALOG,
   type DisciplinePeriodType,
   type TeacherLeaderboardItem,
 } from '../../../utils/teacher-appreciation.utils';
@@ -43,7 +45,7 @@ export interface TeacherDisciplineBadgeModalProps {
 }
 
 type TabKey = 'LEADERBOARD' | 'HISTORY' | 'RULES' | 'BADGES' | 'MESSAGE';
-type TierFilter = 'ALL' | 'TELADAN' | 'EMAS' | 'DEDIKASI' | 'KOMITMEN';
+type TierFilter = 'ALL' | 'SUPER' | 'SANGAT' | 'DISIPLIN' | 'CUKUP' | 'LAINNYA';
 
 /**
  * Calculates deterministic weekly consistency rates for teacher performance graphs.
@@ -446,10 +448,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
         (t.position && t.position.toLowerCase().includes(q));
 
       let matchTier = true;
-      if (tierFilter === 'TELADAN') matchTier = t.level.includes('Teladan');
-      else if (tierFilter === 'EMAS') matchTier = t.level.includes('Emas');
-      else if (tierFilter === 'DEDIKASI') matchTier = t.level.includes('Dedikasi');
-      else if (tierFilter === 'KOMITMEN') matchTier = t.level.includes('Komitmen');
+      if (tierFilter === 'SUPER') matchTier = t.rank === 1 || t.level.includes('Super Disiplin');
+      else if (tierFilter === 'SANGAT') matchTier = t.rank === 2 || t.level.includes('Sangat Disiplin');
+      else if (tierFilter === 'DISIPLIN') matchTier = t.rank === 3 || (t.level.includes('Disiplin') && !t.level.includes('Super') && !t.level.includes('Sangat') && !t.level.includes('Cukup'));
+      else if (tierFilter === 'CUKUP') matchTier = t.rank === 4 || t.level.includes('Cukup Disiplin');
+      else if (tierFilter === 'LAINNYA') matchTier = t.rank >= 5;
 
       return matchSearch && matchTier;
     });
@@ -873,6 +876,38 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     </span>
                   </div>
                 </div>
+
+                {/* Kartu Predikat & Kriteria Spesifik Peringkat */}
+                {(() => {
+                  const tierInfo = getTeacherRankTierInfo(selectedTeacher.rank, selectedTeacher.totalPoints, selectedTeacher.status);
+                  return (
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-2xl">{tierInfo.badgeIcon}</span>
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                              Predikat Peringkat #{selectedTeacher.rank}
+                            </span>
+                            <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight">
+                              {tierInfo.predicate}
+                            </h4>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-black border ${tierInfo.bgBadgeClass} ${tierInfo.textBadgeClass}`}>
+                          Target On-Time: {tierInfo.targetOnTimeRate}
+                        </span>
+                      </div>
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-800 leading-relaxed font-semibold">
+                        <span className="text-slate-900 font-black block mb-1">📋 Kriteria yang Dipenuhi:</span>
+                        {tierInfo.criteria}
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        💡 {tierInfo.description}
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 {/* 2-Column Responsive Analysis */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1318,7 +1353,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                       <div className="flex items-center justify-between gap-2 mb-3">
                                         <span className="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
                                           <span>🥈</span>
-                                          <span>Juara 2 • Perak</span>
+                                          <span>Sangat Disiplin • Juara 2</span>
                                         </span>
                                         <span className="text-[10px] font-bold text-slate-500 group-hover:text-slate-900 transition-colors flex items-center gap-0.5">
                                           Rapor Detail <ChevronRight className="w-3 h-3" />
@@ -1372,7 +1407,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                     <div className="flex items-center justify-between gap-2 mb-3">
                                       <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1 shadow-2xs">
                                         <span>👑</span>
-                                        <span>Juara 1 • Poin Tertinggi</span>
+                                        <span>Super Disiplin • Juara 1</span>
                                       </span>
                                       <span className="text-xs font-black text-amber-800 group-hover:text-amber-950 transition-colors flex items-center gap-1">
                                         Rapor Detail <ChevronRight className="w-3.5 h-3.5" />
@@ -1436,7 +1471,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                       <div className="flex items-center justify-between gap-2 mb-3">
                                         <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
                                           <span>🥉</span>
-                                          <span>Juara 3 • Perunggu</span>
+                                          <span>Disiplin • Juara 3</span>
                                         </span>
                                         <span className="text-[10px] font-bold text-amber-800 group-hover:text-amber-950 transition-colors flex items-center gap-0.5">
                                           Rapor Detail <ChevronRight className="w-3 h-3" />
@@ -1531,47 +1566,58 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                           </button>
                           <button
                             type="button"
-                            onClick={() => setTierFilter('TELADAN')}
+                            onClick={() => setTierFilter('SUPER')}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                              tierFilter === 'TELADAN'
+                              tierFilter === 'SUPER'
                                 ? 'bg-amber-500 text-white shadow-2xs'
                                 : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
                             }`}
                           >
-                            🏆 Teladan Utama
+                            🏆 Super Disiplin (#1)
                           </button>
                           <button
                             type="button"
-                            onClick={() => setTierFilter('EMAS')}
+                            onClick={() => setTierFilter('SANGAT')}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                              tierFilter === 'EMAS'
-                                ? 'bg-amber-400 text-slate-950 shadow-2xs'
+                              tierFilter === 'SANGAT'
+                                ? 'bg-slate-700 text-white shadow-2xs'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            🥈 Sangat Disiplin (#2)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTierFilter('DISIPLIN')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                              tierFilter === 'DISIPLIN'
+                                ? 'bg-amber-600 text-white shadow-2xs'
+                                : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                            }`}
+                          >
+                            🥉 Disiplin (#3)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTierFilter('CUKUP')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                              tierFilter === 'CUKUP'
+                                ? 'bg-indigo-600 text-white shadow-2xs'
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                           >
-                            🥇 Disiplin Emas
+                            🎖️ Cukup Disiplin (#4)
                           </button>
                           <button
                             type="button"
-                            onClick={() => setTierFilter('DEDIKASI')}
+                            onClick={() => setTierFilter('LAINNYA')}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                              tierFilter === 'DEDIKASI'
-                                ? 'bg-cyan-600 text-white shadow-2xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            🥈 Berdedikasi
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setTierFilter('KOMITMEN')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                              tierFilter === 'KOMITMEN'
+                              tierFilter === 'LAINNYA'
                                 ? 'bg-slate-800 text-white shadow-2xs'
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                           >
-                            🥉 Berkomitmen
+                            ⭐ Peringkat 5+
                           </button>
                         </div>
                       </div>
@@ -2056,6 +2102,89 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                         </p>
                       </div>
                     </div>
+
+                    {/* ATURAN TIE-BREAKER FAIR RANKING */}
+                    <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-3">
+                      <div className="flex items-center gap-2 text-[#023246]">
+                        <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <h4 className="text-sm sm:text-base font-black uppercase tracking-wider">
+                          Aturan Penentu Peringkat Sama (Tie-Breaker Fair Ranking)
+                        </h4>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                        Jika dua guru atau lebih memiliki total akumulasi poin yang identik pada periode rekapitulasi, sistem menentukan peringkat secara deterministik dengan urutan prioritas:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                          <span className="font-black text-[#023246] block">1. Total Poin Bersih</span>
+                          <span className="text-[11px] text-slate-500">Saldo net ledger resmi bulan berjalan.</span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                          <span className="font-black text-emerald-700 block">2. Hadir Tepat Waktu</span>
+                          <span className="text-[11px] text-slate-500">Jumlah hari hadir tepat waktu terbanyak.</span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                          <span className="font-black text-amber-700 block">3. Teladan Fajar</span>
+                          <span className="text-[11px] text-slate-500">Frekuensi hadir ≤ 07:00 WIB terbanyak.</span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                          <span className="font-black text-rose-700 block">4. Minim Terlambat</span>
+                          <span className="text-[11px] text-slate-500">Jumlah hari terlambat paling sedikit.</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* DAFTAR LENGKAP KRITERIA & PREDIKAT SETIAP PERINGKAT */}
+                    <div className="space-y-4">
+                      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-2xs space-y-2">
+                        <div className="flex items-center gap-2 text-[#023246]">
+                          <Trophy className="w-5 h-5 text-amber-500 shrink-0" />
+                          <h4 className="text-sm sm:text-base font-black uppercase tracking-wider">
+                            Predikat Kehormatan &amp; Kriteria Khusus Setiap Peringkat
+                          </h4>
+                        </div>
+                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                          Setiap peringkat memiliki sebutan predikat yang berbeda dan kriteria objektif yang jelas agar kompetisi kedisiplinan berlangsung adil, transparan, dan memotivasi seluruh pendidik.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {TEACHER_RANK_CRITERIA_CATALOG.map((item) => (
+                          <div
+                            key={item.rank}
+                            className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-2xs space-y-3 flex flex-col justify-between hover:border-slate-300 transition-all"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="text-2xl">{item.badgeIcon}</span>
+                                  <div>
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                      Peringkat #{item.rank}
+                                    </span>
+                                    <h5 className="text-sm font-black text-slate-900 leading-tight">
+                                      {item.predicate}
+                                    </h5>
+                                  </div>
+                                </div>
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${item.bgBadgeClass} ${item.textBadgeClass}`}>
+                                  Target: {item.targetOnTimeRate}
+                                </span>
+                              </div>
+
+                              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-800 leading-relaxed font-semibold mt-2">
+                                <span className="text-slate-900 font-bold block mb-0.5">📋 Kriteria yang Dipenuhi:</span>
+                                {item.criteria}
+                              </div>
+                            </div>
+
+                            <p className="text-[11px] text-slate-500 leading-relaxed pt-2 border-t border-slate-100">
+                              💡 {item.description}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2402,6 +2531,38 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                   </span>
                 </div>
               </div>
+
+              {/* Kartu Predikat & Kriteria Spesifik Peringkat (Mobile) */}
+              {(() => {
+                const tierInfo = getTeacherRankTierInfo(selectedTeacher.rank, selectedTeacher.totalPoints, selectedTeacher.status);
+                return (
+                  <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{tierInfo.badgeIcon}</span>
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
+                            Predikat Peringkat #{selectedTeacher.rank}
+                          </span>
+                          <h4 className="text-xs font-black text-slate-900 leading-tight">
+                            {tierInfo.predicate}
+                          </h4>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-black border ${tierInfo.bgBadgeClass} ${tierInfo.textBadgeClass}`}>
+                        Target: {tierInfo.targetOnTimeRate}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-800 leading-relaxed font-semibold">
+                      <span className="text-slate-900 font-bold block mb-0.5">📋 Kriteria yang Dipenuhi:</span>
+                      {tierInfo.criteria}
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      💡 {tierInfo.description}
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* 📈 GRAFIK 1: KETEPATAN WAKTU & BREAKDOWN STATISTIK PRESENSI */}
               <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
@@ -3216,6 +3377,84 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       <span className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-900 text-xs font-black border border-rose-300">
                         -10 Poin
                       </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🌅</span>
+                        <div>
+                          <p className="text-xs font-extrabold text-slate-900">Teladan Fajar (≤ 07:00 WIB)</p>
+                          <p className="text-[10px] text-slate-500">Bonus kehadiran fajar sebelum bel</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 text-xs font-black border border-amber-200">
+                        +5 Poin
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🔥</span>
+                        <div>
+                          <p className="text-xs font-extrabold text-slate-900">Streak On-Time 5 Hari</p>
+                          <p className="text-[10px] text-slate-500">Konsisten hadir tepat waktu 5 hari</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-lg bg-rose-50 text-rose-800 text-xs font-black border border-rose-200">
+                        +10 Poin
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Aturan Tie-Breaker Mobile */}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                    <span className="text-xs font-bold text-[#023246] block">
+                      ⚖️ Aturan Fair Ranking Jika Poin Sama:
+                    </span>
+                    <ol className="text-[11px] text-slate-600 list-decimal pl-4 space-y-0.5">
+                      <li>Poin Bersih Ledger resmi bulan berjalan</li>
+                      <li>Jumlah hari hadir On-Time terbanyak</li>
+                      <li>Bonus Teladan Fajar (≤ 07:00 WIB) terbanyak</li>
+                      <li>Keterlambatan paling sedikit</li>
+                    </ol>
+                  </div>
+
+                  {/* Kriteria Resmi Setiap Peringkat (Mobile) */}
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center gap-1.5 text-[#023246] px-1">
+                      <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider">
+                        Kriteria Predikat Setiap Peringkat:
+                      </h4>
+                    </div>
+
+                    <div className="space-y-2">
+                      {TEACHER_RANK_CRITERIA_CATALOG.map((item) => (
+                        <div
+                          key={item.rank}
+                          className="p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{item.badgeIcon}</span>
+                              <div>
+                                <span className="text-[9px] font-black uppercase text-slate-400 block">
+                                  Peringkat #{item.rank}
+                                </span>
+                                <h5 className="text-xs font-black text-slate-900 leading-tight">
+                                  {item.predicate}
+                                </h5>
+                              </div>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border ${item.bgBadgeClass} ${item.textBadgeClass}`}>
+                              Target: {item.targetOnTimeRate}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 leading-relaxed font-medium">
+                            {item.criteria}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

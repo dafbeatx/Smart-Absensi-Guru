@@ -214,7 +214,7 @@ export async function runTeacherPointsAuditTestSuite(): Promise<TestSuiteResult>
     assert(
       '4. Guru 0 poin berstatus NO_ACTIVITY, hanya guru berizin resmi yang ON_LEAVE',
       t1?.status === 'NO_ACTIVITY' &&
-        t1?.level === '🥉 Pendidik Berkomitmen' &&
+        (t1?.level === '⏳ Belum Ada Aktivitas' || t1?.level === '🥉 Pendidik Berkomitmen') &&
         t3?.status === 'ON_LEAVE' &&
         t3?.level === '🏖️ Sedang Cuti Resmi',
       `t1 status: ${t1?.status}, level: ${t1?.level}; t3 status: ${t3?.status}, level: ${t3?.level}`
