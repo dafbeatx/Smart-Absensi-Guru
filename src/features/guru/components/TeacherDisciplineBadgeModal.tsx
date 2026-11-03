@@ -902,6 +902,14 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                         <span className="text-slate-900 font-black block mb-1">📋 Kriteria yang Dipenuhi:</span>
                         {tierInfo.criteria}
                       </div>
+                      {selectedTeacher.tieBreakerAdvantage && (
+                        <div className="p-2.5 rounded-2xl bg-indigo-50/80 border border-indigo-200 text-xs text-indigo-950 flex items-center gap-2">
+                          <span className="text-base shrink-0">⚡</span>
+                          <p className="text-[11px] font-semibold text-indigo-900 leading-tight">
+                            <strong className="font-extrabold text-indigo-950">Keunggulan Pembeda Peringkat:</strong> {selectedTeacher.tieBreakerAdvantage}
+                          </p>
+                        </div>
+                      )}
                       <p className="text-[11px] text-slate-500 leading-relaxed">
                         💡 {tierInfo.description}
                       </p>
@@ -1727,6 +1735,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                             NPP: {teacher.nip}
                                           </p>
                                         )}
+                                        {teacher.tieBreakerAdvantage && (
+                                          <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-[9px] font-bold text-indigo-800">
+                                            ⚡ {teacher.tieBreakerAdvantage}
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
                                   </td>
@@ -2114,22 +2127,26 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                         Jika dua guru atau lebih memiliki total akumulasi poin yang identik pada periode rekapitulasi, sistem menentukan peringkat secara deterministik dengan urutan prioritas:
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
                         <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
                           <span className="font-black text-[#023246] block">1. Total Poin Bersih</span>
                           <span className="text-[11px] text-slate-500">Saldo net ledger resmi bulan berjalan.</span>
                         </div>
-                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
-                          <span className="font-black text-emerald-700 block">2. Hadir Tepat Waktu</span>
-                          <span className="text-[11px] text-slate-500">Jumlah hari hadir tepat waktu terbanyak.</span>
+                        <div className="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-xs space-y-1">
+                          <span className="font-black text-indigo-900 block">2. Rata-Rata Masuk</span>
+                          <span className="text-[11px] text-indigo-700">Rata-rata jam hadir lebih pagi diutamakan.</span>
                         </div>
-                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
-                          <span className="font-black text-amber-700 block">3. Teladan Fajar</span>
-                          <span className="text-[11px] text-slate-500">Frekuensi hadir ≤ 07:00 WIB terbanyak.</span>
+                        <div className="p-3 rounded-2xl bg-cyan-50/70 border border-cyan-200 text-xs space-y-1">
+                          <span className="font-black text-cyan-900 block">3. Kepatuhan Pulang</span>
+                          <span className="text-[11px] text-cyan-700">Rasio presensi pulang tuntas (100%).</span>
                         </div>
-                        <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
-                          <span className="font-black text-rose-700 block">4. Minim Terlambat</span>
-                          <span className="text-[11px] text-slate-500">Jumlah hari terlambat paling sedikit.</span>
+                        <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-xs space-y-1">
+                          <span className="font-black text-emerald-900 block">4. Hadir On-Time &amp; Fajar</span>
+                          <span className="text-[11px] text-emerald-700">Hari tepat waktu &amp; teladan fajar terbanyak.</span>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs space-y-1">
+                          <span className="font-black text-amber-900 block">5. Piket &amp; Minim Telat</span>
+                          <span className="text-[11px] text-amber-700">Tugas piket terbanyak &amp; minim terlambat.</span>
                         </div>
                       </div>
                     </div>
@@ -2557,6 +2574,14 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       <span className="text-slate-900 font-bold block mb-0.5">📋 Kriteria yang Dipenuhi:</span>
                       {tierInfo.criteria}
                     </div>
+                    {selectedTeacher.tieBreakerAdvantage && (
+                      <div className="p-2 rounded-xl bg-indigo-50/80 border border-indigo-200 text-xs text-indigo-950 flex items-center gap-1.5">
+                        <span className="text-sm shrink-0">⚡</span>
+                        <p className="text-[10px] font-semibold text-indigo-900 leading-tight">
+                          <strong className="font-extrabold text-indigo-950">Pembeda Peringkat:</strong> {selectedTeacher.tieBreakerAdvantage}
+                        </p>
+                      </div>
+                    )}
                     <p className="text-[10px] text-slate-500 leading-relaxed">
                       💡 {tierInfo.description}
                     </p>
@@ -3119,6 +3144,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                   {teacher.hadirTepatWaktuCount > 0 ? ` • ${teacher.hadirTepatWaktuCount} On-Time` : ''}
                                   {teacher.earlyBirdCount && teacher.earlyBirdCount > 0 ? ` • 🌅 ${teacher.earlyBirdCount} Fajar` : ''}
                                 </p>
+                                {teacher.tieBreakerAdvantage && (
+                                  <span className="inline-block mt-0.5 px-1 py-0.2 rounded bg-indigo-50 border border-indigo-200 text-[8.5px] font-bold text-indigo-800 truncate max-w-full">
+                                    ⚡ {teacher.tieBreakerAdvantage}
+                                  </span>
+                                )}
                               </div>
                             </div>
 
@@ -3413,9 +3443,10 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                     </span>
                     <ol className="text-[11px] text-slate-600 list-decimal pl-4 space-y-0.5">
                       <li>Poin Bersih Ledger resmi bulan berjalan</li>
-                      <li>Jumlah hari hadir On-Time terbanyak</li>
-                      <li>Bonus Teladan Fajar (≤ 07:00 WIB) terbanyak</li>
-                      <li>Keterlambatan paling sedikit</li>
+                      <li>Rata-rata waktu kedatangan lebih pagi (WIB)</li>
+                      <li>Rasio kelengkapan presensi pulang (100% tuntas)</li>
+                      <li>Jumlah hari hadir On-Time &amp; Teladan Fajar terbanyak</li>
+                      <li>Keaktifan tugas piket terbanyak &amp; minim terlambat</li>
                     </ol>
                   </div>
 

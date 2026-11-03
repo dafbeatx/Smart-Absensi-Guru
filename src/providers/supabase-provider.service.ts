@@ -1003,12 +1003,38 @@ export class SupabaseProvider implements IDataProvider {
     (async () => {
       try {
         const isLate = status === 'TERLAMBAT';
-        const attendancePts = isLate ? 5 : 15;
+        const checkInTimeClean = (timeStr || '').replace(/[^0-9:]/g, '').slice(0, 5);
+        let attendancePts = 15;
+        let attendanceTitle = 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)';
+        let attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'}`;
+
+        if (isLate) {
+          if (checkInTimeClean && checkInTimeClean <= '07:45') {
+            attendancePts = 7;
+            attendanceTitle = 'Presensi Masuk Toleransi (> 07:30 WIB)';
+            attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'} (Toleransi keterlambatan tipis)`;
+          } else {
+            attendancePts = 3;
+            attendanceTitle = 'Presensi Masuk Terlambat (> 07:45 WIB)';
+            attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'} (Keterlambatan)`;
+          }
+        } else {
+          if (checkInTimeClean && checkInTimeClean <= '06:45') {
+            attendancePts = 20;
+            attendanceTitle = '🌅 Presensi Fajar Utama (≤ 06:45 WIB)';
+            attendanceDesc = `Tercatat hadir fajar pada pukul ${timeStr} via ${vMethod || 'QR'} (+5 Bonus Teladan Fajar)`;
+          } else if (checkInTimeClean && checkInTimeClean <= '07:15') {
+            attendancePts = 17;
+            attendanceTitle = '⭐ Presensi Pagi Tertib (≤ 07:15 WIB)';
+            attendanceDesc = `Tercatat hadir tertib pada pukul ${timeStr} via ${vMethod || 'QR'} (+2 Bonus On-Time Prima)`;
+          } else {
+            attendancePts = 15;
+            attendanceTitle = 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)';
+            attendanceDesc = `Tercatat hadir tepat waktu pada pukul ${timeStr} via ${vMethod || 'QR'}`;
+          }
+        }
+
         const attendanceType: TeacherPointActivityType = isLate ? 'CHECK_IN_LATE' : 'CHECK_IN_ON_TIME';
-        const attendanceTitle = isLate
-          ? 'Presensi Masuk Sekolah (> 07:30 WIB)'
-          : 'Presensi Masuk Tepat Waktu (≤ 07:30 WIB)';
-        const attendanceDesc = `Tercatat hadir pada pukul ${timeStr} via ${vMethod || 'QR'}`;
 
         await this.recordTeacherPoint({
           user_id: userId,
@@ -1019,6 +1045,23 @@ export class SupabaseProvider implements IDataProvider {
           title: attendanceTitle,
           description: attendanceDesc,
         });
+
+        // 🌅 Bonus Teladan Fajar (Early Bird ≤ 07:00 WIB)
+        if (!isLate && checkInTimeClean && checkInTimeClean <= '07:00') {
+          try {
+            await this.recordTeacherPoint({
+              user_id: userId,
+              teacher_name: userExists?.full_name || sessionUser?.full_name || undefined,
+              date: todayStr,
+              points: 5,
+              activity_type: 'EARLY_BIRD_BONUS',
+              title: '🌅 Teladan Fajar (Early Bird ≤ 07:00 WIB)',
+              description: `Hadir sangat awal pukul ${timeStr}, keteladanan menyambut siswa di gerbang`,
+            });
+          } catch (eEarly) {
+            logger.warn('SupabaseProvider', 'Failed to record early bird bonus:', eEarly);
+          }
+        }
 
         // Cek apakah guru terjadwal piket hari ini
         try {

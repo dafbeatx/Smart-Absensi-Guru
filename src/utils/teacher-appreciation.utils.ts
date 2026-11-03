@@ -219,6 +219,10 @@ export interface TeacherLeaderboardItem {
   rankPredicate?: string;
   rankCriteria?: string;
   targetOnTimeRate?: string;
+  avgCheckInMinutes?: number;
+  avgCheckInFormatted?: string;
+  checkOutCompletionRate?: number;
+  tieBreakerAdvantage?: string;
 }
 
 export interface TeacherRankTierInfo {
@@ -557,37 +561,37 @@ export interface TeacherDisciplineLeaderboardResult {
  */
 function getInitialSeedLeaderboardCurrentMonth(): TeacherLeaderboardItem[] {
   return [
-    { id: 'usr_guru_007', name: 'Septi Nur Aeni, S.E', nip: '19921105 202102 2 009', position: 'Guru Mapel B. Indonesia', totalPoints: 385, level: '🏆 Super Disiplin', rank: 1, hadirTepatWaktuCount: 14, terlambatCount: 0, piketCount: 2, earlyBirdCount: 1, streakCount: 1, topBadge: { icon: '🏆', title: 'Super Disiplin (Peringkat 1)' } },
-    { id: 'usr_guru_009', name: 'Widianingsih, S.Si., G.r', nip: '19920311 202002 2 006', position: 'Guru Mapel IPA', totalPoints: 385, level: '🥈 Sangat Disiplin', rank: 2, hadirTepatWaktuCount: 13, terlambatCount: 1, piketCount: 3, earlyBirdCount: 3, streakCount: 1, topBadge: { icon: '🥈', title: 'Sangat Disiplin (Peringkat 2)' } },
-    { id: 'usr_guru_002', name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', nip: '19880512 201503 1 002', position: 'Wakasek Sarana dan Prasarana', totalPoints: 375, level: '🥉 Disiplin', rank: 3, hadirTepatWaktuCount: 14, terlambatCount: 0, piketCount: 3, earlyBirdCount: 4, streakCount: 1, topBadge: { icon: '🥉', title: 'Disiplin (Peringkat 3)' } },
-    { id: 'usr_guru_005', name: 'Fitri Ani Rahayu, S.Mat', nip: '19931201 202103 2 007', position: 'Wakasek Kesiswaan', totalPoints: 330, level: '🎖️ Cukup Disiplin', rank: 4, hadirTepatWaktuCount: 9, terlambatCount: 4, piketCount: 3, earlyBirdCount: 3, streakCount: 0, topBadge: { icon: '🎖️', title: 'Cukup Disiplin (Peringkat 4)' } },
-    { id: 'usr_1786512137742', name: 'Ridho Maulana Al Farizi', nip: null, position: 'Guru Mapel Akhlak lil Banin', totalPoints: 315, level: '⭐ Tertib Waktu', rank: 5, hadirTepatWaktuCount: 9, terlambatCount: 5, piketCount: 3, earlyBirdCount: 1, streakCount: 0, topBadge: { icon: '⭐', title: 'Tertib Waktu (Peringkat 5)' } },
-    { id: 'usr_guru_006', name: 'Nurul Fahriya, S.Pd., G.r', nip: '19910415 201902 2 004', position: 'Wakasek Kurikulum', totalPoints: 300, level: '🛡️ Berdedikasi Aktif', rank: 6, hadirTepatWaktuCount: 8, terlambatCount: 4, piketCount: 2, earlyBirdCount: 1, streakCount: 0, topBadge: { icon: '🛡️', title: 'Berdedikasi Aktif (Peringkat 6)' } },
-    { id: 'usr_guru_004', name: 'Mira Nurdianti, S.Pd', nip: '19950117 202303 2 010', position: 'Tata Usaha (TU)', totalPoints: 275, level: '🌟 Berkomitmen Kuat', rank: 7, hadirTepatWaktuCount: 7, terlambatCount: 7, piketCount: 3, earlyBirdCount: 1, streakCount: 0, topBadge: { icon: '🌟', title: 'Berkomitmen Kuat (Peringkat 7)' } },
-    { id: 'usr_admin_001', name: 'Dafa Maulana, S.Pd', nip: null, position: 'Guru Mapel Informatika', totalPoints: 275, level: '📈 Tumbuh Disiplin', rank: 8, hadirTepatWaktuCount: 5, terlambatCount: 8, piketCount: 2, earlyBirdCount: 0, streakCount: 0, topBadge: { icon: '📈', title: 'Tumbuh Disiplin (Peringkat 8)' } },
-    { id: 'usr_guru_003', name: 'Adi Prasetyo, S.Pd., G.r', nip: '19890918 201801 1 003', position: 'Guru Mapel Bahasa Inggris', totalPoints: 200, level: '🎯 Menuju Konsistensi', rank: 9, hadirTepatWaktuCount: 11, terlambatCount: 1, piketCount: 3, earlyBirdCount: 0, streakCount: 0, topBadge: { icon: '🎯', title: 'Menuju Konsistensi (Peringkat 9)' } },
-    { id: 'usr_guru_010', name: 'Mawar Andinia, S.Pd., G.r', nip: '19940725 202201 2 008', position: 'Bimbingan Konseling (BK)', totalPoints: 185, level: '⚡ Perlu Penguatan Disiplin', rank: 10, hadirTepatWaktuCount: 6, terlambatCount: 6, piketCount: 3, earlyBirdCount: 3, streakCount: 0, topBadge: { icon: '⚡', title: 'Perlu Penguatan Disiplin (Peringkat 10)' } },
-    { id: 'usr_kepsek_002', name: 'Farhan Sopian Sahid, S.Pd.I', nip: null, position: 'Kepala Sekolah', totalPoints: 130, level: '🌱 Tahap Pembinaan Waktu', rank: 11, hadirTepatWaktuCount: 3, terlambatCount: 5, piketCount: 0, earlyBirdCount: 1, streakCount: 0, topBadge: { icon: '🌱', title: 'Tahap Pembinaan Waktu (Peringkat 11)' } },
-    { id: 'usr_op_002', name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', nip: '19940608 202202 1 005', position: 'Operator Sekolah', totalPoints: 50, level: '⚠️ Perlu Evaluasi Kehadiran', rank: 12, hadirTepatWaktuCount: 0, terlambatCount: 6, piketCount: 0, earlyBirdCount: 0, streakCount: 0, topBadge: { icon: '⚠️', title: 'Perlu Evaluasi Kehadiran (Peringkat 12)' } },
+    { id: 'usr_guru_007', name: 'Septi Nur Aeni, S.E', nip: '19921105 202102 2 009', position: 'Guru Mapel B. Indonesia', totalPoints: 385, level: '🏆 Super Disiplin', rank: 1, hadirTepatWaktuCount: 14, terlambatCount: 0, piketCount: 2, earlyBirdCount: 1, streakCount: 1, avgCheckInMinutes: 402, avgCheckInFormatted: '06:42 WIB', checkOutCompletionRate: 100, tieBreakerAdvantage: 'Unggul rata-rata kedatangan fajar (06:42 vs 06:58 WIB)', topBadge: { icon: '🏆', title: 'Super Disiplin (Peringkat 1)' } },
+    { id: 'usr_guru_009', name: 'Widianingsih, S.Si., G.r', nip: '19920311 202002 2 006', position: 'Guru Mapel IPA', totalPoints: 385, level: '🥈 Sangat Disiplin', rank: 2, hadirTepatWaktuCount: 13, terlambatCount: 1, piketCount: 3, earlyBirdCount: 3, streakCount: 1, avgCheckInMinutes: 418, avgCheckInFormatted: '06:58 WIB', checkOutCompletionRate: 98, topBadge: { icon: '🥈', title: 'Sangat Disiplin (Peringkat 2)' } },
+    { id: 'usr_guru_002', name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', nip: '19880512 201503 1 002', position: 'Wakasek Sarana dan Prasarana', totalPoints: 375, level: '🥉 Disiplin', rank: 3, hadirTepatWaktuCount: 14, terlambatCount: 0, piketCount: 3, earlyBirdCount: 4, streakCount: 1, avgCheckInMinutes: 410, avgCheckInFormatted: '06:50 WIB', checkOutCompletionRate: 100, topBadge: { icon: '🥉', title: 'Disiplin (Peringkat 3)' } },
+    { id: 'usr_guru_005', name: 'Fitri Ani Rahayu, S.Mat', nip: '19931201 202103 2 007', position: 'Wakasek Kesiswaan', totalPoints: 330, level: '🎖️ Cukup Disiplin', rank: 4, hadirTepatWaktuCount: 9, terlambatCount: 4, piketCount: 3, earlyBirdCount: 3, streakCount: 0, avgCheckInMinutes: 425, avgCheckInFormatted: '07:05 WIB', checkOutCompletionRate: 100, topBadge: { icon: '🎖️', title: 'Cukup Disiplin (Peringkat 4)' } },
+    { id: 'usr_1786512137742', name: 'Ridho Maulana Al Farizi', nip: null, position: 'Guru Mapel Akhlak lil Banin', totalPoints: 315, level: '⭐ Tertib Waktu', rank: 5, hadirTepatWaktuCount: 9, terlambatCount: 5, piketCount: 3, earlyBirdCount: 1, streakCount: 0, avgCheckInMinutes: 428, avgCheckInFormatted: '07:08 WIB', checkOutCompletionRate: 94, topBadge: { icon: '⭐', title: 'Tertib Waktu (Peringkat 5)' } },
+    { id: 'usr_guru_006', name: 'Nurul Fahriya, S.Pd., G.r', nip: '19910415 201902 2 004', position: 'Wakasek Kurikulum', totalPoints: 300, level: '🛡️ Berdedikasi Aktif', rank: 6, hadirTepatWaktuCount: 8, terlambatCount: 4, piketCount: 2, earlyBirdCount: 1, streakCount: 0, avgCheckInMinutes: 429, avgCheckInFormatted: '07:09 WIB', checkOutCompletionRate: 96, topBadge: { icon: '🛡️', title: 'Berdedikasi Aktif (Peringkat 6)' } },
+    { id: 'usr_guru_004', name: 'Mira Nurdianti, S.Pd', nip: '19950117 202303 2 010', position: 'Tata Usaha (TU)', totalPoints: 275, level: '🌟 Berkomitmen Kuat', rank: 7, hadirTepatWaktuCount: 7, terlambatCount: 7, piketCount: 3, earlyBirdCount: 1, streakCount: 0, avgCheckInMinutes: 430, avgCheckInFormatted: '07:10 WIB', checkOutCompletionRate: 95, tieBreakerAdvantage: 'Unggul rasio kehadiran tepat waktu (7 vs 5 hari)', topBadge: { icon: '🌟', title: 'Berkomitmen Kuat (Peringkat 7)' } },
+    { id: 'usr_admin_001', name: 'Dafa Maulana, S.Pd', nip: null, position: 'Guru Mapel Informatika', totalPoints: 275, level: '📈 Tumbuh Disiplin', rank: 8, hadirTepatWaktuCount: 5, terlambatCount: 8, piketCount: 2, earlyBirdCount: 0, streakCount: 0, avgCheckInMinutes: 436, avgCheckInFormatted: '07:16 WIB', checkOutCompletionRate: 90, topBadge: { icon: '📈', title: 'Tumbuh Disiplin (Peringkat 8)' } },
+    { id: 'usr_guru_003', name: 'Adi Prasetyo, S.Pd., G.r', nip: '19890918 201801 1 003', position: 'Guru Mapel Bahasa Inggris', totalPoints: 200, level: '🎯 Menuju Konsistensi', rank: 9, hadirTepatWaktuCount: 11, terlambatCount: 1, piketCount: 3, earlyBirdCount: 0, streakCount: 0, avgCheckInMinutes: 432, avgCheckInFormatted: '07:12 WIB', checkOutCompletionRate: 92, topBadge: { icon: '🎯', title: 'Menuju Konsistensi (Peringkat 9)' } },
+    { id: 'usr_guru_010', name: 'Mawar Andinia, S.Pd., G.r', nip: '19940725 202201 2 008', position: 'Bimbingan Konseling (BK)', totalPoints: 185, level: '⚡ Perlu Penguatan Disiplin', rank: 10, hadirTepatWaktuCount: 6, terlambatCount: 6, piketCount: 3, earlyBirdCount: 3, streakCount: 0, avgCheckInMinutes: 433, avgCheckInFormatted: '07:13 WIB', checkOutCompletionRate: 90, topBadge: { icon: '⚡', title: 'Perlu Penguatan Disiplin (Peringkat 10)' } },
+    { id: 'usr_kepsek_002', name: 'Farhan Sopian Sahid, S.Pd.I', nip: null, position: 'Kepala Sekolah', totalPoints: 130, level: '🌱 Tahap Pembinaan Waktu', rank: 11, hadirTepatWaktuCount: 3, terlambatCount: 5, piketCount: 0, earlyBirdCount: 1, streakCount: 0, avgCheckInMinutes: 440, avgCheckInFormatted: '07:20 WIB', checkOutCompletionRate: 85, topBadge: { icon: '🌱', title: 'Tahap Pembinaan Waktu (Peringkat 11)' } },
+    { id: 'usr_op_002', name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', nip: '19940608 202202 1 005', position: 'Operator Sekolah', totalPoints: 50, level: '⚠️ Perlu Evaluasi Kehadiran', rank: 12, hadirTepatWaktuCount: 0, terlambatCount: 6, piketCount: 0, earlyBirdCount: 0, streakCount: 0, avgCheckInMinutes: 450, avgCheckInFormatted: '07:30 WIB', checkOutCompletionRate: 75, topBadge: { icon: '⚠️', title: 'Perlu Evaluasi Kehadiran (Peringkat 12)' } },
     { id: 'usr_guru_008', name: 'Windiani, S.E., G.r', nip: '19900822 201704 2 005', position: 'Bendahara Sekolah', totalPoints: 0, level: '🏖️ Sedang Cuti Resmi', rank: 13, hadirTepatWaktuCount: 0, terlambatCount: 0, piketCount: 0, earlyBirdCount: 0, streakCount: 0, status: 'ON_LEAVE' as const, topBadge: { icon: '🏖️', title: 'Sedang Cuti Resmi' } },
   ];
 }
 
 function getInitialSeedLeaderboardPreviousMonth(): TeacherLeaderboardItem[] {
   return [
-    { id: 'usr_guru_005', name: 'Fitri Ani Rahayu, S.Mat', nip: '19931201 202103 2 007', position: 'Wakasek Kesiswaan', totalPoints: 415, level: '🏆 Super Disiplin', rank: 1, hadirTepatWaktuCount: 14, terlambatCount: 4, piketCount: 3, topBadge: { icon: '🏆', title: 'Super Disiplin (Peringkat 1)' } },
-    { id: 'usr_admin_001', name: 'Dafa Maulana, S.Pd', nip: null, position: 'Guru Mapel Informatika', totalPoints: 400, level: '🥈 Sangat Disiplin', rank: 2, hadirTepatWaktuCount: 10, terlambatCount: 7, piketCount: 2, topBadge: { icon: '🥈', title: 'Sangat Disiplin (Peringkat 2)' } },
-    { id: 'usr_guru_009', name: 'Widianingsih, S.Si., G.r', nip: '19920311 202002 2 006', position: 'Guru Mapel IPA', totalPoints: 395, level: '🥉 Disiplin', rank: 3, hadirTepatWaktuCount: 14, terlambatCount: 2, piketCount: 3, topBadge: { icon: '🥉', title: 'Disiplin (Peringkat 3)' } },
-    { id: 'usr_guru_007', name: 'Septi Nur Aeni, S.E', nip: '19921105 202102 2 009', position: 'Guru Mapel B. Indonesia', totalPoints: 390, level: '🎖️ Cukup Disiplin', rank: 4, hadirTepatWaktuCount: 14, terlambatCount: 1, piketCount: 3, topBadge: { icon: '🎖️', title: 'Cukup Disiplin (Peringkat 4)' } },
-    { id: 'usr_guru_006', name: 'Nurul Fahriya, S.Pd., G.r', nip: '19910415 201902 2 004', position: 'Wakasek Kurikulum', totalPoints: 380, level: '⭐ Tertib Waktu', rank: 5, hadirTepatWaktuCount: 9, terlambatCount: 8, piketCount: 2, topBadge: { icon: '⭐', title: 'Tertib Waktu (Peringkat 5)' } },
-    { id: 'usr_guru_002', name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', nip: '19880512 201503 1 002', position: 'Wakasek Sarana dan Prasarana', totalPoints: 370, level: '🛡️ Berdedikasi Aktif', rank: 6, hadirTepatWaktuCount: 12, terlambatCount: 4, piketCount: 3, topBadge: { icon: '🛡️', title: 'Berdedikasi Aktif (Peringkat 6)' } },
-    { id: 'usr_guru_003', name: 'Adi Prasetyo, S.Pd., G.r', nip: '19890918 201801 1 003', position: 'Guru Mapel Bahasa Inggris', totalPoints: 300, level: '🌟 Berkomitmen Kuat', rank: 7, hadirTepatWaktuCount: 12, terlambatCount: 2, piketCount: 3, topBadge: { icon: '🌟', title: 'Berkomitmen Kuat (Peringkat 7)' } },
-    { id: 'usr_guru_010', name: 'Mawar Andinia, S.Pd., G.r', nip: '19940725 202201 2 008', position: 'Bimbingan Konseling (BK)', totalPoints: 280, level: '📈 Tumbuh Disiplin', rank: 8, hadirTepatWaktuCount: 7, terlambatCount: 7, piketCount: 2, topBadge: { icon: '📈', title: 'Tumbuh Disiplin (Peringkat 8)' } },
-    { id: 'usr_guru_004', name: 'Mira Nurdianti, S.Pd', nip: '19950117 202303 2 010', position: 'Tata Usaha (TU)', totalPoints: 260, level: '🎯 Menuju Konsistensi', rank: 9, hadirTepatWaktuCount: 5, terlambatCount: 9, piketCount: 2, topBadge: { icon: '🎯', title: 'Menuju Konsistensi (Peringkat 9)' } },
-    { id: 'usr_guru_008', name: 'Windiani, S.E., G.r', nip: '19900822 201704 2 005', position: 'Bendahara Sekolah', totalPoints: 240, level: '⚡ Perlu Penguatan Disiplin', rank: 10, hadirTepatWaktuCount: 5, terlambatCount: 9, piketCount: 1, topBadge: { icon: '⚡', title: 'Perlu Penguatan Disiplin (Peringkat 10)' } },
-    { id: 'usr_kepsek_002', name: 'Farhan Sopian Sahid, S.Pd.I', nip: null, position: 'Kepala Sekolah', totalPoints: 215, level: '🌱 Tahap Pembinaan Waktu', rank: 11, hadirTepatWaktuCount: 4, terlambatCount: 8, piketCount: 0, topBadge: { icon: '🌱', title: 'Tahap Pembinaan Waktu (Peringkat 11)' } },
-    { id: 'usr_op_002', name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', nip: '19940608 202202 1 005', position: 'Operator Sekolah', totalPoints: 165, level: '⚠️ Perlu Evaluasi Kehadiran', rank: 12, hadirTepatWaktuCount: 3, terlambatCount: 8, piketCount: 1, topBadge: { icon: '⚠️', title: 'Perlu Evaluasi Kehadiran (Peringkat 12)' } },
-    { id: 'usr_1786512137742', name: 'Ridho Maulana Al Farizi', nip: null, position: 'Guru Mapel Akhlak lil Banin', totalPoints: 140, level: '⚠️ Perlu Evaluasi Kehadiran', rank: 13, hadirTepatWaktuCount: 3, terlambatCount: 6, piketCount: 1, topBadge: { icon: '⚠️', title: 'Perlu Evaluasi Kehadiran (Peringkat 13)' } },
+    { id: 'usr_guru_005', name: 'Fitri Ani Rahayu, S.Mat', nip: '19931201 202103 2 007', position: 'Wakasek Kesiswaan', totalPoints: 415, level: '🏆 Super Disiplin', rank: 1, hadirTepatWaktuCount: 14, terlambatCount: 4, piketCount: 3, avgCheckInMinutes: 405, avgCheckInFormatted: '06:45 WIB', checkOutCompletionRate: 100, topBadge: { icon: '🏆', title: 'Super Disiplin (Peringkat 1)' } },
+    { id: 'usr_admin_001', name: 'Dafa Maulana, S.Pd', nip: null, position: 'Guru Mapel Informatika', totalPoints: 400, level: '🥈 Sangat Disiplin', rank: 2, hadirTepatWaktuCount: 10, terlambatCount: 7, piketCount: 2, avgCheckInMinutes: 415, avgCheckInFormatted: '06:55 WIB', checkOutCompletionRate: 98, topBadge: { icon: '🥈', title: 'Sangat Disiplin (Peringkat 2)' } },
+    { id: 'usr_guru_009', name: 'Widianingsih, S.Si., G.r', nip: '19920311 202002 2 006', position: 'Guru Mapel IPA', totalPoints: 395, level: '🥉 Disiplin', rank: 3, hadirTepatWaktuCount: 14, terlambatCount: 2, piketCount: 3, avgCheckInMinutes: 412, avgCheckInFormatted: '06:52 WIB', checkOutCompletionRate: 100, topBadge: { icon: '🥉', title: 'Disiplin (Peringkat 3)' } },
+    { id: 'usr_guru_007', name: 'Septi Nur Aeni, S.E', nip: '19921105 202102 2 009', position: 'Guru Mapel B. Indonesia', totalPoints: 390, level: '🎖️ Cukup Disiplin', rank: 4, hadirTepatWaktuCount: 14, terlambatCount: 1, piketCount: 3, avgCheckInMinutes: 414, avgCheckInFormatted: '06:54 WIB', checkOutCompletionRate: 100, topBadge: { icon: '🎖️', title: 'Cukup Disiplin (Peringkat 4)' } },
+    { id: 'usr_guru_006', name: 'Nurul Fahriya, S.Pd., G.r', nip: '19910415 201902 2 004', position: 'Wakasek Kurikulum', totalPoints: 380, level: '⭐ Tertib Waktu', rank: 5, hadirTepatWaktuCount: 9, terlambatCount: 8, piketCount: 2, avgCheckInMinutes: 422, avgCheckInFormatted: '07:02 WIB', checkOutCompletionRate: 95, topBadge: { icon: '⭐', title: 'Tertib Waktu (Peringkat 5)' } },
+    { id: 'usr_guru_002', name: 'Muhammad Iqbal Gustiawan, S.Pd., G.r', nip: '19880512 201503 1 002', position: 'Wakasek Sarana dan Prasarana', totalPoints: 370, level: '🛡️ Berdedikasi Aktif', rank: 6, hadirTepatWaktuCount: 12, terlambatCount: 4, piketCount: 3, avgCheckInMinutes: 420, avgCheckInFormatted: '07:00 WIB', checkOutCompletionRate: 97, topBadge: { icon: '🛡️', title: 'Berdedikasi Aktif (Peringkat 6)' } },
+    { id: 'usr_guru_003', name: 'Adi Prasetyo, S.Pd., G.r', nip: '19890918 201801 1 003', position: 'Guru Mapel Bahasa Inggris', totalPoints: 300, level: '🌟 Berkomitmen Kuat', rank: 7, hadirTepatWaktuCount: 12, terlambatCount: 2, piketCount: 3, avgCheckInMinutes: 426, avgCheckInFormatted: '07:06 WIB', checkOutCompletionRate: 94, topBadge: { icon: '🌟', title: 'Berkomitmen Kuat (Peringkat 7)' } },
+    { id: 'usr_guru_010', name: 'Mawar Andinia, S.Pd., G.r', nip: '19940725 202201 2 008', position: 'Bimbingan Konseling (BK)', totalPoints: 280, level: '📈 Tumbuh Disiplin', rank: 8, hadirTepatWaktuCount: 7, terlambatCount: 7, piketCount: 2, avgCheckInMinutes: 430, avgCheckInFormatted: '07:10 WIB', checkOutCompletionRate: 92, topBadge: { icon: '📈', title: 'Tumbuh Disiplin (Peringkat 8)' } },
+    { id: 'usr_guru_004', name: 'Mira Nurdianti, S.Pd', nip: '19950117 202303 2 010', position: 'Tata Usaha (TU)', totalPoints: 260, level: '🎯 Menuju Konsistensi', rank: 9, hadirTepatWaktuCount: 5, terlambatCount: 9, piketCount: 2, avgCheckInMinutes: 434, avgCheckInFormatted: '07:14 WIB', checkOutCompletionRate: 90, topBadge: { icon: '🎯', title: 'Menuju Konsistensi (Peringkat 9)' } },
+    { id: 'usr_guru_008', name: 'Windiani, S.E., G.r', nip: '19900822 201704 2 005', position: 'Bendahara Sekolah', totalPoints: 240, level: '⚡ Perlu Penguatan Disiplin', rank: 10, hadirTepatWaktuCount: 5, terlambatCount: 9, piketCount: 1, avgCheckInMinutes: 438, avgCheckInFormatted: '07:18 WIB', checkOutCompletionRate: 88, topBadge: { icon: '⚡', title: 'Perlu Penguatan Disiplin (Peringkat 10)' } },
+    { id: 'usr_kepsek_002', name: 'Farhan Sopian Sahid, S.Pd.I', nip: null, position: 'Kepala Sekolah', totalPoints: 215, level: '🌱 Tahap Pembinaan Waktu', rank: 11, hadirTepatWaktuCount: 4, terlambatCount: 8, piketCount: 0, avgCheckInMinutes: 442, avgCheckInFormatted: '07:22 WIB', checkOutCompletionRate: 85, topBadge: { icon: '🌱', title: 'Tahap Pembinaan Waktu (Peringkat 11)' } },
+    { id: 'usr_op_002', name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', nip: '19940608 202202 1 005', position: 'Operator Sekolah', totalPoints: 165, level: '⚠️ Perlu Evaluasi Kehadiran', rank: 12, hadirTepatWaktuCount: 3, terlambatCount: 8, piketCount: 1, avgCheckInMinutes: 448, avgCheckInFormatted: '07:28 WIB', checkOutCompletionRate: 80, topBadge: { icon: '⚠️', title: 'Perlu Evaluasi Kehadiran (Peringkat 12)' } },
+    { id: 'usr_1786512137742', name: 'Ridho Maulana Al Farizi', nip: null, position: 'Guru Mapel Akhlak lil Banin', totalPoints: 140, level: '⚠️ Perlu Evaluasi Kehadiran', rank: 13, hadirTepatWaktuCount: 3, terlambatCount: 6, piketCount: 1, avgCheckInMinutes: 446, avgCheckInFormatted: '07:26 WIB', checkOutCompletionRate: 82, topBadge: { icon: '⚠️', title: 'Perlu Evaluasi Kehadiran (Peringkat 13)' } },
   ];
 }
 
@@ -874,6 +878,43 @@ export function getTeacherDisciplineLeaderboard(
         ? (t.streakCount || 0)
         : logs.filter((l) => l.activity_type === 'STREAK_MILESTONE').length;
 
+      // Ekstraksi rata-rata menit kedatangan presensi masuk (WIB)
+      const checkInLogs = logs.filter(
+        (l) => l.activity_type === 'CHECK_IN_ON_TIME' || l.activity_type === 'CHECK_IN_LATE'
+      );
+      let totalCheckInMinutes = 0;
+      let validCheckInCount = 0;
+
+      checkInLogs.forEach((l) => {
+        let mins: number | null = null;
+        const text = `${l.title || ''} ${l.description || ''}`;
+        const match = text.match(/(?:pukul\s*)?([0-2]?[0-9]):([0-5][0-9])/i);
+        if (match) {
+          mins = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+        } else if (l.occurred_at || l.created_at) {
+          const raw = l.occurred_at || l.created_at;
+          const timeMatch = raw.match(/T?([0-2][0-9]):([0-5][0-9])/);
+          if (timeMatch) {
+            mins = parseInt(timeMatch[1], 10) * 60 + parseInt(timeMatch[2], 10);
+          }
+        }
+        if (mins !== null && mins >= 300 && mins <= 660) {
+          totalCheckInMinutes += mins;
+          validCheckInCount++;
+        }
+      });
+
+      const avgCheckInMin = validCheckInCount > 0 ? Math.round(totalCheckInMinutes / validCheckInCount) : (t.avgCheckInMinutes ?? 9999);
+      const avgCheckInFormatted = avgCheckInMin <= 720
+        ? `${String(Math.floor(avgCheckInMin / 60)).padStart(2, '0')}:${String(avgCheckInMin % 60).padStart(2, '0')} WIB`
+        : '-';
+
+      const checkOutLogs = logs.filter((l) => l.activity_type === 'CHECK_OUT');
+      const totalPresence = onTime + late;
+      const checkOutCompletionRate = totalPresence > 0
+        ? Math.min(100, Math.round((checkOutLogs.length / totalPresence) * 100))
+        : (t.checkOutCompletionRate ?? 100);
+
       return {
         ...t,
         totalPoints: signedNet,
@@ -885,6 +926,9 @@ export function getTeacherDisciplineLeaderboard(
         piketCount: piket,
         earlyBirdCount: earlyBird,
         streakCount: streak,
+        avgCheckInMinutes: avgCheckInMin,
+        avgCheckInFormatted,
+        checkOutCompletionRate,
         status: 'ACTIVE' as const,
       };
     });
@@ -894,8 +938,12 @@ export function getTeacherDisciplineLeaderboard(
   // 4. Pengurutan Tie-Breaker Deterministik:
   // 1. net points (totalPoints signed) tertinggi
   // 2. hadirTepatWaktuCount terbanyak
-  // 3. earlyBirdCount terbanyak
-  // 4. terlambatCount paling sedikit
+  // 3. earlyBirdCount (fajar <= 07:00 WIB) terbanyak
+  // 4. rata-rata jam kedatangan fisik lebih awal (avgCheckInMinutes terendah)
+  // 5. kelengkapan kepulangan (checkOutCompletionRate tertinggi)
+  // 6. piketCount terbanyak
+  // 7. terlambatCount paling sedikit
+  // 8. ID konsisten deterministik
   teachers.sort((a, b) => {
     const aPoints = Number(a.totalPoints) || 0;
     const bPoints = Number(b.totalPoints) || 0;
@@ -909,6 +957,18 @@ export function getTeacherDisciplineLeaderboard(
     const bEarly = Number(b.earlyBirdCount) || 0;
     if (bEarly !== aEarly) return bEarly - aEarly;
 
+    const aAvgMin = a.avgCheckInMinutes ?? 9999;
+    const bAvgMin = b.avgCheckInMinutes ?? 9999;
+    if (aAvgMin !== bAvgMin) return aAvgMin - bAvgMin;
+
+    const aCheckoutRate = a.checkOutCompletionRate ?? 0;
+    const bCheckoutRate = b.checkOutCompletionRate ?? 0;
+    if (bCheckoutRate !== aCheckoutRate) return bCheckoutRate - aCheckoutRate;
+
+    const aPiket = Number(a.piketCount) || 0;
+    const bPiket = Number(b.piketCount) || 0;
+    if (bPiket !== aPiket) return bPiket - aPiket;
+
     const aLate = Number(a.terlambatCount) || 0;
     const bLate = Number(b.terlambatCount) || 0;
     if (aLate !== bLate) return aLate - bLate;
@@ -916,7 +976,7 @@ export function getTeacherDisciplineLeaderboard(
     return (a.id || '').localeCompare(b.id || '');
   });
 
-  // 5. Penetapan Peringkat (Dense Shared Rank) & Tingkat Prestasi
+  // 5. Penetapan Peringkat & Indikator Keunggulan Tie-Breaker
   for (let i = 0; i < teachers.length; i++) {
     const cur = teachers[i];
     const prev = i > 0 ? teachers[i - 1] : null;
@@ -924,8 +984,11 @@ export function getTeacherDisciplineLeaderboard(
     const isTieWithPrev =
       prev !== null &&
       cur.totalPoints === prev.totalPoints &&
+      (cur.avgCheckInMinutes ?? 9999) === (prev.avgCheckInMinutes ?? 9999) &&
+      (cur.checkOutCompletionRate ?? 0) === (prev.checkOutCompletionRate ?? 0) &&
       cur.hadirTepatWaktuCount === prev.hadirTepatWaktuCount &&
       (cur.earlyBirdCount || 0) === (prev.earlyBirdCount || 0) &&
+      (cur.piketCount || 0) === (prev.piketCount || 0) &&
       cur.terlambatCount === prev.terlambatCount;
 
     if (isTieWithPrev) {
@@ -935,6 +998,21 @@ export function getTeacherDisciplineLeaderboard(
     } else {
       cur.rank = i + 1;
       cur.isTie = false;
+    }
+
+    // Berikan keterangan keunggulan jika poin sama namun peringkat terpisah adil
+    if (prev !== null && cur.totalPoints === prev.totalPoints && !isTieWithPrev) {
+      if ((prev.avgCheckInMinutes ?? 9999) < (cur.avgCheckInMinutes ?? 9999)) {
+        prev.tieBreakerAdvantage = `Unggul rata-rata kedatangan fajar (${prev.avgCheckInFormatted || 'lebih awal'} vs ${cur.avgCheckInFormatted || '-'})`;
+      } else if ((prev.checkOutCompletionRate ?? 0) > (cur.checkOutCompletionRate ?? 0)) {
+        prev.tieBreakerAdvantage = `Unggul kepatuhan pulang (${prev.checkOutCompletionRate}% vs ${cur.checkOutCompletionRate}%)`;
+      } else if (prev.hadirTepatWaktuCount > cur.hadirTepatWaktuCount) {
+        prev.tieBreakerAdvantage = `Unggul kehadiran tepat waktu (${prev.hadirTepatWaktuCount} vs ${cur.hadirTepatWaktuCount} hari)`;
+      } else if ((prev.earlyBirdCount || 0) > (cur.earlyBirdCount || 0)) {
+        prev.tieBreakerAdvantage = `Unggul presensi fajar Early Bird (${prev.earlyBirdCount}x vs ${cur.earlyBirdCount}x)`;
+      } else if ((prev.piketCount || 0) > (cur.piketCount || 0)) {
+        prev.tieBreakerAdvantage = `Unggul keaktifan piket (${prev.piketCount}x vs ${cur.piketCount}x)`;
+      }
     }
 
     const tierInfo = getTeacherRankTierInfo(cur.rank, cur.totalPoints, cur.status);

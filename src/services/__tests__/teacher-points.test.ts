@@ -718,6 +718,32 @@ export const runTeacherPointsTestSuite = async (): Promise<{
       tieBreakerPassed,
       `User A (1 Early Bird) Rank: ${rankUserA}, User B (0 Early Bird) Rank: ${rankUserB}`
     );
+
+    // Anti-Tie Engine: Equal points resolved by earlier arrival time (avgCheckInMinutes)
+    const teacherA = { id: 'usr_t_early', full_name: 'Guru Fajar Utama' } as any;
+    const teacherB = { id: 'usr_t_standard', full_name: 'Guru Standar Siang' } as any;
+    const samePointLogs: TeacherPointLog[] = [
+      // Guru A (100 pts, rata-rata 06:40 WIB)
+      { id: 'ea1', user_id: 'usr_t_early', activity_type: 'CHECK_IN_ON_TIME', points: 50, date: '2026-09-01', description: 'Tercatat hadir pada pukul 06:40 via QR', status: 'VALID', created_at: '2026-09-01T06:40:00Z' },
+      { id: 'ea2', user_id: 'usr_t_early', activity_type: 'CHECK_IN_ON_TIME', points: 50, date: '2026-09-02', description: 'Tercatat hadir pada pukul 06:40 via QR', status: 'VALID', created_at: '2026-09-02T06:40:00Z' },
+      // Guru B (100 pts, rata-rata 07:15 WIB)
+      { id: 'eb1', user_id: 'usr_t_standard', activity_type: 'CHECK_IN_ON_TIME', points: 50, date: '2026-09-01', description: 'Tercatat hadir pada pukul 07:15 via QR', status: 'VALID', created_at: '2026-09-01T07:15:00Z' },
+      { id: 'eb2', user_id: 'usr_t_standard', activity_type: 'CHECK_IN_ON_TIME', points: 50, date: '2026-09-02', description: 'Tercatat hadir pada pukul 07:15 via QR', status: 'VALID', created_at: '2026-09-02T07:15:00Z' },
+    ];
+
+    const antiTieResult = getTeacherDisciplineLeaderboard(null, null, 'CURRENT_MONTH', samePointLogs, [teacherA, teacherB], {
+      targetYearMonth: '2026-09',
+      mode: 'PRODUCTION',
+    });
+
+    const earlyRank = antiTieResult.leaderboard.find((t) => t.id === 'usr_t_early');
+    const stdRank = antiTieResult.leaderboard.find((t) => t.id === 'usr_t_standard');
+
+    assert(
+      'Anti-Tie Engine: Equal points resolved by earlier arrival time (avgCheckInMinutes)',
+      earlyRank !== undefined && stdRank !== undefined && earlyRank.rank < stdRank.rank && earlyRank.isTie !== true,
+      `Early Rank: ${earlyRank?.rank} (${earlyRank?.avgCheckInFormatted}), Std Rank: ${stdRank?.rank} (${stdRank?.avgCheckInFormatted})`
+    );
   } catch (err: unknown) {
     assert('Tie-Breaker Engine: Guard', false, String(err));
   }
