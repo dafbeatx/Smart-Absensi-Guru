@@ -54,6 +54,7 @@ import { SarprasInventoryModal } from '../../sarpras/components/SarprasInventory
 import { GuruSurveyVoiceCard } from '../../guru/components/GuruSurveyVoiceCard';
 import { SurveyAnalyticsView } from '../../survey/components/SurveyAnalyticsView';
 import { DailySurveyReminderBanner } from '../../../components/survey/DailySurveyReminderBanner';
+import { syncSurveyCompletionFromPointLogs } from '../../../services/research-survey.service';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
 import { PermissionGuardService } from '../../../services/permission-guard.service';
 import {
@@ -1481,6 +1482,7 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       try {
         const myPointLogs = await provider.getTeacherPointHistory(effectiveUser.id, authToken);
         setPointHistory(myPointLogs || []);
+        syncSurveyCompletionFromPointLogs(effectiveUser.id, myPointLogs || []);
       } catch (err) {
         console.warn('Failed to load teacher point history:', err);
       }
@@ -1853,7 +1855,10 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       try {
         const prov = ProviderFactory.getProvider();
         const myPointLogs = await prov.getTeacherPointHistory(effectiveUser.id, token || '');
-        if (myPointLogs) setPointHistory(myPointLogs);
+        if (myPointLogs) {
+          setPointHistory(myPointLogs);
+          syncSurveyCompletionFromPointLogs(effectiveUser.id, myPointLogs);
+        }
         const allLogs = await prov.getTeacherPointHistory('ALL', token || '');
         if (allLogs && allLogs.length > 0) {
           setAllTeacherPointLogs(allLogs);

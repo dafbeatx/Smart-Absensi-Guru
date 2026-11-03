@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   shouldShowDailySurveyBanner,
+  syncSurveyCompletionFromPointLogs,
 } from '../../services/research-survey.service';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Sparkles, ClipboardCheck, ArrowRight, X } from 'lucide-react';
@@ -39,6 +40,7 @@ export const DailySurveyReminderBanner: React.FC<DailySurveyReminderBannerProps>
     }
 
     // Evaluasi lokal tanpa query jaringan (Zero Egress)
+    syncSurveyCompletionFromPointLogs(user.id);
     const needed = shouldShowDailySurveyBanner(user.id);
     setIsVisible(needed);
 

@@ -8,6 +8,7 @@ import type {
   SurveyScoreDistribution,
   SurveyWeeklyTrend,
   SurveyActionSolution,
+  TeacherPointLog,
 } from '../types/database.types';
 import { getJakartaDayOfWeek, getTodayDateInJakarta } from '../utils/time.utils';
 
@@ -53,10 +54,101 @@ export function getSurveyActivePeriodKey(dateStr?: string): string {
 }
 
 /**
+ * Checks whether two YYYY-MM-DD dates belong to the exact same calendar week (Monday to Sunday).
+ */
+export function isSameCalendarWeek(d1Str: string, d2Str: string): boolean {
+  if (!d1Str || !d2Str) return false;
+  const clean1 = d1Str.substring(0, 10);
+  const clean2 = d2Str.substring(0, 10);
+  if (clean1 === clean2) return true;
+
+  const d1 = new Date(clean1 + 'T00:00:00');
+  const d2 = new Date(clean2 + 'T00:00:00');
+  if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return false;
+
+  const day1 = d1.getDay() === 0 ? 7 : d1.getDay();
+  const mon1 = new Date(d1);
+  mon1.setDate(d1.getDate() - (day1 - 1));
+  mon1.setHours(0, 0, 0, 0);
+
+  const day2 = d2.getDay() === 0 ? 7 : d2.getDay();
+  const mon2 = new Date(d2);
+  mon2.setDate(d2.getDate() - (day2 - 1));
+  mon2.setHours(0, 0, 0, 0);
+
+  return mon1.getTime() === mon2.getTime();
+}
+
+/**
  * Checks whether the current or specified date is Friday in Asia/Jakarta timezone.
  */
 export function isFridayToday(dateOrStr?: Date | string): boolean {
   return getJakartaDayOfWeek(dateOrStr) === 5;
+}
+
+/**
+ * Checks point history logs (cache or parameter) for a SURVEY_PARTICIPATION entry
+ * within the active period or current calendar week, achieving 100% Cross-Device Sync.
+ */
+export function syncSurveyCompletionFromPointLogs(
+  userId: string,
+  pointLogs?: TeacherPointLog[],
+  dateStr?: string
+): boolean {
+  if (!userId) return false;
+
+  let logs = pointLogs;
+  if (!logs || logs.length === 0) {
+    try {
+      const raw = safeGetStorage('smart_absensi_teacher_point_history');
+      if (raw) {
+        logs = JSON.parse(raw);
+      }
+    } catch {}
+  }
+
+  if (!logs || !Array.isArray(logs)) return false;
+
+  const today = dateStr || getTodayDateInJakarta();
+  const todayDate = new Date(today + 'T00:00:00');
+  const activePeriodKey = getSurveyActivePeriodKey(today);
+
+  const surveyLogs = logs.filter(
+    (l) =>
+      (l.user_id === userId || l.user_id === 'usr_' + userId) &&
+      l.activity_type === 'SURVEY_PARTICIPATION' &&
+      l.status !== 'VOIDED'
+  );
+
+  for (const log of surveyLogs) {
+    const logDateStr = log.date || (log.created_at ? log.created_at.substring(0, 10) : '');
+    if (!logDateStr) continue;
+
+    // 1. Same active period key (e.g. 2026_M11_W1)
+    const logPeriodKey = getSurveyActivePeriodKey(logDateStr);
+    if (logPeriodKey === activePeriodKey) {
+      markActiveSurveyCompleted(userId, logDateStr);
+      return true;
+    }
+
+    // 2. Same calendar week (Monday to Sunday)
+    if (isSameCalendarWeek(logDateStr, today)) {
+      markActiveSurveyCompleted(userId, logDateStr);
+      return true;
+    }
+
+    // 3. Within 6 days rolling window
+    const logDate = new Date(logDateStr + 'T00:00:00');
+    if (!isNaN(logDate.getTime()) && !isNaN(todayDate.getTime())) {
+      const diffDays = Math.abs((todayDate.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays <= 6) {
+        markActiveSurveyCompleted(userId, logDateStr);
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -71,20 +163,55 @@ export function hasCompletedFridaySurvey(userId: string, dateStr?: string): bool
 }
 
 /**
- * Checks whether the user has completed the survey for the active period cycle.
- * Evaluated locally with zero egress/network overhead and isolated per user.
+ * Checks whether the user has completed the survey for the active period cycle / current week.
+ * Evaluated locally with zero egress/network overhead, persistent across devices and rolling week.
  */
 export function hasCompletedActiveSurvey(userId: string, dateStr?: string): boolean {
   if (!userId) return false;
-  const periodKey = getSurveyActivePeriodKey(dateStr);
+  const today = dateStr || getTodayDateInJakarta();
+  const periodKey = getSurveyActivePeriodKey(today);
+
+  // 1. Cek penyimpanan lokal per-user dan per-device untuk periode aktif
   const userPeriodKey = `smart_absensi_survey_done_${periodKey}_${userId}`;
   if (safeGetStorage(userPeriodKey) === '1') {
     return true;
   }
-  // Also check if completed today specifically for this user
-  const today = dateStr || getTodayDateInJakarta();
+  const devicePeriodKey = `smart_absensi_survey_done_${periodKey}`;
+  if (safeGetStorage(devicePeriodKey) === '1') {
+    return true;
+  }
+
+  // 2. Cek apakah diselesaikan hari ini
   const todayUserKey = `smart_absensi_friday_survey_${today}_${userId}`;
-  return safeGetStorage(todayUserKey) === '1';
+  if (safeGetStorage(todayUserKey) === '1') {
+    return true;
+  }
+
+  // 3. Cek tanggal terakhir pengisian survey (minggu kalender yang sama / rolling 6 hari)
+  const lastSubmitted =
+    safeGetStorage(`smart_absensi_survey_last_submitted_date_${userId}`) ||
+    safeGetStorage('smart_absensi_survey_last_submitted_date');
+  if (lastSubmitted) {
+    if (isSameCalendarWeek(lastSubmitted, today)) {
+      return true;
+    }
+    const lastDate = new Date(lastSubmitted + 'T00:00:00');
+    const curDate = new Date(today + 'T00:00:00');
+    if (!isNaN(lastDate.getTime()) && !isNaN(curDate.getTime())) {
+      const diffMs = curDate.getTime() - lastDate.getTime();
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (diffDays >= 0 && diffDays <= 6) {
+        return true;
+      }
+    }
+  }
+
+  // 4. Cek sinkronisasi point history lintas perangkat (Laptop/HP)
+  if (syncSurveyCompletionFromPointLogs(userId, undefined, today)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -107,6 +234,11 @@ export function markActiveSurveyCompleted(userId: string, dateStr?: string): voi
   const periodKey = getSurveyActivePeriodKey(today);
   const userPeriodKey = `smart_absensi_survey_done_${periodKey}_${userId || 'anon'}`;
   safeSetStorage(userPeriodKey, '1');
+  safeSetStorage(`smart_absensi_survey_done_${periodKey}`, '1');
+  if (userId) {
+    safeSetStorage(`smart_absensi_survey_last_submitted_date_${userId}`, today);
+  }
+  safeSetStorage('smart_absensi_survey_last_submitted_date', today);
   markFridaySurveyCompleted(userId, today);
 
   if (typeof window !== 'undefined') {
@@ -121,11 +253,12 @@ export function markActiveSurveyCompleted(userId: string, dateStr?: string): voi
 /**
  * Decides whether a daily reminder (notification / prompt) should be sent today.
  * Returns true if:
- * 1. User has NOT completed the active survey period.
+ * 1. User has NOT completed the active survey period / current week.
  * 2. Daily reminder has NOT yet been fired today for this user (prevents spam).
  */
 export function shouldSendDailySurveyReminder(userId: string, dateStr?: string): boolean {
   if (!userId) return false;
+  // PENTING: Jika sudah mengisi survey perminggu, JANGAN DITAGIH LAGI!
   if (hasCompletedActiveSurvey(userId, dateStr)) {
     return false;
   }
@@ -146,7 +279,7 @@ export function markDailySurveyReminderSent(userId: string, dateStr?: string): v
 
 /**
  * Checks whether the daily sticky reminder banner should be visible.
- * Visible if user has NOT completed the active survey for this period.
+ * Sembunyikan banner secara permanen untuk minggu ini jika guru sudah menyelesaikan survey.
  */
 export function shouldShowDailySurveyBanner(userId: string, dateStr?: string): boolean {
   if (!userId) return false;
@@ -162,14 +295,15 @@ export interface ShouldTriggerSurveyParams {
 /**
  * Decides whether the mandatory Friday survey must be triggered:
  * 1. Must be Friday in Jakarta timezone.
- * 2. Must NOT have completed today's survey yet.
+ * 2. Must NOT have completed the survey for the active week / period.
  * 3. Trigger condition: User just checked in (action === 'CHECK_IN') OR already checked in earlier today.
  */
 export function shouldTriggerFridaySurvey(params: ShouldTriggerSurveyParams): boolean {
   if (!isFridayToday()) {
     return false;
   }
-  if (hasCompletedFridaySurvey(params.userId)) {
+  // PENTING: Jika guru sudah mengisi survey perminggu, JANGAN DITAGIH LAGI!
+  if (hasCompletedActiveSurvey(params.userId) || hasCompletedFridaySurvey(params.userId)) {
     return false;
   }
   // Only trigger after check-in, never on check-out

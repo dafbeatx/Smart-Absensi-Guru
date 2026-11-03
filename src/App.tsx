@@ -14,6 +14,7 @@ import { PointRewardCelebrationOverlay } from './components/ui/PointRewardCelebr
 import { CookieConsentBanner } from './components/ui/CookieConsentBanner';
 import { usePointRewardStore } from './store/usePointRewardStore';
 import { useSettingsStore } from './store/useSettingsStore';
+import { useToastStore } from './store/useToastStore';
 
 // Helper: retry a dynamic import once by reloading the page when the chunk
 // is missing (stale deployment).  Uses sessionStorage to prevent infinite loops.
@@ -103,6 +104,7 @@ import {
   shouldTriggerFridaySurvey,
   shouldSendDailySurveyReminder,
   markDailySurveyReminderSent,
+  hasCompletedActiveSurvey,
 } from './services/research-survey.service';
 import { NotificationService } from './services/notification-permission.service';
 
@@ -247,6 +249,14 @@ export const App: React.FC = () => {
     };
 
     const handleOpenSurveyModal = () => {
+      if (userId && hasCompletedActiveSurvey(userId)) {
+        useToastStore.getState().showToast(
+          'info',
+          'Survey Mingguan Telah Selesai',
+          'Bapak/Ibu telah mengisi survey evaluasi untuk minggu ini. Terima kasih atas partisipasi Anda! 🌟'
+        );
+        return;
+      }
       setIsFridaySurveyOpen(true);
     };
 
@@ -259,7 +269,15 @@ export const App: React.FC = () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('openSurvey') === 'true' || window.location.hash.includes('openSurvey')) {
-          setIsFridaySurveyOpen(true);
+          if (userId && hasCompletedActiveSurvey(userId)) {
+            useToastStore.getState().showToast(
+              'info',
+              'Survey Mingguan Telah Selesai',
+              'Bapak/Ibu telah mengisi survey evaluasi untuk minggu ini. Terima kasih atas partisipasi Anda! 🌟'
+            );
+          } else {
+            setIsFridaySurveyOpen(true);
+          }
         }
       } catch {}
     }

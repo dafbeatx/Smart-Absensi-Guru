@@ -11,6 +11,8 @@ import {
   shouldSendDailySurveyReminder,
   markDailySurveyReminderSent,
   shouldShowDailySurveyBanner,
+  isSameCalendarWeek,
+  syncSurveyCompletionFromPointLogs,
 } from '../research-survey.service';
 import { NotificationService } from '../notification-permission.service';
 import { MockProvider } from '../../providers/mock-provider.service';
@@ -269,6 +271,75 @@ export async function runResearchSurveyTestSuite(): Promise<TestSuiteResult> {
     assert(
       'Notification - Targeted for Guru role',
       notifPayload.roleTarget === 'GURU'
+    );
+
+    // ── 6. UNIT TESTS: Weekly Survey Completion Retention (No Re-Nagging) ──
+    // A: Same Calendar Week verification
+    assert(
+      'Calendar Week - Monday and Friday of same week are recognized',
+      isSameCalendarWeek('2026-11-02', '2026-11-06') === true
+    );
+    assert(
+      'Calendar Week - Consecutive weeks are distinct',
+      isSameCalendarWeek('2026-11-06', '2026-11-09') === false
+    );
+    assert(
+      'Calendar Week - Crossing month boundary within same week recognized',
+      isSameCalendarWeek('2026-10-30', '2026-11-01') === true
+    );
+
+    // B: Guru who completes survey on Wednesday must NOT be nagged on Friday
+    const guruWedUser = 'usr_guru_wednesday_test';
+    const wednesdayDate = '2026-11-04';
+    const fridayDate = '2026-11-06';
+
+    // Mark completed on Wednesday
+    markActiveSurveyCompleted(guruWedUser, wednesdayDate);
+
+    assert(
+      'No-Nag Guarantee - Active survey recognized as done on subsequent Friday',
+      hasCompletedActiveSurvey(guruWedUser, fridayDate) === true
+    );
+    assert(
+      'No-Nag Guarantee - Daily banner is hidden on Friday for teacher who completed on Wednesday',
+      shouldShowDailySurveyBanner(guruWedUser, fridayDate) === false
+    );
+    assert(
+      'No-Nag Guarantee - Daily notification reminder is suppressed on Friday',
+      shouldSendDailySurveyReminder(guruWedUser, fridayDate) === false
+    );
+    assert(
+      'No-Nag Guarantee - Friday survey popup is suppressed for teacher who already filled it this week',
+      shouldTriggerFridaySurvey({ userId: guruWedUser, hasCheckedInToday: true }) === false
+    );
+
+    // C: Cross-Device Sync from Cloud Point History Logs
+    const guruCloudUser = 'usr_guru_cross_device_test';
+    const mockCloudLogs: any[] = [
+      {
+        id: 'pt_log_survey_cloud_01',
+        user_id: guruCloudUser,
+        date: '2026-11-03',
+        points: 10,
+        activity_type: 'SURVEY_PARTICIPATION',
+        title: 'Apresiasi Partisipasi Survey TAM',
+        status: 'VALID',
+        created_at: '2026-11-03T08:00:00Z',
+      },
+    ];
+
+    const synced = syncSurveyCompletionFromPointLogs(guruCloudUser, mockCloudLogs, '2026-11-05');
+    assert(
+      'Cross-Device Sync - Point log with SURVEY_PARTICIPATION automatically syncs survey completion',
+      synced === true
+    );
+    assert(
+      'Cross-Device Sync - Teacher is marked completed on other device without re-filling',
+      hasCompletedActiveSurvey(guruCloudUser, '2026-11-05') === true
+    );
+    assert(
+      'Cross-Device Sync - Banner hidden on other device',
+      shouldShowDailySurveyBanner(guruCloudUser, '2026-11-05') === false
     );
   } catch (err: any) {
     assert('Research Survey Suite - Exception free execution', false, err?.message || String(err));
