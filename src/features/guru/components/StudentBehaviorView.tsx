@@ -583,7 +583,7 @@ export const StudentBehaviorView: React.FC<StudentBehaviorViewProps> = ({
             <p className="leading-relaxed">{successMessage}</p>
             {lastSyncStatus === 'SYNCED' ? (
               <a
-                href="https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/"
+                href="https://nawasena-platform-siswa.vercel.app/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-emerald-700 font-bold underline mt-1 text-[11px] hover:text-emerald-900"

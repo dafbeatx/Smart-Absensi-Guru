@@ -133,7 +133,7 @@ export const QuestionCorrectionModal: React.FC<QuestionCorrectionModalProps> = (
 
   const gradeMasterUrl = useMemo(() => {
     const teacher = encodeURIComponent(currentUser?.full_name || 'Guru');
-    return `https://web-input-nilai.vercel.app/?embed=true&teacher=${teacher}#setup`;
+    return `https://nawasena-platform-siswa.vercel.app/?embed=true&teacher=${teacher}#setup`;
   }, [currentUser?.full_name]);
 
   // Load state machine

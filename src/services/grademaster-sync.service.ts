@@ -79,7 +79,7 @@ export async function syncScoresToGradeMaster(payload: {
 }): Promise<SyncScoresToGradeMasterResult> {
   const apiUrl =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GRADEMASTER_API_URL) ||
-    'https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi';
+    'https://nawasena-platform-siswa.vercel.app/api/grademaster/sync-from-smart-absensi';
 
   const syncKey =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GRADEMASTER_SYNC_KEY) ||
@@ -461,7 +461,7 @@ export async function postManualScoreToGradeMasterHttp(params: {
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   const endpoint =
     params.endpointUrl ||
-    'https://web-input-nilai.vercel.app/api/grademaster/data-center/manual-score';
+    'https://nawasena-platform-siswa.vercel.app/api/grademaster/data-center/manual-score';
 
   try {
     const response = await fetch(endpoint, {
@@ -508,7 +508,7 @@ export async function syncBehaviorsToGradeMaster(payload: {
 }): Promise<SyncBehaviorsToGradeMasterResult> {
   const apiUrl =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GRADEMASTER_API_URL) ||
-    'https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi';
+    'https://nawasena-platform-siswa.vercel.app/api/grademaster/sync-from-smart-absensi';
 
   const syncKey =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GRADEMASTER_SYNC_KEY) ||

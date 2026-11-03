@@ -269,7 +269,7 @@ export class StudentBehaviorRepository {
         const timeoutId = setTimeout(() => controller.abort(), 3500);
 
         const res = await window.fetch(
-          'https://web-input-nilai-dafbeatxs-projects-0222ca64.vercel.app/api/grademaster/behaviors/settings',
+          'https://nawasena-platform-siswa.vercel.app/api/grademaster/behaviors/settings',
           {
             headers: { Accept: 'application/json' },
             cache: 'no-store',

@@ -2,7 +2,7 @@
  * SMART ABSENSI GURU — GRADEMASTER SCORE SYNC TEST SUITE (HTTP API BRIDGE)
  * Memverifikasi sinkronisasi nilai siswa ke Portal Siswa (GradeMaster OS / Web Input Nilai)
  * melalui HTTP API Bridge:
- * 1. Dispatch ke URL https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi
+ * 1. Dispatch ke URL https://nawasena-platform-siswa.vercel.app/api/grademaster/sync-from-smart-absensi
  * 2. Header otentikasi x-sync-key: gm_sync_smart_absensi_2026
  * 3. Format payload JSON: className, subject, academicYear (2026/2027), examType, scores
  * 4. Normalisasi academicYear ('2026-2027' -> '2026/2027')
@@ -86,7 +86,7 @@ export async function runGradeMasterScoreSyncTestSuite(): Promise<TestSuiteResul
       const isValid =
         syncRes.success &&
         syncRes.count === 2 &&
-        call?.url === 'https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi' &&
+        call?.url === 'https://nawasena-platform-siswa.vercel.app/api/grademaster/sync-from-smart-absensi' &&
         headers['Content-Type'] === 'application/json' &&
         headers['x-sync-key'] === 'gm_sync_smart_absensi_2026' &&
         body?.className === '9A' &&
@@ -414,7 +414,7 @@ export async function runGradeMasterScoreSyncTestSuite(): Promise<TestSuiteResul
       const isValid =
         syncRes.success &&
         syncRes.count === 2 &&
-        call?.url === 'https://web-input-nilai.vercel.app/api/grademaster/sync-from-smart-absensi' &&
+        call?.url === 'https://nawasena-platform-siswa.vercel.app/api/grademaster/sync-from-smart-absensi' &&
         headers['Content-Type'] === 'application/json' &&
         headers['x-sync-key'] === 'gm_sync_smart_absensi_2026' &&
         body?.className === '9A' &&

@@ -6825,16 +6825,19 @@ export class SupabaseProvider implements IDataProvider {
           updated_at: new Date().toISOString(),
         }));
         if (answerRows.length > 0) {
-          await this.client.from('gm_answers').upsert(answerRows, { onConflict: 'student_id,question_number' });
+          const { error: ansErr } = await this.client.from('gm_answers').upsert(answerRows, { onConflict: 'student_id,question_number' });
+          if (ansErr) {
+            logger.debug('SupabaseProvider', 'gm_answers upsert notice (resolves with migration 67):', ansErr.message);
+          }
         }
       } catch (ansErr) {
-        logger.warn('SupabaseProvider', 'gm_answers upsert note:', ansErr);
+        logger.debug('SupabaseProvider', 'gm_answers upsert note:', ansErr);
       }
     }
 
     // Upsert student_scores on conflict (student_id, session_id) - NEVER duplicate!
     try {
-      await this.client.from('student_scores').upsert({
+      const { error: scoreErr } = await this.client.from('student_scores').upsert({
         student_id: studentUserId,
         session_id: dto.session_id,
         score: finalScore,
@@ -6852,6 +6855,9 @@ export class SupabaseProvider implements IDataProvider {
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'student_id,session_id' });
+      if (scoreErr) {
+        logger.debug('SupabaseProvider', 'student_scores upsert notice (resolves with migration 67):', scoreErr.message);
+      }
     } catch (scoreSyncErr) {
       logger.debug('SupabaseProvider', 'student_scores upsert note:', scoreSyncErr);
     }
