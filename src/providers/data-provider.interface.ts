@@ -68,6 +68,12 @@ import type {
   ExamPeriodSettings,
 } from '../types/exam-schedule.types';
 import type { MeetingMinute } from '../types/meeting-minutes.types';
+import type {
+  BimtekRecord,
+  CreateBimtekDTO,
+  UpdateBimtekDTO,
+  VerifyBimtekDTO,
+} from '../types/bimtek.types';
 
 export interface IDataProvider {
   // Auth API
@@ -269,6 +275,13 @@ export interface IDataProvider {
   getTeacherRewardDecision?(period: string, token?: string): Promise<TeacherRewardDecision | null>;
   saveTeacherRewardDecision?(decision: TeacherRewardDecision, token?: string): Promise<TeacherRewardDecision>;
   invalidateTeacherPointCache?(userId?: string): void;
+
+  // Teacher Bimtek & Diklat (Bimbingan Teknis & Pelatihan Guru) API
+  getBimtekRecords(userId?: string, token?: string): Promise<BimtekRecord[]>;
+  createBimtekRecord(dto: CreateBimtekDTO, token?: string): Promise<BimtekRecord>;
+  updateBimtekRecord(id: string, dto: UpdateBimtekDTO, token?: string): Promise<BimtekRecord | null>;
+  verifyBimtekRecord(id: string, dto: VerifyBimtekDTO, token?: string): Promise<boolean>;
+  deleteBimtekRecord(id: string, token?: string): Promise<boolean>;
 }
 
 

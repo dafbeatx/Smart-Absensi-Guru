@@ -1,3 +1,4 @@
+import { BimtekManagementView } from '../../bimtek/components/BimtekManagementView';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
@@ -603,6 +604,11 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
       icon: '📊',
     },
     {
+      id: 'BIMTEK',
+      label: 'Validasi Bimtek & Diklat',
+      icon: '🎖️',
+    },
+    {
       id: 'GAME_PID',
       label: 'Game PID (Staging)',
       icon: '🎮',
@@ -622,6 +628,10 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
         items={sidebarItems}
         activeTab={activeTab}
         onSelectTab={(id) => {
+          if (id === 'BIMTEK') {
+            setActiveTab('BIMTEK');
+            return;
+          }
           if (id === 'GAME_PID') {
             setActiveTab('GAME_PID');
             return;
@@ -1052,6 +1062,17 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
 
           {/* TAB 5: DEV TEST MODE */}
           {activeTab === 'DEV_TEST' && <DevTestPage onBackToDashboard={() => setActiveTab('DASHBOARD')} />}
+
+          {/* TAB: VALIDASI & REKAP BIMTEK DEWAN GURU */}
+          {activeTab === 'BIMTEK' && (
+            <div className="max-w-5xl mx-auto">
+              <BimtekManagementView
+                currentUser={user}
+                onBack={() => setActiveTab('DASHBOARD')}
+                initialTab="ALL_TEACHERS"
+              />
+            </div>
+          )}
 
           {/* TAB: WADAH PLATFORM GAME PID (LAYER RESMI NON-POPUP) */}
           {activeTab === 'GAME_PID' && (

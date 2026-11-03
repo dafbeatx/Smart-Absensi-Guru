@@ -31,6 +31,7 @@ import {
   CalendarCheck,
   NotebookPen,
   Gamepad2,
+  Award,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import { isUserSarprasOfficer } from '../../sarpras/utils/sarpras-access.utils';
@@ -164,6 +165,14 @@ export const ALL_QUICK_ICONS: QuickIconItem[] = [
     description: 'Notulen rapat AI & arsip risalah rapat sekolah untuk seluruh guru',
     icon: NotebookPen,
     colorClass: 'from-[#18536B] to-[#023246]',
+  },
+  {
+    id: 'bimtek',
+    title: 'Bimtek & Diklat',
+    category: 'Akademik & Nilai',
+    description: 'Pencatatan bimbingan teknis, diklat, workshop, JP, dan sertifikat resmi guru',
+    icon: Award,
+    colorClass: 'from-amber-600 to-indigo-800',
   },
   {
     id: 'game_pid',

@@ -1,9 +1,10 @@
 /**
  * Konfigurasi URL dan Pengaturan Platform Game PID (Pekan Inovasi Digital)
  * SMP Terpadu Al-Ittihadiyah
+ * Platform Inovasi Digital: Nawasena PI (https://nawasena-pi.vercel.app)
  */
 
-export const DEFAULT_GAME_PID_URL = 'https://game-pid.smpt-alittihadiyah.sch.id';
+export const DEFAULT_GAME_PID_URL = 'https://nawasena-pi.vercel.app';
 export const STORAGE_KEY_GAME_PID_URL = 'smart_absensi_game_pid_url';
 
 /**
@@ -41,3 +42,4 @@ export function setGamePidPlatformUrl(url: string): void {
     }
   }
 }
+

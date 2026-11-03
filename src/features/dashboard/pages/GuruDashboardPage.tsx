@@ -1,3 +1,4 @@
+import { BimtekManagementView } from '../../bimtek/components/BimtekManagementView';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
@@ -348,7 +349,8 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   }, [previewUser, authUser]);
 
   const [activeTab, setActiveTab] = useState<'BERANDA' | 'RIWAYAT' | 'NOTIFIKASI' | 'PROFIL'>('BERANDA');
-  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS' | 'GAME_PID'>('HOME');
+  const [berandaLayer, setBerandaLayer] = useState<'HOME' | 'ALL_FEATURES' | 'CHALLENGE' | 'ABOUT' | 'EDUCATION' | 'STUDENT_BEHAVIOR' | 'NOTULEN' | 'SURVEY_ANALYTICS' | 'GAME_PID' | 'BIMTEK'>('HOME');
+  const [bimtekReturnTarget, setBimtekReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
   const berandaLayerRef = React.useRef(berandaLayer);
   berandaLayerRef.current = berandaLayer;
   const [gamePidReturnTarget, setGamePidReturnTarget] = useState<'HOME' | 'ALL_FEATURES'>('HOME');
@@ -905,6 +907,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
       case 'survey_hasil':
         setSurveyAnalyticsReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
         setBerandaLayer('SURVEY_ANALYTICS');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'bimtek':
+        setBimtekReturnTarget(berandaLayer === 'ALL_FEATURES' ? 'ALL_FEATURES' : 'HOME');
+        setBerandaLayer('BIMTEK');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
       case 'game_pid':
@@ -5576,6 +5583,19 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
               }
             />
           </div>
+        )}
+
+        {/* ── LAYER: PENCATATAN BIMTEK & DIKLAT GURU (DEDICATED FULL VIEW - NON-POPUP) ─── */}
+        {activeTab === 'BERANDA' && berandaLayer === 'BIMTEK' && (
+          <BimtekManagementView
+            currentUser={effectiveUser}
+            onBack={() => {
+              setBerandaLayer(bimtekReturnTarget);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            initialTab="MY_BIMTEK"
+            academicYear="2026/2027"
+          />
         )}
 
         {/* ── LAYER: GAME PID (PEKAN INOVASI DIGITAL - DEDICATED FULL VIEW - NON-POPUP) ─── */}

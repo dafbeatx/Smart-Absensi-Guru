@@ -1,3 +1,9 @@
+import type {
+  BimtekRecord,
+  CreateBimtekDTO,
+  UpdateBimtekDTO,
+  VerifyBimtekDTO,
+} from '../types/bimtek.types';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { IDataProvider } from './data-provider.interface';
@@ -8160,6 +8166,202 @@ export class SupabaseProvider implements IDataProvider {
     const mockProv = new (await import('./mock-provider.service')).MockProvider();
     return mockProv.getMonthlySurveySummary(month, year);
   }
+
+  // ============================================================================
+  // PENCATATAN BIMTEK & DIKLAT GURU ENGINE (SUPABASE POSTGRESQL + FALLBACK)
+  // ============================================================================
+  private cachedBimtekRecords: BimtekRecord[] | null = null;
+  private cachedBimtekTimestamp: number = 0;
+
+  public async getBimtekRecords(userId?: string, _token?: string): Promise<BimtekRecord[]> {
+    const now = Date.now();
+    if (!userId && this.cachedBimtekRecords && now - this.cachedBimtekTimestamp < 60000) {
+      return this.cachedBimtekRecords;
+    }
+
+    return this.dedupeRequest(`getBimtekRecords_${userId || 'all'}`, async () => {
+      try {
+        let query = this.client
+          .from('bimtek_records')
+          .select('*')
+          .order('start_date', { ascending: false });
+
+        if (userId) {
+          query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          logger.warn('SupabaseProvider', 'getBimtekRecords error, falling back to mock provider:', error.message);
+          const mockProv = new (await import('./mock-provider.service')).MockProvider();
+          return mockProv.getBimtekRecords(userId);
+        }
+
+        if (data && Array.isArray(data)) {
+          if (!userId) {
+            this.cachedBimtekRecords = data as BimtekRecord[];
+            this.cachedBimtekTimestamp = Date.now();
+          }
+          return data as BimtekRecord[];
+        }
+        return [];
+      } catch (err) {
+        logger.error('SupabaseProvider', 'getBimtekRecords exception, falling back to mock provider:', err);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.getBimtekRecords(userId);
+      }
+    });
+  }
+
+  public async createBimtekRecord(dto: CreateBimtekDTO, _token?: string): Promise<BimtekRecord> {
+    this.cachedBimtekRecords = null;
+    this.cachedBimtekTimestamp = 0;
+
+    try {
+      const payload = {
+        user_id: dto.user_id,
+        teacher_name: dto.teacher_name,
+        teacher_nip: dto.teacher_nip || null,
+        teacher_avatar: dto.teacher_avatar || null,
+        title: dto.title.trim(),
+        activity_type: dto.activity_type,
+        organizer: dto.organizer.trim(),
+        scope: dto.scope,
+        role: dto.role || 'PESERTA',
+        execution_method: dto.execution_method || 'DARING',
+        start_date: dto.start_date,
+        end_date: dto.end_date,
+        duration_hours: Number(dto.duration_hours) || 32,
+        location_or_platform: dto.location_or_platform.trim(),
+        certificate_number: dto.certificate_number ? dto.certificate_number.trim() : null,
+        certificate_date: dto.certificate_date || null,
+        certificate_url: dto.certificate_url ? dto.certificate_url.trim() : null,
+        assignment_letter_number: dto.assignment_letter_number ? dto.assignment_letter_number.trim() : null,
+        summary_notes: dto.summary_notes ? dto.summary_notes.trim() : null,
+        status: 'SUBMITTED',
+        academic_year: dto.academic_year || '2026/2027',
+      };
+
+      const { data, error } = await this.client
+        .from('bimtek_records')
+        .insert(payload)
+        .select('*')
+        .single();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'createBimtekRecord error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.createBimtekRecord(dto);
+      }
+
+      return data as BimtekRecord;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'createBimtekRecord exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.createBimtekRecord(dto);
+    }
+  }
+
+  public async updateBimtekRecord(id: string, dto: UpdateBimtekDTO, _token?: string): Promise<BimtekRecord | null> {
+    this.cachedBimtekRecords = null;
+    this.cachedBimtekTimestamp = 0;
+
+    try {
+      const payload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (dto.title !== undefined) payload.title = dto.title.trim();
+      if (dto.activity_type !== undefined) payload.activity_type = dto.activity_type;
+      if (dto.organizer !== undefined) payload.organizer = dto.organizer.trim();
+      if (dto.scope !== undefined) payload.scope = dto.scope;
+      if (dto.role !== undefined) payload.role = dto.role;
+      if (dto.execution_method !== undefined) payload.execution_method = dto.execution_method;
+      if (dto.start_date !== undefined) payload.start_date = dto.start_date;
+      if (dto.end_date !== undefined) payload.end_date = dto.end_date;
+      if (dto.duration_hours !== undefined) payload.duration_hours = Number(dto.duration_hours);
+      if (dto.location_or_platform !== undefined) payload.location_or_platform = dto.location_or_platform.trim();
+      if (dto.certificate_number !== undefined) payload.certificate_number = dto.certificate_number ? dto.certificate_number.trim() : null;
+      if (dto.certificate_date !== undefined) payload.certificate_date = dto.certificate_date || null;
+      if (dto.certificate_url !== undefined) payload.certificate_url = dto.certificate_url ? dto.certificate_url.trim() : null;
+      if (dto.assignment_letter_number !== undefined) payload.assignment_letter_number = dto.assignment_letter_number ? dto.assignment_letter_number.trim() : null;
+      if (dto.summary_notes !== undefined) payload.summary_notes = dto.summary_notes ? dto.summary_notes.trim() : null;
+      if (dto.academic_year !== undefined) payload.academic_year = dto.academic_year;
+
+      const { data, error } = await this.client
+        .from('bimtek_records')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'updateBimtekRecord error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.updateBimtekRecord(id, dto);
+      }
+
+      return data as BimtekRecord;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'updateBimtekRecord exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.updateBimtekRecord(id, dto);
+    }
+  }
+
+  public async verifyBimtekRecord(id: string, dto: VerifyBimtekDTO, _token?: string): Promise<boolean> {
+    this.cachedBimtekRecords = null;
+    this.cachedBimtekTimestamp = 0;
+
+    try {
+      const payload = {
+        status: dto.status,
+        verified_by: dto.verified_by,
+        verified_at: new Date().toISOString(),
+        verification_notes: dto.verification_notes ? dto.verification_notes.trim() : null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await this.client
+        .from('bimtek_records')
+        .update(payload)
+        .eq('id', id);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'verifyBimtekRecord error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.verifyBimtekRecord(id, dto);
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'verifyBimtekRecord exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.verifyBimtekRecord(id, dto);
+    }
+  }
+
+  public async deleteBimtekRecord(id: string, _token?: string): Promise<boolean> {
+    this.cachedBimtekRecords = null;
+    this.cachedBimtekTimestamp = 0;
+
+    try {
+      const { error } = await this.client
+        .from('bimtek_records')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        logger.warn('SupabaseProvider', 'deleteBimtekRecord error, falling back to mock provider:', error.message);
+        const mockProv = new (await import('./mock-provider.service')).MockProvider();
+        return mockProv.deleteBimtekRecord(id);
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('SupabaseProvider', 'deleteBimtekRecord exception, falling back to mock provider:', err);
+      const mockProv = new (await import('./mock-provider.service')).MockProvider();
+      return mockProv.deleteBimtekRecord(id);
+    }
+  }
+
 }
-
-

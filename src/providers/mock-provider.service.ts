@@ -1,3 +1,9 @@
+import type {
+  BimtekRecord,
+  CreateBimtekDTO,
+  UpdateBimtekDTO,
+  VerifyBimtekDTO,
+} from '../types/bimtek.types';
 import type { IDataProvider } from './data-provider.interface';
 import type {
   UserProfile,
@@ -4368,6 +4374,121 @@ export class MockProvider implements IDataProvider {
     const surveys = this.getStoredSurveys();
     return calculateSurveySummary(surveys, month, year);
   }
+
+  // ============================================================================
+  // PENCATATAN BIMTEK & DIKLAT GURU ENGINE
+  // ============================================================================
+  private getStoredBimtek(): BimtekRecord[] {
+    const raw = safeGetStorage('smart_absensi_bimtek_records');
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // fallback
+    }
+    return [];
+  }
+
+  public async getBimtekRecords(userId?: string, _token?: string): Promise<BimtekRecord[]> {
+    const list = this.getStoredBimtek();
+    if (userId) {
+      return list.filter((r) => r.user_id === userId);
+    }
+    return [...list].sort((a, b) => new Date(b.start_date || b.created_at).getTime() - new Date(a.start_date || a.created_at).getTime());
+  }
+
+  public async createBimtekRecord(dto: CreateBimtekDTO, _token?: string): Promise<BimtekRecord> {
+    const list = this.getStoredBimtek();
+    const newRecord: BimtekRecord = {
+      id: 'bimtek_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      user_id: dto.user_id,
+      teacher_name: dto.teacher_name,
+      teacher_nip: dto.teacher_nip || null,
+      teacher_avatar: dto.teacher_avatar || null,
+      title: dto.title.trim(),
+      activity_type: dto.activity_type,
+      organizer: dto.organizer.trim(),
+      scope: dto.scope,
+      role: dto.role || 'PESERTA',
+      execution_method: dto.execution_method || 'DARING',
+      start_date: dto.start_date,
+      end_date: dto.end_date,
+      duration_hours: Number(dto.duration_hours) || 32,
+      location_or_platform: dto.location_or_platform.trim(),
+      certificate_number: dto.certificate_number ? dto.certificate_number.trim() : null,
+      certificate_date: dto.certificate_date || null,
+      certificate_url: dto.certificate_url ? dto.certificate_url.trim() : null,
+      assignment_letter_number: dto.assignment_letter_number ? dto.assignment_letter_number.trim() : null,
+      summary_notes: dto.summary_notes ? dto.summary_notes.trim() : null,
+      status: 'SUBMITTED',
+      academic_year: dto.academic_year || '2026/2027',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const updated = [newRecord, ...list];
+    safeSetStorage('smart_absensi_bimtek_records', JSON.stringify(updated));
+    return newRecord;
+  }
+
+  public async updateBimtekRecord(id: string, dto: UpdateBimtekDTO, _token?: string): Promise<BimtekRecord | null> {
+    const list = this.getStoredBimtek();
+    const index = list.findIndex((item) => item.id === id);
+    if (index === -1) return null;
+
+    const target = list[index];
+    const updatedRecord: BimtekRecord = {
+      ...target,
+      title: dto.title !== undefined ? dto.title.trim() : target.title,
+      activity_type: dto.activity_type !== undefined ? dto.activity_type : target.activity_type,
+      organizer: dto.organizer !== undefined ? dto.organizer.trim() : target.organizer,
+      scope: dto.scope !== undefined ? dto.scope : target.scope,
+      role: dto.role !== undefined ? dto.role : target.role,
+      execution_method: dto.execution_method !== undefined ? dto.execution_method : target.execution_method,
+      start_date: dto.start_date !== undefined ? dto.start_date : target.start_date,
+      end_date: dto.end_date !== undefined ? dto.end_date : target.end_date,
+      duration_hours: dto.duration_hours !== undefined ? Number(dto.duration_hours) : target.duration_hours,
+      location_or_platform: dto.location_or_platform !== undefined ? dto.location_or_platform.trim() : target.location_or_platform,
+      certificate_number: dto.certificate_number !== undefined ? (dto.certificate_number ? dto.certificate_number.trim() : null) : target.certificate_number,
+      certificate_date: dto.certificate_date !== undefined ? dto.certificate_date : target.certificate_date,
+      certificate_url: dto.certificate_url !== undefined ? (dto.certificate_url ? dto.certificate_url.trim() : null) : target.certificate_url,
+      assignment_letter_number: dto.assignment_letter_number !== undefined ? (dto.assignment_letter_number ? dto.assignment_letter_number.trim() : null) : target.assignment_letter_number,
+      summary_notes: dto.summary_notes !== undefined ? (dto.summary_notes ? dto.summary_notes.trim() : null) : target.summary_notes,
+      academic_year: dto.academic_year !== undefined ? dto.academic_year : target.academic_year,
+      updated_at: new Date().toISOString(),
+    };
+
+    list[index] = updatedRecord;
+    safeSetStorage('smart_absensi_bimtek_records', JSON.stringify(list));
+    return updatedRecord;
+  }
+
+  public async verifyBimtekRecord(id: string, dto: VerifyBimtekDTO, _token?: string): Promise<boolean> {
+    const list = this.getStoredBimtek();
+    const index = list.findIndex((item) => item.id === id);
+    if (index === -1) return false;
+
+    list[index] = {
+      ...list[index],
+      status: dto.status,
+      verified_by: dto.verified_by,
+      verified_at: new Date().toISOString(),
+      verification_notes: dto.verification_notes ? dto.verification_notes.trim() : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    safeSetStorage('smart_absensi_bimtek_records', JSON.stringify(list));
+    return true;
+  }
+
+  public async deleteBimtekRecord(id: string, _token?: string): Promise<boolean> {
+    const list = this.getStoredBimtek();
+    const filtered = list.filter((item) => item.id !== id);
+    if (filtered.length === list.length) return false;
+
+    safeSetStorage('smart_absensi_bimtek_records', JSON.stringify(filtered));
+    return true;
+  }
+
 }
-
-
