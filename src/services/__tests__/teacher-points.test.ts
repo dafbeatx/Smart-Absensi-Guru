@@ -1492,5 +1492,33 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     assert('Future Transition: Guard', false, String(err));
   }
 
+  // 46. Zero-Point Anti-Tie Guard: Teachers with 0 points / NO_ACTIVITY must NEVER receive tieBreakerAdvantage
+  try {
+    const zeroPointTeachers: UserProfile[] = [
+      { id: 'usr_zero_1', full_name: 'Guru Nol A', role: 'GURU', position: 'Guru Seni', nip: null, phone_number: '08101', avatar_url: null, is_active: true, created_at: '2026-01-01' },
+      { id: 'usr_zero_2', full_name: 'Guru Nol B', role: 'GURU', position: 'Guru Olahraga', nip: null, phone_number: '08102', avatar_url: null, is_active: true, created_at: '2026-01-01' },
+      { id: 'usr_zero_3', full_name: 'Guru Nol C', role: 'GURU', position: 'Guru Musik', nip: null, phone_number: '08103', avatar_url: null, is_active: true, created_at: '2026-01-01' },
+    ];
+
+    const zeroResult = getTeacherDisciplineLeaderboard(
+      null,
+      null,
+      'CURRENT_MONTH',
+      [], // no logs at all for this month
+      zeroPointTeachers,
+      { mode: 'PRODUCTION' }
+    );
+
+    const zeroWithAdvantage = zeroResult.leaderboard.filter((t) => t.tieBreakerAdvantage !== undefined);
+
+    assert(
+      'Zero-Point Anti-Tie Guard: Guru dengan 0 poin / Belum Ada Aktivitas tidak pernah memiliki keterangan Unggul',
+      zeroWithAdvantage.length === 0,
+      `Guru dengan keunggulan pada 0 poin: ${zeroWithAdvantage.map((t) => `${t.name} (${t.tieBreakerAdvantage})`).join(', ') || 'Nihil (Sempurna)'}`
+    );
+  } catch (err: unknown) {
+    assert('Zero-Point Anti-Tie Guard: Guard', false, String(err));
+  }
+
   return { passed, failed, results };
 };

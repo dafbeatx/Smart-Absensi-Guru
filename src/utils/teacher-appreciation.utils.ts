@@ -849,6 +849,10 @@ export function getTeacherDisciplineLeaderboard(
           piketCount: 0,
           earlyBirdCount: 0,
           streakCount: 0,
+          avgCheckInMinutes: undefined,
+          avgCheckInFormatted: '-',
+          checkOutCompletionRate: 0,
+          tieBreakerAdvantage: undefined,
           status: isApprovedLeave ? ('ON_LEAVE' as const) : ('NO_ACTIVITY' as const),
           level: isApprovedLeave ? '🏖️ Sedang Cuti Resmi' : '🥉 Pendidik Berkomitmen',
           topBadge: isApprovedLeave ? { icon: '🏖️', title: 'Sedang Cuti Resmi' } : { icon: '🥉', title: 'Pendidik Berkomitmen' },
@@ -904,8 +908,8 @@ export function getTeacherDisciplineLeaderboard(
         }
       });
 
-      const avgCheckInMin = validCheckInCount > 0 ? Math.round(totalCheckInMinutes / validCheckInCount) : (t.avgCheckInMinutes ?? 9999);
-      const avgCheckInFormatted = avgCheckInMin <= 720
+      const avgCheckInMin = validCheckInCount > 0 ? Math.round(totalCheckInMinutes / validCheckInCount) : undefined;
+      const avgCheckInFormatted = (avgCheckInMin !== undefined && avgCheckInMin <= 720)
         ? `${String(Math.floor(avgCheckInMin / 60)).padStart(2, '0')}:${String(avgCheckInMin % 60).padStart(2, '0')} WIB`
         : '-';
 
@@ -913,7 +917,7 @@ export function getTeacherDisciplineLeaderboard(
       const totalPresence = onTime + late;
       const checkOutCompletionRate = totalPresence > 0
         ? Math.min(100, Math.round((checkOutLogs.length / totalPresence) * 100))
-        : (t.checkOutCompletionRate ?? 100);
+        : 0;
 
       return {
         ...t,
@@ -1000,9 +1004,17 @@ export function getTeacherDisciplineLeaderboard(
       cur.isTie = false;
     }
 
-    // Berikan keterangan keunggulan jika poin sama namun peringkat terpisah adil
-    if (prev !== null && cur.totalPoints === prev.totalPoints && !isTieWithPrev) {
-      if ((prev.avgCheckInMinutes ?? 9999) < (cur.avgCheckInMinutes ?? 9999)) {
+    // Berikan keterangan keunggulan jika poin sama (> 0) namun peringkat terpisah adil
+    // PENTING: Keunggulan pembeda HANYA diberikan jika kedua guru memiliki poin aktif (> 0) dan status aktif
+    const hasActivePoints = (prev?.totalPoints ?? 0) > 0 && cur.totalPoints > 0;
+    const hasActiveStatus = prev?.status === 'ACTIVE' && cur.status === 'ACTIVE';
+
+    if (prev !== null && hasActivePoints && hasActiveStatus && cur.totalPoints === prev.totalPoints && !isTieWithPrev) {
+      if (
+        prev.avgCheckInMinutes !== undefined &&
+        cur.avgCheckInMinutes !== undefined &&
+        prev.avgCheckInMinutes < cur.avgCheckInMinutes
+      ) {
         prev.tieBreakerAdvantage = `Unggul rata-rata kedatangan fajar (${prev.avgCheckInFormatted || 'lebih awal'} vs ${cur.avgCheckInFormatted || '-'})`;
       } else if ((prev.checkOutCompletionRate ?? 0) > (cur.checkOutCompletionRate ?? 0)) {
         prev.tieBreakerAdvantage = `Unggul kepatuhan pulang (${prev.checkOutCompletionRate}% vs ${cur.checkOutCompletionRate}%)`;
@@ -1013,6 +1025,10 @@ export function getTeacherDisciplineLeaderboard(
       } else if ((prev.piketCount || 0) > (cur.piketCount || 0)) {
         prev.tieBreakerAdvantage = `Unggul keaktifan piket (${prev.piketCount}x vs ${cur.piketCount}x)`;
       }
+    }
+
+    if (cur.totalPoints <= 0 || cur.status === 'NO_ACTIVITY' || cur.status === 'ON_LEAVE') {
+      cur.tieBreakerAdvantage = undefined;
     }
 
     const tierInfo = getTeacherRankTierInfo(cur.rank, cur.totalPoints, cur.status);

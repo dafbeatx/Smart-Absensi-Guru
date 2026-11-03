@@ -902,7 +902,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                         <span className="text-slate-900 font-black block mb-1">📋 Kriteria yang Dipenuhi:</span>
                         {tierInfo.criteria}
                       </div>
-                      {selectedTeacher.tieBreakerAdvantage && (
+                      {selectedTeacher.totalPoints > 0 && selectedTeacher.tieBreakerAdvantage && (
                         <div className="p-2.5 rounded-2xl bg-indigo-50/80 border border-indigo-200 text-xs text-indigo-950 flex items-center gap-2">
                           <span className="text-base shrink-0">⚡</span>
                           <p className="text-[11px] font-semibold text-indigo-900 leading-tight">
@@ -1735,7 +1735,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                             NPP: {teacher.nip}
                                           </p>
                                         )}
-                                        {teacher.tieBreakerAdvantage && (
+                                        {teacher.totalPoints > 0 && teacher.tieBreakerAdvantage && (
                                           <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-[9px] font-bold text-indigo-800">
                                             ⚡ {teacher.tieBreakerAdvantage}
                                           </span>
@@ -2574,7 +2574,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                       <span className="text-slate-900 font-bold block mb-0.5">📋 Kriteria yang Dipenuhi:</span>
                       {tierInfo.criteria}
                     </div>
-                    {selectedTeacher.tieBreakerAdvantage && (
+                    {selectedTeacher.totalPoints > 0 && selectedTeacher.tieBreakerAdvantage && (
                       <div className="p-2 rounded-xl bg-indigo-50/80 border border-indigo-200 text-xs text-indigo-950 flex items-center gap-1.5">
                         <span className="text-sm shrink-0">⚡</span>
                         <p className="text-[10px] font-semibold text-indigo-900 leading-tight">
@@ -3144,7 +3144,7 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
                                   {teacher.hadirTepatWaktuCount > 0 ? ` • ${teacher.hadirTepatWaktuCount} On-Time` : ''}
                                   {teacher.earlyBirdCount && teacher.earlyBirdCount > 0 ? ` • 🌅 ${teacher.earlyBirdCount} Fajar` : ''}
                                 </p>
-                                {teacher.tieBreakerAdvantage && (
+                                {teacher.totalPoints > 0 && teacher.tieBreakerAdvantage && (
                                   <span className="inline-block mt-0.5 px-1 py-0.2 rounded bg-indigo-50 border border-indigo-200 text-[8.5px] font-bold text-indigo-800 truncate max-w-full">
                                     ⚡ {teacher.tieBreakerAdvantage}
                                   </span>
