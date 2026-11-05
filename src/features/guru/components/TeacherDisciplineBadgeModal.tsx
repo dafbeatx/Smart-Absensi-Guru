@@ -97,12 +97,24 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
   const prevMeta = useMemo(() => getDisciplinePeriodMetadata('PREVIOUS_MONTH'), []);
   const activeMeta = selectedPeriod === 'CURRENT_MONTH' ? currentMeta : prevMeta;
 
-  // Sinkronkan selectedPeriod saat modal dibuka dengan initialPeriod baru
+  // Sinkronkan selectedPeriod saat modal dibuka dengan initialPeriod / target bulan yang dipilih
   useEffect(() => {
-    if (isOpen && initialPeriod) {
+    if (!isOpen) return;
+    if (selectedYear && selectedMonth) {
+      const targetPrefix = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+      if (targetPrefix === prevMeta.yearMonth) {
+        setSelectedPeriod('PREVIOUS_MONTH');
+        return;
+      }
+      if (targetPrefix === currentMeta.yearMonth) {
+        setSelectedPeriod('CURRENT_MONTH');
+        return;
+      }
+    }
+    if (initialPeriod) {
       setSelectedPeriod(initialPeriod);
     }
-  }, [isOpen, initialPeriod]);
+  }, [isOpen, initialPeriod, selectedYear, selectedMonth, prevMeta.yearMonth, currentMeta.yearMonth]);
 
   // Layer detail state: when teacher card is clicked, open clear detail chart view
   const [selectedTeacher, setSelectedTeacher] = useState<TeacherLeaderboardItem | null>(null);
@@ -369,40 +381,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     }
   };
 
-  const effectivePointLogs = useMemo(() => {
-    if (!currentUser?.id || !currentUserScore || typeof currentUserScore.totalPoints !== 'number' || currentUserScore.totalPoints <= 0) {
-      return allPointLogs;
-    }
-    const currentPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-    const targetPrefix = selectedYear && selectedMonth
-      ? `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
-      : currentPrefix;
-
-    const hasUserLogsForPeriod = allPointLogs.some((l) => {
-      if (l.user_id !== currentUser.id) return false;
-      if (l.status === 'VOIDED') return false;
-      const d = l.date || l.created_at;
-      return d && d.startsWith(targetPrefix);
-    });
-
-    if (hasUserLogsForPeriod) {
-      return allPointLogs;
-    }
-
-    const syntheticLog: TeacherPointLog = {
-      id: `synthetic_user_${currentUser.id}_${targetPrefix}`,
-      user_id: currentUser.id,
-      teacher_name: currentUser.full_name || 'Guru',
-      points: currentUserScore.totalPoints,
-      activity_type: 'CHECK_IN_ON_TIME',
-      title: 'Akumulasi Poin Kehadiran',
-      description: 'Rekapitulasi poin kedisiplinan dan kehadiran bulan berjalan',
-      date: `${targetPrefix}-01`,
-      created_at: new Date().toISOString(),
-    };
-
-    return [...allPointLogs, syntheticLog];
-  }, [allPointLogs, currentUser, currentUserScore, selectedYear, selectedMonth]);
+  // Isolasi ketat: Seluruh perhitungan klasemen murni bersumber dari buku besar poin (allPointLogs)
+  // Tidak ada injeksi synthetic log lintas bulan yang mencemari atau menyatukan akumulasi antar periode
+  const effectivePointLogs = allPointLogs;
 
   const {
     leaderboard,
@@ -414,9 +395,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     snapshotId,
     lastCalculated,
   } = useMemo(() => {
-    const targetYearMonth = selectedYear && selectedMonth
-      ? `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`
-      : undefined;
+    const targetYearMonth = selectedPeriod === 'CURRENT_MONTH'
+      ? currentMeta.yearMonth
+      : prevMeta.yearMonth;
 
     return getTeacherDisciplineLeaderboard(
       currentUser,
@@ -424,9 +405,9 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
       selectedPeriod,
       effectivePointLogs,
       registeredTeachers.length > 0 ? registeredTeachers : allRegisteredTeachersProp,
-      targetYearMonth ? { targetYearMonth } : undefined
+      { targetYearMonth }
     );
-  }, [currentUser, selectedPeriod, effectivePointLogs, registeredTeachers, allRegisteredTeachersProp, selectedYear, selectedMonth]);
+  }, [currentUser, selectedPeriod, effectivePointLogs, registeredTeachers, allRegisteredTeachersProp, currentMeta.yearMonth, prevMeta.yearMonth]);
 
   // Keep selectedTeacher synchronized with fresh avatar
   useEffect(() => {
@@ -496,7 +477,11 @@ export const TeacherDisciplineBadgeModal: React.FC<TeacherDisciplineBadgeModalPr
     if (historyFilterScope === 'ALL') {
       return myAllLogs;
     }
-    const filtered = myAllLogs.filter((l) => l.date && l.date.startsWith(targetMonthPrefix));
+    const filtered = myAllLogs.filter((l) => {
+      if (l.status === 'VOIDED') return false;
+      const d = l.date || l.created_at;
+      return Boolean(d && d.startsWith(targetMonthPrefix));
+    });
     // Jika melihat periode bulan lampau dan belum ada baris transaksi harian tersendiri,
     // sediakan item rekap akumulasi resmi agar poin bulan lalu tidak hilang menjadi 0
     if (filtered.length === 0 && selectedPeriod === 'PREVIOUS_MONTH' && resolvedUserTotalPoints > 0) {

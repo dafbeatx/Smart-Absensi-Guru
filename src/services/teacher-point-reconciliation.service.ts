@@ -288,7 +288,12 @@ export class TeacherPointReconciliationService {
    * Dilengkapi proteksi In-Memory Cache TTL (60 detik) agar tidak membebani Egress Supabase
    * saat modal klasemen dibuka berulang kali.
    */
-  public static async reconcileAllTeachers(token?: string, forceRefresh = false): Promise<TeacherPointLog[]> {
+  public static async reconcileAllTeachers(
+    token?: string,
+    forceRefresh = false,
+    targetYear?: string,
+    targetMonth?: string
+  ): Promise<TeacherPointLog[]> {
     const nowMs = Date.now();
     if (!forceRefresh && (nowMs - this.lastReconcileAllTime < this.RECONCILE_CACHE_TTL_MS) && this.cachedReconciledLogs.length > 0) {
       return this.cachedReconciledLogs;
@@ -304,8 +309,10 @@ export class TeacherPointReconciliationService {
 
     try {
       const todayJakarta = getTodayDateInJakarta();
-      const [currentYear, currentMonth] = todayJakarta.split('-');
-      const allAttendance = await provider.getMonthlyAttendance('ALL', currentMonth, currentYear, token || '');
+      const [currY, currM] = todayJakarta.split('-');
+      const yearToReconcile = targetYear || currY;
+      const monthToReconcile = targetMonth ? String(parseInt(targetMonth, 10)) : currM;
+      const allAttendance = await provider.getMonthlyAttendance('ALL', monthToReconcile, yearToReconcile, token || '');
       const allLogs = await provider.getTeacherPointHistory('ALL', token);
       const dutySchedules = await provider.getDutySchedules(token).catch(() => []);
       const holidays = await provider.getHolidays(token).catch(() => []);

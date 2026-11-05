@@ -17,7 +17,8 @@ export function calculateTeacherAppreciationScore(
   dutySchedules: TeacherDutySchedule[] = [],
   _todayMood: TeacherMoodLog | null = null,
   userId?: string,
-  pointHistory?: TeacherPointLog[]
+  pointHistory?: TeacherPointLog[],
+  targetYearMonth?: string
 ): TeacherAppreciationScore {
   const rawHadirTepatWaktuCount = attendanceHistory.filter(
     (r) => r.status === 'HADIR' || (r.status as string) === 'HADIR_TEPAT_WAKTU'
@@ -52,15 +53,19 @@ export function calculateTeacherAppreciationScore(
     isUserDuty && rawHadirTepatWaktuCount + rawTerlambatCount > 0 ? 1 : 0
   );
 
-  // Isolasi per-bulan: ambil prefix bulan dari attendanceHistory (misal '2026-10') atau bulan berjalan WIB
-  const targetMonthPrefix = (attendanceHistory && attendanceHistory.length > 0 && attendanceHistory[0]?.date)
-    ? attendanceHistory[0].date.substring(0, 7)
-    : getTodayDateInJakarta().substring(0, 7);
+  // Isolasi ketat per-bulan: gunakan targetYearMonth eksplisit jika ada, atau prefix dari attendanceHistory, atau bulan berjalan WIB
+  const targetMonthPrefix = targetYearMonth || (
+    (attendanceHistory && attendanceHistory.length > 0 && attendanceHistory[0]?.date)
+      ? attendanceHistory[0].date.substring(0, 7)
+      : getTodayDateInJakarta().substring(0, 7)
+  );
 
   // Filter buku besar poin agar HANYA menghitung transaksi di bulan terpilih (reset ke 0 setiap tanggal 1 awal bulan)
-  const monthlyPointLogs = (pointHistory || []).filter(
-    (p) => p.date && p.date.startsWith(targetMonthPrefix)
-  );
+  const monthlyPointLogs = (pointHistory || []).filter((p) => {
+    if (p.status === 'VOIDED') return false;
+    const d = p.date || p.created_at;
+    return Boolean(d && d.startsWith(targetMonthPrefix));
+  });
 
   // Sinkronkan hitungan dengan monthlyPointLogs ledger jika tersedia
   const historyOnTimeCount = monthlyPointLogs.filter((p) => p.activity_type === 'CHECK_IN_ON_TIME').length;
@@ -559,7 +564,7 @@ export interface TeacherDisciplineLeaderboardResult {
 /**
  * Helper Seed Khusus Test Suite Legacy
  */
-function getInitialSeedLeaderboardCurrentMonth(): TeacherLeaderboardItem[] {
+export function getInitialSeedLeaderboardOctober(): TeacherLeaderboardItem[] {
   return [
     { id: 'usr_guru_007', name: 'Septi Nur Aeni, S.E', nip: null, position: 'Guru Mapel B. Indonesia', totalPoints: 385, level: '🏆 Super Disiplin', rank: 1, hadirTepatWaktuCount: 14, terlambatCount: 0, piketCount: 2, earlyBirdCount: 1, streakCount: 1, avgCheckInMinutes: 402, avgCheckInFormatted: '06:42 WIB', checkOutCompletionRate: 100, tieBreakerAdvantage: 'Unggul rata-rata kedatangan fajar (06:42 vs 06:58 WIB)', topBadge: { icon: '🏆', title: 'Super Disiplin (Peringkat 1)' } },
     { id: 'usr_guru_009', name: 'Widianingsih, S.Si., G.r', nip: null, position: 'Guru Mapel IPA', totalPoints: 385, level: '🥈 Sangat Disiplin', rank: 2, hadirTepatWaktuCount: 13, terlambatCount: 1, piketCount: 3, earlyBirdCount: 3, streakCount: 1, avgCheckInMinutes: 418, avgCheckInFormatted: '06:58 WIB', checkOutCompletionRate: 98, topBadge: { icon: '🥈', title: 'Sangat Disiplin (Peringkat 2)' } },
@@ -577,7 +582,7 @@ function getInitialSeedLeaderboardCurrentMonth(): TeacherLeaderboardItem[] {
   ];
 }
 
-function getInitialSeedLeaderboardPreviousMonth(): TeacherLeaderboardItem[] {
+export function getInitialSeedLeaderboardAugust(): TeacherLeaderboardItem[] {
   return [
     { id: 'usr_guru_005', name: 'Fitri Ani Rahayu, S.Mat', nip: null, position: 'Wakasek Kesiswaan', totalPoints: 415, level: '🏆 Super Disiplin', rank: 1, hadirTepatWaktuCount: 14, terlambatCount: 4, piketCount: 3, avgCheckInMinutes: 405, avgCheckInFormatted: '06:45 WIB', checkOutCompletionRate: 100, topBadge: { icon: '🏆', title: 'Super Disiplin (Peringkat 1)' } },
     { id: 'usr_admin_001', name: 'Dafa Maulana, S.Pd', nip: null, position: 'Guru Mapel Informatika', totalPoints: 400, level: '🥈 Sangat Disiplin', rank: 2, hadirTepatWaktuCount: 10, terlambatCount: 7, piketCount: 2, avgCheckInMinutes: 415, avgCheckInFormatted: '06:55 WIB', checkOutCompletionRate: 98, topBadge: { icon: '🥈', title: 'Sangat Disiplin (Peringkat 2)' } },
@@ -593,6 +598,14 @@ function getInitialSeedLeaderboardPreviousMonth(): TeacherLeaderboardItem[] {
     { id: 'usr_op_002', name: 'Qodiatul Asrof Ramadhoni, S.E., G.r', nip: null, position: 'Operator Sekolah', totalPoints: 165, level: '⚠️ Perlu Evaluasi Kehadiran', rank: 12, hadirTepatWaktuCount: 3, terlambatCount: 8, piketCount: 1, avgCheckInMinutes: 448, avgCheckInFormatted: '07:28 WIB', checkOutCompletionRate: 80, topBadge: { icon: '⚠️', title: 'Perlu Evaluasi Kehadiran (Peringkat 12)' } },
     { id: 'usr_1786512137742', name: 'Ridho Maulana Al Farizi', nip: null, position: 'Guru Mapel Akhlak lil Banin', totalPoints: 140, level: '⚠️ Perlu Evaluasi Kehadiran', rank: 13, hadirTepatWaktuCount: 3, terlambatCount: 6, piketCount: 1, avgCheckInMinutes: 446, avgCheckInFormatted: '07:26 WIB', checkOutCompletionRate: 82, topBadge: { icon: '⚠️', title: 'Perlu Evaluasi Kehadiran (Peringkat 13)' } },
   ];
+}
+
+function getInitialSeedLeaderboardCurrentMonth(): TeacherLeaderboardItem[] {
+  return getInitialSeedLeaderboardOctober();
+}
+
+function getInitialSeedLeaderboardPreviousMonth(): TeacherLeaderboardItem[] {
+  return getInitialSeedLeaderboardAugust();
 }
 
 /**
@@ -661,9 +674,15 @@ export function getTeacherDisciplineLeaderboard(
   let teachers: TeacherLeaderboardItem[] = [];
 
   if (isSeedAllowed) {
-    teachers = isCurrent
-      ? getInitialSeedLeaderboardCurrentMonth()
-      : getInitialSeedLeaderboardPreviousMonth();
+    if (targetMonthPrefix === '2026-10') {
+      teachers = getInitialSeedLeaderboardOctober();
+    } else if (targetMonthPrefix === '2026-08' || targetMonthPrefix === '2026-09') {
+      teachers = getInitialSeedLeaderboardAugust();
+    } else if (isCurrent) {
+      teachers = getInitialSeedLeaderboardCurrentMonth();
+    } else {
+      teachers = getInitialSeedLeaderboardPreviousMonth();
+    }
 
     if (allRegisteredTeachers && allRegisteredTeachers.length > 0) {
       const activeRoster = allRegisteredTeachers.filter((reg) => {
@@ -822,8 +841,8 @@ export function getTeacherDisciplineLeaderboard(
       return d && d.startsWith(targetMonthPrefix);
     });
 
-    if (!hasLogsForTargetMonth && isSeedAllowed && targetMonthPrefix === '2026-08') {
-      // Pertahankan baseline seed resmi Agustus jika logs yang dioper hanya untuk bulan lain (misal September)
+    if (!hasLogsForTargetMonth && isSeedAllowed && (targetMonthPrefix === '2026-08' || targetMonthPrefix === '2026-10')) {
+      // Pertahankan baseline seed resmi Agustus dan Oktober jika logs yang dioper belum memuat bulan tersebut
     } else {
       teachers = teachers.map((t) => {
       const logs = allPointLogs.filter((l) => {

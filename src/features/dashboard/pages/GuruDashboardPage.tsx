@@ -1978,15 +1978,6 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
 
   const terlambatPercent = totalMasukCount > 0 ? (terlambatCount / totalMasukCount) * 100 : 0;
 
-  // Teacher Appreciation & Gamification Score Calculation
-  const appreciationScore = calculateTeacherAppreciationScore(
-    attendanceHistory,
-    _dutySchedules,
-    todayMood,
-    effectiveUser?.id,
-    pointHistory
-  );
-
   // Teacher Discipline Leaderboard & Top Teacher Recognition (Sinkron dengan selectedMonth)
   const currentJakartaToday = getTodayDateInJakarta();
   const currentJakartaYear = parseInt(currentJakartaToday.substring(0, 4), 10);
@@ -1995,45 +1986,26 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
   const disciplinePeriod: DisciplinePeriodType = isCurrentCalendarMonth ? 'CURRENT_MONTH' : 'PREVIOUS_MONTH';
   const selectedYearMonthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
-  const disciplineLeaderboard = useMemo(() => {
-    let effectiveLogs = allTeacherPointLogs;
-    if (
-      effectiveUser?.id &&
-      appreciationScore &&
-      typeof appreciationScore.totalPoints === 'number' &&
-      appreciationScore.totalPoints > 0
-    ) {
-      const hasUserLogs = allTeacherPointLogs.some((l) => {
-        if (l.user_id !== effectiveUser.id) return false;
-        if (l.status === 'VOIDED') return false;
-        const d = l.date || l.created_at;
-        return d && d.startsWith(selectedYearMonthStr);
-      });
-      if (!hasUserLogs) {
-        const syntheticLog: TeacherPointLog = {
-          id: `synthetic_user_${effectiveUser.id}_${selectedYearMonthStr}`,
-          user_id: effectiveUser.id,
-          teacher_name: effectiveUser.full_name || 'Guru',
-          points: appreciationScore.totalPoints,
-          activity_type: 'CHECK_IN_ON_TIME',
-          title: 'Akumulasi Poin Kehadiran',
-          description: 'Rekapitulasi poin kedisiplinan dan kehadiran bulan berjalan',
-          date: `${selectedYearMonthStr}-01`,
-          created_at: new Date().toISOString(),
-        };
-        effectiveLogs = [...allTeacherPointLogs, syntheticLog];
-      }
-    }
+  // Teacher Appreciation & Gamification Score Calculation (Isolasi ketat per bulan terpilih)
+  const appreciationScore = calculateTeacherAppreciationScore(
+    attendanceHistory,
+    _dutySchedules,
+    todayMood,
+    effectiveUser?.id,
+    pointHistory,
+    selectedYearMonthStr
+  );
 
+  const disciplineLeaderboard = useMemo(() => {
     return getTeacherDisciplineLeaderboard(
       effectiveUser,
       null, // DILARANG mengirim currentUserScore untuk mengoverride ledger global!
       disciplinePeriod,
-      effectiveLogs,
+      allTeacherPointLogs,
       allRegisteredTeachers,
       { targetYearMonth: selectedYearMonthStr }
     );
-  }, [effectiveUser, appreciationScore, disciplinePeriod, selectedYearMonthStr, allTeacherPointLogs, allRegisteredTeachers]);
+  }, [effectiveUser, disciplinePeriod, selectedYearMonthStr, allTeacherPointLogs, allRegisteredTeachers]);
 
   const currentUserLeaderboardItem = useMemo(() => {
     if (!disciplineLeaderboard?.leaderboard) return null;

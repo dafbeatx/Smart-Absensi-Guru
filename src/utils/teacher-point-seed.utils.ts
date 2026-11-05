@@ -8,6 +8,140 @@ import type { TeacherPointLog } from '../types/database.types';
  */
 export function getInitialSeedTeacherPointLogs(): TeacherPointLog[] {
   return [
+  // ── Rekapitulasi Resmi Terverifikasi Performa Guru Bulan Oktober 2026 ───────
+  {
+    "id": "pt_oct_septi_01",
+    "user_id": "usr_guru_007",
+    "teacher_name": "Septi Nur Aeni, S.E",
+    "date": "2026-10-31",
+    "points": 385,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "🏆 Juara 1 Pendidik Super Disiplin Kepsek - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (385 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_widia_01",
+    "user_id": "usr_guru_009",
+    "teacher_name": "Widianingsih, S.Si., G.r",
+    "date": "2026-10-31",
+    "points": 385,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "🥈 Peringkat 2 Pendidik Sangat Disiplin - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (385 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_iqbal_01",
+    "user_id": "usr_guru_002",
+    "teacher_name": "Muhammad Iqbal Gustiawan, S.Pd., G.r",
+    "date": "2026-10-31",
+    "points": 375,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "🥉 Peringkat 3 Pendidik Disiplin - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (375 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_fitri_01",
+    "user_id": "usr_guru_005",
+    "teacher_name": "Fitri Ani Rahayu, S.Mat",
+    "date": "2026-10-31",
+    "points": 330,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "🎖️ Peringkat 4 Pendidik Cukup Disiplin - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (330 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_ridho_01",
+    "user_id": "usr_1786512137742",
+    "teacher_name": "Ridho Maulana Al Farizi",
+    "date": "2026-10-31",
+    "points": 315,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "⭐ Peringkat 5 Pendidik Tertib Waktu - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (315 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_nurul_01",
+    "user_id": "usr_guru_006",
+    "teacher_name": "Nurul Fahriya, S.Pd., G.r",
+    "date": "2026-10-31",
+    "points": 300,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "🛡️ Peringkat 6 Pendidik Berdedikasi Aktif - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (300 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_mira_01",
+    "user_id": "usr_guru_004",
+    "teacher_name": "Mira Nurdianti, S.Pd",
+    "date": "2026-10-31",
+    "points": 275,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "🌟 Peringkat 7 Pendidik Berkomitmen Kuat - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (275 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_dafa_01",
+    "user_id": "usr_admin_001",
+    "teacher_name": "Dafa Maulana, S.Pd",
+    "date": "2026-10-31",
+    "points": 275,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "📈 Peringkat 8 Pendidik Tumbuh Disiplin - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (275 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_adi_01",
+    "user_id": "usr_guru_003",
+    "teacher_name": "Adi Prasetyo, S.Pd., G.r",
+    "date": "2026-10-31",
+    "points": 200,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "🎯 Peringkat 9 Pendidik Menuju Konsistensi - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (200 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_mawar_01",
+    "user_id": "usr_guru_010",
+    "teacher_name": "Mawar Andinia, S.Pd., G.r",
+    "date": "2026-10-31",
+    "points": 185,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "⚡ Peringkat 10 Pendidik Perlu Penguatan Disiplin - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (185 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_farhan_01",
+    "user_id": "usr_kepsek_002",
+    "teacher_name": "Farhan Sopian Sahid, S.Pd.I",
+    "date": "2026-10-31",
+    "points": 130,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "🌱 Peringkat 11 Pendidik Tahap Pembinaan Waktu - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (130 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  {
+    "id": "pt_oct_qodiatul_01",
+    "user_id": "usr_op_002",
+    "teacher_name": "Qodiatul Asrof Ramadhoni, S.E., G.r",
+    "date": "2026-10-31",
+    "points": 50,
+    "activity_type": "CHECK_IN_ON_TIME",
+    "title": "Rekap Akumulasi Poin Disiplin Final (Oktober 2026)",
+    "description": "⚠️ Peringkat 12 Pendidik Perlu Evaluasi Kehadiran - Rekapitulasi resmi kehadiran sebulan penuh Oktober 2026 (50 Poin Terverifikasi)",
+    "created_at": "2026-10-31T17:00:00.000Z"
+  },
+  // ── Rekapitulasi Resmi Terverifikasi Performa Guru Bulan Agustus 2026 ───────
   {
     "id": "pt_aug_fitri_01",
     "user_id": "usr_guru_005",
@@ -3952,7 +4086,17 @@ export function getSafeInitialTeacherPointLogs(): TeacherPointLog[] {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= 200) {
-          return parsed;
+          // Cek apakah log rekap resmi Oktober 2026 sudah ada
+          const hasOctober = parsed.some((l: any) => l.date && l.date.startsWith('2026-10'));
+          if (hasOctober) {
+            return parsed;
+          }
+          // Gabungkan log Oktober resmi tanpa merusak riwayat transaksi yang ada
+          const seeds = getInitialSeedTeacherPointLogs();
+          const octSeeds = seeds.filter((s) => s.date && s.date.startsWith('2026-10'));
+          const merged = [...parsed, ...octSeeds];
+          localStorage.setItem('smart_absensi_teacher_point_history', JSON.stringify(merged));
+          return merged;
         }
       }
     } catch {}

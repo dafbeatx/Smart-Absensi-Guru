@@ -1520,5 +1520,98 @@ export const runTeacherPointsTestSuite = async (): Promise<{
     assert('Zero-Point Anti-Tie Guard: Guard', false, String(err));
   }
 
+  // 47. October Historical Data Retention: Leaderboard Oktober 2026 mempertahankan nilai resmi tanpa hilang
+  try {
+    const octLeaderboard = getTeacherDisciplineLeaderboard(
+      null,
+      null,
+      'PREVIOUS_MONTH',
+      undefined,
+      null,
+      { targetYearMonth: '2026-10', mode: 'TEST' }
+    );
+
+    const septi = octLeaderboard.leaderboard.find((t) => t.id === 'usr_guru_007');
+    const widia = octLeaderboard.leaderboard.find((t) => t.id === 'usr_guru_009');
+    const farhan = octLeaderboard.leaderboard.find((t) => t.id === 'usr_kepsek_002');
+    const qodiatul = octLeaderboard.leaderboard.find((t) => t.id === 'usr_op_002');
+
+    assert(
+      'October Retention: Leaderboard Oktober 2026 mempertahankan skor resmi Septi (385), Widia (385), Farhan (130), Qodiatul (50)',
+      septi !== undefined && septi.totalPoints === 385 && septi.rank === 1 &&
+      widia !== undefined && widia.totalPoints === 385 && widia.rank === 2 &&
+      farhan !== undefined && farhan.totalPoints === 130 &&
+      qodiatul !== undefined && qodiatul.totalPoints === 50,
+      `Septi: ${septi?.totalPoints} (Rank ${septi?.rank}), Widia: ${widia?.totalPoints} (Rank ${widia?.rank}), Farhan: ${farhan?.totalPoints}, Qodiatul: ${qodiatul?.totalPoints}`
+    );
+  } catch (err: unknown) {
+    assert('October Retention: Guard', false, String(err));
+  }
+
+  // 48. Strict Monthly Isolation: Poin antar bulan tidak boleh disatukan atau saling bocor
+  try {
+    const multiMonthLogs: TeacherPointLog[] = [
+      { id: 'log_oct_1', user_id: 'usr_t_iso', points: 40, activity_type: 'CHECK_IN_ON_TIME', date: '2026-10-05', created_at: '2026-10-05T07:00:00Z' },
+      { id: 'log_oct_2', user_id: 'usr_t_iso', points: 25, activity_type: 'CHECK_OUT', date: '2026-10-05', created_at: '2026-10-05T14:00:00Z' },
+      { id: 'log_nov_1', user_id: 'usr_t_iso', points: 15, activity_type: 'CHECK_IN_ON_TIME', date: '2026-11-02', created_at: '2026-11-02T07:00:00Z' },
+    ];
+
+    const isoUser: UserProfile = {
+      id: 'usr_t_iso',
+      full_name: 'Guru Isolasi Poin',
+      role: 'GURU',
+      position: 'Guru Fisika',
+      nip: null,
+      phone_number: '08123456789',
+      avatar_url: null,
+      is_active: true,
+      created_at: '2026-01-01',
+    };
+
+    const octResult = getTeacherDisciplineLeaderboard(
+      isoUser,
+      null,
+      'PREVIOUS_MONTH',
+      multiMonthLogs,
+      [isoUser],
+      { targetYearMonth: '2026-10', mode: 'PRODUCTION' }
+    );
+
+    const novResult = getTeacherDisciplineLeaderboard(
+      isoUser,
+      null,
+      'CURRENT_MONTH',
+      multiMonthLogs,
+      [isoUser],
+      { targetYearMonth: '2026-11', mode: 'PRODUCTION' }
+    );
+
+    const octUser = octResult.leaderboard.find((t) => t.id === 'usr_t_iso');
+    const novUser = novResult.leaderboard.find((t) => t.id === 'usr_t_iso');
+
+    assert(
+      'Strict Monthly Isolation: Poin Oktober murni 65 pts dan November murni 15 pts (TIDAK disatukan menjadi 80 pts)',
+      octUser?.totalPoints === 65 && novUser?.totalPoints === 15,
+      `Oktober: ${octUser?.totalPoints} Pts (Diharapkan 65), November: ${novUser?.totalPoints} Pts (Diharapkan 15)`
+    );
+  } catch (err: unknown) {
+    assert('Strict Monthly Isolation: Guard', false, String(err));
+  }
+
+  // 49. TeacherPointSeed October Integrity: Seed memuat rekap resmi Oktober 2026
+  try {
+    const mock = new MockProvider();
+    const history = await mock.getTeacherPointHistory('ALL');
+    const octLogs = history.filter((l) => l.date && l.date.startsWith('2026-10'));
+
+    assert(
+      'TeacherPointSeed: Riwayat resmi bulan Oktober 2026 tersedia di buku besar transaksi',
+      octLogs.length >= 12,
+      `Jumlah log Oktober yang ditemukan: ${octLogs.length}`
+    );
+  } catch (err: unknown) {
+    assert('TeacherPointSeed October Integrity: Guard', false, String(err));
+  }
+
   return { passed, failed, results };
 };

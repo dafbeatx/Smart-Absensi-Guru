@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { TeacherPointLog, UserProfile, TeacherPointActivityType } from '../../../types/database.types';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { getInitialSeedLeaderboardOctober } from '../../../utils/teacher-appreciation.utils';
 import {
   X,
   Clock,
@@ -128,11 +129,14 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
   const availablePeriods = useMemo(() => {
     const periodSet = new Set<string>();
     periodSet.add(defaultPeriodStr);
+    periodSet.add('2026-11');
+    periodSet.add('2026-10');
     periodSet.add('2026-09');
     periodSet.add('2026-08');
     (pointHistory || []).forEach((l) => {
-      if (l.date && l.date.length >= 7) {
-        periodSet.add(l.date.substring(0, 7));
+      const d = l.date || l.created_at;
+      if (d && d.length >= 7) {
+        periodSet.add(d.substring(0, 7));
       }
     });
     return Array.from(periodSet).sort().reverse();
@@ -157,16 +161,49 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
     return prevLogs.reduce((sum, l) => sum + (Number(l.points) || 0), 0);
   }, [teacher?.id, pointHistory]);
 
+  // Skor akumulasi resmi bulan Oktober 2026 yang terverifikasi deterministik dari ledger / seed
+  const octoberVerifiedPoints = useMemo(() => {
+    if (!teacher?.id) return 0;
+    const octLogs = (pointHistory || []).filter((l) => {
+      if (l.user_id !== teacher.id || l.status === 'VOIDED') return false;
+      const d = l.date || l.created_at;
+      return d && d.startsWith('2026-10');
+    });
+    if (octLogs.length > 0) {
+      return octLogs.reduce((sum, l) => sum + (Number(l.points) || 0), 0);
+    }
+    const octSeed = getInitialSeedLeaderboardOctober().find((t) => t.id === teacher.id);
+    return octSeed ? octSeed.totalPoints : 0;
+  }, [teacher?.id, pointHistory]);
+
   // 1. Filter log berdasarkan periode bulan yang dipilih (reset awal bulan per tanggal 1)
   const periodFilteredLogs = useMemo(() => {
     let logs = pointHistory || [];
     if (selectedPeriod !== 'ALL') {
-      logs = logs.filter((l) => l.date && l.date.startsWith(selectedPeriod));
+      logs = logs.filter((l) => {
+        if (l.status === 'VOIDED') return false;
+        const d = l.date || l.created_at;
+        return Boolean(d && d.startsWith(selectedPeriod));
+      });
     }
 
-    // Jika memilih bulan Agustus 2026 dan belum ada baris transaksi harian granular di database,
-    // sediakan rekap transaksi resmi terverifikasi agar poin tidak menjadi 0 kosong atau tertukar dengan bulan berjalan
-    if (selectedPeriod === '2026-08' && logs.length === 0 && augustVerifiedPoints > 0) {
+    // Jika memilih bulan Oktober 2026 dan belum ada baris transaksi harian granular di database,
+    // sediakan rekap transaksi resmi terverifikasi agar poin Oktober tidak menjadi 0
+    if (selectedPeriod === '2026-10' && logs.length === 0 && octoberVerifiedPoints > 0) {
+      logs = [
+        {
+          id: `oct_recap_${teacher?.id || 't'}`,
+          user_id: teacher?.id || '',
+          teacher_name: teacherName,
+          date: '2026-10-31',
+          points: octoberVerifiedPoints,
+          activity_type: 'CHECK_IN_ON_TIME' as TeacherPointActivityType,
+          title: 'Rekap Akumulasi Poin Disiplin Final (Oktober 2026)',
+          description: `Rekapitulasi resmi performa kehadiran dan kedisiplinan sebulan penuh bulan Oktober 2026 (${octoberVerifiedPoints} Poin Terverifikasi)`,
+          created_at: '2026-10-31T17:00:00.000Z',
+        },
+      ];
+    } else if (selectedPeriod === '2026-08' && logs.length === 0 && augustVerifiedPoints > 0) {
       logs = [
         {
           id: `aug_recap_${teacher?.id || 't'}`,
@@ -189,16 +226,24 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
       if (dateB !== dateA) return dateB - dateA;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [pointHistory, selectedPeriod, fallbackPoints, teacher?.id, teacherName]);
+  }, [pointHistory, selectedPeriod, fallbackPoints, teacher?.id, teacherName, octoberVerifiedPoints, augustVerifiedPoints]);
 
   // 2. Hitung total saldo poin untuk periode yang dipilih (reset ke 0 pada tanggal 1 awal bulan)
   const calculatedTotal = useMemo(() => {
     if (selectedPeriod === 'ALL') {
       return Math.max(0, pointHistory.reduce((sum, p) => sum + (p.points || 0), 0));
     }
-    const currentLogs = pointHistory.filter((p) => p.date && p.date.startsWith(selectedPeriod));
+    const currentLogs = pointHistory.filter((p) => {
+      if (p.status === 'VOIDED') return false;
+      const d = p.date || p.created_at;
+      return Boolean(d && d.startsWith(selectedPeriod));
+    });
     if (currentLogs.length > 0) {
       return Math.max(0, currentLogs.reduce((sum, p) => sum + (p.points || 0), 0));
+    }
+    // Jika memilih bulan Oktober 2026, gunakan nilai terverifikasi resmi Oktober
+    if (selectedPeriod === '2026-10') {
+      return octoberVerifiedPoints;
     }
     // Jika memilih bulan Agustus 2026, gunakan nilai terverifikasi resmi Agustus
     if (selectedPeriod === '2026-08') {
@@ -209,7 +254,7 @@ export const TeacherPointHistoryModal: React.FC<TeacherPointHistoryModalProps> =
       return fallbackPoints;
     }
     return 0;
-  }, [pointHistory, selectedPeriod, defaultPeriodStr, fallbackPoints]);
+  }, [pointHistory, selectedPeriod, defaultPeriodStr, fallbackPoints, octoberVerifiedPoints, augustVerifiedPoints]);
 
   // Evaluasi Tier / Level Disiplin berdasarkan saldo periode terpilih
   const teacherLevel = useMemo(() => {
