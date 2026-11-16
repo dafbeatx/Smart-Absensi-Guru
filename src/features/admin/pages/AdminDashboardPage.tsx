@@ -1,6 +1,11 @@
 import { BimtekManagementView } from '../../bimtek/components/BimtekManagementView';
 import { CounselingManagementView } from '../../counseling/components/CounselingManagementView';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  usePageModalBackStack,
+  useTabBackNavigation,
+  BACK_PRIORITIES,
+} from '../../../hooks/useBackNavigation';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Button } from '../../../components/ui/Button';
 import { Sidebar } from '../../../components/ui/Sidebar';
@@ -480,6 +485,38 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onOpenSc
   });
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  // 🛡️ Mobile Hardware & Gesture Back Navigation Stack (Admin Dashboard)
+  usePageModalBackStack([
+    { id: 'admin_correction', isOpen: isCorrectionModalOpen, onClose: () => setIsCorrectionModalOpen(false), title: 'Koreksi Kehadiran Guru' },
+    { id: 'admin_question_correction', isOpen: isQuestionCorrectionModalOpen, onClose: () => setIsQuestionCorrectionModalOpen(false), title: 'Koreksi Soal Ujian' },
+    { id: 'admin_exam_creator', isOpen: isExamCreatorModalOpen, onClose: () => setIsExamCreatorModalOpen(false), title: 'Pembuat Soal Ujian' },
+    { id: 'admin_exam_card', isOpen: isExamCardModalOpen, onClose: () => setIsExamCardModalOpen(false), title: 'Kartu Asesmen Ujian' },
+    { id: 'admin_exam_schedule', isOpen: isExamScheduleModalOpen, onClose: () => setIsExamScheduleModalOpen(false), title: 'Jadwal & Pengawas Ujian' },
+    { id: 'admin_oral_exam', isOpen: isOralExamModalOpen, onClose: () => setIsOralExamModalOpen(false), title: 'Ujian Lisan' },
+    { id: 'admin_homeroom', isOpen: isHomeroomModalOpen, onClose: () => setIsHomeroomModalOpen(false), title: 'Wali Kelas Hub' },
+    { id: 'admin_teaching_materials', isOpen: isTeachingMaterialsModalOpen, onClose: () => setIsTeachingMaterialsModalOpen(false), title: 'Bahan Ajar' },
+    { id: 'admin_leaderboard', isOpen: isLeaderboardModalOpen, onClose: () => setIsLeaderboardModalOpen(false), title: 'Papan Peringkat Kedisiplinan' },
+    { id: 'admin_qr_generator', isOpen: isQrGeneratorOpen, onClose: () => setIsQrGeneratorOpen(false), title: 'Generator QR Poster' },
+    { id: 'admin_test_runner', isOpen: isTestRunnerOpen, onClose: () => setIsTestRunnerOpen(false), title: 'Unit Test Runner' },
+    { id: 'admin_sidebar', isOpen: isSidebarOpen, onClose: () => setIsSidebarOpen(false), priority: BACK_PRIORITIES.DRAWER, title: 'Menu Sidebar' },
+    { id: 'admin_leave', isOpen: isLeaveModalOpen, onClose: () => setIsLeaveModalOpen(false), title: 'Pengajuan Cuti' },
+    { id: 'admin_command_palette', isOpen: isCommandPaletteOpen, onClose: () => setIsCommandPaletteOpen(false), title: 'Command Palette' },
+    { id: 'admin_biometric', isOpen: isBiometricModalOpen, onClose: () => setIsBiometricModalOpen(false), title: 'Biometrik Sidik Jari' },
+    { id: 'admin_preferences', isOpen: isPreferencesModalOpen, onClose: () => setIsPreferencesModalOpen(false), title: 'Preferensi Notifikasi' },
+    { id: 'admin_export', isOpen: isExportModalOpen, onClose: () => setIsExportModalOpen(false), title: 'Export Rekap Kehadiran' },
+  ]);
+
+  // 🛡️ Tab Navigation Back Handler (Admin Sub-Tab -> DASHBOARD)
+  useTabBackNavigation({
+    id: 'admin_active_tab',
+    activeTab,
+    defaultTab: 'DASHBOARD',
+    onBackToDefault: () => {
+      setActiveTab('DASHBOARD');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+  });
 
   const todayStr = getTodayDateInJakarta();
   const isOffDay = useMemo(() => isDateOffDay(todayStr).isOff, [todayStr]);

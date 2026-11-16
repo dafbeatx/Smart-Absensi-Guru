@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GroqAIService } from '../../services/groq-ai.service';
 import { isFeatureEnabled } from '../../config/feature-flags.config';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useBackHandler, BACK_PRIORITIES } from '../../hooks/useBackNavigation';
 
 interface Message {
   id: string;
@@ -27,6 +28,15 @@ export const AIAssistantDrawer: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // 🛡️ Mobile Hardware & Gesture Back Button Handler
+  useBackHandler({
+    id: 'ai_assistant_drawer',
+    isOpen,
+    priority: BACK_PRIORITIES.DRAWER,
+    title: 'AI Assistant Drawer',
+    onBack: () => setIsOpen(false),
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

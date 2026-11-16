@@ -63,6 +63,7 @@ import { runAttendanceCorrectionNotificationExclusionTestSuite } from './__tests
 
 import { runBimtekTestSuite } from './__tests__/bimtek-engine.test';
 import { runCounselingBkTestSuite } from './__tests__/counseling-bk.test';
+import { runBackNavigationTestSuite } from './__tests__/back-navigation.test';
 export interface TestResultItem {
   testName: string;
   status: 'PASS' | 'FAIL';
@@ -169,6 +170,7 @@ export class MasterTestRunner {
       { name: 'Bimtek & Diklat Guru Recording Engine (Phase 5.5)', fn: runBimtekTestSuite },
       { name: 'Catatan Bimbingan Konseling (BK) & Nawasena Sync Engine (Phase 5.6)', fn: runCounselingBkTestSuite },
       { name: 'Attendance Correction & Leave Notification Exclusion Engine', fn: runAttendanceCorrectionNotificationExclusionTestSuite },
+      { name: 'Mobile Hardware & Gesture Back Navigation Engine (Phase 5.7)', fn: runBackNavigationTestSuite },
     ];
 
     let totalPassed = 0;

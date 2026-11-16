@@ -1,6 +1,11 @@
 import { BimtekManagementView } from '../../bimtek/components/BimtekManagementView';
 import { CounselingManagementView } from '../../counseling/components/CounselingManagementView';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  usePageModalBackStack,
+  useTabBackNavigation,
+  BACK_PRIORITIES,
+} from '../../../hooks/useBackNavigation';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { PendingApprovalWidget } from '../../leave/components/PendingApprovalWidget';
@@ -74,6 +79,28 @@ export const KepsekDashboardPage: React.FC<KepsekDashboardPageProps> = ({ onOpen
   const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
   const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [savedChampionReward, setSavedChampionReward] = useState<string | null>(null);
+
+  // 🛡️ Mobile Hardware & Gesture Back Navigation Stack (Kepsek Dashboard)
+  usePageModalBackStack([
+    { id: 'kepsek_sidebar', isOpen: isSidebarOpen, onClose: () => setIsSidebarOpen(false), priority: BACK_PRIORITIES.DRAWER, title: 'Menu Sidebar' },
+    { id: 'kepsek_qr_generator', isOpen: isQrGeneratorOpen, onClose: () => setIsQrGeneratorOpen(false), title: 'Generator QR Poster' },
+    { id: 'kepsek_biometric', isOpen: isBiometricModalOpen, onClose: () => setIsBiometricModalOpen(false), title: 'Biometrik Sidik Jari' },
+    { id: 'kepsek_preferences', isOpen: isPreferencesModalOpen, onClose: () => setIsPreferencesModalOpen(false), title: 'Preferensi Notifikasi' },
+    { id: 'kepsek_leaderboard', isOpen: isLeaderboardModalOpen, onClose: () => setIsLeaderboardModalOpen(false), title: 'Papan Peringkat Kedisiplinan' },
+    { id: 'kepsek_reward', isOpen: isRewardModalOpen, onClose: () => setIsRewardModalOpen(false), title: 'Apresiasi Reward Guru' },
+    { id: 'kepsek_certificate', isOpen: isCertificateModalOpen, onClose: () => setIsCertificateModalOpen(false), title: 'Sertifikat Penghargaan' },
+  ]);
+
+  // 🛡️ Tab Navigation Back Handler (Kepsek Sub-Tab -> DASHBOARD)
+  useTabBackNavigation({
+    id: 'kepsek_active_tab',
+    activeTab,
+    defaultTab: 'DASHBOARD',
+    onBackToDefault: () => {
+      setActiveTab('DASHBOARD');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+  });
 
   // Settings for Geofence & Work Hours
   const [settings, setSettings] = useState<SystemSettings>({

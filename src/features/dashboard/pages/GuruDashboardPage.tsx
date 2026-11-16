@@ -1,6 +1,12 @@
 import { BimtekManagementView } from '../../bimtek/components/BimtekManagementView';
 import { CounselingManagementView } from '../../counseling/components/CounselingManagementView';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  usePageModalBackStack,
+  useBackHandler,
+  useTabBackNavigation,
+  BACK_PRIORITIES,
+} from '../../../hooks/useBackNavigation';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { Badge } from '../../../components/ui/Badge';
@@ -797,6 +803,94 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
     }
     showToast('success', 'Menu Utama Diperbarui', 'Susunan 8 ikon menu utama berhasil disimpan!');
   };
+
+  // 🛡️ Mobile Hardware & Gesture Back Navigation Stack (Guru Dashboard)
+  usePageModalBackStack([
+    { id: 'guru_leave', isOpen: isLeaveModalOpen, onClose: () => setIsLeaveModalOpen(false), title: 'Formulir Izin / Cuti' },
+    { id: 'guru_correction', isOpen: isCorrectionModalOpen, onClose: () => setIsCorrectionModalOpen(false), title: 'Koreksi Absensi' },
+    { id: 'guru_schedule', isOpen: isScheduleModalOpen, onClose: () => setIsScheduleModalOpen(false), title: 'Jadwal Mengajar' },
+    { id: 'guru_terms', isOpen: isTermsModalOpen, onClose: () => setIsTermsModalOpen(false), title: 'Syarat & Ketentuan' },
+    { id: 'guru_change_pin', isOpen: isChangePinOpen, onClose: () => setIsChangePinOpen(false), title: 'Ubah PIN' },
+    { id: 'guru_export', isOpen: isExportModalOpen, onClose: () => setIsExportModalOpen(false), title: 'Export Rekap' },
+    { id: 'guru_attendance_choice', isOpen: isAttendanceChoiceModalOpen, onClose: () => setIsAttendanceChoiceModalOpen(false), title: 'Pilih Metode Absensi' },
+    { id: 'guru_question_correction', isOpen: isQuestionCorrectionModalOpen, onClose: () => setIsQuestionCorrectionModalOpen(false), title: 'Koreksi Soal Ujian' },
+    { id: 'guru_mood', isOpen: isMoodModalOpen, onClose: () => setIsMoodModalOpen(false), title: 'Check-in Mood' },
+    { id: 'guru_complaint', isOpen: isComplaintModalOpen, onClose: () => setIsComplaintModalOpen(false), title: 'Kotak Aspirasi' },
+    { id: 'guru_recap', isOpen: isRecapModalOpen, onClose: () => setIsRecapModalOpen(false), title: 'Rekap Presensi' },
+    { id: 'guru_announcement', isOpen: isAnnouncementModalOpen, onClose: () => setIsAnnouncementModalOpen(false), title: 'Pengumuman Guru' },
+    { id: 'guru_classroom', isOpen: isClassroomModalOpen, onClose: () => setIsClassroomModalOpen(false), title: 'Manajemen Kelas' },
+    { id: 'guru_location', isOpen: isLocationModalOpen, onClose: () => setIsLocationModalOpen(false), title: 'Lokasi Sekolah' },
+    { id: 'guru_student_directory', isOpen: isStudentDirectoryModalOpen, onClose: () => setIsStudentDirectoryModalOpen(false), title: 'Direktori Siswa' },
+    { id: 'guru_teaching_materials', isOpen: isTeachingMaterialsModalOpen, onClose: () => setIsTeachingMaterialsModalOpen(false), title: 'Bahan Ajar' },
+    { id: 'guru_events_calendar', isOpen: isEventsCalendarModalOpen, onClose: () => setIsEventsCalendarModalOpen(false), title: 'Kalender Kegiatan' },
+    { id: 'guru_more_features', isOpen: isMoreFeaturesModalOpen, onClose: () => setIsMoreFeaturesModalOpen(false), title: 'Fitur Lainnya' },
+    { id: 'guru_teacher_board', isOpen: isTeacherBoardOpen, onClose: () => setIsTeacherBoardOpen(false), title: 'Papan Kerja Harian' },
+    { id: 'guru_exam_creator', isOpen: isExamCreatorModalOpen, onClose: () => setIsExamCreatorModalOpen(false), title: 'Pembuat Soal Ujian' },
+    { id: 'guru_homeroom', isOpen: isHomeroomModalOpen, onClose: () => setIsHomeroomModalOpen(false), title: 'Wali Kelas Hub' },
+    { id: 'guru_exam_card', isOpen: isExamCardModalOpen, onClose: () => setIsExamCardModalOpen(false), title: 'Kartu Asesmen Ujian' },
+    { id: 'guru_student_kiosk', isOpen: isStudentKioskOpen, onClose: () => setIsStudentKioskOpen(false), title: 'Kiosk Presensi Siswa' },
+    { id: 'guru_biometric_modal', isOpen: isBiometricModalOpen, onClose: () => setIsBiometricModalOpen(false), title: 'Biometrik Sidik Jari' },
+    { id: 'guru_biometric_prompt', isOpen: isBiometricPromptOpen, onClose: () => setIsBiometricPromptOpen(false), title: 'Aktivasi Biometrik' },
+    { id: 'guru_permission_blocked', isOpen: isPermissionBlockedModalOpen, onClose: () => setIsPermissionBlockedModalOpen(false), title: 'Izin Perangkat Ditolak' },
+    { id: 'guru_discipline_badge', isOpen: isDisciplineBadgeModalOpen, onClose: () => setIsDisciplineBadgeModalOpen(false), title: 'Lencana Disiplin' },
+    { id: 'guru_celebration_modal', isOpen: isCelebrationModalOpen, onClose: () => setIsCelebrationModalOpen(false), title: 'Apresiasi Guru Teladan' },
+    { id: 'guru_point_history', isOpen: isPointHistoryModalOpen, onClose: () => setIsPointHistoryModalOpen(false), title: 'Riwayat Poin Guru' },
+    { id: 'guru_administration', isOpen: isAdministrationModalOpen, onClose: () => setIsAdministrationModalOpen(false), title: 'Hub Administrasi' },
+    { id: 'guru_oral_exam', isOpen: isOralExamModalOpen, onClose: () => setIsOralExamModalOpen(false), title: 'Ujian Lisan' },
+    { id: 'guru_exam_schedule', isOpen: isExamScheduleModalOpen, onClose: () => setIsExamScheduleModalOpen(false), title: 'Jadwal & Pengawas Ujian' },
+    { id: 'guru_emergency', isOpen: isEmergencyModalOpen, onClose: () => setIsEmergencyModalOpen(false), title: 'Darurat Kelas / UKS' },
+    { id: 'guru_preferences', isOpen: isPreferencesModalOpen, onClose: () => setIsPreferencesModalOpen(false), title: 'Preferensi Notifikasi' },
+    { id: 'guru_policy', isOpen: isPolicyModalOpen, onClose: () => setIsPolicyModalOpen(false), title: 'Kebijakan Presensi' },
+    { id: 'guru_challenge', isOpen: isChallengeModalOpen, onClose: () => setIsChallengeModalOpen(false), title: 'Tantangan Mingguan' },
+    { id: 'guru_exam_period', isOpen: isExamPeriodModalOpen, onClose: () => setIsExamPeriodModalOpen(false), title: 'Periode Ujian' },
+    { id: 'guru_sarpras', isOpen: isSarprasModalOpen, onClose: () => setIsSarprasModalOpen(false), title: 'Inventaris Sarpras' },
+    { id: 'guru_customize_icons', isOpen: isCustomizeIconsModalOpen, onClose: () => setIsCustomizeIconsModalOpen(false), title: 'Kustomisasi Menu Utama' },
+  ]);
+
+  // 🛡️ Sub-Layer Back Navigation (berandaLayer -> returnTarget / HOME)
+  useBackHandler({
+    id: 'guru_beranda_layer',
+    isOpen: berandaLayer !== 'HOME',
+    priority: BACK_PRIORITIES.SUB_LAYER,
+    title: `Sub-Layer Beranda (${berandaLayer})`,
+    onBack: () => {
+      if (berandaLayer === 'ABOUT') {
+        handleBackFromAboutLayer();
+      } else if (berandaLayer === 'EDUCATION') {
+        handleBackFromEducation();
+      } else if (berandaLayer === 'NOTULEN') {
+        setBerandaLayer(notulenReturnTarget || 'HOME');
+      } else if (berandaLayer === 'STUDENT_BEHAVIOR') {
+        setBerandaLayer(studentBehaviorReturnTarget || 'HOME');
+      } else if (berandaLayer === 'SURVEY_ANALYTICS') {
+        if (surveyAnalyticsReturnTarget === 'PROFIL') {
+          setActiveTab('PROFIL');
+        } else {
+          setBerandaLayer(surveyAnalyticsReturnTarget || 'HOME');
+        }
+      } else if (berandaLayer === 'BIMTEK') {
+        setBerandaLayer(bimtekReturnTarget || 'HOME');
+      } else if (berandaLayer === 'COUNSELING_BK') {
+        setBerandaLayer(counselingReturnTarget || 'HOME');
+      } else if (berandaLayer === 'GAME_PID') {
+        setBerandaLayer(gamePidReturnTarget || 'HOME');
+      } else {
+        setBerandaLayer('HOME');
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+  });
+
+  // 🛡️ Tab Navigation Back Handler (RIWAYAT / NOTIFIKASI / PROFIL -> BERANDA)
+  useTabBackNavigation({
+    id: 'guru_active_tab',
+    activeTab,
+    defaultTab: 'BERANDA',
+    onBackToDefault: () => {
+      setActiveTab('BERANDA');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+  });
 
   const handleQuickIconClick = (iconId: string) => {
     if (effectiveUser) {

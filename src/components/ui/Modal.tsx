@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackHandler, BACK_PRIORITIES } from '../../hooks/useBackNavigation';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -7,6 +8,8 @@ export interface ModalProps {
   title?: string;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  modalId?: string;
+  disableBackHandler?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -15,7 +18,20 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
   maxWidth = 'md',
+  modalId,
+  disableBackHandler = false,
 }) => {
+  const generatedId = useId();
+  const effectiveModalId = modalId || (title ? `modal_${title.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : `modal_${generatedId}`);
+
+  // 🛡️ Mobile Hardware & Gesture Back Button Handler
+  useBackHandler({
+    id: effectiveModalId,
+    isOpen: isOpen && !disableBackHandler,
+    priority: BACK_PRIORITIES.MODAL,
+    title: title || 'Modal Window',
+    onBack: onClose,
+  });
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();

@@ -15,6 +15,11 @@ import { CookieConsentBanner } from './components/ui/CookieConsentBanner';
 import { usePointRewardStore } from './store/usePointRewardStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useToastStore } from './store/useToastStore';
+import {
+  BackNavigationService,
+  BACK_PRIORITIES,
+} from './services/back-navigation.service';
+import { usePageModalBackStack } from './hooks/useBackNavigation';
 
 // Helper: retry a dynamic import once by reloading the page when the chunk
 // is missing (stale deployment).  Uses sessionStorage to prevent infinite loops.
@@ -137,6 +142,66 @@ export const App: React.FC = () => {
   const closeCelebration = usePointRewardStore((s) => s.closeCelebration);
 
   const appName = useSettingsStore((s) => s.settings.app_name);
+
+  // 🛡️ Global App-Level Overlays & Modals Back Navigation Stack
+  usePageModalBackStack([
+    {
+      id: 'app_scanner',
+      isOpen: isScannerOpen,
+      onClose: () => setIsScannerOpen(false),
+      priority: BACK_PRIORITIES.OVERLAY,
+      title: 'QR Scanner Overlay',
+    },
+    {
+      id: 'app_celebration',
+      isOpen: isCelebrationOpen,
+      onClose: () => closeCelebration(),
+      priority: BACK_PRIORITIES.OVERLAY,
+      title: 'Celebration Award Overlay',
+    },
+    {
+      id: 'app_preview_guru',
+      isOpen: isPreviewGuruMode,
+      onClose: () => setIsPreviewGuruMode(false),
+      priority: BACK_PRIORITIES.PREVIEW_MODE,
+      title: 'Mode Preview Guru',
+    },
+    {
+      id: 'app_test_runner',
+      isOpen: isTestRunnerOpen,
+      onClose: () => setIsTestRunnerOpen(false),
+      priority: BACK_PRIORITIES.MODAL,
+      title: 'Unit Test Runner',
+    },
+    {
+      id: 'app_preview_scanner_blocked',
+      isOpen: isPreviewScannerBlocked,
+      onClose: () => setIsPreviewScannerBlocked(false),
+      priority: BACK_PRIORITIES.MODAL,
+      title: 'Preview Scanner Blocked Dialog',
+    },
+    {
+      id: 'app_friday_survey',
+      isOpen: isFridaySurveyOpen,
+      onClose: () => setIsFridaySurveyOpen(false),
+      priority: BACK_PRIORITIES.MODAL,
+      title: 'Survey Mingguan',
+    },
+    {
+      id: 'app_survey_analytics',
+      isOpen: isSurveyAnalyticsOpen,
+      onClose: () => setIsSurveyAnalyticsOpen(false),
+      priority: BACK_PRIORITIES.MODAL,
+      title: 'Survey Analytics Modal',
+    },
+    {
+      id: 'app_verification_doc',
+      isOpen: Boolean(verificationDocInfo?.isOpen),
+      onClose: () => setVerificationDocInfo(null),
+      priority: BACK_PRIORITIES.MODAL,
+      title: 'Verifikasi Dokumen Resmi',
+    },
+  ]);
 
   // Initialize and synchronize dynamic application settings
   useEffect(() => {
@@ -320,18 +385,8 @@ export const App: React.FC = () => {
   }, [userId]);
 
   useEffect(() => {
-    // Android Hardware Back Button Listener (Capacitor Native)
-    import('@capacitor/app')
-      .then(({ App: CapApp }) => {
-        CapApp.addListener('backButton', ({ canGoBack }) => {
-          if (!canGoBack) {
-            CapApp.exitApp();
-          } else {
-            window.history.back();
-          }
-        }).catch(console.warn);
-      })
-      .catch(() => {});
+    // Inisialisasi Mobile Hardware & Gesture Back Navigation Engine (Web Browser PWA + Capacitor)
+    const cleanupBackNav = BackNavigationService.init();
 
     if (isAuthenticated && token) {
       AuthRepository.verifySession(token)
@@ -369,6 +424,7 @@ export const App: React.FC = () => {
       GPSService.startBackgroundWarmUp();
     }
     return () => {
+      cleanupBackNav();
       GPSService.stopBackgroundWarmUp();
     };
   }, [isAuthenticated, token, userId, userPhone, userNip, userRole]);
