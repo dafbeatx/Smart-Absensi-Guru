@@ -13,9 +13,11 @@ import {
   Info,
   Clock,
   ExternalLink,
+  Box,
+  Play,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
-import { getGamePidPlatformUrl } from '../../../config/game-pid.config';
+import { getGamePidPlatformUrl, getSchoolSlice3dUrl } from '../../../config/game-pid.config';
 
 export interface GamePidModalProps {
   isOpen: boolean;
@@ -32,11 +34,13 @@ interface GamePlanItem {
   category: 'QUIZ' | 'CHALLENGE' | 'LEAGUE';
   badgeCategory: string;
   description: string;
-  status: 'COMING_SOON' | 'IN_DESIGN' | 'PLANNED';
+  status: 'COMING_SOON' | 'IN_DESIGN' | 'PLANNED' | 'AVAILABLE';
   statusLabel: string;
   rewardPoints: number;
   icon: React.ComponentType<{ className?: string }>;
   accentColor: string;
+  actionUrl?: string;
+  is3d?: boolean;
 }
 
 export const GamePidModal: React.FC<GamePidModalProps> = ({
@@ -62,6 +66,21 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
   if (!isOpen) return null;
 
   const gamePlans: GamePlanItem[] = [
+    {
+      id: 'pid_school_slice_3d',
+      title: 'School Slice 3D: Kehidupan Sekolah',
+      category: 'QUIZ',
+      badgeCategory: 'Gim 3D Cel-Shaded PID',
+      description:
+        'Jelajahi kelas 3D cel-shaded SMP Terpadu Al-Ittihadiyah, interaksi tap-to-move dengan NPC guru & murid, dan selesaikan tantangan bank soal terintegrasi.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 35,
+      icon: Box,
+      accentColor: 'from-[#8C5A3C] via-[#C85A32] to-[#2F5D50]',
+      actionUrl: getSchoolSlice3dUrl(),
+      is3d: true,
+    },
     {
       id: 'pid_quiz_quick',
       title: 'Kuis Kilat Edukasi PID',
@@ -346,16 +365,31 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
                   <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
                     <span className="text-[10.5px] font-bold text-emerald-700 flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Estimasi Reward: +{item.rewardPoints} PTS</span>
+                      <span>Reward: +{item.rewardPoints} PTS</span>
                     </span>
-                    <button
-                      type="button"
-                      disabled
-                      className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-400 text-[10px] font-bold inline-flex items-center gap-1 cursor-not-allowed select-none"
-                    >
-                      <Lock className="w-3 h-3" />
-                      <span>Belum Dibuka</span>
-                    </button>
+                    {item.status === 'AVAILABLE' || item.is3d ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            window.open(item.actionUrl || getSchoolSlice3dUrl(), '_blank', 'noopener,noreferrer');
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer active:scale-95 transition-all shadow-2xs"
+                      >
+                        <Play className="w-3 h-3 fill-slate-950 stroke-none" />
+                        <span>Mainkan 3D ↗</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-400 text-[10px] font-bold inline-flex items-center gap-1 cursor-not-allowed select-none"
+                      >
+                        <Lock className="w-3 h-3" />
+                        <span>Belum Dibuka</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );

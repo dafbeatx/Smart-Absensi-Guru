@@ -64,6 +64,7 @@ import { runAttendanceCorrectionNotificationExclusionTestSuite } from './__tests
 import { runBimtekTestSuite } from './__tests__/bimtek-engine.test';
 import { runCounselingBkTestSuite } from './__tests__/counseling-bk.test';
 import { runBackNavigationTestSuite } from './__tests__/back-navigation.test';
+import { runGamePidTestSuite } from './__tests__/game-pid.test';
 export interface TestResultItem {
   testName: string;
   status: 'PASS' | 'FAIL';
@@ -171,6 +172,7 @@ export class MasterTestRunner {
       { name: 'Catatan Bimbingan Konseling (BK) & Nawasena Sync Engine (Phase 5.6)', fn: runCounselingBkTestSuite },
       { name: 'Attendance Correction & Leave Notification Exclusion Engine', fn: runAttendanceCorrectionNotificationExclusionTestSuite },
       { name: 'Mobile Hardware & Gesture Back Navigation Engine (Phase 5.7)', fn: runBackNavigationTestSuite },
+      { name: 'Game PID & School Slice 3D Integration Engine (Phase 5.8)', fn: runGamePidTestSuite },
     ];
 
     let totalPassed = 0;

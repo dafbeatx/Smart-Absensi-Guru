@@ -118,9 +118,9 @@ export const MoreFeaturesModal: React.FC<MoreFeaturesModalProps> = ({
               {
                 id: 'game_pid',
                 title: 'Game PID (Pekan Inovasi Digital)',
-                subtitle: 'Arena permainan edukasi & kuis interaktif sekolah berbasis karakter',
+                subtitle: 'Arena edukasi School Slice 3D & kuis interaktif sekolah berbasis karakter',
                 icon: '🎮',
-                badge: 'Staging Area',
+                badge: '3D Ready',
                 action: () => {
                   WebTrafficService.recordFeatureVisit({
                     user_id: user.id,

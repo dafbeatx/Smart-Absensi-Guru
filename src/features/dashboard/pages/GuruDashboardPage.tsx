@@ -4476,11 +4476,11 @@ export const GuruDashboardPage: React.FC<GuruDashboardPageProps> = ({
                             Platform Game PID
                           </p>
                           <span className="px-1.5 py-0.2 rounded-md bg-amber-400 text-slate-950 text-[8.5px] font-black uppercase tracking-wider shrink-0">
-                            Pekan Inovasi
+                            3D Ready • PID
                           </span>
                         </div>
                         <p className="text-[10px] sm:text-[10.5px] text-violet-200 truncate mt-0.5 font-medium">
-                          Wahana kuis interaktif &amp; gamifikasi edukasi sekolah
+                          School Slice 3D &amp; wahana gamifikasi edukasi sekolah
                         </p>
                       </div>
                     </div>

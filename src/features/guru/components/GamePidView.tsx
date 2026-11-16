@@ -9,20 +9,31 @@ import {
   ArrowLeft,
   CheckCircle2,
   Info,
-  Clock,
   ExternalLink,
   Copy,
   Check,
   Edit2,
   Save,
   RotateCcw,
+  Box,
+  Play,
+  FileSpreadsheet,
+  Download,
+  X,
+  Maximize2,
+  Layers,
+  BookOpen,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import {
   getGamePidPlatformUrl,
   setGamePidPlatformUrl,
   DEFAULT_GAME_PID_URL,
+  getSchoolSlice3dUrl,
+  setSchoolSlice3dUrl,
+  DEFAULT_SCHOOL_SLICE_3D_URL,
 } from '../../../config/game-pid.config';
+import { useBackHandler, BACK_PRIORITIES } from '../../../hooks/useBackNavigation';
 
 export interface GamePidViewProps {
   onBack: () => void;
@@ -39,12 +50,20 @@ interface GamePlanItem {
   category: 'QUIZ' | 'CHALLENGE' | 'LEAGUE';
   badgeCategory: string;
   description: string;
-  status: 'COMING_SOON' | 'IN_DESIGN' | 'PLANNED';
+  status: 'COMING_SOON' | 'IN_DESIGN' | 'PLANNED' | 'AVAILABLE';
   statusLabel: string;
   rewardPoints: number;
   icon: React.ComponentType<{ className?: string }>;
   accentColor: string;
+  actionUrl?: string;
+  is3d?: boolean;
 }
+
+const SAMPLE_CSV_CONTENT = `npcName,npcRole,storyIntro,question,optionA,optionB,optionC,optionD,correctIndex,explanation
+Pak Budi (Guru TIK),Guru Informatika,Selamat pagi! Mari kita uji pemahaman dasar komputer hari ini.,Langkah-langkah sistematis dan logis untuk menyelesaikan masalah disebut...,Algoritma,Perangkat Keras,Jaringan Lokal,Basis Data,0,Algoritma adalah urutan langkah logis untuk menyelesaikan masalah.
+Siti (Ketua Kelas),Teman Sebangku,Hai! Bisa bantu aku menjawab soal TIK ini sebelum bel masuk?,Manakah yang termasuk perangkat masukan (input device)?,Monitor,Printer,Papan Ketik (Keyboard),Speaker,2,Papan ketik digunakan untuk memasukkan perintah dan teks ke komputer.
+Raka (Pengurus OSIS),Sekretaris Kelas,Aku sedang merapikan arsip digital sekolah. Coba tebak soal ini!,Satuan terkecil dalam penyimpanan data digital adalah...,Byte,Bit,Kilobyte,Megabyte,1,Bit merupakan satuan terkecil data biner (0 atau 1).
+Bu Ratna (Pustakawan),Pembina Pojok Baca,Selamat datang di pojok baca! Jawab tantangan literasi digital ini ya.,Menjaga kerahasiaan kata sandi di internet termasuk aspek...,Keamanan Digital,Desain Grafis,Pemrograman Web,Pengolahan Angka,0,Menjaga kerahasiaan akun dan kata sandi merupakan praktik keamanan digital.`;
 
 export const GamePidView: React.FC<GamePidViewProps> = ({
   onBack,
@@ -53,22 +72,76 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
   totalPoints = 0,
 }) => {
   const [activeCategory, setActiveCategory] = useState<GameModeTab>('ALL');
+
+  // State platform umum Nawasena PID
   const [platformUrl, setPlatformUrl] = useState<string>(() => getGamePidPlatformUrl());
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [editUrlInput, setEditUrlInput] = useState<string>(platformUrl);
   const [isCopied, setIsCopied] = useState(false);
 
+  // State khusus School Slice 3D
+  const [schoolSliceUrl, setSchoolSliceUrl] = useState<string>(() => getSchoolSlice3dUrl());
+  const [isEditingSchoolUrl, setIsEditingSchoolUrl] = useState(false);
+  const [editSchoolUrlInput, setEditSchoolUrlInput] = useState<string>(schoolSliceUrl);
+  const [showEmbeddedPlayer, setShowEmbeddedPlayer] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [isCsvCopied, setIsCsvCopied] = useState(false);
+
+  // Sync state dengan event update
   useEffect(() => {
     const handleUrlUpdated = () => {
       const current = getGamePidPlatformUrl();
       setPlatformUrl(current);
       setEditUrlInput(current);
     };
+    const handleSchoolUrlUpdated = () => {
+      const current = getSchoolSlice3dUrl();
+      setSchoolSliceUrl(current);
+      setEditSchoolUrlInput(current);
+    };
+
     window.addEventListener('smart_absensi_game_pid_url_updated', handleUrlUpdated);
+    window.addEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
+
     return () => {
       window.removeEventListener('smart_absensi_game_pid_url_updated', handleUrlUpdated);
+      window.removeEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
     };
   }, []);
+
+  // Back Navigation Handlers untuk modal interaktif
+  useBackHandler({
+    id: 'game-pid-embedded-player',
+    isOpen: showEmbeddedPlayer,
+    priority: BACK_PRIORITIES.MODAL + 5,
+    title: 'School Slice 3D Player',
+    onBack: () => {
+      setShowEmbeddedPlayer(false);
+      return true;
+    },
+  });
+
+  useBackHandler({
+    id: 'game-pid-guide-modal',
+    isOpen: showGuideModal,
+    priority: BACK_PRIORITIES.MODAL + 4,
+    title: 'Panduan Soal Guru 3D',
+    onBack: () => {
+      setShowGuideModal(false);
+      return true;
+    },
+  });
+
+  useBackHandler({
+    id: 'game-pid-edit-school-url',
+    isOpen: isEditingSchoolUrl,
+    priority: BACK_PRIORITIES.SUB_LAYER,
+    title: 'Edit URL School Slice 3D',
+    onBack: () => {
+      setIsEditingSchoolUrl(false);
+      return true;
+    },
+  });
 
   const handleCopyLink = () => {
     if (navigator?.clipboard?.writeText) {
@@ -103,13 +176,79 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
     setIsEditingUrl(false);
   };
 
+  const handleSaveCustomSchoolUrl = () => {
+    const trimmed = editSchoolUrlInput.trim();
+    if (!trimmed) {
+      setSchoolSlice3dUrl(DEFAULT_SCHOOL_SLICE_3D_URL);
+      setSchoolSliceUrl(DEFAULT_SCHOOL_SLICE_3D_URL);
+      setEditSchoolUrlInput(DEFAULT_SCHOOL_SLICE_3D_URL);
+    } else {
+      let finalUrl = trimmed;
+      if (!/^https?:\/\//i.test(finalUrl)) {
+        finalUrl = `https://${finalUrl}`;
+      }
+      setSchoolSlice3dUrl(finalUrl);
+      setSchoolSliceUrl(finalUrl);
+      setEditSchoolUrlInput(finalUrl);
+    }
+    setIsEditingSchoolUrl(false);
+  };
+
+  const handleResetDefaultSchoolUrl = () => {
+    setSchoolSlice3dUrl(DEFAULT_SCHOOL_SLICE_3D_URL);
+    setSchoolSliceUrl(DEFAULT_SCHOOL_SLICE_3D_URL);
+    setEditSchoolUrlInput(DEFAULT_SCHOOL_SLICE_3D_URL);
+    setIsEditingSchoolUrl(false);
+  };
+
   const handleLaunchPlatform = () => {
     if (typeof window !== 'undefined') {
       window.open(platformUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
+  const handleLaunchSchoolSlice = () => {
+    if (typeof window !== 'undefined') {
+      window.open(schoolSliceUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleDownloadCsvTemplate = () => {
+    const blob = new Blob([SAMPLE_CSV_CONTENT], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'template-soal-school-slice-3d.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyCsvTemplate = () => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(SAMPLE_CSV_CONTENT);
+      setIsCsvCopied(true);
+      setTimeout(() => setIsCsvCopied(false), 2000);
+    }
+  };
+
   const gamePlans: GamePlanItem[] = [
+    {
+      id: 'pid_school_slice_3d',
+      title: 'School Slice 3D: Kehidupan Sekolah',
+      category: 'QUIZ',
+      badgeCategory: 'Gim 3D Cel-Shaded PID',
+      description:
+        'Jelajahi kelas 3D cel-shaded SMP Terpadu Al-Ittihadiyah, interaksi tap-to-move dengan NPC guru & murid, dan selesaikan tantangan bank soal terintegrasi.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 35,
+      icon: Box,
+      accentColor: 'from-[#8C5A3C] via-[#C85A32] to-[#2F5D50]',
+      actionUrl: schoolSliceUrl,
+      is3d: true,
+    },
     {
       id: 'pid_quiz_quick',
       title: 'Kuis Kilat Edukasi PID',
@@ -182,24 +321,160 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
           <span>{backLabel}</span>
         </button>
 
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse" />
-          <span className="text-[11px] font-black text-violet-950 uppercase tracking-wider">
-            Platform Game PID
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
+            Game PID &amp; 3D Showcase
           </span>
         </div>
       </div>
 
-      {/* 2. HERO ARENA & DIRECT PLATFORM LAUNCHER */}
-      <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-violet-900 via-indigo-950 to-[#023246] p-4.5 sm:p-6 text-white shadow-md border border-violet-800/40 space-y-4">
-        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-violet-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-44 h-44 rounded-full bg-indigo-500/25 blur-3xl pointer-events-none" />
+      {/* 2. PREMIER SHOWCASE: SCHOOL SLICE 3D (GIM UNGGULAN PEKAN INOVASI DIGITAL) */}
+      <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#1E293B] via-[#0F172A] to-[#023246] p-4.5 sm:p-6 text-white shadow-xl border border-amber-500/30 space-y-4">
+        {/* Decorative glows */}
+        <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-[#C85A32]/25 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 w-56 h-56 rounded-full bg-[#2F5D50]/30 blur-3xl pointer-events-none" />
 
+        <div className="relative z-10 space-y-3.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-linear-to-r from-amber-500/20 to-orange-500/20 border border-amber-400/40 text-amber-300 text-[10px] sm:text-xs font-black uppercase tracking-wider backdrop-blur-xs">
+              <Box className="w-4 h-4 text-amber-400" />
+              <span>Gim 3D Unggulan PID 2026</span>
+            </div>
+            <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/40">
+              ⚡ WebGL Cel-Shaded 3D Ready
+            </span>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h1 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                School Slice 3D: Kehidupan Sekolah
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 font-black text-[10px] tracking-wide uppercase">
+                +35 PTS SAGA
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
+              Simulasi ruang kelas 3D cel-shaded interaktif dengan palet hangat kayu &amp; papan tulis sekolah. Guru dapat mengimpor bank soal kustom (CSV/JSON), berinteraksi dengan NPC siswa/guru menggunakan kontrol <span className="font-semibold text-amber-300">Tap-to-Move</span>, dan menguji pemahaman KBM secara seru.
+            </p>
+          </div>
+
+          {/* PALET ORGANIK & HIGHLIGHT FITUR 3D */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/10 flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#EDE4D3] shrink-0 border border-white/40" />
+              <span className="text-slate-200 font-medium truncate">Krem Hangat (#EDE4D3)</span>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/10 flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#8C5A3C] shrink-0" />
+              <span className="text-slate-200 font-medium truncate">Kayu Mahoni (#8C5A3C)</span>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/10 flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#2F5D50] shrink-0" />
+              <span className="text-slate-200 font-medium truncate">Papan Tulis (#2F5D50)</span>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/10 flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#C85A32] shrink-0" />
+              <span className="text-slate-200 font-medium truncate">Aksen Bata (#C85A32)</span>
+            </div>
+          </div>
+
+          {/* TOMBOL AKSI UTAMA SCHOOL SLICE 3D */}
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 border border-white/20 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[10.5px] font-bold text-amber-200 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Tautan Gim School Slice 3D:</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingSchoolUrl(!isEditingSchoolUrl)}
+                  className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-[10.5px] font-bold text-white transition-all flex items-center gap-1 cursor-pointer border border-white/15"
+                  title="Sesuaikan URL server School Slice 3D (misal localhost saat testing)"
+                >
+                  <Edit2 className="w-3 h-3 text-amber-300" />
+                  <span>Ubah URL Gim</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowGuideModal(true)}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 text-[10.5px] font-bold text-emerald-300 transition-all flex items-center gap-1 cursor-pointer border border-emerald-400/30"
+                  title="Lihat format CSV/JSON pembuatan soal kuis guru"
+                >
+                  <BookOpen className="w-3 h-3 text-emerald-300" />
+                  <span>Panduan Bank Soal</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Input URL Editor jika mode edit aktif */}
+            {isEditingSchoolUrl && (
+              <div className="space-y-2 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={editSchoolUrlInput}
+                    onChange={(e) => setEditSchoolUrlInput(e.target.value)}
+                    placeholder="https://... atau http://localhost:5173"
+                    className="flex-1 bg-white/95 text-slate-900 px-3 py-1.5 rounded-xl text-xs font-mono border border-white/40 focus:outline-hidden focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveCustomSchoolUrl}
+                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer transition-all"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Simpan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetDefaultSchoolUrl}
+                    className="p-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl transition-all cursor-pointer"
+                    title="Reset ke URL default"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[10px] text-amber-200/80">
+                  Tip Pengembang: Jika Anda menjalankan proyek <code>school-slice-3d-starter</code> di laptop via Vite lokal, masukkan <code>http://localhost:5173</code>.
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {/* Tombol 1: Buka Player Interaktif di Dalam Aplikasi */}
+              <button
+                type="button"
+                onClick={() => setShowEmbeddedPlayer(true)}
+                className="w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm bg-linear-to-r from-emerald-400 via-teal-300 to-emerald-500 text-slate-950 hover:brightness-105 active:scale-[0.99] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Play className="w-4 h-4 fill-slate-950 stroke-none" />
+                <span>Mainkan di Aplikasi (In-App 3D)</span>
+              </button>
+
+              {/* Tombol 2: Buka di Tab Baru */}
+              <button
+                type="button"
+                onClick={handleLaunchSchoolSlice}
+                className="w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm bg-white/15 hover:bg-white/25 active:scale-[0.99] text-white border border-white/30 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Buka Tab Baru (Layar Penuh) ↗</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. HERO ARENA & DIRECT PLATFORM LAUNCHER NAWASENA PI */}
+      <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-violet-900 via-indigo-950 to-[#023246] p-4.5 sm:p-6 text-white shadow-md border border-violet-800/40 space-y-4">
         <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-[10px] sm:text-xs font-extrabold uppercase tracking-wider backdrop-blur-xs">
               <Gamepad2 className="w-4 h-4 text-amber-300" />
-              <span>Pekan Inovasi Digital (PID)</span>
+              <span>Portal Terpadu Nawasena PI</span>
             </div>
             <span className="text-[10px] font-bold text-violet-200 bg-violet-800/70 px-2.5 py-0.5 rounded-full border border-violet-600/50">
               SMP Terpadu Al-Ittihadiyah
@@ -207,11 +482,11 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
           </div>
 
           <div>
-            <h1 className="text-lg sm:text-2xl font-black text-white leading-tight">
-              Platform Gamifikasi &amp; Edukasi Interaktif
-            </h1>
-            <p className="text-xs sm:text-sm text-indigo-100/90 mt-1.5 leading-relaxed max-w-2xl">
-              Pusat arena kuis interaktif, tantangan ketangkasan, dan misi keteladanan karakter sekolah. Terbuka bagi seluruh dewan guru dan murid untuk memperkuat digitalisasi pembelajaran yang menyenangkan.
+            <h2 className="text-base sm:text-xl font-black text-white leading-tight">
+              Portal Induk Pekan Inovasi Digital
+            </h2>
+            <p className="text-xs sm:text-sm text-indigo-100/90 mt-1 leading-relaxed max-w-2xl">
+              Platform pusat yang menaungi seluruh ragam game edukasi, kuis kilat, dan tantangan digital guru serta murid.
             </p>
           </div>
 
@@ -220,7 +495,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-[10.5px] font-bold text-violet-200 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>Tautan Langsung Platform Game PID:</span>
+                <span>Tautan Platform Induk:</span>
               </span>
               <div className="flex items-center gap-1.5">
                 <button
@@ -281,45 +556,29 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                     <RotateCcw className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <p className="text-[10px] text-indigo-200">
-                  Masukkan tautan web platform game sekolah (misal web app mandiri, Quizizz, Wordwall, atau domain PID sekolah).
-                </p>
               </div>
             ) : (
-              <div className="bg-black/30 rounded-xl px-3 py-2 border border-white/10 flex items-center justify-between gap-2 min-w-0">
-                <span className="font-mono text-xs text-amber-300 truncate select-all">
+              <div className="flex items-center gap-2 bg-black/25 px-3 py-2 rounded-xl border border-white/15">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-xs font-mono text-amber-200 truncate flex-1">
                   {platformUrl}
-                </span>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-500/30 shrink-0">
-                  Online
                 </span>
               </div>
             )}
 
-            {/* TOMBOL UTAMA: BUKA PLATFORM GAME PID LANGSUNG */}
             <button
               type="button"
               onClick={handleLaunchPlatform}
-              className="w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm bg-linear-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-950 hover:brightness-105 active:scale-[0.99] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm bg-linear-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-950 hover:brightness-105 active:scale-[0.99] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
             >
               <ExternalLink className="w-4 h-4 stroke-[2.5]" />
-              <span>Buka Platform Game PID Sekarang 🚀</span>
+              <span>Buka Portal Nawasena PI 🚀</span>
             </button>
-          </div>
-
-          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-indigo-200">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-amber-300" />
-              <span>Akses Penuh: Terbuka untuk seluruh guru &amp; siswa</span>
-            </span>
-            <span className="font-bold text-amber-300">
-              SAGA Terpadu Hub
-            </span>
           </div>
         </div>
       </div>
 
-      {/* 3. PROFIL PEMAIN & INTEGRASI POIN SAGA */}
+      {/* 4. PROFIL PEMAIN & INTEGRASI POIN SAGA */}
       <div className="bg-white rounded-3xl p-4 sm:p-4.5 border border-slate-200/90 shadow-xs flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-11 h-11 rounded-2xl bg-linear-to-br from-[#023246] to-[#18536B] text-white flex items-center justify-center font-black text-sm shrink-0 border border-slate-200 shadow-2xs">
@@ -350,7 +609,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
         </div>
       </div>
 
-      {/* 4. FILTER TAB KATEGORI PERMAINAN */}
+      {/* 5. FILTER TAB KATEGORI PERMAINAN */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
         <button
           type="button"
@@ -372,7 +631,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          Kuis Interaktif
+          Kuis Interaktif &amp; 3D
         </button>
         <button
           type="button"
@@ -398,7 +657,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
         </button>
       </div>
 
-      {/* 5. DAFTAR RENCANA MODE GAME */}
+      {/* 6. DAFTAR RENCANA MODE GAME */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
@@ -415,7 +674,9 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
             return (
               <div
                 key={item.id}
-                className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between gap-3 group"
+                className={`bg-white rounded-3xl p-4 border shadow-2xs transition-all flex flex-col justify-between gap-3 group ${
+                  item.is3d ? 'border-amber-300 ring-2 ring-amber-400/20' : 'border-slate-200/90 hover:border-slate-300'
+                }`}
               >
                 <div className="flex items-start gap-3">
                   <div
@@ -425,23 +686,31 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1.5 mb-1">
-                      <span className="text-[10px] font-black text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-200 truncate">
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border truncate ${
+                        item.is3d
+                          ? 'text-amber-800 bg-amber-50 border-amber-200'
+                          : 'text-violet-700 bg-violet-50 border-violet-200'
+                      }`}>
                         {item.badgeCategory}
                       </span>
                       <span
-                        className={`text-[9px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
-                          item.status === 'COMING_SOON'
-                            ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          item.status === 'AVAILABLE'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            : item.status === 'COMING_SOON'
+                            ? 'bg-amber-100 text-amber-800'
+                            : item.status === 'IN_DESIGN'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-slate-100 text-slate-600'
                         }`}
                       >
                         {item.statusLabel}
                       </span>
                     </div>
-                    <h3 className="text-xs sm:text-sm font-black text-slate-900 leading-snug">
+                    <h3 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-indigo-950 transition-colors">
                       {item.title}
                     </h3>
-                    <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
+                    <p className="text-[11px] text-slate-500 leading-snug mt-1 line-clamp-2">
                       {item.description}
                     </p>
                   </div>
@@ -452,14 +721,36 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                     <span>Reward: +{item.rewardPoints} PTS</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleLaunchPlatform}
-                    className="px-2.5 py-1 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-800 text-[10px] font-extrabold inline-flex items-center gap-1 border border-violet-200 cursor-pointer active:scale-95 transition-all"
-                  >
-                    <span>Mainkan</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </button>
+
+                  {item.is3d ? (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowEmbeddedPlayer(true)}
+                        className="px-2 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-extrabold inline-flex items-center gap-1 border border-emerald-200 cursor-pointer active:scale-95 transition-all"
+                      >
+                        <Play className="w-3 h-3 fill-emerald-800 stroke-none" />
+                        <span>In-App</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleLaunchSchoolSlice}
+                        className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-extrabold inline-flex items-center gap-1 cursor-pointer active:scale-95 transition-all shadow-2xs"
+                      >
+                        <span>Main</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLaunchPlatform}
+                      className="px-2.5 py-1 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-800 text-[10px] font-extrabold inline-flex items-center gap-1 border border-violet-200 cursor-pointer active:scale-95 transition-all"
+                    >
+                      <span>Portal</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -467,7 +758,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
         </div>
       </div>
 
-      {/* 6. STATUS KESIAPAN ARSITEKTUR & PANDUAN */}
+      {/* 7. STATUS KESIAPAN ARSITEKTUR & PANDUAN */}
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-indigo-100 space-y-3 shadow-xs">
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 text-indigo-700 shrink-0" />
@@ -478,24 +769,24 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10.5px]">
           <div className="bg-slate-50 rounded-2xl p-2.5 border border-slate-200 flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="text-slate-700 font-semibold truncate">Tautan Platform Siap</span>
+            <span className="text-slate-700 font-semibold truncate">Gim 3D Cel-Shaded Siap</span>
           </div>
           <div className="bg-slate-50 rounded-2xl p-2.5 border border-slate-200 flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="text-slate-700 font-semibold truncate">Non-Popup Page View</span>
+            <span className="text-slate-700 font-semibold truncate">In-App WebGL Player</span>
           </div>
           <div className="bg-slate-50 rounded-2xl p-2.5 border border-slate-200 flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="text-slate-700 font-semibold truncate">Sinkron Poin SAGA</span>
+            <span className="text-slate-700 font-semibold truncate">Format CSV Soal Guru</span>
           </div>
           <div className="bg-slate-50 rounded-2xl p-2.5 border border-slate-200 flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="text-slate-700 font-semibold truncate">Responsif Layar HP</span>
+            <span className="text-slate-700 font-semibold truncate">Responsif Infinix Note 8</span>
           </div>
         </div>
       </div>
 
-      {/* 7. BOTTOM RETURN BUTTON */}
+      {/* 8. BOTTOM RETURN BUTTON */}
       <button
         type="button"
         onClick={onBack}
@@ -504,6 +795,233 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
         <ArrowLeft className="w-4 h-4" />
         <span>{backLabel}</span>
       </button>
+
+      {/* =========================================================================
+          MODAL 1: IN-APP EMBEDDED PLAYER FOR SCHOOL SLICE 3D
+          Mematuhi INFINIX_NOTE_8_FULLSCREEN_RULE.md (100dvh, thumb-friendly)
+         ========================================================================= */}
+      {showEmbeddedPlayer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-label="School Slice 3D In-App Player"
+        >
+          <div className="w-full h-dvh md:h-[94vh] md:max-w-5xl md:rounded-3xl bg-slate-950 flex flex-col overflow-hidden shadow-2xl border border-slate-800">
+            {/* Header Player */}
+            <div className="h-14 sm:h-16 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0 text-white pt-[env(safe-area-inset-top)]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setShowEmbeddedPlayer(false)}
+                  className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 flex items-center justify-center text-slate-300 hover:text-white transition-all cursor-pointer shrink-0"
+                  aria-label="Tutup Player"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="w-8 h-8 rounded-xl bg-linear-to-br from-[#8C5A3C] to-[#C85A32] flex items-center justify-center shrink-0">
+                  <Box className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-black text-white truncate">
+                    School Slice 3D: Kehidupan Sekolah
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] text-amber-300 font-mono truncate">
+                    {schoolSliceUrl}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleLaunchSchoolSlice}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                  title="Buka di tab baru (layar penuh)"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Tab Baru</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEmbeddedPlayer(false)}
+                  className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 flex items-center justify-center transition-all cursor-pointer"
+                  aria-label="Tutup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Iframe Viewport Container */}
+            <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+              <iframe
+                src={schoolSliceUrl}
+                title="School Slice 3D Game"
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; xr-spatial-tracking"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              />
+
+              {/* Tips overlay jika iframe tidak tampil (karena dev server belum jalan) */}
+              <div className="pointer-events-none absolute bottom-3 left-3 right-3 sm:left-auto sm:right-3 max-w-md bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 border border-slate-700/80 text-[10.5px] text-slate-300 space-y-1 shadow-lg">
+                <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                  <Info className="w-3.5 h-3.5 shrink-0" />
+                  <span>Koneksi Gim WebGL:</span>
+                </div>
+                <p className="leading-snug">
+                  Jika tampilan hitam atau belum memuat, pastikan server Vercel/Vite <code>school-slice-3d-starter</code> aktif, atau gunakan tombol <strong>Tab Baru</strong> di kanan atas.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 2: PANDUAN BANK SOAL & TEMPLATE CSV GURU
+         ========================================================================= */}
+      {showGuideModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Panduan Bank Soal School Slice 3D"
+        >
+          <div className="w-full h-dvh md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-3xl bg-white flex flex-col overflow-hidden shadow-2xl">
+            {/* Header Modal */}
+            <div className="h-14 sm:h-16 px-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 pt-[env(safe-area-inset-top)]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setShowGuideModal(false)}
+                  className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-all cursor-pointer shrink-0"
+                  aria-label="Kembali"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                    Panduan &amp; Template Bank Soal KBM
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
+                    Format CSV/JSON untuk Gim School Slice 3D
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(false)}
+                className="w-10 h-10 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 hidden sm:flex items-center justify-center transition-all cursor-pointer"
+                aria-label="Tutup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Konten Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 space-y-1.5">
+                <div className="flex items-center gap-2 text-emerald-900 font-black text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Dukungan Kuis Fleksibel untuk Guru</span>
+                </div>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Bapak/Ibu Pendidik dapat menyusun soal ujian, kuis harian, atau studi kasus karakter secara mandiri menggunakan spreadsheet (Excel/Google Sheets) kemudian menyimpannya sebagai file <strong>.csv</strong>.
+                </p>
+              </div>
+
+              {/* Penjelasan Kolom CSV */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Struktur Kolom CSV yang Wajib Ada:</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-mono font-bold text-indigo-700 text-[11px]">npcName</span>
+                    <p className="text-[10.5px] text-slate-600 mt-0.5">Nama karakter NPC (misal: <em>Pak Budi (Guru TIK)</em>)</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-mono font-bold text-indigo-700 text-[11px]">npcRole</span>
+                    <p className="text-[10.5px] text-slate-600 mt-0.5">Peran NPC di kelas (misal: <em>Guru Informatika</em>, <em>Ketua Kelas</em>)</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-mono font-bold text-indigo-700 text-[11px]">storyIntro</span>
+                    <p className="text-[10.5px] text-slate-600 mt-0.5">Kalimat sapaan/narasi sebelum memunculkan soal</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-mono font-bold text-indigo-700 text-[11px]">question</span>
+                    <p className="text-[10.5px] text-slate-600 mt-0.5">Teks pertanyaan kuis pilihan ganda</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-mono font-bold text-indigo-700 text-[11px]">optionA..D</span>
+                    <p className="text-[10.5px] text-slate-600 mt-0.5">Pilihan jawaban (kolom optionA, optionB, optionC, optionD)</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="font-mono font-bold text-indigo-700 text-[11px]">correctIndex</span>
+                    <p className="text-[10.5px] text-slate-600 mt-0.5">Kunci jawaban: <code>0</code>=A, <code>1</code>=B, <code>2</code>=C, <code>3</code>=D</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 sm:col-span-2">
+                    <span className="font-mono font-bold text-indigo-700 text-[11px]">explanation</span>
+                    <p className="text-[10.5px] text-slate-600 mt-0.5">Penjelasan edukatif yang ditampilkan saat pemain selesai memilih jawaban</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview Cuplikan CSV */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">Contoh Isi File CSV:</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyCsvTemplate}
+                    className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    {isCsvCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700">Tersalin ke Clipboard</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Salin Format</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="p-3 bg-slate-900 text-slate-100 rounded-2xl font-mono text-[10.5px] overflow-x-auto border border-slate-800 leading-relaxed max-h-40">
+                  <pre>{SAMPLE_CSV_CONTENT}</pre>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Aksi Modal */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={handleDownloadCsvTemplate}
+                className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-xs transition-all"
+              >
+                <Download className="w-4 h-4" />
+                <span>Unduh Template CSV</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(false)}
+                className="py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100 active:scale-95 text-slate-700 border border-slate-300 font-bold text-xs cursor-pointer transition-all"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
