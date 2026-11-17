@@ -77,7 +77,7 @@ export async function runGamePidTestSuite(): Promise<TestSuiteResult> {
     if (!DEFAULT_GAME_PID_URL.startsWith('https://')) {
       throw new Error(`DEFAULT_GAME_PID_URL tidak valid: ${DEFAULT_GAME_PID_URL}`);
     }
-    if (!DEFAULT_SCHOOL_SLICE_3D_URL.startsWith('https://')) {
+    if (!DEFAULT_SCHOOL_SLICE_3D_URL.startsWith('/') && !DEFAULT_SCHOOL_SLICE_3D_URL.startsWith('https://')) {
       throw new Error(`DEFAULT_SCHOOL_SLICE_3D_URL tidak valid: ${DEFAULT_SCHOOL_SLICE_3D_URL}`);
     }
     if (!DEFAULT_SCHOOL_SLICE_3D_URL.includes('school-slice-3d')) {
@@ -178,6 +178,15 @@ export async function runGamePidTestSuite(): Promise<TestSuiteResult> {
     setSchoolSlice3dUrl('');
     if (getSchoolSlice3dUrl() !== DEFAULT_SCHOOL_SLICE_3D_URL) {
       throw new Error('Reset URL 3D gagal kembali ke default');
+    }
+
+    // Auto-migration test: Tautan Vercel 404 lama dibersihkan otomatis ke bundle internal
+    mockStorage[STORAGE_KEY_SCHOOL_SLICE_3D_URL] = 'https://school-slice-3d.vercel.app';
+    if (getSchoolSlice3dUrl() !== DEFAULT_SCHOOL_SLICE_3D_URL) {
+      throw new Error('Migrasi otomatis URL 404 lama gagal kembali ke default');
+    }
+    if (mockStorage[STORAGE_KEY_SCHOOL_SLICE_3D_URL]) {
+      throw new Error('Key URL 404 lama belum terhapus dari storage');
     }
 
     globalThis.window.removeEventListener('smart_absensi_school_slice_3d_url_updated', listener);

@@ -417,7 +417,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                     type="url"
                     value={editSchoolUrlInput}
                     onChange={(e) => setEditSchoolUrlInput(e.target.value)}
-                    placeholder="https://... atau http://localhost:5173"
+                    placeholder="/games/school-slice-3d/index.html atau http://localhost:5173"
                     className="flex-1 bg-white/95 text-slate-900 px-3 py-1.5 rounded-xl text-xs font-mono border border-white/40 focus:outline-hidden focus:ring-2 focus:ring-amber-400"
                   />
                   <button
@@ -863,14 +863,14 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               />
 
-              {/* Tips overlay jika iframe tidak tampil (karena dev server belum jalan) */}
+              {/* Tips overlay bantuan WebGL & Tab Baru */}
               <div className="pointer-events-none absolute bottom-3 left-3 right-3 sm:left-auto sm:right-3 max-w-md bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 border border-slate-700/80 text-[10.5px] text-slate-300 space-y-1 shadow-lg">
                 <div className="flex items-center gap-1.5 text-amber-300 font-bold">
                   <Info className="w-3.5 h-3.5 shrink-0" />
-                  <span>Koneksi Gim WebGL:</span>
+                  <span>Koneksi Gim WebGL Internal:</span>
                 </div>
                 <p className="leading-snug">
-                  Jika tampilan hitam atau belum memuat, pastikan server Vercel/Vite <code>school-slice-3d-starter</code> aktif, atau gunakan tombol <strong>Tab Baru</strong> di kanan atas.
+                  Gim 3D berjalan langsung secara internal (offline-ready). Anda juga dapat membuka mode layar penuh mandiri melalui tombol <strong>Tab Baru</strong> di kanan atas.
                 </p>
               </div>
             </div>

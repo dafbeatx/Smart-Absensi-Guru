@@ -1,0 +1,62 @@
+[
+  {
+    "id": "q-1",
+    "npcName": "Pak Budi (Guru TIK)",
+    "npcRole": "Wali Kelas & Guru Informatika",
+    "storyIntro": "Selamat pagi! Sebelum pelajaran dimulai, Bapak ingin memeriksa pemahamanmu tentang dasar berpikir komputasional.",
+    "question": "Langkah-langkah sistematis dan logis yang disusun untuk menyelesaikan suatu masalah disebut...",
+    "options": [
+      "Algoritma",
+      "Perangkat Keras",
+      "Jaringan Lokal",
+      "Basis Data"
+    ],
+    "correctIndex": 0,
+    "explanation": "Algoritma adalah urutan langkah logis dan sistematis untuk memecahkan suatu persoalan."
+  },
+  {
+    "id": "q-2",
+    "npcName": "Siti (Ketua Kelas)",
+    "npcRole": "Teman Sebangku",
+    "storyIntro": "Hai! Aku sedang merapikan daftar piket kelas di komputer. Bisa bantu jawab pertanyaan ini sebentar?",
+    "question": "Manakah di bawah ini yang termasuk perangkat masukan (input device) pada komputer?",
+    "options": [
+      "Monitor",
+      "Printer",
+      "Papan Ketik (Keyboard)",
+      "Pengeras Suara (Speaker)"
+    ],
+    "correctIndex": 2,
+    "explanation": "Papan ketik (keyboard) berfungsi memasukkan data karakter maupun perintah ke dalam komputer."
+  },
+  {
+    "id": "q-3",
+    "npcName": "Raka (Pengurus OSIS)",
+    "npcRole": "Sekretaris Kelas",
+    "storyIntro": "Permisi, aku sedang mendata ukuran berkas dokumentasi kegiatan sekolah. Menurutmu jawaban soal ini apa?",
+    "question": "Satuan terkecil dalam penyimpanan data digital pada sistem komputer adalah...",
+    "options": [
+      "Byte",
+      "Bit",
+      "Kilobyte",
+      "Megabyte"
+    ],
+    "correctIndex": 1,
+    "explanation": "Bit (binary digit) merupakan satuan terkecil data digital yang bernilai 0 atau 1."
+  },
+  {
+    "id": "q-4",
+    "npcName": "Bu Ratna (Pustakawan)",
+    "npcRole": "Pembina Pojok Baca",
+    "storyIntro": "Selamat datang di pojok baca kelas! Coba jawab tantangan literasi digital dari Ibu ini ya.",
+    "question": "Tindakan melindungi kata sandi dan data pribadi agar tidak disalahgunakan orang lain di internet merupakan bagian dari...",
+    "options": [
+      "Keamanan Digital",
+      "Desain Grafis",
+      "Pemrograman Web",
+      "Pengolahan Angka"
+    ],
+    "correctIndex": 0,
+    "explanation": "Keamanan digital mencakup upaya perlindungan identitas, akun, dan informasi pribadi di ruang siber."
+  }
+]

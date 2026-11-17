@@ -8,7 +8,7 @@
 export const DEFAULT_GAME_PID_URL = 'https://nawasena-pi.vercel.app';
 export const STORAGE_KEY_GAME_PID_URL = 'smart_absensi_game_pid_url';
 
-export const DEFAULT_SCHOOL_SLICE_3D_URL = 'https://school-slice-3d.vercel.app';
+export const DEFAULT_SCHOOL_SLICE_3D_URL = '/games/school-slice-3d/index.html';
 export const STORAGE_KEY_SCHOOL_SLICE_3D_URL = 'smart_absensi_school_slice_3d_url';
 
 /**
@@ -48,13 +48,19 @@ export function setGamePidPlatformUrl(url: string): void {
 }
 
 /**
- * Mengambil tautan langsung Gim 3D School Slice dari storage lokal atau default
+ * Mengambil tautan langsung Gim 3D School Slice dari storage lokal atau default bundle aplikasi
  */
 export function getSchoolSlice3dUrl(): string {
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_SCHOOL_SLICE_3D_URL);
       if (stored && stored.trim().length > 0) {
+        // Migrasi otomatis: jika browser masih menyimpan tautan 404 lama (school-slice-3d.vercel.app),
+        // bersihkan dan arahkan ke bundle statis resmi aplikasi
+        if (stored.includes('school-slice-3d.vercel.app')) {
+          localStorage.removeItem(STORAGE_KEY_SCHOOL_SLICE_3D_URL);
+          return DEFAULT_SCHOOL_SLICE_3D_URL;
+        }
         return stored.trim();
       }
     } catch {
@@ -71,12 +77,12 @@ export function setSchoolSlice3dUrl(url: string): void {
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     try {
       const trimmed = url.trim();
-      if (trimmed.length > 0) {
+      if (trimmed.length > 0 && trimmed !== DEFAULT_SCHOOL_SLICE_3D_URL) {
         localStorage.setItem(STORAGE_KEY_SCHOOL_SLICE_3D_URL, trimmed);
       } else {
         localStorage.removeItem(STORAGE_KEY_SCHOOL_SLICE_3D_URL);
       }
-      window.dispatchEvent(new CustomEvent('smart_absensi_school_slice_3d_url_updated', { detail: trimmed }));
+      window.dispatchEvent(new CustomEvent('smart_absensi_school_slice_3d_url_updated', { detail: trimmed || DEFAULT_SCHOOL_SLICE_3D_URL }));
     } catch {
       // ignore
     }
