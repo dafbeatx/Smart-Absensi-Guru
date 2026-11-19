@@ -35,6 +35,7 @@ function showToast(text) {
 const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
   showToast,
   onSessionStarted: () => {
+    document.body.classList.remove('in-closet');
     startScreen.classList.add('hidden');
     endScreen.classList.add('hidden');
     hud.classList.add('active');
@@ -43,9 +44,13 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
   },
   setClosetOverlay: (visible, remaining) => {
     if (visible) {
+      document.body.classList.add('in-closet');
       closetOverlay.classList.add('visible');
       closetTimerText.textContent = `${remaining.toFixed(1)} dtk`;
+      alertBanner.classList.remove('visible');
+      dangerPulse.classList.remove('active');
     } else {
+      document.body.classList.remove('in-closet');
       closetOverlay.classList.remove('visible');
     }
   },
@@ -138,6 +143,7 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
 
     if (state.isHiddenInCloset) {
       closetTimerText.textContent = `${Math.max(0, state.closetPauseRemaining).toFixed(1)} dtk`;
+      return;
     }
 
     // Reticle & Tombol Aksi Kontekstual PID
@@ -167,6 +173,7 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
     renderEcg(state.ecgPhase, state.dangerLevel);
   },
   showEndScreen: (won, elapsed, best, isNewRecord, keysFound) => {
+    document.body.classList.remove('in-closet');
     hud.classList.remove('active');
     closetOverlay.classList.remove('visible');
     alertBanner.classList.remove('visible');

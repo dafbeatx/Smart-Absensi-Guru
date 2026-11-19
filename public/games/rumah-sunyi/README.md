@@ -3,6 +3,7 @@
 Gim horor edukasi **First-Person POV 3D** yang dirancang khusus untuk layar sentuh besar **Papan Interaktif Digital (PID)** maupun komputer desktop.
 
 ## Struktur Berkas Bundel
+
 ```text
 rumah_sunyi_tiga_kunci_bundle/
 ├── index.html                                     # Halaman utama (ES Module + ImportMap Three.js)
@@ -28,6 +29,7 @@ rumah_sunyi_tiga_kunci_bundle/
 ```
 
 ## Cara Menjalankan
+
 1. **Langsung di Peramban PID (Tanpa Instalasi):**
    - Buka berkas `standalone/rumah_sunyi_tiga_kunci_standalone.html` di peramban modern (Chrome/Edge), atau jalankan server statis lokal (`npx serve .` / VS Code Live Server) pada `index.html`.
 2. **Integrasi ke Proyek Three.js / Vite yang Sudah Ada:**
@@ -35,8 +37,9 @@ rumah_sunyi_tiga_kunci_bundle/
    - Impor `HorrorGameEngine` dari `./src/game/HorrorGameEngine.js` jika ingin menanamkannya ke komponen React/Next.js atau kanvas kustom.
 
 ## Ringkasan Mekanika Utama
-- **Pengaturan Soal Mata Pelajaran Guru:** Mendukung 5 paket preset (*Informatika*, *Matematika*, *IPA Terpadu*, *IPS*, *Bahasa Indonesia*) serta editor 3 soal kustom (`localStorage`).
+
+- **Pengaturan Soal Mata Pelajaran Guru:** Mendukung 5 paket preset (_Informatika_, _Matematika_, _IPA Terpadu_, _IPS_, _Bahasa Indonesia_) serta editor 3 soal kustom (`localStorage`).
 - **Laci 2× Ketuk & Uji Kunci Kuningan:** Ketukan ke-1 membuka celah laci dengan riak suara; ketukan ke-2 menggeledah isi dan memunculkan modal pertanyaan guru apabila laci berisi kunci.
 - **Persembunyian Lemari Berjalusi:** Masuk ke salah satu dari 9 lemari menjeda pergerakan hantu selama `6,0` / `5,0` / `3,5` detik sebelum entitas kembali berpatroli/mengawasi.
-- **AI Penglihatan Mata (*Eye Line-of-Sight*):** *Sosok Bayangan Pucat* diam memindai (`0 m/s`) di lorong utara hingga kerucut tatapan matanya menangkap pemain secara langsung.
+- **AI Penglihatan Mata (_Eye Line-of-Sight_):** _Sosok Bayangan Pucat_ diam memindai (`0 m/s`) di lorong utara hingga kerucut tatapan matanya menangkap pemain secara langsung.
 - **Navigasi Ramah Siswa & PID:** Dilengkapi pita Kompas Arah dinamis (`[KUNCI]`, `[LEMARI]`, `[PINTU KELUAR]`), kartu panduan langkah, denah cetak biru 9 ruangan, monitor detak jantung ECG, serta stik analog multi-sentuh yang dapat ditukar kiri/kanan.

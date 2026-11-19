@@ -90,12 +90,12 @@ html, body {
 .closet-overlay {
   position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: 25;
   display: none;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  padding: 28px;
+  padding: 32px 20px;
   background:
     repeating-linear-gradient(
       180deg,
@@ -105,6 +105,7 @@ html, body {
       rgba(15, 12, 10, 0.28) 34px
     ),
     radial-gradient(circle, transparent 35%, rgba(0, 0, 0, 0.92) 95%);
+  pointer-events: none;
 }
 
 .closet-overlay.visible {
@@ -112,20 +113,50 @@ html, body {
 }
 
 .closet-banner {
-  background: var(--bg-panel);
-  border: 1px solid var(--brass-gold);
-  padding: 14px 24px;
+  background: rgba(18, 14, 11, 0.97);
+  border: 2px solid var(--brass-gold);
+  border-radius: 6px;
+  padding: 16px 28px;
   text-align: center;
   max-width: 520px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+  width: calc(100% - 32px);
+  margin-top: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95), 0 0 20px rgba(201, 154, 69, 0.25);
+  pointer-events: auto;
 }
 
 .closet-timer-ring {
   font-family: var(--font-mono);
-  font-size: 2rem;
+  font-size: 2.2rem;
   font-weight: bold;
   color: var(--phosphor-bright);
   margin: 6px 0;
+  letter-spacing: 2px;
+  text-shadow: 0 0 12px rgba(107, 196, 133, 0.6);
+}
+
+#exit-closet-btn {
+  margin-bottom: 24px;
+  pointer-events: auto;
+  z-index: 30;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+}
+
+/* Sembunyikan elemen HUD yang bertabrakan saat pemain bersembunyi di dalam lemari */
+body.in-closet #hud .compass-wrap,
+body.in-closet #hud .mission-guide,
+body.in-closet #hud #touch-controls,
+body.in-closet #reticle,
+body.in-closet .alert-banner,
+body.in-closet .danger-pulse {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.in-closet #hud .hud-top {
+  pointer-events: none;
 }
 
 /* Overlay Layar Penuh (Layar Awal & Laporan Akhir) */
@@ -3026,6 +3057,7 @@ function showToast(text) {
 const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
   showToast,
   onSessionStarted: () => {
+    document.body.classList.remove('in-closet');
     startScreen.classList.add('hidden');
     endScreen.classList.add('hidden');
     hud.classList.add('active');
@@ -3034,9 +3066,13 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
   },
   setClosetOverlay: (visible, remaining) => {
     if (visible) {
+      document.body.classList.add('in-closet');
       closetOverlay.classList.add('visible');
       closetTimerText.textContent = `${remaining.toFixed(1)} dtk`;
+      alertBanner.classList.remove('visible');
+      dangerPulse.classList.remove('active');
     } else {
+      document.body.classList.remove('in-closet');
       closetOverlay.classList.remove('visible');
     }
   },
@@ -3129,6 +3165,7 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
 
     if (state.isHiddenInCloset) {
       closetTimerText.textContent = `${Math.max(0, state.closetPauseRemaining).toFixed(1)} dtk`;
+      return;
     }
 
     // Reticle & Tombol Aksi Kontekstual PID
@@ -3158,6 +3195,7 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
     renderEcg(state.ecgPhase, state.dangerLevel);
   },
   showEndScreen: (won, elapsed, best, isNewRecord, keysFound) => {
+    document.body.classList.remove('in-closet');
     hud.classList.remove('active');
     closetOverlay.classList.remove('visible');
     alertBanner.classList.remove('visible');
