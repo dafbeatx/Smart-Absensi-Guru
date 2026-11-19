@@ -83,7 +83,7 @@ html, body {
 .closet-overlay {
   position: fixed;
   inset: 0;
-  z-index: 25;
+  z-index: 50;
   display: none;
   flex-direction: column;
   justify-content: space-between;
@@ -102,13 +102,13 @@ html, body {
 }
 
 .closet-overlay.visible {
-  display: flex;
+  display: flex !important;
 }
 
 .closet-banner {
   position: relative;
-  z-index: 35;
-  background: #14100d;
+  z-index: 60;
+  background: #14100d !important;
   border: 2px solid var(--brass-gold);
   border-radius: 6px;
   padding: 16px 28px;
@@ -133,17 +133,24 @@ html, body {
 #exit-closet-btn {
   margin-bottom: 24px;
   pointer-events: auto;
-  z-index: 30;
+  z-index: 65;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
 }
 
 /* Sembunyikan elemen HUD yang bertabrakan saat pemain bersembunyi di dalam lemari */
+body.in-closet .compass-wrap,
 body.in-closet #hud .compass-wrap,
+body.in-closet .mission-guide,
 body.in-closet #hud .mission-guide,
+body.in-closet #compass-bar,
 body.in-closet #hud #compass-bar,
+body.in-closet .compass-marker,
 body.in-closet #hud .compass-marker,
+body.in-closet #hud-room-name,
 body.in-closet #hud #hud-room-name,
+body.in-closet #hud-mission-guide,
 body.in-closet #hud #hud-mission-guide,
+body.in-closet #touch-controls,
 body.in-closet #hud #touch-controls,
 body.in-closet #reticle,
 body.in-closet .alert-banner,

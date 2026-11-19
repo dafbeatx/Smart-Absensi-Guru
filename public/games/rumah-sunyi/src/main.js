@@ -43,15 +43,41 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
     showToast('Gunakan kompas di atas untuk menemukan 3 laci berisi Kunci Kuningan!');
   },
   setClosetOverlay: (visible, remaining) => {
+    const compassWrap = document.querySelector('.compass-wrap');
+    const touchControls = document.getElementById('touch-controls');
+    const reticleEl = document.getElementById('reticle');
+    const alertBannerEl = document.getElementById('alert-banner');
+    const dangerPulseEl = document.getElementById('danger-pulse');
+    const closetDesc = document.getElementById('closet-desc-text');
+
     if (visible) {
       document.body.classList.add('in-closet');
       closetOverlay.classList.add('visible');
+      closetOverlay.style.display = 'flex';
       closetTimerText.textContent = `${remaining.toFixed(1)} dtk`;
-      alertBanner.classList.remove('visible');
-      dangerPulse.classList.remove('active');
+      if (closetDesc) {
+        closetDesc.textContent = 'Sosok Bayangan Pucat terhenti sejenak. Tunggu hingga hitungan selesai sebelum keluar.';
+      }
+      if (compassWrap) compassWrap.style.display = 'none';
+      if (touchControls) touchControls.style.display = 'none';
+      if (reticleEl) reticleEl.style.display = 'none';
+      if (alertBannerEl) {
+        alertBannerEl.classList.remove('visible');
+        alertBannerEl.style.display = 'none';
+      }
+      if (dangerPulseEl) {
+        dangerPulseEl.classList.remove('active');
+        dangerPulseEl.style.display = 'none';
+      }
     } else {
       document.body.classList.remove('in-closet');
       closetOverlay.classList.remove('visible');
+      closetOverlay.style.display = 'none';
+      if (compassWrap) compassWrap.style.display = '';
+      if (touchControls) touchControls.style.display = '';
+      if (reticleEl) reticleEl.style.display = '';
+      if (alertBannerEl) alertBannerEl.style.display = '';
+      if (dangerPulseEl) dangerPulseEl.style.display = '';
     }
   },
   openQuizModal: (subject, keyNumber, questionObj) => {
@@ -117,6 +143,61 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
       }
     }
 
+    const compassWrap = document.querySelector('.compass-wrap');
+    const touchControls = document.getElementById('touch-controls');
+    const reticleEl = document.getElementById('reticle');
+    const alertBannerEl = document.getElementById('alert-banner');
+    const dangerPulseEl = document.getElementById('danger-pulse');
+    const closetDesc = document.getElementById('closet-desc-text');
+
+    // Jika pemain sedang bersembunyi di dalam lemari berjalusi
+    if (state.isHiddenInCloset) {
+      if (!document.body.classList.contains('in-closet')) {
+        document.body.classList.add('in-closet');
+      }
+      if (!closetOverlay.classList.contains('visible')) {
+        closetOverlay.classList.add('visible');
+      }
+      closetOverlay.style.display = 'flex';
+      if (compassWrap) compassWrap.style.display = 'none';
+      if (touchControls) touchControls.style.display = 'none';
+      if (reticleEl) reticleEl.style.display = 'none';
+      if (alertBannerEl) {
+        alertBannerEl.classList.remove('visible');
+        alertBannerEl.style.display = 'none';
+      }
+      if (dangerPulseEl) {
+        dangerPulseEl.classList.remove('active');
+        dangerPulseEl.style.display = 'none';
+      }
+
+      const remaining = Math.max(0, state.closetPauseRemaining);
+      if (remaining > 0) {
+        closetTimerText.textContent = `${remaining.toFixed(1)} dtk`;
+        if (closetDesc) {
+          closetDesc.textContent = 'Sosok Bayangan Pucat terhenti sejenak. Tunggu hingga hitungan selesai sebelum keluar.';
+        }
+      } else {
+        closetTimerText.textContent = 'AMAN';
+        if (closetDesc) {
+          closetDesc.textContent = 'Sosok hantu telah menjauh. Kamu aman untuk keluar dari lemari sekarang.';
+        }
+      }
+      return;
+    }
+
+    // Jika tidak lagi di dalam lemari, pastikan overlay dan HUD dikembalikan ke status normal
+    if (document.body.classList.contains('in-closet') || closetOverlay.classList.contains('visible')) {
+      document.body.classList.remove('in-closet');
+      closetOverlay.classList.remove('visible');
+      closetOverlay.style.display = 'none';
+      if (compassWrap) compassWrap.style.display = '';
+      if (touchControls) touchControls.style.display = '';
+      if (reticleEl) reticleEl.style.display = '';
+      if (alertBannerEl) alertBannerEl.style.display = '';
+      if (dangerPulseEl) dangerPulseEl.style.display = '';
+    }
+
     document.getElementById('hud-room-name').textContent = `LOKASI: ${state.room.name} (${state.room.wing})`;
 
     // Panduan Misi Kontekstual untuk Siswa
@@ -143,20 +224,6 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
     } else {
       alertBanner.classList.remove('visible');
       dangerPulse.classList.remove('active');
-    }
-
-    if (state.isHiddenInCloset) {
-      if (!document.body.classList.contains('in-closet')) {
-        document.body.classList.add('in-closet');
-      }
-      if (!closetOverlay.classList.contains('visible')) {
-        closetOverlay.classList.add('visible');
-      }
-      closetTimerText.textContent = `${Math.max(0, state.closetPauseRemaining).toFixed(1)} dtk`;
-      return;
-    } else if (document.body.classList.contains('in-closet')) {
-      document.body.classList.remove('in-closet');
-      closetOverlay.classList.remove('visible');
     }
 
     // Reticle & Tombol Aksi Kontekstual PID
@@ -189,8 +256,17 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
     document.body.classList.remove('in-closet');
     hud.classList.remove('active');
     closetOverlay.classList.remove('visible');
+    closetOverlay.style.display = 'none';
+    const compassWrap = document.querySelector('.compass-wrap');
+    const touchControls = document.getElementById('touch-controls');
+    const reticleEl = document.getElementById('reticle');
+    if (compassWrap) compassWrap.style.display = '';
+    if (touchControls) touchControls.style.display = '';
+    if (reticleEl) reticleEl.style.display = '';
     alertBanner.classList.remove('visible');
+    alertBanner.style.display = '';
     dangerPulse.classList.remove('active');
+    dangerPulse.style.display = '';
     endScreen.classList.remove('hidden');
 
     const stamp = document.getElementById('end-stamp');
@@ -283,7 +359,8 @@ function renderCompass(state) {
     if (relAngle < -Math.PI) relAngle += Math.PI * 2;
 
     const clamped = Math.max(-1.25, Math.min(1.25, relAngle));
-    const pct = 50 - (clamped / 1.25) * 44;
+    // Batasi posisi 14% - 86% agar label panjang seperti [PINTU KELUAR 6m] tidak terpotong tepi layar kompas
+    const pct = Math.max(14, Math.min(86, 50 - (clamped / 1.25) * 35));
 
     const el = document.createElement('div');
     el.className = `compass-marker ${t.cls}`;

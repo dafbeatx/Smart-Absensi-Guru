@@ -4,7 +4,45 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Rumah Sunyi: Tiga Kunci — Gim Horor Edukasi 3D POV</title>
-  <link rel="stylesheet" href="./src/styles/dossier.css" />
+  <link rel="stylesheet" href="./src/styles/dossier.css?v=20261119b" />
+  <style>
+    /* Anti-collision HUD & Closet Overlay Guard */
+    body.in-closet .compass-wrap,
+    body.in-closet #hud .compass-wrap,
+    body.in-closet .mission-guide,
+    body.in-closet #compass-bar,
+    body.in-closet .compass-marker,
+    body.in-closet #hud-room-name,
+    body.in-closet #hud-mission-guide,
+    body.in-closet #touch-controls,
+    body.in-closet #reticle,
+    body.in-closet .alert-banner,
+    body.in-closet .danger-pulse,
+    #closet-overlay.visible ~ #hud .compass-wrap,
+    #closet-overlay.visible ~ #hud .mission-guide,
+    #closet-overlay.visible ~ #hud #compass-bar,
+    #closet-overlay.visible ~ #hud .compass-marker,
+    #closet-overlay.visible ~ #hud #hud-room-name,
+    #closet-overlay.visible ~ #hud #hud-mission-guide,
+    #closet-overlay.visible ~ #hud #touch-controls,
+    #closet-overlay.visible ~ #hud #reticle,
+    #closet-overlay.visible ~ #hud .alert-banner,
+    #closet-overlay.visible ~ #hud .danger-pulse {
+      display: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    .closet-overlay {
+      z-index: 50 !important;
+    }
+    .closet-banner {
+      z-index: 60 !important;
+      background: #14100d !important;
+      border: 2px solid #c99a45 !important;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.95), 0 0 20px rgba(201, 154, 69, 0.25) !important;
+    }
+  </style>
   <script type="importmap">
     {
       "imports": {
@@ -24,7 +62,7 @@
     <div class="closet-banner">
       <div class="dossier-tag">PERSEMBUNYIAN LEMARI BERJALUSI</div>
       <div id="closet-timer-text" class="closet-timer-ring">5.0 dtk</div>
-      <p style="font-size: 0.88rem; color: var(--paper-muted);">
+      <p id="closet-desc-text" style="font-size: 0.88rem; color: var(--paper-muted); margin: 6px 0 0 0; line-height: 1.4;">
         Sosok Bayangan Pucat terhenti sejenak. Tunggu hingga hitungan selesai sebelum keluar.
       </p>
     </div>
