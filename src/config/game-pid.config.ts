@@ -1,11 +1,11 @@
 /**
  * Konfigurasi URL dan Pengaturan Platform Game PID (Pekan Inovasi Digital)
  * SMP Terpadu Al-Ittihadiyah
- * Platform Inovasi Digital: Nawasena PI (https://nawasena-pi.vercel.app)
- * Gim Edukatif 3D: School Slice 3D (https://school-slice-3d.vercel.app)
+ * Platform Inovasi Digital Siswa: Nawasena Platform Siswa (https://nawasena-platform-siswa.vercel.app/)
+ * Gim Edukatif 3D: School Slice 3D (/games/school-slice-3d/index.html)
  */
 
-export const DEFAULT_GAME_PID_URL = 'https://nawasena-pi.vercel.app';
+export const DEFAULT_GAME_PID_URL = 'https://nawasena-platform-siswa.vercel.app/';
 export const STORAGE_KEY_GAME_PID_URL = 'smart_absensi_game_pid_url';
 
 export const DEFAULT_SCHOOL_SLICE_3D_URL = '/games/school-slice-3d/index.html';
@@ -28,6 +28,11 @@ export function getGamePidPlatformUrl(): string {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_GAME_PID_URL);
       if (stored && stored.trim().length > 0) {
+        // Sanitasi permanen: hapus URL lama nawasena-pi.vercel.app dari storage lokal perangkat
+        if (stored.includes('nawasena-pi.vercel.app')) {
+          localStorage.removeItem(STORAGE_KEY_GAME_PID_URL);
+          return DEFAULT_GAME_PID_URL;
+        }
         return stored.trim();
       }
     } catch {

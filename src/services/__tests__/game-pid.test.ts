@@ -113,6 +113,12 @@ export async function runGamePidTestSuite(): Promise<TestSuiteResult> {
     if (!DEFAULT_GAME_PID_URL.startsWith('https://')) {
       throw new Error(`DEFAULT_GAME_PID_URL tidak valid: ${DEFAULT_GAME_PID_URL}`);
     }
+    if (DEFAULT_GAME_PID_URL !== 'https://nawasena-platform-siswa.vercel.app/') {
+      throw new Error(`DEFAULT_GAME_PID_URL harus mengarah ke platform siswa resmi: ${DEFAULT_GAME_PID_URL}`);
+    }
+    if (DEFAULT_GAME_PID_URL.includes('nawasena-pi.vercel.app')) {
+      throw new Error('URL usang nawasena-pi.vercel.app tidak boleh digunakan lagi');
+    }
     if (!DEFAULT_SCHOOL_SLICE_3D_URL.startsWith('/') && !DEFAULT_SCHOOL_SLICE_3D_URL.startsWith('https://')) {
       throw new Error(`DEFAULT_SCHOOL_SLICE_3D_URL tidak valid: ${DEFAULT_SCHOOL_SLICE_3D_URL}`);
     }
@@ -141,6 +147,13 @@ export async function runGamePidTestSuite(): Promise<TestSuiteResult> {
     const initial = getGamePidPlatformUrl();
     if (initial !== DEFAULT_GAME_PID_URL) {
       throw new Error(`Getter default gagal: diharapkan ${DEFAULT_GAME_PID_URL}, didapat ${initial}`);
+    }
+
+    // Sanitasi otomatis: jika storage masih menyimpan URL usang nawasena-pi.vercel.app
+    mockStorage[STORAGE_KEY_GAME_PID_URL] = 'https://nawasena-pi.vercel.app';
+    const sanitized = getGamePidPlatformUrl();
+    if (sanitized !== DEFAULT_GAME_PID_URL || mockStorage[STORAGE_KEY_GAME_PID_URL] !== undefined) {
+      throw new Error('Pembersihan otomatis URL usang nawasena-pi dari storage gagal');
     }
 
     let eventDispatched = false;
