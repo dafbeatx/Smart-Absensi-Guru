@@ -14,6 +14,9 @@ export const STORAGE_KEY_SCHOOL_SLICE_3D_URL = 'smart_absensi_school_slice_3d_ur
 export const DEFAULT_RUMAH_SUNYI_URL = '/games/rumah-sunyi/index.html';
 export const STORAGE_KEY_RUMAH_SUNYI_URL = 'smart_absensi_rumah_sunyi_url';
 
+export const DEFAULT_G7KAIH_URL = '/games/g7kaih-al-ittihadiyah/index.html';
+export const STORAGE_KEY_G7KAIH_URL = 'smart_absensi_g7kaih_url';
+
 /**
  * Mengambil tautan langsung platform Game PID dari storage lokal atau default resmi sekolah
  */
@@ -124,6 +127,46 @@ export function setRumahSunyiUrl(url: string): void {
       window.dispatchEvent(
         new CustomEvent('smart_absensi_rumah_sunyi_url_updated', {
           detail: trimmed || DEFAULT_RUMAH_SUNYI_URL,
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }
+}
+
+/**
+ * Mengambil tautan langsung Gim 3D G7KAIH Al-Ittihadiyah dari storage lokal atau default bundle
+ */
+export function getG7kaihUrl(): string {
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_G7KAIH_URL);
+      if (stored && stored.trim().length > 0) {
+        return stored.trim();
+      }
+    } catch {
+      // fallback to default
+    }
+  }
+  return DEFAULT_G7KAIH_URL;
+}
+
+/**
+ * Menyimpan tautan kustom Gim 3D G7KAIH (misal: localhost atau URL staging)
+ */
+export function setG7kaihUrl(url: string): void {
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const trimmed = url.trim();
+      if (trimmed.length > 0 && trimmed !== DEFAULT_G7KAIH_URL) {
+        localStorage.setItem(STORAGE_KEY_G7KAIH_URL, trimmed);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_G7KAIH_URL);
+      }
+      window.dispatchEvent(
+        new CustomEvent('smart_absensi_g7kaih_url_updated', {
+          detail: trimmed || DEFAULT_G7KAIH_URL,
         })
       );
     } catch {

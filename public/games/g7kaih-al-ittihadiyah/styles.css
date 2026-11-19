@@ -1,0 +1,507 @@
+/* =========================================================================
+       PALET WARNA ALAMI PAGI HARI (ANTI-NEON) & TATA LETAK CSS INTI (ANTI-HILANG)
+       ========================================================================= */
+    :root {
+      --bg-paper: #F5EFE4;
+      --bg-panel: rgba(42, 33, 25, 0.90);
+      --bg-panel-solid: #2A2119;
+      --border-warm: #8C7056;
+      --accent-gold: #D9A043;
+      --accent-sage: #3B5946;
+      --accent-terracotta: #9E472A;
+      --text-cream: #FFFDF8;
+      --text-muted: #D8CBB8;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #181E2B;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      color: var(--text-cream);
+      touch-action: none;
+    }
+
+    .font-mono-classic {
+      font-family: 'Courier Prime', monospace;
+    }
+
+    .is-hidden {
+      display: none !important;
+    }
+
+    /* Kanvas 3D Selalu di Lapisan Dasar (z-index: 1) */
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Lapisan HUD Selalu Tegas di Atas Kanvas 3D (z-index: 20) */
+    #hud-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 20;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 12px 16px;
+    }
+
+    .hud-interactive {
+      pointer-events: auto;
+    }
+
+    /* Baris Atas HUD: Info Misi (Kiri) & Status GTA Klasik (Kanan) */
+    #hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .hud-card {
+      background: var(--bg-panel);
+      border: 2px solid var(--border-warm);
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(15, 10, 6, 0.45);
+      backdrop-filter: blur(6px);
+    }
+
+    #mission-panel {
+      max-width: 470px;
+      padding: 10px 14px;
+    }
+
+    #status-panel {
+      padding: 10px 14px;
+      min-width: 260px;
+    }
+
+    /* Baris 7 Lencana Kebiasaan G7KAIH */
+    #habits-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .habit-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(255, 250, 240, 0.10);
+      border: 1px solid rgba(216, 203, 184, 0.25);
+      color: #C7B9A5;
+      transition: all 0.25s ease;
+    }
+
+    .habit-badge.done {
+      background: #3B5946;
+      border-color: #D9A043;
+      color: #FFFDF8;
+    }
+
+    /* Bar Energi */
+    .energy-track {
+      width: 100%;
+      height: 11px;
+      background: rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(216, 203, 184, 0.3);
+      margin-top: 4px;
+    }
+
+    #energy-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #4E7A5B, #87A86B);
+      border-radius: 999px;
+      transition: width 0.25s ease;
+    }
+
+    /* Toast Notifikasi di Tengah Atas */
+    #toast-box {
+      position: fixed;
+      top: 118px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 35;
+      pointer-events: none;
+      background: rgba(42, 33, 25, 0.94);
+      border: 2px solid #D9A043;
+      color: #FFFDF8;
+      padding: 10px 20px;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 14px;
+      text-align: center;
+      max-width: min(90vw, 560px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      transition: opacity 0.28s ease;
+    }
+
+    #toast-box.show {
+      opacity: 1;
+    }
+
+    /* Crosshair & Prompt Interaksi Tengah Layar */
+    #crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 253, 248, 0.9);
+      background: rgba(42, 33, 25, 0.45);
+      pointer-events: none;
+      z-index: 22;
+    }
+
+    #interact-prompt {
+      position: fixed;
+      top: 57%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 24;
+      pointer-events: auto;
+      background: rgba(59, 89, 70, 0.95);
+      border: 2px solid #E5B25D;
+      color: #FFFDF8;
+      padding: 10px 18px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42);
+      transition: transform 0.15s ease;
+    }
+
+    #interact-prompt:active {
+      transform: translateX(-50%) scale(0.96);
+    }
+
+    /* Baris Bawah HUD: Minimap Bulat Kiri Bawah & Joystick + Tombol Kanan Bawah */
+    #hud-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      width: 100%;
+      padding-bottom: 4px;
+    }
+
+    /* Minimap Radar Bulat Kiri Bawah */
+    #minimap-wrapper {
+      position: relative;
+      width: 158px;
+      height: 158px;
+      border-radius: 50%;
+      border: 5px solid #5C4634;
+      box-shadow: 0 0 0 3px #D9A043, 0 10px 26px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+      background: #D8CEBC;
+      flex-shrink: 0;
+    }
+
+    #minimap-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #minimap-label {
+      margin-top: 6px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      background: rgba(42, 33, 25, 0.88);
+      border: 1px solid #8C7056;
+      border-radius: 999px;
+      padding: 3px 10px;
+      color: #F3E5CE;
+    }
+
+    /* Kontrol Kanan Bawah (Joystick + Tombol Aksi untuk PID & Mouse) */
+    #controls-right {
+      display: flex;
+      align-items: flex-end;
+      gap: 14px;
+    }
+
+    #action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .game-btn {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      border-radius: 16px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.12s ease, background 0.2s ease, opacity 0.2s ease;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      border: 2px solid #E5B25D;
+    }
+
+    .game-btn:active {
+      transform: scale(0.95);
+    }
+
+    #btn-interact {
+      min-width: 148px;
+      padding: 13px 18px;
+      font-size: 15px;
+      background: linear-gradient(180deg, #4B7359 0%, #32503D 100%);
+      color: #FFFDF8;
+    }
+
+    #btn-interact.inactive {
+      opacity: 0.58;
+      background: linear-gradient(180deg, #52453A 0%, #382E26 100%);
+      border-color: #8C7056;
+    }
+
+    #btn-sprint {
+      min-width: 148px;
+      padding: 11px 16px;
+      font-size: 14px;
+      background: linear-gradient(180deg, #B57B2E 0%, #8C5B1D 100%);
+      color: #FFFDF8;
+      border-color: #F0CB85;
+    }
+
+    #btn-sprint.active {
+      background: linear-gradient(180deg, #9E472A 0%, #75311B 100%);
+      border-color: #F4D59B;
+    }
+
+    /* Virtual Analog Joystick (Unified Pointer Events: Mouse & PID Touch) */
+    #joystick-zone {
+      position: relative;
+      width: 148px;
+      height: 148px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(66, 52, 40, 0.72) 0%, rgba(36, 28, 22, 0.88) 100%);
+      border: 4px solid #8C7056;
+      box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.45), 0 8px 22px rgba(0, 0, 0, 0.5);
+      touch-action: none;
+      cursor: grab;
+      flex-shrink: 0;
+    }
+
+    #joystick-zone:active {
+      cursor: grabbing;
+    }
+
+    .joy-dir {
+      position: absolute;
+      font-size: 11px;
+      font-weight: 800;
+      color: rgba(243, 229, 206, 0.55);
+      pointer-events: none;
+    }
+
+    #joystick-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 60px;
+      height: 60px;
+      margin-left: -30px;
+      margin-top: -30px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #F0D298 0%, #C88A2E 65%, #8F5D1B 100%);
+      border: 3px solid #FFFDF8;
+      box-shadow: 0 5px 14px rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+      transform: translate(0px, 0px);
+    }
+
+    /* Modal / Layar Pembuka / Chapter / Pilihan / Rapor (z-index: 50) */
+    .overlay-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(24, 19, 15, 0.84);
+      backdrop-filter: blur(7px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .paper-modal {
+      width: 100%;
+      max-width: 680px;
+      max-height: 92vh;
+      overflow-y: auto;
+      background: #F6F0E4;
+      color: #2E231B;
+      border: 4px solid #6E523B;
+      border-radius: 22px;
+      padding: 24px 26px;
+      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.6);
+    }
+
+    .btn-primary-warm {
+      background: linear-gradient(180deg, #436951 0%, #2E4B39 100%);
+      color: #FFFDF8;
+      border: 2px solid #D9A043;
+      border-radius: 14px;
+      padding: 13px 24px;
+      font-weight: 800;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(46, 35, 27, 0.25);
+      transition: transform 0.12s ease;
+    }
+
+    .btn-primary-warm:hover {
+      filter: brightness(1.06);
+    }
+
+    .btn-primary-warm:active {
+      transform: scale(0.97);
+    }
+
+    .btn-secondary-warm {
+      background: linear-gradient(180deg, #8C5B1D 0%, #6E4514 100%);
+      color: #FFFDF8;
+      border: 2px solid #D9A043;
+      border-radius: 14px;
+      padding: 13px 20px;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(46, 35, 27, 0.22);
+      transition: transform 0.12s ease, filter 0.15s ease;
+    }
+
+    .btn-secondary-warm:hover {
+      filter: brightness(1.08);
+    }
+
+    .btn-secondary-warm:active {
+      transform: scale(0.97);
+    }
+
+    #btn-export-hud {
+      margin-top: 8px;
+      width: 100%;
+      background: rgba(140, 91, 29, 0.85);
+      color: #FFFDF8;
+      border: 1px solid #D9A043;
+      border-radius: 10px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.18s ease, transform 0.12s ease;
+    }
+
+    #btn-export-hud:hover {
+      background: rgba(168, 111, 38, 0.95);
+    }
+
+    #btn-export-hud:active {
+      transform: scale(0.97);
+    }
+
+    .choice-option-btn {
+      width: 100%;
+      text-align: left;
+      background: #FFFDF8;
+      color: #2E231B;
+      border: 2px solid #B59D82;
+      border-radius: 14px;
+      padding: 13px 16px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .choice-option-btn:hover {
+      border-color: #3B5946;
+      background: #EEF4EE;
+    }
+
+    /* Responsif Layar Kecil / Tablet */
+    @media (max-width: 768px) {
+      #hud-layer {
+        padding: 8px 10px;
+      }
+      #mission-panel {
+        max-width: 56vw;
+        padding: 8px 10px;
+      }
+      #status-panel {
+        min-width: 168px;
+        padding: 8px 10px;
+      }
+      #minimap-wrapper {
+        width: 118px;
+        height: 118px;
+      }
+      #joystick-zone {
+        width: 118px;
+        height: 118px;
+      }
+      #joystick-knob {
+        width: 48px;
+        height: 48px;
+        margin-left: -24px;
+        margin-top: -24px;
+      }
+      #btn-interact, #btn-sprint {
+        min-width: 116px;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+      #habits-bar {
+        display: none;
+      }
+    }

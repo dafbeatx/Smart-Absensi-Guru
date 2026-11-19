@@ -7,15 +7,19 @@ import {
   DEFAULT_GAME_PID_URL,
   DEFAULT_SCHOOL_SLICE_3D_URL,
   DEFAULT_RUMAH_SUNYI_URL,
+  DEFAULT_G7KAIH_URL,
   STORAGE_KEY_GAME_PID_URL,
   STORAGE_KEY_SCHOOL_SLICE_3D_URL,
   STORAGE_KEY_RUMAH_SUNYI_URL,
+  STORAGE_KEY_G7KAIH_URL,
   getGamePidPlatformUrl,
   setGamePidPlatformUrl,
   getSchoolSlice3dUrl,
   setSchoolSlice3dUrl,
   getRumahSunyiUrl,
   setRumahSunyiUrl,
+  getG7kaihUrl,
+  setG7kaihUrl,
 } from '../../config/game-pid.config';
 import type { TestSuiteResult, TestResultItem } from '../test-runner.service';
 
@@ -377,6 +381,109 @@ Siti (Ketua Kelas),Teman Sebangku,Hai kawan!,Perangkat masukan komputer?,Monitor
     failed++;
     results.push({
       testName: 'Asset Sfx Rumah Sunyi: 5 berkas audio (lobby, menjelajah, melihat-pemain, muncul-soal, menunggu-menjawab-soal) terintegrasi',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 7: G7KAIH 3D Getter & Setter
+  try {
+    setupMockBrowser();
+    const initial = getG7kaihUrl();
+    if (initial !== DEFAULT_G7KAIH_URL) {
+      throw new Error(`Getter default gagal: diharapkan ${DEFAULT_G7KAIH_URL}, didapat ${initial}`);
+    }
+
+    let eventDispatched = false;
+    let eventDetail = '';
+    const listener = (e: unknown) => {
+      eventDispatched = true;
+      eventDetail = (e as { detail: string }).detail;
+    };
+    globalThis.window.addEventListener('smart_absensi_g7kaih_url_updated', listener);
+
+    // Simpan URL kustom
+    const customUrl = 'http://localhost:5174/g7kaih';
+    setG7kaihUrl(customUrl);
+
+    if (getG7kaihUrl() !== customUrl) {
+      throw new Error(`URL kustom tidak tersimpan: ${getG7kaihUrl()}`);
+    }
+    if (mockStorage[STORAGE_KEY_G7KAIH_URL] !== customUrl) {
+      throw new Error(`Storage key ${STORAGE_KEY_G7KAIH_URL} tidak berisi URL kustom`);
+    }
+    if (!eventDispatched || eventDetail !== customUrl) {
+      throw new Error('Event smart_absensi_g7kaih_url_updated tidak ter-dispatch dengan benar');
+    }
+
+    // Reset default
+    setG7kaihUrl('');
+    if (getG7kaihUrl() !== DEFAULT_G7KAIH_URL) {
+      throw new Error('Reset URL G7KAIH gagal kembali ke default');
+    }
+
+    globalThis.window.removeEventListener('smart_absensi_g7kaih_url_updated', listener);
+    cleanupMockBrowser();
+
+    passed++;
+    results.push({
+      testName: 'G7KAIH 3D Getter & Setter: Tersimpan di localStorage & trigger event',
+      status: 'PASS',
+      details: 'URL kustom tersimpan, CustomEvent ter-dispatch, reset default sukses',
+    });
+  } catch (err: unknown) {
+    cleanupMockBrowser();
+    failed++;
+    results.push({
+      testName: 'G7KAIH 3D Getter & Setter: Tersimpan di localStorage & trigger event',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
+  // Test 8: G7KAIH Bundle & Thumbnail Integrity
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const g7Dir = path.resolve(process.cwd(), 'public/games/g7kaih-al-ittihadiyah');
+
+    const expectedFiles = [
+      'index.html',
+      'styles.css',
+      'game.js',
+      'g7kaih_standalone.html',
+      'agent_manifest.json',
+      'README_AGENT.md',
+      'thumbnail.jpg',
+    ];
+
+    for (const f of expectedFiles) {
+      const fullPath = path.join(g7Dir, f);
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(`Berkas wajib G7KAIH tidak ditemukan: ${f}`);
+      }
+      const stat = fs.statSync(fullPath);
+      if (stat.size < 100) {
+        throw new Error(`Ukuran berkas ${f} tidak valid (${stat.size} bytes)`);
+      }
+    }
+
+    // Verifikasi root thumbnail public/games/g7kaih-thumbnail.jpg
+    const rootThumb = path.resolve(process.cwd(), 'public/games/g7kaih-thumbnail.jpg');
+    if (!fs.existsSync(rootThumb)) {
+      throw new Error('Thumbnail root public/games/g7kaih-thumbnail.jpg tidak ditemukan');
+    }
+
+    passed++;
+    results.push({
+      testName: 'G7KAIH Bundle & Thumbnail Integrity: Semua berkas bundel & thumbnail 3D terverifikasi',
+      status: 'PASS',
+      details: 'Semua 7 berkas bundel g7kaih-al-ittihadiyah + thumbnail resmi terkonfirmasi ada dan utuh',
+    });
+  } catch (err: unknown) {
+    failed++;
+    results.push({
+      testName: 'G7KAIH Bundle & Thumbnail Integrity: Semua berkas bundel & thumbnail 3D terverifikasi',
       status: 'FAIL',
       details: (err as Error)?.message || String(err),
     });

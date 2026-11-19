@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>G7KAIH: Perjalanan ke SMP Terpadu Al-Ittihadiyah</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Jika project kamu sudah memiliki Tailwind & Three.js lokal, ganti 2 baris CDN di bawah dengan bundle lokalmu -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<!-- =======================================================================
+       1. KONTAINER 3D THREE.JS (LAPISAN DASAR)
+       ======================================================================= -->
+  <div id="canvas-container"></div>
+
+  <!-- =======================================================================
+       2. LAPISAN HUD / UI GAME (LAPISAN ATAS - SELALU TERLIHAT SAAT MAIN)
+       ======================================================================= -->
+  <div id="hud-layer" class="is-hidden">
+    <!-- BARIS ATAS: MISI G7KAIH (KIRI) & STATUS GTA KLASIK (KANAN) -->
+    <div id="hud-top">
+      <!-- Panel Misi & 7 Lencana G7KAIH -->
+      <div id="mission-panel" class="hud-card hud-interactive">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <span id="hud-chapter-badge" style="background:#9E472A; color:#FFFDF8; font-size:11px; font-weight:800; padding:3px 9px; border-radius:999px; letter-spacing:0.04em;">CHAPTER 1</span>
+          <span id="hud-zone" style="font-size:11px; font-weight:700; color:#E5B25D;">Zona 1: Kamar Saya (Tengah Kiri)</span>
+        </div>
+        <div id="hud-mission-title" style="font-size:15px; font-weight:800; color:#FFFDF8; margin-top:5px; line-height:1.25;">Kebiasaan 1: Bangun Pagi &amp; Rapikan Kasur</div>
+        <div id="hud-mission-hint" style="font-size:12px; color:#D8CBB8; margin-top:3px; line-height:1.35;">Dekati kasur &amp; jam alarm di Kamar Saya, lalu tekan [INTERAKSI (E)].</div>
+        <div id="habits-bar">
+          <span class="habit-badge" data-habit="1">1. Bangun Pagi</span>
+          <span class="habit-badge" data-habit="2">2. Beribadah</span>
+          <span class="habit-badge" data-habit="3">3. Berolahraga</span>
+          <span class="habit-badge" data-habit="4">4. Makan Sehat</span>
+          <span class="habit-badge" data-habit="5">5. Gemar Belajar</span>
+          <span class="habit-badge" data-habit="6">6. Bermasyarakat</span>
+          <span class="habit-badge" data-habit="7">7. Tidur Cepat</span>
+        </div>
+      </div>
+
+      <!-- Panel Status Gaya GTA Klasik (Jam, Uang, Energi, Skor) -->
+      <div id="status-panel" class="hud-card hud-interactive">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <!-- Jam Digital -->
+          <div style="border-right:1px solid #7C644E; padding-right:12px;">
+            <div style="font-size:10px; text-transform:uppercase; font-weight:700; color:#D8CBB8;">Waktu WIB</div>
+            <div id="hud-clock" class="font-mono-classic" style="font-size:21px; font-weight:700; color:#FFFDF8; line-height:1.1; margin-top:2px;">04:05</div>
+          </div>
+
+          <!-- Uang Saku -->
+          <div style="border-right:1px solid #7C644E; padding-right:12px;">
+            <div style="font-size:10px; text-transform:uppercase; font-weight:700; color:#D8CBB8;">Uang Saku</div>
+            <div id="hud-money" class="font-mono-classic" style="font-size:19px; font-weight:700; color:#9FD18B; line-height:1.1; margin-top:2px;">Rp 20.000</div>
+          </div>
+
+          <!-- Skor Karakter -->
+          <div>
+            <div style="font-size:10px; text-transform:uppercase; font-weight:700; color:#D8CBB8;">Karakter</div>
+            <div id="hud-score" class="font-mono-classic" style="font-size:19px; font-weight:700; color:#E5B25D; line-height:1.1; margin-top:2px;">0</div>
+          </div>
+        </div>
+
+        <!-- Bar Energi / Stamina -->
+        <div style="margin-top:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:700; color:#E8DCC8;">
+            <span>ENERGI / STAMINA</span>
+            <span id="hud-energy-text">100 / 100</span>
+          </div>
+          <div class="energy-track">
+            <div id="energy-fill" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- Tombol Cepat Unduh Bundle .ZIP untuk Project & AI Agent -->
+        <button id="btn-export-hud" type="button" title="Unduh bundle proyek modular (.zip)">
+          <span>📦</span>
+          <span>UNDUH BUNDLE .ZIP</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- BARIS BAWAH: MINIMAP BULAT (KIRI BAWAH) & JOYSTICK + TOMBOL AKSI (KANAN BAWAH) -->
+    <div id="hud-bottom">
+      <!-- Minimap Radar Bulat Gaya GTA Klasik -->
+      <div style="display:flex; flex-direction:column; align-items:center;">
+        <div id="minimap-wrapper" class="hud-interactive">
+          <canvas id="minimap-canvas" width="220" height="220"></canvas>
+        </div>
+        <div id="minimap-label">RADAR PETA • UTARA (U)</div>
+      </div>
+
+      <!-- Kontrol Kanan Bawah: Tombol Aksi & Virtual Joystick (PID Touch & Mouse PC) -->
+      <div id="controls-right">
+        <div id="action-buttons" class="hud-interactive">
+          <button id="btn-interact" type="button" class="game-btn inactive">
+            <span>✋</span>
+            <span>INTERAKSI (E)</span>
+          </button>
+          <button id="btn-sprint" type="button" class="game-btn">
+            <span>🏃</span>
+            <span id="btn-sprint-label">LARI CEPAT</span>
+          </button>
+        </div>
+
+        <div id="joystick-zone" class="hud-interactive" aria-label="Analog Joystick">
+          <span class="joy-dir" style="top:8px; left:50%; transform:translateX(-50%);">▲</span>
+          <span class="joy-dir" style="bottom:8px; left:50%; transform:translateX(-50%);">▼</span>
+          <span class="joy-dir" style="left:10px; top:50%; transform:translateY(-50%);">◀</span>
+          <span class="joy-dir" style="right:10px; top:50%; transform:translateY(-50%);">▶</span>
+          <div id="joystick-knob"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Elemen Overlay Tengah Layar (Notifikasi, Crosshair & Prompt Interaksi) -->
+  <div id="toast-box" role="status" aria-live="polite"></div>
+  <div id="crosshair" class="is-hidden"></div>
+  <button id="interact-prompt" type="button" class="is-hidden">[E] Interaksi</button>
+
+  <!-- =======================================================================
+       3. LAYAR PEMBUKA (PENGENALAN G7KAIH + TOMBOL MULAI & DOWNLOAD .ZIP)
+       ======================================================================= -->
+  <div id="start-screen" class="overlay-screen">
+    <div class="paper-modal">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <span style="background:#3B5946; color:#FFFDF8; font-size:12px; font-weight:800; padding:5px 12px; border-radius:999px; letter-spacing:0.04em;">
+          EDUKASI INTERAKTIF POV 3D • PID &amp; PC
+        </span>
+        <span class="font-mono-classic" style="font-size:13px; font-weight:700; color:#9E472A;">
+          Subuh Hari Ini: 04:05 WIB
+        </span>
+      </div>
+
+      <h1 style="font-size:27px; font-weight:800; margin:0 0 8px 0; color:#2A1F17; line-height:1.2;">
+        G7KAIH: Perjalanan ke SMP Terpadu Al-Ittihadiyah
+      </h1>
+      <p style="font-size:14px; color:#4D3D30; margin:0 0 14px 0; line-height:1.55;">
+        Jalani rutinitas pagi <strong>7 Kebiasaan Anak Indonesia Hebat</strong> dari bangun Subuh di rumah bersama Ayah, Bunda, Kakak, dan Adik, beribadah di Mushola atau <strong>Masjid Al-Ikhlas</strong>, hingga tiba tepat waktu di gerbang <strong>SMP Terpadu Al-Ittihadiyah</strong>!
+      </p>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-bottom:16px;">
+        <div style="background:#ECE3D2; border:1px solid #C9B59C; border-radius:14px; padding:12px;">
+          <div style="font-size:12px; font-weight:800; color:#3B5946; margin-bottom:4px;">🗺️ TATA LETAK LAYAR PID</div>
+          <div style="font-size:12.5px; color:#4D3D30; line-height:1.45;">
+            <strong>Minimap Bulat</strong> di kiri bawah, <strong>Virtual Joystick &amp; Tombol Aksi</strong> di kanan bawah (bisa jari PID maupun mouse), dan <strong>geser area tengah</strong> untuk menengok.
+          </div>
+        </div>
+        <div style="background:#ECE3D2; border:1px solid #C9B59C; border-radius:14px; padding:12px;">
+          <div style="font-size:12px; font-weight:800; color:#9E472A; margin-bottom:4px;">🤝 MODE ESTAFET 4 CHAPTER</div>
+          <div style="font-size:12.5px; color:#4D3D30; line-height:1.45;">
+            Dibagi menjadi <strong>4 Chapter</strong> agar siswa bisa maju bergantian di depan kelas sambil berdiskusi tentang makna setiap kebiasaan G7KAIH.
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+        <div style="font-size:12px; color:#6B5542; font-weight:600;">
+          Keyboard PC: <strong>W A S D</strong> jalan • <strong>Shift</strong> lari • <strong>E</strong> interaksi / buka pintu
+        </div>
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+          <button id="btn-download-zip" type="button" class="btn-secondary-warm">
+            📦 DOWNLOAD BUNDLE .ZIP
+          </button>
+          <button id="btn-start" type="button" class="btn-primary-warm">
+            MULAI PETUALANGAN ▶
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; padding:10px 12px; background:#EAE0CE; border:1px dashed #8C7056; border-radius:12px; font-size:11.5px; color:#4D3D30; line-height:1.45;">
+        <strong>Isi Paket <code>.zip</code> (Siap Integrasi Project Three.js &amp; AI Agent):</strong>
+        <code>index.html</code>, <code>styles.css</code>, <code>game.js</code> (modular), <code>g7kaih_standalone.html</code>, <code>README_AGENT.md</code>, dan <code>agent_manifest.json</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       4. MODAL PILIHAN INTERAKTIF (SARAPAN SEHAT / GODAAN DI JALAN)
+       ======================================================================= -->
+  <div id="choice-modal" class="overlay-screen is-hidden">
+    <div class="paper-modal" style="max-width:560px;">
+      <div id="choice-tag" style="display:inline-block; background:#9E472A; color:#FFFDF8; font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px; margin-bottom:8px;">
+        KEPUTUSAN G7KAIH
+      </div>
+      <h2 id="choice-title" style="font-size:22px; font-weight:800; margin:0 0 8px 0;">Judul Pilihan</h2>
+      <p id="choice-desc" style="font-size:14px; color:#4D3D30; margin:0 0 16px 0; line-height:1.5;">Deskripsi pilihan...</p>
+      <div id="choice-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       5. MODAL SELESAI CHAPTER (UNTUK ESTAFET SISWA DI DEPAN PID)
+       ======================================================================= -->
+  <div id="chapter-modal" class="overlay-screen is-hidden">
+    <div class="paper-modal" style="max-width:600px;">
+      <div style="display:inline-block; background:#3B5946; color:#FFFDF8; font-size:12px; font-weight:800; padding:5px 12px; border-radius:999px; margin-bottom:10px;">
+        CHAPTER COMPLETE • GANTIAN PEMAIN DI PID
+      </div>
+      <h2 id="chapter-modal-title" style="font-size:24px; font-weight:800; margin:0 0 10px 0; color:#2A1F17;">
+        Chapter Selesai!
+      </h2>
+      <p id="chapter-modal-edu" style="font-size:14.5px; color:#4D3D30; margin:0 0 18px 0; line-height:1.6; background:#ECE3D2; border-left:4px solid #D9A043; padding:12px 14px; border-radius:10px;">
+        Penjelasan manfaat kebiasaan G7KAIH...
+      </p>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <span style="font-size:12.5px; color:#6B5542; font-weight:700;">
+          Silakan siswa berikutnya maju ke depan PID!
+        </span>
+        <button id="btn-next-chapter" type="button" class="btn-primary-warm">
+          LANJUT CHAPTER BERIKUTNYA ▶
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       6. MODAL RAPOR AKHIR G7KAIH (TIBA DI SMP TERPADU AL-ITTIHADIYAH)
+       ======================================================================= -->
+  <div id="report-modal" class="overlay-screen is-hidden">
+    <div class="paper-modal" style="max-width:680px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <span style="background:#3B5946; color:#FFFDF8; font-size:12px; font-weight:800; padding:5px 12px; border-radius:999px;">
+          MISSION PASSED • SMP TERPADU AL-ITTIHADIYAH
+        </span>
+        <span id="report-arrival-time" class="font-mono-classic" style="font-size:15px; font-weight:700; color:#9E472A;">
+          Tiba Pukul 06:50 WIB
+        </span>
+      </div>
+      <h2 style="font-size:26px; font-weight:800; margin:0 0 8px 0; color:#2A1F17;">
+        Rapor 7 Kebiasaan Anak Indonesia Hebat
+      </h2>
+      <p style="font-size:14px; color:#4D3D30; margin:0 0 14px 0; line-height:1.5;">
+        Selamat! Kamu berhasil mengamalkan kebiasaan baik dari rumah sampai gerbang <strong>SMP Terpadu Al-Ittihadiyah</strong> tepat waktu. Jangan lupa malam harinya amalkan <strong>Kebiasaan 7: Tidur Cepat (maksimal 21:00 WIB)</strong> agar besok bangun Subuh kembali segar!
+      </p>
+
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:14px;">
+        <div style="background:#ECE3D2; border-radius:12px; padding:10px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#6B5542;">SKOR KARAKTER</div>
+          <div id="report-score" class="font-mono-classic" style="font-size:22px; font-weight:700; color:#3B5946;">0</div>
+        </div>
+        <div style="background:#ECE3D2; border-radius:12px; padding:10px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#6B5542;">SISA UANG SAKU</div>
+          <div id="report-money" class="font-mono-classic" style="font-size:20px; font-weight:700; color:#2E5B44;">Rp 0</div>
+        </div>
+        <div style="background:#ECE3D2; border-radius:12px; padding:10px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#6B5542;">ENERGI TERSISA</div>
+          <div id="report-energy" class="font-mono-classic" style="font-size:22px; font-weight:700; color:#9E472A;">100%</div>
+        </div>
+      </div>
+
+      <div id="report-habits-summary" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; margin-bottom:18px; font-size:12px;"></div>
+
+      <div style="display:flex; justify-content:flex-end;">
+        <button id="btn-restart" type="button" class="btn-primary-warm">
+          MAIN ULANG DARI CHAPTER 1 ↻
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =======================================================================
+       7. ENGINE 3D POV, RUMAH REALISTIS, MASJID AL-IKHLAS & LOGIKA G7KAIH
+       ======================================================================= -->
+  <script src="./game.js"></script>
+</body>
+</html>

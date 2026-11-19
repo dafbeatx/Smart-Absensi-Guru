@@ -20,6 +20,7 @@ import {
   Layers,
   BookOpen,
   Key,
+  Compass,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import {
@@ -30,6 +31,7 @@ import {
   setSchoolSlice3dUrl,
   DEFAULT_SCHOOL_SLICE_3D_URL,
   getRumahSunyiUrl,
+  getG7kaihUrl,
 } from '../../../config/game-pid.config';
 import { useBackHandler, BACK_PRIORITIES } from '../../../hooks/useBackNavigation';
 
@@ -82,7 +84,10 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
   // State khusus Rumah Sunyi 3D
   const [rumahSunyiUrl, setRumahSunyiUrlState] = useState<string>(() => getRumahSunyiUrl());
 
-  // Embedded Player Aktif (School Slice 3D atau Rumah Sunyi 3D)
+  // State khusus G7KAIH 3D
+  const [g7kaihUrl, setG7kaihUrlState] = useState<string>(() => getG7kaihUrl());
+
+  // Embedded Player Aktif (School Slice 3D, Rumah Sunyi 3D, atau G7KAIH 3D)
   const [embeddedGame, setEmbeddedGame] = useState<{
     id: string;
     title: string;
@@ -109,15 +114,21 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       const current = getRumahSunyiUrl();
       setRumahSunyiUrlState(current);
     };
+    const handleG7kaihUrlUpdated = () => {
+      const current = getG7kaihUrl();
+      setG7kaihUrlState(current);
+    };
 
     window.addEventListener('smart_absensi_game_pid_url_updated', handleUrlUpdated);
     window.addEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
     window.addEventListener('smart_absensi_rumah_sunyi_url_updated', handleRumahSunyiUrlUpdated);
+    window.addEventListener('smart_absensi_g7kaih_url_updated', handleG7kaihUrlUpdated);
 
     return () => {
       window.removeEventListener('smart_absensi_game_pid_url_updated', handleUrlUpdated);
       window.removeEventListener('smart_absensi_school_slice_3d_url_updated', handleSchoolUrlUpdated);
       window.removeEventListener('smart_absensi_rumah_sunyi_url_updated', handleRumahSunyiUrlUpdated);
+      window.removeEventListener('smart_absensi_g7kaih_url_updated', handleG7kaihUrlUpdated);
     };
   }, []);
 
@@ -276,6 +287,22 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
       accentColor: 'from-[#171310] via-[#c99a45] to-[#b52b21]',
       actionUrl: rumahSunyiUrl,
       thumbnailUrl: '/games/rumah-sunyi/thumbnail.jpg',
+      is3d: true,
+    },
+    {
+      id: 'pid_g7kaih',
+      title: 'G7KAIH: Perjalanan ke SMP Terpadu Al-Ittihadiyah',
+      category: 'CHALLENGE',
+      badgeCategory: 'Gim 3D Simulasi Karakter PID',
+      description:
+        'Simulasi POV 3D 7 Kebiasaan Anak Indonesia Hebat: bangun Subuh di rumah 4 kamar, sholat berjamaah di Masjid Al-Ikhlas, perjalanan desa, dan tiba tepat waktu di SMP Terpadu Al-Ittihadiyah.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 45,
+      icon: Compass,
+      accentColor: 'from-[#2A2119] via-[#8C7056] to-[#3B5946]',
+      actionUrl: g7kaihUrl,
+      thumbnailUrl: '/games/g7kaih-al-ittihadiyah/thumbnail.jpg',
       is3d: true,
     },
   ];

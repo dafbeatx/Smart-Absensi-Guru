@@ -11,12 +11,14 @@ import {
   Box,
   Play,
   Key,
+  Compass,
 } from 'lucide-react';
 import type { UserProfile } from '../../../types/database.types';
 import {
   getGamePidPlatformUrl,
   getSchoolSlice3dUrl,
   getRumahSunyiUrl,
+  getG7kaihUrl,
 } from '../../../config/game-pid.config';
 
 export interface GamePidModalProps {
@@ -93,6 +95,22 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
       accentColor: 'from-[#171310] via-[#c99a45] to-[#b52b21]',
       actionUrl: getRumahSunyiUrl(),
       thumbnailUrl: '/games/rumah-sunyi/thumbnail.jpg',
+      is3d: true,
+    },
+    {
+      id: 'pid_g7kaih',
+      title: 'G7KAIH: Perjalanan ke SMP Terpadu Al-Ittihadiyah',
+      category: 'CHALLENGE',
+      badgeCategory: 'Gim 3D Simulasi Karakter PID',
+      description:
+        'Simulasi POV 3D 7 Kebiasaan Anak Indonesia Hebat: bangun Subuh di rumah 4 kamar, sholat berjamaah di Masjid Al-Ikhlas, perjalanan desa, dan tiba tepat waktu di SMP Terpadu Al-Ittihadiyah.',
+      status: 'AVAILABLE',
+      statusLabel: 'Siap Dimainkan',
+      rewardPoints: 45,
+      icon: Compass,
+      accentColor: 'from-[#2A2119] via-[#8C7056] to-[#3B5946]',
+      actionUrl: getG7kaihUrl(),
+      thumbnailUrl: '/games/g7kaih-al-ittihadiyah/thumbnail.jpg',
       is3d: true,
     },
   ];
@@ -303,7 +321,7 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
                       className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all shadow-md"
                     >
                       <Play className="w-3.5 h-3.5 fill-slate-950 stroke-none" />
-                      <span>Mainkan School Slice 3D Sekarang ↗</span>
+                      <span>Mainkan {item.title} Sekarang ↗</span>
                     </button>
                   </div>
                 </div>

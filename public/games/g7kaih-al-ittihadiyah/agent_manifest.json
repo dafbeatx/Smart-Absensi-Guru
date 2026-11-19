@@ -1,0 +1,99 @@
+{
+  "project": "G7KAIH: Perjalanan ke SMP Terpadu Al-Ittihadiyah",
+  "view": "First-Person POV (Three.js)",
+  "targetDevices": [
+    "Papan Interaktif Digital (PID Touchscreen)",
+    "PC / Laptop (Keyboard + Mouse)"
+  ],
+  "artDirection": {
+    "style": "Warm Natural Stylized Low-Poly + Procedural Canvas Textures",
+    "noNeonColors": true,
+    "palette": {
+      "paper": "#F5EFE4",
+      "panel": "#2A2119",
+      "border": "#8C7056",
+      "accentGold": "#D9A043",
+      "accentSage": "#3B5946",
+      "accentTerracotta": "#9E472A"
+    }
+  },
+  "hudLayout": {
+    "minimap": "bottom-left (circular GTA-style radar with auto-zoom inside house & mosque)",
+    "joystickAndActions": "bottom-right (PointerEvents supporting both PID touch and PC mouse)",
+    "cameraLook": "center canvas swipe/drag"
+  },
+  "prayerSchedule": {
+    "location": "Kabupaten Bogor / Ciampea (Kemenag RI)",
+    "date": "2026-11-19",
+    "subuhStart": "04:05 WIB",
+    "syuruqEnd": "05:22 WIB"
+  },
+  "worldZones": {
+    "familyHouse": {
+      "boundsX": [
+        -11,
+        11
+      ],
+      "boundsZ": [
+        2,
+        18
+      ],
+      "rooms": [
+        "Teras & Ruang Tamu (depan)",
+        "Kamar Ayah & Bunda (depan kiri)",
+        "Kamar Kakak (depan kanan)",
+        "Kamar Saya (tengah kiri)",
+        "Kamar Adik (tengah kanan)",
+        "Ruang Keluarga & Ruang Makan (tengah)",
+        "Kamar Mandi & Wudhu (belakang kiri)",
+        "Mushola Keluarga (belakang tengah)",
+        "Dapur Lengkap (belakang kanan)"
+      ]
+    },
+    "masjidAlIkhlas": {
+      "boundsX": [
+        11.9,
+        24.8
+      ],
+      "boundsZ": [
+        -19,
+        -6.7
+      ],
+      "features": [
+        "Double Hinged Doors",
+        "Mihrab",
+        "Mimbar",
+        "Jadwal Sholat Board",
+        "Calligraphy Allah & Muhammad",
+        "Rak Al-Quran",
+        "Kotak Amal Interactive",
+        "Tempat Wudhu",
+        "Subuh Congregational Prayer NPCs"
+      ]
+    },
+    "villageRoadAndSchool": {
+      "posRonda": {
+        "x": -8.5,
+        "z": -12
+      },
+      "warungBuSiti": {
+        "x": 9.8,
+        "z": -62
+      },
+      "smpTerpaduAlIttihadiyah": {
+        "gateZ": -110.5,
+        "buildingZ": -128
+      }
+    }
+  },
+  "chapters": 4,
+  "missionsCount": 11,
+  "files": [
+    "index.html",
+    "styles.css",
+    "game.js",
+    "g7kaih_standalone.html",
+    "README_AGENT.md",
+    "agent_manifest.json"
+  ]
+}
