@@ -319,6 +319,69 @@ Siti (Ketua Kelas),Teman Sebangku,Hai kawan!,Perangkat masukan komputer?,Monitor
     });
   }
 
+  // Test 6: Asset Sfx Rumah Sunyi - Verifikasi 5 Berkas Audio & Pemetaan Fungsi
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const audioDir = path.resolve(process.cwd(), 'public/games/rumah-sunyi/audio');
+
+    const expectedAssets = [
+      { file: 'lobby.wav', minSize: 10000000, desc: 'BGM Layar Awal / Dossier Investigasi' },
+      { file: 'menjelajah.mp3', minSize: 1000000, desc: 'BGM Eksplorasi Koridor & Ruangan Mansion' },
+      { file: 'melihat-pemain.wav', minSize: 400000, desc: 'SFX Ketakutan saat Mata Sosok Melihat Pemain' },
+      { file: 'muncul-soal.mp3', minSize: 200000, desc: 'SFX Pop-up Kuis Gembok Kunci Kuningan' },
+      { file: 'menunggu-menjawab-soal.mp3', minSize: 200000, desc: 'BGM Ketegangan Saat Menjawab Soal Kuis' },
+    ];
+
+    for (const asset of expectedAssets) {
+      const fullPath = path.join(audioDir, asset.file);
+      if (!fs.existsSync(fullPath)) {
+        throw new Error(`Berkas audio wajib tidak ditemukan: ${asset.file} (${asset.desc})`);
+      }
+      const stat = fs.statSync(fullPath);
+      if (stat.size < asset.minSize) {
+        throw new Error(`Ukuran berkas audio ${asset.file} terlalu kecil (${stat.size} < ${asset.minSize})`);
+      }
+    }
+
+    // Verifikasi keterhubungan HorrorAudioEngine dengan fungsi BGM & SFX
+    const horrorAudioPath = path.resolve(process.cwd(), 'public/games/rumah-sunyi/src/audio/horrorAudio.js');
+    const code = fs.readFileSync(horrorAudioPath, 'utf-8');
+
+    const requiredMethods = [
+      'playLobbyBgm',
+      'playExploreBgm',
+      'playWaitingQuizBgm',
+      'playSpotPlayer',
+      'playQuizPopup',
+      'lobby.wav',
+      'menjelajah.mp3',
+      'melihat-pemain.wav',
+      'muncul-soal.mp3',
+      'menunggu-menjawab-soal.mp3',
+    ];
+
+    for (const m of requiredMethods) {
+      if (!code.includes(m)) {
+        throw new Error(`HorrorAudioEngine belum mengimplementasikan / memetakan: ${m}`);
+      }
+    }
+
+    passed++;
+    results.push({
+      testName: 'Asset Sfx Rumah Sunyi: 5 berkas audio (lobby, menjelajah, melihat-pemain, muncul-soal, menunggu-menjawab-soal) terintegrasi',
+      status: 'PASS',
+      details: 'Semua 5 berkas audio terverifikasi di public/games/rumah-sunyi/audio/ dan terhubung ke HorrorAudioEngine',
+    });
+  } catch (err: unknown) {
+    failed++;
+    results.push({
+      testName: 'Asset Sfx Rumah Sunyi: 5 berkas audio (lobby, menjelajah, melihat-pemain, muncul-soal, menunggu-menjawab-soal) terintegrasi',
+      status: 'FAIL',
+      details: (err as Error)?.message || String(err),
+    });
+  }
+
   return {
     suiteName: 'Game PID & School Slice 3D Integration Test Suite',
     passed,

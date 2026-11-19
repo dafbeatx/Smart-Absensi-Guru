@@ -161,6 +161,8 @@ export class HorrorGameEngine {
 
   startSession(diffId, quizData) {
     this.audio.init();
+    this.audio.stopLobbyBgm();
+    this.audio.playExploreBgm();
     this.diffConfig = DIFFICULTY_CONFIG[diffId] || DIFFICULTY_CONFIG.normal;
     this.quizData = JSON.parse(JSON.stringify(quizData));
 
@@ -266,6 +268,8 @@ export class HorrorGameEngine {
           this.pendingKeyDrawer = d;
           this.isPausedByQuiz = true;
           const qObj = this.quizData.questions[this.keysFound] || this.quizData.questions[0];
+          this.audio.playQuizPopup();
+          this.audio.playWaitingQuizBgm();
           this.ui.openQuizModal(this.quizData.subject, this.keysFound + 1, qObj);
         } else {
           this.ui.showToast('Laci ini hanya berisi berkas usang — kosong, tidak ada kunci.');
@@ -295,6 +299,8 @@ export class HorrorGameEngine {
       if (this.world.padlockMeshes[this.keysFound - 1]) {
         this.world.padlockMeshes[this.keysFound - 1].visible = false;
       }
+      this.audio.stopWaitingQuizBgm();
+      this.audio.resumeExploreBgm();
       this.audio.playKeyFound();
       this.pendingKeyDrawer = null;
       this.isPausedByQuiz = false;
@@ -314,6 +320,8 @@ export class HorrorGameEngine {
   _finishGame(won) {
     this.isPlaying = false;
     this.isPausedByQuiz = false;
+    this.audio.stopExploreBgm();
+    this.audio.stopWaitingQuizBgm();
     if (won) {
       const rec = saveBestTime(this.diffConfig.id, this.elapsedTime);
       this.ui.showEndScreen(true, this.elapsedTime, rec.best, rec.isNewRecord, this.keysFound);

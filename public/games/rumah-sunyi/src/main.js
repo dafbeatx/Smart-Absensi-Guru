@@ -98,6 +98,10 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
   closeQuizModal: () => {
     document.getElementById('quiz-modal').classList.remove('open');
     activeQuizQuestion = null;
+    engine.audio.stopWaitingQuizBgm();
+    if (engine.isPlaying) {
+      engine.audio.resumeExploreBgm();
+    }
   },
   updateHud: (state) => {
     document.getElementById('hud-timer').textContent = formatTime(state.elapsedTime);
@@ -556,6 +560,9 @@ function initUiBindings() {
   document.getElementById('back-menu-btn').addEventListener('click', () => {
     endScreen.classList.add('hidden');
     startScreen.classList.remove('hidden');
+    engine.audio.stopExploreBgm();
+    engine.audio.stopWaitingQuizBgm();
+    engine.audio.playLobbyBgm();
   });
 
   // Tombol Kontrol PID dalam Permainan
@@ -575,6 +582,16 @@ function initUiBindings() {
     const on = engine.audio.toggleSfx();
     sfxBtn.classList.toggle('off', !on);
   });
+
+  // Memulai BGM lobby begitu pengguna berinteraksi pertama kali (kebijakan autoplay peramban)
+  const startLobbyOnInteraction = () => {
+    if (!engine.isPlaying && !startScreen.classList.contains('hidden')) {
+      engine.audio.playLobbyBgm();
+    }
+  };
+  window.addEventListener('pointerdown', startLobbyOnInteraction, { once: true });
+  window.addEventListener('keydown', startLobbyOnInteraction, { once: true });
+  window.addEventListener('touchstart', startLobbyOnInteraction, { once: true });
 }
 
 initUiBindings();

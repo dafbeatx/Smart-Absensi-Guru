@@ -9,6 +9,13 @@ rumah_sunyi_tiga_kunci_bundle/
 ├── index.html                                     # Halaman utama (ES Module + ImportMap Three.js)
 ├── package.json                                   # Konfigurasi proyek Vite / Node.js dengan Three.js
 ├── README.md                                      # Dokumentasi & panduan integrasi AI Agent
+├── thumbnail.jpg                                  # Thumbnail sinematik HD rasio 16:9
+├── audio/                                         # Berkas Asset Audio & SFX Realistis
+│   ├── lobby.wav                                  # BGM Layar Awal / Dossier Investigasi
+│   ├── menjelajah.mp3                             # BGM Eksplorasi Koridor & Ruangan Mansion
+│   ├── melihat-pemain.wav                         # SFX Ketakutan saat Mata Sosok Melihat Pemain
+│   ├── muncul-soal.mp3                            # SFX Pop-up Kuis Gembok Kunci Kuningan
+│   └── menunggu-menjawab-soal.mp3                 # BGM Ketegangan Saat Menjawab Soal Kuis
 ├── src/
 │   ├── main.js                                    # Titik masuk aplikasi & pengikat UI guru/siswa
 │   ├── styles/
@@ -17,7 +24,7 @@ rumah_sunyi_tiga_kunci_bundle/
 │   │   ├── quizPresets.js                         # 5 preset soal mata pelajaran & editor soal guru
 │   │   └── mansionLayout.js                       # Denah 9 ruangan, koordinat laci/lemari, rekor waktu
 │   ├── audio/
-│   │   └── horrorAudio.js                         # Mesin Web Audio API (Backsound 3 lapis + Foley akustik)
+│   │   └── horrorAudio.js                         # Mesin Web Audio API + Pengendali Asset Audio
 │   ├── entities/
 │   │   └── paleShadow.js                          # Entitas 3D "Sosok Bayangan Pucat" (AI penglihatan mata)
 │   ├── world/

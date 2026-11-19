@@ -1,3 +1,12 @@
+function getAudioPath(fileName) {
+  if (typeof window === 'undefined') return fileName;
+  const path = window.location.pathname;
+  if (path.includes('/standalone/')) {
+    return '../audio/' + fileName;
+  }
+  return './audio/' + fileName;
+}
+
 export class HorrorAudioEngine {
   constructor() {
     this.ctx = null;
@@ -11,6 +20,56 @@ export class HorrorAudioEngine {
     this.sfxEnabled = true;
     this.started = false;
     this.stepToggle = false;
+
+    // Track active BGM state ('lobby' | 'explore' | 'waitingQuiz' | 'none')
+    this.currentBgm = 'none';
+
+    // 🎵 Berkas Asset Audio Resmi Sesuai Nama
+    this.audioAssets = {
+      lobby: null,
+      explore: null,
+      waitingQuiz: null,
+      spotPlayer: null,
+      quizPopup: null,
+    };
+
+    this._initAudioAssets();
+  }
+
+  _initAudioAssets() {
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
+
+    try {
+      // 1. lobby.wav -> BGM Layar Awal / Dossier
+      const lobby = new Audio(getAudioPath('lobby.wav'));
+      lobby.loop = true;
+      lobby.volume = this.bgmEnabled ? 0.45 : 0;
+      this.audioAssets.lobby = lobby;
+
+      // 2. menjelajah.mp3 -> BGM Eksplorasi Mansion
+      const explore = new Audio(getAudioPath('menjelajah.mp3'));
+      explore.loop = true;
+      explore.volume = this.bgmEnabled ? 0.42 : 0;
+      this.audioAssets.explore = explore;
+
+      // 3. menunggu-menjawab-soal.mp3 -> BGM Saat Menunggu / Menjawab Soal Kuis
+      const waitingQuiz = new Audio(getAudioPath('menunggu-menjawab-soal.mp3'));
+      waitingQuiz.loop = true;
+      waitingQuiz.volume = this.bgmEnabled ? 0.52 : 0;
+      this.audioAssets.waitingQuiz = waitingQuiz;
+
+      // 4. melihat-pemain.wav -> SFX Sengatan Saat Mata Sosok Menatap Pemain
+      const spotPlayer = new Audio(getAudioPath('melihat-pemain.wav'));
+      spotPlayer.volume = this.sfxEnabled ? 0.85 : 0;
+      this.audioAssets.spotPlayer = spotPlayer;
+
+      // 5. muncul-soal.mp3 -> SFX Saat Modal Pertanyaan Muncul di Layar
+      const quizPopup = new Audio(getAudioPath('muncul-soal.mp3'));
+      quizPopup.volume = this.sfxEnabled ? 0.8 : 0;
+      this.audioAssets.quizPopup = quizPopup;
+    } catch (e) {
+      console.warn('[HorrorAudioEngine] Gagal memuat berkas audio asset:', e);
+    }
   }
 
   init() {
@@ -169,6 +228,99 @@ export class HorrorAudioEngine {
     padOscB.start(now);
   }
 
+  // --- BGM Controllers (Lobby, Menjelajah, Menunggu Menjawab Soal) ---
+  playLobbyBgm() {
+    this.currentBgm = 'lobby';
+    this.stopExploreBgm();
+    this.stopWaitingQuizBgm();
+    if (!this.bgmEnabled) return;
+    if (this.audioAssets.lobby) {
+      this.audioAssets.lobby.currentTime = 0;
+      this.audioAssets.lobby.play().catch(() => {});
+    }
+  }
+
+  stopLobbyBgm() {
+    if (this.audioAssets.lobby) {
+      this.audioAssets.lobby.pause();
+    }
+    if (this.currentBgm === 'lobby') {
+      this.currentBgm = 'none';
+    }
+  }
+
+  playExploreBgm() {
+    this.currentBgm = 'explore';
+    this.stopLobbyBgm();
+    this.stopWaitingQuizBgm();
+    if (!this.bgmEnabled) return;
+    if (this.audioAssets.explore) {
+      this.audioAssets.explore.play().catch(() => {});
+    }
+  }
+
+  pauseExploreBgm() {
+    if (this.audioAssets.explore) {
+      this.audioAssets.explore.pause();
+    }
+  }
+
+  resumeExploreBgm() {
+    this.currentBgm = 'explore';
+    this.stopWaitingQuizBgm();
+    if (!this.bgmEnabled) return;
+    if (this.audioAssets.explore) {
+      this.audioAssets.explore.play().catch(() => {});
+    }
+  }
+
+  stopExploreBgm() {
+    if (this.audioAssets.explore) {
+      this.audioAssets.explore.pause();
+      this.audioAssets.explore.currentTime = 0;
+    }
+    if (this.currentBgm === 'explore') {
+      this.currentBgm = 'none';
+    }
+  }
+
+  playWaitingQuizBgm() {
+    this.currentBgm = 'waitingQuiz';
+    this.pauseExploreBgm();
+    if (!this.bgmEnabled) return;
+    if (this.audioAssets.waitingQuiz) {
+      this.audioAssets.waitingQuiz.currentTime = 0;
+      this.audioAssets.waitingQuiz.play().catch(() => {});
+    }
+  }
+
+  stopWaitingQuizBgm() {
+    if (this.audioAssets.waitingQuiz) {
+      this.audioAssets.waitingQuiz.pause();
+      this.audioAssets.waitingQuiz.currentTime = 0;
+    }
+    if (this.currentBgm === 'waitingQuiz') {
+      this.currentBgm = 'none';
+    }
+  }
+
+  // --- Dedicated Asset SFX (Melihat Pemain & Muncul Soal) ---
+  playSpotPlayer() {
+    if (!this.sfxEnabled) return;
+    if (this.audioAssets.spotPlayer) {
+      this.audioAssets.spotPlayer.currentTime = 0;
+      this.audioAssets.spotPlayer.play().catch(() => {});
+    }
+  }
+
+  playQuizPopup() {
+    if (!this.sfxEnabled) return;
+    if (this.audioAssets.quizPopup) {
+      this.audioAssets.quizPopup.currentTime = 0;
+      this.audioAssets.quizPopup.play().catch(() => {});
+    }
+  }
+
   setTensionLevel(level01) {
     if (!this.started || !this.tensionGain) return;
     const clamped = Math.max(0, Math.min(1, level01));
@@ -178,6 +330,21 @@ export class HorrorAudioEngine {
 
   toggleBgm() {
     this.bgmEnabled = !this.bgmEnabled;
+    const vol = this.bgmEnabled ? 1 : 0;
+    if (this.audioAssets.lobby) this.audioAssets.lobby.volume = 0.45 * vol;
+    if (this.audioAssets.explore) this.audioAssets.explore.volume = 0.42 * vol;
+    if (this.audioAssets.waitingQuiz) this.audioAssets.waitingQuiz.volume = 0.52 * vol;
+
+    if (!this.bgmEnabled) {
+      if (this.audioAssets.lobby) this.audioAssets.lobby.pause();
+      if (this.audioAssets.explore) this.audioAssets.explore.pause();
+      if (this.audioAssets.waitingQuiz) this.audioAssets.waitingQuiz.pause();
+    } else {
+      if (this.currentBgm === 'lobby') this.playLobbyBgm();
+      else if (this.currentBgm === 'explore') this.playExploreBgm();
+      else if (this.currentBgm === 'waitingQuiz') this.playWaitingQuizBgm();
+    }
+
     if (this.bgmGain && this.ctx) {
       this.bgmGain.gain.setTargetAtTime(this.bgmEnabled ? 0.34 : 0, this.ctx.currentTime, 0.1);
     }
@@ -186,6 +353,10 @@ export class HorrorAudioEngine {
 
   toggleSfx() {
     this.sfxEnabled = !this.sfxEnabled;
+    const vol = this.sfxEnabled ? 1 : 0;
+    if (this.audioAssets.spotPlayer) this.audioAssets.spotPlayer.volume = 0.85 * vol;
+    if (this.audioAssets.quizPopup) this.audioAssets.quizPopup.volume = 0.8 * vol;
+
     if (this.sfxGain && this.ctx) {
       this.sfxGain.gain.setTargetAtTime(this.sfxEnabled ? 0.8 : 0, this.ctx.currentTime, 0.1);
     }
@@ -193,7 +364,7 @@ export class HorrorAudioEngine {
   }
 
   playFootstep(isGhost = false) {
-    if (!this.started || !this.sfxEnabled) return;
+    if (!this.started || !this.sfxEnabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     this.stepToggle = !this.stepToggle;
 
@@ -221,7 +392,7 @@ export class HorrorAudioEngine {
   }
 
   playDrawerCreak(stage = 1) {
-    if (!this.started || !this.sfxEnabled) return;
+    if (!this.started || !this.sfxEnabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     const dur = stage === 1 ? 0.36 : 0.52;
 
@@ -258,7 +429,7 @@ export class HorrorAudioEngine {
   }
 
   playKeyFound() {
-    if (!this.started || !this.sfxEnabled) return;
+    if (!this.started || !this.sfxEnabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     const notes = [880, 1174.66, 1318.51];
     notes.forEach((freq, idx) => {
@@ -277,7 +448,7 @@ export class HorrorAudioEngine {
   }
 
   playWrongAnswerLock() {
-    if (!this.started || !this.sfxEnabled) return;
+    if (!this.started || !this.sfxEnabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -295,7 +466,7 @@ export class HorrorAudioEngine {
   }
 
   playClosetDoor(closing = true) {
-    if (!this.started || !this.sfxEnabled) return;
+    if (!this.started || !this.sfxEnabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -313,9 +484,12 @@ export class HorrorAudioEngine {
   }
 
   playEyeSpotSting() {
-    if (!this.started || !this.sfxEnabled) return;
+    // 1. Putar berkas audio real 'melihat-pemain.wav'
+    this.playSpotPlayer();
+
+    // 2. Padukan dengan sintesis frekuensi disonan
+    if (!this.started || !this.sfxEnabled || !this.ctx) return;
     const now = this.ctx.currentTime;
-    // Waterphone / Metallic Terror Sting
     [554.37, 587.33, 830.61].forEach((freq, i) => {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -334,7 +508,7 @@ export class HorrorAudioEngine {
   }
 
   playJumpscare() {
-    if (!this.started || !this.sfxEnabled) return;
+    if (!this.started || !this.sfxEnabled || !this.ctx) return;
     const now = this.ctx.currentTime;
     [92.5, 98.0, 277.18, 554.37, 1108.73].forEach((freq) => {
       const osc = this.ctx.createOscillator();
