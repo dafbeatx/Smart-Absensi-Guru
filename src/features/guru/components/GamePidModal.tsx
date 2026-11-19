@@ -247,7 +247,7 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
                   className="bg-white rounded-2xl border-2 border-amber-300 ring-4 ring-amber-400/10 shadow-md overflow-hidden transition-all group"
                 >
                   {/* THUMBNAIL BANNER */}
-                  <div className="relative w-full aspect-16/9 bg-slate-950 overflow-hidden">
+                  <div className="relative w-full aspect-video bg-slate-950 overflow-hidden">
                     <img
                       src={item.thumbnailUrl || '/games/school-slice-3d/thumbnail.jpg'}
                       alt={item.title}
@@ -259,7 +259,7 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
                         }
                       }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/10" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/25 to-black/10" />
 
                     {/* Badges on thumbnail */}
                     <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2 pointer-events-none">

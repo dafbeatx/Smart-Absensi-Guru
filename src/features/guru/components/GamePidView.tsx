@@ -608,7 +608,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
               className="bg-white rounded-3xl border-2 border-amber-300 ring-4 ring-amber-400/10 shadow-md overflow-hidden transition-all group"
             >
               {/* THUMBNAIL BANNER HERO */}
-              <div className="relative w-full aspect-16/9 sm:aspect-21/9 bg-slate-950 overflow-hidden">
+              <div className="relative w-full aspect-video sm:aspect-21/9 bg-slate-950 overflow-hidden">
                 <img
                   src={item.thumbnailUrl || '/games/school-slice-3d/thumbnail.jpg'}
                   alt={item.title}
@@ -621,7 +621,7 @@ export const GamePidView: React.FC<GamePidViewProps> = ({
                   }}
                 />
                 {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/25 to-black/10" />
 
                 {/* Badges on top of thumbnail */}
                 <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
