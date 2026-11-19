@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { RoleCode } from '../../../types/database.types';
 import {
   ResearchSurveyService,
@@ -8,7 +8,8 @@ import { ProviderFactory } from '../../../providers/provider-factory';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useToastStore } from '../../../store/useToastStore';
 import { getTodayDateInJakarta } from '../../../utils/time.utils';
-import { X, Sparkles, ShieldCheck } from 'lucide-react';
+import { BackNavigationService, BACK_PRIORITIES } from '../../../services/back-navigation.service';
+import { Sparkles, ShieldCheck, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export interface WeeklyResearchSurveyModalProps {
   isOpen: boolean;
@@ -110,6 +111,112 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // 🛡️ 5-Press Back Navigation Guard State
+  const [backPressCount, setBackPressCount] = useState(0);
+  const lastPressTimeRef = useRef<number>(0);
+  const pressCountRef = useRef<number>(0);
+  const unregisterRef = useRef<(() => void) | null>(null);
+
+  // Fungsi register guard ke BackNavigationService
+  const registerBackGuard = useCallback((onBackAttemptFn: () => boolean) => {
+    if (unregisterRef.current) {
+      unregisterRef.current();
+      unregisterRef.current = null;
+    }
+    unregisterRef.current = BackNavigationService.register({
+      id: 'weekly-research-survey-guard',
+      onBack: onBackAttemptFn,
+      priority: BACK_PRIORITIES.OVERLAY + 10,
+      title: 'Kuesioner Evaluasi Mingguan',
+      pushHistory: true,
+    });
+  }, []);
+
+  // Handler interupsi navigasi kembali: cegah exit sebelum 5 kali ditekan
+  const handleBackAttempt = useCallback((): boolean => {
+    const now = Date.now();
+    const timeSinceLast = now - lastPressTimeRef.current;
+
+    let newCount = pressCountRef.current + 1;
+    // Reset counter jika jeda antar tekanan lebih dari 4 detik (mencegah akumulasi tidak sengaja)
+    if (timeSinceLast > 4000) {
+      newCount = 1;
+    }
+
+    lastPressTimeRef.current = now;
+    pressCountRef.current = newCount;
+    setBackPressCount(newCount);
+
+    const remaining = 5 - newCount;
+
+    if (remaining > 0) {
+      useToastStore.getState().showToast(
+        'warning',
+        `Survei Evaluasi Wajib Diisi (${remaining}x lagi)`,
+        `Survei mingguan wajib diisi untuk penjaminan mutu. Tekan tombol kembali ${remaining} kali lagi untuk keluar tanpa mengisi.`
+      );
+
+      // Re-register handler ke stack navigasi kembali agar tekanan berikutnya tetap terhadang
+      setTimeout(() => {
+        registerBackGuard(handleBackAttempt);
+      }, 15);
+
+      return true; // Ditangani: batalkan navigasi keluar
+    } else {
+      // Tekanan ke-5 tercapai: berikan izin keluar ("baru bisa left")
+      useToastStore.getState().showToast(
+        'info',
+        'Keluar dari Survei Mingguan',
+        'Anda telah keluar dari pengisian survei evaluasi mingguan.'
+      );
+      markActiveSurveyCompleted(userId);
+      onCompleted();
+      return true;
+    }
+  }, [userId, onCompleted, registerBackGuard]);
+
+  // Registrasi back guard saat modal terbuka
+  useEffect(() => {
+    if (!isOpen || isSubmitted) return;
+
+    registerBackGuard(handleBackAttempt);
+
+    return () => {
+      if (unregisterRef.current) {
+        unregisterRef.current();
+        unregisterRef.current = null;
+      }
+    };
+  }, [isOpen, isSubmitted, registerBackGuard, handleBackAttempt]);
+
+  // Tangkap tombol Escape pada keyboard fisik desktop/laptop
+  useEffect(() => {
+    if (!isOpen || isSubmitted) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleBackAttempt();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+    };
+  }, [isOpen, isSubmitted, handleBackAttempt]);
+
+  // Kunci scroll body saat tampilan full screen aktif
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -227,206 +334,224 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
 
   return (
     <div
-      className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-60 w-full h-dvh bg-slate-950 flex flex-col overflow-hidden text-slate-100 animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-label="Kuesioner Evaluasi Sistem Sekolah"
     >
-      <div className="relative w-full max-w-xl max-h-[92dvh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-scale-up">
-        {/* Header Section */}
-        <div className="bg-linear-to-r from-emerald-700 via-teal-700 to-slate-900 text-white p-4 sm:p-5 shrink-0">
-          <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1.5">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-extrabold bg-emerald-500/25 border border-emerald-400/40 text-emerald-200">
-              <span>📋</span> Kuesioner Evaluasi Sistem
+      {/* 1. STICKY TOP HEADER (Full-width, zero margins, no X button) */}
+      <header className="bg-linear-to-r from-emerald-900 via-teal-900 to-slate-950 border-b border-emerald-800/40 text-white shrink-0 pt-[max(12px,env(safe-area-inset-top))] px-4 sm:px-6 py-3.5 shadow-md">
+        <div className="max-w-3xl mx-auto w-full">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 border border-emerald-400/30 text-emerald-300">
+              <span>📋</span> Kuesioner Evaluasi Mingguan
             </span>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-amber-400 text-slate-950 shadow-2xs">
-                <Sparkles className="w-2.5 h-2.5 text-slate-950" />
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-amber-400 text-slate-950 shadow-2xs">
+                <Sparkles className="w-3 h-3 text-slate-950" />
                 +10 Poin
               </span>
-              <span className="text-xs font-bold text-emerald-200/90">
-                {answeredCount}/{totalQuestions}
+              <span className="text-xs font-extrabold text-emerald-200 bg-white/10 px-2.5 py-1 rounded-full border border-white/15">
+                {answeredCount} / {totalQuestions} Terjawab
               </span>
-              <button
-                type="button"
-                onClick={onCompleted}
-                aria-label="Tutup kuesioner"
-                className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer ml-1"
-                title="Tutup / Nanti Saja"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {/* Note: Tombol 'X' dihilangkan total sesuai instruksi */}
             </div>
           </div>
 
-          <h2 className="text-base sm:text-lg font-extrabold text-white leading-tight">
+          <h1 className="text-base sm:text-xl font-black text-white leading-tight tracking-tight">
             Evaluasi Efektivitas Aplikasi Sekolah
-          </h2>
-          <p className="text-[11px] sm:text-xs text-emerald-100/90 mt-0.5 leading-relaxed">
+          </h1>
+          <p className="text-xs sm:text-sm text-emerald-100/80 mt-1 leading-relaxed">
             Penelitian kuantitatif model TAM &amp; evaluasi berkala demi penjaminan mutu sistem sekolah.
           </p>
 
           {/* Anonymity Banner */}
-          <div className="mt-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2.5 flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0 mt-0.5" />
-            <div className="text-[11px] text-emerald-50 leading-relaxed">
-              <strong className="text-white font-extrabold">100% Anonim &amp; Rahasia:</strong> Identitas pribadi (Nama, NPP, Telepon) tidak dicatat. Pengisian hanya membutuhkan waktu ~1 menit.
+          <div className="mt-3 bg-emerald-950/60 border border-emerald-600/30 rounded-xl p-2.5 sm:p-3 flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="text-xs text-emerald-100/90 leading-relaxed">
+              <strong className="text-emerald-200 font-extrabold">100% Anonim &amp; Terjaga:</strong> Identitas pribadi (Nama, NPP, Kontak) tidak dicatat dalam hasil riset. Pengisian hanya membutuhkan waktu ~1 menit.
             </div>
           </div>
         </div>
+      </header>
 
-        {/* Modal Body */}
-        {isSubmitted ? (
-          <div className="p-8 text-center flex flex-col items-center justify-center space-y-4 my-auto">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl animate-bounce shadow-md">
-              ✓
+      {/* ⚠️ Exit Attempt Warning Banner (if back button was pressed < 5 times) */}
+      {backPressCount > 0 && 5 - backPressCount > 0 && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-amber-200 text-xs flex items-center justify-between shrink-0 animate-fade-in">
+          <div className="max-w-3xl mx-auto w-full flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="truncate sm:whitespace-normal">
+                Survei wajib diisi. Tekan tombol kembali <strong>{5 - backPressCount} kali lagi</strong> untuk keluar tanpa menyimpan.
+              </span>
             </div>
-            <h3 className="text-lg sm:text-xl font-black text-slate-900">Terima Kasih Banyak!</h3>
-            <p className="text-xs sm:text-sm text-slate-600 max-w-md leading-relaxed">
-              Tanggapan Anda telah tersimpan secara <strong>100% anonim</strong> dan Anda memperoleh <strong>+10 Poin</strong> apresiasi.
-            </p>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Menutup jendela evaluasi...
+            <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-extrabold text-[11px] shrink-0">
+              {backPressCount}/5
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* 2. SCROLLABLE WORKSPACE */}
+      {isSubmitted ? (
+        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-xl animate-scale-up">
+            <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-white">Terima Kasih Banyak!</h2>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-md leading-relaxed">
+            Tanggapan Anda telah tersimpan secara <strong className="text-emerald-300">100% anonim</strong> dan Anda memperoleh <strong className="text-amber-300">+10 Poin</strong> apresiasi.
+          </p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-bold shadow-md">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            Menutup jendela evaluasi...
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
+            <div className="max-w-3xl mx-auto w-full space-y-5">
+              {/* Progress Bar */}
+              <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className="bg-linear-to-r from-emerald-500 to-teal-400 h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${(answeredCount / totalQuestions) * 100}%` }}
+                />
+              </div>
+
+              {/* Questions 1 to 5 */}
+              {QUESTIONS.map((q) => {
+                const currentScore = scores[q.id];
+                const isAnswered = currentScore > 0;
+                return (
+                  <div
+                    key={q.id}
+                    className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                      isAnswered
+                        ? 'bg-slate-900/90 border-emerald-500/40 ring-1 ring-emerald-500/20 shadow-md'
+                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+                      <h3 className="text-sm sm:text-base font-extrabold text-white leading-snug">
+                        {q.title}
+                      </h3>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-800/40 shrink-0">
+                        {q.dimension}
+                      </span>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-slate-300 mb-4 leading-relaxed">
+                      {q.description}
+                    </p>
+
+                    {/* Rating Selector Buttons (1 to 5) - Large Thumb Targets */}
+                    <div className="grid grid-cols-5 gap-2 sm:gap-3">
+                      {[1, 2, 3, 4, 5].map((val) => {
+                        const isSelected = currentScore === val;
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            id={`btn-survey-${q.id}-${val}`}
+                            onClick={() => handleScoreSelect(q.id, val)}
+                            className={`min-h-[50px] sm:min-h-[56px] py-2.5 px-1 rounded-xl text-xs sm:text-sm font-black transition-all flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/50 scale-[1.02] ring-2 ring-emerald-400'
+                                : 'bg-slate-800 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60'
+                            }`}
+                          >
+                            <span className="text-base sm:text-lg">{isSelected ? '★' : val}</span>
+                            <span className="text-[10px] sm:text-xs font-bold">
+                              Skor {val}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Selected Label Display */}
+                    <div className="mt-3 flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
+                      <span className="text-slate-500 font-medium">1: Sangat Rendah</span>
+                      {isAnswered ? (
+                        <span className="font-extrabold text-emerald-300 bg-emerald-950/80 px-2.5 py-0.5 rounded-md border border-emerald-800/50">
+                          {q.labels[currentScore]}
+                        </span>
+                      ) : (
+                        <span className="text-amber-400 font-semibold italic text-[11px]">Wajib dipilih</span>
+                      )}
+                      <span className="text-slate-500 font-medium">5: Sangat Tinggi</span>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Question 6: Evaluasi & Harapan Minggu Depan */}
+              <div
+                className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                  nextWeekEvaluation.trim().length >= 5
+                    ? 'bg-slate-900/90 border-emerald-500/40 ring-1 ring-emerald-500/20 shadow-md'
+                    : 'bg-slate-900/60 border-slate-800'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+                  <h3 className="text-sm sm:text-base font-extrabold text-white leading-snug">
+                    6. Evaluasi & Harapan untuk Minggu Depan
+                  </h3>
+                  <span className="text-[11px] font-black px-2.5 py-0.5 rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/40 shrink-0">
+                    Wajib Diisi
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 mb-3 leading-relaxed">
+                  Tuliskan evaluasi kendala minggu ini serta masukan/harapan konkret untuk perbaikan sistem absensi maupun agenda sekolah minggu depan.
+                </p>
+
+                <textarea
+                  id="survey-next-week-evaluation-input"
+                  rows={4}
+                  value={nextWeekEvaluation}
+                  onChange={(e) => {
+                    setNextWeekEvaluation(e.target.value);
+                    setErrorMessage(null);
+                  }}
+                  placeholder="Contoh: Aplikasi sudah sangat cepat dan stabil. Harap tambahkan pengingat jadwal piket pagi minggu depan..."
+                  className="w-full text-xs sm:text-sm p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 resize-none transition-all"
+                />
+
+                <div className="flex items-center justify-between mt-2 text-xs text-slate-400">
+                  <span>Minimal 5 karakter</span>
+                  <span
+                    className={
+                      nextWeekEvaluation.trim().length >= 5
+                        ? 'text-emerald-400 font-bold'
+                        : 'text-amber-400 font-medium'
+                    }
+                  >
+                    {nextWeekEvaluation.trim().length} karakter
+                  </span>
+                </div>
+              </div>
+
+              {errorMessage && (
+                <div className="p-3.5 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 text-xs font-bold text-center">
+                  {errorMessage}
+                </div>
+              )}
             </div>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
-            {/* Progress Bar */}
-            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-emerald-500 h-full transition-all duration-300"
-                style={{ width: `${(answeredCount / totalQuestions) * 100}%` }}
-              />
-            </div>
 
-            {/* Questions 1 to 5 */}
-            {QUESTIONS.map((q) => {
-              const currentScore = scores[q.id];
-              return (
-                <div
-                  key={q.id}
-                  className={`p-4 rounded-2xl border transition-all ${
-                    currentScore > 0
-                      ? 'bg-emerald-50/50 border-emerald-200'
-                      : 'bg-white border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug">
-                      {q.title}
-                    </h4>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 shrink-0">
-                      {q.dimension}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-600 mb-3">{q.description}</p>
-
-                  {/* Rating Selector Buttons (1 to 5) */}
-                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-                    {[1, 2, 3, 4, 5].map((val) => {
-                      const isSelected = currentScore === val;
-                      return (
-                        <button
-                          key={val}
-                          type="button"
-                          id={`btn-survey-${q.id}-${val}`}
-                          onClick={() => handleScoreSelect(q.id, val)}
-                          className={`min-h-11 py-2 px-1 rounded-xl text-xs font-black transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-102 ring-2 ring-emerald-500'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          <span className="text-sm">{isSelected ? '★' : val}</span>
-                          <span className="text-[10px] font-bold hidden sm:inline">
-                            Skor {val}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Selected Label Display */}
-                  <div className="mt-2 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400">1: Sangat Rendah</span>
-                    {currentScore > 0 ? (
-                      <span className="font-extrabold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
-                        {q.labels[currentScore]}
-                      </span>
-                    ) : (
-                      <span className="text-amber-600 font-medium italic">Wajib dipilih</span>
-                    )}
-                    <span className="text-slate-400">5: Sangat Tinggi</span>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Question 6: Evaluasi & Harapan Minggu Depan */}
-            <div
-              className={`p-4 rounded-2xl border transition-all ${
-                nextWeekEvaluation.trim().length >= 5
-                  ? 'bg-emerald-50/50 border-emerald-200'
-                  : 'bg-white border-slate-200'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2 mb-1.5">
-                <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug">
-                  6. Evaluasi & Harapan untuk Minggu Depan
-                </h4>
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 shrink-0">
-                  Wajib Diisi
-                </span>
-              </div>
-
-              <p className="text-xs text-slate-600 mb-2">
-                Tuliskan evaluasi kendala minggu ini serta masukan/harapan konkret untuk perbaikan sistem absensi maupun agenda sekolah minggu depan.
-              </p>
-
-              <textarea
-                id="survey-next-week-evaluation-input"
-                rows={3}
-                value={nextWeekEvaluation}
-                onChange={(e) => {
-                  setNextWeekEvaluation(e.target.value);
-                  setErrorMessage(null);
-                }}
-                placeholder="Contoh: Aplikasi sudah sangat cepat, harap pertahankan. Untuk minggu depan mohon ditambahkan pengingat jadwal piket pada pagi hari..."
-                className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-400 resize-none transition-all"
-              />
-
-              <div className="flex items-center justify-between mt-1 text-[11px] text-slate-400">
-                <span>Minimal 5 karakter</span>
-                <span
-                  className={
-                    nextWeekEvaluation.trim().length >= 5
-                      ? 'text-emerald-600 font-bold'
-                      : 'text-amber-600'
-                  }
-                >
-                  {nextWeekEvaluation.trim().length} karakter
-                </span>
-              </div>
-            </div>
-
-            {errorMessage && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold text-center">
-                {errorMessage}
-              </div>
-            )}
-
-            {/* Footer Action */}
-            <div className="pt-2 sticky bottom-0 bg-white/95 backdrop-blur-sm pb-1">
+          {/* 3. STICKY BOTTOM ACTION BAR (Thumb Zone, Full Viewport Width) */}
+          <footer className="sticky bottom-0 z-20 w-full bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-4 sm:px-6 py-3.5 pb-[max(16px,env(safe-area-inset-bottom))] shrink-0">
+            <div className="max-w-3xl mx-auto w-full">
               <button
                 type="submit"
                 id="btn-submit-weekly-survey"
                 disabled={!isFormValid || isSubmitting}
-                className={`w-full h-12 rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer ${
+                className={`w-full h-12 sm:h-13 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer ${
                   isFormValid && !isSubmitting
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-98 shadow-emerald-600/30'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-98 shadow-emerald-600/30'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/60'
                 }`}
               >
                 {isSubmitting ? (
@@ -436,21 +561,21 @@ export const WeeklyResearchSurveyModal: React.FC<WeeklyResearchSurveyModalProps>
                   </>
                 ) : (
                   <>
-                    <span>Kirim Tanggapan Anonim Saya</span>
+                    <span>Kirim Tanggapan Anonim Saya (+10 Poin)</span>
                     <span>➔</span>
                   </>
                 )}
               </button>
 
               {!isFormValid && (
-                <p className="text-[11px] text-slate-400 text-center mt-2 font-medium">
-                  Lengkapi 5 penilaian di atas dan tuliskan kolom evaluasi untuk mengaktifkan tombol kirim.
+                <p className="text-[11px] sm:text-xs text-slate-400 text-center mt-2 font-medium">
+                  Lengkapi 5 penilaian skala di atas dan tuliskan kolom evaluasi untuk mengaktifkan tombol kirim.
                 </p>
               )}
             </div>
-          </form>
-        )}
-      </div>
+          </footer>
+        </form>
+      )}
     </div>
   );
 };

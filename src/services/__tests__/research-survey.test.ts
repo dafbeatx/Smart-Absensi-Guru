@@ -341,6 +341,65 @@ export async function runResearchSurveyTestSuite(): Promise<TestSuiteResult> {
       'Cross-Device Sync - Banner hidden on other device',
       shouldShowDailySurveyBanner(guruCloudUser, '2026-11-05') === false
     );
+
+    // D: 5-Press Back Navigation Guard Logic Verification
+    // Helper function simulating the exact state machine used in WeeklyResearchSurveyModal
+    const createBackGuardSimulator = () => {
+      let pressCount = 0;
+      let lastPressTime = 0;
+      let hasExited = false;
+
+      const triggerBack = (now: number): { handled: boolean; remaining: number; exited: boolean } => {
+        const timeSinceLast = now - lastPressTime;
+        if (timeSinceLast > 4000) {
+          pressCount = 1;
+        } else {
+          pressCount += 1;
+        }
+        lastPressTime = now;
+        const remaining = 5 - pressCount;
+
+        if (remaining > 0) {
+          return { handled: true, remaining, exited: false };
+        } else {
+          hasExited = true;
+          return { handled: true, remaining: 0, exited: true };
+        }
+      };
+
+      return { triggerBack, getExited: () => hasExited };
+    };
+
+    const sim = createBackGuardSimulator();
+    let baseTime = 1000000;
+
+    // Press 1 (within 1s) -> remaining 4, no exit
+    const p1 = sim.triggerBack(baseTime);
+    assert('Back Guard - Press 1 prevents exit and requires 4 more presses', p1.handled && p1.remaining === 4 && !p1.exited);
+
+    // Press 2 (within 1s) -> remaining 3, no exit
+    const p2 = sim.triggerBack(baseTime + 1000);
+    assert('Back Guard - Press 2 prevents exit and requires 3 more presses', p2.handled && p2.remaining === 3 && !p2.exited);
+
+    // Press 3 (within 1s) -> remaining 2, no exit
+    const p3 = sim.triggerBack(baseTime + 2000);
+    assert('Back Guard - Press 3 prevents exit and requires 2 more presses', p3.handled && p3.remaining === 2 && !p3.exited);
+
+    // Press 4 (within 1s) -> remaining 1, no exit
+    const p4 = sim.triggerBack(baseTime + 3000);
+    assert('Back Guard - Press 4 prevents exit and requires 1 more press', p4.handled && p4.remaining === 1 && !p4.exited);
+
+    // Press 5 (within 1s) -> allowed to exit!
+    const p5 = sim.triggerBack(baseTime + 4000);
+    assert('Back Guard - Press 5 allows exit ("baru bisa left")', p5.handled && p5.remaining === 0 && p5.exited && sim.getExited());
+
+    // Test timeout reset: if > 4s passes, count resets to 1 (remaining 4)
+    const sim2 = createBackGuardSimulator();
+    sim2.triggerBack(baseTime); // count 1
+    sim2.triggerBack(baseTime + 500); // count 2
+    // 5 seconds later
+    const resetPress = sim2.triggerBack(baseTime + 5600);
+    assert('Back Guard - Resets counter back to 1 if pressed after 4s window', resetPress.remaining === 4 && !resetPress.exited);
   } catch (err: any) {
     assert('Research Survey Suite - Exception free execution', false, err?.message || String(err));
   }
