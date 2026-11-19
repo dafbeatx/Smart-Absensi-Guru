@@ -424,8 +424,34 @@ export class HorrorGameEngine {
 
         if (this.keysDown.has('KeyW') || this.keysDown.has('ArrowUp')) forwardInput += 1;
         if (this.keysDown.has('KeyS') || this.keysDown.has('ArrowDown')) forwardInput -= 1;
-        if (this.keysDown.has('KeyD') || this.keysDown.has('ArrowRight')) strafeInput += 1;
-        if (this.keysDown.has('KeyA') || this.keysDown.has('ArrowLeft')) strafeInput -= 1;
+        if (this.keysDown.has('KeyD')) strafeInput += 1;
+        if (this.keysDown.has('KeyA')) strafeInput -= 1;
+
+        // 🕹️ Kamera Otomatis Mengikuti Gerakan Joystick (Auto-Turn / Camera Follow)
+        const joyX = this.joyInput.x;
+        const joyY = this.joyInput.y;
+        const joyMag = Math.hypot(joyX, joyY);
+
+        if (joyMag > 0.06) {
+          // Putar kamera (yaw) mengikuti arah belokan joystick secara proporsional & halus
+          const turnRate = 2.85; // Kecepatan putar sudut ~163°/detik saat stik penuh
+          this.yaw -= joyX * turnRate * dt;
+
+          // Mendorong maju atau menyerong: gerakkan pemain ke arah hadap kamera yang baru
+          if (joyY < 0.2) {
+            const forwardBoost = Math.max(0, -joyY) + Math.abs(joyX) * 0.75;
+            forwardInput = Math.max(forwardInput, forwardBoost);
+            strafeInput = joyX * 0.25; // Reduksi strafe agar belokan membulat natural
+          }
+        }
+
+        // Kontrol putar sudut kamera via keyboard (ArrowLeft / ArrowRight)
+        if (this.keysDown.has('ArrowRight')) {
+          this.yaw -= 2.85 * dt;
+        }
+        if (this.keysDown.has('ArrowLeft')) {
+          this.yaw += 2.85 * dt;
+        }
 
         const mag = Math.hypot(forwardInput, strafeInput);
         if (mag > 0.05) {

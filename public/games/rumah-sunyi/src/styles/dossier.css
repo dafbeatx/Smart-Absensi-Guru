@@ -106,7 +106,9 @@ html, body {
 }
 
 .closet-banner {
-  background: rgba(18, 14, 11, 0.97);
+  position: relative;
+  z-index: 35;
+  background: #14100d;
   border: 2px solid var(--brass-gold);
   border-radius: 6px;
   padding: 16px 28px;
@@ -138,17 +140,32 @@ html, body {
 /* Sembunyikan elemen HUD yang bertabrakan saat pemain bersembunyi di dalam lemari */
 body.in-closet #hud .compass-wrap,
 body.in-closet #hud .mission-guide,
+body.in-closet #hud #compass-bar,
+body.in-closet #hud .compass-marker,
+body.in-closet #hud #hud-room-name,
+body.in-closet #hud #hud-mission-guide,
 body.in-closet #hud #touch-controls,
 body.in-closet #reticle,
 body.in-closet .alert-banner,
-body.in-closet .danger-pulse {
+body.in-closet .danger-pulse,
+#closet-overlay.visible ~ #hud .compass-wrap,
+#closet-overlay.visible ~ #hud .mission-guide,
+#closet-overlay.visible ~ #hud #compass-bar,
+#closet-overlay.visible ~ #hud .compass-marker,
+#closet-overlay.visible ~ #hud #hud-room-name,
+#closet-overlay.visible ~ #hud #hud-mission-guide,
+#closet-overlay.visible ~ #hud #touch-controls,
+#closet-overlay.visible ~ #hud #reticle,
+#closet-overlay.visible ~ #hud .alert-banner,
+#closet-overlay.visible ~ #hud .danger-pulse {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
-body.in-closet #hud .hud-top {
+body.in-closet #hud .hud-top,
+#closet-overlay.visible ~ #hud .hud-top {
   pointer-events: none;
 }
 

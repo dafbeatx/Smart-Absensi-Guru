@@ -113,7 +113,9 @@ html, body {
 }
 
 .closet-banner {
-  background: rgba(18, 14, 11, 0.97);
+  position: relative;
+  z-index: 35;
+  background: #14100d;
   border: 2px solid var(--brass-gold);
   border-radius: 6px;
   padding: 16px 28px;
@@ -145,17 +147,32 @@ html, body {
 /* Sembunyikan elemen HUD yang bertabrakan saat pemain bersembunyi di dalam lemari */
 body.in-closet #hud .compass-wrap,
 body.in-closet #hud .mission-guide,
+body.in-closet #hud #compass-bar,
+body.in-closet #hud .compass-marker,
+body.in-closet #hud #hud-room-name,
+body.in-closet #hud #hud-mission-guide,
 body.in-closet #hud #touch-controls,
 body.in-closet #reticle,
 body.in-closet .alert-banner,
-body.in-closet .danger-pulse {
+body.in-closet .danger-pulse,
+#closet-overlay.visible ~ #hud .compass-wrap,
+#closet-overlay.visible ~ #hud .mission-guide,
+#closet-overlay.visible ~ #hud #compass-bar,
+#closet-overlay.visible ~ #hud .compass-marker,
+#closet-overlay.visible ~ #hud #hud-room-name,
+#closet-overlay.visible ~ #hud #hud-mission-guide,
+#closet-overlay.visible ~ #hud #touch-controls,
+#closet-overlay.visible ~ #hud #reticle,
+#closet-overlay.visible ~ #hud .alert-banner,
+#closet-overlay.visible ~ #hud .danger-pulse {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
-body.in-closet #hud .hud-top {
+body.in-closet #hud .hud-top,
+#closet-overlay.visible ~ #hud .hud-top {
   pointer-events: none;
 }
 
@@ -3114,8 +3131,34 @@ class HorrorGameEngine {
 
         if (this.keysDown.has('KeyW') || this.keysDown.has('ArrowUp')) forwardInput += 1;
         if (this.keysDown.has('KeyS') || this.keysDown.has('ArrowDown')) forwardInput -= 1;
-        if (this.keysDown.has('KeyD') || this.keysDown.has('ArrowRight')) strafeInput += 1;
-        if (this.keysDown.has('KeyA') || this.keysDown.has('ArrowLeft')) strafeInput -= 1;
+        if (this.keysDown.has('KeyD')) strafeInput += 1;
+        if (this.keysDown.has('KeyA')) strafeInput -= 1;
+
+        // 🕹️ Kamera Otomatis Mengikuti Gerakan Joystick (Auto-Turn / Camera Follow)
+        const joyX = this.joyInput.x;
+        const joyY = this.joyInput.y;
+        const joyMag = Math.hypot(joyX, joyY);
+
+        if (joyMag > 0.06) {
+          // Putar kamera (yaw) mengikuti arah belokan joystick secara proporsional & halus
+          const turnRate = 2.85; // Kecepatan putar sudut ~163°/detik saat stik penuh
+          this.yaw -= joyX * turnRate * dt;
+
+          // Mendorong maju atau menyerong: gerakkan pemain ke arah hadap kamera yang baru
+          if (joyY < 0.2) {
+            const forwardBoost = Math.max(0, -joyY) + Math.abs(joyX) * 0.75;
+            forwardInput = Math.max(forwardInput, forwardBoost);
+            strafeInput = joyX * 0.25; // Reduksi strafe agar belokan membulat natural
+          }
+        }
+
+        // Kontrol putar sudut kamera via keyboard (ArrowLeft / ArrowRight)
+        if (this.keysDown.has('ArrowRight')) {
+          this.yaw -= 2.85 * dt;
+        }
+        if (this.keysDown.has('ArrowLeft')) {
+          this.yaw += 2.85 * dt;
+        }
 
         const mag = Math.hypot(forwardInput, strafeInput);
         if (mag > 0.05) {
@@ -3348,8 +3391,17 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
     }
 
     if (state.isHiddenInCloset) {
+      if (!document.body.classList.contains('in-closet')) {
+        document.body.classList.add('in-closet');
+      }
+      if (!closetOverlay.classList.contains('visible')) {
+        closetOverlay.classList.add('visible');
+      }
       closetTimerText.textContent = `${Math.max(0, state.closetPauseRemaining).toFixed(1)} dtk`;
       return;
+    } else if (document.body.classList.contains('in-closet')) {
+      document.body.classList.remove('in-closet');
+      closetOverlay.classList.remove('visible');
     }
 
     // Reticle & Tombol Aksi Kontekstual PID

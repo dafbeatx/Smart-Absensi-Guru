@@ -146,8 +146,17 @@ const engine = new HorrorGameEngine(document.getElementById('game-canvas'), {
     }
 
     if (state.isHiddenInCloset) {
+      if (!document.body.classList.contains('in-closet')) {
+        document.body.classList.add('in-closet');
+      }
+      if (!closetOverlay.classList.contains('visible')) {
+        closetOverlay.classList.add('visible');
+      }
       closetTimerText.textContent = `${Math.max(0, state.closetPauseRemaining).toFixed(1)} dtk`;
       return;
+    } else if (document.body.classList.contains('in-closet')) {
+      document.body.classList.remove('in-closet');
+      closetOverlay.classList.remove('visible');
     }
 
     // Reticle & Tombol Aksi Kontekstual PID
