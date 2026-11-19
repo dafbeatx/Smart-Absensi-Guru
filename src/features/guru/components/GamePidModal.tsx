@@ -1,14 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Gamepad2,
-  Trophy,
   Sparkles,
-  Target,
-  Zap,
-  Flame,
   ArrowLeft,
   X,
-  Lock,
   CheckCircle2,
   Info,
   Clock,
@@ -26,8 +21,6 @@ export interface GamePidModalProps {
   totalPoints?: number;
 }
 
-type GameModeTab = 'ALL' | 'QUIZ' | 'CHALLENGE' | 'LEAGUE';
-
 interface GamePlanItem {
   id: string;
   title: string;
@@ -41,6 +34,7 @@ interface GamePlanItem {
   accentColor: string;
   actionUrl?: string;
   is3d?: boolean;
+  thumbnailUrl?: string;
 }
 
 export const GamePidModal: React.FC<GamePidModalProps> = ({
@@ -49,8 +43,6 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
   user,
   totalPoints = 0,
 }) => {
-  const [activeCategory, setActiveCategory] = useState<GameModeTab>('ALL');
-
   // Prevent background scroll on mobile Infinix Note 8
   useEffect(() => {
     if (isOpen) {
@@ -72,73 +64,17 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
       category: 'QUIZ',
       badgeCategory: 'Gim 3D Cel-Shaded PID',
       description:
-        'Jelajahi kelas 3D cel-shaded SMP Terpadu Al-Ittihadiyah, interaksi tap-to-move dengan NPC guru & murid, dan selesaikan tantangan bank soal terintegrasi.',
+        'Jelajahi kelas dan lingkungan 3D cel-shaded SMP Terpadu Al-Ittihadiyah, interaksi tap-to-move dengan karakter siswa dan guru, nikmati mode split-screen 2 pemain, dan selesaikan tantangan bank soal terintegrasi.',
       status: 'AVAILABLE',
       statusLabel: 'Siap Dimainkan',
       rewardPoints: 35,
       icon: Box,
       accentColor: 'from-[#8C5A3C] via-[#C85A32] to-[#2F5D50]',
       actionUrl: getSchoolSlice3dUrl(),
+      thumbnailUrl: '/games/school-slice-3d/thumbnail.jpg',
       is3d: true,
     },
-    {
-      id: 'pid_quiz_quick',
-      title: 'Kuis Kilat Edukasi PID',
-      category: 'QUIZ',
-      badgeCategory: 'Kuis Interaktif',
-      description:
-        'Tantangan kuis cepat 10 soal seputar wawasan Kurikulum Merdeka, sains terpadu, dan nilai keteladanan Islam.',
-      status: 'COMING_SOON',
-      statusLabel: 'Segera Hadir',
-      rewardPoints: 15,
-      icon: Zap,
-      accentColor: 'from-amber-500 to-orange-600',
-    },
-    {
-      id: 'pid_discipline_quest',
-      title: 'Misi Keteladanan Fajar',
-      category: 'CHALLENGE',
-      badgeCategory: 'Misi Karakter',
-      description:
-        'Misi harian menjaga ritme presensi on-time sebelum 07:00 WIB dan keteladanan keaktifan kegiatan sekolah.',
-      status: 'IN_DESIGN',
-      statusLabel: 'Tahap Desain',
-      rewardPoints: 25,
-      icon: Flame,
-      accentColor: 'from-rose-500 to-pink-600',
-    },
-    {
-      id: 'pid_classroom_league',
-      title: 'Liga Rombel Cerdas Cermat',
-      category: 'LEAGUE',
-      badgeCategory: 'Turnamen Kelas',
-      description:
-        'Kolaborasi antar-siswa dan wali kelas dalam kompetisi poin kebaikan dan kebersihan rombel per semester.',
-      status: 'PLANNED',
-      statusLabel: 'Rencana Rilis',
-      rewardPoints: 50,
-      icon: Trophy,
-      accentColor: 'from-violet-600 to-indigo-700',
-    },
-    {
-      id: 'pid_memory_match',
-      title: 'Teka-Teki Glosarium Guru',
-      category: 'QUIZ',
-      badgeCategory: 'Ketangkasan Kognitif',
-      description:
-        'Asah ingatan istilah pedagogik dan instrumen asesmen KBM dalam simulasi kartu bergambar interaktif.',
-      status: 'IN_DESIGN',
-      statusLabel: 'Tahap Desain',
-      rewardPoints: 10,
-      icon: Target,
-      accentColor: 'from-cyan-600 to-blue-700',
-    },
   ];
-
-  const filteredPlans =
-    activeCategory === 'ALL'
-      ? gamePlans
-      : gamePlans.filter((p) => p.category === activeCategory);
 
   return (
     // BACKDROP: Full-screen di mobile, blur backdrop di Desktop
@@ -271,125 +207,83 @@ export const GamePidModal: React.FC<GamePidModalProps> = ({
             </div>
           </div>
 
-          {/* Filter Kategori Tab */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            <button
-              type="button"
-              onClick={() => setActiveCategory('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                activeCategory === 'ALL'
-                  ? 'bg-[#023246] text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Semua Mode ({gamePlans.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveCategory('QUIZ')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                activeCategory === 'QUIZ'
-                  ? 'bg-violet-700 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Kuis Interaktif
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveCategory('CHALLENGE')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                activeCategory === 'CHALLENGE'
-                  ? 'bg-rose-700 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Misi Karakter
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveCategory('LEAGUE')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                activeCategory === 'LEAGUE'
-                  ? 'bg-indigo-700 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Liga Kelas
-            </button>
-          </div>
-
-          {/* Daftar Rencana Mode Permainan */}
+          {/* Game Pilihan Utama: School Slice 3D */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-              Rencana Mode Game ({filteredPlans.length})
-            </h3>
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Gim Terintegrasi Resmi (1)
+              </h3>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                Siap Dimainkan
+              </span>
+            </div>
 
-            {filteredPlans.map((item) => {
+            {gamePlans.map((item) => {
               const IconComp = item.icon;
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between gap-3 group"
+                  className="bg-white rounded-2xl border-2 border-amber-300 ring-4 ring-amber-400/10 shadow-md overflow-hidden transition-all group"
                 >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-11 h-11 rounded-xl bg-linear-to-br ${item.accentColor} text-white flex items-center justify-center shrink-0 shadow-2xs`}
-                    >
-                      <IconComp className="w-5 h-5" />
+                  {/* THUMBNAIL BANNER */}
+                  <div className="relative w-full aspect-16/9 bg-slate-950 overflow-hidden">
+                    <img
+                      src={item.thumbnailUrl || '/games/school-slice-3d/thumbnail.jpg'}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.src.endsWith('/games/school-slice-3d-thumbnail.jpg')) {
+                          target.src = '/games/school-slice-3d-thumbnail.jpg';
+                        }
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/10" />
+
+                    {/* Badges on thumbnail */}
+                    <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-2 pointer-events-none">
+                      <span className="text-[9.5px] font-black px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-amber-300 border border-amber-300/40 flex items-center gap-1">
+                        <IconComp className="w-3 h-3" />
+                        <span>{item.badgeCategory}</span>
+                      </span>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-emerald-500/90 text-white backdrop-blur-md flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        <span>{item.statusLabel}</span>
+                      </span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-[10px] font-extrabold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-200">
-                          {item.badgeCategory}
-                        </span>
-                        <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
-                            item.status === 'COMING_SOON'
-                              ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}
-                        >
-                          {item.statusLabel}
-                        </span>
+
+                    <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-end justify-between gap-2 pointer-events-none">
+                      <div className="text-white drop-shadow-md">
+                        <h4 className="text-xs sm:text-sm font-black leading-tight drop-shadow-sm">
+                          {item.title}
+                        </h4>
+                        <p className="text-[10px] text-amber-200 font-medium drop-shadow-sm mt-0.5">
+                          Mode Split-Screen 2 Pemain • Kejar-kejaran KBM
+                        </p>
                       </div>
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-snug">
-                        {item.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
-                        {item.description}
-                      </p>
+                      <div className="px-2 py-0.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black shadow-md shrink-0">
+                        ⭐ +{item.rewardPoints} PTS
+                      </div>
                     </div>
                   </div>
 
-                  <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-[10.5px] font-bold text-emerald-700 flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Reward: +{item.rewardPoints} PTS</span>
-                    </span>
-                    {item.status === 'AVAILABLE' || item.is3d ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (typeof window !== 'undefined') {
-                            window.open(item.actionUrl || getSchoolSlice3dUrl(), '_blank', 'noopener,noreferrer');
-                          }
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-950 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer active:scale-95 transition-all shadow-2xs"
-                      >
-                        <Play className="w-3 h-3 fill-slate-950 stroke-none" />
-                        <span>Mainkan 3D ↗</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-400 text-[10px] font-bold inline-flex items-center gap-1 cursor-not-allowed select-none"
-                      >
-                        <Lock className="w-3 h-3" />
-                        <span>Belum Dibuka</span>
-                      </button>
-                    )}
+                  <div className="p-3.5 sm:p-4 space-y-3">
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      {item.description}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.open(item.actionUrl || getSchoolSlice3dUrl(), '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                      className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs inline-flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all shadow-md"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-slate-950 stroke-none" />
+                      <span>Mainkan School Slice 3D Sekarang ↗</span>
+                    </button>
                   </div>
                 </div>
               );
